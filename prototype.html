@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zero Draft - 写下第一稿，不要回头</title>
+
+  <!-- 字体加载 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css" rel="stylesheet">
+
+  <!-- 样式 -->
+  <link rel="stylesheet" href="./src/styles/global.css">
+  <link rel="stylesheet" href="./src/styles/animations.css">
+
+  <style>
+    /* 临时内联样式（用于快速原型验证）*/
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 初始界面 (Idle Screen) -->
+  <div id="idle-screen" class="centered">
+    <h1 class="title">Zero Draft</h1>
+    <p class="tagline">写下第一稿，不要回头</p>
+
+    <div class="button-group">
+      <button class="duration-btn" data-duration="300">5 分钟</button>
+      <button class="duration-btn active" data-duration="900">15 分钟</button>
+      <button class="duration-btn" data-duration="1800">30 分钟</button>
+      <button class="duration-btn" data-duration="custom">自定义</button>
+    </div>
+
+    <button class="btn-primary" id="start-btn">开始写作 →</button>
+  </div>
+
+  <!-- 写作界面 (Writing Screen) -->
+  <div id="writing-screen" class="hidden">
+    <!-- 进度条 -->
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+
+    <!-- 计时器 -->
+    <div class="timer" id="timer">00:00 / 15:00</div>
+
+    <!-- 文本输入区 -->
+    <div class="writing-area" id="writing-area">
+      <div
+        class="writing-content"
+        id="writing-content"
+        contenteditable="true"
+        data-placeholder="开始输入..."
+        spellcheck="false"
+      ></div>
+    </div>
+  </div>
+
+  <!-- 成功界面 (Success Screen) -->
+  <div id="success-screen" class="centered hidden">
+    <div class="status-icon success icon-pop">✓</div>
+    <p class="stats-text">写了 <span id="word-count">1,234</span> 字</p>
+
+    <div class="button-group">
+      <button class="btn-primary" id="copy-btn">复制文本</button>
+      <button class="btn-secondary" id="history-btn">查看历史</button>
+      <button class="btn-secondary" id="restart-btn">再来一次</button>
+    </div>
+  </div>
+
+  <!-- 失败界面 (Failed Screen) -->
+  <div id="failed-screen" class="centered hidden">
+    <div class="status-icon failed icon-pop">✗</div>
+    <p class="stats-text">文字已清空</p>
+    <p class="hint-text text-blink">再试一次？</p>
+
+    <button class="btn-primary" id="retry-btn">重新开始</button>
+  </div>
+
+  <!-- JavaScript 逻辑 -->
+  <script>
+    // ========== 全局状态 ==========
+    let state = {
+      current: 'idle', // idle | writing | success | failed
+      duration: 900,    // 默认 15 分钟（秒）
+      elapsed: 0,       // 已过去的时间（秒）
+      content: '',      // 写作内容
+      dangerTimer: null,
+      clearTimer: null,
+      sessionTimer: null,
+    };
+
+    // ========== DOM 元素 ==========
+    const screens = {
+      idle: document.getElementById('idle-screen'),
+      writing: document.getElementById('writing-screen'),
+      success: document.getElementById('success-screen'),
+      failed: document.getElementById('failed-screen'),
+    };
+
+    const elements = {
+      durationBtns: document.querySelectorAll('.duration-btn'),
+      startBtn: document.getElementById('start-btn'),
+      writingArea: document.getElementById('writing-area'),
+      writingContent: document.getElementById('writing-content'),
+      timer: document.getElementById('timer'),
+      progressFill: document.getElementById('progress-fill'),
+      wordCount: document.getElementById('word-count'),
+      copyBtn: document.getElementById('copy-btn'),
+      historyBtn: document.getElementById('history-btn'),
+      restartBtn: document.getElementById('restart-btn'),
+      retryBtn: document.getElementById('retry-btn'),
+    };
+
+    // ========== 工具函数 ==========
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function countWords(text) {
+      // 简单的字数统计（中文字符 + 英文单词）
+      const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+      const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+      return chineseChars + englishWords;
+    }
+
+    function switchScreen(from, to) {
+      screens[from].classList.add('hidden');
+      screens[to].classList.remove('hidden');
+      screens[to].classList.add('animate-fade-in');
+
+      setTimeout(() => {
+        screens[to].classList.remove('animate-fade-in');
+      }, 800);
+    }
+
+    // Zen 模式：仅露出当前行和淡化的上一行
+    function updateLineFadeState() {
+      const contentEl = elements.writingContent;
+      if (!contentEl) return;
+
+      const text = contentEl.innerText;
+      const lines = text ? text.split(/\r?\n/) : [];
+      const hasMultipleLines = lines.length > 1;
+
+      contentEl.classList.toggle('has-multiple-lines', hasMultipleLines);
+    }
+
+    // ========== 定时器逻辑 ==========
+    function resetDangerTimer() {
+      clearTimeout(state.dangerTimer);
+      clearTimeout(state.clearTimer);
+      const writingArea = elements.writingArea;
+      if (!writingArea) return;
+
+      writingArea.classList.remove('danger-state');
+
+      // 5 秒后进入危险状态
+      state.dangerTimer = setTimeout(() => {
+        if (!elements.writingArea) return;
+        elements.writingArea.classList.add('danger-state');
+
+        // 再过 3 秒清空
+        state.clearTimer = setTimeout(() => {
+          handleFailure();
+        }, 3000);
+      }, 5000);
+    }
+
+    function startSession() {
+      state.elapsed = 0;
+      updateTimer();
+      updateProgress();
+
+      state.sessionTimer = setInterval(() => {
+        state.elapsed++;
+        updateTimer();
+        updateProgress();
+
+        // 时间到达，成功完成
+        if (state.elapsed >= state.duration) {
+          handleSuccess();
+        }
+      }, 1000);
+    }
+
+    function updateTimer() {
+      const elapsed = formatTime(state.elapsed);
+      const total = formatTime(state.duration);
+      elements.timer.textContent = `${elapsed} / ${total}`;
+    }
+
+    function updateProgress() {
+      const percentage = (state.elapsed / state.duration) * 100;
+      elements.progressFill.style.width = `${percentage}%`;
+    }
+
+    function stopSession() {
+      clearInterval(state.sessionTimer);
+      clearTimeout(state.dangerTimer);
+      clearTimeout(state.clearTimer);
+    }
+
+    // ========== 状态处理 ==========
+    function handleSuccess() {
+      stopSession();
+      state.current = 'success';
+      state.content = elements.writingContent.textContent;
+
+      const wordCount = countWords(state.content);
+      elements.wordCount.textContent = wordCount.toLocaleString();
+
+      // 保存到 localStorage
+      saveToHistory(state.content, wordCount, 'success');
+
+      switchScreen('writing', 'success');
+    }
+
+    function handleFailure() {
+      stopSession();
+      state.current = 'failed';
+
+      // 淡出动画后清空
+      elements.writingContent.classList.add('animate-fade-out');
+      setTimeout(() => {
+        elements.writingContent.textContent = '';
+        elements.writingContent.classList.remove('animate-fade-out', 'has-multiple-lines');
+        elements.writingArea?.classList.remove('danger-state');
+        updateLineFadeState();
+      }, 400);
+
+      switchScreen('writing', 'failed');
+    }
+
+    function saveToHistory(content, wordCount, status) {
+      const history = JSON.parse(localStorage.getItem('zerodraft_history') || '[]');
+
+      const entry = {
+        id: Date.now().toString(),
+        content: content,
+        wordCount: wordCount,
+        duration: state.duration,
+        completedAt: new Date().toISOString(),
+        status: status,
+      };
+
+      history.unshift(entry);
+
+      // 只保留最近 10 篇
+      if (history.length > 10) {
+        history.pop();
+      }
+
+      localStorage.setItem('zerodraft_history', JSON.stringify(history));
+    }
+
+    // ========== 事件监听 ==========
+
+    // 时长选择
+    elements.durationBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        elements.durationBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const duration = btn.dataset.duration;
+        if (duration === 'custom') {
+          const customMins = prompt('请输入分钟数（1-120）:', '15');
+          if (customMins && !isNaN(customMins)) {
+            state.duration = Math.max(1, Math.min(120, parseInt(customMins))) * 60;
+          }
+        } else {
+          state.duration = parseInt(duration);
+        }
+      });
+    });
+
+    // 开始写作
+    elements.startBtn.addEventListener('click', () => {
+      state.current = 'writing';
+      switchScreen('idle', 'writing');
+
+      // 延迟聚焦（等待动画完成）
+      setTimeout(() => {
+        elements.writingContent.focus();
+        startSession();
+        resetDangerTimer();
+        updateLineFadeState();
+      }, 100);
+    });
+
+    // 写作区域输入监听
+    elements.writingContent.addEventListener('input', () => {
+      resetDangerTimer();
+      updateLineFadeState();
+    });
+
+    // 复制文本
+    elements.copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(state.content);
+        elements.copyBtn.textContent = '已复制 ✓';
+        setTimeout(() => {
+          elements.copyBtn.textContent = '复制文本';
+        }, 2000);
+      } catch (err) {
+        alert('复制失败，请手动复制');
+      }
+    });
+
+    // 查看历史（占位）
+    elements.historyBtn.addEventListener('click', () => {
+      const history = JSON.parse(localStorage.getItem('zerodraft_history') || '[]');
+      console.log('历史记录：', history);
+      alert(`共有 ${history.length} 篇历史记录，请查看控制台`);
+    });
+
+    // 再来一次 / 重新开始
+    function restart() {
+      state.current = 'idle';
+      state.elapsed = 0;
+      state.content = '';
+      elements.writingContent.textContent = '';
+      elements.writingContent.classList.remove('has-multiple-lines');
+      elements.writingArea?.classList.remove('danger-state');
+      updateLineFadeState();
+      elements.progressFill.style.width = '0%';
+
+      switchScreen(state.current === 'success' ? 'success' : 'failed', 'idle');
+    }
+
+    elements.restartBtn.addEventListener('click', restart);
+    elements.retryBtn.addEventListener('click', restart);
+
+    // ========== 初始化 ==========
+    console.log('Zero Draft 原型已加载');
+    console.log('当前模式：', state.current);
+    updateLineFadeState();
+  </script>
+</body>
+</html>

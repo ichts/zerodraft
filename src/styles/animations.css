@@ -1,0 +1,287 @@
+/* Zero Draft - 动画系统 */
+
+/* ========== 核心动画定义 ========== */
+
+/* 1. 危险状态：文字模糊 */
+@keyframes gentle-blur {
+  from {
+    filter: blur(0);
+  }
+  to {
+    filter: blur(3px);
+  }
+}
+
+/* 2. 危险状态：边框脉冲 */
+@keyframes gentle-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(193, 64, 61, 0.2),
+      0 0 20px rgba(193, 64, 61, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(193, 64, 61, 0.3),
+      0 0 30px rgba(193, 64, 61, 0.15);
+  }
+}
+
+/* 3. 淡入动画 */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 4. 淡出动画 */
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 5. 淡入向上 */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 6. 进度条填充 */
+@keyframes progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* ========== 动画类 ========== */
+
+/* 危险状态（组合动画）*/
+.danger-state {
+  animation:
+    gentle-blur 3s ease-in-out forwards,
+    gentle-pulse 2s ease-in-out infinite;
+}
+
+/* 淡入 */
+.animate-fade-in {
+  animation: fade-in 800ms ease-out forwards;
+}
+
+/* 淡出 */
+.animate-fade-out {
+  animation: fade-out 400ms ease forwards;
+}
+
+/* 淡入向上（用于成功/失败界面）*/
+.animate-fade-in-up {
+  animation: fade-in-up 600ms ease-out forwards;
+}
+
+/* ========== 过渡效果 ========== */
+
+/* 通用过渡 */
+.transition-all {
+  transition: all 200ms ease;
+}
+
+.transition-opacity {
+  transition: opacity 400ms ease;
+}
+
+.transition-transform {
+  transition: transform 200ms ease;
+}
+
+/* 慢速过渡（界面切换）*/
+.transition-slow {
+  transition: all 800ms ease-out;
+}
+
+/* ========== 状态过渡 ========== */
+
+/* 写作状态切换 */
+.state-idle {
+  opacity: 1;
+  transition: opacity 800ms ease-out;
+}
+
+.state-idle.leaving {
+  opacity: 0;
+}
+
+.state-writing {
+  opacity: 0;
+}
+
+.state-writing.entering {
+  animation: fade-in 800ms ease-out forwards;
+}
+
+.state-success,
+.state-failed {
+  opacity: 0;
+}
+
+.state-success.entering,
+.state-failed.entering {
+  animation: fade-in-up 600ms ease-out forwards;
+}
+
+/* ========== 按钮交互动画 ========== */
+
+/* 按钮悬停 */
+.btn-hover-lift {
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.btn-hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-hover-lift:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* 按钮点击反馈 */
+.btn-press {
+  transition: transform 100ms ease;
+}
+
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* ========== 进度条动画 ========== */
+
+.progress-bar-animated .progress-fill {
+  transition: width 1000ms linear;
+}
+
+/* ========== 微交互 ========== */
+
+/* 文字闪烁提示（用于失败后的鼓励语）*/
+@keyframes text-blink {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.text-blink {
+  animation: text-blink 1.5s ease-in-out 2;
+}
+
+/* 成功图标放大 */
+@keyframes icon-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.icon-pop {
+  animation: icon-pop 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+/* ========== 加载动画（备用）========== */
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ========== 特殊效果 ========== */
+
+/* 打字机光标闪烁 */
+@keyframes cursor-blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0;
+  }
+}
+
+.typing-cursor::after {
+  content: '|';
+  animation: cursor-blink 1s step-end infinite;
+}
+
+/* 危险倒计时数字（可选）*/
+@keyframes countdown-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.countdown-number {
+  animation: countdown-pulse 1s ease-in-out;
+}
+
+/* ========== 性能优化 ========== */
+
+/* 使用 GPU 加速的属性 */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* 减少重绘的动画 */
+.reduce-motion {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* 用户偏好：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

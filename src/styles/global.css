@@ -1,0 +1,378 @@
+/* Zero Draft - Global Styles */
+
+/* CSS 变量定义 */
+:root {
+  /* 配色系统 */
+  --color-bg: #FAFAF8;
+  --color-text: #1A1A1A;
+  --color-danger: #C1403D;
+  --color-success: #2E5930;
+  --color-ui: #8B8B8B;
+  --color-ui-light: #D4D4D4;
+
+  /* 字体系统 */
+  --font-main-zh: "LXGW WenKai", "霞鹜文楷", serif;
+  --font-main-en: "IBM Plex Mono", "SF Mono", monospace;
+  --font-main: var(--font-main-zh), var(--font-main-en);
+  --font-ui: "PingFang SC", "SF Pro", -apple-system, system-ui, sans-serif;
+
+  /* 字号 */
+  --text-xl: 32px;
+  --text-lg: 18px;
+  --text-md: 14px;
+  --text-sm: 12px;
+
+  /* 行高 */
+  --line-height-main: 1.8;
+  --line-height-ui: 1.5;
+
+  /* 间距 */
+  --spacing-xs: 8px;
+  --spacing-sm: 16px;
+  --spacing-md: 32px;
+  --spacing-lg: 64px;
+  --spacing-xl: 96px;
+
+  /* 过渡速度 */
+  --transition-fast: 200ms ease;
+  --transition-medium: 400ms ease;
+  --transition-slow: 800ms ease-out;
+}
+
+/* 全局重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 基础样式 */
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-main);
+  font-size: var(--text-lg);
+  line-height: var(--line-height-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 按钮基础样式 */
+button {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  transition: var(--transition-fast);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 4px;
+}
+
+/* 输入框基础样式 */
+textarea,
+input {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+  border: none;
+  background: transparent;
+}
+
+textarea:focus,
+input:focus {
+  outline: none;
+}
+
+/* Placeholder 样式 */
+::placeholder {
+  color: var(--color-ui-light);
+  opacity: 0.3;
+}
+
+/* 写作界面容器 */
+#writing-screen {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* Zen 模式渐变遮罩 */
+#writing-screen::before,
+#writing-screen::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 35vh;
+  pointer-events: none;
+  z-index: 100;
+}
+
+#writing-screen::before {
+  top: 0;
+  background: linear-gradient(to bottom, var(--color-bg) 0%, transparent 100%);
+}
+
+#writing-screen::after {
+  bottom: 0;
+  background: linear-gradient(to top, var(--color-bg) 0%, transparent 100%);
+}
+
+/* 写作区域样式 */
+.writing-area {
+  width: 100%;
+  max-width: 720px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 0 48px;
+  padding-top: clamp(96px, calc(100vh * 0.382), 240px);
+  padding-bottom: 96px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.writing-content {
+  position: relative;
+  width: 100%;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: var(--line-height-main);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  max-height: calc(var(--line-height-main) * 2em);
+  overflow: hidden;
+}
+
+.writing-content:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-ui-light);
+  opacity: 0.3;
+}
+
+.writing-content.has-multiple-lines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(250, 250, 248, 0.95) 0%, rgba(250, 250, 248, 0.55) 45%, rgba(250, 250, 248, 0) 100%);
+}
+
+.writing-content.danger-state {
+  animation: gentle-blur 3s ease-in-out forwards,
+             gentle-pulse 2s ease-in-out infinite;
+}
+
+/* 进度条 */
+.progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--color-ui-light);
+  opacity: 0.4;
+  z-index: 100;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--color-text);
+  transition: width 0.3s ease;
+}
+
+/* 计时器 */
+.timer {
+  position: fixed;
+  top: 16px;
+  right: 24px;
+  font-family: var(--font-main-en);
+  font-size: var(--text-sm);
+  color: var(--color-ui);
+  z-index: 100;
+}
+
+/* 布局容器 */
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--spacing-md);
+}
+
+.centered {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* 按钮组 */
+.button-group {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
+/* 主按钮 */
+.btn-primary {
+  padding: 12px 32px;
+  background-color: var(--color-text);
+  color: var(--color-bg);
+  border-radius: 2px;
+  min-width: 200px;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-primary:active {
+  transform: translateY(1px);
+}
+
+/* 次要按钮 */
+.btn-secondary {
+  padding: 10px 24px;
+  background-color: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-ui-light);
+  border-radius: 2px;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* 时长选择按钮 */
+.duration-btn {
+  padding: 10px 20px;
+  background-color: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-ui-light);
+  border-radius: 2px;
+  min-width: 80px;
+}
+
+.duration-btn:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.duration-btn.active {
+  background-color: var(--color-text);
+  color: var(--color-bg);
+  border-color: var(--color-text);
+}
+
+/* 状态图标 */
+.status-icon {
+  font-size: 48px;
+  margin-bottom: var(--spacing-sm);
+}
+
+.status-icon.success {
+  color: var(--color-success);
+}
+
+.status-icon.failed {
+  color: var(--color-danger);
+}
+
+/* 统计文字 */
+.stats-text {
+  font-size: 24px;
+  color: var(--color-text);
+  margin: var(--spacing-sm) 0;
+}
+
+/* 标题 */
+.title {
+  font-family: var(--font-ui);
+  font-size: var(--text-xl);
+  font-weight: 400;
+  margin-bottom: var(--spacing-sm);
+}
+
+/* 标语 */
+.tagline {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--color-ui);
+  line-height: var(--line-height-ui);
+  margin-bottom: var(--spacing-md);
+}
+
+/* 提示文字 */
+.hint-text {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--color-ui);
+  text-align: center;
+}
+
+/* 隐藏元素 */
+.hidden {
+  display: none;
+}
+
+/* 淡入动画 */
+.fade-in {
+  animation: fade-in 800ms ease-out forwards;
+}
+
+/* 淡出动画 */
+.fade-out {
+  animation: fade-out 400ms ease forwards;
+}
+
+/* 响应式设计 */
+@media (max-width: 1023px) {
+  .writing-area {
+    max-width: 100%;
+    padding: 0 32px;
+    padding-top: clamp(72px, calc(100vh * 0.4), 160px);
+    padding-bottom: 72px;
+  }
+
+  .container {
+    padding: var(--spacing-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --text-lg: 16px;
+    --text-xl: 28px;
+  }
+
+  .writing-area {
+    padding: 0 20px;
+    padding-top: clamp(56px, calc(100vh * 0.45), 120px);
+    padding-bottom: 64px;
+  }
+
+  .timer {
+    top: 12px;
+    right: 16px;
+  }
+
+  .button-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .duration-btn {
+    width: 100%;
+  }
+}

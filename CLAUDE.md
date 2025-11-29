@@ -18,6 +18,8 @@ python3 -m http.server 8000
 
 **Static Deployment:** Compatible with Vercel, Netlify, or GitHub Pages.
 
+**Live Demo:** https://zerodraft.ai-builders.space/
+
 ## Architecture
 
 ### Datastar Framework
@@ -39,8 +41,8 @@ idle → writing → danger → failure
 - **Idle**: Duration selection via dropdown (3/5/10/15/20/30/60 min)
 - **Writing**: Active session with timer, centered text, append-only input
 - **Danger**: 5s no input triggers blur/pulse, 3s more clears text
-- **Success**: Shows written text with copy/restart options
-- **Failure**: Text cleared due to inactivity
+- **Success**: Shows written text with copy/continue options, content saved to `savedContent`
+- **Failure**: Current session text cleared, but previously saved content preserved with copy option
 
 ### Key Files
 - `index.html` - Main Datastar-based implementation
@@ -56,7 +58,8 @@ Defined on `<body data-signals="...">`:
 screen: 'idle'          // idle | writing | success | failed
 duration: 900           // Session duration in seconds
 elapsed: 0              // Elapsed time in seconds
-content: ''             // Written text
+content: ''             // Current session text (new input only)
+savedContent: ''        // Accumulated text from completed sessions
 sessionActive: false    // Timer running flag
 lastInputTime: 0        // Timestamp for danger detection
 dangerActive: false     // Blur/pulse animation active
@@ -113,4 +116,5 @@ localStorage key `zerodraft_history` stores last 10 sessions:
 - Cut blocked with `data-on:cut__prevent="true"`
 - Auto-focus on session start via `setTimeout(() => el.focus(), 100)`
 - Zen mode: `has-multiple-lines` class toggles gradient overlay on multi-line input
-- Success screen shows full text with fixed bottom actions ("复制" / "我还要写")
+- Success screen shows full text with fixed bottom actions ("复制" / "继续写")
+- Session protection: completed session content stored in `savedContent`, survives subsequent failures

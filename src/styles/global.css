@@ -235,7 +235,7 @@ input:focus {
   background: transparent;
   border: 1px solid var(--color-ui-light);
   border-radius: 2px;
-  padding: 10px 40px 10px 16px;
+  padding: 12px 40px 12px 16px;
   font-family: var(--font-ui);
   font-size: 14px;
   color: var(--color-text);
@@ -326,6 +326,7 @@ input:focus {
   right: 0;
   display: flex;
   justify-content: center;
+  align-items: center;
   gap: 16px;
   padding: 24px;
   background: linear-gradient(to top, var(--color-bg) 60%, transparent);

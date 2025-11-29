@@ -116,12 +116,12 @@
     <div class="success-actions">
       <button class="btn-primary"
         data-on:click="const text = document.querySelector('.success-text').innerText; const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); $copied = true; setTimeout(() => $copied = false, 2000)">复制</button>
-      <select class="duration-dropdown" data-on:change="$duration = parseInt(el.value)">
+      <select class="duration-dropdown" data-bind:value="$duration" data-on:change="$duration = parseInt(el.value)">
         <option value="5">5 秒 (测试)</option>
         <option value="180">3 分钟</option>
         <option value="300">5 分钟</option>
         <option value="600">10 分钟</option>
-        <option value="900" selected>15 分钟</option>
+        <option value="900">15 分钟</option>
         <option value="1200">20 分钟</option>
         <option value="1800">30 分钟</option>
         <option value="3600">60 分钟</option>

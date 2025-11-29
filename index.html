@@ -36,7 +36,8 @@
     sessionActive: false,
     lastInputTime: 0,
     dangerActive: false,
-    wordCount: 0
+    wordCount: 0,
+    copied: false
   }">
 
   <!-- 初始界面 (Idle Screen) -->
@@ -46,6 +47,7 @@
 
     <div class="action-row">
       <select class="duration-dropdown" data-on:change="$duration = parseInt(el.value)">
+        <option value="5">5 秒 (测试)</option>
         <option value="180">3 分钟</option>
         <option value="300">5 分钟</option>
         <option value="600">10 分钟</option>
@@ -56,8 +58,7 @@
       </select>
 
       <button class="btn-primary"
-        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $content = ''; $lastInputTime = Date.now(); $dangerActive = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = ''; el.focus(); }, 100)">开始写作
-        →</button>
+        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $lastInputTime = Date.now(); $dangerActive = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = $content; el.focus(); if ($content) { const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); el.classList.toggle('has-multiple-lines', $content.split(/\r?\n/).length > 1); } }, 100)">开始写作 →</button>
     </div>
   </div>
 
@@ -108,11 +109,22 @@
     <div class="success-content">
       <div class="success-text" data-text="$content"></div>
     </div>
+    <div class="copy-toast" data-show="$copied">已复制</div>
     <div class="success-actions">
       <button class="btn-primary"
-        data-on:click="navigator.clipboard.writeText($content).then(() => { el.textContent = '已复制 ✓'; setTimeout(() => el.textContent = '复制', 2000) }).catch(() => alert('复制失败，请手动复制'))">复制</button>
-      <button class="btn-secondary"
-        data-on:click="$screen = 'idle'; $elapsed = 0; $content = ''; $dangerActive = false">我还要写</button>
+        data-on:click="const text = document.querySelector('.success-text').innerText; const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); $copied = true; setTimeout(() => $copied = false, 2000)">复制</button>
+      <select class="duration-dropdown" data-on:change="$duration = parseInt(el.value)">
+        <option value="5">5 秒 (测试)</option>
+        <option value="180">3 分钟</option>
+        <option value="300">5 分钟</option>
+        <option value="600">10 分钟</option>
+        <option value="900" selected>15 分钟</option>
+        <option value="1200">20 分钟</option>
+        <option value="1800">30 分钟</option>
+        <option value="3600">60 分钟</option>
+      </select>
+      <button class="btn-primary"
+        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $lastInputTime = Date.now(); $dangerActive = false; $copied = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = $content; el.focus(); if ($content) { const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); el.classList.toggle('has-multiple-lines', $content.split(/\r?\n/).length > 1); } }, 100)">继续写</button>
     </div>
   </div>
 

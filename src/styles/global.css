@@ -331,6 +331,21 @@ input:focus {
   background: linear-gradient(to top, var(--color-bg) 60%, transparent);
 }
 
+.copy-toast {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-text);
+  color: var(--color-bg);
+  padding: 16px 48px;
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 18px;
+  z-index: 1000;
+  animation: fade-in 200ms ease-out;
+}
+
 /* 时长选择按钮 */
 .duration-btn {
   padding: 8px 16px;

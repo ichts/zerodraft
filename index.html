@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zero Draft - 写出你的第零稿</title>
+
+  <!-- 字体加载 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.1.0/style.css" rel="stylesheet">
+
+  <!-- 样式 -->
+  <link rel="stylesheet" href="./src/styles/global.css">
+  <link rel="stylesheet" href="./src/styles/animations.css">
+
+  <!-- Datastar -->
+  <script type="module" src="datastar-pro.js"></script>
+  <script type="module" src="datastar-inspector.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+
+<body data-signals="{
+    screen: 'idle',
+    duration: 900,
+    elapsed: 0,
+    content: '',
+    sessionActive: false,
+    lastInputTime: 0,
+    dangerActive: false,
+    wordCount: 0
+  }">
+
+  <!-- 初始界面 (Idle Screen) -->
+  <div id="idle-screen" class="centered" data-show="$screen === 'idle'">
+    <h1 class="title">Zero Draft</h1>
+    <p class="tagline">写出你的第零稿</p>
+
+    <div class="action-row">
+      <select class="duration-dropdown" data-on:change="$duration = parseInt(el.value)">
+        <option value="180">3 分钟</option>
+        <option value="300">5 分钟</option>
+        <option value="600">10 分钟</option>
+        <option value="900" selected>15 分钟</option>
+        <option value="1200">20 分钟</option>
+        <option value="1800">30 分钟</option>
+        <option value="3600">60 分钟</option>
+      </select>
+
+      <button class="btn-primary"
+        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $content = ''; $lastInputTime = Date.now(); $dangerActive = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = ''; el.focus(); }, 100)">开始写作
+        →</button>
+    </div>
+  </div>
+
+  <!-- 写作界面 (Writing Screen) -->
+  <div id="writing-screen" data-show="$screen === 'writing'" style="display: none">
+    <!-- 进度条 -->
+    <div class="progress-bar">
+      <div class="progress-fill" data-style:width="($elapsed / $duration * 100) + '%'"></div>
+    </div>
+
+    <!-- 计时器 -->
+    <div class="timer"
+      data-text="String(Math.floor($elapsed / 60)).padStart(2, '0') + ':' + String($elapsed % 60).padStart(2, '0') + ' / ' + String(Math.floor($duration / 60)).padStart(2, '0') + ':' + String($duration % 60).padStart(2, '0')">
+      00:00 / 15:00</div>
+
+    <!-- 主计时器：每秒递增 elapsed，检查危险状态和完成状态 -->
+    <div data-on-interval__duration.1s="
+        if (!$sessionActive) return;
+        $elapsed++;
+        const idleTime = (Date.now() - $lastInputTime) / 1000;
+        $dangerActive = idleTime >= 5;
+        if (idleTime >= 8) {
+          $sessionActive = false;
+          $content = '';
+          document.querySelector('.writing-content').innerText = '';
+          $screen = 'failed';
+        } else if ($elapsed >= $duration) {
+          $sessionActive = false;
+          const text = $content;
+          const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+          const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
+          $wordCount = chineseChars + englishWords;
+          $screen = 'success';
+        }
+      " style="display: none"></div>
+
+    <!-- 文本输入区 -->
+    <div class="writing-area" data-class:danger-state="$dangerActive">
+      <div class="writing-content" contenteditable="true" data-placeholder="开始输入..." spellcheck="false"
+        data-on:input="$lastInputTime = Date.now(); $dangerActive = false; $content = el.innerText; el.classList.toggle('has-multiple-lines', el.innerText.split(/\r?\n/).length > 1); document.getElementById('writing-screen').scrollTop = document.getElementById('writing-screen').scrollHeight"
+        data-on:keydown="(evt.key === 'Backspace' || evt.key === 'Delete') && evt.preventDefault()"
+        data-on:cut__prevent="true"></div>
+    </div>
+  </div>
+
+  <!-- 成功界面 (Success Screen) -->
+  <div id="success-screen" data-show="$screen === 'success'" style="display: none">
+    <div class="success-content">
+      <div class="success-text" data-text="$content"></div>
+    </div>
+    <div class="success-actions">
+      <button class="btn-primary"
+        data-on:click="navigator.clipboard.writeText($content).then(() => { el.textContent = '已复制 ✓'; setTimeout(() => el.textContent = '复制', 2000) }).catch(() => alert('复制失败，请手动复制'))">复制</button>
+      <button class="btn-secondary"
+        data-on:click="$screen = 'idle'; $elapsed = 0; $content = ''; $dangerActive = false">我还要写</button>
+    </div>
+  </div>
+
+  <!-- 失败界面 (Failed Screen) -->
+  <div id="failed-screen" class="centered" data-show="$screen === 'failed'" style="display: none">
+    <div class="status-icon failed icon-pop">✗</div>
+    <p class="stats-text">文字已清空</p>
+    <p class="hint-text text-blink">再试一次？</p>
+
+    <button class="btn-primary"
+      data-on:click="$screen = 'idle'; $elapsed = 0; $content = ''; $dangerActive = false">重新开始</button>
+  </div>
+
+  <!-- localStorage 持久化 -->
+  <div data-effect="
+      if ($screen === 'success' && $content) {
+        const history = JSON.parse(localStorage.getItem('zerodraft_history') || '[]');
+        const exists = history.some(h => h.content === $content);
+        if (!exists) {
+          history.unshift({
+            id: Date.now().toString(),
+            content: $content,
+            wordCount: $wordCount,
+            duration: $duration,
+            completedAt: new Date().toISOString(),
+            status: 'success'
+          });
+          if (history.length > 10) history.pop();
+          localStorage.setItem('zerodraft_history', JSON.stringify(history));
+        }
+      }
+    " style="display: none"></div>
+
+  <datastar-inspector>hello world</datastar-inspector>
+
+</body>
+
+</html>

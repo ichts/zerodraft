@@ -98,8 +98,17 @@ input:focus {
 /* 写作界面容器 */
 #writing-screen {
   position: relative;
-  min-height: 100vh;
-  overflow: hidden;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+#writing-screen::-webkit-scrollbar {
+  display: none;
+}
+
+#writing-screen {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Zen 模式渐变遮罩 */
@@ -128,14 +137,14 @@ input:focus {
 .writing-area {
   width: 100%;
   max-width: 720px;
-  min-height: 100vh;
+  height: 100vh;
   margin: 0 auto;
   padding: 0 48px;
-  padding-top: clamp(96px, calc(100vh * 0.382), 240px);
-  padding-bottom: 96px;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding-bottom: 62vh;
 }
 
 .writing-content {
@@ -144,13 +153,9 @@ input:focus {
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: var(--line-height-main);
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  max-height: calc(var(--line-height-main) * 2em);
-  overflow: hidden;
+  font-size: 28px;
+  line-height: 1.6;
+  text-align: center;
 }
 
 .writing-content:empty::before {
@@ -169,7 +174,7 @@ input:focus {
 
 .writing-content.danger-state {
   animation: gentle-blur 3s ease-in-out forwards,
-             gentle-pulse 2s ease-in-out infinite;
+    gentle-pulse 2s ease-in-out infinite;
 }
 
 /* 进度条 */
@@ -212,24 +217,63 @@ input:focus {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   min-height: 100vh;
+  padding-top: 18vh;
 }
 
-/* 按钮组 */
+/* 操作行 - 下拉框和按钮并排 */
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.duration-dropdown {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 1px solid var(--color-ui-light);
+  border-radius: 2px;
+  padding: 10px 40px 10px 16px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238B8B8B' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.duration-dropdown:hover {
+  border-color: var(--color-ui);
+}
+
+.duration-dropdown:focus {
+  outline: none;
+  border-color: var(--color-text);
+}
+
+.duration-dropdown option {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* 按钮组（用于成功/失败页面） */
 .button-group {
   display: flex;
-  gap: var(--spacing-sm);
-  margin: var(--spacing-md) 0;
+  gap: 8px;
+  margin-bottom: 16px;
 }
 
 /* 主按钮 */
 .btn-primary {
-  padding: 12px 32px;
+  padding: 12px 48px;
   background-color: var(--color-text);
   color: var(--color-bg);
   border-radius: 2px;
-  min-width: 200px;
+  font-size: 14px;
 }
 
 .btn-primary:hover {
@@ -253,14 +297,49 @@ input:focus {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
+/* 成功界面 */
+#success-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.success-content {
+  flex: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 80px 48px 120px;
+  overflow-y: auto;
+}
+
+.success-text {
+  font-size: 24px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.success-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: linear-gradient(to top, var(--color-bg) 60%, transparent);
+}
+
 /* 时长选择按钮 */
 .duration-btn {
-  padding: 10px 20px;
+  padding: 8px 16px;
   background-color: transparent;
   color: var(--color-text);
   border: 1px solid var(--color-ui-light);
   border-radius: 2px;
-  min-width: 80px;
+  min-width: 64px;
+  font-size: 13px;
 }
 
 .duration-btn:hover {
@@ -297,18 +376,20 @@ input:focus {
 /* 标题 */
 .title {
   font-family: var(--font-ui);
-  font-size: var(--text-xl);
-  font-weight: 400;
-  margin-bottom: var(--spacing-sm);
+  font-size: 96px;
+  font-weight: 200;
+  letter-spacing: -0.03em;
+  margin-bottom: 24px;
 }
 
 /* 标语 */
 .tagline {
   font-family: var(--font-ui);
-  font-size: var(--text-md);
-  color: var(--color-ui);
-  line-height: var(--line-height-ui);
-  margin-bottom: var(--spacing-md);
+  font-size: 24px;
+  color: var(--color-text);
+  font-weight: 300;
+  margin-top: -50px;
+  margin-bottom: 48px;
 }
 
 /* 提示文字 */

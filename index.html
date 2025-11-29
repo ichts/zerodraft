@@ -33,6 +33,7 @@
     duration: 900,
     elapsed: 0,
     content: '',
+    savedContent: '',
     sessionActive: false,
     lastInputTime: 0,
     dangerActive: false,
@@ -83,11 +84,13 @@
         if (idleTime >= 8) {
           $sessionActive = false;
           $content = '';
-          document.querySelector('.writing-content').innerText = '';
+          document.querySelector('.writing-content').innerText = $savedContent;
           $screen = 'failed';
         } else if ($elapsed >= $duration) {
           $sessionActive = false;
-          const text = $content;
+          $savedContent = $savedContent + $content;
+          $content = '';
+          const text = $savedContent;
           const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
           const englishWords = (text.match(/[a-zA-Z]+/g) || []).length;
           $wordCount = chineseChars + englishWords;
@@ -98,7 +101,7 @@
     <!-- 文本输入区 -->
     <div class="writing-area" data-class:danger-state="$dangerActive">
       <div class="writing-content" contenteditable="true" data-placeholder="开始输入..." spellcheck="false"
-        data-on:input="$lastInputTime = Date.now(); $dangerActive = false; $content = el.innerText; el.classList.toggle('has-multiple-lines', el.innerText.split(/\r?\n/).length > 1); document.getElementById('writing-screen').scrollTop = document.getElementById('writing-screen').scrollHeight"
+        data-on:input="$lastInputTime = Date.now(); $dangerActive = false; const fullText = el.innerText; $content = fullText.length > $savedContent.length ? fullText.substring($savedContent.length) : ''; el.classList.toggle('has-multiple-lines', fullText.split(/\r?\n/).length > 1); document.getElementById('writing-screen').scrollTop = document.getElementById('writing-screen').scrollHeight"
         data-on:keydown="(evt.key === 'Backspace' || evt.key === 'Delete') && evt.preventDefault()"
         data-on:cut__prevent="true"></div>
     </div>
@@ -107,7 +110,7 @@
   <!-- 成功界面 (Success Screen) -->
   <div id="success-screen" data-show="$screen === 'success'" style="display: none">
     <div class="success-content">
-      <div class="success-text" data-text="$content"></div>
+      <div class="success-text" data-text="$savedContent"></div>
     </div>
     <div class="copy-toast" data-show="$copied">已复制</div>
     <div class="success-actions">
@@ -124,29 +127,40 @@
         <option value="3600">60 分钟</option>
       </select>
       <button class="btn-primary"
-        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $lastInputTime = Date.now(); $dangerActive = false; $copied = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = $content; el.focus(); if ($content) { const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); el.classList.toggle('has-multiple-lines', $content.split(/\r?\n/).length > 1); } }, 100)">继续写</button>
+        data-on:click="$screen = 'writing'; $sessionActive = true; $elapsed = 0; $lastInputTime = Date.now(); $dangerActive = false; $copied = false; setTimeout(() => { const el = document.querySelector('.writing-content'); el.innerText = $savedContent; el.focus(); if ($savedContent) { const range = document.createRange(); range.selectNodeContents(el); range.collapse(false); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); el.classList.toggle('has-multiple-lines', $savedContent.split(/\r?\n/).length > 1); } }, 100)">继续写</button>
     </div>
   </div>
 
   <!-- 失败界面 (Failed Screen) -->
   <div id="failed-screen" class="centered" data-show="$screen === 'failed'" style="display: none">
     <div class="status-icon failed icon-pop">✗</div>
-    <p class="stats-text">文字已清空</p>
-    <p class="hint-text text-blink">再试一次？</p>
+    <p class="stats-text">本轮文字已清空</p>
+
+    <!-- 有已保存内容时显示 -->
+    <div data-show="$savedContent" class="saved-content-section">
+      <p class="hint-text">之前保存的内容：</p>
+      <div class="saved-preview" data-text="$savedContent"></div>
+      <div class="copy-toast" data-show="$copied">已复制</div>
+      <button class="btn-secondary"
+        data-on:click="const ta = document.createElement('textarea'); ta.value = $savedContent; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); $copied = true; setTimeout(() => $copied = false, 2000)">复制已保存内容</button>
+    </div>
+
+    <!-- 无已保存内容时显示 -->
+    <p class="hint-text text-blink" data-show="!$savedContent">再试一次？</p>
 
     <button class="btn-primary"
-      data-on:click="$screen = 'idle'; $elapsed = 0; $content = ''; $dangerActive = false">重新开始</button>
+      data-on:click="$screen = 'idle'; $elapsed = 0; $content = ''; $savedContent = ''; $dangerActive = false">重新开始</button>
   </div>
 
   <!-- localStorage 持久化 -->
   <div data-effect="
-      if ($screen === 'success' && $content) {
+      if ($screen === 'success' && $savedContent) {
         const history = JSON.parse(localStorage.getItem('zerodraft_history') || '[]');
-        const exists = history.some(h => h.content === $content);
+        const exists = history.some(h => h.content === $savedContent);
         if (!exists) {
           history.unshift({
             id: Date.now().toString(),
-            content: $content,
+            content: $savedContent,
             wordCount: $wordCount,
             duration: $duration,
             completedAt: new Date().toISOString(),

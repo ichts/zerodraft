@@ -382,6 +382,29 @@ input:focus {
   color: var(--color-danger);
 }
 
+/* 已保存内容区域（失败界面） */
+.saved-content-section {
+  max-width: 480px;
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm);
+  text-align: center;
+}
+
+.saved-preview {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 4px;
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--color-ui);
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* 统计文字 */
 .stats-text {
   font-size: 24px;

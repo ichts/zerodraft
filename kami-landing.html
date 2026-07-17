@@ -1,0 +1,2542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="First Line is a timed writing app that blocks deleting, keeps you moving, and clears the page after eight seconds of silence." />
+<title>First Line - Write Forward</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23eadcc2'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%23172947'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%23145dff'/%3E%3C/svg%3E" />
+<script>
+  window.FirstLineLandingDemo = (() => {
+    const state = {
+      active: false,
+      composing: false,
+      countdownTimer: null,
+      failed: false,
+      draftIndex: 0,
+      dangerTimer: null,
+      introTyping: false,
+      lastInputTime: 0,
+      morphing: false,
+      pauseCursor: 0,
+      pausePlan: [],
+      timer: null,
+      trialComplete: false,
+      trialDuration: 60,
+      trialMode: false,
+      trialRoutePending: false,
+      trialResultText: '',
+      trialStartedAt: 0,
+      trialText: '',
+      typingIndex: 0,
+      typingTimer: null
+    };
+    const SILENCE_CLEAR_SECONDS = 8;
+    const SILENCE_BLUR_SECONDS = 5;
+    const SILENCE_COUNTDOWN_SECONDS = 5;
+    const SILENCE_COUNTDOWN_START_SECONDS = SILENCE_CLEAR_SECONDS - SILENCE_COUNTDOWN_SECONDS;
+    const DEMO_COUNTDOWN_DELAY = 2000;
+    const DEMO_COUNTDOWN_SECONDS = 5;
+    const DEMO_DANGER_DURATION = 3000;
+    const DEMO_RECOVERY_DEADLINE = DEMO_COUNTDOWN_DELAY + (DEMO_COUNTDOWN_SECONDS - 1.2) * 1000;
+    const DEMO_REPLAY_DELAY = 3600;
+    const DEMO_RESUME_DELAY = 640;
+    const DEMO_START_DELAY = 1100;
+    const TRIAL_CARET_ANCHOR = '\u200B';
+    const TRIAL_MORPH_DURATION = 520;
+    const TRIAL_MORPH_EASING = 'cubic-bezier(.16, 1, .3, 1)';
+    const DEMO_PAUSE_PROFILES = [
+      [{ ratio: .32, recoveryDelay: 7200 }, { ratio: .64, recoveryDelay: 3600 }],
+      [{ ratio: .28, recoveryDelay: 4700 }, { ratio: .59, recoveryDelay: 6900 }],
+      [{ ratio: .34, recoveryDelay: 3000 }, { ratio: .71, recoveryDelay: 6200 }],
+      [{ ratio: .25, recoveryDelay: 4200 }, { ratio: .66, recoveryDelay: 6400 }]
+    ];
+    const demoDrafts = [
+      "I want to write about productivity apps\nthey keep acting like the problem is memory\nbut the problem is choosing what matters\nmaybe start with the tab I reopen every morning\nand the small shame of not finishing\nthen say the app is not the bottleneck\nthe decision is the bottleneck",
+      "This piece is about AI note apps\nthey feel useful for a week\nthen become storage units for anxiety\nI do not need another place to save quotes\nI need one claim before more evidence\nmaybe the real feature is refusing more input\nuntil I know what I think",
+      "The restaurant near my apartment is always full\nnot because the menu is bigger\nbecause the owner removed slow choices\nsoftware keeps doing the opposite\nanother settings page another way to hide\nI want the piece to be about subtraction\nand why constraint feels rude but useful",
+      "Start with the blank document\nafter reading too much online\nthe opinions are there but they arrive as fog\nthe draft is not trying to sound smart\nit turns the fog into something I can fight\nmaybe this is why notes feel safe\nand drafts feel like a risk"
+    ];
+
+    function followupContent() {
+      return demoDrafts[state.draftIndex];
+    }
+
+    function demoEditor() { return document.querySelector('.live-demo-editor'); }
+    function demoSurface() { return document.querySelector('.demo-writing-surface'); }
+    function trialOverlay() { return document.querySelector('.trial-overlay'); }
+    function trialEditor() { return document.querySelector('.trial-editor'); }
+    function trialSurface() { return document.querySelector('.trial-writing-surface'); }
+    function status() { return document.querySelector('.live-demo-status'); }
+    function demoDanger() { return document.querySelector('.live-demo-danger'); }
+    function trialDanger() { return document.querySelector('.trial-danger'); }
+    function count() { return document.querySelector('.live-demo-count'); }
+    function trialTimer() { return document.querySelector('.trial-timer'); }
+    function trialResult() { return document.querySelector('.trial-result'); }
+    function trialResultText() { return document.querySelector('.trial-result-text'); }
+    function trialFailure() { return document.querySelector('.trial-failure'); }
+    function trialToast() { return document.querySelector('.trial-toast'); }
+    function emailForm() { return document.querySelector('.email-form'); }
+
+    function isTrialRoute() {
+      return location.hash === '#trial';
+    }
+
+    function homeRoute() {
+      return `${location.pathname}${location.search}`;
+    }
+
+    function pushTrialRoute() {
+      if (isTrialRoute()) return;
+      history.pushState({ firstLineTrial: true }, '', `${homeRoute()}#trial`);
+    }
+
+    function replaceHomeRoute() {
+      history.replaceState({ firstLineTrial: false }, '', homeRoute());
+    }
+
+    function focusWithoutScroll(el) {
+      try {
+        el.focus({ preventScroll: true });
+      } catch (_error) {
+        el.focus();
+      }
+    }
+
+    function moveCaretToEnd(el, options = {}) {
+      if (!el) return;
+      if (options.focus !== false) focusWithoutScroll(el);
+      const range = document.createRange();
+      range.selectNodeContents(el.querySelector('.trial-thought.is-current') || el);
+      range.collapse(false);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    function selectionIsAtEnd(el) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return true;
+
+      const range = selection.getRangeAt(0);
+      if (!selection.isCollapsed || !el.contains(range.endContainer)) return false;
+
+      const trailing = range.cloneRange();
+      trailing.selectNodeContents(el);
+      trailing.setStart(range.endContainer, range.endOffset);
+      return trailing.toString().length === 0;
+    }
+
+    function keepCaretAtEnd(el) {
+      if (document.activeElement === el && !selectionIsAtEnd(el)) moveCaretToEnd(el);
+    }
+
+    function wordCount(text) {
+      const zh = text.match(/[\u4e00-\u9fff]/g) || [];
+      const words = text.match(/[A-Za-z0-9]+(?:[-'][A-Za-z0-9]+)*/g) || [];
+      return zh.length + words.length;
+    }
+
+    function formatClock(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function shouldReduceMotion() {
+      return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    }
+
+    function freezeMorphGhostStyles(ghost, source) {
+      const surfaceStyle = getComputedStyle(source);
+      Object.assign(ghost.style, {
+        alignContent: surfaceStyle.alignContent,
+        background: surfaceStyle.background,
+        borderRadius: surfaceStyle.borderRadius,
+        boxShadow: surfaceStyle.boxShadow,
+        display: surfaceStyle.display,
+        gap: surfaceStyle.gap,
+        margin: '0',
+        overflow: 'hidden',
+        padding: surfaceStyle.padding
+      });
+
+      const ghostEditor = ghost.querySelector('.live-demo-editor, .trial-editor');
+      const sourceEditor = source.querySelector('.live-demo-editor, .trial-editor');
+      if (ghostEditor && sourceEditor) {
+        const editorStyle = getComputedStyle(sourceEditor);
+        Object.assign(ghostEditor.style, {
+          color: editorStyle.color,
+          fontFamily: editorStyle.fontFamily,
+          fontSize: editorStyle.fontSize,
+          letterSpacing: editorStyle.letterSpacing,
+          lineHeight: editorStyle.lineHeight,
+          maxWidth: editorStyle.maxWidth,
+          minHeight: editorStyle.minHeight,
+          textAlign: editorStyle.textAlign,
+          width: editorStyle.width
+        });
+      }
+
+      ghost.querySelector('.trial-hud')?.remove();
+      ghost.querySelector('.trial-result')?.remove();
+      ghost.querySelector('.trial-toast')?.remove();
+      ghost.classList.remove('is-demo-danger');
+      if (ghostEditor) {
+        ghostEditor.innerHTML = '';
+        ghostEditor.removeAttribute('data-placeholder');
+        ghostEditor.classList.remove('is-demo-danger');
+      }
+      const ghostDanger = ghost.querySelector('.live-demo-danger, .trial-danger');
+      if (ghostDanger) {
+        ghostDanger.textContent = '';
+        ghostDanger.hidden = true;
+      }
+      ghost.querySelectorAll('[contenteditable]').forEach((node) => {
+        node.removeAttribute('contenteditable');
+      });
+      ghost.querySelectorAll('a, button').forEach((node) => {
+        node.setAttribute('tabindex', '-1');
+      });
+    }
+
+    function animateSurfaceChange(source, change, targetRect) {
+      const el = source();
+      if (!el || shouldReduceMotion()) {
+        change();
+        return Promise.resolve();
+      }
+
+      const first = el.getBoundingClientRect();
+      const ghost = el.cloneNode(true);
+      ghost.setAttribute('aria-hidden', 'true');
+      ghost.classList.add('trial-morph-ghost');
+      Object.assign(ghost.style, {
+        position: 'fixed',
+        inset: 'auto',
+        top: `${first.top}px`,
+        left: `${first.left}px`,
+        width: `${first.width}px`,
+        height: `${first.height}px`,
+        transformOrigin: 'top left',
+        zIndex: '2000',
+        pointerEvents: 'none',
+        contain: 'layout paint style',
+        backfaceVisibility: 'hidden'
+      });
+      freezeMorphGhostStyles(ghost, el);
+      document.body.appendChild(ghost);
+      el.style.visibility = 'hidden';
+      state.morphing = true;
+      document.body.classList.add('trial-morphing');
+
+      change();
+
+      const last = targetRect();
+      const deltaX = last.left - first.left;
+      const deltaY = last.top - first.top;
+      const scaleX = last.width / first.width;
+      const scaleY = last.height / first.height;
+      const firstStyle = getComputedStyle(ghost);
+
+      const animation = ghost.animate([
+        {
+          borderRadius: firstStyle.borderRadius,
+          boxShadow: firstStyle.boxShadow,
+          opacity: .96,
+          transform: 'translate3d(0, 0, 0) scale(1, 1)'
+        },
+        {
+          borderRadius: last.borderRadius || firstStyle.borderRadius,
+          boxShadow: last.boxShadow || firstStyle.boxShadow,
+          opacity: 1,
+          transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`
+        }
+      ], {
+        duration: TRIAL_MORPH_DURATION,
+        easing: TRIAL_MORPH_EASING,
+        fill: 'both'
+      });
+
+      return animation.finished.then(() => {
+        el.style.visibility = '';
+      }).finally(() => {
+        ghost.remove();
+        state.morphing = false;
+        document.body.classList.remove('trial-morphing');
+      });
+    }
+
+    function viewportRect() {
+      return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, borderRadius: '0px', boxShadow: 'none' };
+    }
+
+    function elementMorphRect(el) {
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        borderRadius: style.borderRadius,
+        boxShadow: style.boxShadow
+      };
+    }
+
+    function updateTrialHUD() {
+      if (!state.trialMode) return;
+      const elapsed = state.trialStartedAt ? Math.floor((Date.now() - state.trialStartedAt) / 1000) : 0;
+      const remaining = Math.max(0, state.trialDuration - elapsed);
+      const el = trialTimer();
+      if (el) el.textContent = formatClock(remaining);
+    }
+
+    function setStatus(message) {
+      const el = status();
+      if (el) el.textContent = message;
+    }
+
+    function visibleText() {
+      return demoEditor()?.innerText || '';
+    }
+
+    function normalizeTrialText(value) {
+      return value.split(TRIAL_CARET_ANCHOR).join('');
+    }
+
+    function renderTrialZenText() {
+      const el = trialEditor();
+      if (!state.trialMode || state.composing || !el) return;
+
+      const text = state.trialText;
+      if (!text) {
+        el.innerHTML = `<span class="trial-thought is-current" data-empty="true">${TRIAL_CARET_ANCHOR}</span>`;
+        el.classList.remove('has-multiple-lines');
+        moveCaretToEnd(el, { focus: false });
+        return;
+      }
+
+      const thoughts = text.split('\n');
+      const currentIndex = thoughts.length - 1;
+      const previousIndex = currentIndex - 1;
+      el.innerHTML = thoughts.map((thought, index) => {
+        const stateClass = index === currentIndex ? 'is-current' : index === previousIndex ? 'is-previous' : 'is-hidden';
+        const emptyFlag = thought ? '' : ' data-empty="true"';
+        return `<span class="trial-thought ${stateClass}"${emptyFlag}>${escapeHTML(thought)}</span>`;
+      }).join('');
+      el.classList.toggle('has-multiple-lines', thoughts.length > 1);
+      moveCaretToEnd(el, { focus: false });
+    }
+
+    function currentTrialLineRect() {
+      const el = trialEditor();
+      const current = el?.querySelector('.trial-thought.is-current');
+      if (!current) return null;
+
+      const range = document.createRange();
+      range.selectNodeContents(current);
+      const rects = Array.from(range.getClientRects()).filter((rect) => rect.width || rect.height);
+      if (rects.length) return rects[rects.length - 1];
+
+      const rect = current.getBoundingClientRect();
+      return rect.height ? rect : null;
+    }
+
+    function syncTrialDangerPosition() {
+      const dangerEl = trialDanger();
+      if (!dangerEl) return;
+
+      const surfaceRect = trialSurface()?.getBoundingClientRect();
+      const lineRect = currentTrialLineRect();
+      const fallbackX = surfaceRect ? surfaceRect.left + surfaceRect.width / 2 : window.innerWidth / 2;
+      const fallbackY = surfaceRect ? surfaceRect.top + surfaceRect.height * 0.35 : window.innerHeight * 0.35;
+      const rawX = lineRect ? lineRect.left + lineRect.width / 2 : fallbackX;
+      const rawY = lineRect ? lineRect.top + lineRect.height / 2 : fallbackY;
+      const dangerWidth = Math.min(720, Math.max(0, window.innerWidth - 96));
+      const halfDanger = dangerWidth / 2;
+      const minX = Math.min(window.innerWidth / 2, halfDanger + 24);
+      const maxX = Math.max(minX, window.innerWidth - halfDanger - 24);
+      const x = Math.min(maxX, Math.max(minX, rawX));
+
+      dangerEl.style.setProperty('--trial-danger-x', `${Math.round(x)}px`);
+      dangerEl.style.setProperty('--trial-danger-y', `${Math.round(rawY)}px`);
+    }
+
+    function scrollTrialCaretToAnchor() {
+      if (!state.trialMode) return;
+      const surfaceEl = trialSurface();
+      const el = trialEditor();
+      if (!surfaceEl) return;
+      if (!normalizeTrialText(el?.innerText || '')) {
+        surfaceEl.scrollTo({ top: 0 });
+        return;
+      }
+
+      const current = el.querySelector('.trial-thought.is-current') || el;
+      const currentRect = current.getBoundingClientRect();
+      if (!currentRect.height) return;
+
+      const surfaceRect = surfaceEl.getBoundingClientRect();
+      const targetY = surfaceRect.top + surfaceRect.height * 0.35;
+      const targetScroll = Math.max(0, Math.round(surfaceEl.scrollTop + currentRect.top - targetY));
+      if (Math.abs(surfaceEl.scrollTop - targetScroll) > 1) surfaceEl.scrollTop = targetScroll;
+    }
+
+    function appendTrialLineBreak(el) {
+      state.trialText = `${state.trialText || normalizeTrialText(el.innerText)}\n`;
+      syncTrialZenView();
+      start();
+      state.lastInputTime = Date.now();
+      setTrialDangerActive(false);
+    }
+
+    function syncTrialZenView() {
+      renderTrialZenText();
+      requestAnimationFrame(scrollTrialCaretToAnchor);
+    }
+
+    function renderDangerLabel(el, secondsLeft) {
+      if (!el) return;
+      if (!secondsLeft) {
+        el.textContent = '';
+        el.hidden = true;
+        return;
+      }
+
+      el.innerHTML = `<span class="danger-count">${secondsLeft}</span><span class="danger-hint">Keep writing, or it disappears.</span>`;
+      el.hidden = false;
+    }
+
+    function fallbackCopyText(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.top = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      return copied;
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_error) {
+          return fallbackCopyText(text);
+        }
+      }
+
+      return fallbackCopyText(text);
+    }
+
+    function showTrialToast(message) {
+      const el = trialToast();
+      if (!el) return;
+      el.textContent = message;
+      el.hidden = false;
+      window.clearTimeout(el.dataset.timerId);
+      el.dataset.timerId = window.setTimeout(() => {
+        el.hidden = true;
+      }, 1700);
+    }
+
+
+
+    function showEmailStatus(message) {
+      const el = document.querySelector('.email-status');
+      if (!el) return;
+      el.textContent = message;
+      el.hidden = false;
+    }
+
+    async function submitEmailSignup(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const input = form.querySelector('input[type="email"]');
+      if (!input?.checkValidity()) {
+        input?.reportValidity();
+        return;
+      }
+
+      const body = new URLSearchParams(new FormData(form));
+      try {
+        const response = await fetch(form.action || '/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body
+        });
+        if (!response.ok) throw new Error('signup failed');
+        form.reset();
+        showEmailStatus('You are on the launch list.');
+      } catch (_error) {
+        const isLocalPreview = ['localhost', '127.0.0.1'].includes(location.hostname);
+        if (isLocalPreview) {
+          window.localStorage?.setItem('first-line-launch-email', input.value);
+          form.reset();
+          showEmailStatus('Saved for this preview.');
+          return;
+        }
+        showEmailStatus('Could not save. Please try again.');
+      }
+    }
+
+    function trialMarkdown() {
+      const text = state.trialResultText || state.trialText;
+      const completedAt = new Date().toISOString();
+      return `---\ncompleted_at: ${completedAt}\nduration_seconds: ${state.trialDuration}\nword_count: ${wordCount(text)}\nsource: first-line-web-trial\n---\n\n${text}\n`;
+    }
+
+    function downloadTrialText() {
+      const blob = new Blob([trialMarkdown()], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      link.href = url;
+      link.download = `${stamp}-first-line.md`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showTrialToast('Saved as markdown');
+    }
+
+    async function copyTrialText() {
+      const copied = await copyText(state.trialResultText || state.trialText);
+      showTrialToast(copied ? 'Copied' : 'Copy failed');
+    }
+
+    function renderTrialResult() {
+      const text = state.trialResultText || state.trialText;
+      const resultEl = trialResult();
+      const textEl = trialResultText();
+      if (!resultEl || !textEl) return;
+
+      textEl.textContent = text;
+      resultEl.hidden = false;
+    }
+
+    function hideTrialResult() {
+      const resultEl = trialResult();
+      if (resultEl) resultEl.hidden = true;
+      const textEl = trialResultText();
+      if (textEl) textEl.textContent = '';
+      const toastEl = trialToast();
+      if (toastEl) toastEl.hidden = true;
+    }
+
+    function hideTrialFailure() {
+      const failureEl = trialFailure();
+      if (failureEl) failureEl.hidden = true;
+    }
+
+    function showTrialFailure() {
+      const failureEl = trialFailure();
+      if (failureEl) failureEl.hidden = false;
+    }
+
+    function completeTrial() {
+      state.active = false;
+      state.trialComplete = true;
+      state.trialResultText = (state.trialText || normalizeTrialText(trialEditor()?.innerText || '')).trim();
+      setTrialDangerLabel(0);
+      setTrialDangerActive(false);
+      updateTrialHUD();
+      const el = trialEditor();
+      if (el) {
+        el.blur();
+        el.setAttribute('contenteditable', 'false');
+      }
+      state.failed = false;
+      document.body.classList.add('trial-complete');
+      document.body.classList.remove('trial-failed');
+      hideTrialFailure();
+      renderTrialResult();
+      requestAnimationFrame(() => document.querySelector('.trial-copy')?.focus({ preventScroll: true }));
+    }
+
+    function resetTrialWriting() {
+      const el = trialEditor();
+      state.active = false;
+      state.failed = false;
+      state.lastInputTime = 0;
+      state.trialComplete = false;
+      state.trialResultText = '';
+      state.trialStartedAt = 0;
+      state.trialText = '';
+      document.body.classList.remove('trial-complete', 'trial-failed');
+      hideTrialResult();
+      hideTrialFailure();
+      if (el) {
+        el.setAttribute('contenteditable', 'true');
+        el.innerHTML = '';
+      }
+      renderTrialZenText();
+      updateTrialHUD();
+      setTrialDangerLabel(0);
+      setTrialDangerActive(false);
+      requestAnimationFrame(() => moveCaretToEnd(el));
+    }
+
+    function restartTrialFromResult() {
+      resetTrialWriting();
+    }
+
+    function failTrial() {
+      const el = trialEditor();
+      state.active = false;
+      state.failed = true;
+      state.lastInputTime = 0;
+      state.trialComplete = false;
+      state.trialResultText = '';
+      state.trialStartedAt = 0;
+      state.trialText = '';
+      setTrialDangerLabel(0);
+      setTrialDangerActive(false);
+      updateTrialHUD();
+      hideTrialResult();
+      if (el) {
+        el.blur();
+        el.innerHTML = '';
+        el.setAttribute('contenteditable', 'false');
+      }
+      document.body.classList.remove('trial-complete');
+      document.body.classList.add('trial-failed');
+      showTrialFailure();
+      requestAnimationFrame(() => document.querySelector('.trial-restart')?.focus({ preventScroll: true }));
+    }
+
+    function setDemoDangerLabel(secondsLeft) {
+      renderDangerLabel(demoDanger(), secondsLeft);
+    }
+
+    function setTrialDangerLabel(secondsLeft) {
+      renderDangerLabel(trialDanger(), secondsLeft);
+      if (secondsLeft) syncTrialDangerPosition();
+    }
+
+    function setDemoDangerActive(active) {
+      const el = demoEditor();
+      if (el) el.classList.toggle('is-demo-danger', active);
+
+      const surfaceEl = demoSurface();
+      if (surfaceEl) surfaceEl.classList.toggle('is-demo-danger', active);
+    }
+
+    function setTrialDangerActive(active) {
+      const el = trialEditor();
+      if (el) el.classList.toggle('is-demo-danger', active);
+      if (active) syncTrialDangerPosition();
+    }
+
+    function clearPauseCountdown() {
+      if (state.dangerTimer) window.clearTimeout(state.dangerTimer);
+      if (state.countdownTimer) window.clearInterval(state.countdownTimer);
+      state.dangerTimer = null;
+      state.countdownTimer = null;
+      setDemoDangerLabel(0);
+    }
+
+    function startPauseCountdown() {
+      clearPauseCountdown();
+      if (!state.introTyping) return;
+      state.dangerTimer = window.setTimeout(() => {
+        state.dangerTimer = null;
+        if (!state.introTyping) return;
+        let secondsLeft = DEMO_COUNTDOWN_SECONDS;
+        setDemoDangerLabel(secondsLeft);
+        setStatus('Typing paused. Keep writing.');
+        state.countdownTimer = window.setInterval(() => {
+          secondsLeft -= 1;
+          if (secondsLeft <= DEMO_DANGER_DURATION / 1000) {
+            setDemoDangerActive(true);
+            setStatus('Draft fading. Type to pull it back.');
+          }
+          if (secondsLeft > 0) {
+            setDemoDangerLabel(secondsLeft);
+            return;
+          }
+
+          if (state.countdownTimer) window.clearInterval(state.countdownTimer);
+          state.countdownTimer = null;
+          setDemoDangerLabel(0);
+        }, 1000);
+      }, DEMO_COUNTDOWN_DELAY);
+    }
+
+    function findNaturalPauseIndex(content, ratio, usedIndexes) {
+      const target = Math.floor(content.length * ratio);
+      for (let offset = 0; offset < 80; offset += 1) {
+        const direction = offset % 2 === 0 ? 1 : -1;
+        const index = target + Math.ceil(offset / 2) * direction;
+        if (index < 24 || index > content.length - 32) continue;
+        if (content[index] !== ' ') continue;
+        if (content.slice(Math.max(0, index - 8), index + 8).includes('\n')) continue;
+        if (usedIndexes.some((usedIndex) => Math.abs(usedIndex - index) < 42)) continue;
+        return index + 1;
+      }
+
+      return target;
+    }
+
+    function buildPausePlan(content) {
+      const usedIndexes = [];
+      return DEMO_PAUSE_PROFILES[state.draftIndex % DEMO_PAUSE_PROFILES.length]
+        .map((profile) => {
+          const index = findNaturalPauseIndex(content, profile.ratio, usedIndexes);
+          usedIndexes.push(index);
+          return { index, recoveryDelay: profile.recoveryDelay };
+        })
+        .sort((left, right) => left.index - right.index);
+    }
+
+    function escapeHTML(value) {
+      return value.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
+    }
+
+    function renderDemoEditor(followupText) {
+      const el = demoEditor();
+      if (!el) return;
+
+      let followup = el.querySelector('.demo-paragraph-followup');
+      if (!followup) {
+        el.innerHTML = '<div class="demo-paragraph demo-paragraph-followup"></div>';
+        followup = el.querySelector('.demo-paragraph-followup');
+      }
+
+      followup.innerHTML = `<span class="typed-current">${escapeHTML(followupText)}</span>`;
+      updateCount();
+    }
+
+    function stopIntroTyping(options = {}) {
+      const { keepDanger = false } = options;
+      if (state.typingTimer) window.clearTimeout(state.typingTimer);
+      state.typingTimer = null;
+      clearPauseCountdown();
+      state.introTyping = false;
+      if (!keepDanger) setDemoDangerActive(false);
+    }
+
+    function restoreSeed() {
+      stopIntroTyping();
+      state.active = false;
+      state.failed = false;
+      state.lastInputTime = 0;
+      state.pauseCursor = 0;
+      state.pausePlan = [];
+      renderDemoEditor(followupContent());
+      setStatus('Start anywhere. Keep moving.');
+      setDemoDangerActive(false);
+    }
+
+    function syncTrialRoute() {
+      if (state.morphing) {
+        state.trialRoutePending = true;
+        return;
+      }
+
+      if (isTrialRoute() && !state.trialMode) {
+        enterTrial(null, { updateRoute: false });
+        return;
+      }
+
+      if (!isTrialRoute() && state.trialMode) exitTrial({ updateRoute: false });
+    }
+
+    function enterTrial(event, options = {}) {
+      const { updateRoute = true } = options;
+      event?.preventDefault();
+      if (state.morphing || state.trialMode) return;
+      const el = trialEditor();
+      if (!el) return;
+
+      if (updateRoute) pushTrialRoute();
+
+      el.blur();
+      document.body.classList.remove('trial-focus-ready');
+      animateSurfaceChange(demoSurface, () => {
+        state.active = false;
+        state.failed = false;
+        state.lastInputTime = 0;
+        state.trialComplete = false;
+        state.trialDuration = 60;
+        state.trialMode = true;
+        state.trialResultText = '';
+        state.trialStartedAt = 0;
+        state.trialText = '';
+        el.innerHTML = '';
+        el.setAttribute('contenteditable', 'true');
+        document.body.classList.add('trial-mode');
+        document.body.classList.remove('trial-complete', 'trial-failed');
+        trialOverlay()?.setAttribute('aria-hidden', 'false');
+        hideTrialResult();
+        hideTrialFailure();
+        renderTrialZenText();
+        updateTrialHUD();
+        setTrialDangerLabel(0);
+        setTrialDangerActive(false);
+      }, viewportRect).then(() => {
+        if (state.trialRoutePending) {
+          state.trialRoutePending = false;
+          syncTrialRoute();
+          return;
+        }
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          if (!state.trialMode) return;
+          document.body.classList.add('trial-focus-ready');
+          moveCaretToEnd(el);
+        }));
+      });
+    }
+
+    function exitTrial(options = {}) {
+      const { updateRoute = true } = options;
+      if (state.morphing || !state.trialMode) return;
+      if (updateRoute && isTrialRoute()) {
+        if (history.state?.firstLineTrial) {
+          history.back();
+          return;
+        }
+        replaceHomeRoute();
+      }
+
+      setTrialDangerLabel(0);
+      setTrialDangerActive(false);
+      const el = trialEditor();
+      if (el) el.blur();
+      document.body.classList.remove('trial-focus-ready');
+      animateSurfaceChange(trialSurface, () => {
+        state.active = false;
+        state.failed = false;
+        state.trialComplete = false;
+        state.trialMode = false;
+        state.trialResultText = '';
+        state.trialStartedAt = 0;
+        state.trialText = '';
+        document.body.classList.remove('trial-mode', 'trial-complete', 'trial-failed');
+        trialOverlay()?.setAttribute('aria-hidden', 'true');
+        hideTrialResult();
+        hideTrialFailure();
+        if (el) {
+          el.setAttribute('contenteditable', 'true');
+          el.innerHTML = '';
+        }
+      }, () => elementMorphRect(demoSurface())).then(() => {
+        if (state.trialRoutePending) {
+          state.trialRoutePending = false;
+          syncTrialRoute();
+        }
+      });
+    }
+
+    function beginFollowupTyping() {
+      if (!state.introTyping) return;
+      typeNextFollowupCharacter();
+    }
+
+    function followupTypingDelay(content) {
+      const index = state.typingIndex;
+      const char = content[index - 1];
+      const next = content[index] || '';
+
+      if (char === '\n') return 720;
+      if (next === '\n') return 300;
+      if (char === ' ') return index % 31 < 5 ? 300 : 130;
+      if (index > 18 && index % 47 === 0) return 460;
+      return 86 + (index % 5) * 11;
+    }
+
+    function typeNextFollowupCharacter(options = {}) {
+      if (!state.introTyping) return;
+
+      const content = followupContent();
+
+      if (options.recovering) {
+        clearPauseCountdown();
+        setDemoDangerActive(false);
+        setStatus('Typing resumed.');
+      }
+
+      if (state.typingIndex >= content.length) {
+        state.introTyping = false;
+        renderDemoEditor(content);
+        setStatus('Keep writing.');
+        state.typingTimer = window.setTimeout(() => {
+          state.draftIndex = (state.draftIndex + 1) % demoDrafts.length;
+          replaySeedTyping();
+        }, DEMO_REPLAY_DELAY);
+        return;
+      }
+
+      state.typingIndex += 1;
+      renderDemoEditor(content.slice(0, state.typingIndex));
+
+      const pause = state.pausePlan[state.pauseCursor];
+      if (pause && state.typingIndex === pause.index) {
+        state.pauseCursor += 1;
+        setStatus('Typing paused.');
+        startPauseCountdown();
+        state.typingTimer = window.setTimeout(() => {
+          if (!state.introTyping) return;
+          typeNextFollowupCharacter({ recovering: true });
+        }, Math.min(pause.recoveryDelay, DEMO_RECOVERY_DEADLINE));
+        return;
+      }
+
+      state.typingTimer = window.setTimeout(
+        typeNextFollowupCharacter,
+        options.recovering ? DEMO_RESUME_DELAY : followupTypingDelay(content)
+      );
+    }
+
+    function replaySeedTyping() {
+      stopIntroTyping();
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        restoreSeed();
+        return;
+      }
+
+      state.active = false;
+      state.failed = false;
+      state.lastInputTime = 0;
+      state.pauseCursor = 0;
+      state.typingIndex = 0;
+      state.introTyping = true;
+      state.pausePlan = buildPausePlan(followupContent());
+      renderDemoEditor('');
+      setStatus('Start anywhere. Keep moving.');
+      setDemoDangerActive(false);
+      state.typingTimer = window.setTimeout(beginFollowupTyping, DEMO_START_DELAY);
+    }
+
+    function updateCount() {
+      const el = count();
+      if (!el) return;
+      el.textContent = `${wordCount(visibleText())} words / characters`;
+    }
+
+    function start() {
+      if (state.failed) return;
+      if (state.trialComplete) return;
+      if (state.trialMode && !state.trialStartedAt) state.trialStartedAt = Date.now();
+      state.active = true;
+      state.lastInputTime = Date.now();
+      setTrialDangerActive(false);
+      setTrialDangerLabel(0);
+      if (!state.timer) state.timer = window.setInterval(tick, 250);
+    }
+
+    function tick() {
+      if (!state.active || state.failed) return;
+
+      const idle = (Date.now() - state.lastInputTime) / 1000;
+
+      if (state.trialMode) {
+        updateTrialHUD();
+        const elapsed = Math.floor((Date.now() - state.trialStartedAt) / 1000);
+        if (elapsed >= state.trialDuration) {
+          completeTrial();
+          return;
+        }
+      }
+
+      if (idle >= SILENCE_CLEAR_SECONDS) {
+        if (state.trialMode) {
+          failTrial();
+        } else {
+          state.failed = true;
+          state.active = false;
+          setTrialDangerLabel(0);
+          setTrialDangerActive(false);
+        }
+      } else if (idle >= SILENCE_COUNTDOWN_START_SECONDS) {
+        const secondsLeft = Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - idle));
+        if (state.trialMode) setTrialDangerLabel(secondsLeft);
+        setTrialDangerActive(idle >= SILENCE_BLUR_SECONDS);
+      } else {
+        setTrialDangerLabel(0);
+        setTrialDangerActive(false);
+      }
+    }
+
+    function restartWithSeed() {
+      replaySeedTyping();
+    }
+
+    function bind() {
+      const el = trialEditor();
+      if (!el) return;
+
+      replaySeedTyping();
+      el.addEventListener('focus', () => {
+        if (!state.trialMode) return;
+        moveCaretToEnd(el);
+      });
+      el.addEventListener('pointerup', () => keepCaretAtEnd(el));
+      el.addEventListener('click', () => keepCaretAtEnd(el));
+      document.addEventListener('selectionchange', () => {
+        if (!state.composing) keepCaretAtEnd(el);
+      });
+      el.addEventListener('compositionstart', () => { state.composing = true; });
+      el.addEventListener('compositionend', () => {
+        state.composing = false;
+        state.lastInputTime = Date.now();
+        setTrialDangerActive(false);
+        if (state.trialMode) state.trialText = normalizeTrialText(el.innerText);
+        syncTrialZenView();
+      });
+      el.addEventListener('beforeinput', (evt) => {
+        if (!state.trialMode) return;
+        const inputType = evt.inputType || '';
+        if (state.failed) {
+          evt.preventDefault();
+          return;
+        }
+        if (state.composing || inputType === 'insertCompositionText') return;
+        if (state.trialMode && (inputType === 'insertParagraph' || inputType === 'insertLineBreak')) {
+          evt.preventDefault();
+          appendTrialLineBreak(el);
+          return;
+        }
+        if (inputType.startsWith('delete') || inputType.startsWith('history') || inputType === 'insertFromPaste' || !selectionIsAtEnd(el)) {
+          evt.preventDefault();
+          moveCaretToEnd(el);
+        }
+      }, true);
+      el.addEventListener('keydown', (evt) => {
+        if (!state.trialMode) return;
+        const key = evt.key.toLowerCase();
+        const command = evt.metaKey || evt.ctrlKey;
+        if (evt.key === 'Backspace' || evt.key === 'Delete' || (command && ['a', 'v', 'x', 'z', 'y'].includes(key))) {
+          evt.preventDefault();
+          moveCaretToEnd(el);
+        } else if (['ArrowLeft', 'ArrowUp', 'Home', 'PageUp'].includes(evt.key)) {
+          evt.preventDefault();
+          moveCaretToEnd(el);
+        }
+      }, true);
+      el.addEventListener('input', () => {
+        if (!state.trialMode) return;
+        if (state.trialMode) state.trialText = normalizeTrialText(el.innerText);
+        syncTrialZenView();
+        start();
+        state.lastInputTime = Date.now();
+        setTrialDangerActive(false);
+      });
+      el.addEventListener('paste', (evt) => evt.preventDefault(), true);
+      el.addEventListener('drop', (evt) => evt.preventDefault(), true);
+      document.querySelectorAll('[data-trial-launch]').forEach((link) => {
+        link.addEventListener('click', enterTrial);
+      });
+      emailForm()?.addEventListener('submit', submitEmailSignup);
+      document.querySelector('.trial-exit')?.addEventListener('click', exitTrial);
+      document.querySelector('.trial-copy')?.addEventListener('click', copyTrialText);
+      document.querySelector('.trial-save')?.addEventListener('click', downloadTrialText);
+      document.querySelector('.trial-next')?.addEventListener('click', restartTrialFromResult);
+      document.querySelector('.trial-restart')?.addEventListener('click', restartTrialFromResult);
+      document.querySelector('.trial-close')?.addEventListener('click', exitTrial);
+      document.querySelector('.trial-return')?.addEventListener('click', exitTrial);
+      document.addEventListener('keydown', (evt) => {
+        if (evt.key !== 'Escape' || !state.trialMode) return;
+        evt.preventDefault();
+        exitTrial();
+      });
+      window.addEventListener('popstate', syncTrialRoute);
+      updateCount();
+      syncTrialRoute();
+    }
+
+    return { bind, exitTrial, restartWithSeed, startTrial: enterTrial };
+  })();
+
+  document.addEventListener('DOMContentLoaded', () => window.FirstLineLandingDemo.bind());
+</script>
+<style>
+
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+
+  @font-face {
+    font-family: "TsangerJinKai02";
+    src: url("assets/fonts/TsangerJinKai02-W05.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+  }
+
+
+
+
+
+  :root {
+    --paper: #eee2cf;
+    --paper-deep: #dfceb4;
+    --sheet: #fffaf1;
+    --ink: #172947;
+    --ink-soft: #4f5666;
+    --rust: #7a4a2b;
+    --line: rgba(23, 41, 71, .11);
+    --line-strong: rgba(23, 41, 71, .18);
+    --cream: #fffaf1;
+    --wash: rgba(255, 252, 244, .72);
+    --yellow: #ead9b8;
+    --blue: #172947;
+    --blue-soft: rgba(23, 41, 71, .08);
+    --radius-control: 12px;
+    --radius-paper: 6px;
+    --shadow-paper: 0 16px 42px rgba(48, 43, 31, .07), 0 2px 0 rgba(255, 255, 255, .76) inset;
+    --font-ui: "First Line Pitch", "Pitch Light", "Pitch Sans", "iA Writer Quattro S", ui-monospace, monospace;
+    --font-body: "Iowan Old Style", "Palatino", "Georgia", serif;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 76% 4%, rgba(255, 253, 246, .88), transparent 24rem),
+      linear-gradient(115deg, rgba(122, 74, 43, .045), transparent 38%),
+      repeating-linear-gradient(93deg, rgba(23, 41, 71, .015) 0 1px, transparent 1px 20px),
+      var(--paper);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 19px;
+    line-height: 1.82;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(23, 41, 71, .018) 1px, transparent 1px),
+      radial-gradient(circle, rgba(27, 54, 93, .026) 0 1px, transparent 1.4px);
+    background-size: 100% 31px, 23px 23px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .72), rgba(0, 0, 0, .2));
+  }
+
+  a { color: inherit; }
+
+  button {
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 4px;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .live-demo-editor:focus-visible,
+  .trial-editor:focus-visible {
+    outline: none;
+  }
+
+  .sheet {
+    width: min(1280px, calc(100vw - 36px));
+    margin: 18px auto 54px;
+  }
+
+  .hero-frame {
+    min-height: calc(100vh - 36px);
+    padding: 0;
+  }
+
+  .nav {
+    position: relative;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(auto, 44ch) minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+    min-height: 68px;
+    padding: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    letter-spacing: -.035em;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .seal {
+    width: 30px;
+    height: 30px;
+    display: block;
+    flex: 0 0 auto;
+    filter: drop-shadow(0 4px 8px rgba(48, 43, 31, .08));
+  }
+
+  .brand-name {
+    transform: translateY(-.5px);
+  }
+
+  .nav-manifesto {
+    justify-self: center;
+    max-width: 44ch;
+    margin: 0;
+    color: rgba(27, 54, 93, .62);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 14px;
+    line-height: 1.45;
+    letter-spacing: -.01em;
+    text-align: center;
+  }
+
+  .nav-download {
+    justify-self: end;
+    height: 38px;
+    min-height: 38px;
+    padding: 0 15px;
+    font-size: 14px;
+  }
+
+  .cta {
+    display: inline-flex;
+    height: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(27, 54, 93, .22);
+    background: rgba(255, 253, 246, .68);
+    color: var(--ink);
+    padding: 0 18px;
+    border-radius: var(--radius-control);
+    font-size: 15px;
+    line-height: 1;
+    text-decoration: none;
+    box-shadow: 0 8px 18px rgba(48, 43, 31, .035);
+    transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+
+  .cta:hover {
+    border-color: rgba(27, 54, 93, .4);
+    background: rgba(255, 253, 246, .86);
+    color: var(--ink);
+    transform: translateY(-1px);
+  }
+
+  .secondary {
+    background: transparent;
+    color: var(--ink);
+    box-shadow: none;
+  }
+
+  .hero-actions > .cta {
+    box-shadow: none;
+  }
+
+  .hero-actions > .cta:hover {
+    color: var(--ink);
+  }
+
+  .download-cta {
+    border-color: rgba(23, 41, 71, .82);
+    background: var(--ink);
+    color: var(--cream);
+    box-shadow: 0 12px 24px rgba(23, 41, 71, .11);
+  }
+
+  .download-cta:hover {
+    background: rgba(23, 41, 71, .9);
+    color: var(--cream);
+  }
+
+  .hero {
+    position: relative;
+    display: grid;
+    gap: 18px;
+    min-height: 0;
+    align-content: start;
+    padding: clamp(34px, 5vh, 56px) 0 0;
+  }
+
+  .hero::before {
+    content: "";
+    position: absolute;
+    right: 9%;
+    top: 86px;
+    width: min(28vw, 330px);
+    height: min(28vw, 330px);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 253, 246, .82), transparent 66%);
+    filter: blur(2px);
+    pointer-events: none;
+  }
+
+  .eyebrow {
+    margin: 0;
+    color: var(--rust);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  h1,
+  h2,
+  h3 {
+    margin: 0;
+    font-weight: 300;
+    letter-spacing: -.035em;
+    line-height: 1.35;
+  }
+
+  h1 {
+    max-width: 25ch;
+    margin: 0 auto;
+    font-size: clamp(28px, 3.2vw, 40px);
+    line-height: 1.35;
+  }
+
+  h2 {
+    max-width: 10.6ch;
+    font-size: clamp(36px, 5vw, 70px);
+  }
+
+  h3 {
+    font-size: clamp(25px, 2.6vw, 38px);
+    line-height: 1.35;
+  }
+
+  .hero-subline {
+    max-width: 560px;
+    margin: 16px auto 0;
+    color: var(--ink-soft);
+    font-size: clamp(16px, 1.6vw, 20px);
+    line-height: 1.38;
+    letter-spacing: -.025em;
+  }
+
+  .live-demo {
+    position: relative;
+    display: grid;
+    gap: 18px;
+    width: 100%;
+    min-height: 0;
+    justify-self: stretch;
+    margin-top: 0;
+    padding: 0;
+  }
+
+  .demo-window {
+    position: relative;
+    z-index: 2;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    overflow: visible;
+  }
+
+  .demo-window::before {
+    display: none;
+  }
+
+  .demo-window::after {
+    display: none;
+  }
+
+  .demo-bar {
+    display: none;
+  }
+
+  .demo-reset {
+    background: transparent;
+    color: var(--ink-soft);
+    font-size: 12px;
+    letter-spacing: .02em;
+    white-space: nowrap;
+    text-transform: none;
+  }
+
+  .demo-reset:hover { color: var(--ink); }
+
+  .demo-body {
+    position: relative;
+    z-index: 3;
+    min-height: 0;
+    width: 100%;
+    margin: 0;
+    display: grid;
+    align-content: start;
+    gap: 0;
+    padding: 0;
+  }
+
+  .live-demo-danger,
+  .live-demo-status,
+  .live-demo-count {
+    margin: 0;
+    font-size: 10px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+  }
+
+  .live-demo-status,
+  .live-demo-count { color: var(--ink-soft); }
+
+  .demo-prompt { display: none; }
+
+  .live-demo-danger {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 6;
+    transform: translate(-50%, -50%);
+    min-width: 1.1em;
+    color: rgba(122, 74, 43, .74);
+    font-family: var(--font-ui), var(--font-cn);
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: 0;
+    text-align: center;
+    text-shadow: 0 10px 34px rgba(48, 43, 31, .16);
+    text-transform: none;
+    pointer-events: none;
+  }
+
+  .danger-count {
+    display: block;
+    font-size: clamp(56px, 9vw, 116px);
+    line-height: .9;
+    letter-spacing: -.08em;
+  }
+
+  .danger-hint {
+    display: block;
+    margin-top: 14px;
+    color: rgba(23, 41, 71, .68);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(13px, 1.1vw, 16px);
+    font-weight: 400;
+    line-height: 1.35;
+    letter-spacing: -.01em;
+    text-shadow: none;
+  }
+
+  .live-demo-danger:not([hidden]) {
+    display: block;
+    animation: countdown-breathe 1s ease-in-out infinite alternate;
+  }
+
+  .demo-writing-surface .live-demo-danger {
+    justify-self: center;
+    text-align: center;
+  }
+
+  .live-demo-editor {
+    position: relative;
+    z-index: 3;
+    min-height: 0;
+    width: min(820px, 100%);
+    max-width: 820px;
+    justify-self: center;
+    color: var(--ink);
+    caret-color: var(--blue);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: clamp(21px, 1.8vw, 24px);
+    line-height: 1.82;
+    letter-spacing: -.025em;
+    outline: none;
+    text-align: center;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: normal;
+    transition: filter 90ms ease-out, color 90ms ease-out, text-shadow 90ms ease-out;
+  }
+
+  .live-demo-editor.is-demo-danger {
+    color: rgba(23, 41, 71, .2);
+    filter: blur(6.2px);
+    text-shadow: 0 0 24px rgba(23, 41, 71, .36);
+    transition: filter 3s linear, color 3s linear, text-shadow 3s linear;
+  }
+
+  .hero-lead {
+    max-width: 760px;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(30px, 2.75vw, 42px);
+    font-weight: 400;
+    line-height: 1.32;
+    letter-spacing: -.025em;
+    text-align: left;
+  }
+
+  .hero-copy {
+    width: min(760px, 64%);
+    min-height: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 0;
+  }
+
+  .hero-note {
+    max-width: 66ch;
+    margin: 0;
+    color: rgba(27, 54, 93, .72);
+    font-size: clamp(13px, 1.08vw, 15px);
+    line-height: 1.62;
+    font-family: var(--font-body), var(--font-cn);
+    letter-spacing: -.005em;
+  }
+
+  .hero-lead span {
+    display: block;
+    white-space: nowrap;
+  }
+
+  .demo-paragraph {
+    margin: 0;
+  }
+
+  .demo-writing-surface {
+    position: relative;
+    width: 100%;
+    min-height: clamp(620px, 78vh, 760px);
+    margin: clamp(30px, 4vh, 44px) 0 0;
+    display: grid;
+    align-content: start;
+    gap: 18px;
+    padding: clamp(30px, 3.2vw, 42px) clamp(22px, 5vw, 68px) clamp(34px, 4vw, 54px);
+    border: 0;
+    border-radius: var(--radius-paper);
+    transform-origin: top left;
+    background:
+      linear-gradient(180deg, rgba(255, 253, 246, .76), rgba(255, 253, 246, .48)),
+      repeating-linear-gradient(0deg, transparent 0 29px, rgba(27, 54, 93, .035) 30px 31px);
+    box-shadow: 0 22px 70px rgba(48, 43, 31, .05);
+  }
+
+  .demo-writing-surface::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    box-shadow:
+      inset 0 0 54px 2px rgba(27, 54, 93, .18),
+      0 22px 70px rgba(48, 43, 31, .05);
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .demo-writing-surface.is-demo-danger::after {
+    opacity: .92;
+    transition: opacity 3s linear;
+  }
+
+  .trial-timer {
+    display: inline-flex;
+    min-height: 36px;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: rgba(255, 253, 246, .72);
+    padding: 0 13px;
+    font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .28) inset;
+  }
+
+  .trial-exit {
+    min-height: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-control);
+    background: rgba(255, 253, 246, .72);
+    color: inherit;
+    padding: 0 14px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 13px;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .28) inset;
+  }
+
+  .trial-exit:hover {
+    color: var(--ink);
+    border-color: var(--line-strong);
+    background: var(--cream);
+  }
+
+  .demo-paragraph-followup {
+    font-size: clamp(22px, 2.05vw, 28px);
+    line-height: 1.82;
+    white-space: pre-wrap;
+  }
+
+  .typed-current {
+    color: var(--ink);
+  }
+
+  .demo-paragraph-followup::after,
+  .live-demo-editor:not(:focus):empty::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 3px;
+    background: var(--blue);
+    vertical-align: -.12em;
+    animation: caret-blink 1.05s steps(1, end) infinite;
+  }
+
+  .live-demo-editor:focus .demo-paragraph-followup::after {
+    display: none;
+  }
+
+  .trial-morph-ghost .demo-paragraph-followup::after,
+  .trial-morph-ghost .live-demo-editor:empty::after,
+  .trial-morphing .demo-writing-surface:not(.trial-morph-ghost) .demo-paragraph-followup::after,
+  .trial-morphing .demo-writing-surface:not(.trial-morph-ghost) .live-demo-editor:empty::after,
+  .trial-mode:not(.trial-focus-ready) .trial-editor:empty::after {
+    display: none;
+  }
+
+  .live-demo-editor:empty::before {
+    content: attr(data-placeholder);
+    color: rgba(23, 41, 71, .28);
+  }
+
+  @keyframes caret-blink {
+    50% { opacity: 0; }
+  }
+
+  @keyframes danger-pulse {
+    from { opacity: .54; }
+    to { opacity: 1; }
+  }
+
+  @keyframes countdown-breathe {
+    from { opacity: .48; transform: translate(-50%, -50%) scale(.98); }
+    to { opacity: .88; transform: translate(-50%, -50%) scale(1.02); }
+  }
+
+  .demo-footer {
+    position: relative;
+    z-index: 3;
+    min-height: auto;
+    width: min(720px, 100%);
+    margin: 0 auto;
+    padding: clamp(18px, 3vh, 28px) 0 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 18px;
+    border-top: 0;
+  }
+
+  .demo-footer .live-demo-status,
+  .demo-footer .live-demo-count {
+    display: none;
+  }
+
+  .demo-actions,
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .hero-actions {
+    width: min(440px, 100%);
+  }
+
+  .email-form {
+    width: min(520px, 100%);
+    margin-top: 2px;
+    padding: 14px;
+    border: 1px solid rgba(27, 54, 93, .12);
+    border-radius: var(--radius-paper);
+    background: rgba(255, 253, 246, .5);
+    box-shadow: 0 16px 34px rgba(48, 43, 31, .04);
+  }
+
+  .email-label {
+    display: block;
+    margin-bottom: 9px;
+    color: rgba(27, 54, 93, .74);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  .email-row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .email-input {
+    width: 100%;
+    height: 44px;
+    border: 1px solid rgba(27, 54, 93, .16);
+    border-radius: var(--radius-control);
+    background: rgba(255, 253, 246, .78);
+    color: var(--ink);
+    padding: 0 14px;
+    font: inherit;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 15px;
+    outline: none;
+  }
+
+  .email-input:focus {
+    border-color: rgba(27, 54, 93, .42);
+    box-shadow: 0 0 0 3px rgba(27, 54, 93, .08);
+  }
+
+  .email-submit {
+    flex: 0 0 auto;
+    box-shadow: none;
+  }
+
+  .email-note,
+  .email-status {
+    margin: 9px 0 0;
+    color: rgba(27, 54, 93, .58);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .email-status {
+    color: rgba(27, 54, 93, .74);
+  }
+
+  .demo-actions {
+    display: none;
+    justify-content: flex-start;
+  }
+
+  .demo-actions .secondary {
+    display: none;
+  }
+
+  .section {
+    border-top: 1px solid rgba(27, 54, 93, .1);
+    padding: 96px 58px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+    gap: clamp(34px, 6vw, 88px);
+    align-items: start;
+  }
+
+  .body-copy {
+    max-width: 47ch;
+    margin: 24px 0 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    line-height: 1.62;
+  }
+
+  .rules {
+    display: grid;
+    gap: 14px;
+  }
+
+  .rule {
+    border: 1px solid rgba(27, 54, 93, .12);
+    background: rgba(255, 253, 246, .5);
+    padding: 25px;
+    box-shadow: 0 16px 34px rgba(48, 43, 31, .05);
+  }
+
+  .rule:nth-child(1) { transform: rotate(-.8deg); }
+  .rule:nth-child(2) { transform: translateX(22px) rotate(.5deg); }
+  .rule:nth-child(3) { border-color: var(--rust); transform: rotate(-.4deg); }
+
+  .rule b {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: 23px;
+    font-weight: 300;
+    letter-spacing: -.025em;
+  }
+
+  .rule span {
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .ledger {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 36px;
+  }
+
+  .entry {
+    min-height: 210px;
+    border: 1px solid rgba(27, 54, 93, .12);
+    background: rgba(255, 253, 246, .48);
+    padding: 20px;
+    box-shadow: 0 16px 34px rgba(48, 43, 31, .045);
+  }
+
+  .entry:nth-child(2) { transform: translateY(22px); }
+
+  .entry strong {
+    display: block;
+    margin-bottom: 16px;
+    color: var(--rust);
+    font-size: 12px;
+    letter-spacing: .17em;
+    text-transform: uppercase;
+  }
+
+  .entry p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    line-height: 1.55;
+  }
+
+  .quote {
+    max-width: 850px;
+    margin: 0 auto;
+    text-align: center;
+    font-size: clamp(34px, 5vw, 74px);
+    line-height: 1.5;
+    letter-spacing: -.035em;
+  }
+
+  .quote small {
+    display: block;
+    margin-top: 24px;
+    color: var(--rust);
+    font-size: 13px;
+    letter-spacing: .04em;
+    text-transform: none;
+  }
+
+  @media (max-width: 860px) {
+    .sheet {
+      width: calc(100vw - 20px);
+      margin-top: 9px;
+    }
+
+    .nav {
+      grid-template-columns: 1fr auto;
+    }
+
+    .nav-manifesto {
+      display: none;
+    }
+
+    .hero,
+    .grid,
+    .ledger { grid-template-columns: 1fr; }
+
+    .hero {
+      gap: 18px;
+      min-height: 0;
+      padding-top: 18px;
+      padding-bottom: 34px;
+    }
+
+    .hero-subline {
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    .hero::before { display: none; }
+
+    .live-demo {
+      min-height: 610px;
+    }
+
+    .demo-window {
+      transform: none;
+    }
+
+    .demo-window::before {
+      display: none;
+    }
+
+    .demo-body {
+      min-height: 480px;
+      padding: 0;
+    }
+
+    .hero-copy {
+      width: 100%;
+      min-height: auto;
+      padding: 0;
+    }
+
+    .live-demo-editor {
+      min-height: 0;
+      font-size: 22px;
+      line-height: 1.82;
+      text-align: center;
+    }
+
+    .demo-writing-surface {
+      min-height: 560px;
+      padding: 24px 16px 28px;
+      gap: 18px;
+    }
+
+    .hero-lead {
+      font-size: 30px;
+      line-height: 1.35;
+      text-align: left;
+    }
+
+    .hero-lead span {
+      white-space: normal;
+    }
+
+    .demo-paragraph-followup {
+      font-size: 22px;
+      line-height: 1.82;
+    }
+
+    .demo-footer {
+      min-height: auto;
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 16px 0 0;
+    }
+
+    .rule:nth-child(n),
+    .entry:nth-child(n) { transform: none; }
+
+  }
+
+  @media (max-width: 480px) {
+    .hero-lead {
+      font-size: clamp(22px, 6.1vw, 24px);
+      line-height: 1.35;
+    }
+
+    .hero-actions {
+      width: 100%;
+    }
+
+    .hero-actions .cta,
+    .email-row,
+    .email-submit {
+      width: 100%;
+    }
+
+    .email-row {
+      flex-direction: column;
+    }
+
+  }
+
+  .trial-mode {
+    overflow: hidden;
+  }
+
+  .trial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .trial-mode .trial-overlay {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .trial-writing-surface {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    min-height: 100vh;
+    margin: 0;
+    display: block;
+    padding: 0;
+    border-radius: 0;
+    overflow-y: auto;
+    background:
+      linear-gradient(180deg, rgba(255, 253, 246, .72), rgba(255, 253, 246, .28)),
+      repeating-linear-gradient(0deg, transparent 0 30px, rgba(27, 54, 93, .03) 31px 32px),
+      var(--paper);
+    box-shadow: none;
+  }
+
+  .trial-writing-surface::before {
+    display: none;
+  }
+
+  .trial-hud {
+    position: fixed;
+    top: 20px;
+    left: 28px;
+    right: 28px;
+    z-index: 1003;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 14px;
+    letter-spacing: -.01em;
+  }
+
+  .trial-danger {
+    position: fixed;
+    top: var(--trial-danger-y, 35%);
+    left: var(--trial-danger-x, 50%);
+    z-index: 1004;
+    width: min(720px, calc(100vw - 96px));
+    color: rgba(122, 74, 43, .78);
+    font-family: var(--font-ui), var(--font-cn);
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: 0;
+    text-align: center;
+    text-shadow: 0 10px 34px rgba(48, 43, 31, .16);
+    text-transform: none;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .trial-danger:not([hidden]) {
+    display: block;
+    animation: countdown-breathe 1s ease-in-out infinite alternate;
+  }
+
+  .trial-editor {
+    position: relative;
+    z-index: 3;
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    padding: calc(35vh - .81em) clamp(20px, 8vw, 160px) calc(65vh - .81em);
+    color: var(--ink);
+    caret-color: rgba(23, 41, 71, .55);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(22px, 2.05vw, 28px);
+    line-height: 1.62;
+    letter-spacing: -.025em;
+    outline: none;
+    text-align: center;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    word-break: normal;
+    transition: filter 90ms ease-out, color 90ms ease-out, text-shadow 90ms ease-out;
+  }
+
+  .trial-editor .trial-thought {
+    display: block;
+    min-height: 1.62em;
+    color: rgba(23, 41, 71, 0);
+    filter: none;
+    text-shadow: none;
+  }
+
+  .trial-editor .trial-thought.is-previous {
+    color: rgba(23, 41, 71, .12);
+    filter: none;
+    text-shadow: 0 0 3.5px rgba(23, 41, 71, .26);
+  }
+
+  .trial-editor .trial-thought.is-current {
+    color: var(--ink);
+    filter: none;
+    text-shadow: none;
+  }
+
+  .trial-editor.is-demo-danger .trial-thought.is-current {
+    color: rgba(23, 41, 71, .2);
+    text-shadow: 0 0 24px rgba(23, 41, 71, .36);
+  }
+
+  .trial-editor.is-demo-danger {
+    filter: blur(3px);
+  }
+
+  .trial-mode:not(.trial-focus-ready) .trial-editor {
+    caret-color: transparent;
+  }
+
+  .trial-editor:empty::before {
+    content: "";
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  .trial-complete .trial-editor,
+  .trial-complete .trial-danger,
+  .trial-failed .trial-editor,
+  .trial-failed .trial-danger {
+    display: none;
+  }
+
+  .trial-complete .trial-hud,
+  .trial-failed .trial-hud {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .trial-result[hidden],
+  .trial-failure[hidden],
+  .trial-toast[hidden] {
+    display: none;
+  }
+
+  .trial-result,
+  .trial-failure {
+    position: fixed;
+    inset: 0;
+    z-index: 1005;
+    display: grid;
+    place-items: center;
+    overflow-y: auto;
+    padding: clamp(42px, 7vh, 72px) clamp(18px, 6vw, 72px) 44px;
+    background:
+      linear-gradient(180deg, rgba(255, 253, 246, .72), rgba(255, 253, 246, .28)),
+      repeating-linear-gradient(0deg, transparent 0 30px, rgba(27, 54, 93, .03) 31px 32px),
+      var(--paper);
+  }
+
+  .trial-result-card {
+    width: min(920px, 100%);
+    display: grid;
+    gap: 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-paper);
+    background: rgba(255, 253, 246, .78);
+    padding: clamp(22px, 4vw, 38px);
+    box-shadow: var(--shadow-paper-lift);
+  }
+
+  .trial-result-text {
+    max-height: min(62vh, 620px);
+    overflow-y: auto;
+    margin: 0;
+    border: 1px solid rgba(27, 54, 93, .13);
+    border-radius: var(--radius-paper);
+    background: rgba(255, 250, 241, .56);
+    padding: clamp(20px, 3vw, 30px);
+    color: var(--ink);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: clamp(17px, 1.45vw, 21px);
+    line-height: 1.7;
+    letter-spacing: -.02em;
+    white-space: pre-wrap;
+    box-shadow: 0 18px 46px rgba(48, 43, 31, .055);
+  }
+
+  .trial-ai-note,
+  .trial-failure-copy {
+    margin: 0;
+    max-width: 68ch;
+    color: rgba(23, 41, 71, .7);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 15px;
+    line-height: 1.58;
+  }
+
+  .trial-kicker {
+    margin: 0;
+    color: var(--ink-soft);
+    font-size: 11px;
+    letter-spacing: .14em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .trial-failure-title {
+    max-width: 11ch;
+    color: var(--ink);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(40px, 7vw, 78px);
+    font-weight: 400;
+    line-height: 1.04;
+    letter-spacing: -.05em;
+  }
+
+  .trial-result-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .trial-copy,
+  .trial-restart {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: var(--cream);
+    box-shadow: none;
+  }
+
+  .trial-copy:hover,
+  .trial-restart:hover {
+    background: #14294a;
+    color: var(--cream);
+  }
+
+  .trial-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    z-index: 1010;
+    margin: 0;
+    transform: translateX(-50%);
+    border: 1px solid rgba(27, 54, 93, .13);
+    border-radius: 999px;
+    background: rgba(255, 250, 241, .92);
+    color: var(--ink);
+    padding: 8px 13px;
+    font-size: 12px;
+    box-shadow: 0 14px 38px rgba(48, 43, 31, .12);
+  }
+
+  .trial-morphing .sheet,
+  .trial-morphing .trial-overlay {
+    visibility: hidden;
+  }
+
+  .trial-morph-ghost {
+    transform-origin: top left;
+    will-change: transform;
+  }
+
+  .trial-morph-ghost::before,
+  .trial-morph-ghost::after,
+  .trial-mode .trial-morph-ghost::before,
+  .trial-mode .trial-morph-ghost::after {
+    display: none;
+  }
+
+  .trial-morph-ghost .trial-hud,
+  .trial-morph-ghost .live-demo-danger[hidden] {
+    display: none;
+  }
+
+  .trial-morphing .demo-writing-surface:not(.trial-morph-ghost) {
+    will-change: transform;
+  }
+
+  /* Kami skin: same landing structure, document-system surface. */
+  :root {
+    --paper: #f5f4ed;
+    --paper-deep: #e8e6dc;
+    --sheet: #faf9f5;
+    --ink: #141413;
+    --ink-soft: #504e49;
+    --rust: #1b365d;
+    --border: #e8e6dc;
+    --border-soft: #e5e3d8;
+    --line: #d8d5c8;
+    --line-strong: #c9c3b5;
+    --cream: #faf9f5;
+    --wash: rgba(250, 249, 245, .78);
+    --yellow: #e8e6dc;
+    --blue: #1b365d;
+    --blue-soft: #e4ecf5;
+    --radius-control: 8px;
+    --radius-paper: 16px;
+    --shadow-paper: 0 0 0 1px var(--line), 0 4px 24px rgba(20, 20, 19, .05);
+    --shadow-paper-lift:
+      0 0 0 1px var(--border),
+      0 1px 0 rgba(255, 255, 255, .72) inset,
+      0 10px 32px rgba(0, 0, 0, .06),
+      0 34px 90px rgba(0, 0, 0, .045);
+    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", serif;
+  }
+
+  body {
+    background: var(--paper);
+  }
+
+  body::before {
+    background-image: linear-gradient(rgba(27, 54, 93, .025) 1px, transparent 1px);
+    background-size: 100% 32px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, .46), rgba(0, 0, 0, .14));
+  }
+
+  .sheet {
+    width: min(1280px, calc(100vw - 40px));
+    margin: 20px auto 56px;
+  }
+
+  .nav {
+    min-height: 64px;
+  }
+
+  .brand {
+    font-weight: 500;
+    letter-spacing: -.02em;
+  }
+
+  .seal {
+    box-shadow: 0 0 0 1px var(--line);
+    filter: none;
+  }
+
+  .cta {
+    border-color: var(--line);
+    border-radius: var(--radius-control);
+    background: var(--sheet);
+    box-shadow: 0 0 0 1px var(--line);
+    font-weight: 500;
+  }
+
+  .cta:hover {
+    border-color: var(--line-strong);
+    background: var(--cream);
+  }
+
+  .secondary {
+    background: transparent;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  .download-cta {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: var(--cream);
+    box-shadow: none;
+  }
+
+  .download-cta:hover {
+    background: #14294a;
+    color: var(--cream);
+  }
+
+  .trial-copy,
+  .trial-restart {
+    border-color: var(--blue);
+    background: var(--blue);
+    color: var(--cream);
+    box-shadow: none;
+  }
+
+  .trial-copy:hover,
+  .trial-restart:hover {
+    background: #14294a;
+    color: var(--cream);
+  }
+
+  .hero::before {
+    display: none;
+  }
+
+  .hero-lead {
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: -.04em;
+  }
+
+  .hero-note,
+  .live-demo-status,
+  .live-demo-count,
+  .trial-ai-note {
+    color: var(--ink-soft);
+  }
+
+  .demo-writing-surface,
+  .trial-writing-surface,
+  .trial-result,
+  .trial-failure {
+    background:
+      linear-gradient(180deg, rgba(250, 249, 245, .94), rgba(250, 249, 245, .74)),
+      repeating-linear-gradient(0deg, transparent 0 30px, #ebe7dd 31px 32px),
+      var(--paper);
+  }
+
+  .demo-writing-surface {
+    background:
+      linear-gradient(180deg, rgba(250, 249, 245, .98), rgba(250, 249, 245, .84)),
+      repeating-linear-gradient(0deg, transparent 0 30px, var(--border-soft) 31px 32px),
+      var(--paper);
+    box-shadow: var(--shadow-paper-lift);
+  }
+
+  .demo-writing-surface::after {
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1px var(--border), inset 0 1px 0 rgba(255, 255, 255, .54);
+  }
+
+  .live-demo-editor,
+  .trial-editor,
+  .trial-result-text {
+    color: var(--ink);
+    font-family: var(--font-body), var(--font-cn);
+  }
+
+  .live-demo-editor:empty::before {
+    color: rgba(80, 78, 73, .38);
+  }
+
+  .demo-paragraph-followup::after,
+  .live-demo-editor:not(:focus):empty::after {
+    background: var(--blue);
+  }
+
+  .live-demo-danger,
+  .trial-danger {
+    color: rgba(27, 54, 93, .72);
+    text-shadow: 0 10px 34px rgba(20, 20, 19, .12);
+  }
+
+  .danger-hint {
+    color: rgba(80, 78, 73, .72);
+  }
+
+  .trial-hud {
+    color: rgba(80, 78, 73, .78);
+  }
+
+  .trial-timer,
+  .trial-exit,
+  .trial-toast {
+    border-color: var(--line);
+    background: rgba(250, 249, 245, .9);
+  }
+
+  .trial-result-card,
+  .trial-result-text {
+    border-color: var(--line);
+    border-radius: var(--radius-paper);
+    background: rgba(250, 249, 245, .76);
+  }
+
+  .trial-result-text {
+    box-shadow: var(--shadow-paper);
+  }
+
+  @media (max-width: 860px) {
+    .sheet {
+      width: calc(100vw - 20px);
+      margin-top: 10px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation: none; transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="sheet">
+    <main id="top">
+      <section class="hero-frame">
+        <nav class="nav" aria-label="Primary">
+          <a class="brand" href="#top"><svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" fill="#eadcc2"/><path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#172947"/><path d="M48 14h5v36h-5z" fill="#145dff"/></svg><span class="brand-name">First Line</span></a>
+          <p class="nav-manifesto">For the thought you lose before it becomes a sentence.</p>
+          <a class="cta download-cta nav-download" href="https://github.com/ichts/zerodraft/releases/latest">Download</a>
+        </nav>
+
+        <section class="hero" aria-labelledby="hero-title">
+          <section id="demo" class="live-demo" aria-label="Interactive First Line demo">
+            <div class="demo-window">
+              <div class="demo-body">
+                <div class="hero-copy">
+                  <h1 id="hero-title" class="hero-lead"><span>First Line is a timed writing app</span><span>that forces your first draft forward.</span></h1>
+                  <p class="hero-note">Stop typing for eight seconds and the draft disappears.</p>
+                  <div class="hero-actions">
+                    <a class="cta download-cta" href="https://github.com/ichts/zerodraft/releases/latest">Download for Mac</a>
+                    <a class="cta secondary" href="#trial" data-trial-launch>Try 1 minute</a>
+                  </div>
+                  <form class="email-form" name="first-line-updates" method="POST" action="/" data-netlify="true" aria-label="Get First Line launch updates">
+                    <input type="hidden" name="form-name" value="first-line-updates">
+                    <label class="email-label" for="launch-email">Get the paid launch note.</label>
+                    <div class="email-row">
+                      <input class="email-input" id="launch-email" name="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+                      <button class="cta email-submit" type="submit">Notify me</button>
+                    </div>
+                    <p class="email-note">One quiet email when the Mac build is ready to buy.</p>
+                    <p class="email-status" hidden aria-live="polite"></p>
+                  </form>
+                </div>
+                <div class="demo-writing-surface" aria-label="First Line app preview">
+                  <div class="live-demo-editor" aria-label="First Line autoplay demo" data-placeholder="Write one sentence here."></div>
+                  <p class="live-demo-danger" hidden aria-hidden="true"></p>
+                </div>
+              </div>
+              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status">Keep writing.</span><span class="live-demo-count">0 words / characters</span></div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+  </div>
+  <div class="trial-overlay" aria-hidden="true">
+    <div class="trial-writing-surface" aria-label="First Line browser trial">
+      <div class="trial-hud" aria-label="Trial status"><span class="trial-timer">01:00</span><button type="button" class="trial-exit">Exit</button></div>
+      <p class="trial-danger" hidden aria-hidden="true"></p>
+      <div class="trial-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line trial editor" spellcheck="false"></div>
+      <section class="trial-result" hidden aria-live="polite" aria-label="Trial result">
+        <div class="trial-result-card">
+          <article class="trial-result-text"></article>
+          <p class="trial-ai-note">Next step: copy this into your AI editor and ask it to organize the mess into an outline, then a cleaner draft. Keep the raw version as the source.</p>
+          <div class="trial-result-actions">
+            <button type="button" class="cta trial-copy">Copy full text</button>
+            <button type="button" class="cta secondary trial-save">Save .md</button>
+            <button type="button" class="cta secondary trial-next">Start next</button>
+            <button type="button" class="cta secondary trial-close">Exit</button>
+          </div>
+        </div>
+      </section>
+      <section class="trial-failure" hidden aria-live="polite" aria-label="Trial failed">
+        <div class="trial-result-card trial-failure-card">
+          <p class="trial-kicker">Eight seconds of silence</p>
+          <h2 class="trial-failure-title">The draft disappeared.</h2>
+          <p class="trial-failure-copy">That is the rule. No undo, no recovery, no editing your way back in. Start a fresh minute, or return to the landing page.</p>
+          <div class="trial-result-actions">
+            <button type="button" class="cta trial-restart">Try again</button>
+            <button type="button" class="cta secondary trial-return">Back to landing</button>
+          </div>
+        </div>
+      </section>
+      <p class="trial-toast" hidden aria-live="polite">Copied</p>
+    </div>
+  </div>
+</body>
+</html>

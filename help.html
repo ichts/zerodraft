@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Help for First Line: buying the early-bird license, finding your Dodo license key email, activating the Mac app, and the 2-Mac activation limit." />
+<title>First Line - Help</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --parchment: #f5f4ed;
+    --ivory: #faf9f5;
+    --warm-sand: #e8e6dc;
+    --brand: #1b365d;
+    --brand-light: #2d5a8a;
+    --near-black: #141413;
+    --olive: #504e49;
+    --stone: #6b6a64;
+    --paper: var(--parchment);
+    --ink: var(--near-black);
+    --ink-soft: var(--olive);
+    --rust: var(--stone);
+    --line: #d8d5c8;
+    --line-strong: #c9c3b5;
+    --cream: var(--ivory);
+    --radius-control: 8px;
+    --radius-paper: 16px;
+    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Songti SC", serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .sheet {
+    width: min(1120px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 48px 0 96px;
+  }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .seal { width: 28px; height: 28px; display: block; }
+  .header-back {
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .header-back:hover { color: var(--ink); }
+  .page-main { padding: 56px 0 0; }
+  .eyebrow {
+    margin: 0 0 14px;
+    color: var(--rust);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(26px, 2.8vw, 32px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    line-height: 1.28;
+    max-width: 22ch;
+  }
+  .page-lede {
+    max-width: 56ch;
+    margin: 0 0 48px;
+    color: var(--ink-soft);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .qa {
+    display: grid;
+    gap: 0;
+    border-top: 1px solid var(--line);
+  }
+  .qa-row {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr;
+    gap: 24px 32px;
+    padding: 24px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .qa-question {
+    margin: 0;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--ink);
+  }
+  .qa-answer { max-width: 64ch; }
+  .qa-answer p { margin: 0 0 12px; }
+  .qa-answer p:last-child { margin-bottom: 0; }
+  .placeholder { color: var(--ink-soft); font-style: italic; }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border: 1px solid var(--brand);
+    border-radius: var(--radius-control);
+    background: var(--brand);
+    color: var(--cream);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 15px;
+    text-decoration: none;
+  }
+  .cta.secondary {
+    background: var(--warm-sand);
+    border-color: var(--line);
+    color: var(--near-black);
+  }
+  .page-main a:not(.cta) { color: var(--brand); }
+  .page-main a:not(.cta):hover { color: var(--brand-light); }
+
+  .page-footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .footer-nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .footer-nav a { text-decoration: none; color: var(--ink-soft); }
+  .footer-nav a:hover { color: var(--ink); }
+  @media (max-width: 720px) {
+    .qa-row { grid-template-columns: 1fr; gap: 10px; }
+    .sheet { padding: 32px 0 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="page-header">
+    <a class="brand" href="index.html">
+      <svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" fill="#e8e6dc" />
+        <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d" />
+        <path d="M48 14h5v36h-5z" fill="#2d5a8a" />
+      </svg>
+      <span>First Line</span>
+    </a>
+    <a class="header-back" href="index.html">Back to landing</a>
+  </header>
+
+  <main class="page-main">
+    <p class="eyebrow">Help</p>
+    <h1>Buying, finding your license, and activating First Line.</h1>
+    <p class="page-lede">Short answers to the questions that come up around the early-bird license, the Dodo license key email, and the Mac activation flow.</p>
+
+    <section class="qa">
+      <article class="qa-row">
+        <h2 class="qa-question">How do I buy First Line?</h2>
+        <div class="qa-answer">
+          <p>The Early Bird License is a one-time payment of <strong>USD&nbsp;$5</strong>. Checkout is handled by <strong>Dodo Payments</strong> as the merchant of record and opens with the early-bird release. No subscription, no recurring billing.</p>
+          <p>The purchase covers <strong>2 Macs</strong> and includes a 14-day refund window. See the <a href="refund.html">refund policy</a>.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">Where is my license key?</h2>
+        <div class="qa-answer">
+          <p>The receipt and license key arrive by email from <strong>Dodo Payments</strong>, sent to the address used at checkout. They are not delivered by this site.</p>
+          <p>If the email has not arrived within a few minutes, check spam, promotions, and any other inbox aliases that might have received it. Keep the email: it is your proof of purchase.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">How do I activate First Line?</h2>
+        <div class="qa-answer">
+          <p>The Mac app gives you <strong>3 writing sessions</strong> as a trial. When the trial ends, the app shows the Upgrade screen.</p>
+          <p>Paste the license key from the Dodo email into the license key field and activate. Activation contacts Dodo to verify the key. A valid key immediately unlocks First Line on that Mac. You can also activate from Settings.</p>
+          <p>Activation requires an internet connection. After successful activation, the app tolerates short offline periods.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">How many Macs can I use?</h2>
+        <div class="qa-answer">
+          <p>Each license key allows <strong>2 active Macs</strong>. Activating on a new Mac counts toward that limit. Activations are tracked by Dodo against the license key.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">What if I hit the 2-Mac limit?</h2>
+        <div class="qa-answer">
+          <p>Self-serve deactivation is not available yet. If you need to move First Line to a new Mac beyond the 2-Mac limit, contact support at <span class="placeholder">Unknown / to fill</span> with your purchase email and license key.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">My key will not activate.</h2>
+        <div class="qa-answer">
+          <p>Check that the key was pasted exactly as it appears in the Dodo email, with no leading or trailing spaces. Confirm that you are connected to the internet.</p>
+          <p>If the key is rejected as invalid, already at the activation limit, or refunded/revoked, contact support at <span class="placeholder">Unknown / to fill</span> with the purchase email and license key.</p>
+        </div>
+      </article>
+
+      <article class="qa-row">
+        <h2 class="qa-question">Refunds</h2>
+        <div class="qa-answer">
+          <p>Refunds are available within 14 days of purchase. See the <a href="refund.html">refund policy</a> for what to send.</p>
+        </div>
+      </article>
+    </section>
+
+    <p style="margin-top: 32px;">
+      <a class="cta" href="download.html">Go to download</a>
+      <a class="cta secondary" href="index.html">Back to landing</a>
+    </p>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="footer-nav" aria-label="Support">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="refund.html">Refund</a>
+      <a href="download.html">Download</a>
+      <a href="release-notes.html">Release notes</a>
+      <a href="checkout-success.html">After purchase</a>
+    </nav>
+    <p>First Line. A forward-only writing app for Mac.</p>
+  </footer>
+</div>
+</body>
+</html>

@@ -5,6 +5,8 @@ Zero Draft App - 产品需求文档 (PRD)
 
 作者: ichts
 
+Note: This is the historical Zero Draft web-app PRD. The current root `index.html` has been repurposed as the First Line public landing page; do not treat this PRD as a requirement to restore Datastar on the landing.
+
 技术栈：
 - 前端框架：Datastar (https://data-star.dev/)
 - 数据存储：浏览器 localStorage

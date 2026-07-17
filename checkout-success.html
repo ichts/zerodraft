@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Thank you for buying First Line. Check your email for the Dodo receipt and license key, then keep that email safe." />
+<title>First Line - Thank you for your purchase</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --parchment: #f5f4ed;
+    --ivory: #faf9f5;
+    --warm-sand: #e8e6dc;
+    --brand: #1b365d;
+    --brand-light: #2d5a8a;
+    --near-black: #141413;
+    --olive: #504e49;
+    --stone: #6b6a64;
+    --paper: var(--parchment);
+    --ink: var(--near-black);
+    --ink-soft: var(--olive);
+    --rust: var(--stone);
+    --line: #d8d5c8;
+    --line-strong: #c9c3b5;
+    --cream: var(--ivory);
+    --radius-control: 8px;
+    --radius-paper: 16px;
+    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Songti SC", serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .sheet {
+    width: min(1120px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 48px 0 96px;
+  }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .seal { width: 28px; height: 28px; display: block; }
+  .header-back {
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .header-back:hover { color: var(--ink); }
+  .page-main { padding: 56px 0 0; }
+  .eyebrow {
+    margin: 0 0 14px;
+    color: var(--rust);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(28px, 3vw, 36px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    line-height: 1.28;
+    max-width: 22ch;
+  }
+  .page-lede {
+    max-width: 56ch;
+    margin: 0 0 48px;
+    color: var(--ink-soft);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .section {
+    display: grid;
+    grid-template-columns: minmax(120px, 200px) 1fr;
+    gap: 24px 32px;
+    padding: 24px 0;
+    border-top: 1px solid var(--line);
+  }
+  .section-label {
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .section-body { max-width: 64ch; }
+  .section-body p { margin: 0 0 14px; }
+  .section-body p:last-child { margin-bottom: 0; }
+  .note {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-paper);
+    background: var(--ivory);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .note strong { color: var(--ink); }
+  .placeholder { color: var(--ink-soft); font-style: italic; }
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border: 1px solid var(--brand);
+    border-radius: var(--radius-control);
+    background: var(--brand);
+    color: var(--cream);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 15px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .cta.secondary {
+    background: var(--warm-sand);
+    border-color: var(--line);
+    color: var(--near-black);
+  }
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+  .steps li {
+    counter-increment: step;
+    padding: 12px 0 12px 36px;
+    border-top: 1px solid var(--line);
+    position: relative;
+  }
+  .steps li:first-child { border-top: 0; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 14px;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 11px;
+    color: var(--ink-soft);
+  }
+  .page-main a:not(.cta) { color: var(--brand); }
+  .page-main a:not(.cta):hover { color: var(--brand-light); }
+
+  .page-footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .footer-nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .footer-nav a { text-decoration: none; color: var(--ink-soft); }
+  .footer-nav a:hover { color: var(--ink); }
+  @media (max-width: 720px) {
+    .section { grid-template-columns: 1fr; gap: 8px; }
+    .sheet { padding: 32px 0 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="page-header">
+    <a class="brand" href="index.html">
+      <svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" fill="#e8e6dc" />
+        <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d" />
+        <path d="M48 14h5v36h-5z" fill="#2d5a8a" />
+      </svg>
+      <span>First Line</span>
+    </a>
+    <a class="header-back" href="index.html">Back to landing</a>
+  </header>
+
+  <main class="page-main">
+    <p class="eyebrow">After purchase</p>
+    <h1>Thank you. Check your email for the license key.</h1>
+    <p class="page-lede">Dodo Payments sends your receipt and license key by email. First Line does not use an account system, so the email is your proof of purchase and your way back in.</p>
+
+    <section class="section">
+      <p class="section-label">Next steps</p>
+      <div class="section-body">
+        <ol class="steps">
+          <li>Open the inbox you used at checkout, including spam and promotions folders.</li>
+          <li>Look for the email from <strong>Dodo Payments</strong> with your receipt and license key.</li>
+          <li>Save the email. The license key is the only way to activate First Line.</li>
+          <li>When the signed Mac build is released, install First Line and paste the license key when the trial ends.</li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="section-label">Download</p>
+      <div class="section-body">
+        <div class="note">
+          <p><strong>The signed Mac build is not yet available.</strong> It will be published on the download page after Developer ID signing and notarization are complete.</p>
+        </div>
+        <p style="margin-top: 18px;">
+          <a class="cta" href="download.html">Go to download page</a>
+          <a class="cta secondary" href="help.html">Activation help</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="section-label">Need help?</p>
+      <div class="section-body">
+        <p>If the license key email has not arrived within a few minutes, or if activation fails, contact support at <span class="placeholder">Unknown / to fill</span> with the purchase email and license key.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="footer-nav" aria-label="Support">
+      <a href="help.html">Help</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="refund.html">Refund</a>
+      <a href="release-notes.html">Release notes</a>
+      <a href="download.html">Download</a>
+    </nav>
+    <p>First Line. A forward-only writing app for Mac.</p>
+  </footer>
+</div>
+</body>
+</html>

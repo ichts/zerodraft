@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+
+# Tool / agent artifacts
+.pi/
+.pi-subagents/
+.playwright-mcp/
+tmp/
+
+# Build artifacts
+.build/
+apps/macos/FirstLine/build/
+
+# Debug bundles
+*.zip
+
+# Root-level review / QA screenshots (not product assets)
+/*.png
+
+# Existing
+tmp/font-candidates/

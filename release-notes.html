@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Release notes for First Line. The first signed public build will be documented here once Developer ID signing and notarization are complete." />
+<title>First Line - Release notes</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --parchment: #f5f4ed;
+    --ivory: #faf9f5;
+    --warm-sand: #e8e6dc;
+    --brand: #1b365d;
+    --brand-light: #2d5a8a;
+    --near-black: #141413;
+    --olive: #504e49;
+    --stone: #6b6a64;
+    --paper: var(--parchment);
+    --ink: var(--near-black);
+    --ink-soft: var(--olive);
+    --rust: var(--stone);
+    --line: #d8d5c8;
+    --line-strong: #c9c3b5;
+    --cream: var(--ivory);
+    --radius-control: 8px;
+    --radius-paper: 16px;
+    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Songti SC", serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; }
+  a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .sheet {
+    width: min(1120px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 48px 0 96px;
+  }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .seal { width: 28px; height: 28px; display: block; }
+  .header-back {
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+  .header-back:hover { color: var(--ink); }
+  .page-main { padding: 56px 0 0; }
+  .eyebrow {
+    margin: 0 0 14px;
+    color: var(--rust);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(28px, 3vw, 36px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    line-height: 1.28;
+    max-width: 22ch;
+  }
+  .page-lede {
+    max-width: 56ch;
+    margin: 0 0 48px;
+    color: var(--ink-soft);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .release {
+    display: grid;
+    grid-template-columns: minmax(140px, 220px) 1fr;
+    gap: 24px 32px;
+    padding: 24px 0;
+    border-top: 1px solid var(--line);
+  }
+  .release-meta {
+    font-family: var(--font-ui), var(--font-cn);
+    color: var(--ink-soft);
+  }
+  .release-version {
+    margin: 0 0 6px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink);
+    letter-spacing: -.01em;
+  }
+  .release-date {
+    margin: 0;
+    font-size: 12px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .release-body { max-width: 64ch; }
+  .release-body p { margin: 0 0 14px; }
+  .release-body p:last-child { margin-bottom: 0; }
+  .placeholder { color: var(--ink-soft); font-style: italic; }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    background: var(--cream);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--rust);
+  }
+  .status-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rust);
+  }
+  .page-main a:not(.cta) { color: var(--brand); }
+  .page-main a:not(.cta):hover { color: var(--brand-light); }
+
+  .page-footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .footer-nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+  .footer-nav a { text-decoration: none; color: var(--ink-soft); }
+  .footer-nav a:hover { color: var(--ink); }
+  @media (max-width: 720px) {
+    .release { grid-template-columns: 1fr; gap: 10px; }
+    .sheet { padding: 32px 0 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="page-header">
+    <a class="brand" href="index.html">
+      <svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" fill="#e8e6dc" />
+        <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d" />
+        <path d="M48 14h5v36h-5z" fill="#2d5a8a" />
+      </svg>
+      <span>First Line</span>
+    </a>
+    <a class="header-back" href="index.html">Back to landing</a>
+  </header>
+
+  <main class="page-main">
+    <p class="eyebrow">Release notes</p>
+    <h1>What ships in each version of First Line.</h1>
+    <p class="page-lede">User-visible changes per release. The first signed public build will be documented here once Developer ID signing and notarization are complete.</p>
+
+    <article class="release">
+      <div class="release-meta">
+        <p class="release-version">First Mac build</p>
+        <p class="release-date">Not yet released</p>
+      </div>
+      <div class="release-body">
+        <p><span class="status-badge">Pending release</span></p>
+        <p>This entry will be updated when the first signed, notarized Mac build is published. The planned scope of the first public build is:</p>
+        <ul>
+          <li>Forward-only writing surface with the 8-second silence rule.</li>
+          <li>3-session Mac trial, then upgrade screen with license entry.</li>
+          <li>Dodo Payments license activation and validation.</li>
+          <li>Local-first session storage in Application Support; no analytics, no AI processing.</li>
+          <li>Early bird pricing at USD $5, covering 2 Macs.</li>
+        </ul>
+        <p>No public build has shipped yet. No version number, file, or checksum will appear here until the signed DMG exists.</p>
+      </div>
+    </article>
+
+    <article class="release">
+      <div class="release-meta">
+        <p class="release-version">Browser trial</p>
+        <p class="release-date">Available now</p>
+      </div>
+      <div class="release-body">
+        <p>The one-minute browser trial on the <a href="index.html">landing page</a> is live. It runs entirely in your browser and does not require a license.</p>
+      </div>
+    </article>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="footer-nav" aria-label="Support">
+      <a href="help.html">Help</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="refund.html">Refund</a>
+      <a href="download.html">Download</a>
+      <a href="checkout-success.html">After purchase</a>
+    </nav>
+    <p>First Line. A forward-only writing app for Mac.</p>
+  </footer>
+</div>
+</body>
+</html>

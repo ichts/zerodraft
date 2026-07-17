@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>First Line Logo Concepts</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23eadcc2'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%23172947'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%23145dff'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --paper: #eee2cf;
+    --paper-deep: #dfceb4;
+    --sheet: #fffaf1;
+    --ink: #172947;
+    --ink-soft: #4f5666;
+    --rust: #7a4a2b;
+    --cursor: #145dff;
+    --line: rgba(23, 41, 71, .13);
+    --font-ui: "First Line Pitch", "iA Writer Quattro S", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-body: Iowan Old Style, Palatino, Georgia, serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(circle at 72% 4%, rgba(255, 253, 246, .92), transparent 26rem),
+      repeating-linear-gradient(93deg, rgba(23, 41, 71, .018) 0 1px, transparent 1px 20px),
+      var(--paper);
+    font-family: var(--font-ui);
+    line-height: 1.6;
+  }
+
+  main {
+    width: min(1180px, calc(100vw - 36px));
+    margin: 0 auto;
+    padding: 42px 0 64px;
+  }
+
+  header {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 34px;
+  }
+
+  h1 {
+    margin: 0;
+    font-family: var(--font-body);
+    font-size: clamp(36px, 5vw, 72px);
+    font-weight: 400;
+    letter-spacing: -.04em;
+    line-height: 1.08;
+  }
+
+  .lede {
+    max-width: 68ch;
+    margin: 0;
+    color: rgba(23, 41, 71, .68);
+    font-family: var(--font-body);
+    font-size: 17px;
+  }
+
+  .reference {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    margin: 0 0 28px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: rgba(255, 250, 241, .46);
+  }
+
+  .reference p {
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body);
+    font-size: 14px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+  }
+
+  article {
+    min-height: 330px;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    gap: 13px;
+    padding: 18px;
+    border: 1px solid rgba(23, 41, 71, .12);
+    border-radius: 14px;
+    background: rgba(255, 250, 241, .58);
+    box-shadow: 0 18px 42px rgba(48, 43, 31, .045);
+  }
+
+  .mark-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .large-mark,
+  .small-mark,
+  .tiny-mark {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border: 1px solid rgba(23, 41, 71, .1);
+    border-radius: 10px;
+    background: rgba(255, 253, 246, .72);
+  }
+
+  .large-mark { width: 72px; height: 72px; padding: 6px; }
+  .small-mark { width: 40px; height: 40px; padding: 4px; }
+  .tiny-mark { width: 24px; height: 24px; padding: 3px; }
+
+  svg {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+  }
+
+  h2 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 500;
+    letter-spacing: -.025em;
+  }
+
+  .idea {
+    margin: 0;
+    color: rgba(23, 41, 71, .72);
+    font-family: var(--font-body);
+    font-size: 15px;
+  }
+
+  .tag {
+    width: fit-content;
+    align-self: end;
+    margin: 0;
+    padding: 4px 8px;
+    border: 1px solid rgba(23, 41, 71, .12);
+    border-radius: 999px;
+    color: var(--ink-soft);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+
+  .swatches {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .swatches span {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid rgba(23, 41, 71, .13);
+  }
+
+  @media (max-width: 560px) {
+    main { width: calc(100vw - 20px); padding-top: 24px; }
+    article { min-height: 0; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>First Line logo concepts</h1>
+      <p class="lede">Eight SVG directions. Current favicon is included only as a reference. Each option is shown at 64, 32, and 16-ish sizes so the favicon problem is visible.</p>
+    </header>
+
+    <section class="reference" aria-label="Current logo reference">
+      <span class="large-mark">
+        <svg viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="current-logo-title">
+          <title id="current-logo-title">Current favicon reference</title>
+          <rect width="64" height="64" fill="#eadcc2"/>
+          <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#172947"/>
+          <path d="M48 14h5v36h-5z" fill="#145dff"/>
+        </svg>
+      </span>
+      <div>
+        <strong>Current reference</strong>
+        <p>Two text lines plus cursor. Clear and usable, but a little generic and static.</p>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="Eight new logo concepts">
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M14 18h25v5H14zM14 30h19v5H14zM14 42h28v5H14z" fill="#172947"/>
+              <path d="M48 15h4v34h-4z" fill="#145dff"/>
+              <path d="M10 14v36" stroke="#7a4a2b" stroke-width="2" stroke-linecap="square" opacity=".72"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M14 18h25v5H14zM14 30h19v5H14zM14 42h28v5H14z" fill="#172947"/><path d="M48 15h4v34h-4z" fill="#145dff"/><path d="M10 14v36" stroke="#7a4a2b" stroke-width="2" opacity=".72"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M14 18h25v5H14zM14 30h19v5H14zM14 42h28v5H14z" fill="#172947"/><path d="M48 15h4v34h-4z" fill="#145dff"/><path d="M10 14v36" stroke="#7a4a2b" stroke-width="2" opacity=".72"/></svg></span>
+        </div>
+        <h2>01 Margin Cursor</h2>
+        <p class="idea">Closest to the current mark, but adds the red-brown margin line: paper, draft, cursor, discipline.</p>
+        <p class="tag">Safest evolution</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M13 22h25v5H13zM13 37h26v5H13z" fill="#172947"/>
+              <path d="M38 29h10v-6l10 9-10 9v-6H38z" fill="#145dff"/>
+              <path d="M49 17h4v30h-4z" fill="#172947" opacity=".22"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 22h25v5H13zM13 37h26v5H13z" fill="#172947"/><path d="M38 29h10v-6l10 9-10 9v-6H38z" fill="#145dff"/><path d="M49 17h4v30h-4z" fill="#172947" opacity=".22"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 22h25v5H13zM13 37h26v5H13z" fill="#172947"/><path d="M38 29h10v-6l10 9-10 9v-6H38z" fill="#145dff"/></svg></span>
+        </div>
+        <h2>02 Forward Only</h2>
+        <p class="idea">The first draft can only move right. More explicit, almost like a rule stamped into the icon.</p>
+        <p class="tag">Most literal</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M12 15h40v34H12z" fill="none" stroke="#172947" stroke-width="4"/>
+              <path d="M20 25h17v5H20zM20 36h12v5H20z" fill="#172947"/>
+              <path d="M43 21h4v24h-4z" fill="#145dff"/>
+              <path d="M50 15v34" stroke="#7a4a2b" stroke-width="4" opacity=".7"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M12 15h40v34H12z" fill="none" stroke="#172947" stroke-width="4"/><path d="M20 25h17v5H20zM20 36h12v5H20z" fill="#172947"/><path d="M43 21h4v24h-4z" fill="#145dff"/><path d="M50 15v34" stroke="#7a4a2b" stroke-width="4" opacity=".7"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M12 15h40v34H12z" fill="none" stroke="#172947" stroke-width="4"/><path d="M20 25h17v5H20zM20 36h12v5H20z" fill="#172947"/><path d="M43 21h4v24h-4z" fill="#145dff"/></svg></span>
+        </div>
+        <h2>03 Constraint Box</h2>
+        <p class="idea">A page as a hard boundary. Good if the brand should feel stricter and more native-tool-like.</p>
+        <p class="tag">Most app-like</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M13 18h32v5H13z" fill="#172947" opacity=".18"/>
+              <path d="M13 29h26v5H13z" fill="#172947" opacity=".38"/>
+              <path d="M13 40h30v5H13z" fill="#172947"/>
+              <path d="M49 36h4v14h-4z" fill="#145dff"/>
+              <path d="M48 17h5v5h-5z" fill="#7a4a2b" opacity=".58"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 18h32v5H13z" fill="#172947" opacity=".18"/><path d="M13 29h26v5H13z" fill="#172947" opacity=".38"/><path d="M13 40h30v5H13z" fill="#172947"/><path d="M49 36h4v14h-4z" fill="#145dff"/><path d="M48 17h5v5h-5z" fill="#7a4a2b" opacity=".58"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 18h32v5H13z" fill="#172947" opacity=".18"/><path d="M13 29h26v5H13z" fill="#172947" opacity=".38"/><path d="M13 40h30v5H13z" fill="#172947"/><path d="M49 36h4v14h-4z" fill="#145dff"/></svg></span>
+        </div>
+        <h2>04 Vanishing Draft</h2>
+        <p class="idea">The old lines fade; only the current line survives. Captures the danger mechanic without alarm red.</p>
+        <p class="tag">Most product-specific</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M16 14h28v6H23v10h17v6H23v14h-7z" fill="#172947"/>
+              <path d="M44 14h5v36h-5z" fill="#145dff"/>
+              <path d="M28 44h20v6H28z" fill="#172947"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M16 14h28v6H23v10h17v6H23v14h-7z" fill="#172947"/><path d="M44 14h5v36h-5z" fill="#145dff"/><path d="M28 44h20v6H28z" fill="#172947"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M16 14h28v6H23v10h17v6H23v14h-7z" fill="#172947"/><path d="M44 14h5v36h-5z" fill="#145dff"/><path d="M28 44h20v6H28z" fill="#172947"/></svg></span>
+        </div>
+        <h2>05 FL Cursor</h2>
+        <p class="idea">A compact monogram: F/L structure with the cursor as the right spine. Stronger as app icon.</p>
+        <p class="tag">Most brandable</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M15 18h30v5H15zM19 29h22v5H19zM23 40h14v5H23z" fill="#172947"/>
+              <path d="M47 15h4v34h-4z" fill="#145dff"/>
+              <path d="M12 51h40" stroke="#7a4a2b" stroke-width="3" stroke-linecap="square" opacity=".65"/>
+              <path d="M17 13h28" stroke="#7a4a2b" stroke-width="2" stroke-linecap="square" opacity=".28"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M15 18h30v5H15zM19 29h22v5H19zM23 40h14v5H23z" fill="#172947"/><path d="M47 15h4v34h-4z" fill="#145dff"/><path d="M12 51h40" stroke="#7a4a2b" stroke-width="3" opacity=".65"/><path d="M17 13h28" stroke="#7a4a2b" stroke-width="2" opacity=".28"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M15 18h30v5H15zM19 29h22v5H19zM23 40h14v5H23z" fill="#172947"/><path d="M47 15h4v34h-4z" fill="#145dff"/><path d="M12 51h40" stroke="#7a4a2b" stroke-width="3" opacity=".65"/></svg></span>
+        </div>
+        <h2>06 Pressure Lines</h2>
+        <p class="idea">Lines narrow under pressure until the cursor is all that remains. Feels like a forge, not a notebook.</p>
+        <p class="tag">Most severe</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M32 10a22 22 0 0 1 22 22" fill="none" stroke="#7a4a2b" stroke-width="4" stroke-linecap="square"/>
+              <path d="M14 28h29v5H14zM14 39h22v5H14z" fill="#172947"/>
+              <path d="M47 24h4v25h-4z" fill="#145dff"/>
+              <path d="M31 10v8" stroke="#172947" stroke-width="4"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M32 10a22 22 0 0 1 22 22" fill="none" stroke="#7a4a2b" stroke-width="4"/><path d="M14 28h29v5H14zM14 39h22v5H14z" fill="#172947"/><path d="M47 24h4v25h-4z" fill="#145dff"/><path d="M31 10v8" stroke="#172947" stroke-width="4"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M32 10a22 22 0 0 1 22 22" fill="none" stroke="#7a4a2b" stroke-width="4"/><path d="M14 28h29v5H14zM14 39h22v5H14z" fill="#172947"/><path d="M47 24h4v25h-4z" fill="#145dff"/></svg></span>
+        </div>
+        <h2>07 Sixty Seconds</h2>
+        <p class="idea">Timer arc plus current line. It says “timed writing” immediately, but is less literary.</p>
+        <p class="tag">Most explanatory</p>
+      </article>
+
+      <article>
+        <div class="mark-row">
+          <span class="large-mark">
+            <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+              <rect width="64" height="64" rx="6" fill="#eadcc2"/>
+              <path d="M13 18h36v5H13zM13 30h25v5H13zM13 42h29v5H13z" fill="#172947"/>
+              <path d="M47 15h4v34h-4z" fill="#145dff"/>
+              <path d="M50 25l7 7-7 7z" fill="#7a4a2b"/>
+            </svg>
+          </span>
+          <span class="small-mark"><svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 18h36v5H13zM13 30h25v5H13zM13 42h29v5H13z" fill="#172947"/><path d="M47 15h4v34h-4z" fill="#145dff"/><path d="M50 25l7 7-7 7z" fill="#7a4a2b"/></svg></span>
+          <span class="tiny-mark"><svg viewBox="0 0 64 64" width="16" height="16" aria-hidden="true" focusable="false"><rect width="64" height="64" rx="6" fill="#eadcc2"/><path d="M13 18h36v5H13zM13 30h25v5H13zM13 42h29v5H13z" fill="#172947"/><path d="M47 15h4v34h-4z" fill="#145dff"/><path d="M50 25l7 7-7 7z" fill="#7a4a2b"/></svg></span>
+        </div>
+        <h2>08 Irreversible Edge</h2>
+        <p class="idea">Text hits a cursor, then an arrow edge. The page pushes forward and refuses retreat.</p>
+        <p class="tag">Most directional</p>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

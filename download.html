@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Download First Line for Mac. The signed, notarized Mac build will be available here after Developer ID signing and notarization are complete." />
+<title>First Line - Download for Mac</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --parchment: #f5f4ed;
+    --ivory: #faf9f5;
+    --warm-sand: #e8e6dc;
+    --brand: #1b365d;
+    --brand-light: #2d5a8a;
+    --near-black: #141413;
+    --olive: #504e49;
+    --stone: #6b6a64;
+    --paper: var(--parchment);
+    --ink: var(--near-black);
+    --ink-soft: var(--olive);
+    --rust: var(--stone);
+    --line: #d8d5c8;
+    --line-strong: #c9c3b5;
+    --cream: var(--ivory);
+    --radius-control: 8px;
+    --radius-paper: 16px;
+    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
+    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Songti SC", serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    color: var(--ink);
+    background: var(--paper);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+
+  a:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .sheet {
+    width: min(1120px, calc(100vw - 48px));
+    margin: 0 auto;
+    padding: 48px 0 96px;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+
+  .seal {
+    width: 28px;
+    height: 28px;
+    display: block;
+  }
+
+  .header-back {
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    letter-spacing: .02em;
+    color: var(--ink-soft);
+    text-decoration: none;
+  }
+
+  .header-back:hover { color: var(--ink); }
+
+  .page-main { padding: 56px 0 0; }
+
+  .eyebrow {
+    margin: 0 0 14px;
+    color: var(--rust);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(28px, 3vw, 36px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    line-height: 1.28;
+    max-width: 22ch;
+  }
+
+  .page-lede {
+    max-width: 56ch;
+    margin: 0 0 48px;
+    color: var(--ink-soft);
+    font-size: 17px;
+    line-height: 1.6;
+  }
+
+  .section {
+    display: grid;
+    grid-template-columns: minmax(120px, 200px) 1fr;
+    gap: 24px 32px;
+    padding: 24px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .section-label {
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+
+  .section-body { max-width: 64ch; }
+
+  .section-body p { margin: 0 0 14px; }
+  .section-body p:last-child { margin-bottom: 0; }
+
+  .meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 14px;
+  }
+
+  .meta-table td {
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+    vertical-align: top;
+  }
+
+  .meta-table tr:first-child td { border-top: 0; }
+
+  .meta-table td:first-child {
+    width: 38%;
+    color: var(--ink-soft);
+    letter-spacing: .04em;
+  }
+
+  .placeholder {
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-control);
+    background: var(--cream);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--rust);
+  }
+
+  .status-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--rust);
+  }
+
+  .cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 18px;
+    border: 1px solid var(--brand);
+    border-radius: var(--radius-control);
+    background: var(--brand);
+    color: var(--cream);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: 15px;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .cta.secondary {
+    background: var(--warm-sand);
+    border-color: var(--line);
+    color: var(--near-black);
+  }
+
+  .cta.disabled {
+    background: transparent;
+    color: var(--stone);
+    border-color: var(--line-strong);
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .note {
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-paper);
+    background: var(--ivory);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .note strong { color: var(--ink); }
+
+  .page-main a:not(.cta) { color: var(--brand); }
+  .page-main a:not(.cta):hover { color: var(--brand-light); }
+
+  .page-footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+
+  .footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+  }
+
+  .footer-nav a {
+    text-decoration: none;
+    color: var(--ink-soft);
+  }
+
+  .footer-nav a:hover { color: var(--ink); }
+
+  @media (max-width: 720px) {
+    .section {
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .sheet { padding: 32px 0 64px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="page-header">
+    <a class="brand" href="index.html">
+      <svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" fill="#e8e6dc" />
+        <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d" />
+        <path d="M48 14h5v36h-5z" fill="#2d5a8a" />
+      </svg>
+      <span>First Line</span>
+    </a>
+    <a class="header-back" href="index.html">Back to landing</a>
+  </header>
+
+  <main class="page-main">
+    <p class="eyebrow">Download</p>
+    <h1>The Mac build has not shipped.</h1>
+    <p class="page-lede">First Line will be available here after Developer ID signing and notarization are complete. The public download is intentionally not enabled yet.</p>
+
+    <section class="section">
+      <p class="section-label">Status</p>
+      <div class="section-body">
+        <p><span class="status-badge">In preparation</span></p>
+        <p>The signed, notarized Mac disk image is the only build that will appear on this page. No unsigned build is distributed as a public release.</p>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="section-label">Release details</p>
+      <div class="section-body">
+        <p>No public build has shipped yet. When the signed, notarized disk image is published, this page will list the version, file, SHA-256 checksum, signing identity, and notarization status.</p>
+        <table class="meta-table">
+          <tr><td>macOS requirement</td><td>macOS 13 or later (subject to final build)</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="section-label">Already bought?</p>
+      <div class="section-body">
+        <div class="note">
+          <p><strong>Keep the Dodo email.</strong> Dodo emails your receipt and license key after checkout. You will need the key to activate First Line on your Macs after the signed build is released here.</p>
+          <p>If you cannot find the email, check the inbox used at checkout, including spam and promotions folders. The license key is sent by Dodo Payments, not from this site.</p>
+        </div>
+        <p style="margin-top: 18px;">
+          <a class="cta disabled" href="#" aria-disabled="true">Download unavailable</a>
+          <a class="cta secondary" href="help.html">License and activation help</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="section">
+      <p class="section-label">Pricing</p>
+      <div class="section-body">
+        <p>First Line Early Bird License is a one-time purchase of <strong>USD&nbsp;$5</strong>, covering <strong>2 Macs</strong>. No subscription.</p>
+        <p><a class="cta secondary" href="refund.html">Refund policy</a></p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="page-footer">
+    <nav class="footer-nav" aria-label="Support">
+      <a href="help.html">Help</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="refund.html">Refund</a>
+      <a href="release-notes.html">Release notes</a>
+      <a href="checkout-success.html">After purchase</a>
+    </nav>
+    <p>First Line. A forward-only writing app for Mac.</p>
+  </footer>
+</div>
+</body>
+</html>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<meta name="description" content="First Line is a forward-only writing app. You cannot delete, paste, or undo. If you stop for eight seconds, the draft is deleted." />
-<title>First Line - Write Without Going Back</title>
+<meta name="description" content="Zero Draft makes polishing impossible: no deleting, pasting, or undo. Stop for eight seconds and the draft is gone - write forward for sixty seconds and keep the draft before the draft." />
+<title>Zero Draft - The draft before the draft</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
 <script type="module" src="datastar-pro.js"></script>
 <script type="module">
@@ -453,7 +453,7 @@ window.FirstLineLandingDemo = (() => {
     const remaining = Math.max(0, duration - elapsed);
     if (elapsed >= duration) {
       const trimmed = (text || "").trim();
-      emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, now) });
+      emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, now), resultWordCount: wordCount(trimmed) });
       return;
     }
     const idle = (now - lastInputAt) / 1000;
@@ -475,7 +475,7 @@ window.FirstLineLandingDemo = (() => {
       focusWithoutScroll(sessionEditor());
       return;
     }
-    emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, Date.now()) });
+    emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, Date.now()), resultWordCount: wordCount(trimmed) });
   }
 
   function showInlineChrome() {
@@ -731,7 +731,7 @@ window.FirstLineLandingDemo = (() => {
     if (el) { el.blur(); el.setAttribute("contenteditable", "false"); }
     clearEditorDanger();
     if (context === "inline") hideInlineChrome();
-    requestAnimationFrame(() => sessionResultEl()?.querySelector(".trial-copy")?.focus({ preventScroll: true }));
+    requestAnimationFrame(() => sessionResultEl()?.querySelector(".trial-copy-ai")?.focus({ preventScroll: true }));
   }
   function onFail(context) {
     const el = sessionEditor();
@@ -1080,6 +1080,8 @@ if (document.readyState === "loading") {
     --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
     --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
     --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong", serif;
+    --rule-red: #b53333;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
 
   * { box-sizing: border-box; }
@@ -1516,7 +1518,7 @@ if (document.readyState === "loading") {
     display: grid;
     align-content: start;
     gap: 18px;
-    padding: clamp(30px, 3.2vw, 42px) clamp(22px, 5vw, 68px) clamp(34px, 4vw, 54px);
+    padding: clamp(30px, 3.2vw, 42px) clamp(20px, 3vw, 44px) clamp(34px, 4vw, 54px);
     border: 0;
     border-radius: var(--radius-paper);
     transform-origin: top left;
@@ -1834,8 +1836,8 @@ if (document.readyState === "loading") {
     height: 100%;
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding-right: clamp(22px, 5vw, 68px);
-    padding-left: clamp(22px, 5vw, 68px);
+    padding-right: clamp(20px, 3vw, 44px);
+    padding-left: clamp(20px, 3vw, 44px);
     scrollbar-width: thin;
     scrollbar-color: var(--line) transparent;
   }
@@ -2640,7 +2642,7 @@ if (document.readyState === "loading") {
   }
 
   .primary-cta,
-  .trial-copy,
+  .trial-copy-ai,
   .trial-restart {
     border-color: var(--blue);
     background: var(--blue);
@@ -2649,7 +2651,7 @@ if (document.readyState === "loading") {
   }
 
   .primary-cta:hover,
-  .trial-copy:hover,
+  .trial-copy-ai:hover,
   .trial-restart:hover {
     background: var(--brand-light);
     color: var(--cream);
@@ -2764,7 +2766,7 @@ if (document.readyState === "loading") {
   }
 
   .primary-cta,
-  .trial-copy,
+  .trial-copy-ai,
   .trial-restart {
     border-color: var(--blue);
     background: var(--blue);
@@ -2773,7 +2775,7 @@ if (document.readyState === "loading") {
   }
 
   .primary-cta:hover,
-  .trial-copy:hover,
+  .trial-copy-ai:hover,
   .trial-restart:hover {
     background: var(--brand-light);
     color: var(--cream);
@@ -3310,7 +3312,7 @@ if (document.readyState === "loading") {
   }
 
   .hero-frame {
-    min-height: calc(100vh - 36px);
+    min-height: auto;
     margin-bottom: 0;
     padding-bottom: 0;
     border-bottom: 0;
@@ -3444,11 +3446,11 @@ if (document.readyState === "loading") {
     border: 0;
     border-radius: var(--radius-paper);
     padding: clamp(36px, 4vw, 56px) clamp(22px, 5vw, 68px) clamp(40px, 5vw, 64px);
+    overflow: hidden;
     background:
-      linear-gradient(180deg, rgba(250, 249, 245, .98), rgba(250, 249, 245, .84)),
-      repeating-linear-gradient(0deg, transparent 0 30px, var(--border-soft) 31px 32px),
-      var(--paper);
-    box-shadow: var(--shadow-paper-lift);
+      repeating-linear-gradient(to bottom, transparent 0 31px, rgba(80, 78, 73, .10) 31px 32px),
+      var(--ivory);
+    box-shadow: var(--shadow-paper);
   }
 
   .demo-writing-surface::after {
@@ -3697,10 +3699,574 @@ if (document.readyState === "loading") {
     html { scroll-behavior: auto; }
     *, *::before, *::after { animation: none; transition: none; }
   }
+
+  /* === Zero Draft hero: left copy + right paper grid ==================== */
+  /* Final layer: converts the stacked hero into a two-column Fable layout.
+     Kept last so it wins the cascade over the earlier single-focus rules. */
+  .demo-body {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: clamp(40px, 4.6vw, 68px);
+    align-items: start;
+  }
+
+  .hero-copy {
+    width: 100%;
+    margin: 0;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .hero-kicker {
+    margin: 0;
+    color: var(--brand);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(12px, .9vw, 13px);
+    font-weight: 500;
+    letter-spacing: .06em;
+    line-height: 1.4;
+  }
+
+  .hero-lead {
+    font-size: clamp(34px, 3vw, 46px);
+    line-height: 1.12;
+  }
+
+  .hero-lead-sub {
+    max-width: 22ch;
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(20px, 1.7vw, 25px);
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -.02em;
+  }
+
+  .hero-note {
+    max-width: 38ch;
+    font-size: clamp(14px, 1.05vw, 16px);
+    line-height: 1.6;
+  }
+
+  /* The paper fills the right grid column instead of spanning the page. */
+  .demo-writing-surface {
+    width: 100%;
+    min-height: clamp(460px, 60vh, 600px);
+    margin: 0;
+  }
+
+  /* Notebook left-margin rule; it strengthens while danger ramps. */
+  .demo-writing-surface::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 52px;
+    width: 1.5px;
+    background: rgba(181, 51, 51, .32);
+    z-index: 1;
+    pointer-events: none;
+    transition: background 200ms ease-out, box-shadow 200ms ease-out, width 200ms ease-out;
+  }
+
+  .demo-writing-surface.is-demo-danger::before {
+    background: rgba(181, 51, 51, .6);
+    width: 4px;
+    box-shadow: 0 0 14px rgba(181, 51, 51, .3);
+    transition: background 3s linear, box-shadow 3s linear, width 3s linear;
+  }
+
+  @media (max-width: 860px) {
+    .demo-body {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+
+    .hero-copy {
+      width: 100%;
+    }
+
+    .hero-lead {
+      font-size: 30px;
+      line-height: 1.2;
+    }
+
+    .hero-lead-sub {
+      font-size: 18px;
+    }
+
+    .hero-note {
+      max-width: 100%;
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .demo-writing-surface {
+      width: 100%;
+      min-height: clamp(320px, 52vh, 480px);
+      margin-top: 30px;
+      padding: 28px 20px 36px;
+    }
+  }
+
+  /* === Milestone 2: result "done" metric + explanatory sections =========== */
+
+  /* Result metric: big word count + fixed label (replaces the result-words line). */
+  .result-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .result-metric-number {
+    color: var(--ink);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(54px, 7vw, 84px);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -.045em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result-metric-label {
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(14px, 1.1vw, 16px);
+    font-weight: 400;
+    line-height: 1.4;
+    letter-spacing: -.01em;
+  }
+
+  /* Shared section wrapper: aligns with the hero grid and the footer left edge. */
+  .feature-section {
+    width: min(1180px, 100%);
+    margin: 0 auto;
+    padding: clamp(36px, 4.5vh, 56px) 0;
+  }
+
+  .section-overline {
+    margin: 0 0 14px;
+    color: var(--brand);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(12px, .9vw, 13px);
+    font-weight: 500;
+    letter-spacing: .06em;
+    line-height: 1.4;
+  }
+
+  /* Before/after: raw zero draft vs. cleaned first draft. */
+  .ba-title {
+    max-width: 22ch;
+    margin: 0 0 18px;
+    color: var(--ink);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(26px, 3vw, 40px);
+    font-weight: 500;
+    line-height: 1.15;
+    letter-spacing: -.03em;
+  }
+
+  .ba-intro {
+    max-width: 60ch;
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(16px, 1.25vw, 19px);
+    line-height: 1.6;
+  }
+
+  .ba-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: clamp(16px, 2vw, 28px);
+    margin: clamp(26px, 3vh, 38px) 0;
+  }
+
+  .ba-card {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-paper);
+    background: var(--ivory);
+    padding: clamp(18px, 2vw, 26px);
+    box-shadow: var(--shadow-paper);
+  }
+
+  .ba-card-label {
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(12px, .9vw, 13px);
+    font-weight: 500;
+    letter-spacing: .04em;
+  }
+
+  .ba-card-clean .ba-card-label {
+    color: var(--brand);
+  }
+
+  .ba-card-body {
+    margin: 0;
+    color: var(--dark-warm);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(14px, 1.1vw, 16px);
+    line-height: 1.65;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+  }
+
+  .ba-card-clean .ba-card-body {
+    color: var(--ink);
+  }
+
+  .ba-arrow {
+    display: grid;
+    place-items: center;
+    color: var(--brand-light);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(22px, 2vw, 30px);
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  .ba-caption {
+    max-width: 66ch;
+    margin: 0;
+    color: var(--ink-soft);
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(13px, 1vw, 15px);
+    line-height: 1.6;
+  }
+
+  /* House rules. */
+  .rules-section {
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .rules-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+  }
+
+  .rule {
+    padding: clamp(20px, 2.4vw, 26px) 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .rule:last-child {
+    border-bottom: 0;
+  }
+
+  .rule-name,
+  .rule-body {
+    font-family: var(--font-body), var(--font-cn);
+    font-size: clamp(16px, 1.3vw, 19px);
+    line-height: 1.6;
+  }
+
+  .rule-name {
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: -.02em;
+  }
+
+  .rule-body {
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 860px) {
+    .ba-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .ba-arrow {
+      transform: rotate(90deg);
+    }
+
+    .feature-section {
+      padding: clamp(32px, 5vh, 44px) 0;
+    }
+  }
+
+  /* === GPT visual review fixes (final layer; wins the cascade) ========== */
+
+  /* B1: result/failure cards occupy the paper's grid cell, not a full-width row. */
+  .demo-result,
+  .demo-failure {
+    width: 100%;
+    margin: 0;
+  }
+  .demo-result .trial-result-card,
+  .demo-failure .trial-result-card {
+    min-height: 440px;
+    place-content: center;
+    justify-items: center;
+    text-align: center;
+    padding: 32px;
+  }
+
+  /* B2: shared content measure keeps nav, hero, sections, and footer aligned. */
+  .nav,
+  .demo-body,
+  .feature-section,
+  .site-footer {
+    width: min(1120px, 100%);
+  }
+
+  /* F1: hero hierarchy. */
+  .hero-copy {
+    gap: 0;
+  }
+  .hero-kicker {
+    margin: 0 0 22px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .hero-lead {
+    margin: 0 0 26px;
+    font-size: clamp(38px, 4.6vw, 58px);
+    line-height: 1.1;
+    letter-spacing: -.01em;
+    text-wrap: balance;
+  }
+  .hero-lead-sub {
+    max-width: none;
+    margin: 0 0 12px;
+    color: var(--ink);
+    font-size: 19px;
+    line-height: 1.4;
+    letter-spacing: 0;
+  }
+  .hero-note {
+    max-width: 44ch;
+    margin: 0 0 12px;
+    color: var(--ink-soft);
+    font-size: 16px;
+    line-height: 1.55;
+  }
+  .hero-action-block {
+    margin-top: 18px;
+    padding-top: 0;
+  }
+
+  /* F2: session chrome reads as a quiet paper header. */
+  .demo-writing-surface.is-live .demo-session-chrome {
+    position: absolute;
+    left: 68px;
+    right: 20px;
+    top: 12px;
+    z-index: 8;
+  }
+  .demo-writing-surface.is-live .demo-session-bar {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .demo-writing-surface.is-live .demo-session-timer,
+  .demo-writing-surface.is-live .trial-prompt-toggle,
+  .demo-writing-surface.is-live .trial-finish {
+    min-height: auto;
+    padding: 4px 6px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--stone);
+  }
+  .demo-writing-surface.is-live .demo-session-timer {
+    font-family: var(--font-mono);
+    font-size: 13px;
+  }
+
+  /* F3: inline result is a concise done state (fullscreen trial stays as-is). */
+  .demo-result .result-metric {
+    align-items: center;
+  }
+  .demo-result .result-metric-number {
+    font-size: 56px;
+  }
+  .demo-result .result-metric-label {
+    font-size: 13px;
+  }
+  .demo-result .trial-result-text {
+    display: none;
+  }
+  .demo-result .trial-result-card {
+    justify-items: center;
+    text-align: center;
+  }
+  .demo-result .trial-result-actions {
+    justify-content: center;
+  }
+  .demo-result .trial-export-actions {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  /* F4: section headings at editorial scale. */
+  .section-overline {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+  }
+  .ba-title {
+    max-width: none;
+    margin: 0 0 14px;
+    font-size: 24px;
+    line-height: 1.25;
+    letter-spacing: 0;
+  }
+  .ba-intro {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* F5: before/after cards as labeled figures. */
+  .ba-card {
+    border-radius: 12px;
+    padding: 24px 26px;
+    gap: 12px;
+  }
+  .ba-card-label {
+    align-self: flex-start;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+  .ba-card-raw .ba-card-label {
+    background: var(--warm-sand);
+    color: var(--ink-soft);
+  }
+  .ba-card-clean .ba-card-label {
+    background: var(--blue-soft);
+    color: var(--brand);
+  }
+  .ba-arrow {
+    color: var(--stone);
+    font-size: 15px;
+  }
+  .ba-caption {
+    color: var(--stone);
+    font-size: 14px;
+  }
+
+  /* F6: house rules as marginalia. */
+  .rules-section {
+    border-top: 0;
+    padding-top: 0;
+  }
+  .rules-list {
+    max-width: 62ch;
+    border-left: 2px solid var(--brand);
+    padding-left: 26px;
+  }
+  .rule {
+    border: 0;
+    padding: 9px 0;
+    transform: none;
+  }
+  .rule::before {
+    content: "";
+    display: inline-block;
+    width: 14px;
+    height: 0;
+    margin-right: 10px;
+    border-top: 1px solid var(--brand);
+    vertical-align: middle;
+  }
+  .rule-name,
+  .rule-body {
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* F7: drop dead spacing. */
+  .demo-footer {
+    display: none;
+  }
+  .ba-section {
+    padding-bottom: 16px;
+  }
+
+  /* F8: brand seal clipped to a small rounded tile. */
+  .seal {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 0 0 1px var(--line);
+  }
+
+  /* Desktop-only geometry. */
+  @media (min-width: 861px) {
+    .sheet {
+      margin-top: 0;
+    }
+    .nav {
+      min-height: 30px;
+    }
+    .hero {
+      padding: 44px 0 72px;
+    }
+    .demo-body {
+      grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+      gap: 56px;
+    }
+    .demo-writing-surface,
+    .demo-writing-surface.is-live {
+      min-height: 440px;
+      height: 440px;
+    }
+    .demo-result,
+    .demo-failure {
+      grid-column: 2;
+      grid-row: 1;
+      width: 100%;
+      margin: 0;
+    }
+  }
+
+  /* Mobile. */
+  @media (max-width: 860px) {
+    .demo-body {
+      grid-template-columns: 1fr;
+      gap: 0;
+    }
+    .demo-writing-surface,
+    .demo-writing-surface.is-live {
+      min-height: 380px;
+      height: 380px;
+    }
+    .demo-result,
+    .demo-failure {
+      grid-column: 1;
+      grid-row: auto;
+      margin-top: 30px;
+    }
+    .hero {
+      padding: 18px 0 34px;
+    }
+    .hero-lead {
+      font-size: 38px;
+    }
+    .hero-lead-sub {
+      max-width: none;
+    }
+    .site-footer {
+      margin-top: 24px;
+    }
+  }
 </style>
 </head>
 <body
-  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false}}'
+  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false}}'
   data-computed:_session.clock="String(Math.floor($_session.remaining/60)).padStart(2,'0')+':'+String($_session.remaining%60).padStart(2,'0')"
   data-class:trial-mode="$_session.context === 'trial'"
   data-class:trial-complete="$_session.complete &amp;&amp; $_session.context === 'trial'"
@@ -3709,10 +4275,10 @@ if (document.readyState === "loading") {
   data-on-interval__duration.250ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
   data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.context); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.context)"
   data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
-  data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
-  data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60)); $_session.toastVisible = false; $_session.toastText = ''"
-  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
-  data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60)); $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.resultWordCount = evt.detail.resultWordCount; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flfail="$_session.active = false; $_session.failed = true; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.resultText = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:fldanger="$_session.dangerSeconds = evt.detail.dangerSeconds; $_session.dangerActive = evt.detail.dangerActive; (typeof evt.detail.remaining !== 'undefined') &amp;&amp; ($_session.remaining = evt.detail.remaining)"
   data-on:fltoast="$_session.toastText = evt.detail.message; $_session.toastVisible = true"
@@ -3721,7 +4287,7 @@ if (document.readyState === "loading") {
   data-on:flpromptdismiss="$_session.promptOpen = false"
   data-on:flpromptset="$_session.promptIndex = evt.detail.index; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
   data-on:flpromptreset="$_session.promptIndex = evt.detail.index; $_session.promptOpen = false; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
-  data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flmorphing="$_session.morphing = evt.detail.v"
   data-on:keydown__document="FirstLineLandingDemo.onGlobalKeydown(evt, $_session.text, $_session.context, $_session.startedAt)"
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
@@ -3731,21 +4297,24 @@ if (document.readyState === "loading") {
     <main id="top">
       <section class="hero-frame">
         <nav class="nav" aria-label="Primary">
-          <a class="brand" href="#top"><svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" fill="#e8e6dc"/><path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d"/><path d="M48 14h5v36h-5z" fill="#2d5a8a"/></svg><span class="brand-name">First Line</span></a>
+          <a class="brand" href="#top"><svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" fill="#e8e6dc"/><path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d"/><path d="M48 14h5v36h-5z" fill="#2d5a8a"/></svg><span class="brand-name">Zero Draft</span></a>
           <a class="nav-price" href="download.html">Mac release</a>
         </nav>
         <section class="hero" aria-labelledby="hero-title">
-          <section id="demo" class="live-demo" aria-label="First Line product preview">
+          <section id="demo" class="live-demo" aria-label="Zero Draft product preview">
             <div class="demo-window">
               <div class="demo-body">
                 <div class="hero-copy">
-                  <h1 id="hero-title" class="hero-lead"><span>Write.</span> <span>Don't go back.</span></h1>
-                  <p class="hero-note">You cannot delete, paste, or undo. If you stop for eight seconds, the draft is deleted.</p>
+                  <p class="hero-kicker">Zero Draft · a writing tool</p>
+                  <h1 id="hero-title" class="hero-lead">It's not supposed to be good yet.</h1>
+                  <p class="hero-lead-sub">So we made polishing impossible.</p>
+                  <p class="hero-note">No deleting, no pasting, no undo - stop for eight seconds and it's gone. Set the timer and write forward only. Sixty seconds is plenty.</p>
+                  <p class="hero-note">Typos and all, you walk away with a zero draft: the draft before the draft. Keep it raw - or copy it into any AI and watch it come back a real one.</p>
                   <div class="hero-action-block">
                     <div class="hero-actions">
-                      <a class="cta primary-cta" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write for 1 minute</a>
+                      <a class="cta primary-cta" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Give it sixty seconds.</a>
                     </div>
-                    <p class="hero-hint">Or select the paper and start typing.</p>
+                    <p class="hero-hint">or just click the paper and type</p>
                   </div>
                 </div>
                 <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-on:click="FirstLineLandingDemo.activateInline()">
@@ -3765,17 +4334,20 @@ if (document.readyState === "loading") {
                   </div>
                   <div class="demo-editor-stack">
                     <div class="demo-preview" aria-hidden="true"></div>
-                    <div class="live-demo-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line live writing surface" spellcheck="false"></div>
+                    <div class="live-demo-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft live writing surface" spellcheck="false"></div>
                   </div>
                   <p class="live-demo-danger" data-show="$_session.dangerSeconds &gt; 0 &amp;&amp; $_session.context !== 'trial'" aria-live="polite" aria-atomic="true"><span class="danger-count" data-text="$_session.dangerSeconds"></span><span class="danger-hint">Keep typing or the draft will be deleted.</span></p>
                 </div>
                 <section class="demo-result" data-show="$_session.complete &amp;&amp; $_session.context === 'inline'" aria-live="polite" aria-label="Session result">
                   <div class="trial-result-card">
+                    <div class="result-metric">
+                      <span class="result-metric-number" data-text="$_session.resultWordCount"></span>
+                      <span class="result-metric-label">words you would not have written</span>
+                    </div>
                     <article class="trial-result-text" data-text="$_session.resultText"></article>
-                    <p class="trial-result-words" data-text="$_session.resultWords"></p>
                     <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
-                      <button type="button" class="cta trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
-                      <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+                      <button type="button" class="cta trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+                      <button type="button" class="cta secondary trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
                       <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
                     </div>
                     <div class="trial-result-actions">
@@ -3804,8 +4376,33 @@ if (document.readyState === "loading") {
         </section>
       </section>
     </main>
+    <section class="feature-section ba-section" aria-labelledby="ba-title">
+      <p class="section-overline">What comes out</p>
+      <h2 id="ba-title" class="ba-title">Raw goes in. A draft comes back.</h2>
+      <p class="ba-intro">A zero draft is not meant to be read - it's meant to exist. Once it exists, shaping it is the easy part.</p>
+      <div class="ba-grid">
+        <figure class="ba-card ba-card-raw">
+          <figcaption class="ba-card-label">zero draft · 58 seconds</figcaption>
+          <div class="ba-card-body">i keep riting the same opening line<br>then delting it befor it gets going<br>teh point is just to get sumthing down<br>fixing it later is the ez part<br>so ill write the bad versoin now</div>
+        </figure>
+        <div class="ba-arrow" aria-hidden="true">→</div>
+        <figure class="ba-card ba-card-clean">
+          <figcaption class="ba-card-label">first draft · via your AI</figcaption>
+          <div class="ba-card-body">I keep writing the same opening line, then deleting it before it gets going.<br><br>The point is just to get something down. Fixing it later is the easy part, so I'll write the bad version now.</div>
+        </figure>
+      </div>
+      <p class="ba-caption">The shaping happens in whatever AI you already use. Copy for AI puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point.</p>
+    </section>
+    <section class="feature-section rules-section" aria-label="House rules">
+      <p class="section-overline">House rules</p>
+      <ol class="rules-list">
+        <li class="rule"><span class="rule-name">Forward only.</span> <span class="rule-body">Backspace, delete, paste, and undo do nothing. Mistyped a word? Keep going.</span></li>
+        <li class="rule"><span class="rule-name">Eight seconds.</span> <span class="rule-body">Pause for five and a countdown starts. Reach eight, and the draft deletes itself.</span></li>
+        <li class="rule"><span class="rule-name">Your timer.</span> <span class="rule-body">Sixty seconds is plenty for a thesis and the points around it.</span></li>
+      </ol>
+    </section>
     <footer class="site-footer">
-      <p>First Line. A forward-only writing app for Mac. Your writing never leaves this page.</p>
+      <p>Zero Draft - the draft before the draft. Your writing never leaves this page.</p>
       <nav class="footer-nav" aria-label="Support">
         <a href="help.html">Help</a>
         <a href="privacy.html">Privacy</a>
@@ -3815,7 +4412,7 @@ if (document.readyState === "loading") {
       </nav>
     </footer>
   </div>
-  <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="First Line writing trial" aria-hidden="true">
+  <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="Zero Draft writing trial" aria-hidden="true">
     <div class="trial-writing-surface">
       <div class="trial-hud" aria-label="Trial status">
         <span class="trial-timer" data-text="$_session.clock">01:00</span>
@@ -3833,14 +4430,17 @@ if (document.readyState === "loading") {
         </p>
       </div>
       <p class="trial-danger" data-show="$_session.dangerSeconds &gt; 0 &amp;&amp; $_session.context === 'trial'" aria-live="assertive" aria-atomic="true"><span class="danger-count" data-text="$_session.dangerSeconds"></span><span class="danger-hint">Keep typing or the draft will be deleted.</span></p>
-      <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line trial editor" spellcheck="false"></div>
+      <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
       <section class="trial-result" data-show="$_session.complete &amp;&amp; $_session.context === 'trial'" aria-live="polite" aria-label="Trial result">
         <div class="trial-result-card">
+          <div class="result-metric">
+            <span class="result-metric-number" data-text="$_session.resultWordCount"></span>
+            <span class="result-metric-label">words you would not have written</span>
+          </div>
           <article class="trial-result-text" data-text="$_session.resultText"></article>
-          <p class="trial-result-words" data-text="$_session.resultWords"></p>
           <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
-            <button type="button" class="cta trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
-            <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+            <button type="button" class="cta trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+            <button type="button" class="cta secondary trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
             <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
           </div>
           <div class="trial-result-actions">

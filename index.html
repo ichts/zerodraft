@@ -120,12 +120,13 @@ window.FirstLineLandingDemo = (() => {
   // Global key handler registered via data-on:keydown__document. Handles Escape
   // (exit trial) and Cmd/Ctrl+Enter (finish) with IME composition guards.
   function onGlobalKeydown(evt, text, context, startedAt) {
-    if (evt.key === "Escape" && !evt.isComposing && contextFromDom() === "trial") {
+    if (internal.composing || evt.isComposing) return;
+    if (evt.key === "Escape" && contextFromDom() === "trial") {
       evt.preventDefault();
       exitTrial();
       return;
     }
-    if (evt.key === "Enter" && (evt.metaKey || evt.ctrlKey) && !evt.isComposing && (isTrial() || isInline())) {
+    if (evt.key === "Enter" && (evt.metaKey || evt.ctrlKey) && (isTrial() || isInline())) {
       evt.preventDefault();
       tryFinish(text, context, startedAt);
     }
@@ -304,9 +305,10 @@ window.FirstLineLandingDemo = (() => {
     trialEditor()?.classList.remove("is-demo-danger");
   }
 
-  function commitInput(el, text) {
+  function commitInput(el, text, { render = true } = {}) {
     emit("flinput", { text, now: Date.now() });
     clearEditorDanger();
+    if (!render) return;
     renderZen(el, text);
     syncZenView();
   }
@@ -365,8 +367,7 @@ window.FirstLineLandingDemo = (() => {
     }, true);
     el.addEventListener("input", () => {
       if (!isActiveContext()) return;
-      if (internal.composing) return;
-      commitInput(el, normalizeTrialText(el.innerText));
+      commitInput(el, normalizeTrialText(el.innerText), { render: !internal.composing });
     });
     el.addEventListener("paste", (evt) => evt.preventDefault(), true);
     el.addEventListener("drop", (evt) => evt.preventDefault(), true);
@@ -467,6 +468,7 @@ window.FirstLineLandingDemo = (() => {
   // --- Transitions (browser DOM work + events that patch signals) ------------
   function tryFinish(text, context, startedAt) {
     if (context !== "inline" && context !== "trial") return;
+    if (sessionEditor()?.isContentEditable === false) return;
     const trimmed = (text || "").trim();
     if (!wordCount(trimmed)) {
       showToast("Write something first.");
@@ -676,6 +678,7 @@ window.FirstLineLandingDemo = (() => {
       // declarative data-class:trial-mode / data-class:is-live bindings apply
       // synchronously. trial-mode is no longer toggled imperatively.
       emit("flentertrial", { handoff });
+      clearEditorDanger();
       if (inlineActive) deactivateInlineForTrial(handoff);
       el.innerHTML = "";
       el.setAttribute("contenteditable", "true");
@@ -711,6 +714,7 @@ window.FirstLineLandingDemo = (() => {
       setLandingInert(false);
       if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
       emit("flexittrial");
+      clearEditorDanger();
     }, () => elementMorphRect(demoSurface())).then(() => {
       internal.returnFocusElement = null;
       const coarse = Boolean(window.matchMedia?.("(pointer: coarse)").matches);
@@ -3705,11 +3709,11 @@ if (document.readyState === "loading") {
   data-on-interval__duration.250ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
   data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.context); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.context)"
   data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
-  data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
-  data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60))"
-  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
-  data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.dangerSeconds = 0; $_session.dangerActive = false"
-  data-on:flfail="$_session.active = false; $_session.failed = true; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.resultText = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60)); $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flfail="$_session.active = false; $_session.failed = true; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.resultText = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:fldanger="$_session.dangerSeconds = evt.detail.dangerSeconds; $_session.dangerActive = evt.detail.dangerActive; (typeof evt.detail.remaining !== 'undefined') &amp;&amp; ($_session.remaining = evt.detail.remaining)"
   data-on:fltoast="$_session.toastText = evt.detail.message; $_session.toastVisible = true"
   data-on:fltoast__window__debounce.1700ms="$_session.toastVisible = false"
@@ -3717,7 +3721,7 @@ if (document.readyState === "loading") {
   data-on:flpromptdismiss="$_session.promptOpen = false"
   data-on:flpromptset="$_session.promptIndex = evt.detail.index; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
   data-on:flpromptreset="$_session.promptIndex = evt.detail.index; $_session.promptOpen = false; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
-  data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flmorphing="$_session.morphing = evt.detail.v"
   data-on:keydown__document="FirstLineLandingDemo.onGlobalKeydown(evt, $_session.text, $_session.context, $_session.startedAt)"
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"

@@ -14,8 +14,9 @@ These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do no
 - `index.html` is the canonical landing page and deployment source of truth.
 - `kami-landing.html` is a visual reference copy. Do not assume it is synchronized with `index.html`.
 - `download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, and `release-notes.html` are supporting public pages.
-- The web pages are self-contained static HTML with inline vanilla CSS and JavaScript. Do not add Datastar or a build framework to the current landing unless the user explicitly requests an architecture change.
-- The trial/demo API is `window.FirstLineLandingDemo`. Preserve `.demo-writing-surface`, `.live-demo-editor`, `.demo-session-bar`, `.demo-result`, `.demo-failure`, `.demo-toast`, `.demo-prompt`, `.trial-overlay`, `.trial-writing-surface`, `.trial-editor`, `[data-trial-launch]`, and the `#trial` route.
+- The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) are self-contained static HTML with inline vanilla CSS and JavaScript and no framework.
+- `index.html` (the landing and trial surface) is Datastar-native: it loads `datastar-pro.js` as an ES module and keeps inline CSS plus an inline browser-bridge module. Do not add any other build framework. Do not regress the landing back to a parallel vanilla state machine.
+- The trial/demo API is `window.FirstLineLandingDemo`. It is now the browser-bridge layer (see "Web architecture boundary"): a set of stateless functions that read the DOM, perform browser-only work, and dispatch custom `fl*` DOM events. Preserve `.demo-writing-surface`, `.live-demo-editor`, `.demo-session-bar`, `.demo-result`, `.demo-failure`, `.demo-toast`, `.demo-prompt`, `.trial-overlay`, `.trial-writing-surface`, `.trial-editor`, `[data-trial-launch]`, and the `#trial` route.
 - Preserve the forward-only writing contract: input appends at the end; deletion, paste, cut, undo, and selection replacement stay blocked; IME composition remains usable; danger begins after 5 seconds of silence and failure clears the current draft at 8 seconds.
 - A trial session completes either by writing for the full 60 seconds or by clicking Finish (also Cmd/Ctrl+Enter). Both paths lead to the same result card.
 - The trial result card offers Copy full text, Copy for AI, and Download .md as export actions. Copy for AI formats the draft with a cleanup prompt for the user's AI-to-Obsidian workflow.
@@ -31,11 +32,19 @@ These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do no
 
 ## Web architecture boundary
 
-- Name the runtime before implementing a web interaction. Do not mix a vanilla state machine and Datastar signals on the same surface.
-- The current landing and trial are vanilla by design. Do not describe their imperative JavaScript as Datastar-native or sprinkle `data-*` expressions over the existing state machine.
-- A Datastar adoption is a deliberate whole-surface migration that requires explicit user authorization and an updated architecture contract in this file.
-- If the root surface migrates to Datastar, signals and `data-on:*` expressions own ordinary UI state and actions. Keep custom JavaScript only for browser-only capabilities such as contenteditable selection, IME composition, clipboard access, and necessary animation APIs.
-- In a Datastar implementation, do not maintain duplicate truth in signals and JavaScript. Durable business truth belongs to the server; browser signals are transient UI state.
+Runtime on the landing/trial surface: Datastar Pro v1.0.2 (`datastar-pro.js`, loaded as `type="module"`). v1 colon syntax only (`data-signals`, `data-computed`, `data-text`, `data-show`, `data-class`, `data-attr`, `data-on:*`, `data-on-interval`, `data-effect`, `data-ignore`). Pure frontend: no backend, no SSE, no `@get/@post`, no `data-persist`, no `data-query-string`.
+
+- Signals are the ONLY UI-state truth. The session state lives in the `_session.*` signal object declared on `<body>` via `data-signals` (context, active, failed, complete, text, startedAt, duration, lastInputAt, remaining, dangerSeconds, dangerActive, resultText, resultWords, promptOpen, promptIndex, promptText, toastVisible, toastText, morphing). `_session.clock` is `data-computed`. There is NO parallel JS state object.
+- The runtime also exports `root`, `mergePatch`, `mergePaths`, and `getPath`. `root` IS the same page signal store the bindings read, and writing it from JavaScript does update bindings. Those exports are a thinly documented, version-sensitive programmatic surface, not an officially preferred application API. The project deliberately does NOT write signals through them. Its single JS-to-signal policy is the custom-event bridge: JavaScript dispatches custom `fl*` DOM events and `data-on:fl*` expressions write the signals. This is a project-chosen boundary, not a runtime limitation. Do not switch to `root`/`mergePaths` writes and do not mix the two write policies.
+- `window.FirstLineLandingDemo` is a stateless browser-bridge module. It holds no UI state (only genuinely non-UI plumbing: the IME composition flag, timers and observers, demo animation timeline counters, focus return references, and WAAPI/geometry state). Bridge contract:
+  - READ UI state from the DOM (element text, the `body.trial-mode` / `.demo-writing-surface.is-live` / `body.trial-morphing` classes (all declarative `data-class`, mirroring `_session.context`/`_session.morphing`), and contenteditable state) or from values passed in by expressions; never from the signal store directly.
+  - WRITE UI state by dispatching custom `fl*` DOM events on `document.body` (e.g. `flinput`, `flactivate`, `flentertrial`, `flexittrial`, `flcomplete`, `flfail`, `fldanger`, `fltoast`, `flprompt*`, `flreset`, `flmorphing`, `flroutecheck`). The matching `data-on:fl*` expressions on `<body>` translate each event's `evt.detail` into signal patches.
+- The session ticker is a `data-on-interval__duration.250ms` expression that reads signals and calls the pure `FirstLineLandingDemo.tickDispatch(...)` helper, which dispatches `flcomplete` / `flfail` / `fldanger`. Pure helpers called from expressions are allowed; they must be stateless.
+- DOM side-effects of state transitions (blur, contenteditable toggle, focus move, inline chrome hide) run in `FirstLineLandingDemo.onComplete` / `onFail`, invoked from `data-effect` expressions that watch `_session.complete` / `_session.failed`.
+- Custom JavaScript remains only for browser-only capabilities: contenteditable selection and forward-only guards, IME composition, the zen renderer, the WAAPI morph, clipboard and Blob download, and the demo typing sequencer. The session editor subtree carries `data-ignore` so Datastar does not fight the zen-rendered contenteditable DOM; the editors' `is-demo-danger` class is therefore applied imperatively by the bridge while the writing-surface class is declarative (`data-class`).
+- `datastar-inspector.js` is a dev-only tool. It is loaded and the `<datastar-inspector>` element is mounted only when the page is opened with `?debug`; it is never present in production markup.
+- Do not maintain duplicate truth in signals and JavaScript. Durable business truth would belong to the server; the landing has no server, so the transient UI signals on `<body>` are the whole truth.
+- The supporting public pages remain vanilla static HTML with no framework. Do not migrate them without explicit authorization.
 
 ## Product voice
 
@@ -62,7 +71,7 @@ Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray pal
 
 ## Historical material
 
-- `prototype.html`, `src/styles/`, `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app.
+- `prototype.html`, `src/styles/`, `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app, except that `datastar-pro.js` and `datastar-inspector.js` are now ALSO the live runtime/dev-tool for the First Line landing (see "Web architecture boundary"); treat them as active there.
 - `zerodraft-prd.md` and `docs/design-system.md` describe the historical product and design system.
 - Do not restore Datastar behavior, legacy signals, old visual tokens, or `zerodraft_history` persistence into the current landing unless explicitly requested.
 

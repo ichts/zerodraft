@@ -6,1462 +6,1016 @@
 <meta name="description" content="First Line is a forward-only writing app. You cannot delete, paste, or undo. If you stop for eight seconds, the draft is deleted." />
 <title>First Line - Write Without Going Back</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
-<script>
-  window.FirstLineLandingDemo = (() => {
-    const state = {
-      active: false,
-      composing: false,
-      demoHasPlayed: false,
-      demoObserver: null,
-      demoPauseElapsed: 0,
-      demoPauseIndex: -1,
-      demoPauseStartedAt: 0,
-      demoPauseUsed: false,
-      demoPhase: 'idle',
-      demoVisible: false,
-      failed: false,
-      draftIndex: 0,
-      introTyping: false,
-      inlineMode: false,
-      lastInputTime: 0,
-      morphing: false,
-      promptIndex: 0,
-      promptOpen: false,
-      returnFocusElement: null,
-      timer: null,
-      trialComplete: false,
-      trialDuration: 60,
-      trialMode: false,
-      trialRoutePending: false,
-      trialResultText: '',
-      trialStartedAt: 0,
-      trialText: '',
-      typingIndex: 0,
-      typingTimer: null
-    };
-    const SILENCE_CLEAR_SECONDS = 8;
-    const SILENCE_BLUR_SECONDS = 5;
-    const SILENCE_COUNTDOWN_START_SECONDS = SILENCE_BLUR_SECONDS;
-    const DEMO_DANGER_DELAY = SILENCE_BLUR_SECONDS * 1000;
-    const DEMO_RECOVERY_DELAY = 7600;
-    const DEMO_PAUSE_TICK = 100;
-    const DEMO_RESUME_DELAY = 220;
-    const DEMO_START_DELAY = 500;
-    const TRIAL_CARET_ANCHOR = '\u200B';
-    const TRIAL_MORPH_DURATION = 420;
-    const TRIAL_MORPH_EASING = 'cubic-bezier(.16, 1, .3, 1)';
-    const INLINE_ANCHOR = 0.38;
-    const AI_CLEANUP_PROMPT = 'Below is my raw freewriting draft. Organize it into clear notes. Keep my original wording where possible. List any tasks or open questions separately at the end. Do not add ideas that are not in the draft.';
-    const trialPrompts = [
-      'What did you dream last night?',
-      'What happened this morning, in order.',
-      'The thing I keep putting off is\u2026',
-      'The conversation I keep replaying.',
-      'What is taking up the most space in my head right now?',
-      'The decision I already made but have not said out loud.',
-      'What I can see from where I am sitting.',
-      'The last thing that annoyed me.'
-    ];
-    const demoDrafts = [
-      "I keep fixing the first sentence\nuntil I forget what I meant to say\nso I am leaving this one alone\nand moving on",
-      "I opened this page because I was avoiding the draft\nthere is no better first sentence coming\nI can write the bad version now\nthen move it into an editor later",
-      "The point is not to write something good\nthe point is to stop interrupting the thought\nevery correction can wait\nthis minute is only for getting words out",
-      "I know what I want to say\nI keep stopping to make it sound right\nfor one minute I will not do that\nI will follow the sentence until it ends"
-    ];
+<script type="module" src="datastar-pro.js"></script>
+<script type="module">
+// First Line landing - Datastar-native session engine (Datastar Pro v1.0.2).
+//
+// Architecture: signals (declared on <body> via data-signals) are the ONLY
+// UI-state truth. This module holds NO UI state object. It is a set of
+// browser-only bridges (contenteditable selection/IME, WAAPI morph, clipboard,
+// Blob download, demo typing sequencer) that:
+//   - READ from the DOM (element text, body classes that mirror context/morphing,
+//     contenteditable state) or from values passed in by Datastar expressions;
+//   - WRITE UI state by dispatching custom DOM events, which `data-on:<event>`
+//     expressions on <body> translate into signal patches.
+// The event bridge is the project's chosen JS-to-signal policy. The runtime also
+// exports `root`/`mergePatch`/`mergePaths` (root IS the page signal store), but
+// they are a thinly documented, version-sensitive surface and are NOT used here
+// by policy. Do not mix the two write policies.
+// The session ticker lives in a `data-on-interval` expression that reads signals
+// and calls the pure FirstLineLandingDemo.tickDispatch(...) helper below.
 
-    function followupContent() {
-      return demoDrafts[state.draftIndex];
+window.FirstLineLandingDemo = (() => {
+  // Internal (non-UI) plumbing only: IME flag, timers/observers, demo sequencer
+  // counters, DOM refs. None of this is UI display state.
+  const internal = {
+    composing: false,
+    demoObserver: null,
+    demoPauseElapsed: 0,
+    demoPauseIndex: -1,
+    demoPauseStartedAt: 0,
+    demoPauseUsed: false,
+    demoVisible: false,
+    draftIndex: 0,
+    introTyping: false,
+    demoPhase: "idle",
+    demoHasPlayed: false,
+    returnFocusElement: null,
+    typingIndex: 0,
+    typingTimer: null
+  };
+
+  const SILENCE_CLEAR_SECONDS = 8;
+  const SILENCE_BLUR_SECONDS = 5;
+  const SILENCE_COUNTDOWN_START_SECONDS = SILENCE_BLUR_SECONDS;
+  const DEMO_DANGER_DELAY = SILENCE_BLUR_SECONDS * 1000;
+  const DEMO_RECOVERY_DELAY = 7600;
+  const DEMO_PAUSE_TICK = 100;
+  const DEMO_RESUME_DELAY = 220;
+  const DEMO_START_DELAY = 500;
+  const TRIAL_CARET_ANCHOR = "\u200B";
+  const TRIAL_MORPH_DURATION = 420;
+  const TRIAL_MORPH_EASING = "cubic-bezier(.16, 1, .3, 1)";
+  const INLINE_ANCHOR = 0.38;
+  const AI_CLEANUP_PROMPT = "Below is my raw freewriting draft. Organize it into clear notes. Keep my original wording where possible. List any tasks or open questions separately at the end. Do not add ideas that are not in the draft.";
+  const trialPrompts = [
+    "What did you dream last night?",
+    "What happened this morning, in order.",
+    "The thing I keep putting off is\u2026",
+    "The conversation I keep replaying.",
+    "What is taking up the most space in my head right now?",
+    "The decision I already made but have not said out loud.",
+    "What I can see from where I am sitting.",
+    "The last thing that annoyed me."
+  ];
+  const demoDrafts = [
+    "I keep fixing the first sentence\nuntil I forget what I meant to say\nso I am leaving this one alone\nand moving on",
+    "I opened this page because I was avoiding the draft\nthere is no better first sentence coming\nI can write the bad version now\nthen move it into an editor later",
+    "The point is not to write something good\nthe point is to stop interrupting the thought\nevery correction can wait\nthis minute is only for getting words out",
+    "I know what I want to say\nI keep stopping to make it sound right\nfor one minute I will not do that\nI will follow the sentence until it ends"
+  ];
+
+  // --- DOM helpers -----------------------------------------------------------
+  function demoEditor() { return document.querySelector(".live-demo-editor"); }
+  function demoPreview() { return document.querySelector(".demo-preview"); }
+  function demoSurface() { return document.querySelector(".demo-writing-surface"); }
+  function trialOverlay() { return document.querySelector(".trial-overlay"); }
+  function trialEditor() { return document.querySelector(".trial-editor"); }
+  function trialSurface() { return document.querySelector(".trial-writing-surface"); }
+  function status() { return document.querySelector(".live-demo-status"); }
+  function demoDanger() { return document.querySelector(".live-demo-danger"); }
+  function trialDanger() { return document.querySelector(".trial-danger"); }
+  function count() { return document.querySelector(".live-demo-count"); }
+  function trialResult() { return document.querySelector(".trial-result"); }
+  function trialFailure() { return document.querySelector(".trial-failure"); }
+  function demoResult() { return document.querySelector(".demo-result"); }
+  function demoFailure() { return document.querySelector(".demo-failure"); }
+  function demoPrompt() { return document.querySelector(".demo-prompt"); }
+  function trialPrompt() { return document.querySelector(".trial-prompt"); }
+
+  function sessionEditor() { return contextFromDom() === "inline" ? demoEditor() : trialEditor(); }
+  function sessionResultEl() { return contextFromDom() === "inline" ? demoResult() : trialResult(); }
+  function sessionFailureEl() { return contextFromDom() === "inline" ? demoFailure() : trialFailure(); }
+  function sessionPromptEl() { return contextFromDom() === "inline" ? demoPrompt() : trialPrompt(); }
+
+  // Context is read from DOM classes that the reactive layer owns:
+  // body.trial-mode and .demo-writing-surface.is-live are both declarative
+  // (data-class from _session.context). body.trial-morphing mirrors _session.morphing.
+  // These let browser bridges read UI state without touching the signal store directly.
+  function contextFromDom() {
+    if (document.body.classList.contains("trial-mode")) return "trial";
+    if (demoSurface()?.classList.contains("is-live")) return "inline";
+    return "demo";
+  }
+  const isInline = () => contextFromDom() === "inline";
+  const isTrial = () => contextFromDom() === "trial";
+  const isDemo = () => contextFromDom() === "demo";
+  const morphingFromDom = () => document.body.classList.contains("trial-morphing");
+
+  function emit(type, detail) {
+    document.body.dispatchEvent(new CustomEvent(type, { bubbles: true, detail: detail || {} }));
+  }
+  function emitFlroutecheck() { emit("flroutecheck"); }
+
+  // Global key handler registered via data-on:keydown__document. Handles Escape
+  // (exit trial) and Cmd/Ctrl+Enter (finish) with IME composition guards.
+  function onGlobalKeydown(evt, text, context, startedAt) {
+    if (evt.key === "Escape" && !evt.isComposing && contextFromDom() === "trial") {
+      evt.preventDefault();
+      exitTrial();
+      return;
     }
-
-    function demoEditor() { return document.querySelector('.live-demo-editor'); }
-    function demoSurface() { return document.querySelector('.demo-writing-surface'); }
-    function trialOverlay() { return document.querySelector('.trial-overlay'); }
-    function trialEditor() { return document.querySelector('.trial-editor'); }
-    function trialSurface() { return document.querySelector('.trial-writing-surface'); }
-    function status() { return document.querySelector('.live-demo-status'); }
-    function demoDanger() { return document.querySelector('.live-demo-danger'); }
-    function trialDanger() { return document.querySelector('.trial-danger'); }
-    function count() { return document.querySelector('.live-demo-count'); }
-    function trialTimer() { return document.querySelector('.trial-timer'); }
-    function trialResult() { return document.querySelector('.trial-result'); }
-    function trialFailure() { return document.querySelector('.trial-failure'); }
-    function trialToast() { return document.querySelector('.trial-toast'); }
-    function trialPrompt() { return document.querySelector('.trial-prompt'); }
-    function demoResult() { return document.querySelector('.demo-result'); }
-    function demoFailure() { return document.querySelector('.demo-failure'); }
-    function demoToast() { return document.querySelector('.demo-toast'); }
-    function demoSessionBar() { return document.querySelector('.demo-session-chrome'); }
-    function demoSessionTimer() { return document.querySelector('.demo-session-timer'); }
-    function demoPrompt() { return document.querySelector('.demo-prompt'); }
-    function sessionEditor() { return state.inlineMode ? demoEditor() : trialEditor(); }
-    function sessionResultEl() { return state.inlineMode ? demoResult() : trialResult(); }
-    function sessionFailureEl() { return state.inlineMode ? demoFailure() : trialFailure(); }
-    function sessionToastEl() { return state.inlineMode ? demoToast() : trialToast(); }
-    function sessionPromptEl() { return state.inlineMode ? demoPrompt() : trialPrompt(); }
-    function sessionTimerEl() { return state.inlineMode ? demoSessionTimer() : trialTimer(); }
-
-    function setLandingInert(active) {
-      const landing = document.querySelector('.sheet');
-      if (!landing) return;
-      landing.inert = active;
-      if (active) landing.setAttribute('aria-hidden', 'true');
-      else landing.removeAttribute('aria-hidden');
+    if (evt.key === "Enter" && (evt.metaKey || evt.ctrlKey) && !evt.isComposing && (isTrial() || isInline())) {
+      evt.preventDefault();
+      tryFinish(text, context, startedAt);
     }
+  }
 
-    function isTrialRoute() {
-      return location.hash === '#trial';
-    }
+  function followupContent() { return demoDrafts[internal.draftIndex]; }
+  function promptAt(index) { return trialPrompts[index % trialPrompts.length]; }
 
-    function homeRoute() {
-      return `${location.pathname}${location.search}`;
-    }
+  function setLandingInert(active) {
+    const landing = document.querySelector(".sheet");
+    if (!landing) return;
+    landing.inert = active;
+    if (active) landing.setAttribute("aria-hidden", "true");
+    else landing.removeAttribute("aria-hidden");
+  }
 
-    function pushTrialRoute() {
-      if (isTrialRoute()) return;
-      history.pushState({ firstLineTrial: true }, '', `${homeRoute()}#trial`);
-    }
+  function isTrialRoute() { return location.hash === "#trial"; }
+  function homeRoute() { return `${location.pathname}${location.search}`; }
+  function pushTrialRoute() {
+    if (isTrialRoute()) return;
+    history.pushState({ firstLineTrial: true }, "", `${homeRoute()}#trial`);
+  }
+  function replaceHomeRoute() { history.replaceState({ firstLineTrial: false }, "", homeRoute()); }
 
-    function replaceHomeRoute() {
-      history.replaceState({ firstLineTrial: false }, '', homeRoute());
-    }
+  function focusWithoutScroll(el) {
+    try { el.focus({ preventScroll: true }); } catch (_error) { el.focus(); }
+  }
 
-    function focusWithoutScroll(el) {
-      try {
-        el.focus({ preventScroll: true });
-      } catch (_error) {
-        el.focus();
-      }
-    }
+  function moveCaretToEnd(el, options = {}) {
+    if (!el) return;
+    if (options.focus !== false) focusWithoutScroll(el);
+    const range = document.createRange();
+    range.selectNodeContents(el.querySelector(".trial-thought.is-current") || el);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
 
-    function moveCaretToEnd(el, options = {}) {
-      if (!el) return;
-      if (options.focus !== false) focusWithoutScroll(el);
-      const range = document.createRange();
-      range.selectNodeContents(el.querySelector('.trial-thought.is-current') || el);
-      range.collapse(false);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-
-    function selectionIsAtEnd(el) {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return true;
-
-      const range = selection.getRangeAt(0);
-      if (!selection.isCollapsed || !el.contains(range.endContainer)) return false;
-
-      const current = el.querySelector('.trial-thought.is-current');
-      if (current) {
-        if (current !== range.endContainer && !current.contains(range.endContainer)) return false;
-        const trailing = range.cloneRange();
-        trailing.selectNodeContents(current);
-        trailing.setStart(range.endContainer, range.endOffset);
-        return normalizeTrialText(trailing.toString()).length === 0;
-      }
-
+  function selectionIsAtEnd(el) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return true;
+    const range = selection.getRangeAt(0);
+    if (!selection.isCollapsed || !el.contains(range.endContainer)) return false;
+    const current = el.querySelector(".trial-thought.is-current");
+    if (current) {
+      if (current !== range.endContainer && !current.contains(range.endContainer)) return false;
       const trailing = range.cloneRange();
-      trailing.selectNodeContents(el);
+      trailing.selectNodeContents(current);
       trailing.setStart(range.endContainer, range.endOffset);
-      return trailing.toString().length === 0;
+      return normalizeTrialText(trailing.toString()).length === 0;
     }
+    const trailing = range.cloneRange();
+    trailing.selectNodeContents(el);
+    trailing.setStart(range.endContainer, range.endOffset);
+    return trailing.toString().length === 0;
+  }
 
-    function keepCaretAtEnd(el) {
-      if (document.activeElement === el && !selectionIsAtEnd(el)) moveCaretToEnd(el);
-    }
+  function keepCaretAtEnd(el) {
+    if (document.activeElement === el && !selectionIsAtEnd(el)) moveCaretToEnd(el);
+  }
 
-    function wordCount(text) {
-      const zh = text.match(/[\u4e00-\u9fff]/g) || [];
-      const nonHan = text.replace(/[\u4e00-\u9fff]/g, ' ');
-      const words = nonHan.match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu) || [];
-      return zh.length + words.length;
-    }
+  function wordCount(text) {
+    const zh = text.match(/[\u4e00-\u9fff]/g) || [];
+    const nonHan = text.replace(/[\u4e00-\u9fff]/g, " ");
+    const words = nonHan.match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu) || [];
+    return zh.length + words.length;
+  }
 
-    function formatClock(totalSeconds) {
-      const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
-      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
+  function shouldReduceMotion() { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
 
-    function shouldReduceMotion() {
-      return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    }
+  function normalizeTrialText(value) { return value.split(TRIAL_CARET_ANCHOR).join(""); }
+  function escapeHTML(value) {
+    return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
+  }
 
-    function freezeMorphGhostStyles(ghost, source) {
-      const surfaceStyle = getComputedStyle(source);
-      Object.assign(ghost.style, {
-        alignContent: surfaceStyle.alignContent,
-        background: surfaceStyle.background,
-        borderRadius: surfaceStyle.borderRadius,
-        boxShadow: surfaceStyle.boxShadow,
-        display: surfaceStyle.display,
-        gap: surfaceStyle.gap,
-        margin: '0',
-        overflow: 'hidden',
-        padding: surfaceStyle.padding
-      });
+  // Result card word/duration label (pure). `now` is passed in by the caller.
+  function resultWordsFor(text, startedAt, now) {
+    const words = wordCount(text);
+    const elapsed = startedAt ? Math.max(1, Math.round((now - startedAt) / 1000)) : 60;
+    const label = elapsed >= 120 ? `in ${Math.round(elapsed / 60)} minutes`
+      : elapsed >= 60 ? "in 1 minute"
+        : `in ${elapsed} second${elapsed === 1 ? "" : "s"}`;
+    return `${words} word${words === 1 ? "" : "s"} ${label}`;
+  }
 
-      const ghostEditor = ghost.querySelector('.live-demo-editor, .trial-editor');
-      const sourceEditor = source.querySelector('.live-demo-editor, .trial-editor');
-      if (ghostEditor && sourceEditor) {
-        const editorStyle = getComputedStyle(sourceEditor);
-        Object.assign(ghostEditor.style, {
-          color: editorStyle.color,
-          fontFamily: editorStyle.fontFamily,
-          fontSize: editorStyle.fontSize,
-          letterSpacing: editorStyle.letterSpacing,
-          lineHeight: editorStyle.lineHeight,
-          maxWidth: editorStyle.maxWidth,
-          minHeight: editorStyle.minHeight,
-          textAlign: editorStyle.textAlign,
-          width: editorStyle.width
-        });
-      }
-
-      ghost.querySelector('.trial-hud')?.remove();
-      ghost.querySelector('.trial-result')?.remove();
-      ghost.querySelector('.trial-toast')?.remove();
-      ghost.querySelector('.trial-prompt')?.remove();
-      ghost.querySelector('.demo-session-chrome')?.remove();
-      ghost.classList.remove('is-demo-danger');
-      if (ghostEditor) {
-        ghostEditor.innerHTML = '';
-        ghostEditor.removeAttribute('data-placeholder');
-        ghostEditor.classList.remove('is-demo-danger');
-      }
-      const ghostDanger = ghost.querySelector('.live-demo-danger, .trial-danger');
-      if (ghostDanger) {
-        ghostDanger.textContent = '';
-        ghostDanger.hidden = true;
-      }
-      ghost.querySelectorAll('[contenteditable]').forEach((node) => {
-        node.removeAttribute('contenteditable');
-      });
-      ghost.querySelectorAll('a, button').forEach((node) => {
-        node.setAttribute('tabindex', '-1');
-      });
-    }
-
-    function animateSurfaceChange(source, change, targetRect) {
-      const el = source();
-      if (!el || shouldReduceMotion()) {
-        change();
-        return Promise.resolve();
-      }
-
-      const first = el.getBoundingClientRect();
-      const ghost = el.cloneNode(true);
-      ghost.setAttribute('aria-hidden', 'true');
-      ghost.classList.add('trial-morph-ghost');
-      Object.assign(ghost.style, {
-        position: 'fixed',
-        inset: 'auto',
-        top: `${first.top}px`,
-        left: `${first.left}px`,
-        width: `${first.width}px`,
-        height: `${first.height}px`,
-        transformOrigin: 'top left',
-        zIndex: '2000',
-        pointerEvents: 'none',
-        contain: 'layout paint style',
-        backfaceVisibility: 'hidden'
-      });
-      freezeMorphGhostStyles(ghost, el);
-      document.body.appendChild(ghost);
-      el.style.visibility = 'hidden';
-      state.morphing = true;
-      document.body.classList.add('trial-morphing');
-
-      change();
-
-      const last = targetRect();
-      const deltaX = last.left - first.left;
-      const deltaY = last.top - first.top;
-      const scaleX = last.width / first.width;
-      const scaleY = last.height / first.height;
-      const firstStyle = getComputedStyle(ghost);
-
-      const animation = ghost.animate([
-        {
-          borderRadius: firstStyle.borderRadius,
-          boxShadow: firstStyle.boxShadow,
-          opacity: .96,
-          transform: 'translate3d(0, 0, 0) scale(1, 1)'
-        },
-        {
-          borderRadius: last.borderRadius || firstStyle.borderRadius,
-          boxShadow: last.boxShadow || firstStyle.boxShadow,
-          opacity: 1,
-          transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`
-        }
-      ], {
-        duration: TRIAL_MORPH_DURATION,
-        easing: TRIAL_MORPH_EASING,
-        fill: 'both'
-      });
-
-      return animation.finished.then(() => {
-        el.style.visibility = '';
-      }).finally(() => {
-        ghost.remove();
-        state.morphing = false;
-        document.body.classList.remove('trial-morphing');
-      });
-    }
-
-    function viewportRect() {
-      return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, borderRadius: '0px', boxShadow: 'none' };
-    }
-
-    function elementMorphRect(el) {
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-      return {
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-        borderRadius: style.borderRadius,
-        boxShadow: style.boxShadow
-      };
-    }
-
-    function updateSessionHUD() {
-      if (!state.trialMode && !state.inlineMode) return;
-      const elapsed = state.trialStartedAt ? Math.floor((Date.now() - state.trialStartedAt) / 1000) : 0;
-      const remaining = Math.max(0, state.trialDuration - elapsed);
-      const el = sessionTimerEl();
-      if (el) el.textContent = formatClock(remaining);
-    }
-
-    function setStatus(message) {
-      const el = status();
-      if (el) el.textContent = message;
-    }
-
-    function visibleText() {
-      return demoEditor()?.innerText || '';
-    }
-
-    function normalizeTrialText(value) {
-      return value.split(TRIAL_CARET_ANCHOR).join('');
-    }
-
-    function renderSessionZenText() {
-      const el = sessionEditor();
-      if ((!state.trialMode && !state.inlineMode) || state.composing || !el) return;
-
-      const text = state.trialText;
-      if (!text) {
-        el.innerHTML = `<span class="trial-thought is-current" data-empty="true">${TRIAL_CARET_ANCHOR}</span>`;
-        el.classList.remove('has-multiple-lines');
-        moveCaretToEnd(el, { focus: false });
-        return;
-      }
-
-      const thoughts = text.split('\n');
-      const currentIndex = thoughts.length - 1;
-      const previousIndex = currentIndex - 1;
-      el.innerHTML = thoughts.map((thought, index) => {
-        const stateClass = index === currentIndex ? 'is-current' : index === previousIndex ? 'is-previous' : 'is-hidden';
-        return `<span class="trial-thought ${stateClass}">${escapeHTML(thought)}</span>`;
-      }).join('');
-      el.classList.toggle('has-multiple-lines', thoughts.length > 1);
+  // --- Zen renderer (browser-only; reads the text arg, never signals) ---------
+  function renderZen(el, text) {
+    if (isDemo() || internal.composing || !el) return;
+    if (!text) {
+      el.innerHTML = `<span class="trial-thought is-current" data-empty="true">${TRIAL_CARET_ANCHOR}</span>`;
+      el.classList.remove("has-multiple-lines");
       moveCaretToEnd(el, { focus: false });
+      return;
     }
+    const thoughts = text.split("\n");
+    const currentIndex = thoughts.length - 1;
+    const previousIndex = currentIndex - 1;
+    el.innerHTML = thoughts.map((thought, index) => {
+      const stateClass = index === currentIndex ? "is-current" : index === previousIndex ? "is-previous" : "is-hidden";
+      return `<span class="trial-thought ${stateClass}">${escapeHTML(thought)}</span>`;
+    }).join("");
+    el.classList.toggle("has-multiple-lines", thoughts.length > 1);
+    moveCaretToEnd(el, { focus: false });
+  }
 
-    function currentTrialLineRect() {
-      const el = trialEditor();
-      const current = el?.querySelector('.trial-thought.is-current');
-      if (!current) return null;
+  function syncZenView() {
+    const el = sessionEditor();
+    if (isTrial()) requestAnimationFrame(scrollTrialCaretToAnchor);
+    else if (isInline()) requestAnimationFrame(scrollInlineCaretToAnchor);
+    return el;
+  }
 
-      const range = document.createRange();
-      range.selectNodeContents(current);
-      const rects = Array.from(range.getClientRects()).filter((rect) => rect.width || rect.height);
-      if (rects.length) return rects[rects.length - 1];
+  function currentTrialLineRect() {
+    const el = trialEditor();
+    const current = el?.querySelector(".trial-thought.is-current");
+    if (!current) return null;
+    const range = document.createRange();
+    range.selectNodeContents(current);
+    const rects = Array.from(range.getClientRects()).filter((rect) => rect.width || rect.height);
+    if (rects.length) return rects[rects.length - 1];
+    const rect = current.getBoundingClientRect();
+    return rect.height ? rect : null;
+  }
 
-      const rect = current.getBoundingClientRect();
-      return rect.height ? rect : null;
-    }
+  function syncTrialDangerPosition() {
+    const dangerEl = trialDanger();
+    if (!dangerEl) return;
+    const surfaceRect = trialSurface()?.getBoundingClientRect();
+    const lineRect = currentTrialLineRect();
+    const fallbackX = surfaceRect ? surfaceRect.left + surfaceRect.width / 2 : window.innerWidth / 2;
+    const fallbackY = surfaceRect ? surfaceRect.top + surfaceRect.height * 0.35 : window.innerHeight * 0.35;
+    const rawX = lineRect ? lineRect.left + lineRect.width / 2 : fallbackX;
+    const rawY = lineRect ? lineRect.top + lineRect.height / 2 : fallbackY;
+    const dangerWidth = Math.min(720, Math.max(0, window.innerWidth - 96));
+    const halfDanger = dangerWidth / 2;
+    const minX = Math.min(window.innerWidth / 2, halfDanger + 24);
+    const maxX = Math.max(minX, window.innerWidth - halfDanger - 24);
+    const x = Math.min(maxX, Math.max(minX, rawX));
+    dangerEl.style.setProperty("--trial-danger-x", `${Math.round(x)}px`);
+    dangerEl.style.setProperty("--trial-danger-y", `${Math.round(rawY)}px`);
+  }
 
-    function syncTrialDangerPosition() {
-      const dangerEl = trialDanger();
-      if (!dangerEl) return;
+  function scrollTrialCaretToAnchor() {
+    if (!isTrial()) return;
+    const surfaceEl = trialSurface();
+    const el = trialEditor();
+    if (!surfaceEl) return;
+    if (!normalizeTrialText(el?.innerText || "")) { surfaceEl.scrollTo({ top: 0 }); return; }
+    const current = el.querySelector(".trial-thought.is-current") || el;
+    const currentRect = current.getBoundingClientRect();
+    if (!currentRect.height) return;
+    const surfaceRect = surfaceEl.getBoundingClientRect();
+    const targetY = surfaceRect.top + surfaceRect.height * 0.35;
+    const targetScroll = Math.max(0, Math.round(surfaceEl.scrollTop + currentRect.top - targetY));
+    if (Math.abs(surfaceEl.scrollTop - targetScroll) > 1) surfaceEl.scrollTop = targetScroll;
+  }
 
-      const surfaceRect = trialSurface()?.getBoundingClientRect();
-      const lineRect = currentTrialLineRect();
-      const fallbackX = surfaceRect ? surfaceRect.left + surfaceRect.width / 2 : window.innerWidth / 2;
-      const fallbackY = surfaceRect ? surfaceRect.top + surfaceRect.height * 0.35 : window.innerHeight * 0.35;
-      const rawX = lineRect ? lineRect.left + lineRect.width / 2 : fallbackX;
-      const rawY = lineRect ? lineRect.top + lineRect.height / 2 : fallbackY;
-      const dangerWidth = Math.min(720, Math.max(0, window.innerWidth - 96));
-      const halfDanger = dangerWidth / 2;
-      const minX = Math.min(window.innerWidth / 2, halfDanger + 24);
-      const maxX = Math.max(minX, window.innerWidth - halfDanger - 24);
-      const x = Math.min(maxX, Math.max(minX, rawX));
+  function scrollInlineCaretToAnchor() {
+    if (!isInline()) return;
+    const el = sessionEditor();
+    if (!el) return;
+    if (!normalizeTrialText(el.innerText || "")) { el.scrollTo({ top: 0 }); return; }
+    const current = el.querySelector(".trial-thought.is-current") || el;
+    const currentRect = current.getBoundingClientRect();
+    if (!currentRect.height) return;
+    const elRect = el.getBoundingClientRect();
+    const targetY = elRect.top + elRect.height * INLINE_ANCHOR;
+    const targetScroll = Math.max(0, Math.round(el.scrollTop + currentRect.top - targetY));
+    if (Math.abs(el.scrollTop - targetScroll) > 1) el.scrollTop = targetScroll;
+  }
 
-      dangerEl.style.setProperty('--trial-danger-x', `${Math.round(x)}px`);
-      dangerEl.style.setProperty('--trial-danger-y', `${Math.round(rawY)}px`);
-    }
+  // --- Session input bridge (EditorGuard). Reads DOM text; emits flinput. -----
+  function clearEditorDanger() {
+    demoEditor()?.classList.remove("is-demo-danger");
+    trialEditor()?.classList.remove("is-demo-danger");
+  }
 
-    function scrollTrialCaretToAnchor() {
-      if (!state.trialMode) return;
-      const surfaceEl = trialSurface();
-      const el = trialEditor();
-      if (!surfaceEl) return;
-      if (!normalizeTrialText(el?.innerText || '')) {
-        surfaceEl.scrollTo({ top: 0 });
+  function commitInput(el, text) {
+    emit("flinput", { text, now: Date.now() });
+    clearEditorDanger();
+    renderZen(el, text);
+    syncZenView();
+  }
+
+  function appendTrialLineBreak(el) {
+    const text = `${normalizeTrialText(el.innerText)}\n`;
+    commitInput(el, text);
+  }
+
+  function bindSessionEditor(el, mode) {
+    const isActiveContext = () => (mode === "inline" ? isInline() : isTrial());
+    el.addEventListener("focus", () => { if (isActiveContext()) moveCaretToEnd(el); });
+    el.addEventListener("pointerup", () => { if (isActiveContext()) keepCaretAtEnd(el); });
+    el.addEventListener("click", () => { if (isActiveContext()) keepCaretAtEnd(el); });
+    el.addEventListener("compositionstart", () => { internal.composing = true; });
+    el.addEventListener("compositionend", () => {
+      internal.composing = false;
+      if (!isActiveContext()) return;
+      commitInput(el, normalizeTrialText(el.innerText));
+    });
+    el.addEventListener("beforeinput", (evt) => {
+      if (!isActiveContext()) return;
+      const inputType = evt.inputType || "";
+      if (!el.isContentEditable) { evt.preventDefault(); return; }
+      if (internal.composing || inputType === "insertCompositionText") return;
+      if (inputType === "insertParagraph" || inputType === "insertLineBreak") {
+        evt.preventDefault();
+        appendTrialLineBreak(el);
         return;
       }
-
-      const current = el.querySelector('.trial-thought.is-current') || el;
-      const currentRect = current.getBoundingClientRect();
-      if (!currentRect.height) return;
-
-      const surfaceRect = surfaceEl.getBoundingClientRect();
-      const targetY = surfaceRect.top + surfaceRect.height * 0.35;
-      const targetScroll = Math.max(0, Math.round(surfaceEl.scrollTop + currentRect.top - targetY));
-      if (Math.abs(surfaceEl.scrollTop - targetScroll) > 1) surfaceEl.scrollTop = targetScroll;
-    }
-
-    function scrollInlineCaretToAnchor() {
-      if (!state.inlineMode) return;
-      const el = sessionEditor();
-      if (!el) return;
-      if (!normalizeTrialText(el.innerText || '')) {
-        el.scrollTo({ top: 0 });
-        return;
-      }
-      const current = el.querySelector('.trial-thought.is-current') || el;
-      const currentRect = current.getBoundingClientRect();
-      if (!currentRect.height) return;
-      const elRect = el.getBoundingClientRect();
-      const targetY = elRect.top + elRect.height * INLINE_ANCHOR;
-      const targetScroll = Math.max(0, Math.round(el.scrollTop + currentRect.top - targetY));
-      if (Math.abs(el.scrollTop - targetScroll) > 1) el.scrollTop = targetScroll;
-    }
-
-    function appendTrialLineBreak(el) {
-      state.trialText = `${state.trialText || normalizeTrialText(el.innerText)}\n`;
-      syncSessionZenView();
-      start();
-      state.lastInputTime = Date.now();
-      setSessionDangerActive(false);
-    }
-
-    function syncSessionZenView() {
-      renderSessionZenText();
-      if (state.trialMode) requestAnimationFrame(scrollTrialCaretToAnchor);
-      else if (state.inlineMode) requestAnimationFrame(scrollInlineCaretToAnchor);
-    }
-
-    function renderDangerLabel(el, secondsLeft) {
-      if (!el) return;
-      if (!secondsLeft) {
-        el.textContent = '';
-        el.hidden = true;
-        el.setAttribute('aria-hidden', 'true');
-        return;
-      }
-
-      el.hidden = false;
-      el.setAttribute('aria-hidden', 'false');
-      el.innerHTML = `<span class="danger-count">${secondsLeft}</span><span class="danger-hint">Keep typing or the draft will be deleted.</span>`;
-    }
-
-    function fallbackCopyText(text) {
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.setAttribute('readonly', '');
-      textarea.style.position = 'fixed';
-      textarea.style.top = '-9999px';
-      document.body.appendChild(textarea);
-      textarea.select();
-      const copied = document.execCommand('copy');
-      textarea.remove();
-      return copied;
-    }
-
-    async function copyText(text) {
-      if (navigator.clipboard?.writeText) {
-        try {
-          await navigator.clipboard.writeText(text);
-          return true;
-        } catch (_error) {
-          return fallbackCopyText(text);
-        }
-      }
-
-      return fallbackCopyText(text);
-    }
-
-    function showSessionToast(message) {
-      const el = sessionToastEl();
-      if (!el) return;
-      el.textContent = message;
-      el.hidden = false;
-      window.clearTimeout(el.dataset.timerId);
-      el.dataset.timerId = window.setTimeout(() => {
-        el.hidden = true;
-      }, 1700);
-    }
-
-    function setSessionDangerLabel(secondsLeft) {
-      if (state.inlineMode) {
-        renderDangerLabel(demoDanger(), secondsLeft);
-        return;
-      }
-      renderDangerLabel(trialDanger(), secondsLeft);
-      if (secondsLeft) syncTrialDangerPosition();
-    }
-
-    function setSessionDangerActive(active) {
-      if (state.inlineMode) {
-        setDemoDangerActive(active);
-        return;
-      }
-      setTrialDangerActive(active);
-    }
-
-
-
-    async function copyTrialText() {
-      const copied = await copyText(state.trialResultText || state.trialText);
-      showSessionToast(copied ? 'Copied' : 'Copy failed');
-    }
-
-    async function copyTrialForAI() {
-      const text = (state.trialResultText || state.trialText || '').trim();
-      if (!text) {
-        showSessionToast('Nothing to copy.');
-        return;
-      }
-      const copied = await copyText(`${AI_CLEANUP_PROMPT}\n\n---\n\n${text}`);
-      showSessionToast(copied ? 'Copied for AI' : 'Copy failed');
-    }
-
-    function localDateKey(date) {
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${date.getFullYear()}-${month}-${day}`;
-    }
-
-    function downloadTrialMarkdown() {
-      const text = (state.trialResultText || state.trialText || '').trim();
-      if (!text) {
-        showSessionToast('Nothing to download.');
-        return;
-      }
-      const now = new Date();
-      const time = `${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-      const markdown = `---\ncreated: ${localDateKey(now)} ${time.slice(0, 2)}:${time.slice(2)}\nsource: First Line\nwords: ${wordCount(text)}\n---\n\n${text}\n`;
-      const url = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }));
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `first-line-${localDateKey(now)}-${time}.md`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showSessionToast('Downloaded');
-    }
-
-    function sessionDurationLabel() {
-      const elapsed = state.trialStartedAt ? Math.max(1, Math.round((Date.now() - state.trialStartedAt) / 1000)) : state.trialDuration;
-      if (elapsed >= 120) return `in ${Math.round(elapsed / 60)} minutes`;
-      if (elapsed >= 60) return 'in 1 minute';
-      return `in ${elapsed} second${elapsed === 1 ? '' : 's'}`;
-    }
-
-    function finishSessionEarly() {
-      if ((!state.trialMode && !state.inlineMode) || state.trialComplete || state.failed) return;
-      const text = (state.trialText || normalizeTrialText(sessionEditor()?.innerText || '')).trim();
-      if (!wordCount(text)) {
-        showSessionToast('Write something first.');
-        focusWithoutScroll(sessionEditor());
-        return;
-      }
-      completeSession();
-    }
-
-    function renderSessionPromptText() {
-      const el = sessionPromptEl()?.querySelector('.trial-prompt-text');
-      if (el) el.textContent = trialPrompts[state.promptIndex % trialPrompts.length];
-    }
-
-    function setSessionPromptOpen(open) {
-      state.promptOpen = open;
-      const container = sessionPromptEl();
-      if (!container) return;
-      const toggle = container.querySelector('.trial-prompt-toggle');
-      const card = container.querySelector('.trial-prompt-card');
-      if (toggle) {
-        toggle.hidden = open;
-        toggle.setAttribute('aria-expanded', String(open));
-      }
-      if (card) card.hidden = !open;
-      if (open) renderSessionPromptText();
-    }
-
-    function showNextTrialPrompt() {
-      state.promptIndex = (state.promptIndex + 1) % trialPrompts.length;
-      renderSessionPromptText();
-    }
-
-    function resetTrialPrompt() {
-      state.promptIndex = Math.floor(Math.random() * trialPrompts.length);
-      state.promptOpen = false;
-      document.querySelectorAll('.trial-prompt, .demo-prompt').forEach((container) => {
-        const toggle = container.querySelector('.trial-prompt-toggle');
-        const card = container.querySelector('.trial-prompt-card');
-        if (toggle) {
-          toggle.hidden = false;
-          toggle.setAttribute('aria-expanded', 'false');
-        }
-        if (card) card.hidden = true;
-      });
-    }
-
-    function renderSessionResult() {
-      const text = (state.trialResultText || state.trialText || '').trim();
-      const resultEl = sessionResultEl();
-      if (!resultEl) return;
-      const textEl = resultEl.querySelector('.trial-result-text');
-      if (!textEl) return;
-
-      const words = wordCount(text);
-      const wordsEl = resultEl.querySelector('.trial-result-words');
-      if (wordsEl) wordsEl.textContent = `${words} word${words === 1 ? '' : 's'} ${sessionDurationLabel()}`;
-
-      textEl.textContent = text;
-      resultEl.hidden = false;
-    }
-
-    function hideSessionResult() {
-      const resultEl = sessionResultEl();
-      if (resultEl) resultEl.hidden = true;
-      const textEl = resultEl?.querySelector('.trial-result-text');
-      if (textEl) textEl.textContent = '';
-      const toastEl = sessionToastEl();
-      if (toastEl) toastEl.hidden = true;
-    }
-
-    function hideSessionFailure() {
-      const failureEl = sessionFailureEl();
-      if (failureEl) failureEl.hidden = true;
-    }
-
-    function showSessionFailure() {
-      const failureEl = sessionFailureEl();
-      if (failureEl) failureEl.hidden = false;
-    }
-
-    function completeSession() {
-      state.active = false;
-      stopSessionTimer();
-      state.trialComplete = true;
-      state.trialResultText = (state.trialText || normalizeTrialText(sessionEditor()?.innerText || '')).trim();
-      setSessionDangerLabel(0);
-      setSessionDangerActive(false);
-      updateSessionHUD();
-      const el = sessionEditor();
-      if (el) {
-        el.blur();
-        el.setAttribute('contenteditable', 'false');
-      }
-      state.failed = false;
-      if (state.trialMode) {
-        document.body.classList.add('trial-complete');
-        document.body.classList.remove('trial-failed');
-      }
-      hideSessionFailure();
-      if (state.inlineMode) hideInlineChrome();
-      renderSessionResult();
-      requestAnimationFrame(() => sessionResultEl()?.querySelector('.trial-copy')?.focus({ preventScroll: true }));
-    }
-
-    function resetTrialWriting() {
-      const el = trialEditor();
-      state.active = false;
-      stopSessionTimer();
-      state.failed = false;
-      state.lastInputTime = 0;
-      state.trialComplete = false;
-      state.trialResultText = '';
-      state.trialStartedAt = 0;
-      state.trialText = '';
-      document.body.classList.remove('trial-complete', 'trial-failed');
-      hideSessionResult();
-      hideSessionFailure();
-      resetTrialPrompt();
-      if (el) {
-        el.setAttribute('contenteditable', 'true');
-        el.innerHTML = '';
-      }
-      renderSessionZenText();
-      updateSessionHUD();
-      setSessionDangerLabel(0);
-      setSessionDangerActive(false);
-      requestAnimationFrame(() => moveCaretToEnd(el));
-    }
-
-    function resetInlineWriting() {
-      const el = demoEditor();
-      state.active = false;
-      stopSessionTimer();
-      state.failed = false;
-      state.lastInputTime = 0;
-      state.trialComplete = false;
-      state.trialResultText = '';
-      state.trialStartedAt = 0;
-      state.trialText = '';
-      hideSessionResult();
-      hideSessionFailure();
-      resetTrialPrompt();
-      showInlineChrome();
-      if (el) {
-        el.setAttribute('contenteditable', 'true');
-        el.innerHTML = '';
-      }
-      renderSessionZenText();
-      updateSessionHUD();
-      setSessionDangerLabel(0);
-      setSessionDangerActive(false);
-      requestAnimationFrame(() => moveCaretToEnd(el));
-    }
-
-    function restartSessionFromResult() {
-      if (state.inlineMode) resetInlineWriting();
-      else resetTrialWriting();
-    }
-
-    function showInlineChrome() {
-      const surface = demoSurface();
-      if (surface) surface.hidden = false;
-      const bar = demoSessionBar();
-      if (bar) bar.hidden = false;
-    }
-
-    function hideInlineChrome() {
-      const surface = demoSurface();
-      if (surface) surface.hidden = true;
-    }
-
-    function activateInlineEditor() {
-      if (state.inlineMode || state.trialMode || state.morphing) return;
-      const el = demoEditor();
-      const surface = demoSurface();
-      if (!el || !surface) return;
-      stopIntroTyping();
-      state.demoHasPlayed = true;
-      state.demoObserver?.disconnect();
-      state.inlineMode = true;
-      state.active = false;
-      state.failed = false;
-      state.lastInputTime = 0;
-      state.trialComplete = false;
-      state.trialResultText = '';
-      state.trialStartedAt = 0;
-      state.trialText = '';
-      el.innerHTML = '';
-      el.setAttribute('contenteditable', 'true');
-      el.setAttribute('role', 'textbox');
-      el.setAttribute('aria-multiline', 'true');
-      el.setAttribute('aria-label', 'First Line live writing surface');
-      el.removeAttribute('tabindex');
-      surface.classList.add('is-live');
-      showInlineChrome();
-      resetTrialPrompt();
-      renderSessionZenText();
-      updateSessionHUD();
-      focusWithoutScroll(el);
-      requestAnimationFrame(() => {
-        if (!state.inlineMode) return;
-        const h = surface.clientHeight;
-        if (h > 0) {
-          el.style.paddingTop = `${Math.round(h * INLINE_ANCHOR - 24)}px`;
-          el.style.paddingBottom = `${Math.round(h * (1 - INLINE_ANCHOR))}px`;
-        }
+      if (inputType.startsWith("delete") || inputType.startsWith("history") || inputType === "insertFromPaste") {
+        evt.preventDefault();
         moveCaretToEnd(el);
-      });
-    }
-
-    function deactivateInlineForTrial(keepDraft) {
-      hideSessionResult();
-      hideSessionFailure();
-      const bar = demoSessionBar();
-      if (bar) bar.hidden = true;
-      const surface = demoSurface();
-      if (surface) surface.classList.remove('is-live');
-      const dangerEl = demoDanger();
-      if (dangerEl) renderDangerLabel(dangerEl, 0);
-      setDemoDangerActive(false);
-      state.inlineMode = false;
-      const el = demoEditor();
-      if (el) {
-        el.setAttribute('contenteditable', 'false');
-        el.setAttribute('tabindex', '0');
-        el.setAttribute('role', 'button');
-        el.setAttribute('aria-label', 'Live writing surface. Press Enter to start typing.');
-        el.removeAttribute('aria-multiline');
-        el.style.paddingTop = '';
-        el.style.paddingBottom = '';
-        el.scrollTop = 0;
-      }
-      if (keepDraft) {
-        state.demoHasPlayed = true;
-        state.demoPhase = 'complete';
-        renderDemoEditor(followupContent());
-      } else {
-        restoreSeed({ markPlayed: true });
-      }
-    }
-
-    function failSession() {
-      const el = sessionEditor();
-      state.active = false;
-      stopSessionTimer();
-      state.failed = true;
-      state.lastInputTime = 0;
-      state.trialComplete = false;
-      state.trialResultText = '';
-      state.trialStartedAt = 0;
-      state.trialText = '';
-      setSessionDangerLabel(0);
-      setSessionDangerActive(false);
-      updateSessionHUD();
-      hideSessionResult();
-      if (el) {
-        el.blur();
-        el.innerHTML = '';
-        el.setAttribute('contenteditable', 'false');
-      }
-      if (state.trialMode) {
-        document.body.classList.remove('trial-complete');
-        document.body.classList.add('trial-failed');
-      }
-      if (state.inlineMode) hideInlineChrome();
-      showSessionFailure();
-      requestAnimationFrame(() => sessionFailureEl()?.querySelector('.trial-restart')?.focus({ preventScroll: true }));
-    }
-
-    function setDemoDangerLabel(secondsLeft) {
-      renderDangerLabel(demoDanger(), secondsLeft);
-    }
-
-    function setTrialDangerLabel(secondsLeft) {
-      renderDangerLabel(trialDanger(), secondsLeft);
-      if (secondsLeft) syncTrialDangerPosition();
-    }
-
-    function setDemoDangerActive(active) {
-      const el = demoEditor();
-      if (el) el.classList.toggle('is-demo-danger', active);
-
-      const surfaceEl = demoSurface();
-      if (surfaceEl) surfaceEl.classList.toggle('is-demo-danger', active);
-    }
-
-    function setTrialDangerActive(active) {
-      const el = trialEditor();
-      if (el) el.classList.toggle('is-demo-danger', active);
-      if (active) syncTrialDangerPosition();
-    }
-
-    function clearDemoTimer() {
-      if (state.typingTimer) window.clearTimeout(state.typingTimer);
-      state.typingTimer = null;
-    }
-
-    function stopSessionTimer() {
-      if (state.timer) window.clearInterval(state.timer);
-      state.timer = null;
-    }
-
-    function shouldRunDemo() {
-      return state.introTyping && state.demoVisible && !document.hidden && !state.trialMode && !state.inlineMode;
-    }
-
-    function scheduleDemoStep(callback, delay) {
-      clearDemoTimer();
-      if (!shouldRunDemo()) return;
-      state.typingTimer = window.setTimeout(() => {
-        state.typingTimer = null;
-        callback();
-      }, delay);
-    }
-
-    function suspendDemoPlayback() {
-      if (!state.introTyping) return;
-      clearDemoTimer();
-      if (state.demoPhase === 'pause' && state.demoPauseStartedAt) {
-        state.demoPauseElapsed += performance.now() - state.demoPauseStartedAt;
-        state.demoPauseStartedAt = 0;
-        setDemoDangerLabel(0);
-        setDemoDangerActive(false);
-      }
-    }
-
-    function updateDemoPause() {
-      if (!shouldRunDemo() || state.demoPhase !== 'pause') return;
-      const elapsed = state.demoPauseElapsed + performance.now() - state.demoPauseStartedAt;
-
-      if (elapsed >= DEMO_RECOVERY_DELAY) {
-        state.demoPauseElapsed = 0;
-        state.demoPauseStartedAt = 0;
-        state.demoPhase = 'typing';
-        setDemoDangerLabel(0);
-        setDemoDangerActive(false);
-        setStatus('Typing resumed.');
-        scheduleDemoStep(typeNextFollowupCharacter, DEMO_RESUME_DELAY);
         return;
       }
-
-      if (elapsed >= DEMO_DANGER_DELAY) {
-        const secondsLeft = Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - elapsed / 1000));
-        setDemoDangerLabel(secondsLeft);
-        setDemoDangerActive(true);
-        setStatus('Draft fading. Keep typing.');
-      } else {
-        setDemoDangerLabel(0);
-        setDemoDangerActive(false);
-        setStatus('Typing paused.');
+      if (!selectionIsAtEnd(el)) {
+        evt.preventDefault();
+        const insertedText = inputType === "insertText" ? (evt.data || "") : "";
+        moveCaretToEnd(el);
+        if (!insertedText) return;
+        commitInput(el, `${normalizeTrialText(el.innerText)}${insertedText}`);
       }
-
-      scheduleDemoStep(updateDemoPause, DEMO_PAUSE_TICK);
-    }
-
-    function beginDemoPause() {
-      state.demoPhase = 'pause';
-      state.demoPauseElapsed = 0;
-      state.demoPauseStartedAt = performance.now();
-      setStatus('Typing paused.');
-      updateDemoPause();
-    }
-
-    function resumeDemoPlayback() {
-      if (!state.introTyping || !state.demoVisible || document.hidden || state.trialMode || state.inlineMode) return;
-      if (state.demoPhase === 'pause') {
-        state.demoPauseStartedAt = performance.now();
-        updateDemoPause();
-        return;
+    }, true);
+    el.addEventListener("keydown", (evt) => {
+      if (!isActiveContext()) return;
+      if (internal.composing || evt.isComposing) return;
+      const key = evt.key.toLowerCase();
+      const command = evt.metaKey || evt.ctrlKey;
+      if (evt.key === "Backspace" || evt.key === "Delete" || (command && ["a", "v", "x", "z", "y"].includes(key))) {
+        evt.preventDefault();
+        moveCaretToEnd(el);
+      } else if (["ArrowLeft", "ArrowUp", "Home", "PageUp"].includes(evt.key)) {
+        evt.preventDefault();
+        moveCaretToEnd(el);
       }
-      if (state.demoPhase === 'waiting') {
-        scheduleDemoStep(beginFollowupTyping, DEMO_START_DELAY);
-        return;
+    }, true);
+    el.addEventListener("input", () => {
+      if (!isActiveContext()) return;
+      if (internal.composing) return;
+      commitInput(el, normalizeTrialText(el.innerText));
+    });
+    el.addEventListener("paste", (evt) => evt.preventDefault(), true);
+    el.addEventListener("drop", (evt) => evt.preventDefault(), true);
+  }
+
+  // --- Clipboard + export (browser-only). Text is passed in by expressions. ---
+  function fallbackCopyText(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.top = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand("copy");
+    textarea.remove();
+    return copied;
+  }
+  async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(text); return true; }
+      catch (_error) { return fallbackCopyText(text); }
+    }
+    return fallbackCopyText(text);
+  }
+  function showToast(message) {
+    emit("fltoast", { message });
+  }
+  async function copyText(text) {
+    const copied = await copyTextToClipboard(text);
+    showToast(copied ? "Copied" : "Copy failed");
+  }
+  async function copyForAI(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed) { showToast("Nothing to copy."); return; }
+    const copied = await copyTextToClipboard(`${AI_CLEANUP_PROMPT}\n\n---\n\n${trimmed}`);
+    showToast(copied ? "Copied for AI" : "Copy failed");
+  }
+  function localDateKey(date) {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${date.getFullYear()}-${month}-${day}`;
+  }
+  function downloadMarkdown(text) {
+    const trimmed = (text || "").trim();
+    if (!trimmed) { showToast("Nothing to download."); return; }
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const markdown = `---\ncreated: ${localDateKey(now)} ${time.slice(0, 2)}:${time.slice(2)}\nsource: First Line\nwords: ${wordCount(trimmed)}\n---\n\n${trimmed}\n`;
+    const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `first-line-${localDateKey(now)}-${time}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast("Downloaded");
+  }
+
+  // --- Ticker (pure). Called from a data-on-interval expression with the
+  //     current signal values; emits flcomplete / flfail / fldanger. -----------
+  // Editors are data-ignored, so their is-demo-danger class is toggled here
+  // alongside the fldanger event that drives the signal + surface class.
+  function dangerEditor() {
+    const c = contextFromDom();
+    if (c === "trial") return trialEditor();
+    if (c === "inline") return demoEditor();
+    return demoPreview();
+  }
+  function setDanger(opts) {
+    emit("fldanger", opts);
+    const ed = dangerEditor();
+    if (ed) ed.classList.toggle("is-demo-danger", !!opts.dangerActive);
+    if (opts.dangerActive && isTrial()) syncTrialDangerPosition();
+  }
+
+  function tickDispatch(active, failed, complete, context, startedAt, lastInputAt, duration, text) {
+    if (!active || failed || complete) return;
+    if (context !== "inline" && context !== "trial") return;
+    const now = Date.now();
+    const elapsed = Math.floor((now - startedAt) / 1000);
+    const remaining = Math.max(0, duration - elapsed);
+    if (elapsed >= duration) {
+      const trimmed = (text || "").trim();
+      emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, now) });
+      return;
+    }
+    const idle = (now - lastInputAt) / 1000;
+    if (idle >= SILENCE_CLEAR_SECONDS) { emit("flfail"); return; }
+    if (idle >= SILENCE_COUNTDOWN_START_SECONDS) {
+      setDanger({ remaining, dangerSeconds: Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - idle)), dangerActive: true });
+      return;
+    }
+    setDanger({ remaining, dangerSeconds: 0, dangerActive: false });
+  }
+
+  // --- Transitions (browser DOM work + events that patch signals) ------------
+  function tryFinish(text, context, startedAt) {
+    if (context !== "inline" && context !== "trial") return;
+    const trimmed = (text || "").trim();
+    if (!wordCount(trimmed)) {
+      showToast("Write something first.");
+      focusWithoutScroll(sessionEditor());
+      return;
+    }
+    emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, Date.now()) });
+  }
+
+  function showInlineChrome() {
+    const surface = demoSurface();
+    if (surface) surface.hidden = false;
+    const bar = document.querySelector(".demo-session-chrome");
+    if (bar) bar.hidden = false;
+  }
+  function hideInlineChrome() {
+    const surface = demoSurface();
+    if (surface) surface.hidden = true;
+  }
+
+  function layoutInlineEditor() {
+    const el = demoEditor();
+    const surface = demoSurface();
+    requestAnimationFrame(() => {
+      if (!isInline() || !el || !surface) return;
+      const h = surface.clientHeight;
+      if (h > 0) {
+        el.style.paddingTop = `${Math.round(h * INLINE_ANCHOR - 24)}px`;
+        el.style.paddingBottom = `${Math.round(h * (1 - INLINE_ANCHOR))}px`;
       }
-      if (state.demoPhase === 'typing') scheduleDemoStep(typeNextFollowupCharacter, 80);
-    }
+    });
+  }
 
-    function setDemoVisibility(visible) {
-      state.demoVisible = visible;
-      if (!visible || document.hidden || state.trialMode || state.inlineMode) {
-        suspendDemoPlayback();
-        return;
+  function armInline() {
+    if (contextFromDom() !== "demo" || morphingFromDom()) return;
+    stopIntroTyping();
+    internal.demoHasPlayed = true;
+    internal.demoObserver?.disconnect();
+    // Flip context first: flactivate sets _session.context='inline', which the
+    // declarative data-class:is-live binding applies synchronously, so every later
+    // isInline()/contextFromDom() read in this activation sees 'inline'.
+    emit("flactivate");
+    showInlineChrome();
+    emitPromptReset();
+    layoutInlineEditor();
+  }
+
+  function activateInline() {
+    if (contextFromDom() !== "demo" || morphingFromDom()) return;
+    const el = demoEditor();
+    const surface = demoSurface();
+    if (!el || !surface) return;
+    armInline();
+    el.innerHTML = "";
+    renderZen(el, "");
+    focusWithoutScroll(el);
+    requestAnimationFrame(() => {
+      if (!isInline()) return;
+      const h = surface.clientHeight;
+      if (h > 0) {
+        el.style.paddingTop = `${Math.round(h * INLINE_ANCHOR - 24)}px`;
+        el.style.paddingBottom = `${Math.round(h * (1 - INLINE_ANCHOR))}px`;
       }
-      if (!state.demoHasPlayed && !state.introTyping) {
-        replaySeedTyping();
-        return;
-      }
-      resumeDemoPlayback();
+      moveCaretToEnd(el);
+    });
+  }
+
+  function emitPromptReset() {
+    emit("flpromptreset", { index: Math.floor(Math.random() * trialPrompts.length) });
+  }
+
+  function deactivateInlineForTrial(keepDraft) {
+    const bar = document.querySelector(".demo-session-chrome");
+    if (bar) bar.hidden = true;
+    // is-live is declarative (data-class from _session.context==='inline'); the caller
+    // removes it by flipping context to 'trial' via flentertrial. Here we only restore
+    // the landing paper's demo content.
+    const el = demoEditor();
+    if (el) {
+      el.innerHTML = "";
+      el.style.paddingTop = "";
+      el.style.paddingBottom = "";
+      el.scrollTop = 0;
     }
-
-    function findNaturalPauseIndex(content) {
-      const firstLineBreak = content.indexOf('\n');
-      return firstLineBreak >= 0 ? firstLineBreak + 1 : content.length;
-    }
-
-    function escapeHTML(value) {
-      return value.replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[char]));
-    }
-
-    function renderDemoEditor(followupText) {
-      const el = demoEditor();
-      if (!el) return;
-
-      let followup = el.querySelector('.demo-paragraph-followup');
-      if (!followup) {
-        el.innerHTML = '<div class="demo-paragraph demo-paragraph-followup"></div>';
-        followup = el.querySelector('.demo-paragraph-followup');
-      }
-
-      followup.innerHTML = `<span class="typed-current">${escapeHTML(followupText)}</span>`;
-      updateCount();
-    }
-
-    function stopIntroTyping() {
-      clearDemoTimer();
-      state.introTyping = false;
-      state.demoPhase = 'idle';
-      state.demoPauseElapsed = 0;
-      state.demoPauseStartedAt = 0;
-      setDemoDangerLabel(0);
-      setDemoDangerActive(false);
-    }
-
-    function restoreSeed(options = {}) {
-      const { markPlayed = true } = options;
-      stopIntroTyping();
-      state.active = false;
-      state.failed = false;
-      state.lastInputTime = 0;
-      state.demoHasPlayed = markPlayed;
-      state.demoPauseIndex = -1;
-      state.demoPauseUsed = false;
-      state.demoPhase = 'complete';
+    if (keepDraft) {
+      internal.demoHasPlayed = true;
+      internal.demoPhase = "complete";
       renderDemoEditor(followupContent());
-      setStatus('Keep writing.');
-    }
-
-    function prepareDemoPlayback() {
-      stopIntroTyping();
-      state.demoHasPlayed = false;
-      state.demoPauseIndex = -1;
-      state.demoPauseUsed = false;
-      state.typingIndex = 0;
-      renderDemoEditor('');
-      setStatus('Demo ready.');
-    }
-
-    function completeDemoPlayback() {
+    } else {
       restoreSeed({ markPlayed: true });
     }
+  }
 
-    function syncTrialRoute() {
-      if (state.morphing) {
-        state.trialRoutePending = true;
-        return;
-      }
-
-      if (isTrialRoute() && !state.trialMode) {
-        enterTrial(null, { updateRoute: false });
-        return;
-      }
-
-      if (!isTrialRoute() && state.trialMode) exitTrial({ updateRoute: false });
-    }
-
-    function enterTrial(event, options = {}) {
-      const { updateRoute = true } = options;
-      event?.preventDefault();
-      if (state.morphing || state.trialMode) return;
-      const el = trialEditor();
-      if (!el) return;
-
-      const handoff = state.inlineMode && state.active && !state.trialComplete && !state.failed && Boolean(state.trialText);
-
-      if (event?.currentTarget instanceof HTMLElement) state.returnFocusElement = event.currentTarget;
-      if (updateRoute) pushTrialRoute();
-      if (!state.inlineMode && (state.introTyping || !state.demoHasPlayed)) completeDemoPlayback();
-
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      document.body.classList.remove('trial-focus-ready');
-      const surface = demoSurface();
-      if (state.inlineMode && surface?.hidden) surface.hidden = false;
-      animateSurfaceChange(demoSurface, () => {
-        if (state.inlineMode) deactivateInlineForTrial(handoff);
-        state.failed = false;
-        state.trialComplete = false;
-        state.trialDuration = 60;
-        state.trialMode = true;
-        state.trialResultText = '';
-        if (!handoff) {
-          state.active = false;
-          state.lastInputTime = 0;
-          state.trialStartedAt = 0;
-          state.trialText = '';
-        }
-        el.innerHTML = '';
-        el.setAttribute('contenteditable', 'true');
-        document.body.classList.add('trial-mode');
-        document.body.classList.remove('trial-complete', 'trial-failed');
-        setLandingInert(true);
-        trialOverlay()?.setAttribute('aria-hidden', 'false');
-        hideSessionResult();
-        hideSessionFailure();
-        if (!handoff) resetTrialPrompt();
-        renderSessionZenText();
-        updateSessionHUD();
-        setTrialDangerLabel(0);
-        setTrialDangerActive(false);
-      }, viewportRect).then(() => {
-        if (state.trialRoutePending) {
-          state.trialRoutePending = false;
-          syncTrialRoute();
-          return;
-        }
-
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          if (!state.trialMode) return;
-          document.body.classList.add('trial-focus-ready');
-          moveCaretToEnd(el);
-        }));
+  function freezeMorphGhostStyles(ghost, source) {
+    const surfaceStyle = getComputedStyle(source);
+    Object.assign(ghost.style, {
+      alignContent: surfaceStyle.alignContent,
+      background: surfaceStyle.background,
+      borderRadius: surfaceStyle.borderRadius,
+      boxShadow: surfaceStyle.boxShadow,
+      display: surfaceStyle.display,
+      gap: surfaceStyle.gap,
+      margin: "0",
+      overflow: "hidden",
+      padding: surfaceStyle.padding
+    });
+    const ghostEditor = ghost.querySelector(".live-demo-editor, .trial-editor");
+    const sourceEditor = source.querySelector(".live-demo-editor, .trial-editor");
+    if (ghostEditor && sourceEditor) {
+      const editorStyle = getComputedStyle(sourceEditor);
+      Object.assign(ghostEditor.style, {
+        color: editorStyle.color,
+        fontFamily: editorStyle.fontFamily,
+        fontSize: editorStyle.fontSize,
+        letterSpacing: editorStyle.letterSpacing,
+        lineHeight: editorStyle.lineHeight,
+        maxWidth: editorStyle.maxWidth,
+        minHeight: editorStyle.minHeight,
+        textAlign: editorStyle.textAlign,
+        width: editorStyle.width
       });
     }
-
-    function exitTrial(options = {}) {
-      const { updateRoute = true } = options;
-      if (state.morphing || !state.trialMode) return;
-      if (updateRoute && isTrialRoute()) {
-        if (history.state?.firstLineTrial) {
-          history.back();
-          return;
-        }
-        replaceHomeRoute();
-      }
-
-      setTrialDangerLabel(0);
-      setTrialDangerActive(false);
-      state.active = false;
-      stopSessionTimer();
-      const el = trialEditor();
-      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-      const returnFocusElement = state.returnFocusElement || document.querySelector('[data-trial-launch]');
-      document.body.classList.remove('trial-focus-ready');
-      animateSurfaceChange(trialSurface, () => {
-        state.failed = false;
-        state.trialComplete = false;
-        state.trialMode = false;
-        state.trialResultText = '';
-        state.trialStartedAt = 0;
-        state.trialText = '';
-        document.body.classList.remove('trial-mode', 'trial-complete', 'trial-failed');
-        trialOverlay()?.setAttribute('aria-hidden', 'true');
-        setLandingInert(false);
-        hideSessionResult();
-        hideSessionFailure();
-        if (el) {
-          el.setAttribute('contenteditable', 'true');
-          el.innerHTML = '';
-        }
-      }, () => elementMorphRect(demoSurface())).then(() => {
-        if (state.trialRoutePending) {
-          state.trialRoutePending = false;
-          syncTrialRoute();
-          return;
-        }
-        state.returnFocusElement = null;
-        returnFocusElement?.focus({ preventScroll: true });
-      });
+    ghost.querySelector(".trial-hud")?.remove();
+    ghost.querySelector(".trial-result")?.remove();
+    ghost.querySelector(".trial-toast")?.remove();
+    ghost.querySelector(".trial-prompt")?.remove();
+    ghost.querySelector(".demo-session-chrome")?.remove();
+    ghost.classList.remove("is-demo-danger");
+    if (ghostEditor) {
+      ghostEditor.innerHTML = "";
+      ghostEditor.removeAttribute("data-placeholder");
+      ghostEditor.classList.remove("is-demo-danger");
     }
+    const ghostDanger = ghost.querySelector(".live-demo-danger, .trial-danger");
+    if (ghostDanger) { ghostDanger.textContent = ""; ghostDanger.hidden = true; }
+    ghost.querySelectorAll("[contenteditable]").forEach((node) => node.removeAttribute("contenteditable"));
+    ghost.querySelectorAll("a, button").forEach((node) => node.setAttribute("tabindex", "-1"));
+    // Keep Datastar from adopting the morph ghost clone as a reactive scope.
+    ghost.setAttribute("data-ignore", "");
+  }
 
-    function beginFollowupTyping() {
-      if (!shouldRunDemo()) return;
-      state.demoPhase = 'typing';
-      typeNextFollowupCharacter();
-    }
+  function animateSurfaceChange(source, change, targetRect) {
+    const el = source();
+    if (!el || shouldReduceMotion()) { change(); return Promise.resolve(); }
+    const first = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.classList.add("trial-morph-ghost");
+    Object.assign(ghost.style, {
+      position: "fixed", inset: "auto", top: `${first.top}px`, left: `${first.left}px`,
+      width: `${first.width}px`, height: `${first.height}px`, transformOrigin: "top left",
+      zIndex: "2000", pointerEvents: "none", contain: "layout paint style", backfaceVisibility: "hidden"
+    });
+    freezeMorphGhostStyles(ghost, el);
+    document.body.appendChild(ghost);
+    el.style.visibility = "hidden";
+    emit("flmorphing", { v: true });
 
-    function followupTypingDelay(content) {
-      const index = state.typingIndex;
-      const char = content[index - 1];
-      const typed = content.slice(0, index);
-      const cadence = [120, 145, 175, 130, 190, 150, 135];
+    change();
 
-      if (char === '\n') return 620;
-      if (/[.,!?]/.test(char)) return 480;
-      if (typed.endsWith('fixing ')) return 520;
-      if (typed.endsWith('meant to ')) return 420;
-      if (char === ' ') return 190 + (index % 3) * 35;
-      if (index > 12 && index % 19 === 0) return 360;
-      return cadence[index % cadence.length];
-    }
+    const last = targetRect();
+    const deltaX = last.left - first.left;
+    const deltaY = last.top - first.top;
+    const scaleX = last.width / first.width;
+    const scaleY = last.height / first.height;
+    const firstStyle = getComputedStyle(ghost);
+    const animation = ghost.animate([
+      { borderRadius: firstStyle.borderRadius, boxShadow: firstStyle.boxShadow, opacity: .96, transform: "translate3d(0, 0, 0) scale(1, 1)" },
+      { borderRadius: last.borderRadius || firstStyle.borderRadius, boxShadow: last.boxShadow || firstStyle.boxShadow, opacity: 1, transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})` }
+    ], { duration: TRIAL_MORPH_DURATION, easing: TRIAL_MORPH_EASING, fill: "both" });
 
-    function typeNextFollowupCharacter() {
-      if (!shouldRunDemo() || state.demoPhase !== 'typing') return;
-      const content = followupContent();
+    return animation.finished.then(() => { el.style.visibility = ""; }).finally(() => {
+      ghost.remove();
+      emit("flmorphing", { v: false });
+    });
+  }
 
-      if (state.typingIndex >= content.length) {
-        completeDemoPlayback();
-        return;
-      }
+  function viewportRect() {
+    return { left: 0, top: 0, width: window.innerWidth, height: window.innerHeight, borderRadius: "0px", boxShadow: "none" };
+  }
+  function elementMorphRect(el) {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return { left: rect.left, top: rect.top, width: rect.width, height: rect.height, borderRadius: style.borderRadius, boxShadow: style.boxShadow };
+  }
 
-      state.typingIndex += 1;
-      renderDemoEditor(content.slice(0, state.typingIndex));
+  function startTrial(event) {
+    event?.preventDefault();
+    if (morphingFromDom() || isTrial()) return;
+    const el = trialEditor();
+    if (!el) return;
 
-      if (!state.demoPauseUsed && state.typingIndex >= state.demoPauseIndex) {
-        state.demoPauseUsed = true;
-        beginDemoPause();
-        return;
-      }
+    const inlineActive = isInline();
+    const handoffText = inlineActive ? normalizeTrialText(demoEditor()?.innerText || "") : "";
+    const handoff = inlineActive && Boolean(demoEditor()?.isContentEditable) && Boolean(handoffText);
 
-      scheduleDemoStep(typeNextFollowupCharacter, followupTypingDelay(content));
-    }
+    if (event?.currentTarget instanceof HTMLElement) internal.returnFocusElement = event.currentTarget;
+    pushTrialRoute();
+    if (!inlineActive && (internal.introTyping || !internal.demoHasPlayed)) completeDemoPlayback();
 
-    function replaySeedTyping() {
-      if (state.trialMode || state.inlineMode) return;
-      stopIntroTyping();
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
-        restoreSeed();
-        return;
-      }
-
-      state.active = false;
-      state.failed = false;
-      state.lastInputTime = 0;
-      state.demoHasPlayed = false;
-      state.demoPauseElapsed = 0;
-      state.demoPauseIndex = findNaturalPauseIndex(followupContent());
-      state.demoPauseStartedAt = 0;
-      state.demoPauseUsed = false;
-      state.demoPhase = 'waiting';
-      state.typingIndex = 0;
-      state.introTyping = true;
-      renderDemoEditor('');
-      setStatus('Demo ready.');
-      setDemoDangerLabel(0);
-      setDemoDangerActive(false);
-      resumeDemoPlayback();
-    }
-
-    function setupDemoPlayback() {
-      prepareDemoPlayback();
-      const motionQuery = window.matchMedia?.('(prefers-reduced-motion: reduce)');
-      if (motionQuery?.matches) {
-        restoreSeed();
-        return;
-      }
-
-      const surface = demoSurface();
-      if (!surface || !('IntersectionObserver' in window)) {
-        state.demoVisible = true;
-        replaySeedTyping();
-        return;
-      }
-
-      state.demoObserver?.disconnect();
-      state.demoObserver = new IntersectionObserver((entries) => {
-        const entry = entries[entries.length - 1];
-        setDemoVisibility(Boolean(entry?.isIntersecting && entry.intersectionRatio >= .2));
-      }, { threshold: [0, .2] });
-      state.demoObserver.observe(surface);
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) suspendDemoPlayback();
-        else if (state.demoVisible) resumeDemoPlayback();
-      });
-      motionQuery?.addEventListener?.('change', (event) => {
-        if (event.matches && !state.trialMode && !state.inlineMode) restoreSeed();
-      });
-    }
-
-    function updateCount() {
-      const el = count();
-      if (!el) return;
-      el.textContent = `${wordCount(visibleText())} words / characters`;
-    }
-
-    function start() {
-      if (state.failed) return;
-      if (state.trialComplete) return;
-      if ((state.trialMode || state.inlineMode) && !state.trialStartedAt) {
-        state.trialStartedAt = Date.now();
-      }
-      state.active = true;
-      state.lastInputTime = Date.now();
-      setSessionDangerActive(false);
-      setSessionDangerLabel(0);
-      if (!state.timer) state.timer = window.setInterval(tick, 250);
-    }
-
-    function tick() {
-      if (!state.active || state.failed) return;
-
-      const idle = (Date.now() - state.lastInputTime) / 1000;
-
-      if (state.trialMode || state.inlineMode) {
-        updateSessionHUD();
-        const elapsed = Math.floor((Date.now() - state.trialStartedAt) / 1000);
-        if (elapsed >= state.trialDuration) {
-          completeSession();
-          return;
-        }
-      }
-
-      if (idle >= SILENCE_CLEAR_SECONDS) {
-        failSession();
-      } else if (idle >= SILENCE_COUNTDOWN_START_SECONDS) {
-        const secondsLeft = Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - idle));
-        setSessionDangerLabel(secondsLeft);
-        setSessionDangerActive(idle >= SILENCE_BLUR_SECONDS);
-      } else {
-        setSessionDangerLabel(0);
-        setSessionDangerActive(false);
-      }
-    }
-
-    function restartWithSeed() {
-      replaySeedTyping();
-    }
-
-    function bindSessionEditor(el, mode) {
-      const isActiveContext = () => (mode === 'inline' ? state.inlineMode : state.trialMode);
-      el.addEventListener('focus', () => {
-        if (!isActiveContext()) return;
-        moveCaretToEnd(el);
-      });
-      el.addEventListener('pointerup', () => {
-        if (isActiveContext()) keepCaretAtEnd(el);
-      });
-      el.addEventListener('click', () => {
-        if (isActiveContext()) keepCaretAtEnd(el);
-      });
-      el.addEventListener('compositionstart', () => { state.composing = true; });
-      el.addEventListener('compositionend', () => {
-        state.composing = false;
-        if (!isActiveContext()) return;
-        state.trialText = normalizeTrialText(el.innerText);
-        syncSessionZenView();
-        start();
-        state.lastInputTime = Date.now();
-        setSessionDangerActive(false);
-      });
-      el.addEventListener('beforeinput', (evt) => {
-        if (!isActiveContext()) return;
-        const inputType = evt.inputType || '';
-        if (state.failed) {
-          evt.preventDefault();
-          return;
-        }
-        if (state.composing || inputType === 'insertCompositionText') return;
-        if (inputType === 'insertParagraph' || inputType === 'insertLineBreak') {
-          evt.preventDefault();
-          appendTrialLineBreak(el);
-          return;
-        }
-        if (inputType.startsWith('delete') || inputType.startsWith('history') || inputType === 'insertFromPaste') {
-          evt.preventDefault();
-          moveCaretToEnd(el);
-          return;
-        }
-        if (!selectionIsAtEnd(el)) {
-          evt.preventDefault();
-          const insertedText = inputType === 'insertText' ? (evt.data || '') : '';
-          moveCaretToEnd(el);
-          if (!insertedText) return;
-          state.trialText = `${state.trialText || normalizeTrialText(el.innerText)}${insertedText}`;
-          renderSessionZenText();
-          start();
-          state.lastInputTime = Date.now();
-          setSessionDangerActive(false);
-        }
-      }, true);
-      el.addEventListener('keydown', (evt) => {
-        if (!isActiveContext()) return;
-        if (state.composing || evt.isComposing) return;
-        const key = evt.key.toLowerCase();
-        const command = evt.metaKey || evt.ctrlKey;
-        if (evt.key === 'Backspace' || evt.key === 'Delete' || (command && ['a', 'v', 'x', 'z', 'y'].includes(key))) {
-          evt.preventDefault();
-          moveCaretToEnd(el);
-        } else if (['ArrowLeft', 'ArrowUp', 'Home', 'PageUp'].includes(evt.key)) {
-          evt.preventDefault();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    document.body.classList.remove("trial-focus-ready");
+    const surface = demoSurface();
+    if (inlineActive && surface?.hidden) surface.hidden = false;
+    animateSurfaceChange(demoSurface, () => {
+      // Flip context first: flentertrial sets _session.context='trial', which the
+      // declarative data-class:trial-mode / data-class:is-live bindings apply
+      // synchronously. trial-mode is no longer toggled imperatively.
+      emit("flentertrial", { handoff });
+      if (inlineActive) deactivateInlineForTrial(handoff);
+      el.innerHTML = "";
+      el.setAttribute("contenteditable", "true");
+      setLandingInert(true);
+      trialOverlay()?.setAttribute("aria-hidden", "false");
+      if (!handoff) emitPromptReset();
+      renderZen(el, handoff ? handoffText : "");
+    }, viewportRect).then(() => {
+      // After the morph, re-check the route (covers a route change that arrived
+      // while morphing) and move focus into the trial editor.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (isTrial()) {
+          document.body.classList.add("trial-focus-ready");
           moveCaretToEnd(el);
         }
-      }, true);
-      el.addEventListener('input', () => {
-        if (!isActiveContext()) return;
-        start();
-        state.lastInputTime = Date.now();
-        setSessionDangerActive(false);
-        if (state.composing) return;
-        state.trialText = normalizeTrialText(el.innerText);
-        syncSessionZenView();
-      });
-      el.addEventListener('paste', (evt) => evt.preventDefault(), true);
-      el.addEventListener('drop', (evt) => evt.preventDefault(), true);
+        emit("flroutecheck");
+      }));
+    });
+  }
+
+  function exitTrial() {
+    if (morphingFromDom() || !isTrial()) return;
+    if (isTrialRoute()) {
+      if (history.state?.firstLineTrial) { history.back(); return; }
+      replaceHomeRoute();
     }
+    const el = trialEditor();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    const returnFocusElement = internal.returnFocusElement || document.querySelector("[data-trial-launch]");
+    document.body.classList.remove("trial-focus-ready");
+    animateSurfaceChange(trialSurface, () => {
+      trialOverlay()?.setAttribute("aria-hidden", "true");
+      setLandingInert(false);
+      if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
+      emit("flexittrial");
+    }, () => elementMorphRect(demoSurface())).then(() => {
+      internal.returnFocusElement = null;
+      const coarse = Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+      if (!coarse) focusWithoutScroll(demoEditor());
+      else returnFocusElement?.focus({ preventScroll: true });
+      emit("flroutecheck");
+    });
+  }
 
-    function bind() {
-      const trialEl = trialEditor();
-      const demoEl = demoEditor();
-      if (!trialEl || !demoEl) return;
+  // onComplete / onFail: DOM side-effects of state changes (called from
+  // data-effect expressions that watch _session.complete / _session.failed).
+  function onComplete(context) {
+    const el = sessionEditor();
+    if (el) { el.blur(); el.setAttribute("contenteditable", "false"); }
+    clearEditorDanger();
+    if (context === "inline") hideInlineChrome();
+    requestAnimationFrame(() => sessionResultEl()?.querySelector(".trial-copy")?.focus({ preventScroll: true }));
+  }
+  function onFail(context) {
+    const el = sessionEditor();
+    if (el) { el.blur(); el.innerHTML = ""; el.setAttribute("contenteditable", "false"); }
+    clearEditorDanger();
+    if (context === "inline") hideInlineChrome();
+    requestAnimationFrame(() => sessionFailureEl()?.querySelector(".trial-restart")?.focus({ preventScroll: true }));
+  }
 
-      setupDemoPlayback();
-      bindSessionEditor(trialEl, 'trial');
-      bindSessionEditor(demoEl, 'inline');
+  function restart(context) {
+    const el = context === "inline" ? demoEditor() : trialEditor();
+    if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
+    clearEditorDanger();
+    renderZen(el, "");
+    if (context === "inline") showInlineChrome();
+    emitPromptReset();
+    requestAnimationFrame(() => moveCaretToEnd(el));
+    emit("flreset", { context });
+  }
 
-      // Type-to-start: interrupt the demo on the first keystroke. Focus is set
-      // synchronously inside the real keydown, so the browser and IME route the
-      // input to the editor - no reliance on load-time programmatic focus.
-      document.addEventListener('keydown', (evt) => {
-        if (state.inlineMode || state.trialMode || state.morphing) return;
-        if (evt.metaKey || evt.ctrlKey || evt.altKey) return;
-        const tag = document.activeElement && document.activeElement.tagName;
-        if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA') return;
-        if (evt.key.length === 1 || evt.key === 'Enter' || evt.key === 'Process') {
-          activateInlineEditor();
-        }
-      }, true);
+  // --- Prompt bridge ---------------------------------------------------------
+  function openPrompt() {
+    emit("flpromptopen");
+    requestAnimationFrame(() => sessionPromptEl()?.querySelector(".trial-prompt-next")?.focus({ preventScroll: true }));
+  }
+  function nextPrompt(currentIndex) {
+    emit("flpromptset", { index: (currentIndex + 1) % trialPrompts.length });
+  }
+  function dismissPrompt() {
+    emit("flpromptdismiss");
+    requestAnimationFrame(() => sessionPromptEl()?.querySelector(".trial-prompt-toggle")?.focus({ preventScroll: true }));
+  }
 
-      demoSurface()?.addEventListener('click', () => activateInlineEditor());
-      demoEl.addEventListener('keydown', (evt) => {
-        if (state.inlineMode || state.trialMode || state.morphing) return;
-        if (evt.key === 'Enter' || evt.key === ' ') {
-          evt.preventDefault();
-          activateInlineEditor();
-        }
-      });
-      document.addEventListener('selectionchange', () => {
-        if (state.composing) return;
-        const el = sessionEditor();
-        if (el) keepCaretAtEnd(el);
-      });
-      document.querySelectorAll('[data-trial-launch]').forEach((link) => {
-        link.addEventListener('click', enterTrial);
-      });
-      document.querySelector('.trial-exit')?.addEventListener('click', exitTrial);
-      document.querySelector('.trial-close')?.addEventListener('click', exitTrial);
-      document.querySelector('.trial-return')?.addEventListener('click', exitTrial);
-      document.querySelectorAll('.trial-finish').forEach((button) => {
-        button.addEventListener('click', finishSessionEarly);
-      });
-      document.querySelectorAll('.trial-copy').forEach((button) => {
-        button.addEventListener('click', copyTrialText);
-      });
-      document.querySelectorAll('.trial-copy-ai').forEach((button) => {
-        button.addEventListener('click', copyTrialForAI);
-      });
-      document.querySelectorAll('.trial-download-md').forEach((button) => {
-        button.addEventListener('click', downloadTrialMarkdown);
-      });
-      document.querySelectorAll('.trial-next, .trial-restart').forEach((button) => {
-        button.addEventListener('click', restartSessionFromResult);
-      });
-      document.querySelectorAll('.trial-prompt-toggle').forEach((button) => {
-        button.addEventListener('click', () => {
-          setSessionPromptOpen(true);
-          sessionPromptEl()?.querySelector('.trial-prompt-next')?.focus({ preventScroll: true });
-        });
-      });
-      document.querySelectorAll('.trial-prompt-next').forEach((button) => {
-        button.addEventListener('click', showNextTrialPrompt);
-      });
-      document.querySelectorAll('.trial-prompt-dismiss').forEach((button) => {
-        button.addEventListener('click', () => {
-          setSessionPromptOpen(false);
-          sessionPromptEl()?.querySelector('.trial-prompt-toggle')?.focus({ preventScroll: true });
-        });
-      });
-      document.addEventListener('keydown', (evt) => {
-        if (evt.key === 'Escape' && state.trialMode && !state.composing) {
-          evt.preventDefault();
-          exitTrial();
-          return;
-        }
-        if (evt.key === 'Enter' && (evt.metaKey || evt.ctrlKey) && !state.composing && (state.trialMode || state.inlineMode)) {
-          evt.preventDefault();
-          finishSessionEarly();
-        }
-      });
-      window.addEventListener('popstate', syncTrialRoute);
-      updateCount();
-      syncTrialRoute();
+  // --- Demo preview sequencer (browser-only). Writes the demo editor DOM and
+  //     emits fldanger while paused; reads only internal counters. -------------
+  function setStatus(message) { const el = status(); if (el) el.textContent = message; }
+  function visibleText() { return demoPreview()?.innerText || ""; }
+  function updateCount() { const el = count(); if (el) el.textContent = `${wordCount(visibleText())} words / characters`; }
+
+  function renderDemoEditor(followupText) {
+    const el = demoPreview();
+    if (!el) return;
+    let followup = el.querySelector(".demo-paragraph-followup");
+    if (!followup) {
+      el.innerHTML = '<div class="demo-paragraph demo-paragraph-followup"></div>';
+      followup = el.querySelector(".demo-paragraph-followup");
     }
+    followup.innerHTML = `<span class="typed-current">${escapeHTML(followupText)}</span>`;
+    updateCount();
+  }
 
-    return { bind, exitTrial, restartWithSeed, startTrial: enterTrial };
-  })();
+  function clearDemoTimer() { if (internal.typingTimer) window.clearTimeout(internal.typingTimer); internal.typingTimer = null; }
+  function stopIntroTyping() {
+    clearDemoTimer();
+    internal.introTyping = false;
+    internal.demoPhase = "idle";
+    internal.demoPauseElapsed = 0;
+    internal.demoPauseStartedAt = 0;
+    setDanger({ dangerSeconds: 0, dangerActive: false });
+  }
 
-  document.addEventListener('DOMContentLoaded', () => window.FirstLineLandingDemo.bind());
+  function restoreSeed(options = {}) {
+    const { markPlayed = true } = options;
+    stopIntroTyping();
+    internal.demoHasPlayed = markPlayed;
+    internal.demoPauseIndex = -1;
+    internal.demoPauseUsed = false;
+    internal.demoPhase = "complete";
+    renderDemoEditor(followupContent());
+    setStatus("Keep writing.");
+  }
+  function prepareDemoPlayback() {
+    stopIntroTyping();
+    internal.demoHasPlayed = false;
+    internal.demoPauseIndex = -1;
+    internal.demoPauseUsed = false;
+    internal.typingIndex = 0;
+    renderDemoEditor("");
+    setStatus("Demo ready.");
+  }
+  function completeDemoPlayback() { restoreSeed({ markPlayed: true }); }
+
+  function shouldRunDemo() { return internal.introTyping && internal.demoVisible && !document.hidden && !isTrial() && !isInline(); }
+  function scheduleDemoStep(callback, delay) {
+    clearDemoTimer();
+    if (!shouldRunDemo()) return;
+    internal.typingTimer = window.setTimeout(() => { internal.typingTimer = null; callback(); }, delay);
+  }
+  function suspendDemoPlayback() {
+    if (!internal.introTyping) return;
+    clearDemoTimer();
+    if (internal.demoPhase === "pause" && internal.demoPauseStartedAt) {
+      internal.demoPauseElapsed += performance.now() - internal.demoPauseStartedAt;
+      internal.demoPauseStartedAt = 0;
+      setDanger({ dangerSeconds: 0, dangerActive: false });
+    }
+  }
+  function updateDemoPause() {
+    if (!shouldRunDemo() || internal.demoPhase !== "pause") return;
+    const elapsed = internal.demoPauseElapsed + performance.now() - internal.demoPauseStartedAt;
+    if (elapsed >= DEMO_RECOVERY_DELAY) {
+      internal.demoPauseElapsed = 0;
+      internal.demoPauseStartedAt = 0;
+      internal.demoPhase = "typing";
+      setDanger({ dangerSeconds: 0, dangerActive: false });
+      setStatus("Typing resumed.");
+      scheduleDemoStep(typeNextFollowupCharacter, DEMO_RESUME_DELAY);
+      return;
+    }
+    if (elapsed >= DEMO_DANGER_DELAY) {
+      const secondsLeft = Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - elapsed / 1000));
+      setDanger({ dangerSeconds: secondsLeft, dangerActive: true });
+      setStatus("Draft fading. Keep typing.");
+    } else {
+      setDanger({ dangerSeconds: 0, dangerActive: false });
+      setStatus("Typing paused.");
+    }
+    scheduleDemoStep(updateDemoPause, DEMO_PAUSE_TICK);
+  }
+  function beginDemoPause() {
+    internal.demoPhase = "pause";
+    internal.demoPauseElapsed = 0;
+    internal.demoPauseStartedAt = performance.now();
+    setStatus("Typing paused.");
+    updateDemoPause();
+  }
+  function resumeDemoPlayback() {
+    if (!internal.introTyping || !internal.demoVisible || document.hidden || isTrial() || isInline()) return;
+    if (internal.demoPhase === "pause") { internal.demoPauseStartedAt = performance.now(); updateDemoPause(); return; }
+    if (internal.demoPhase === "waiting") { scheduleDemoStep(beginFollowupTyping, DEMO_START_DELAY); return; }
+    if (internal.demoPhase === "typing") scheduleDemoStep(typeNextFollowupCharacter, 80);
+  }
+  function setDemoVisibility(visible) {
+    internal.demoVisible = visible;
+    if (!visible || document.hidden || isTrial() || isInline()) { suspendDemoPlayback(); return; }
+    if (!internal.demoHasPlayed && !internal.introTyping) { replaySeedTyping(); return; }
+    resumeDemoPlayback();
+  }
+  function findNaturalPauseIndex(content) { const i = content.indexOf("\n"); return i >= 0 ? i + 1 : content.length; }
+
+  function beginFollowupTyping() { if (!shouldRunDemo()) return; internal.demoPhase = "typing"; typeNextFollowupCharacter(); }
+  function followupTypingDelay(content) {
+    const index = internal.typingIndex;
+    const char = content[index - 1];
+    const typed = content.slice(0, index);
+    const cadence = [120, 145, 175, 130, 190, 150, 135];
+    if (char === "\n") return 620;
+    if (/[.,!?]/.test(char)) return 480;
+    if (typed.endsWith("fixing ")) return 520;
+    if (typed.endsWith("meant to ")) return 420;
+    if (char === " ") return 190 + (index % 3) * 35;
+    if (index > 12 && index % 19 === 0) return 360;
+    return cadence[index % cadence.length];
+  }
+  function typeNextFollowupCharacter() {
+    if (!shouldRunDemo() || internal.demoPhase !== "typing") return;
+    const content = followupContent();
+    if (internal.typingIndex >= content.length) { completeDemoPlayback(); return; }
+    internal.typingIndex += 1;
+    renderDemoEditor(content.slice(0, internal.typingIndex));
+    if (!internal.demoPauseUsed && internal.typingIndex >= internal.demoPauseIndex) { internal.demoPauseUsed = true; beginDemoPause(); return; }
+    scheduleDemoStep(typeNextFollowupCharacter, followupTypingDelay(content));
+  }
+  function replaySeedTyping() {
+    if (isTrial() || isInline()) return;
+    stopIntroTyping();
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { restoreSeed(); return; }
+    internal.demoHasPlayed = false;
+    internal.demoPauseElapsed = 0;
+    internal.demoPauseIndex = findNaturalPauseIndex(followupContent());
+    internal.demoPauseStartedAt = 0;
+    internal.demoPauseUsed = false;
+    internal.demoPhase = "waiting";
+    internal.typingIndex = 0;
+    internal.introTyping = true;
+    renderDemoEditor("");
+    setStatus("Demo ready.");
+    setDanger({ dangerSeconds: 0, dangerActive: false });
+    resumeDemoPlayback();
+  }
+  function setupDemoPlayback() {
+    prepareDemoPlayback();
+    const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    if (motionQuery?.matches) { restoreSeed(); return; }
+    const surface = demoSurface();
+    if (!surface || !("IntersectionObserver" in window)) { internal.demoVisible = true; replaySeedTyping(); return; }
+    internal.demoObserver?.disconnect();
+    internal.demoObserver = new IntersectionObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      setDemoVisibility(Boolean(entry?.isIntersecting && entry.intersectionRatio >= .2));
+    }, { threshold: [0, .2] });
+    internal.demoObserver.observe(surface);
+    document.addEventListener("visibilitychange", () => { if (document.hidden) suspendDemoPlayback(); else if (internal.demoVisible) resumeDemoPlayback(); });
+    motionQuery?.addEventListener?.("change", (event) => { if (event.matches && !isTrial() && !isInline()) restoreSeed(); });
+  }
+
+  function restartWithSeed() { replaySeedTyping(); }
+
+  // --- Wiring ----------------------------------------------------------------
+  function bind() {
+    const trialEl = trialEditor();
+    const demoEl = demoEditor();
+    if (!trialEl || !demoEl) return;
+
+    emitPromptReset();
+    setupDemoPlayback();
+    bindSessionEditor(trialEl, "trial");
+
+    // The live editor is editable from load. On fine-pointer devices it is also
+    // focused (invisible while the demo plays), so English beforeinput and IME
+    // compositionstart reach it directly and arm the session with no click. On
+    // touch devices it stays unfocused so page load never summons the keyboard;
+    // tap activates. Document keydown is the fallback for when focus is elsewhere.
+    demoEl.addEventListener("beforeinput", (evt) => {
+      if (contextFromDom() !== "demo" || morphingFromDom()) return;
+      if (evt.inputType && evt.inputType.startsWith("insert")) armInline();
+    }, true);
+    demoEl.addEventListener("compositionstart", () => {
+      if (contextFromDom() !== "demo" || morphingFromDom()) return;
+      armInline();
+    }, true);
+    bindSessionEditor(demoEl, "inline");
+
+    const coarsePointer = Boolean(window.matchMedia?.("(pointer: coarse)").matches);
+    if (!coarsePointer && !isTrialRoute()) focusWithoutScroll(demoEl);
+
+    document.addEventListener("keydown", (evt) => {
+      if (contextFromDom() !== "demo" || morphingFromDom()) return;
+      if (evt.metaKey || evt.ctrlKey || evt.altKey) return;
+      if (document.activeElement === demoEl) return;
+      const tag = document.activeElement && document.activeElement.tagName;
+      if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA") return;
+      if (evt.key.length === 1 || evt.key === "Enter" || evt.key === "Process") activateInline();
+    }, true);
+
+    document.addEventListener("selectionchange", () => {
+      if (internal.composing) return;
+      const el = sessionEditor();
+      if (el) keepCaretAtEnd(el);
+    });
+
+    window.addEventListener("resize", () => { if (isTrial() && trialDanger()) syncTrialDangerPosition(); });
+
+    updateCount();
+    // The initial route check must run only after Datastar has attached its
+    // data-on handlers. data-init on <body> fires too early for this in v1.0.2,
+    // so wait for datastar-ready, with a timeout fallback in case it already
+    // fired before this listener was attached.
+    let routeChecked = false;
+    const initialRouteCheck = () => {
+      if (routeChecked) return;
+      routeChecked = true;
+      emit("flroutecheck");
+    };
+    document.addEventListener("datastar-ready", initialRouteCheck, { once: true });
+    window.setTimeout(initialRouteCheck, 500);
+  }
+
+  return {
+    bind,
+    // pure helpers / action targets called from data-on + data-on-interval + data-effect expressions
+    tickDispatch,
+    tryFinish,
+    promptAt,
+    onComplete,
+    onFail,
+    // action targets called from data-on:click (and flroutecheck events)
+    activateInline,
+    startTrial,
+    exitTrial,
+    copyText,
+    copyForAI,
+    download: downloadMarkdown,
+    restart,
+    openPrompt,
+    nextPrompt,
+    dismissPrompt,
+    onGlobalKeydown,
+    emitFlroutecheck,
+    restartWithSeed
+  };
+})();
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", () => window.FirstLineLandingDemo.bind());
+} else {
+  window.FirstLineLandingDemo.bind();
+}
 </script>
 <style>
 
@@ -2214,6 +1768,55 @@
     padding: 0;
   }
 
+  .demo-editor-stack {
+    display: grid;
+  }
+
+  .demo-editor-stack .demo-preview,
+  .demo-editor-stack .live-demo-editor {
+    grid-area: 1 / 1;
+  }
+
+  .demo-preview {
+    color: var(--ink);
+    font-family: var(--font-ui), var(--font-cn);
+    font-size: clamp(26px, 2.2vw, 32px);
+    line-height: 1.75;
+    letter-spacing: -.02em;
+    text-align: center;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    pointer-events: none;
+    transition: filter 3s linear, color 3s linear, text-shadow 3s linear;
+  }
+
+  .demo-preview.is-demo-danger {
+    color: rgba(23, 41, 71, .2);
+    filter: blur(3px);
+    text-shadow: 0 0 18px rgba(23, 41, 71, .3);
+  }
+
+  .live-demo-editor {
+    opacity: 0;
+    transition: opacity 120ms ease-out;
+  }
+
+  .demo-writing-surface.is-live .demo-editor-stack {
+    height: 100%;
+  }
+
+  .demo-writing-surface.is-live .live-demo-editor {
+    opacity: 1;
+  }
+
+  .demo-writing-surface.is-live .demo-preview {
+    display: none;
+  }
+
+  .demo-writing-surface.is-live[hidden] {
+    display: none;
+  }
+
   .demo-writing-surface.is-live .demo-session-chrome {
     position: absolute;
     top: 12px;
@@ -2250,7 +1853,7 @@
 
   .demo-writing-surface.is-live .live-demo-danger {
     position: absolute;
-    top: 38%;
+    top: calc(38% - 72px);
     font-size: 14px;
   }
 
@@ -2267,10 +1870,11 @@
 
   .demo-result,
   .demo-failure {
-    width: min(1080px, 100%);
+    width: min(1180px, 100%);
     margin: clamp(24px, 3vh, 36px) auto 0;
   }
 
+  .demo-result .trial-result-card,
   .demo-result .trial-result-card,
   .demo-failure .trial-result-card {
     width: 100%;
@@ -4091,7 +3695,34 @@
   }
 </style>
 </head>
-<body>
+<body
+  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false}}'
+  data-computed:_session.clock="String(Math.floor($_session.remaining/60)).padStart(2,'0')+':'+String($_session.remaining%60).padStart(2,'0')"
+  data-class:trial-mode="$_session.context === 'trial'"
+  data-class:trial-complete="$_session.complete &amp;&amp; $_session.context === 'trial'"
+  data-class:trial-failed="$_session.failed &amp;&amp; $_session.context === 'trial'"
+  data-class:trial-morphing="$_session.morphing"
+  data-on-interval__duration.250ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
+  data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.context); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.context)"
+  data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60))"
+  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flfail="$_session.active = false; $_session.failed = true; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.resultText = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:fldanger="$_session.dangerSeconds = evt.detail.dangerSeconds; $_session.dangerActive = evt.detail.dangerActive; (typeof evt.detail.remaining !== 'undefined') &amp;&amp; ($_session.remaining = evt.detail.remaining)"
+  data-on:fltoast="$_session.toastText = evt.detail.message; $_session.toastVisible = true"
+  data-on:fltoast__window__debounce.1700ms="$_session.toastVisible = false"
+  data-on:flpromptopen="$_session.promptOpen = true"
+  data-on:flpromptdismiss="$_session.promptOpen = false"
+  data-on:flpromptset="$_session.promptIndex = evt.detail.index; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
+  data-on:flpromptreset="$_session.promptIndex = evt.detail.index; $_session.promptOpen = false; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
+  data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flmorphing="$_session.morphing = evt.detail.v"
+  data-on:keydown__document="FirstLineLandingDemo.onGlobalKeydown(evt, $_session.text, $_session.context, $_session.startedAt)"
+  data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
+  data-on:flroutecheck="$_session.morphing ? '' : ((location.hash === '#trial' &amp;&amp; $_session.context !== 'trial') ? FirstLineLandingDemo.startTrial(null) : ((location.hash !== '#trial' &amp;&amp; $_session.context === 'trial') ? FirstLineLandingDemo.exitTrial() : ''))"
+>
   <div class="sheet">
     <main id="top">
       <section class="hero-frame">
@@ -4099,7 +3730,6 @@
           <a class="brand" href="#top"><svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><rect width="64" height="64" fill="#e8e6dc"/><path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d"/><path d="M48 14h5v36h-5z" fill="#2d5a8a"/></svg><span class="brand-name">First Line</span></a>
           <a class="nav-price" href="download.html">Mac release</a>
         </nav>
-
         <section class="hero" aria-labelledby="hero-title">
           <section id="demo" class="live-demo" aria-label="First Line product preview">
             <div class="demo-window">
@@ -4109,66 +3739,67 @@
                   <p class="hero-note">You cannot delete, paste, or undo. If you stop for eight seconds, the draft is deleted.</p>
                   <div class="hero-action-block">
                     <div class="hero-actions">
-                      <a class="cta primary-cta" href="#trial" data-trial-launch="">Write for 1 minute</a>
+                      <a class="cta primary-cta" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write for 1 minute</a>
                     </div>
                     <p class="hero-hint">Or select the paper and start typing.</p>
                   </div>
                 </div>
-                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing.">
+                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-on:click="FirstLineLandingDemo.activateInline()">
                   <div class="demo-session-chrome demo-prompt" hidden>
                     <div class="demo-session-bar">
-                      <span class="demo-session-timer">01:00</span>
+                      <span class="demo-session-timer" data-text="$_session.clock">01:00</span>
                       <div class="demo-session-actions">
-                        <button type="button" class="trial-prompt-toggle" aria-expanded="false" aria-controls="demo-prompt-card">Need a prompt?</button>
-                        <button type="button" class="trial-finish" title="Finish this draft (Cmd/Ctrl+Enter)">Finish</button>
+                        <button type="button" class="trial-prompt-toggle" aria-expanded="false" aria-controls="demo-prompt-card" data-show="!$_session.promptOpen" data-attr:aria-expanded="$_session.promptOpen ? 'true' : 'false'" data-on:click="FirstLineLandingDemo.openPrompt()">Need a prompt?</button>
+                        <button type="button" class="trial-finish" title="Finish this draft (Cmd/Ctrl+Enter)" data-on:click="FirstLineLandingDemo.tryFinish($_session.text, $_session.context, $_session.startedAt)">Finish</button>
                       </div>
                     </div>
-                    <p class="trial-prompt-card" id="demo-prompt-card" hidden>
-                      <span class="trial-prompt-text"></span>
-                      <button type="button" class="trial-prompt-next">Another</button>
-                      <button type="button" class="trial-prompt-dismiss" aria-label="Dismiss prompt">&times;</button>
+                    <p class="trial-prompt-card" id="demo-prompt-card" data-show="$_session.promptOpen">
+                      <span class="trial-prompt-text" data-text="$_session.promptText"></span>
+                      <button type="button" class="trial-prompt-next" data-on:click="FirstLineLandingDemo.nextPrompt($_session.promptIndex)">Another</button>
+                      <button type="button" class="trial-prompt-dismiss" aria-label="Dismiss prompt" data-on:click="FirstLineLandingDemo.dismissPrompt()">&times;</button>
                     </p>
                   </div>
-                  <div class="live-demo-editor" tabindex="0" role="button" aria-label="Live writing surface. Press Enter to start typing." data-placeholder="Start typing."></div>
-                  <p class="live-demo-danger" hidden aria-hidden="true" aria-live="polite" aria-atomic="true"></p>
+                  <div class="demo-editor-stack">
+                    <div class="demo-preview" aria-hidden="true"></div>
+                    <div class="live-demo-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line live writing surface" spellcheck="false"></div>
+                  </div>
+                  <p class="live-demo-danger" data-show="$_session.dangerSeconds &gt; 0 &amp;&amp; $_session.context !== 'trial'" aria-live="polite" aria-atomic="true"><span class="danger-count" data-text="$_session.dangerSeconds"></span><span class="danger-hint">Keep typing or the draft will be deleted.</span></p>
                 </div>
-                <section class="demo-result" hidden aria-live="polite" aria-label="Session result">
+                <section class="demo-result" data-show="$_session.complete &amp;&amp; $_session.context === 'inline'" aria-live="polite" aria-label="Session result">
                   <div class="trial-result-card">
-                    <article class="trial-result-text"></article>
-                    <p class="trial-result-words"></p>
+                    <article class="trial-result-text" data-text="$_session.resultText"></article>
+                    <p class="trial-result-words" data-text="$_session.resultWords"></p>
                     <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
-                      <button type="button" class="cta trial-copy">Copy full text</button>
-                      <button type="button" class="cta secondary trial-copy-ai">Copy for AI</button>
-                      <button type="button" class="cta secondary trial-download-md">Download .md</button>
+                      <button type="button" class="cta trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
+                      <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+                      <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
                     </div>
                     <div class="trial-result-actions">
-                      <button type="button" class="cta secondary trial-next">Start another minute</button>
-                      <a class="cta secondary" href="#trial" data-trial-launch="">Write fullscreen</a>
+                      <button type="button" class="cta secondary trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Start another minute</button>
+                      <a class="cta secondary" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write fullscreen</a>
                       <a class="trial-download-link" href="download.html">Mac release</a>
                     </div>
                   </div>
                 </section>
-                <section class="demo-failure" hidden aria-live="polite" aria-label="Session failed">
+                <section class="demo-failure" data-show="$_session.failed &amp;&amp; $_session.context === 'inline'" aria-live="polite" aria-label="Session failed">
                   <div class="trial-result-card trial-failure-card">
                     <h2 class="trial-failure-title">Draft deleted.</h2>
                     <p class="trial-failure-copy">You stopped for eight seconds. Try again.</p>
                     <div class="trial-result-actions">
-                      <button type="button" class="cta trial-restart">Try again</button>
-                      <a class="cta secondary" href="#trial" data-trial-launch="">Write fullscreen</a>
+                      <button type="button" class="cta trial-restart" data-on:click="FirstLineLandingDemo.restart($_session.context)">Try again</button>
+                      <a class="cta secondary" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write fullscreen</a>
                       <a class="trial-download-link" href="download.html">Mac release</a>
                     </div>
                   </div>
                 </section>
               </div>
               <div class="demo-footer" aria-hidden="true"><span class="live-demo-status">Keep writing.</span><span class="live-demo-count">0 words / characters</span></div>
-              <p class="demo-toast" hidden aria-live="polite">Copied</p>
+              <p class="demo-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context !== 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
             </div>
           </section>
         </section>
       </section>
-
     </main>
-
     <footer class="site-footer">
       <p>First Line. A forward-only writing app for Mac. Your writing never leaves this page.</p>
       <nav class="footer-nav" aria-label="Support">
@@ -4183,51 +3814,68 @@
   <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="First Line writing trial" aria-hidden="true">
     <div class="trial-writing-surface">
       <div class="trial-hud" aria-label="Trial status">
-        <span class="trial-timer">01:00</span>
+        <span class="trial-timer" data-text="$_session.clock">01:00</span>
         <div class="trial-hud-actions">
-          <button type="button" class="trial-finish" title="Finish this draft (Cmd/Ctrl+Enter)">Finish</button>
-          <button type="button" class="trial-exit">Exit</button>
+          <button type="button" class="trial-finish" title="Finish this draft (Cmd/Ctrl+Enter)" data-on:click="FirstLineLandingDemo.tryFinish($_session.text, $_session.context, $_session.startedAt)">Finish</button>
+          <button type="button" class="trial-exit" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
         </div>
       </div>
       <div class="trial-prompt">
-        <button type="button" class="trial-prompt-toggle" aria-expanded="false" aria-controls="trial-prompt-card">Need a prompt?</button>
-        <p class="trial-prompt-card" id="trial-prompt-card" hidden>
-          <span class="trial-prompt-text"></span>
-          <button type="button" class="trial-prompt-next">Another</button>
-          <button type="button" class="trial-prompt-dismiss" aria-label="Dismiss prompt">&times;</button>
+        <button type="button" class="trial-prompt-toggle" aria-expanded="false" aria-controls="trial-prompt-card" data-show="!$_session.promptOpen" data-attr:aria-expanded="$_session.promptOpen ? 'true' : 'false'" data-on:click="FirstLineLandingDemo.openPrompt()">Need a prompt?</button>
+        <p class="trial-prompt-card" id="trial-prompt-card" data-show="$_session.promptOpen">
+          <span class="trial-prompt-text" data-text="$_session.promptText"></span>
+          <button type="button" class="trial-prompt-next" data-on:click="FirstLineLandingDemo.nextPrompt($_session.promptIndex)">Another</button>
+          <button type="button" class="trial-prompt-dismiss" aria-label="Dismiss prompt" data-on:click="FirstLineLandingDemo.dismissPrompt()">&times;</button>
         </p>
       </div>
-      <p class="trial-danger" hidden aria-hidden="true" aria-live="assertive" aria-atomic="true"></p>
-      <div class="trial-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line trial editor" spellcheck="false"></div>
-      <section class="trial-result" hidden aria-live="polite" aria-label="Trial result">
+      <p class="trial-danger" data-show="$_session.dangerSeconds &gt; 0 &amp;&amp; $_session.context === 'trial'" aria-live="assertive" aria-atomic="true"><span class="danger-count" data-text="$_session.dangerSeconds"></span><span class="danger-hint">Keep typing or the draft will be deleted.</span></p>
+      <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="First Line trial editor" spellcheck="false"></div>
+      <section class="trial-result" data-show="$_session.complete &amp;&amp; $_session.context === 'trial'" aria-live="polite" aria-label="Trial result">
         <div class="trial-result-card">
-          <article class="trial-result-text"></article>
-          <p class="trial-result-words"></p>
+          <article class="trial-result-text" data-text="$_session.resultText"></article>
+          <p class="trial-result-words" data-text="$_session.resultWords"></p>
           <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
-            <button type="button" class="cta trial-copy">Copy full text</button>
-            <button type="button" class="cta secondary trial-copy-ai">Copy for AI</button>
-            <button type="button" class="cta secondary trial-download-md">Download .md</button>
+            <button type="button" class="cta trial-copy" data-on:click="FirstLineLandingDemo.copyText($_session.resultText || $_session.text)">Copy full text</button>
+            <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
+            <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
           </div>
           <div class="trial-result-actions">
-            <button type="button" class="cta secondary trial-next">Start another minute</button>
-            <button type="button" class="cta secondary trial-close">Exit</button>
+            <button type="button" class="cta secondary trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Start another minute</button>
+            <button type="button" class="cta secondary trial-close" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
             <a class="trial-download-link" href="download.html">Mac release</a>
           </div>
         </div>
       </section>
-      <section class="trial-failure" hidden aria-live="polite" aria-label="Trial failed">
+      <section class="trial-failure" data-show="$_session.failed &amp;&amp; $_session.context === 'trial'" aria-live="polite" aria-label="Trial failed">
         <div class="trial-result-card trial-failure-card">
           <h2 class="trial-failure-title">Draft deleted.</h2>
           <p class="trial-failure-copy">You stopped for eight seconds. Try again.</p>
           <div class="trial-result-actions">
-            <button type="button" class="cta trial-restart">Try again</button>
-            <button type="button" class="cta secondary trial-return">Back to landing</button>
+            <button type="button" class="cta trial-restart" data-on:click="FirstLineLandingDemo.restart($_session.context)">Try again</button>
+            <button type="button" class="cta secondary trial-return" data-on:click="FirstLineLandingDemo.exitTrial()">Back to landing</button>
             <a class="trial-download-link" href="download.html">Mac release</a>
           </div>
         </div>
       </section>
-      <p class="trial-toast" hidden aria-live="polite">Copied</p>
+      <p class="trial-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context === 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
     </div>
   </div>
+  <script>
+    // Datastar Inspector is a dev-only tool: it loads and mounts only when the
+    // page is opened with ?debug. It is never present in ordinary production use.
+    if (/[?&]debug\b/.test(location.search)) {
+      var insp = document.createElement("script");
+      insp.src = "datastar-inspector.js";
+      insp.defer = true;
+      document.head.appendChild(insp);
+      var mount = function () {
+        if (!document.querySelector("datastar-inspector")) {
+          document.body.appendChild(document.createElement("datastar-inspector"));
+        }
+      };
+      if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", mount, { once: true });
+      else mount();
+    }
+  </script>
 </body>
 </html>

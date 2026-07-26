@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero Draft - game: siege</title>
+<meta name="description" content="Game mode demo: the pile closes in from every side. Typing pushes it back.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f1f0eb;
+    --ink:#17150f;
+    --dim:#6b665b;
+    --faint:#b3ada0;
+    --red:#c8392f;
+    --paper:#ffffff;
+    --serif:"Newsreader",Georgia,"Times New Roman",serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:var(--serif);font-weight:400;line-height:1.55;
+    -webkit-font-smoothing:antialiased;overflow:hidden;height:100vh;
+  }
+  ::selection{background:rgba(200,57,47,.22)}
+  button{font-family:inherit}
+
+  /* ---------- the siege field: the pile, armed, surrounding the paper ---------- */
+  .field{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .frag{
+    position:absolute;left:0;top:0;font-family:var(--mono);color:var(--ink);
+    white-space:pre;line-height:1.5;opacity:.1;
+    transition:transform .5s ease,opacity .5s ease,color .45s ease;
+    will-change:transform,opacity;
+  }
+  .frag s{text-decoration-color:var(--red);text-decoration-thickness:1.5px}
+  .frag.red{color:var(--red)}
+  .frag.join-new{color:var(--red);opacity:.85;font-size:13px;transition:color 1.6s ease,opacity 1.6s ease}
+  .frag.join-new.settle{color:var(--ink);opacity:.1}
+
+  .veil{
+    position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;
+    box-shadow:inset 0 0 140px rgba(200,57,47,.3),inset 0 0 40px rgba(200,57,47,.12);
+    transition:opacity .35s ease;
+  }
+  body.danger .veil{opacity:1}
+
+  /* ---------- chrome ---------- */
+  .topbar{
+    position:fixed;top:0;left:0;right:0;z-index:20;
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:18px 22px;
+  }
+  .wordmark{font-family:var(--mono);font-size:13px;letter-spacing:.14em;color:var(--ink);text-decoration:none}
+  .wordmark b{color:var(--red);font-weight:500}
+  .top-right{display:flex;align-items:baseline;gap:18px}
+  .mode-tag{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+  .dur{display:flex;gap:4px}
+  .dur button{
+    font-family:var(--mono);font-size:11px;color:var(--faint);background:none;border:0;
+    padding:4px 8px;cursor:pointer;border-bottom:2px solid transparent;font-variant-numeric:tabular-nums;
+  }
+  .dur button.on{color:var(--ink);border-bottom-color:var(--ink)}
+  .dur button:hover{color:var(--ink)}
+  .dur button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .dur.locked{opacity:.35;pointer-events:none}
+
+  /* ---------- arena + paper ---------- */
+  .arena{position:fixed;inset:0;z-index:1;display:grid;place-items:center;padding:64px 16px 24px}
+  .paper{
+    position:relative;width:min(1080px,92vw);background:var(--paper);
+    border:1px solid rgba(23,21,15,.2);border-radius:3px;
+    box-shadow:0 1px 0 rgba(23,21,15,.06),0 24px 60px rgba(23,21,15,.1);
+    min-height:clamp(560px,74vh,800px);max-height:calc(100vh - 110px);cursor:text;overflow:hidden;
+    display:flex;flex-direction:column;will-change:transform;
+    transition:border-color .3s ease,box-shadow .3s ease,transform .25s ease;
+  }
+  body.danger .paper{
+    border-color:rgba(200,57,47,.55);
+    box-shadow:0 1px 0 rgba(23,21,15,.06),0 24px 60px rgba(23,21,15,.1),0 0 0 4px rgba(200,57,47,.08);
+  }
+  .paper-head{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:12px 18px;border-bottom:1px solid rgba(23,21,15,.1);
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    flex:none;
+  }
+  .spec{color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .spec b{color:var(--red);font-weight:500}
+  .head-right{display:flex;align-items:center;gap:14px;flex:none}
+  .clock{color:var(--dim);font-variant-numeric:tabular-nums;font-size:12px}
+  .clock.running{color:var(--ink)}
+  body.danger .clock{color:var(--red)}
+  #finish{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    background:none;border:0;color:var(--dim);cursor:pointer;padding:4px 0;
+  }
+  #finish:hover{color:var(--ink)}
+  #finish:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .sheet{
+    padding:0 max(48px,calc((100% - 560px)/2));min-height:300px;flex:1;overflow-y:auto;
+    font-size:19px;line-height:1.8;color:var(--ink);
+    outline:none;white-space:pre-wrap;word-break:break-word;
+    caret-color:var(--ink);text-align:center;
+    transition:opacity .3s ease,filter .3s ease;
+  }
+  .zen-fade{
+    position:absolute;left:0;right:0;z-index:2;pointer-events:none;
+    background:linear-gradient(to bottom,var(--paper) 0%,rgba(255,255,255,.92) 38%,rgba(255,255,255,.38) 72%,rgba(255,255,255,0) 100%);
+  }
+  .sheet:focus-visible{box-shadow:inset 0 0 0 2px rgba(23,21,15,.35)}
+  body.danger .sheet{opacity:.35;caret-color:var(--red)}
+  .paper.wiping .sheet{opacity:0;filter:blur(6px)}
+  .placeholder{
+    position:absolute;top:64px;left:48px;right:48px;pointer-events:none;
+    font-style:italic;font-size:19px;line-height:1.8;color:var(--faint);
+    transition:opacity .2s ease;text-align:center;
+  }
+  .countdown{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    pointer-events:none;opacity:0;transition:opacity .18s ease;z-index:10;
+    text-align:center;
+  }
+  body.danger .countdown{opacity:1}
+  .countdown .num{
+    font-family:var(--mono);font-weight:500;
+    font-size:clamp(110px,16vw,180px);line-height:1;text-align:center;
+    color:var(--red);font-variant-numeric:tabular-nums;
+  }
+  .countdown .cap{
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--dim);text-align:center;margin-top:12px;
+  }
+  .paper-foot{
+    display:flex;justify-content:space-between;gap:12px;flex:none;
+    padding:12px 18px;border-top:1px solid rgba(23,21,15,.1);
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);
+  }
+  .foot-msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .foot-msg.gone{color:var(--red)}
+  .foot-tag{flex:none}
+  .done{
+    position:absolute;inset:0;z-index:4;background:var(--paper);
+    display:none;flex-direction:column;justify-content:center;align-items:center;gap:6px;
+    padding:36px;text-align:center;
+  }
+  .paper.finished .done{display:flex}
+  .done .metric{font-size:clamp(72px,9vw,96px);font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+  .done .metric-label{
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--faint);
+  }
+  .done .metric-sub{
+    font-family:var(--mono);font-size:11px;color:var(--dim);
+    margin-top:6px;margin-bottom:24px;letter-spacing:.04em;
+  }
+  .done-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:.06em;
+    padding:14px 26px;border:0;cursor:pointer;border-radius:2px;
+    background:var(--ink);color:var(--bg);
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(23,21,15,.18)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .btn-ghost{
+    background:transparent;color:var(--dim);border:1px solid rgba(23,21,15,.25);
+    font-size:11px;padding:11px 15px;box-shadow:none;
+  }
+  .btn-ghost:hover{color:var(--ink);border-color:var(--ink);transform:none;box-shadow:none}
+  .copied{color:var(--red) !important;border-color:var(--red) !important}
+
+  @media (max-width:700px){
+    .topbar{padding:14px 16px}
+    .mode-tag{display:none}
+    .paper{min-height:calc(100vh - 150px)}
+    .paper-head{padding:10px 12px;font-size:9.5px;letter-spacing:.08em}
+    .sheet{padding:0 24px;font-size:17px;min-height:280px}
+    .placeholder{left:24px;right:24px;font-size:17px}
+    .paper-foot{padding:10px 12px;font-size:9.5px;letter-spacing:.08em}
+    .countdown .num{font-size:110px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+
+<div class="field" id="field" aria-hidden="true"></div>
+<div class="veil" aria-hidden="true"></div>
+
+<nav class="topbar">
+  <a class="wordmark" href="#">ZERO<b>_</b>DRAFT</a>
+  <div class="top-right">
+    <span class="mode-tag">game mode / siege</span>
+    <div class="dur" id="dur">
+      <button data-dur="60" class="on">1:00</button>
+      <button data-dur="180">3:00</button>
+      <button data-dur="300">5:00</button>
+    </div>
+  </div>
+</nav>
+
+<div class="arena">
+  <div class="paper" id="paper">
+    <div class="paper-head">
+      <span class="spec">forward only <b>/</b> 5s warn <b>/</b> 8s wipe <b>/</b> <span id="specDur">60s</span></span>
+      <div class="head-right">
+        <button id="finish" hidden>Finish -&gt;</button>
+        <span class="clock" id="clock">T-01:00</span>
+      </div>
+    </div>
+    <div class="placeholder" id="ph">Click here. Type anything.<br>No deleting, no pasting, no undo.<br>Stop for eight seconds and it's gone.</div>
+    <div class="sheet" id="sheet" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero draft writing sheet" spellcheck="false"></div>
+    <div class="zen-fade" id="zenFade" aria-hidden="true"></div>
+    <div class="paper-foot">
+      <span class="foot-msg" id="msg" role="status">the pile is patient. it gets whatever you stop writing.</span>
+      <span class="foot-tag">fwd only</span>
+    </div>
+    <div class="done" id="done">
+      <div class="metric" id="wordCount">0</div>
+      <div class="metric-label">words you would not have written</div>
+      <div class="metric-sub" id="metricSub"></div>
+      <div class="done-actions">
+        <button class="btn" id="copyRaw">Copy full text</button>
+        <button class="btn btn-ghost" id="copyAI">Copy for AI</button>
+        <button class="btn btn-ghost" id="downloadMd">Download .md</button>
+        <button class="btn btn-ghost" id="again">Go again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="countdown" aria-hidden="true">
+  <div>
+    <div class="num" id="cd" role="status" aria-live="polite">3</div>
+    <div class="cap">keep typing or the draft is deleted</div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const body=document.body, paper=$('#paper'), sheet=$('#sheet'), ph=$('#ph'),
+  clock=$('#clock'), cd=$('#cd'), msg=$('#msg'), finishBtn=$('#finish'),
+  wordCount=$('#wordCount'), metricSub=$('#metricSub'), field=$('#field'),
+  durBox=$('#dur'), specDur=$('#specDur'), zenFade=$('#zenFade');
+
+const DANGER_AT=5000, GONE_AT=8000, ARM_AT=1200;
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+let DURATION=60;
+
+let sessionStart=null,lastInput=0,tickId=null,finished=false,wiping=false;
+let composing=false,lastCdShown=null;
+
+/* ---------------- corpus: the pile, armed ---------------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const CORPUS=[
+"dont delte this whatever you do",
+"the first sentence is the worst sentence",
+"why cant i just START",
+"~dear journal~ no wait",
+"ok ok ok think think",
+"~i will write every morning~",
+"brain dump number four hundered",
+"fix it LATER. later later later",
+"zero readers, and still i didnt start",
+"i had the idea and then it left",
+"NOTE TO SELF: stop rereading line one",
+"unsent email no. 12\nre: nothing. hi.",
+"the good version needed one more week. it got none",
+"stopped editing mid-sentence. never resumed",
+"~dear hiring manager~ hi dana,",
+"chapter one, attempt seven\nit was a dark and stormy",
+"it made sense at 1am",
+"spoken out loud once. never typed",
+"~opening line~ gave up on it mid-wor",
+"untitled (37). untitled (38). untitled (39)",
+"i will start when i know how it ends",
+"somewhere between a text and a novel",
+"so many typos i stopped noticing. then i stopped",
+"almost. always almost",
+"waited for the muse. she was on break",
+"half a thought. the other half left",
+"dear future me: this is as far as i got",
+"i was going to finish this one",
+"saved as draft. never opened again",
+"the second sentence killed it",
+"i thought about it so hard it disappeared",
+"rewrite of the rewrite of the openin",
+"opening line pending since march",
+"the idea was there a second ago",
+"just one more reread before i",
+"to whom it may concern. thats as far as i got",
+"the ending was supposed to come later",
+"first draft? more like first and last",
+"written in my head on the train,\ngone by the platform",
+"the notes app has forty of these",
+"i paused to check my phone. that was it",
+"this paragraph had one job. RIP",
+"i highlighted it all. then what",
+"thoughts, unsorted, mostly loud",
+"stopped to find the perfect word. found nothing",
+"this is the pile. you are in it."
+];
+function fragHTML(t){
+  const esc=t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return esc.replace(/~([^~]+)~/g,'<s>$1</s>');
+}
+
+/* ---------------- the siege field ---------------- */
+let frags=[];
+function buildField(){
+  field.querySelectorAll('.frag').forEach(f=>{if(!f.classList.contains('join-new'))f.remove();});
+  frags=[];
+  const W=innerWidth,H=innerHeight;
+  const pr=paper.getBoundingClientRect();
+  const cx=pr.left+pr.width/2, cy=pr.top+pr.height/2;
+  const killR=Math.hypot(pr.width,pr.height)/2*0.68;
+  const edgeR=Math.hypot(W,H)/2*1.04;
+  const N=W<700?38:84;
+  const rand=mulberry32(20260724);
+  const bag=CORPUS.map((c,i)=>i);
+  for(let i=bag.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));const t=bag[i];bag[i]=bag[j];bag[j]=t;}
+  for(let i=0;i<N;i++){
+    const el=document.createElement('span');
+    el.className='frag';
+    el.innerHTML=fragHTML(CORPUS[bag[i%bag.length]]);
+    const a=(i/N)*Math.PI*2+(rand()-.5)*.55;
+    const R0=edgeR*(0.6+rand()*.5);
+    const R1=killR*(0.88+rand()*.5);
+    const fs=W<700?11+rand()*4:12+rand()*13;
+    const fo=.08+rand()*.09;
+    el.style.fontSize=fs.toFixed(1)+'px';
+    field.appendChild(el);
+    frags.push({
+      el:el,a:a,R0:R0,R1:R1,fo:fo,
+      rot:(rand()*8-4).toFixed(1),
+      speed:.8+rand()*.45,
+      redAt:Math.min(1,Math.max(0,(R1/killR-0.88)/0.5))*0.72,
+      hw:0,hh:0
+    });
+  }
+  frags.forEach(f=>{f.hw=f.el.offsetWidth/2;f.hh=f.el.offsetHeight/2;});
+  renderField(0,-1);
+}
+function renderField(L,kd){
+  const pr=paper.getBoundingClientRect();
+  const cx=pr.left+pr.width/2, cy=pr.top+pr.height/2;
+  for(let i=0;i<frags.length;i++){
+    const f=frags[i];
+    const p=Math.min(1,L*f.speed);
+    const e=p*p*(3-2*p);
+    const r=f.R0+(f.R1-f.R0)*e;
+    const x=cx+Math.cos(f.a)*r, y=cy+Math.sin(f.a)*r;
+    f.el.style.transform='translate('+(x-f.hw).toFixed(1)+'px,'+(y-f.hh).toFixed(1)+'px) rotate('+f.rot+'deg)';
+    f.el.style.opacity=Math.min(.55,f.fo+p*.42).toFixed(3);
+    f.el.classList.toggle('red',kd>=0&&kd>=f.redAt);
+  }
+}
+
+/* ---------------- engine ---------------- */
+const now=()=>performance.now();
+function fmt(s){const m=Math.floor(s/60),r=s%60;return 'T-'+String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');}
+function modelText(){return sheet.innerText.replace(/\r/g,'');}
+function placeholder(){ph.style.opacity=(modelText().length||sessionStart||finished)?0:1;}
+function caretToEnd(){
+  const r=document.createRange();r.selectNodeContents(sheet);r.collapse(false);
+  const s=getSelection();s.removeAllRanges();s.addRange(r);
+}
+function lastDeepText(node){
+  let n=node;
+  while(n.lastChild)n=n.lastChild;
+  return n.nodeType===3?n:node;
+}
+function caretAtEnd(){
+  const sel=getSelection();if(!sel.rangeCount)return true;
+  const r=sel.getRangeAt(0);
+  if(!r.collapsed)return false;
+  const end=document.createRange();end.selectNodeContents(sheet);end.collapse(false);
+  if(r.endContainer===end.endContainer)return r.endOffset===end.endOffset;
+  const last=lastDeepText(sheet);
+  return last.nodeType===3&&r.endContainer===last&&r.endOffset===last.nodeValue.length;
+}
+const PH_DEFAULT=ph.innerHTML;
+function setSheet(t){sheet.textContent=t;placeholder();}
+
+/* zen renderer (Swift app style): text scrolls up under a paper-colored gradient
+   mask at the top of the sheet; the caret line anchors at 38% of the sheet. */
+function zenScroll(){
+  const sel=getSelection();
+  let rect=null;
+  if(sel.rangeCount&&sheet.contains(sel.anchorNode)){
+    rect=sel.getRangeAt(0).getBoundingClientRect();
+  }
+  const sr=sheet.getBoundingClientRect();
+  let cy=rect?rect.top:0;
+  if(!rect||(rect.top===0&&rect.bottom===0&&rect.left===0&&rect.right===0))cy=sr.top+sheet.clientHeight*0.38;
+  sheet.scrollTop+=cy-(sr.top+sheet.clientHeight*0.38);
+}
+function layoutSheet(){
+  const H=sheet.clientHeight;
+  sheet.style.paddingTop=Math.round(H*0.38)+'px';
+  sheet.style.paddingBottom=Math.round(H*0.62)+'px';
+  ph.style.top=(sheet.offsetTop+Math.round(H*0.38))+'px';
+  zenFade.style.top=sheet.offsetTop+'px';
+  zenFade.style.height=Math.round(H*0.38)+'px';
+}
+
+let squeeze=1,denyX=0;
+function applyPaperTransform(){
+  if(REDUCED){paper.style.transform='';return;}
+  paper.style.transform='scale('+squeeze.toFixed(3)+') translateX('+denyX+'px)';
+}
+function deny(){
+  msg.textContent='no going back.';
+  denyX=-2;applyPaperTransform();
+  setTimeout(()=>{denyX=0;applyPaperTransform();},160);
+  setTimeout(()=>{if(sessionStart&&!finished)msg.textContent='forward only. don\u2019t stop.';},1200);
+}
+function startSession(){
+  if(sessionStart||finished)return;
+  sessionStart=now();lastInput=sessionStart;
+  clock.classList.add('running');
+  finishBtn.hidden=false;
+  durBox.classList.add('locked');
+  msg.classList.remove('gone');
+  msg.textContent='forward only. don\u2019t stop.';
+  ph.innerHTML=PH_DEFAULT;
+  tickId=setInterval(loop,100);
+}
+function loop(){
+  const t=now();
+  const remain=Math.max(0,DURATION*1000-(t-sessionStart));
+  clock.textContent=fmt(Math.ceil(remain/1000));
+  if(remain<=0){finish();return;}
+  const idle=t-lastInput;
+  const len=modelText().length;
+  if(len>0&&idle>=GONE_AT){wipe();return;}
+  let L=0,kd=-1;
+  if(len>0&&idle>ARM_AT)L=Math.min(1,(idle-ARM_AT)/(GONE_AT-ARM_AT));
+  if(len>0&&idle>=DANGER_AT){
+    kd=Math.min(1,(idle-DANGER_AT)/(GONE_AT-DANGER_AT));
+    body.classList.add('danger');
+    const c=Math.max(1,Math.ceil((GONE_AT-idle)/1000));
+    if(c!==lastCdShown){
+      lastCdShown=c;cd.textContent=c;
+      if(!REDUCED)cd.animate([{transform:'scale(1.14)'},{transform:'scale(1)'}],{duration:180,easing:'ease-out'});
+    }
+  }else{
+    body.classList.remove('danger');lastCdShown=null;
+  }
+  if(!REDUCED){
+    const target=1-0.16*L;
+    if(Math.abs(target-squeeze)>.0005){squeeze=target;applyPaperTransform();}
+  }
+  if(kd<0&&L>0)paper.style.borderColor='rgba(23,21,15,'+(0.2+0.3*L).toFixed(2)+')';
+  else paper.style.borderColor='';
+  renderField(L,kd);
+}
+function wipe(){
+  const lost=modelText();
+  clearInterval(tickId);wiping=true;
+  body.classList.remove('danger');lastCdShown=null;
+  paper.classList.add('wiping');
+  if(!REDUCED){squeeze=0.78;applyPaperTransform();}
+  joinField(lost);
+  setTimeout(()=>{
+    setSheet('');paper.classList.remove('wiping');
+    squeeze=1;applyPaperTransform();
+    wiping=false;reset(false);
+    msg.textContent='gone. it joined the pile.';
+    msg.classList.add('gone');
+    ph.innerHTML='Draft deleted.<br>Type to start over.';
+    placeholder();
+  },REDUCED?60:450);
+}
+function joinField(lost){
+  const t=lost.replace(/\s+/g,' ').trim().slice(0,64);
+  if(!t)return;
+  const pr=paper.getBoundingClientRect();
+  const cx=pr.left+pr.width/2, cy=pr.top+pr.height/2;
+  const a=Math.random()*Math.PI*2;
+  const r=Math.hypot(pr.width,pr.height)/2*(0.75+Math.random()*.3);
+  const f=document.createElement('span');
+  f.className='frag join-new';
+  f.textContent=t;
+  f.style.transform='translate('+(cx+Math.cos(a)*r)+'px,'+(cy+Math.sin(a)*r)+'px) rotate('+((Math.random()*8)-4).toFixed(1)+'deg)';
+  field.appendChild(f);
+  if(REDUCED){f.classList.add('settle');return;}
+  requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.add('settle')));
+}
+function finish(){
+  clearInterval(tickId);finished=true;
+  body.classList.remove('danger');lastCdShown=null;
+  renderField(0,-1);
+  const t=modelText();
+  const words=t.trim()?t.trim().split(/\s+/).length:0;
+  const secs=Math.max(1,Math.round((now()-sessionStart)/1000));
+  wordCount.textContent=words;
+  metricSub.textContent='session: '+secs+'s - forward only';
+  paper.classList.add('finished');
+  finishBtn.hidden=true;
+  $('#copyRaw').focus();
+}
+function reset(clearText){
+  sessionStart=null;lastInput=0;finished=false;
+  if(clearText)setSheet('');
+  clearInterval(tickId);
+  paper.classList.remove('finished');
+  paper.style.borderColor='';
+  body.classList.remove('danger');lastCdShown=null;
+  squeeze=1;applyPaperTransform();
+  renderField(0,-1);
+  clock.classList.remove('running');
+  clock.textContent=fmt(DURATION);
+  finishBtn.hidden=true;
+  durBox.classList.remove('locked');
+  msg.classList.remove('gone');
+  msg.textContent='the pile is patient. it gets whatever you stop writing.';
+  placeholder();
+}
+
+finishBtn.addEventListener('click',e=>{e.stopPropagation();if(sessionStart)finish();});
+$('#again').addEventListener('click',()=>{ph.innerHTML=PH_DEFAULT;reset(true);sheet.focus();});
+const AI_PROMPT='Below is a zero draft - raw, unedited, typos included. Shape it into a clear first draft. Keep my ideas and my voice; fix structure, spelling, and flow. Do not add claims I didn\u2019t make.\n\n---\n\n';
+function flash(btn,label){const old=btn.textContent;btn.textContent=label;btn.classList.add('copied');setTimeout(()=>{btn.textContent=old;btn.classList.remove('copied');},1400);}
+$('#copyAI').addEventListener('click',function(){navigator.clipboard.writeText(AI_PROMPT+modelText()).then(()=>flash(this,'Copied \u2713')).catch(()=>flash(this,'Copy failed'));});
+$('#copyRaw').addEventListener('click',function(){navigator.clipboard.writeText(modelText()).then(()=>flash(this,'Copied \u2713')).catch(()=>flash(this,'Copy failed'));});
+$('#downloadMd').addEventListener('click',function(){
+  const blob=new Blob([modelText()],{type:'text/markdown'});
+  const a=document.createElement('a');
+  const d=new Date();
+  a.href=URL.createObjectURL(blob);
+  a.download='zero-draft-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.md';
+  a.click();URL.revokeObjectURL(a.href);flash(this,'Saved \u2713');
+});
+
+/* ---------------- duration select ---------------- */
+durBox.addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b||sessionStart)return;
+  durBox.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');
+  DURATION=parseInt(b.dataset.dur,10);
+  specDur.textContent=DURATION+'s';
+  clock.textContent=fmt(DURATION);
+});
+
+/* ---------------- forward-only guards ---------------- */
+sheet.addEventListener('beforeinput',e=>{
+  if(finished||wiping){e.preventDefault();return;}
+  const t=e.inputType||'';
+  if(t.indexOf('delete')===0||t==='historyUndo'||t==='historyRedo'||
+     t==='insertFromPaste'||t==='insertFromDrop'||t==='insertFromYank'||
+     t==='insertReplacementText'||t==='insertTranspose'){
+    e.preventDefault();deny();caretToEnd();return;
+  }
+  if(t==='insertText'||t==='insertParagraph'||t==='insertLineBreak'||t==='insertCompositionText'){
+    if(!composing&&!caretAtEnd()){e.preventDefault();deny();caretToEnd();}
+  }
+});
+sheet.addEventListener('keydown',e=>{
+  if(finished){e.preventDefault();return;}
+  const k=e.key;
+  if((e.metaKey||e.ctrlKey)&&k==='Enter'){e.preventDefault();if(sessionStart)finish();return;}
+  if(k==='Backspace'||k==='Delete'){e.preventDefault();deny();return;}
+  if((e.ctrlKey||e.metaKey)&&['z','y','x','v'].indexOf(k.toLowerCase())>=0){e.preventDefault();deny();return;}
+});
+['paste','cut','drop'].forEach(ev=>sheet.addEventListener(ev,e=>{e.preventDefault();deny();}));
+sheet.addEventListener('compositionstart',()=>{composing=true;});
+sheet.addEventListener('compositionend',()=>{composing=false;onRealInput();});
+sheet.addEventListener('input',()=>{if(!composing)onRealInput();});
+function onRealInput(){
+  if(finished||wiping)return;
+  startSession();
+  lastInput=now();
+  body.classList.remove('danger');lastCdShown=null;
+  requestAnimationFrame(zenScroll);
+  placeholder();
+}
+paper.addEventListener('mousedown',e=>{
+  if(finished)return;
+  if(e.target.closest('button'))return;
+  if(document.activeElement!==sheet){e.preventDefault();sheet.focus();caretToEnd();}
+});
+document.addEventListener('keydown',e=>{
+  if(finished||wiping)return;
+  const t=e.target;
+  if(t!==document.body&&t!==document.documentElement)return;
+  const k=e.key;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(k==='Enter'||(k&&k.length===1)){
+    ph.innerHTML=PH_DEFAULT;
+    sheet.focus();caretToEnd();
+  }
+});
+
+/* ---------------- boot ---------------- */
+placeholder();
+layoutSheet();
+buildField();
+window.addEventListener('load',buildField);
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(buildField);}
+let rzT=null;
+window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{layoutSheet();buildField();},180);});
+})();
+</script>
+</body>
+</html>

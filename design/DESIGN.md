@@ -109,7 +109,7 @@ Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms
 | Sheet | full | opacity .35 | clears to empty |
 | Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
 
-The countdown never prints on top of the draft. It rides at the current line's height just left of the line start, or drops below the line when the margin is tight; the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
+The countdown never prints on top of the draft. It hangs above the current line (or drops below it when the headroom is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
 | Clock | ink | red | resets after aftermath |
 | Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
 
@@ -126,7 +126,8 @@ Demo preview (the page teaches before the user touches it): types the sample onc
 
 ## 9. Interaction contract
 
-- **First keystroke anywhere starts the session.** A document-level `keydown` (target is body, printable key, no modifiers) synchronously focuses the sheet inside the keystroke so the browser and IME route input to the editor. The page IS the tool; no click required.
+- **First keystroke anywhere starts the session.** A document-level `keydown` (target is body, printable key, no modifiers) synchronously focuses the editor inside the keystroke so the browser and IME route input to it. The page IS the tool; no click required.
+- **Typing or clicking the paper goes straight to the fullscreen trial.** The landing paper is a preview and an invitation, not the writing room: the first input arms the session for one frame, the handoff morph carries the draft into the trial, and keys struck mid-morph are buffered and replayed after focus lands. The inline embedded session is a transient arming step, never a destination.
 - **Forward-only guards** on `beforeinput`: block `delete*`, `historyUndo/Redo`, `insertFromPaste/Drop/Yank/ReplacementText/Transpose`; allow `insertText/Paragraph/LineBreak/CompositionText` only with a collapsed caret at the very end (`caretAtEnd()`); `paste/cut/drop` prevented. Every block fires the deny nudge ("no going back." + 2px shake) and restores the caret to the end.
 - **IME composition works.** Track `compositionstart/end`; never rewrite the sheet DOM during composition; sync the model on `compositionend`.
 - During live typing the browser owns the sheet DOM (flood renders plain text); styled layers may only rebuild the DOM outside composition and always restore the caret to the end.

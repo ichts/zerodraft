@@ -40,6 +40,8 @@ window.FirstLineLandingDemo = (() => {
     demoPauseUsed: false,
     demoVisible: false,
     draftIndex: 0,
+    armToTrial: false,
+    morphBuffer: [],
     introTyping: false,
     demoPhase: "idle",
     demoHasPlayed: false,
@@ -261,7 +263,7 @@ window.FirstLineLandingDemo = (() => {
     const current = editorEl.querySelector(".trial-thought.is-current");
     if (!current) {
       dangerEl.style.setProperty("--dx", "50%");
-      dangerEl.style.setProperty("--dy", "38%");
+      dangerEl.style.setProperty("--dy", "64%");
       dangerEl.style.setProperty("--dt", "translate(-50%,-50%)");
       return;
     }
@@ -270,16 +272,15 @@ window.FirstLineLandingDemo = (() => {
     const rects = Array.from(range.getClientRects()).filter((r) => r.width || r.height);
     const r = rects.length ? rects[rects.length - 1] : current.getBoundingClientRect();
     const sRect = surfaceEl.getBoundingClientRect();
-    const lineCenterY = r.top + r.height / 2 - sRect.top;
-    const lineLeft = r.left - sRect.left;
-    const groupW = dangerEl.offsetWidth || 180;
-    if (lineLeft > groupW + 48) {
-      dangerEl.style.setProperty("--dx", `${Math.round(lineLeft - 20)}px`);
-      dangerEl.style.setProperty("--dy", `${Math.round(lineCenterY)}px`);
-      dangerEl.style.setProperty("--dt", "translate(-100%,-50%)");
+    const gh = dangerEl.offsetHeight || 200;
+    const yAbove = r.top - sRect.top - 20;
+    if (yAbove - gh > 56) {
+      dangerEl.style.setProperty("--dx", "50%");
+      dangerEl.style.setProperty("--dy", `${Math.round(yAbove)}px`);
+      dangerEl.style.setProperty("--dt", "translate(-50%,-100%)");
     } else {
       dangerEl.style.setProperty("--dx", "50%");
-      dangerEl.style.setProperty("--dy", `${Math.round(r.bottom - sRect.top + 44)}px`);
+      dangerEl.style.setProperty("--dy", `${Math.round(r.bottom - sRect.top + 40)}px`);
       dangerEl.style.setProperty("--dt", "translate(-50%,0)");
     }
   }
@@ -346,6 +347,10 @@ window.FirstLineLandingDemo = (() => {
       internal.composing = false;
       if (!isActiveContext()) return;
       commitInput(el, normalizeTrialText(el.innerText));
+      if (mode === "inline" && internal.armToTrial) {
+        internal.armToTrial = false;
+        startTrial();
+      }
     });
     el.addEventListener("beforeinput", (evt) => {
       if (!isActiveContext()) return;
@@ -616,6 +621,11 @@ window.FirstLineLandingDemo = (() => {
     ghost.querySelector(".trial-toast")?.remove();
     ghost.querySelector(".trial-prompt")?.remove();
     ghost.querySelector(".demo-session-chrome")?.remove();
+    ghost.querySelector(".paper-head")?.remove();
+    const ghostPreview = ghost.querySelector(".demo-preview");
+    if (ghostPreview) ghostPreview.innerHTML = "";
+    const ghostPlaceholder = ghost.querySelector(".demo-placeholder");
+    if (ghostPlaceholder) ghostPlaceholder.innerHTML = "";
     ghost.classList.remove("is-demo-danger");
     if (ghostEditor) {
       ghostEditor.innerHTML = "";
@@ -680,10 +690,9 @@ window.FirstLineLandingDemo = (() => {
     if (morphingFromDom() || isTrial()) return;
     const el = trialEditor();
     if (!el) return;
-
     const inlineActive = isInline();
     const handoffText = inlineActive ? normalizeTrialText(demoEditor()?.innerText || "") : "";
-    const handoff = inlineActive && Boolean(demoEditor()?.isContentEditable) && Boolean(handoffText);
+    const handoff = inlineActive && Boolean(handoffText);
 
     if (event?.currentTarget instanceof HTMLElement) internal.returnFocusElement = event.currentTarget;
     pushTrialRoute();
@@ -713,6 +722,11 @@ window.FirstLineLandingDemo = (() => {
         if (isTrial()) {
           document.body.classList.add("trial-focus-ready");
           moveCaretToEnd(el);
+          if (internal.morphBuffer.length) {
+            const buffered = internal.morphBuffer.join("");
+            internal.morphBuffer = [];
+            commitInput(el, normalizeTrialText(el.innerText) + buffered);
+          }
         }
         emit("flroutecheck");
       }));
@@ -1196,13 +1210,20 @@ window.FirstLineLandingDemo = (() => {
     // compositionstart reach it directly and arm the session with no click. On
     // touch devices it stays unfocused so page load never summons the keyboard;
     // tap activates. Document keydown is the fallback for when focus is elsewhere.
+    // Typing arms inline for one frame, the character lands and commits, then the
+    // handoff morph carries it into the fullscreen trial - the landing paper is a
+    // preview and an invitation, not the writing room.
     demoEl.addEventListener("beforeinput", (evt) => {
       if (contextFromDom() !== "demo" || morphingFromDom()) return;
-      if (evt.inputType && evt.inputType.startsWith("insert")) armInline();
+      if (evt.inputType && evt.inputType.startsWith("insert")) {
+        armInline();
+        requestAnimationFrame(() => startTrial());
+      }
     }, true);
     demoEl.addEventListener("compositionstart", () => {
       if (contextFromDom() !== "demo" || morphingFromDom()) return;
       armInline();
+      internal.armToTrial = true;
     }, true);
     bindSessionEditor(demoEl, "inline");
 
@@ -1210,12 +1231,24 @@ window.FirstLineLandingDemo = (() => {
     if (!coarsePointer && !isTrialRoute()) focusWithoutScroll(demoEl);
 
     document.addEventListener("keydown", (evt) => {
+      // Keys struck mid-morph would otherwise drop into the void: buffer them and
+      // replay into the trial editor once the morph lands and focus is set.
+      if (morphingFromDom() && contextFromDom() === "trial") {
+        if (!evt.metaKey && !evt.ctrlKey && !evt.altKey && evt.key.length === 1) {
+          evt.preventDefault();
+          internal.morphBuffer.push(evt.key);
+        }
+        return;
+      }
       if (contextFromDom() !== "demo" || morphingFromDom()) return;
       if (evt.metaKey || evt.ctrlKey || evt.altKey) return;
       if (document.activeElement === demoEl) return;
       const tag = document.activeElement && document.activeElement.tagName;
       if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA") return;
-      if (evt.key.length === 1 || evt.key === "Enter" || evt.key === "Process") activateInline();
+      if (evt.key.length === 1 || evt.key === "Enter" || evt.key === "Process") {
+        activateInline();
+        requestAnimationFrame(() => startTrial());
+      }
     }, true);
 
     document.addEventListener("selectionchange", () => {
@@ -1575,11 +1608,11 @@ if (document.readyState === "loading") {
   .demo-writing-surface.is-live .live-demo-editor { opacity: 1; height: 100%; }
   .demo-writing-surface.is-live[hidden] { display: none; }
 
-  /* danger countdown: in the margin at the line's height, never on the words */
+  /* danger countdown: above the current line, never on the words */
   .live-demo-danger {
     position: absolute;
     left: var(--dx, 50%);
-    top: var(--dy, 38%);
+    top: var(--dy, 64%);
     z-index: 6;
     transform: var(--dt, translate(-50%, -50%));
     display: flex;
@@ -1927,7 +1960,7 @@ if (document.readyState === "loading") {
 
   .trial-danger {
     position: fixed;
-    top: var(--dy, 35%);
+    top: var(--dy, 64%);
     left: var(--dx, 50%);
     z-index: 1004;
     transform: var(--dt, translate(-50%, -50%));
@@ -2081,7 +2114,7 @@ if (document.readyState === "loading") {
                     <p class="hero-hint">or just click the paper and type</p>
                   </div>
                 </div>
-                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-on:click="FirstLineLandingDemo.activateInline()">
+                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-on:click="evt.target.closest('button, a') ? '' : FirstLineLandingDemo.startTrial(evt)">
                   <div class="paper-head">
                     <span class="spec">forward only <b>/</b> 5s warn <b>/</b> 8s wipe <b>/</b> 60s</span>
                     <div class="head-right">

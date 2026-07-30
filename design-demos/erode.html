@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero Draft - the draft before the draft</title>
+<meta name="description" content="A writing tool where polishing is impossible. No deleting, no pasting, no undo - stop for eight seconds and it's gone.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#edf0ea;
+    --paper:#fbfbf7;
+    --ink:#181a15;
+    --dim:#5d6156;
+    --faint:#a6aa9c;
+    --line:rgba(24,26,21,.16);
+    --red:#c8392f;
+    --serif:"Spectral",Georgia,"Times New Roman",serif;
+    --grot:"Space Grotesk",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:var(--serif);font-weight:400;line-height:1.55;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  }
+  ::selection{background:rgba(200,57,47,.22)}
+  a{color:var(--ink);text-decoration:none}
+  button{font-family:inherit}
+
+  .veil{
+    position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;
+    box-shadow:inset 0 0 150px rgba(200,57,47,.32),inset 0 0 44px rgba(200,57,47,.14);
+    transition:opacity .3s ease;
+  }
+  body.danger .veil{opacity:1}
+
+  .wrap{max-width:1080px;margin:0 auto;padding:0 32px}
+
+  nav{padding:24px 0;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line)}
+  .wordmark{font-family:var(--grot);font-weight:700;font-size:13px;letter-spacing:.16em}
+  .wordmark b{color:var(--red);font-weight:700}
+  .nav-link{font-family:var(--grot);font-size:12px;color:var(--dim)}
+  .nav-link:hover{color:var(--ink)}
+  .nav-link:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+
+  /* ---------- hero: left, clinical ---------- */
+  .hero{padding:52px 0 36px;max-width:780px}
+  h1{
+    font-weight:400;font-size:clamp(42px,5.6vw,68px);
+    line-height:1.04;letter-spacing:-.02em;text-wrap:balance;
+  }
+  h1 em{font-style:italic;font-weight:400}
+  .sub{
+    font-style:italic;font-size:clamp(17px,2vw,21px);
+    color:var(--dim);margin-top:18px;
+  }
+  .cta-row{display:flex;align-items:center;gap:18px;margin-top:34px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--grot);font-weight:500;font-size:13px;letter-spacing:.06em;
+    padding:14px 26px;border:0;cursor:pointer;border-radius:0;
+    background:var(--ink);color:var(--bg);
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(24,26,21,.2)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .hint{font-family:var(--grot);font-size:11.5px;color:var(--faint)}
+
+  /* ---------- the sheet: a living specimen ---------- */
+  .sheet-zone{padding:8px 0 88px}
+  .sheet-wrap{max-width:780px;margin:0 auto}
+  .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    font-family:var(--grot);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:0;
+  }
+  .sheet-head .lhs{display:flex;align-items:center;gap:10px;min-width:0}
+  .pulse{
+    width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none;
+    transition:background .25s ease;
+  }
+  body.live .pulse{background:var(--ink)}
+  body.danger .pulse{background:var(--red)}
+  .head-right{display:flex;align-items:center;gap:16px;flex:none}
+  .clock{font-variant-numeric:tabular-nums;font-size:11px;color:var(--dim);letter-spacing:.1em}
+  .clock.running{color:var(--ink)}
+  body.danger .clock{color:var(--red)}
+  #finish{
+    font-family:var(--grot);font-size:10px;letter-spacing:.18em;text-transform:uppercase;
+    background:none;border:0;color:var(--dim);cursor:pointer;padding:4px 0;
+  }
+  #finish:hover{color:var(--ink)}
+  #finish:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+  .lifeline{
+    height:5px;background:var(--line);margin:10px 0 0;position:relative;overflow:hidden;
+  }
+  .lifeline .fill{
+    position:absolute;inset:0;background:var(--ink);transform-origin:left center;
+    transform:scaleX(1);
+  }
+  body.danger .lifeline .fill{background:var(--red)}
+  .lifeline.flat .fill{background:var(--red);transform:scaleX(1)}
+  .lifeline-label{
+    display:flex;justify-content:space-between;
+    font-family:var(--grot);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--faint);margin-top:6px;
+  }
+  .paper{
+    position:relative;background:var(--paper);border:1px solid var(--line);
+    margin-top:14px;min-height:400px;cursor:text;
+    transition:border-color .3s ease,box-shadow .3s ease,transform .15s ease;
+  }
+  body.danger .paper{border-color:rgba(200,57,47,.6);box-shadow:0 0 0 4px rgba(200,57,47,.07)}
+  .paper.denied{transform:translateX(-2px)}
+  .sheet{
+    padding:30px 34px 84px;min-height:400px;
+    font-size:20px;line-height:1.78;color:var(--ink);font-weight:400;
+    outline:none;white-space:pre-wrap;word-break:break-word;caret-color:var(--ink);
+  }
+  .sheet:focus-visible{box-shadow:inset 0 0 0 2px rgba(24,26,21,.4)}
+  .sheet .w{transition:opacity .45s ease,filter .45s ease,color .45s ease}
+  .sheet .w.edge{color:var(--red);opacity:.8}
+  .sheet .w.gone{opacity:.06;filter:blur(1.5px)}
+  .placeholder{
+    position:absolute;top:30px;left:34px;right:34px;pointer-events:none;
+    font-style:italic;font-weight:300;font-size:20px;line-height:1.78;color:var(--faint);
+    transition:opacity .2s ease;
+  }
+  .bignum{
+    position:absolute;top:18px;right:26px;z-index:2;pointer-events:none;
+    font-family:var(--grot);font-weight:700;font-size:88px;line-height:1;
+    color:var(--red);font-variant-numeric:tabular-nums;opacity:0;
+    transition:opacity .15s ease;
+  }
+  body.danger .bignum{opacity:1}
+  .sheet-foot{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+    padding:13px 18px;border-top:1px solid var(--line);
+    font-family:var(--grot);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint);
+  }
+  .status{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.live .status{color:var(--dim)}
+  body.danger .status{color:var(--red)}
+  .status.dead{color:var(--red)}
+  .words{flex:none;font-variant-numeric:tabular-nums}
+  .done{
+    position:absolute;inset:0;z-index:4;background:var(--paper);
+    display:none;flex-direction:column;justify-content:center;align-items:flex-start;gap:6px;
+    padding:44px;text-align:left;
+  }
+  .paper.finished .done{display:flex}
+  .done .metric{font-size:clamp(80px,10vw,110px);font-weight:300;line-height:1;font-variant-numeric:tabular-nums}
+  .done .metric-label{
+    font-family:var(--grot);font-size:10px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);
+  }
+  .done .metric-sub{
+    font-family:var(--grot);font-size:11px;color:var(--dim);
+    margin-top:8px;margin-bottom:28px;letter-spacing:.04em;
+  }
+  .done-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .btn-ghost{
+    background:transparent;color:var(--dim);border:1px solid var(--line);
+    font-size:11px;padding:11px 15px;box-shadow:none;
+  }
+  .btn-ghost:hover{color:var(--ink);border-color:var(--ink);transform:none;box-shadow:none}
+  .copied{color:var(--red) !important;border-color:var(--red) !important}
+
+  /* ---------- payoff ---------- */
+  section{padding:70px 0 76px;border-top:1px solid var(--line)}
+  .payoff-kick{
+    font-family:var(--grot);font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--dim);margin-bottom:16px;
+  }
+  h2{font-weight:300;font-size:clamp(26px,3.2vw,36px);letter-spacing:-.015em;margin-bottom:42px;max-width:780px}
+  .ba{display:grid;grid-template-columns:1fr auto 1fr;gap:22px;align-items:stretch;max-width:980px}
+  .ba-card{padding:24px 26px;border:1px solid var(--line);background:var(--paper)}
+  .ba-card.raw{
+    font-family:var(--grot);font-size:13px;line-height:1.8;color:var(--dim);
+    border-style:dashed;
+  }
+  .ba-card.raw .ba-tag{color:var(--red)}
+  .ba-card.clean{font-size:15px;line-height:1.75}
+  .ba-tag{
+    display:block;font-family:var(--grot);font-size:9px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:14px;
+  }
+  .ba-arrow{font-family:var(--grot);color:var(--red);font-size:18px;align-self:center}
+  .cap{
+    font-family:var(--grot);font-size:12px;color:var(--dim);
+    margin:34px 0 0;max-width:62ch;line-height:1.7;
+  }
+  .cap b{color:var(--ink);font-weight:500}
+
+  footer{border-top:1px solid var(--line);padding:26px 0 46px}
+  .foot-inner{
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    font-family:var(--grot);font-size:10.5px;letter-spacing:.1em;color:var(--faint);
+  }
+
+  @media (max-width:820px){
+    .ba{grid-template-columns:1fr}
+    .ba-arrow{transform:rotate(90deg);justify-self:center}
+    .hero{padding:48px 0 30px}
+    .wrap{padding:0 20px}
+    .paper{min-height:400px}
+    .sheet{padding:24px 22px 92px;font-size:18px;min-height:400px}
+    .placeholder{top:24px;left:22px;right:22px;font-size:18px}
+    .bignum{font-size:64px;top:14px;right:18px}
+    .sheet-foot{flex-direction:column;align-items:flex-start;gap:4px;padding:11px 14px}
+    .status{white-space:normal}
+    .done{padding:28px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="veil" aria-hidden="true"></div>
+
+<nav class="wrap">
+  <a class="wordmark" href="#">ZERO<b>_</b>DRAFT</a>
+  <a class="nav-link" href="#">mac release -&gt;</a>
+</nav>
+
+<header class="wrap hero">
+  <h1>It's not supposed to be <em>good</em> yet.</h1>
+  <p class="sub">So we made polishing impossible.</p>
+  <div class="cta-row">
+    <button class="btn" id="cta">Give it sixty seconds.</button>
+    <span class="hint">or just click the sheet and type</span>
+  </div>
+</header>
+
+<div class="wrap sheet-zone">
+  <div class="sheet-wrap">
+    <div class="sheet-head">
+      <span class="lhs"><span class="pulse" aria-hidden="true"></span><span>current draft</span></span>
+      <div class="head-right">
+        <button id="finish" hidden>Finish -&gt;</button>
+        <span class="clock" id="clock">T-01:00</span>
+      </div>
+    </div>
+    <div class="lifeline" id="lifeline" aria-hidden="true"><div class="fill" id="lifelineFill"></div></div>
+    <div class="lifeline-label"><span>forward only / 5s warn / 8s wipe / 60s</span><span>silence budget</span></div>
+    <div class="paper" id="paper">
+      <div class="placeholder" id="ph">Click here. Type anything.<br>No deleting, no pasting, no undo.<br>Stop for eight seconds and it's gone.</div>
+      <div class="sheet" id="sheet" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero draft writing sheet" spellcheck="false"></div>
+      <div class="bignum" id="cd" role="status" aria-live="polite" aria-hidden="true">3</div>
+      <div class="sheet-foot">
+        <span class="status" id="status" role="status">type to start</span>
+        <span class="words" id="words">0 words</span>
+      </div>
+      <div class="done" id="done">
+        <div class="metric" id="wordCount">0</div>
+        <div class="metric-label">words you would not have written</div>
+        <div class="metric-sub" id="metricSub"></div>
+        <div class="done-actions">
+          <button class="btn" id="copyRaw">Copy full text</button>
+          <button class="btn btn-ghost" id="copyAI">Copy for AI</button>
+          <button class="btn btn-ghost" id="downloadMd">Download .md</button>
+          <button class="btn btn-ghost" id="again">Go again</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="wrap" id="payoff">
+  <p class="payoff-kick">What comes out</p>
+  <h2>Raw goes in. A draft comes back.</h2>
+  <div class="ba">
+    <div class="ba-card raw">
+      <span class="ba-tag">zero draft - 58s</span>
+      ok thesis is peopel dont lack ideas they lack permission, the editor in your head kills sentences befor they land. evidence: i rewrote my first paragraph five times yesterday and posted nothing.
+    </div>
+    <div class="ba-arrow">-&gt;</div>
+    <div class="ba-card clean">
+      <span class="ba-tag">first draft - via your AI</span>
+      People don't lack ideas - they lack permission. The editor in your head kills sentences before they land: yesterday I rewrote one opening paragraph five times and published nothing.
+    </div>
+  </div>
+  <p class="cap">The shaping happens in whatever AI you already use. <b>Copy for AI</b> puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point.</p>
+</section>
+
+<footer class="wrap">
+  <div class="foot-inner">
+    <span>Zero Draft - the draft before the draft</span>
+    <span>your writing never leaves this page</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const body=document.body,paper=$('#paper'),sheet=$('#sheet'),ph=$('#ph'),
+  clock=$('#clock'),cd=$('#cd'),statusEl=$('#status'),wordsEl=$('#words'),
+  finishBtn=$('#finish'),wordCount=$('#wordCount'),metricSub=$('#metricSub'),
+  cta=$('#cta'),lifeline=$('#lifeline'),lifelineFill=$('#lifelineFill');
+
+/* ---------------- samples ---------------- */
+const SAMPLES={
+  1:"hi dana. the budget number moved\nbecause i trusted the march tab.\nmy fault. fixing it now,\nfull breakdown tomorow morning",
+  2:"the idea is that meetings\nare where decisions go to wait.\ni cant prove it yet. it might be\nthe only true thing i beleive",
+  3:"i am not mad. thats the line\ni keep starting with. not true.\ni waited forty minutes.\nyou never said why."
+};
+const SAMPLE=SAMPLES[new URLSearchParams(location.search).get('sample')]||SAMPLES[3];
+
+const DANGER_AT=5000,GONE_AT=8000,DURATION=60,FADE_AT=2200;
+const REDUCED=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+let sessionStart=null,lastInput=0,tickId=null,finished=false,wiping=false;
+let composing=false,lastCdShown=null;
+
+const now=()=>performance.now();
+function fmt(s){const m=Math.floor(s/60),r=s%60;return 'T-'+String(m).padStart(2,'0')+':'+String(r).padStart(2,'0');}
+function modelText(){return sheet.innerText.replace(/\r/g,'');}
+function placeholder(){ph.style.opacity=(modelText().length||sessionStart||finished)?0:1;}
+const PH_DEFAULT=ph.innerHTML;
+function caretToEnd(){
+  const r=document.createRange();r.selectNodeContents(sheet);r.collapse(false);
+  const s=getSelection();s.removeAllRanges();s.addRange(r);
+}
+function lastDeepText(node){let n=node;while(n.lastChild)n=n.lastChild;return n.nodeType===3?n:node;}
+function caretAtEnd(){
+  const sel=getSelection();if(!sel.rangeCount)return true;
+  const r=sel.getRangeAt(0);
+  if(!r.collapsed)return false;
+  const end=document.createRange();end.selectNodeContents(sheet);end.collapse(false);
+  if(r.endContainer===end.endContainer)return r.endOffset===end.endOffset;
+  const last=lastDeepText(sheet);
+  return last.nodeType===3&&r.endContainer===last&&r.endOffset===last.nodeValue.length;
+}
+
+/* render text into per-word spans so the death front can eat them in reading order */
+function setSheet(t){
+  sheet.textContent='';
+  const frag=document.createDocumentFragment();
+  t.split(/(\s+)/).forEach(tok=>{
+    if(!tok)return;
+    if(/^\s+$/.test(tok)){frag.appendChild(document.createTextNode(tok));}
+    else{const s=document.createElement('span');s.className='w';s.textContent=tok;frag.appendChild(s);}
+  });
+  sheet.appendChild(frag);
+  placeholder();
+}
+function wordSpans(){return sheet.querySelectorAll('.w');}
+function updateWords(){
+  const t=modelText().trim();
+  wordsEl.textContent=(t?t.split(/\s+/).length:0)+' words';
+}
+
+/* the vital signs, mapped from time-since-last-keystroke */
+function applyVitals(idle){
+  const spans=wordSpans();
+  if(idle>=DANGER_AT&&spans.length){
+    body.classList.add('danger');
+    const p=Math.min(1,(idle-DANGER_AT)/(GONE_AT-DANGER_AT));
+    const k=Math.floor(p*spans.length);
+    spans.forEach((s,i)=>{
+      s.classList.toggle('gone',i<k);
+      s.classList.toggle('edge',i>=k&&i<k+3);
+    });
+    const c=Math.max(1,Math.ceil((GONE_AT-idle)/1000));
+    if(c!==lastCdShown){
+      lastCdShown=c;cd.textContent=c;
+      if(!REDUCED)cd.animate([{transform:'translateY(-4px)',opacity:.4},{transform:'translateY(0)',opacity:1}],{duration:160,easing:'ease-out'});
+    }
+    statusEl.textContent='keep typing or it\u2019s gone';
+  }else{
+    body.classList.remove('danger');lastCdShown=null;
+    spans.forEach(s=>{s.classList.remove('gone');s.classList.remove('edge');});
+    if(sessionStart){
+      if(idle>=FADE_AT){
+        statusEl.textContent='keep writing';
+        const f=(idle-FADE_AT)/(DANGER_AT-FADE_AT);
+        sheet.style.opacity=String(1-f*.3);
+        sheet.style.filter='blur('+(f*.6).toFixed(2)+'px)';
+      }else{
+        statusEl.textContent='keep writing';
+        sheet.style.opacity='';sheet.style.filter='';
+      }
+    }
+  }
+  const budget=Math.max(0,1-idle/GONE_AT);
+  lifelineFill.style.transform='scaleX('+budget.toFixed(3)+')';
+}
+function clearVitals(){
+  body.classList.remove('danger');lastCdShown=null;
+  sheet.style.opacity='';sheet.style.filter='';
+  wordSpans().forEach(s=>{s.classList.remove('gone');s.classList.remove('edge');});
+  lifelineFill.style.transform='scaleX(1)';
+}
+
+function deny(){
+  statusEl.textContent='no going back.';
+  paper.classList.add('denied');
+  setTimeout(()=>paper.classList.remove('denied'),160);
+  setTimeout(()=>{if(sessionStart&&!finished)statusEl.textContent='keep writing';},1200);
+}
+function startSession(){
+  if(sessionStart||finished)return;
+  sessionStart=now();lastInput=sessionStart;
+  body.classList.add('live');
+  clock.classList.add('running');
+  finishBtn.hidden=false;
+  statusEl.classList.remove('dead');
+  statusEl.textContent='keep writing';
+  lifeline.classList.remove('flat');
+  ph.innerHTML=PH_DEFAULT;
+  tickId=setInterval(loop,100);
+}
+function loop(){
+  const t=now();
+  const remain=Math.max(0,DURATION*1000-(t-sessionStart));
+  clock.textContent=fmt(Math.ceil(remain/1000));
+  if(remain<=0){finish();return;}
+  const idle=t-lastInput;
+  if(modelText().length>0&&idle>=GONE_AT){wipe();return;}
+  applyVitals(idle);
+}
+function wipe(){
+  clearInterval(tickId);wiping=true;
+  body.classList.remove('live');
+  body.classList.remove('danger');lastCdShown=null;
+  lifeline.classList.add('flat');
+  statusEl.textContent='draft deleted - 08s silence';
+  statusEl.classList.add('dead');
+  setSheet('');
+  wordsEl.textContent='0 words';
+  ph.innerHTML='Draft deleted.<br>Type to start over.';
+  placeholder();
+  setTimeout(()=>{
+    wiping=false;reset(false);
+    statusEl.textContent='draft deleted - 08s silence';
+    statusEl.classList.add('dead');
+    lifeline.classList.add('flat');
+    ph.innerHTML='Draft deleted.<br>Type to start over.';
+    placeholder();
+  },REDUCED?60:500);
+}
+function finish(){
+  clearInterval(tickId);finished=true;
+  body.classList.remove('live');
+  body.classList.remove('danger');lastCdShown=null;
+  const t=modelText();
+  const words=t.trim()?t.trim().split(/\s+/).length:0;
+  const secs=Math.max(1,Math.round((now()-sessionStart)/1000));
+  wordCount.textContent=words;
+  metricSub.textContent='session: '+secs+'s - forward only';
+  paper.classList.add('finished');
+  finishBtn.hidden=true;
+  $('#copyRaw').focus();
+}
+function reset(clearText){
+  sessionStart=null;lastInput=0;finished=false;
+  if(clearText)setSheet('');
+  clearInterval(tickId);
+  paper.classList.remove('finished');
+  body.classList.remove('live');
+  clearVitals();
+  clock.classList.remove('running');
+  clock.textContent=fmt(DURATION);
+  finishBtn.hidden=true;
+  lifeline.classList.remove('flat');
+  statusEl.classList.remove('dead');
+  statusEl.textContent='type to start';
+  updateWords();
+  placeholder();
+}
+
+finishBtn.addEventListener('click',e=>{e.stopPropagation();if(sessionStart)finish();});
+$('#again').addEventListener('click',()=>{ph.innerHTML=PH_DEFAULT;reset(true);sheet.focus();});
+const AI_PROMPT='Below is a zero draft - raw, unedited, typos included. Shape it into a clear first draft. Keep my ideas and my voice; fix structure, spelling, and flow. Do not add claims I didn\u2019t make.\n\n---\n\n';
+function flash(btn,label){const old=btn.textContent;btn.textContent=label;btn.classList.add('copied');setTimeout(()=>{btn.textContent=old;btn.classList.remove('copied');},1400);}
+$('#copyAI').addEventListener('click',function(){navigator.clipboard.writeText(AI_PROMPT+modelText()).then(()=>flash(this,'Copied \u2713')).catch(()=>flash(this,'Copy failed'));});
+$('#copyRaw').addEventListener('click',function(){navigator.clipboard.writeText(modelText()).then(()=>flash(this,'Copied \u2713')).catch(()=>flash(this,'Copy failed'));});
+$('#downloadMd').addEventListener('click',function(){
+  const blob=new Blob([modelText()],{type:'text/markdown'});
+  const a=document.createElement('a');
+  const d=new Date();
+  a.href=URL.createObjectURL(blob);
+  a.download='zero-draft-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(d.getHours()).padStart(2,'0')+String(d.getMinutes()).padStart(2,'0')+'.md';
+  a.click();URL.revokeObjectURL(a.href);flash(this,'Saved \u2713');
+});
+
+/* ---------------- forward-only guards ---------------- */
+sheet.addEventListener('beforeinput',e=>{
+  if(finished||wiping){e.preventDefault();return;}
+  interruptDemo();
+  const t=e.inputType||'';
+  if(t.indexOf('delete')===0||t==='historyUndo'||t==='historyRedo'||
+     t==='insertFromPaste'||t==='insertFromDrop'||t==='insertFromYank'||
+     t==='insertReplacementText'||t==='insertTranspose'){
+    e.preventDefault();deny();caretToEnd();return;
+  }
+  if(t==='insertText'||t==='insertParagraph'||t==='insertLineBreak'||t==='insertCompositionText'){
+    if(!composing&&!caretAtEnd()){e.preventDefault();deny();caretToEnd();}
+  }
+});
+sheet.addEventListener('keydown',e=>{
+  if(finished){e.preventDefault();return;}
+  const k=e.key;
+  if((e.metaKey||e.ctrlKey)&&k==='Enter'){e.preventDefault();if(sessionStart)finish();return;}
+  if(k==='Backspace'||k==='Delete'){e.preventDefault();interruptDemo();deny();return;}
+  if((e.ctrlKey||e.metaKey)&&['z','y','x','v'].indexOf(k.toLowerCase())>=0){e.preventDefault();interruptDemo();deny();return;}
+  if(k==='Enter'||k.length===1)interruptDemo();
+});
+['paste','cut','drop'].forEach(ev=>sheet.addEventListener(ev,e=>{e.preventDefault();deny();}));
+sheet.addEventListener('compositionstart',()=>{interruptDemo();composing=true;});
+sheet.addEventListener('compositionend',()=>{composing=false;onRealInput();});
+sheet.addEventListener('input',()=>{if(!composing)onRealInput();});
+function onRealInput(){
+  if(finished||wiping)return;
+  const t=modelText();
+  startSession();
+  lastInput=now();
+  setSheet(t);caretToEnd();
+  clearVitals();
+  lifelineFill.style.transform='scaleX(1)';
+  updateWords();
+  placeholder();
+}
+paper.addEventListener('mousedown',e=>{
+  if(finished)return;
+  if(e.target.closest('button'))return;
+  interruptDemo();
+  if(document.activeElement!==sheet){e.preventDefault();sheet.focus();caretToEnd();}
+});
+/* first keystroke anywhere starts the session - the page IS the tool */
+document.addEventListener('keydown',e=>{
+  if(finished||wiping)return;
+  const t=e.target;
+  if(t!==document.body&&t!==document.documentElement)return;
+  const k=e.key;
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  if(k==='Enter'||(k&&k.length===1)){
+    interruptDemo();
+    ph.innerHTML=PH_DEFAULT;
+    sheet.focus();caretToEnd();
+  }
+});
+cta.addEventListener('click',()=>{
+  interruptDemo();
+  paper.scrollIntoView({block:'center',behavior:REDUCED?'auto':'smooth'});
+  setTimeout(()=>{sheet.focus();caretToEnd();},REDUCED?0:350);
+});
+
+/* ---------------- demo preview: types once, then lets you watch it almost die ---------------- */
+const demo={running:false,paused:false,clock:0,last:0,steps:[],raf:null,done:false,textUp:false};
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function buildDemo(){
+  const steps=[];let t=1600;
+  const rand=mulberry32(7);
+  for(let i=1;i<=SAMPLE.length;i++){steps.push({at:t,i:i});t+=30+rand()*46;}
+  const typeEnd=t;
+  steps.push({at:typeEnd+5200,dangerStart:true});
+  steps.push({at:typeEnd+5200+2600,calm:true});
+  demo.steps=steps;demo.clock=0;demo.last=0;demo.done=false;
+}
+let demoDangerT0=0;
+function demoFrame(ts){
+  if(!demo.running)return;
+  if(!demo.last)demo.last=ts;
+  const dt=Math.min(100,ts-demo.last);demo.last=ts;
+  if(!demo.paused){
+    demo.clock+=dt;
+    while(demo.steps.length&&demo.steps[0].at<=demo.clock){
+      const s=demo.steps.shift();
+      if(s.dangerStart){demoDangerT0=now();body.classList.add('danger');}
+      else if(s.calm){demoDangerT0=0;setSheet(SAMPLE);clearVitals();statusEl.textContent='type to start';}
+      else{setSheet(SAMPLE.slice(0,s.i));demo.textUp=true;updateWords();}
+    }
+    if(demoDangerT0){
+      // simulate the death front creeping, then stop short of the kill
+      const fakeIdle=DANGER_AT+Math.min(1500,(now()-demoDangerT0)*.6);
+      applyVitals(fakeIdle);
+      statusEl.textContent='keep typing or it\u2019s gone';
+    }
+    if(!demo.steps.length){demo.running=false;demo.done=true;return;}
+  }
+  demo.raf=requestAnimationFrame(demoFrame);
+}
+function interruptDemo(){
+  if(demo.raf)cancelAnimationFrame(demo.raf);
+  demo.running=false;demo.paused=false;demo.done=true;demoDangerT0=0;
+  clearVitals();
+  if(demo.textUp&&!sessionStart){setSheet('');demo.textUp=false;updateWords();}
+}
+function maybeStartDemo(){
+  if(REDUCED){setSheet(SAMPLE);demo.done=true;demo.textUp=true;updateWords();return;}
+  buildDemo();
+  demo.running=true;
+  demo.raf=requestAnimationFrame(demoFrame);
+}
+const io=new IntersectionObserver(entries=>{
+  entries.forEach(en=>{
+    if(!demo.running)return;
+    demo.paused=!en.isIntersecting||document.hidden;
+  });
+},{threshold:.15});
+io.observe(paper);
+document.addEventListener('visibilitychange',()=>{
+  if(!demo.running)return;
+  demo.paused=document.hidden;
+  demo.last=0;
+});
+
+placeholder();
+updateWords();
+maybeStartDemo();
+})();
+</script>
+</body>
+</html>

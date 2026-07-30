@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero Draft - the draft before the draft</title>
+<meta name="description" content="A writing tool where polishing is impossible. No deleting, no pasting, no undo - stop for eight seconds and it's gone. You walk away with a zero draft.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --grid:rgba(15,23,34,.055);
+    --grid-strong:rgba(15,23,34,.09);
+    --ink:#0f1722;
+    --slate:#5b6472;
+    --faint:#98a1ad;
+    --paper:#ffffff;
+    --hairline:rgba(15,23,34,.16);
+    --hairline-soft:rgba(15,23,34,.09);
+    --red:#d93b3b;
+    --blue:#1d4ed8;
+    --grotesk:"Space Grotesk",system-ui,sans-serif;
+    --body:"Inter",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:
+      repeating-linear-gradient(to right,var(--grid) 0 1px,transparent 1px 28px),
+      repeating-linear-gradient(to bottom,var(--grid) 0 1px,transparent 1px 28px),
+      repeating-linear-gradient(to right,var(--grid-strong) 0 1px,transparent 1px 140px),
+      repeating-linear-gradient(to bottom,var(--grid-strong) 0 1px,transparent 1px 140px),
+      #fbfbf9;
+    color:var(--ink);
+    font-family:var(--body);
+    font-weight:400;
+    line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(217,59,59,.22)}
+  a{color:var(--ink);text-decoration:none}
+
+  .wrap{max-width:1160px;margin:0 auto;padding:0 32px}
+
+  /* ---------- nav ---------- */
+  nav{padding:22px 0;border-bottom:1px solid var(--hairline-soft)}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between}
+  .wordmark{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12.5px;letter-spacing:.16em;text-transform:uppercase}
+  .reg{
+    width:26px;height:26px;border:1.5px solid var(--ink);border-radius:2px;
+    display:grid;place-items:center;font-family:var(--mono);font-size:13px;font-weight:500;
+  }
+  .nav-link{font-family:var(--mono);font-size:12px;letter-spacing:.06em;color:var(--slate)}
+  .nav-link:hover{color:var(--ink)}
+
+  /* ---------- hero ---------- */
+  .hero{
+    display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);
+    gap:64px;align-items:start;padding:72px 0 80px;
+  }
+  .kicker{
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--slate);margin-bottom:26px;
+  }
+  .kicker b{font-weight:500;color:var(--red)}
+  h1{
+    font-family:var(--grotesk);font-weight:700;
+    font-size:clamp(40px,4.8vw,60px);
+    line-height:1.02;letter-spacing:-.025em;margin-bottom:24px;
+  }
+  .lead{
+    font-family:var(--grotesk);font-weight:500;font-size:20px;
+    color:var(--slate);margin-bottom:26px;letter-spacing:-.01em;
+  }
+  .note{font-size:15.5px;line-height:1.7;color:var(--slate);max-width:46ch;margin-bottom:14px}
+  .note strong{font-weight:500;color:var(--ink)}
+  .anno{
+    font-family:var(--mono);font-size:11px;color:var(--red);
+    letter-spacing:.04em;white-space:nowrap;
+  }
+  .cta-row{display:flex;align-items:center;gap:20px;margin-top:34px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--grotesk);font-size:15px;font-weight:500;
+    padding:14px 26px;border:0;cursor:pointer;border-radius:2px;
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .btn-ink{background:var(--ink);color:#fbfbf9;box-shadow:3px 3px 0 rgba(15,23,34,.18)}
+  .btn-ink:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(15,23,34,.22)}
+  .btn-ink:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(15,23,34,.18)}
+  .btn:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+  .cta-hint{font-family:var(--mono);font-size:12px;color:var(--faint)}
+
+  /* ---------- the sheet ---------- */
+  .sheet-card{
+    position:relative;background:var(--paper);
+    border:1px solid var(--hairline);border-radius:2px;
+    min-height:460px;overflow:hidden;cursor:text;
+  }
+  .sheet-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 18px;border-bottom:1px solid var(--hairline-soft);
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  }
+  .sheet-head .zone{color:var(--faint)}
+  .head-right{display:flex;align-items:center;gap:16px}
+  .rules-tag{
+    color:var(--ink);border:1px solid var(--hairline);border-radius:2px;
+    padding:3px 8px;font-size:10px;
+  }
+  .clock{
+    color:var(--slate);font-variant-numeric:tabular-nums;font-size:12px;
+  }
+  .clock.running{color:var(--ink)}
+  .clock.danger{color:var(--red)}
+  #finish{
+    font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    background:none;border:0;color:var(--slate);cursor:pointer;padding:0;
+  }
+  #finish:hover{color:var(--ink)}
+  /* dimension bar that appears in danger */
+  .dim-bar{
+    position:absolute;left:0;top:38px;bottom:0;width:0;
+    border-right:1.5px solid var(--red);pointer-events:none;
+    opacity:0;transition:opacity .3s ease;
+  }
+  .sheet-card.danger .dim-bar{opacity:1}
+  .dim-bar span{
+    position:absolute;top:14px;left:8px;
+    font-family:var(--mono);font-size:10px;color:var(--red);
+    letter-spacing:.08em;writing-mode:vertical-rl;
+  }
+  .sheet{
+    position:relative;padding:26px 30px 90px 40px;min-height:340px;
+    font-family:var(--body);font-size:17px;line-height:28px;
+    color:var(--ink);outline:none;white-space:pre-wrap;word-break:break-word;
+  }
+  .placeholder{
+    position:absolute;top:26px;left:40px;right:30px;pointer-events:none;
+    font-size:17px;line-height:28px;color:var(--faint);
+  }
+  .placeholder .anno{display:block;margin-top:8px}
+  .countdown{
+    position:absolute;top:14px;right:18px;z-index:2;
+    font-family:var(--mono);font-weight:500;font-size:44px;line-height:1;
+    color:var(--red);font-variant-numeric:tabular-nums;
+    opacity:0;transition:opacity .2s ease;
+  }
+  .sheet-card.danger .countdown{opacity:1}
+  .sheet-card.danger .sheet{opacity:.45}
+  /* wipe scanline */
+  .scanline{
+    position:absolute;left:0;right:0;top:38px;height:3px;background:var(--red);
+    box-shadow:0 0 18px rgba(217,59,59,.5);z-index:3;
+    transform:translateY(-4px);opacity:0;pointer-events:none;
+  }
+  .sheet-card.wiping .scanline{opacity:1;transform:translateY(420px);transition:transform .38s cubic-bezier(.4,0,.6,1),opacity .1s}
+  .sheet-card.wiping .sheet{opacity:0;transition:opacity .3s ease .1s}
+  .sheet-foot{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 18px;border-top:1px solid var(--hairline-soft);
+    font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  }
+  .foot-msg{color:var(--slate)}
+  .foot-msg.gone{color:var(--red)}
+  .foot-side{color:var(--faint)}
+  /* done state */
+  .done{
+    position:absolute;inset:0;z-index:4;background:var(--paper);
+    display:none;flex-direction:column;justify-content:center;align-items:center;
+    gap:4px;padding:36px;text-align:center;
+  }
+  .sheet-card.finished .done{display:flex}
+  .done .done-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--slate);
+  }
+  .done .metric{
+    font-family:var(--grotesk);font-weight:700;font-size:96px;line-height:1.05;
+    color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+  }
+  .done .metric-label{
+    font-family:var(--mono);font-size:11px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--faint);margin-bottom:26px;
+  }
+  .done-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .btn-outline{
+    background:transparent;color:var(--ink);
+    border:1px solid var(--hairline);font-family:var(--mono);
+    font-size:12px;letter-spacing:.06em;padding:11px 16px;
+  }
+  .btn-outline:hover{border-color:var(--ink)}
+  .copied{color:var(--red) !important;border-color:var(--red) !important}
+
+  /* ---------- sections ---------- */
+  section{padding:72px 0;border-top:1px solid var(--hairline-soft)}
+  .overline{
+    font-family:var(--mono);font-size:11px;letter-spacing:.18em;
+    text-transform:uppercase;color:var(--slate);margin-bottom:16px;
+  }
+  .overline b{color:var(--red);font-weight:500}
+  h2{
+    font-family:var(--grotesk);font-weight:700;font-size:clamp(24px,3vw,32px);
+    line-height:1.12;letter-spacing:-.02em;margin-bottom:12px;
+  }
+  .section-intro{font-size:15px;color:var(--slate);max-width:58ch;margin-bottom:44px;line-height:1.65}
+
+  .ba{display:grid;grid-template-columns:1fr auto 1fr;gap:20px;align-items:stretch}
+  .ba-card{
+    position:relative;background:var(--paper);border:1px solid var(--hairline);
+    border-radius:2px;padding:26px 26px 24px;display:flex;flex-direction:column;gap:16px;
+  }
+  .ba-tag{
+    align-self:flex-start;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.1em;text-transform:uppercase;padding:4px 10px;
+    border:1px solid var(--hairline);color:var(--slate);border-radius:2px;
+  }
+  .ba-card.clean .ba-tag{border-color:rgba(29,78,216,.4);color:var(--blue)}
+  .ba-text{font-size:15px;line-height:1.7;color:var(--slate)}
+  .ba-card.clean .ba-text{color:var(--ink)}
+  .ba-arrow{display:grid;place-items:center;color:var(--red);font-family:var(--mono);font-size:15px;text-align:center}
+  .ba-arrow small{display:block;font-size:9.5px;letter-spacing:.1em;color:var(--slate);margin-top:6px;text-transform:uppercase}
+  .ba-caption{font-family:var(--mono);font-size:12.5px;color:var(--slate);margin-top:32px;max-width:66ch;line-height:1.7}
+  .ba-caption strong{color:var(--ink);font-weight:500}
+
+  /* house rules: spec table */
+  .rules{border-top:1px solid var(--hairline)}
+  .rule{
+    display:grid;grid-template-columns:88px 220px 1fr;gap:24px;align-items:baseline;
+    padding:18px 0;border-bottom:1px solid var(--hairline-soft);
+  }
+  .rule-id{font-family:var(--mono);font-size:12px;color:var(--red);letter-spacing:.08em}
+  .rule-name{font-family:var(--grotesk);font-weight:700;font-size:16px;letter-spacing:-.01em;text-transform:uppercase}
+  .rule p{font-size:14.5px;color:var(--slate);line-height:1.6}
+
+  /* footer */
+  footer{padding:40px 0 56px;border-top:1px solid var(--hairline-soft)}
+  .foot-inner{
+    display:flex;align-items:baseline;justify-content:space-between;
+    gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;
+  }
+  .foot-brand{text-transform:uppercase;letter-spacing:.16em}
+  .foot-tag{color:var(--faint)}
+  .foot-links{display:flex;gap:18px;color:var(--slate)}
+  .foot-links a{color:var(--slate)}
+  .foot-links a:hover{color:var(--ink)}
+
+  @media (max-width:900px){
+    .hero{grid-template-columns:1fr;gap:40px;padding:48px 0 56px}
+    .sheet-card{min-height:400px}
+    .ba{grid-template-columns:1fr}
+    .ba-arrow{transform:rotate(90deg);padding:2px 0}
+    .ba-arrow small{display:none}
+    .rule{grid-template-columns:56px 1fr;gap:6px 16px}
+    .rule p{grid-column:2}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+
+<nav class="wrap">
+  <div class="nav-inner">
+    <a class="wordmark" href="#"><span class="reg">0</span>Zero Draft</a>
+    <a class="nav-link" href="#">Mac release -&gt;</a>
+  </div>
+</nav>
+
+<header class="wrap hero">
+  <div>
+    <p class="kicker">Spec <b>001</b> - forced-output writing instrument</p>
+    <h1>It's not supposed to be good yet.</h1>
+    <p class="lead">So we made polishing impossible.</p>
+    <p class="note">No deleting, no pasting, no undo - stop for eight seconds and <strong>it's gone</strong> <span class="anno">[T+8s: WIPE]</span>. Set the timer and write forward only. Sixty seconds is plenty.</p>
+    <p class="note">Typos and all, you walk away with a zero draft: the draft before the draft. Keep it raw - or copy it into any AI and watch it come back a real one.</p>
+    <div class="cta-row">
+      <button class="btn btn-ink" id="cta">Give it sixty seconds.</button>
+      <span class="cta-hint">or just click the sheet and type</span>
+    </div>
+  </div>
+
+  <div class="sheet-card" id="paper">
+    <div class="sheet-head">
+      <span class="zone">INPUT - RAW</span>
+      <div class="head-right">
+        <span class="rules-tag">RULES ACTIVE</span>
+        <button id="finish" hidden>Finish -&gt;</button>
+        <span class="clock" id="clock">T-01:00</span>
+      </div>
+    </div>
+    <div class="dim-bar" aria-hidden="true"><span>WIPE IN</span></div>
+    <div class="scanline" aria-hidden="true"></div>
+    <div class="placeholder" id="ph">Click here. Type anything. Stop, and it disappears.<span class="anno">[T+5s: COUNTDOWN / T+8s: WIPE]</span></div>
+    <div class="sheet" id="sheet" tabindex="0" role="textbox" aria-multiline="true" aria-label="Zero draft writing sheet"></div>
+    <div class="countdown" id="cd" aria-hidden="true">3</div>
+    <div class="sheet-foot">
+      <span class="foot-msg" id="msg">IDLE - AWAITING INPUT</span>
+      <span class="foot-side">FWD ONLY</span>
+    </div>
+    <div class="done" id="done">
+      <span class="done-label">Output</span>
+      <div class="metric" id="wordCount">0</div>
+      <div class="metric-label">words you would not have written</div>
+      <div class="done-actions">
+        <button class="btn btn-ink" id="copyAI">Copy for AI</button>
+        <button class="btn btn-outline" id="copyRaw">Copy raw</button>
+        <button class="btn btn-outline" id="again">Go again</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section class="wrap" id="how">
+  <p class="overline">Process <b>002</b> - what comes out</p>
+  <h2>Raw goes in. A draft comes back.</h2>
+  <p class="section-intro">A zero draft is not meant to be read - it's meant to exist. Once it exists, shaping it is the easy part.</p>
+  <div class="ba">
+    <div class="ba-card">
+      <span class="ba-tag">Artifact A - zero draft - 58s</span>
+      <p class="ba-text">ok thesis is peopel dont lack ideas they lack permission, the editor in your head kills sentences befor they land. evidence: i rewrote my first paragraph five times yesterday and posted nothing. also deadlines work becuse fear beats perfectionism somehow?? want examples from painters, sketches vs finished canvas</p>
+    </div>
+    <div class="ba-arrow">-&gt;<small>run: cleanup</small></div>
+    <div class="ba-card clean">
+      <span class="ba-tag">Artifact B - first draft - via your AI</span>
+      <p class="ba-text">People don't lack ideas - they lack permission. The editor in your head kills sentences before they land: yesterday I rewrote one opening paragraph five times and published nothing. Deadlines work because fear outruns perfectionism, the way a painter's sketch outruns the finished canvas.</p>
+    </div>
+  </div>
+  <p class="ba-caption">The shaping happens in whatever AI you already use. <strong>Copy for AI</strong> puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point.</p>
+</section>
+
+<section class="wrap">
+  <p class="overline">House rules <b>003</b> - non-negotiable</p>
+  <div class="rules">
+    <div class="rule">
+      <span class="rule-id">R-01</span>
+      <span class="rule-name">Forward only</span>
+      <p>Backspace, delete, paste, and undo do nothing. Mistyped a word? Keep going.</p>
+    </div>
+    <div class="rule">
+      <span class="rule-id">R-02</span>
+      <span class="rule-name">T+5s warning</span>
+      <p>Pause for five seconds and a countdown starts. Keep typing to cancel it.</p>
+    </div>
+    <div class="rule">
+      <span class="rule-id">R-03</span>
+      <span class="rule-name">T+8s wipe</span>
+      <p>Reach eight seconds of silence and the draft deletes itself. No recovery.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="wrap">
+  <div class="foot-inner">
+    <span class="foot-brand">Zero Draft</span>
+    <span class="foot-tag">The draft before the draft. Your writing never leaves this page.</span>
+    <div class="foot-links"><a href="#">Help</a><a href="#">Privacy</a><a href="#">Terms</a></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const paper=document.getElementById('paper');
+  const sheet=document.getElementById('sheet');
+  const ph=document.getElementById('ph');
+  const clock=document.getElementById('clock');
+  const cd=document.getElementById('cd');
+  const msg=document.getElementById('msg');
+  const finishBtn=document.getElementById('finish');
+  const wordCount=document.getElementById('wordCount');
+  const cta=document.getElementById('cta');
+
+  const SAMPLE="I keep fixing the first sentence\nuntil I forget what I meant to say\nso I am leaving this one alone\nand moving on";
+  const DANGER_AT=5000, GONE_AT=8000, DURATION=60;
+
+  let text='';
+  let sessionStart=null, lastInput=null, tick=null, finished=false;
+  let demoRunning=true, demoTimer=null;
+
+  function fmt(s){const m=Math.floor(s/60),r=s%60;return 'T-'+m+':'+String(r).padStart(2,'0');}
+  function render(){
+    sheet.textContent=text;
+    ph.style.opacity=(text.length||sessionStart)?0:1;
+  }
+  function setDanger(on){
+    paper.classList.toggle('danger',on);
+    clock.classList.toggle('danger',on);
+  }
+  function stopDemo(){
+    if(!demoRunning)return;
+    demoRunning=false;
+    clearTimeout(demoTimer);
+    setDanger(false);
+    text='';render();
+  }
+  function startSession(){
+    if(sessionStart||finished)return;
+    sessionStart=performance.now();
+    lastInput=sessionStart;
+    clock.classList.add('running');
+    finishBtn.hidden=false;
+    msg.textContent='RUNNING - FORWARD ONLY';
+    tick=setInterval(loop,100);
+  }
+  function loop(){
+    const now=performance.now();
+    const remain=Math.max(0,DURATION*1000-(now-sessionStart));
+    clock.textContent=fmt(Math.ceil(remain/1000));
+    if(remain<=0){finish();return;}
+    const idle=now-lastInput;
+    if(text.length>0&&idle>=GONE_AT){wipe();return;}
+    if(text.length>0&&idle>=DANGER_AT){
+      setDanger(true);
+      cd.textContent=Math.max(1,Math.ceil((GONE_AT-idle)/1000));
+    }else{
+      setDanger(false);
+    }
+  }
+  function wipe(){
+    clearInterval(tick);
+    setDanger(false);
+    paper.classList.add('wiping');
+    msg.textContent='T+8s REACHED - DRAFT DELETED';
+    msg.classList.add('gone');
+    setTimeout(()=>{
+      text='';render();
+      paper.classList.remove('wiping');
+      reset(false);
+    },500);
+  }
+  function finish(){
+    clearInterval(tick);
+    finished=true;
+    setDanger(false);
+    const words=text.trim()?text.trim().split(/\s+/).length:0;
+    wordCount.textContent=words;
+    paper.classList.add('finished');
+  }
+  function reset(clearText){
+    sessionStart=null;lastInput=null;finished=false;
+    if(clearText)text='';
+    clearInterval(tick);
+    paper.classList.remove('finished');
+    setDanger(false);
+    clock.classList.remove('running');
+    clock.textContent=fmt(DURATION);
+    finishBtn.hidden=true;
+    msg.classList.remove('gone');
+    render();
+  }
+  finishBtn.addEventListener('click',e=>{e.stopPropagation();if(sessionStart)finish();});
+  document.getElementById('again').addEventListener('click',()=>{
+    reset(true);
+    msg.textContent='IDLE - AWAITING INPUT';
+    sheet.focus();
+  });
+  const AI_PROMPT='Below is a zero draft - raw, unedited, typos included. Shape it into a clear first draft. Keep my ideas and my voice; fix structure, spelling, and flow. Do not add claims I didn\u2019t make.\n\n---\n\n';
+  function flash(btn,label){
+    const old=btn.textContent;btn.textContent=label;btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent=old;btn.classList.remove('copied');},1400);
+  }
+  document.getElementById('copyAI').addEventListener('click',function(){
+    navigator.clipboard.writeText(AI_PROMPT+text).then(()=>flash(this,'Copied \u2713'));
+  });
+  document.getElementById('copyRaw').addEventListener('click',function(){
+    navigator.clipboard.writeText(text).then(()=>flash(this,'Copied \u2713'));
+  });
+
+  paper.addEventListener('click',()=>{if(!finished){stopDemo();sheet.focus();}});
+  cta.addEventListener('click',()=>{
+    stopDemo();
+    paper.scrollIntoView({block:'center',behavior:'smooth'});
+    setTimeout(()=>sheet.focus(),350);
+  });
+
+  sheet.addEventListener('keydown',e=>{
+    if(finished)return;
+    stopDemo();
+    const k=e.key;
+    if(k==='Backspace'||k==='Delete'){e.preventDefault();nudge();return;}
+    if((e.ctrlKey||e.metaKey)&&['z','y','x','v'].includes(k.toLowerCase())){e.preventDefault();nudge();return;}
+    if(k==='Enter'){e.preventDefault();commit('\n');return;}
+    if(k.length===1&&!e.ctrlKey&&!e.metaKey){e.preventDefault();commit(k);return;}
+  });
+  ['paste','cut','drop'].forEach(ev=>sheet.addEventListener(ev,e=>{e.preventDefault();nudge();}));
+
+  function commit(ch){
+    startSession();
+    text+=ch;lastInput=performance.now();
+    setDanger(false);
+    render();
+    sheet.scrollTop=sheet.scrollHeight;
+  }
+  function nudge(){
+    msg.textContent='BLOCKED - FORWARD ONLY';
+    setTimeout(()=>{if(sessionStart)msg.textContent='RUNNING - FORWARD ONLY';},1200);
+  }
+
+  /* ambient demo: type once, hold into danger, recover, then stay */
+  function playDemo(){
+    let i=0;
+    function step(){
+      if(!demoRunning)return;
+      if(i<SAMPLE.length){
+        text=SAMPLE.slice(0,++i);render();
+        demoTimer=setTimeout(step,34+Math.random()*46);
+      }else{
+        demoTimer=setTimeout(()=>{
+          if(!demoRunning)return;
+          setDanger(true);cd.textContent='3';
+          demoTimer=setTimeout(()=>{
+            if(!demoRunning)return;
+            setDanger(false);
+          },2600);
+        },5200);
+      }
+    }
+    step();
+  }
+  render();
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){playDemo();}
+  else{demoRunning=false;text=SAMPLE;render();}
+})();
+</script>
+</body>
+</html>

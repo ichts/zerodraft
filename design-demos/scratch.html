@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zero Draft - the draft before the draft</title>
+<meta name="description" content="A writing tool where polishing is impossible. No deleting, no pasting, no undo - stop for eight seconds and it's gone.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --desk:#f3efe6;
+    --paper:#fdfcf7;
+    --ink:#1c1a16;
+    --dim:#6d675c;
+    --faint:#a39c8d;
+    --red:#c8392f;
+    --mono:"Courier Prime","Courier New",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--desk);
+    background-image:radial-gradient(rgba(28,26,22,.05) 1px,transparent 1px);
+    background-size:22px 22px;
+    color:var(--ink);
+    font-family:var(--mono);
+    font-weight:400;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:rgba(200,57,47,.25)}
+  a{color:var(--ink);text-decoration:none}
+
+  .wrap{max-width:860px;margin:0 auto;padding:0 28px}
+
+  nav{padding:22px 0;display:flex;justify-content:space-between;align-items:baseline}
+  .wordmark{font-weight:700;font-size:15px;letter-spacing:.04em}
+  .wordmark span{color:var(--red)}
+  .nav-link{font-size:13px;color:var(--dim)}
+  .nav-link:hover{color:var(--ink)}
+
+  /* ---------- hero: barely any words ---------- */
+  .hero{padding:44px 0 26px}
+  .kick{font-size:12px;color:var(--faint);letter-spacing:.14em;margin-bottom:20px}
+  h1{
+    font-weight:700;font-size:clamp(30px,4.6vw,44px);
+    line-height:1.25;letter-spacing:-.01em;max-width:22ch;
+  }
+  .typo{position:relative;white-space:nowrap}
+  .typo s{text-decoration-color:var(--red);text-decoration-thickness:3px}
+  .typo i{
+    position:absolute;left:6px;top:-22px;
+    font-style:normal;font-size:20px;color:var(--red);
+    transform:rotate(-4deg);
+  }
+  .sub{font-size:15px;color:var(--dim);margin-top:18px}
+  .cta-row{display:flex;align-items:center;gap:18px;margin-top:26px;flex-wrap:wrap}
+  .btn{
+    font-family:var(--mono);font-weight:700;font-size:15px;
+    padding:13px 24px;border:0;cursor:pointer;border-radius:2px;
+    background:var(--ink);color:var(--desk);
+    box-shadow:3px 3px 0 rgba(28,26,22,.25);
+    transition:transform .1s ease,box-shadow .1s ease;
+  }
+  .btn:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 rgba(28,26,22,.25)}
+  .btn:active{transform:translate(1px,1px);box-shadow:1px 1px 0 rgba(28,26,22,.25)}
+  .btn:focus-visible{outline:2px solid var(--red);outline-offset:3px}
+  .hint{font-size:12.5px;color:var(--faint)}
+
+  /* ---------- the desk: tilted paper + red pencil notes ---------- */
+  .desk{position:relative;margin-top:34px;padding:26px 40px 60px}
+  .note-red{
+    position:absolute;font-size:13px;font-weight:700;color:var(--red);
+    pointer-events:none;z-index:6;
+  }
+  .note-left{left:-6px;top:38%;transform:rotate(-90deg);transform-origin:left center}
+  .note-topright{right:6px;top:-6px;transform:rotate(3deg)}
+  .note-bottomright{right:18px;bottom:16px;transform:rotate(-2deg)}
+  .note-bottomright::after{
+    content:"";position:absolute;right:-24px;top:-6px;width:22px;height:14px;
+    border-right:2.5px solid var(--red);border-top:2.5px solid var(--red);
+    transform:rotate(38deg);
+  }
+
+  .paper{
+    position:relative;background:var(--paper);
+    border:1px solid rgba(28,26,22,.18);
+    box-shadow:4px 5px 0 rgba(28,26,22,.12);
+    transform:rotate(-.6deg);
+    min-height:400px;cursor:text;overflow:hidden;
+  }
+  .paper-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:14px 20px 0;
+  }
+  .clock{font-weight:700;font-size:14px;color:var(--red);letter-spacing:.05em;font-variant-numeric:tabular-nums}
+  #finish{
+    font-family:var(--mono);font-size:13px;font-weight:700;
+    background:none;border:0;color:var(--dim);cursor:pointer;text-decoration:underline;
+    text-decoration-style:dashed;text-underline-offset:3px;
+  }
+  #finish:hover{color:var(--ink)}
+  .sheet{
+    padding:18px 26px 70px;min-height:300px;
+    font-size:17px;line-height:1.9;color:var(--ink);
+    outline:none;white-space:pre-wrap;word-break:break-word;
+    transition:opacity .3s ease;
+  }
+  .paper.danger .sheet{opacity:.4}
+  .placeholder{
+    position:absolute;top:18px;left:26px;right:26px;pointer-events:none;
+    font-size:17px;line-height:1.9;color:var(--faint);font-style:italic;
+  }
+  /* red circle scribble around countdown */
+  .countdown{
+    position:absolute;inset:0;display:grid;place-items:center;
+    pointer-events:none;opacity:0;transition:opacity .2s ease;z-index:3;
+  }
+  .paper.danger .countdown{opacity:1}
+  .countdown .ring{
+    position:relative;display:grid;place-items:center;
+    width:170px;height:130px;border:4px solid var(--red);border-radius:48% 52% 51% 49%/58% 47% 53% 42%;
+    transform:rotate(-5deg);
+    animation:draw .3s ease-out;
+  }
+  @keyframes draw{from{transform:rotate(-5deg) scale(1.25);opacity:0}to{transform:rotate(-5deg) scale(1);opacity:1}}
+  .countdown .num{font-size:64px;font-weight:700;color:var(--red);font-variant-numeric:tabular-nums}
+  .countdown .cap{
+    position:absolute;bottom:-34px;left:50%;transform:translateX(-50%) rotate(-2deg);
+    white-space:nowrap;font-size:12.5px;font-weight:700;color:var(--red);
+  }
+  .paper-foot{
+    position:absolute;left:0;right:0;bottom:0;
+    display:flex;justify-content:space-between;
+    padding:12px 20px;font-size:12px;color:var(--faint);
+  }
+  .foot-msg.gone{color:var(--red);font-weight:700}
+  /* scribble-out wipe */
+  .paper.wiping .sheet{opacity:0;transition:opacity .18s ease}
+  .paper.wiping::after{
+    content:"";position:absolute;left:4%;right:4%;top:50%;height:10px;
+    background:repeating-linear-gradient(-3deg,var(--red) 0 3px,transparent 3px 7px);
+    opacity:.7;transform:rotate(-1.5deg);
+    animation:scribble .3s ease;
+  }
+  @keyframes scribble{from{transform:rotate(-1.5deg) scaleX(.2)}to{transform:rotate(-1.5deg) scaleX(1)}}
+  /* done */
+  .done{
+    position:absolute;inset:0;z-index:4;background:var(--paper);
+    display:none;flex-direction:column;justify-content:center;align-items:center;gap:8px;
+    transform:rotate(.6deg);padding:30px;text-align:center;
+  }
+  .paper.finished .done{display:flex}
+  .done .stamp{
+    border:3px solid var(--red);color:var(--red);border-radius:4px;
+    padding:6px 16px;font-weight:700;font-size:13px;letter-spacing:.12em;
+    transform:rotate(-3deg);margin-bottom:10px;
+  }
+  .done .metric{font-size:80px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .done .metric-label{font-size:12.5px;color:var(--dim);margin-bottom:22px}
+  .done-actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .btn-ghost{
+    background:transparent;color:var(--dim);box-shadow:none;
+    font-weight:400;font-size:13px;padding:11px 14px;
+    text-decoration:underline;text-decoration-style:dashed;text-underline-offset:3px;
+  }
+  .btn-ghost:hover{color:var(--ink);transform:none;box-shadow:none}
+  .copied{color:var(--red) !important}
+
+  /* ---------- payoff: taped scraps ---------- */
+  section{padding:56px 0}
+  .payoff-intro{font-size:13px;color:var(--dim);text-align:center;margin-bottom:34px}
+  .payoff-intro b{color:var(--ink)}
+  .scraps{display:grid;grid-template-columns:1fr auto 1fr;gap:22px;align-items:center}
+  .scrap{
+    position:relative;background:var(--paper);
+    border:1px solid rgba(28,26,22,.14);
+    box-shadow:3px 4px 0 rgba(28,26,22,.1);
+    padding:30px 22px 22px;font-size:14.5px;line-height:1.75;
+  }
+  .scrap::before{
+    content:"";position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(-2deg);
+    width:92px;height:24px;background:rgba(216,205,178,.75);
+    box-shadow:0 1px 2px rgba(28,26,22,.12);
+  }
+  .scrap.raw{transform:rotate(-1.1deg);color:var(--dim)}
+  .scrap.clean{transform:rotate(.9deg)}
+  .scrap-tag{
+    position:absolute;top:8px;left:12px;font-size:11px;font-weight:700;
+    letter-spacing:.1em;color:var(--faint);
+  }
+  .scrap.clean .scrap-tag{color:var(--red)}
+  .scrap-arrow{font-size:26px;font-weight:700;color:var(--red);transform:rotate(-4deg)}
+  .payoff-cap{font-size:13px;color:var(--dim);text-align:center;margin-top:30px}
+
+  footer{padding:36px 0 48px}
+  .foot-inner{
+    border-top:1px dashed rgba(28,26,22,.3);padding-top:18px;
+    display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    font-size:12px;color:var(--faint);
+  }
+
+  @media (max-width:760px){
+    .desk{padding:18px 6px 48px}
+    .note-left{display:none}
+    .scraps{grid-template-columns:1fr}
+    .scrap-arrow{transform:rotate(86deg);text-align:center}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{transition:none !important;animation:none !important}
+  }
+</style>
+</head>
+<body>
+
+<nav class="wrap">
+  <a class="wordmark" href="#">zero<span>_</span>draft</a>
+  <a class="nav-link" href="#">mac release -&gt;</a>
+</nav>
+
+<header class="wrap hero">
+  <p class="kick">A WRITING TOOL THAT DELETES YOUR DRAFT IF YOU STOP</p>
+  <h1>It's not supposed to be <span class="typo"><i>good</i><s>goood</s></span> yet.</h1>
+  <p class="sub">So we made polishing impossible.</p>
+  <div class="cta-row">
+    <button class="btn" id="cta">Give it sixty seconds.</button>
+    <span class="hint">or just click the paper and type</span>
+  </div>
+</header>
+
+<div class="wrap desk">
+  <span class="note-red note-left">no delete. no paste. no undo!!</span>
+  <span class="note-red note-topright">60s. forward only.</span>
+  <span class="note-red note-bottomright">8 quiet seconds = gone</span>
+  <div class="paper" id="paper">
+    <div class="paper-head">
+      <span class="clock" id="clock">T-1:00</span>
+      <button id="finish" hidden>finish early</button>
+    </div>
+    <div class="placeholder" id="ph">click here. type anything.<br>stop, and it disappears.</div>
+    <div class="sheet" id="sheet" tabindex="0" role="textbox" aria-multiline="true" aria-label="Zero draft writing sheet"></div>
+    <div class="countdown" aria-hidden="true">
+      <div class="ring">
+        <div class="num" id="cd">3</div>
+        <div class="cap">keep typing or it's gone</div>
+      </div>
+    </div>
+    <div class="paper-foot">
+      <span class="foot-msg" id="msg">the rules apply here.</span>
+      <span>fwd only -&gt;</span>
+    </div>
+    <div class="done" id="done">
+      <span class="stamp">ZERO DRAFT</span>
+      <div class="metric" id="wordCount">0</div>
+      <div class="metric-label">words you would not have written</div>
+      <div class="done-actions">
+        <button class="btn" id="copyAI">Copy for AI</button>
+        <button class="btn btn-ghost" id="copyRaw">copy raw</button>
+        <button class="btn btn-ghost" id="again">go again</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="wrap">
+  <p class="payoff-intro">what comes out: <b>raw goes in. a draft comes back.</b></p>
+  <div class="scraps">
+    <div class="scrap raw">
+      <span class="scrap-tag">ZERO DRAFT / 58S</span>
+      ok thesis is peopel dont lack ideas they lack permission, the editor in your head kills sentences befor they land. evidence: i rewrote my first paragraph five times yesterday and posted nothing. also deadlines work becuse fear beats perfectionism somehow??
+    </div>
+    <div class="scrap-arrow">-&gt;</div>
+    <div class="scrap clean">
+      <span class="scrap-tag">FIRST DRAFT / VIA YOUR AI</span>
+      People don't lack ideas - they lack permission. The editor in your head kills sentences before they land: yesterday I rewrote one opening paragraph five times and published nothing. Deadlines work because fear outruns perfectionism.
+    </div>
+  </div>
+  <p class="payoff-cap">your AI does the shaping. we just make you start.</p>
+</section>
+
+<footer class="wrap">
+  <div class="foot-inner">
+    <span>zero_draft - the draft before the draft</span>
+    <span>your writing never leaves this page</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const paper=document.getElementById('paper');
+  const sheet=document.getElementById('sheet');
+  const ph=document.getElementById('ph');
+  const clock=document.getElementById('clock');
+  const cd=document.getElementById('cd');
+  const msg=document.getElementById('msg');
+  const finishBtn=document.getElementById('finish');
+  const wordCount=document.getElementById('wordCount');
+  const cta=document.getElementById('cta');
+
+  const SAMPLE="i keep fixing the first sentence\nuntil i forget what i meant to say\nso i am leaving this one alone\nand moving on";
+  const DANGER_AT=5000, GONE_AT=8000, DURATION=60;
+
+  let text='';
+  let sessionStart=null, lastInput=null, tick=null, finished=false;
+  let demoRunning=true, demoTimer=null;
+
+  function fmt(s){const m=Math.floor(s/60),r=s%60;return 'T-'+m+':'+String(r).padStart(2,'0');}
+  function render(){sheet.textContent=text;ph.style.opacity=(text.length||sessionStart)?0:1;}
+  function stopDemo(){if(!demoRunning)return;demoRunning=false;clearTimeout(demoTimer);paper.classList.remove('danger');text='';render();}
+  function startSession(){
+    if(sessionStart||finished)return;
+    sessionStart=performance.now();lastInput=sessionStart;
+    finishBtn.hidden=false;
+    msg.textContent='forward only. don\u2019t stop.';
+    tick=setInterval(loop,100);
+  }
+  function loop(){
+    const now=performance.now();
+    const remain=Math.max(0,DURATION*1000-(now-sessionStart));
+    clock.textContent=fmt(Math.ceil(remain/1000));
+    if(remain<=0){finish();return;}
+    const idle=now-lastInput;
+    if(text.length>0&&idle>=GONE_AT){wipe();return;}
+    if(text.length>0&&idle>=DANGER_AT){
+      paper.classList.add('danger');
+      cd.textContent=Math.max(1,Math.ceil((GONE_AT-idle)/1000));
+    }else{paper.classList.remove('danger');}
+  }
+  function wipe(){
+    clearInterval(tick);
+    paper.classList.remove('danger');
+    paper.classList.add('wiping');
+    msg.textContent='gone. that\u2019s the deal.';
+    msg.classList.add('gone');
+    setTimeout(()=>{text='';render();paper.classList.remove('wiping');reset(false);},450);
+  }
+  function finish(){
+    clearInterval(tick);finished=true;
+    paper.classList.remove('danger');
+    const words=text.trim()?text.trim().split(/\s+/).length:0;
+    wordCount.textContent=words;
+    paper.classList.add('finished');
+  }
+  function reset(clearText){
+    sessionStart=null;lastInput=null;finished=false;
+    if(clearText)text='';
+    clearInterval(tick);
+    paper.classList.remove('finished','danger');
+    clock.textContent=fmt(DURATION);
+    finishBtn.hidden=true;
+    msg.classList.remove('gone');
+    render();
+  }
+  finishBtn.addEventListener('click',e=>{e.stopPropagation();if(sessionStart)finish();});
+  document.getElementById('again').addEventListener('click',()=>{reset(true);msg.textContent='the rules apply here.';sheet.focus();});
+  const AI_PROMPT='Below is a zero draft - raw, unedited, typos included. Shape it into a clear first draft. Keep my ideas and my voice; fix structure, spelling, and flow. Do not add claims I didn\u2019t make.\n\n---\n\n';
+  function flash(btn,label){const old=btn.textContent;btn.textContent=label;btn.classList.add('copied');setTimeout(()=>{btn.textContent=old;btn.classList.remove('copied');},1400);}
+  document.getElementById('copyAI').addEventListener('click',function(){navigator.clipboard.writeText(AI_PROMPT+text).then(()=>flash(this,'copied \u2713'));});
+  document.getElementById('copyRaw').addEventListener('click',function(){navigator.clipboard.writeText(text).then(()=>flash(this,'copied \u2713'));});
+
+  paper.addEventListener('click',()=>{if(!finished){stopDemo();sheet.focus();}});
+  cta.addEventListener('click',()=>{stopDemo();paper.scrollIntoView({block:'center',behavior:'smooth'});setTimeout(()=>sheet.focus(),350);});
+
+  sheet.addEventListener('keydown',e=>{
+    if(finished)return;
+    stopDemo();
+    const k=e.key;
+    if(k==='Backspace'||k==='Delete'){e.preventDefault();nudge();return;}
+    if((e.ctrlKey||e.metaKey)&&['z','y','x','v'].includes(k.toLowerCase())){e.preventDefault();nudge();return;}
+    if(k==='Enter'){e.preventDefault();commit('\n');return;}
+    if(k.length===1&&!e.ctrlKey&&!e.metaKey){e.preventDefault();commit(k);return;}
+  });
+  ['paste','cut','drop'].forEach(ev=>sheet.addEventListener(ev,e=>{e.preventDefault();nudge();}));
+
+  function commit(ch){startSession();text+=ch;lastInput=performance.now();paper.classList.remove('danger');render();sheet.scrollTop=sheet.scrollHeight;}
+  function nudge(){msg.textContent='no going back.';setTimeout(()=>{if(sessionStart)msg.textContent='forward only. don\u2019t stop.';},1200);}
+
+  function playDemo(){
+    let i=0;
+    function step(){
+      if(!demoRunning)return;
+      if(i<SAMPLE.length){text=SAMPLE.slice(0,++i);render();demoTimer=setTimeout(step,32+Math.random()*44);}
+      else{
+        demoTimer=setTimeout(()=>{
+          if(!demoRunning)return;
+          paper.classList.add('danger');cd.textContent='3';
+          demoTimer=setTimeout(()=>{if(!demoRunning)return;paper.classList.remove('danger');},2600);
+        },5200);
+      }
+    }
+    step();
+  }
+  render();
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){playDemo();}
+  else{demoRunning=false;text=SAMPLE;render();}
+})();
+</script>
+</body>
+</html>

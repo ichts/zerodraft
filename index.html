@@ -254,23 +254,37 @@ window.FirstLineLandingDemo = (() => {
     return rect.height ? rect : null;
   }
 
-  function syncTrialDangerPosition() {
-    const dangerEl = trialDanger();
-    if (!dangerEl) return;
-    const surfaceRect = trialSurface()?.getBoundingClientRect();
-    const lineRect = currentTrialLineRect();
-    const fallbackX = surfaceRect ? surfaceRect.left + surfaceRect.width / 2 : window.innerWidth / 2;
-    const fallbackY = surfaceRect ? surfaceRect.top + surfaceRect.height * 0.35 : window.innerHeight * 0.35;
-    const rawX = lineRect ? lineRect.left + lineRect.width / 2 : fallbackX;
-    const rawY = lineRect ? lineRect.top + lineRect.height / 2 : fallbackY;
-    const dangerWidth = Math.min(720, Math.max(0, window.innerWidth - 96));
-    const halfDanger = dangerWidth / 2;
-    const minX = Math.min(window.innerWidth / 2, halfDanger + 24);
-    const maxX = Math.max(minX, window.innerWidth - halfDanger - 24);
-    const x = Math.min(maxX, Math.max(minX, rawX));
-    dangerEl.style.setProperty("--trial-danger-x", `${Math.round(x)}px`);
-    dangerEl.style.setProperty("--trial-danger-y", `${Math.round(rawY)}px`);
+  // Danger rides beside the words, never on top of them: numeral + hint in the
+  // margin at the current line's height; if the line starts too far left, above it.
+  function positionDangerBesideLine(dangerEl, surfaceEl, editorEl) {
+    if (!dangerEl || !surfaceEl || !editorEl) return;
+    const current = editorEl.querySelector(".trial-thought.is-current");
+    if (!current) {
+      dangerEl.style.setProperty("--dx", "50%");
+      dangerEl.style.setProperty("--dy", "38%");
+      dangerEl.style.setProperty("--dt", "translate(-50%,-50%)");
+      return;
+    }
+    const range = document.createRange();
+    range.selectNodeContents(current);
+    const rects = Array.from(range.getClientRects()).filter((r) => r.width || r.height);
+    const r = rects.length ? rects[rects.length - 1] : current.getBoundingClientRect();
+    const sRect = surfaceEl.getBoundingClientRect();
+    const lineCenterY = r.top + r.height / 2 - sRect.top;
+    const lineLeft = r.left - sRect.left;
+    const groupW = dangerEl.offsetWidth || 180;
+    if (lineLeft > groupW + 48) {
+      dangerEl.style.setProperty("--dx", `${Math.round(lineLeft - 20)}px`);
+      dangerEl.style.setProperty("--dy", `${Math.round(lineCenterY)}px`);
+      dangerEl.style.setProperty("--dt", "translate(-100%,-50%)");
+    } else {
+      dangerEl.style.setProperty("--dx", "50%");
+      dangerEl.style.setProperty("--dy", `${Math.round(r.bottom - sRect.top + 44)}px`);
+      dangerEl.style.setProperty("--dt", "translate(-50%,0)");
+    }
   }
+  function syncInlineDangerPosition() { positionDangerBesideLine(demoDanger(), demoSurface(), demoEditor()); }
+  function syncTrialDangerPosition() { positionDangerBesideLine(trialDanger(), trialSurface(), trialEditor()); }
 
   function scrollTrialCaretToAnchor() {
     if (!isTrial()) return;
@@ -310,6 +324,8 @@ window.FirstLineLandingDemo = (() => {
   function commitInput(el, text, { render = true } = {}) {
     emit("flinput", { text, now: Date.now() });
     clearEditorDanger();
+    setDeadStatus(false);
+    setStatus("forward only. don\u2019t stop.");
     if (!render) return;
     renderZen(el, text);
     syncZenView();
@@ -445,6 +461,7 @@ window.FirstLineLandingDemo = (() => {
     const ed = dangerEditor();
     if (ed) ed.classList.toggle("is-demo-danger", !!opts.dangerActive);
     if (opts.dangerActive && isTrial()) syncTrialDangerPosition();
+    if (opts.dangerActive && isInline()) syncInlineDangerPosition();
   }
 
   function tickDispatch(active, failed, complete, context, startedAt, lastInputAt, duration, text) {
@@ -523,6 +540,7 @@ window.FirstLineLandingDemo = (() => {
     const el = demoEditor();
     const surface = demoSurface();
     if (!el || !surface) return;
+    el.tabIndex = 0;
     armInline();
     el.innerHTML = "";
     renderZen(el, "");
@@ -732,6 +750,8 @@ window.FirstLineLandingDemo = (() => {
     const el = sessionEditor();
     if (el) { el.blur(); el.setAttribute("contenteditable", "false"); }
     clearEditorDanger();
+    setDeadStatus(false);
+    setStatus("everything you stop writing joins the pile.");
     if (context === "inline") hideInlineChrome();
     requestAnimationFrame(() => sessionResultEl()?.querySelector(".trial-copy")?.focus({ preventScroll: true }));
   }
@@ -739,6 +759,8 @@ window.FirstLineLandingDemo = (() => {
     const el = sessionEditor();
     if (el) { el.blur(); el.innerHTML = ""; el.setAttribute("contenteditable", "false"); }
     clearEditorDanger();
+    setStatus("gone. it joined the pile.");
+    setDeadStatus(true);
     if (context === "inline") hideInlineChrome();
     requestAnimationFrame(() => sessionFailureEl()?.querySelector(".trial-restart")?.focus({ preventScroll: true }));
   }
@@ -747,6 +769,8 @@ window.FirstLineLandingDemo = (() => {
     const el = context === "inline" ? demoEditor() : trialEditor();
     if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
     clearEditorDanger();
+    setDeadStatus(false);
+    setStatus("everything you stop writing joins the pile.");
     renderZen(el, "");
     if (context === "inline") showInlineChrome();
     emitPromptReset();
@@ -769,7 +793,8 @@ window.FirstLineLandingDemo = (() => {
 
   // --- Demo preview sequencer (browser-only). Writes the demo editor DOM and
   //     emits fldanger while paused; reads only internal counters. -------------
-  function setStatus(message) { const el = status(); if (el) el.textContent = message; }
+  function setStatus(message) { document.querySelectorAll(".live-demo-status").forEach((el) => { el.textContent = message; }); }
+  function setDeadStatus(on) { document.querySelectorAll(".live-demo-status").forEach((el) => el.classList.toggle("dead", on)); }
   function visibleText() { return demoPreview()?.innerText || ""; }
   function updateCount() { const el = count(); if (el) el.textContent = `${wordCount(visibleText())} words / characters`; }
 
@@ -804,7 +829,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoPauseUsed = false;
     internal.demoPhase = "complete";
     renderDemoEditor(followupContent());
-    setStatus("the pile is patient. it gets whatever you stop writing.");
+    setStatus("everything you stop writing joins the pile.");
   }
   function prepareDemoPlayback() {
     stopIntroTyping();
@@ -813,7 +838,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoPauseUsed = false;
     internal.typingIndex = 0;
     renderDemoEditor("");
-    setStatus("the pile is patient. it gets whatever you stop writing.");
+    setStatus("everything you stop writing joins the pile.");
   }
   function completeDemoPlayback() { restoreSeed({ markPlayed: true }); }
 
@@ -911,7 +936,7 @@ window.FirstLineLandingDemo = (() => {
     internal.typingIndex = 0;
     internal.introTyping = true;
     renderDemoEditor("");
-    setStatus("the pile is patient. it gets whatever you stop writing.");
+    setStatus("everything you stop writing joins the pile.");
     setDanger({ dangerSeconds: 0, dangerActive: false });
     resumeDemoPlayback();
   }
@@ -937,7 +962,7 @@ window.FirstLineLandingDemo = (() => {
   //     hesitation. Pure DOM plumbing around the page; no UI state lives here. -
   const FLOOD_CORPUS = [
     "dont delte this whatever you do",
-    "the first sentence is the worst sentence",
+    "the first sentence is still the only sentence",
     "why cant i just START",
     "~dear journal~ no wait",
     "ok ok ok think think",
@@ -946,7 +971,7 @@ window.FirstLineLandingDemo = (() => {
     "fix it LATER. later later later",
     "zero readers, and still i didnt start",
     "i had the idea and then it left",
-    "NOTE TO SELF: stop rereading line one",
+    "reread it nine times. sent zero",
     "unsent email no. 12\nre: nothing. hi.",
     "the good version needed one more week. it got none",
     "stopped editing mid-sentence. never resumed",
@@ -962,7 +987,7 @@ window.FirstLineLandingDemo = (() => {
     "almost. always almost",
     "waited for the muse. she was on break",
     "half a thought. the other half left",
-    "dear future me: this is as far as i got",
+    "dear future me: this page was never finished",
     "i was going to finish this one",
     "saved as draft. never opened again",
     "the second sentence killed it",
@@ -981,7 +1006,7 @@ window.FirstLineLandingDemo = (() => {
     "i highlighted it all. then what",
     "thoughts, unsorted, mostly loud",
     "stopped to find the perfect word. found nothing",
-    "this is the pile. you are in it."
+    "stopped mid-sentence, mid-thought, mid-everything"
   ];
   function mulberry32(a) {
     return function () {
@@ -1029,6 +1054,7 @@ window.FirstLineLandingDemo = (() => {
     const ctaBottom = ctaRow ? ctaRow.getBoundingClientRect().bottom + window.scrollY : 0;
     const heroTextTop = heroRect ? heroRect.top : 80;
     const heroTextBottom = Math.max(subRect ? subRect.bottom + window.scrollY + 58 : 0, ctaBottom + 12) || heroTextTop + 120;
+    const paperTop = blockRects.length ? Math.min.apply(null, blockRects.map((r) => r.top)) : heroTextBottom + 200;
 
     const regions = [];
     if (mobile) {
@@ -1051,6 +1077,8 @@ window.FirstLineLandingDemo = (() => {
       if (colL > 36) regions.push({ x: 0, y: 0, w: colL, h: H });
       if (W - colR > 36) regions.push({ x: colR, y: 0, w: W - colR, h: H });
       if (heroTextTop > 130) regions.push({ x: 20, y: 64, w: W - 40, h: heroTextTop - 80, faint: true });
+      // one band of mess directly in the reading axis, between the CTA and the paper
+      if (paperTop - heroTextBottom > 30) regions.push({ x: colL + 24, y: heroTextBottom + 8, w: colR - colL - 48, h: Math.min(44, paperTop - heroTextBottom - 10), axis: true });
     }
     if (!regions.length) return;
 
@@ -1073,11 +1101,11 @@ window.FirstLineLandingDemo = (() => {
           const f = document.createElement("span");
           f.className = "frag";
           f.innerHTML = fragHTML(nextText());
-          const fs = mobile ? 11 + rand() * 4 : 13 + rand() * 15;
-          const fo = reg.faint ? .05 + rand() * .05 : (mobile ? .07 + rand() * .07 : .09 + rand() * .09);
+          const fs = reg.axis ? 12 + rand() * 5 : (mobile ? 11 + rand() * 4 : 13 + rand() * 15);
+          const fo = reg.faint ? .05 + rand() * .05 : (reg.axis ? .14 + rand() * .08 : (mobile ? .07 + rand() * .07 : .09 + rand() * .09));
           const rot = (rand() * 10 - 5).toFixed(1);
           let fx;
-          if (reg.faint) fx = rand() * Math.max(40, reg.w - 200);
+          if (reg.faint || reg.axis) fx = rand() * Math.max(40, reg.w - 200);
           else if (mobile) fx = reg.w * (k / perRow) + rand() * (reg.w / perRow * .55) - 20;
           else if (reg.x === 0) fx = -40 + rand() * (reg.w * .6);
           else fx = reg.w * .2 + rand() * (reg.w * .9);
@@ -1089,6 +1117,37 @@ window.FirstLineLandingDemo = (() => {
           f.style.transform = `rotate(${rot}deg)`;
           host.appendChild(f);
         }
+      }
+    });
+  }
+  function layoutTrialFlood() {
+    const host = document.getElementById("trialFlood");
+    if (!host) return;
+    host.innerHTML = "";
+    const W = document.documentElement.clientWidth;
+    const H = Math.max(window.innerHeight, 480);
+    const rand = mulberry32(4242);
+    const bag = FLOOD_CORPUS.map((c, i) => i);
+    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = bag[i]; bag[i] = bag[j]; bag[j] = t; }
+    let bagIdx = 0;
+    const colW = Math.max(80, (W - 980) / 2);
+    [{ x: 0, w: colW }, { x: W - colW, w: colW }].forEach((g, gi) => {
+      const rows = Math.max(3, Math.floor(H / 120));
+      for (let r = 0; r < rows; r++) {
+        if (rand() < .35) continue;
+        const f = document.createElement("span");
+        f.className = "frag";
+        f.innerHTML = fragHTML(FLOOD_CORPUS[bag[bagIdx++ % bag.length]]);
+        const fs = 12 + rand() * 10;
+        const fo = .05 + rand() * .06;
+        const rot = (rand() * 8 - 4).toFixed(1);
+        const fx = gi === 0 ? -30 + rand() * (g.w * .5) : g.w * .3 + rand() * (g.w * .8);
+        f.style.left = (g.x + fx).toFixed(0) + "px";
+        f.style.top = (r * 120 + rand() * 50).toFixed(0) + "px";
+        f.style.fontSize = fs.toFixed(1) + "px";
+        f.style.setProperty("--fo", fo.toFixed(3));
+        f.style.transform = `rotate(${rot}deg)`;
+        host.appendChild(f);
       }
     });
   }
@@ -1126,9 +1185,10 @@ window.FirstLineLandingDemo = (() => {
     setupDemoPlayback();
     internal.draftIndex = Math.floor(Math.random() * demoDrafts.length);
     layoutFlood();
-    if (document.fonts?.ready) document.fonts.ready.then(layoutFlood);
+    layoutTrialFlood();
+    if (document.fonts?.ready) document.fonts.ready.then(() => { layoutFlood(); layoutTrialFlood(); });
     let floodResizeT = null;
-    window.addEventListener("resize", () => { window.clearTimeout(floodResizeT); floodResizeT = window.setTimeout(layoutFlood, 180); });
+    window.addEventListener("resize", () => { window.clearTimeout(floodResizeT); floodResizeT = window.setTimeout(() => { layoutFlood(); layoutTrialFlood(); }, 180); });
     bindSessionEditor(trialEl, "trial");
 
     // The live editor is editable from load. On fine-pointer devices it is also
@@ -1215,21 +1275,6 @@ if (document.readyState === "loading") {
 </script>
 <style>
   /* Zero Draft - Flood design system (design/DESIGN.md). */
-  @font-face {
-    font-family: "TsangerJinKai02";
-    src: url("assets/fonts/TsangerJinKai02-W04.ttf") format("truetype");
-    font-weight: 400;
-    font-style: normal;
-    font-display: swap;
-  }
-  @font-face {
-    font-family: "TsangerJinKai02";
-    src: url("assets/fonts/TsangerJinKai02-W05.ttf") format("truetype");
-    font-weight: 500;
-    font-style: normal;
-    font-display: swap;
-  }
-
   :root {
     --bg: #f1f0eb;
     --paper: #ffffff;
@@ -1239,9 +1284,8 @@ if (document.readyState === "loading") {
     --red: #c8392f;
     --line: rgba(23, 21, 15, .14);
     --line-strong: rgba(23, 21, 15, .25);
-    --serif: "Newsreader", Georgia, "Times New Roman", var(--cn), serif;
-    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, var(--cn), monospace;
-    --cn: "TsangerJinKai02";
+    --serif: "Newsreader", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     --radius: 3px;
   }
 
@@ -1353,6 +1397,7 @@ if (document.readyState === "loading") {
     color: var(--dim);
     margin-top: 16px;
   }
+  .hero-lead-sub s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
   .hero-action-block { margin-top: 30px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
   .hero-hint { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 14px; }
@@ -1361,7 +1406,7 @@ if (document.readyState === "loading") {
   .demo-writing-surface {
     position: relative;
     width: min(700px, 100%);
-    margin: 26px auto 0;
+    margin: 58px auto 0;
     background: var(--paper);
     border: 1px solid rgba(23, 21, 15, .2);
     border-radius: var(--radius);
@@ -1395,7 +1440,7 @@ if (document.readyState === "loading") {
   .clock { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; }
   body.danger .clock { color: var(--red); }
 
-  .demo-session-chrome { display: flex; align-items: center; }
+  .demo-session-chrome { display: flex; align-items: center; position: relative; }
   .demo-session-chrome[hidden] { display: none; }
   .demo-session-bar { display: flex; align-items: center; gap: 10px; }
   .demo-session-actions { display: flex; align-items: center; gap: 12px; }
@@ -1422,7 +1467,7 @@ if (document.readyState === "loading") {
     display: flex;
     align-items: center;
     gap: 10px;
-    max-width: min(420px, calc(100vw - 64px));
+    width: min(420px, calc(100vw - 64px));
     background: var(--paper);
     border: 1px solid rgba(23, 21, 15, .2);
     border-radius: var(--radius);
@@ -1490,8 +1535,10 @@ if (document.readyState === "loading") {
   .live-demo-editor {
     padding: 26px 30px 76px;
     min-height: 340px;
-    font-size: 19px;
-    line-height: 1.8;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.62;
+    letter-spacing: -.01em;
+    text-align: center;
     color: var(--ink);
     white-space: pre-wrap;
     overflow-wrap: break-word;
@@ -1506,7 +1553,7 @@ if (document.readyState === "loading") {
   .live-demo-editor:focus-visible { box-shadow: inset 0 0 0 2px rgba(23, 21, 15, .35); }
   .live-demo-editor .trial-thought {
     display: block;
-    min-height: 1.8em;
+    min-height: 1.62em;
     color: transparent;
     transition: color .3s ease, filter .3s ease;
   }
@@ -1528,23 +1575,24 @@ if (document.readyState === "loading") {
   .demo-writing-surface.is-live .live-demo-editor { opacity: 1; height: 100%; }
   .demo-writing-surface.is-live[hidden] { display: none; }
 
-  /* danger countdown: the moment the whole paper holds its breath */
+  /* danger countdown: in the margin at the line's height, never on the words */
   .live-demo-danger {
     position: absolute;
-    inset: 0;
+    left: var(--dx, 50%);
+    top: var(--dy, 38%);
     z-index: 6;
-    display: grid;
-    place-content: center;
-    justify-items: center;
-    gap: 12px;
+    transform: var(--dt, translate(-50%, -50%));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
     pointer-events: none;
-    text-align: center;
   }
   .live-demo-danger .danger-count {
     display: block;
     font-family: var(--mono);
     font-weight: 500;
-    font-size: clamp(110px, 16vw, 180px);
+    font-size: clamp(90px, 12vw, 140px);
     line-height: 1;
     color: var(--red);
     font-variant-numeric: tabular-nums;
@@ -1552,17 +1600,21 @@ if (document.readyState === "loading") {
   .live-demo-danger .danger-hint {
     display: block;
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: 10.5px;
     letter-spacing: .18em;
     text-transform: uppercase;
     color: var(--dim);
+    text-align: right;
+    line-height: 1.6;
+    max-width: 17ch;
+    text-shadow: 0 1px 10px rgba(255, 255, 255, .95), 0 0 24px rgba(255, 255, 255, .92);
   }
   body.danger .live-demo-editor, body.danger .demo-preview { opacity: .35; }
 
   /* ---------- result / failure: the card takes the paper's place ---------- */
   .demo-result, .demo-failure {
     width: min(700px, 100%);
-    margin: 26px auto 0;
+    margin: 58px auto 0;
   }
   .demo-result .trial-result-card,
   .demo-failure .trial-result-card {
@@ -1612,18 +1664,15 @@ if (document.readyState === "loading") {
   }
   .trial-download-link:hover { color: var(--ink); }
   .trial-failure-card { gap: 12px; }
+  .demo-failure .trial-result-card, .trial-failure .trial-result-card {
+    border-top: 2px solid var(--red);
+    box-shadow: 0 1px 0 rgba(23, 21, 15, .05);
+    border-radius: 0 0 var(--radius) var(--radius);
+  }
   .trial-failure-title {
     font-weight: 500;
     font-size: clamp(26px, 3vw, 34px);
     letter-spacing: -.01em;
-  }
-  .trial-failure-title::before {
-    content: "";
-    display: block;
-    width: 42px;
-    height: 2px;
-    background: var(--red);
-    margin: 0 auto 16px;
   }
   .trial-failure-copy { color: var(--dim); font-size: 15px; }
 
@@ -1647,6 +1696,7 @@ if (document.readyState === "loading") {
     color: var(--faint);
   }
   .live-demo-status { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .live-demo-status.dead { color: var(--red); }
   body.danger .live-demo-status { color: var(--red); }
   .live-demo-count { flex: none; font-variant-numeric: tabular-nums; }
   .demo-toast {
@@ -1847,7 +1897,26 @@ if (document.readyState === "loading") {
   }
   .trial-editor .trial-thought.is-previous { color: rgba(23, 21, 15, .3); }
   .trial-editor .trial-thought.is-current { color: var(--ink); }
-  .trial-editor.is-demo-danger { filter: blur(2px); opacity: .6; }
+  .trial-editor.is-demo-danger .trial-thought.is-current { color: rgba(23, 21, 15, .55); }
+  .trial-flood { z-index: 1; }
+  .trial-writing-surface { z-index: 2; }
+  .trial-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1003;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 24px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  .trial-count { flex: none; font-variant-numeric: tabular-nums; }
   .trial-editor .trial-thought[data-empty="true"]::before {
     content: "Start typing.";
     color: var(--faint);
@@ -1858,11 +1927,14 @@ if (document.readyState === "loading") {
 
   .trial-danger {
     position: fixed;
-    top: var(--trial-danger-y, 35%);
-    left: var(--trial-danger-x, 50%);
+    top: var(--dy, 35%);
+    left: var(--dx, 50%);
     z-index: 1004;
-    transform: translate(-50%, -50%);
-    text-align: center;
+    transform: var(--dt, translate(-50%, -50%));
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
     pointer-events: none;
     color: var(--red);
     text-shadow: 0 2px 24px rgba(255, 255, 255, .9), 0 2px 10px rgba(255, 255, 255, .9);
@@ -1871,19 +1943,22 @@ if (document.readyState === "loading") {
     display: block;
     font-family: var(--mono);
     font-weight: 500;
-    font-size: clamp(72px, 12vw, 130px);
+    font-size: clamp(96px, 12vw, 140px);
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
   .trial-danger .danger-hint {
     display: block;
-    margin-top: 12px;
+    margin-top: 0;
     font-family: var(--mono);
-    font-size: 11px;
+    font-size: 10.5px;
     letter-spacing: .18em;
     text-transform: uppercase;
     color: var(--dim);
-    text-shadow: 0 2px 12px rgba(255, 255, 255, .95);
+    text-align: right;
+    line-height: 1.6;
+    max-width: 17ch;
+    text-shadow: 0 2px 12px rgba(255, 255, 255, .95), 0 0 22px rgba(255, 255, 255, .92);
   }
 
   .trial-result, .trial-failure {
@@ -1931,8 +2006,11 @@ if (document.readyState === "loading") {
     .demo-writing-surface { min-height: 420px; }
     .paper-head { padding: 10px 12px; font-size: 9.5px; letter-spacing: .08em; }
     .demo-preview, .demo-placeholder { padding: 22px 20px 88px; font-size: 17px; }
-    .live-demo-editor { padding: 22px 20px 88px; font-size: 17px; min-height: 300px; }
-    .live-demo-danger .danger-count { font-size: 110px; }
+    .live-demo-editor { padding: 22px 20px 88px; font-size: 18px; min-height: 300px; }
+    .live-demo-danger { gap: 8px; }
+    .live-demo-danger .danger-count { font-size: 84px; }
+    .live-demo-danger .danger-hint { white-space: normal; max-width: 15ch; }
+    .trial-spec { display: none; }
     .demo-footer { flex-direction: column; gap: 4px; padding: 10px 12px; font-size: 9.5px; letter-spacing: .08em; }
     .live-demo-status { white-space: normal; }
     .feature-section { padding: 64px 20px; }
@@ -1953,12 +2031,13 @@ if (document.readyState === "loading") {
 <body
   data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false}}'
   data-computed:_session.clock="String(Math.floor($_session.remaining/60)).padStart(2,'0')+':'+String($_session.remaining%60).padStart(2,'0')"
+  data-computed:_session.liveWords="($_session.text.match(/[\u4e00-\u9fff]/g)||[]).length + ($_session.text.replace(/[\u4e00-\u9fff]/g,' ').match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[]).length"
   data-class:trial-mode="$_session.context === 'trial'"
   data-class:trial-complete="$_session.complete &amp;&amp; $_session.context === 'trial'"
   data-class:trial-failed="$_session.failed &amp;&amp; $_session.context === 'trial'"
   data-class:trial-morphing="$_session.morphing"
   data-class:danger="$_session.dangerActive"
-  data-on-interval__duration.250ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
+  data-on-interval__duration.100ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
   data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.context); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.context)"
   data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
   data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
@@ -1994,7 +2073,7 @@ if (document.readyState === "loading") {
               <div class="demo-body">
                 <div class="hero-copy">
                   <h1 id="hero-title" class="hero-lead">It's not supposed to be good yet.</h1>
-                  <p class="hero-lead-sub">So we made polishing impossible.</p>
+                  <p class="hero-lead-sub">So we made <s>polishing</s> impossible.</p>
                   <div class="hero-action-block">
                     <div class="hero-actions">
                       <a class="cta primary-cta" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Give it sixty seconds.</a>
@@ -2026,7 +2105,7 @@ if (document.readyState === "loading") {
                   <div class="demo-editor-stack">
                     <div class="demo-placeholder" aria-hidden="true">Click here. Type anything.<br>No deleting, no pasting, no undo.<br>Stop for eight seconds and it's gone.</div>
                     <div class="demo-preview" aria-hidden="true"></div>
-                    <div class="live-demo-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft live writing surface" spellcheck="false"></div>
+                    <div class="live-demo-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft live writing surface" spellcheck="false" tabindex="-1"></div>
                   </div>
                   <p class="live-demo-danger" data-show="$_session.dangerSeconds &gt; 0 &amp;&amp; $_session.context !== 'trial'" aria-live="polite" aria-atomic="true"><span class="danger-count" data-text="$_session.dangerSeconds"></span><span class="danger-hint">keep typing or the draft is deleted</span></p>
                 </div>
@@ -2059,7 +2138,7 @@ if (document.readyState === "loading") {
                   </div>
                 </section>
               </div>
-              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status">the pile is patient. it gets whatever you stop writing.</span><span class="live-demo-count">0 words / characters</span></div>
+              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status">everything you stop writing joins the pile.</span><span class="live-demo-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
               <p class="demo-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context !== 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
             </div>
           </section>
@@ -2095,8 +2174,10 @@ if (document.readyState === "loading") {
   </div>
   <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="Zero Draft writing trial" aria-hidden="true">
     <div class="trial-writing-surface">
+      <div class="flood trial-flood" id="trialFlood" aria-hidden="true"></div>
       <div class="trial-hud" aria-label="Trial status">
         <span class="trial-timer" data-text="$_session.clock">01:00</span>
+        <span class="trial-spec">forward only / 5s warn / 8s wipe / 60s</span>
         <div class="trial-hud-actions">
           <button type="button" class="trial-finish" title="Finish this draft (Cmd/Ctrl+Enter)" data-on:click="FirstLineLandingDemo.tryFinish($_session.text, $_session.context, $_session.startedAt)">Finish</button>
           <button type="button" class="trial-exit" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
@@ -2141,6 +2222,7 @@ if (document.readyState === "loading") {
         </div>
       </section>
       <p class="trial-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context === 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
+      <div class="trial-foot" aria-hidden="true"><span class="live-demo-status">everything you stop writing joins the pile.</span><span class="trial-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
     </div>
   </div>
   <script>

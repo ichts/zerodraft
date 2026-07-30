@@ -60,7 +60,7 @@ Scale:
 - Countdown numeral: mono 500, `clamp(110px, 16vw, 180px)`, `text-align: center`.
 - Result metric: `clamp(72px, 9vw, 96px)` serif 500.
 
-Rules: headings use 500, never synthetic bold. All numerals `font-variant-numeric: tabular-nums`. Body weight 400. `::selection` as above. `-webkit-font-smoothing: antialiased`.
+Rules: headings use 500, never synthetic bold. All numerals `font-variant-numeric: tabular-nums`. Body weight 400. `::selection` as above. `-webkit-font-smoothing: antialiased`. CJK text deliberately falls back to the system serif (PingFang SC / Songti) - no bundled CJK face; TsangerJinKai02 belonged to the dead system and is banned.
 
 ## 5. The flood (signature layer)
 
@@ -99,7 +99,7 @@ The only clean thing on the page. Anatomy, top to bottom:
 
 ## 7. Danger choreography
 
-Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms, session 60s, tick 100ms.
+Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms, session 60s, tick 100ms. The ticker's authority is exactness.
 
 | Element | Idle/session | Danger (5-8s) | Wipe (8s) |
 |---|---|---|---|
@@ -107,7 +107,9 @@ Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms
 | Veil | transparent | red inset shadow, opacity 1, .35s | clears |
 | Paper | ink border | red border + red ring | sheet `blur(6px)` + opacity 0, .45s |
 | Sheet | full | opacity .35 | clears to empty |
-| Countdown | hidden | red numeral 3-2-1, scale-pulse per tick (180ms WAAPI), caption | hides |
+| Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
+
+The countdown never prints on top of the draft. It rides at the current line's height just left of the line start, or drops below the line when the margin is tight; the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
 | Clock | ink | red | resets after aftermath |
 | Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
 

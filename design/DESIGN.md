@@ -1,49 +1,176 @@
-# First Line Web Design System
+# Zero Draft Web Design System (Flood)
 
-This is the visual constitution for all web-facing pages in this repo. When in doubt, use Kami.
+This is the visual constitution for all web-facing pages in this repo. It supersedes the Kami system (kept in git history only). Every new page, component, section, or experiment must reference this document. The reference implementation is `design-demos/flood-v2.html`.
 
-## Direction
+## 1. Product soul
 
-First Line web pages should feel like a restrained Mac writing tool rendered as a warm document: quiet, legible, and serious. The landing should sell the writing constraint, not fill space with support copy.
+Zero Draft is a threat the user hires. Two pains created it:
 
-## Kami rules
+- Opening a notes app and writing nothing: the inner editor kills sentences before they land.
+- A head too full to articulate: the only way out is a stream-of-consciousness dump.
 
-- Canvas: parchment `#f5f4ed`, never pure white.
-- Accent: one ink blue `#1B365D`.
-- Neutrals: warm beige/ink only; no cool gray SaaS palette.
-- Shadows: ring and whisper paper shadows only; no hard floating cards.
-- Radii: controls `8px`; paper surfaces `16px`.
-- Type: serif-led hierarchy using Charter/Georgia/Iowan-style fonts plus TsangerJinKai02 for Chinese.
-- Shape language: document sections, paper panels, native controls. No pill buttons, decorative cards, gradients, blobs, or component-system ornaments.
-- Page rhythm follows upstream Kami: max-width around `1120px`, parchment body, `88px 64px 120px` desktop page padding, hero bottom hairline, and `48-72px` section rhythm.
-- Content lists are hairline rows, not floating cards. Use top/bottom borders for Trial, Privacy, FAQ, Help, and Status blocks.
+The 8-second deletion is a forcing mechanism: the gun must be faster than the inner editor. Stopping is death; forward motion is survival. The draft you produce is the words that escaped the graveyard.
 
-## Type scale
+Positioning line: **删掉草稿的不是这个工具，是你的停顿。纸堆就是证据。** (The tool does not delete your draft; your pause does. The pile is the evidence.)
 
-The hero is the only large display moment.
+Lineage: The Most Dangerous Writing App. Zero Draft adds a bounded 60-second session and an artifact you keep.
 
-- Hero title: `30-42px`, line-height about `1.32`, weight `500`.
-- Section title: `20-28px`, or `20-22px` on small phones when the hero compresses, line-height about `1.28`, weight `500`, max width around `22ch`.
-- Card title / FAQ question: `17-18px`, line-height about `1.35`, weight `500`.
-- Body and section note: `15-16px`, line-height `1.6-1.65`.
-- Kicker / metadata: `12-13px`, uppercase or compact only when it labels structure.
+What we are NOT: a gentle, comforting writing companion. Never soften the deletion into "compost" or reassurance. The threat keeps its teeth.
 
-Never reuse hero `h2` display sizes for support, FAQ, privacy, release, or help sections.
+### Voice
 
-## Section rules
+Short, plain sentences about mechanism and consequence. Direct labels: "Start typing", "Keep writing", "Draft deleted". Banned registers: therapeutic, ceremonial, self-help ("honest sentence", "begin when you are ready", "honor your practice"), product advertising inside the graveyard, and any copy that says deletion is okay.
 
-- Extra sections are allowed only when they answer a real user question. Do not add trial, legal, help, privacy, or release blocks just to make the page feel complete.
-- FAQ should be short: usually 2-4 questions such as privacy, trial sessions, and draft recovery.
-- Sections should read like a product document: quiet dividers, clear text, low-density layout.
-- Do not add a new visual motif for each section.
-- Keep anchors discoverable, but links should look like editorial text links, not navigation pills.
-- Do not rotate cards, stagger cards, add card walls, or use repeated lifted panels for support content.
-- The landing should have one strong product claim, one writing/demo surface, and at most a small FAQ/footer unless the product surface truly needs more.
+## 2. Design principles
 
-## Verification checklist
+1. **Messy, urgent, raw - never calm or polished.** The old Kami system (parchment, serif serenity, ink blue, printable composure) is dead. This app is a mess in progress.
+2. **Copy appears at the moment it explains.** Hero keeps one hook + one CTA. Mechanism lives as spec annotations on the paper. Rules sit beside the objects they constrain. Payoff waits below. No paragraph where a glance works.
+3. **Danger is the dramatic climax and must be felt in the body,** not read in small text. Every screen needs a danger state that changes the environment, not just a widget.
+4. **The pile does three jobs and no more.** It is the only non-calm element (tone). It reframes nothing - it warns (the graveyard is where stopped drafts go). It replaces a paragraph of persuasion (quantity without judgment, shown not said).
+5. **Threat grammar, applicable to any future concept:** the threat is visible at rest, it advances continuously through the silence window, it is violent at the end, and a single keystroke reverses it instantly.
 
-- The first thing seen is the product claim and writing surface, not support content.
-- Section headings are visibly below the hero title in scale.
-- Buttons use `8px` control radius.
-- Paper surfaces/cards use `16px` paper radius.
-- Browser QA checks desktop, mobile, anchors, trial launch, console errors, and horizontal overflow.
+## 3. Color
+
+| Token | Value | Use |
+|---|---|---|
+| `--bg` | `#f1f0eb` | Page canvas. Neutral bone, never parchment, never beige-calm. |
+| `--paper` | `#ffffff` | The one clean surface. Only the paper and result/payoff cards. |
+| `--ink` | `#17150f` | Text, primary buttons, borders. |
+| `--dim` | `#6b665b` | Secondary text, chrome labels. |
+| `--faint` | `#b3ada0` | Placeholders, captions, annotations. |
+| `--red` | `#c8392f` | Danger. See the discipline below. |
+
+Red discipline: `#c8392f` means danger, deletion, or a graveyard mark. The only pre-approved non-danger uses are the wordmark underscore, strikethroughs inside fragments, the raw-card tag, and the payoff arrow - all deletion-adjacent. Never spend red on decoration, links, success, or generic accents. UI feedback (copied/saved) uses ink. Blue usage: zero. Selection: `rgba(200,57,47,.22)` (blood-adjacent by nature, allowed).
+
+Shadows: whisper + one diffuse layer max on the paper (`0 1px 0 rgba(23,21,15,.06), 0 24px 60px rgba(23,21,15,.1)`). No hard floating cards, no colored glows outside danger. Danger glow: `0 0 0 4px rgba(200,57,47,.08)` plus the veil (`inset 0 0 140px rgba(200,57,47,.3), inset 0 0 40px rgba(200,57,47,.12)`).
+
+## 4. Typography
+
+Two families, no more.
+
+- **Newsreader** (serif): the human layer. H1/H2 weight 500, draft text and result metric weight 400-500, placeholders italic.
+- **IBM Plex Mono**: the machine layer. Fragments, spec annotations, status lines, buttons, clocks, countdown, corpus. Chrome labels uppercase with `.12-.18em` tracking.
+
+Scale:
+
+- H1: `clamp(40px, 5.4vw, 64px)`, line-height 1.06, letter-spacing `-.015em`, `text-wrap: balance`.
+- Lead italic: `clamp(17px, 2vw, 21px)`, `--dim`.
+- Draft on paper: 19px / 1.8 (mobile 17px).
+- Chrome labels: 10-10.5px mono uppercase (mobile 9-9.5px, tracking `.08em`).
+- Countdown numeral: mono 500, `clamp(110px, 16vw, 180px)`, `text-align: center`.
+- Result metric: `clamp(72px, 9vw, 96px)` serif 500.
+
+Rules: headings use 500, never synthetic bold. All numerals `font-variant-numeric: tabular-nums`. Body weight 400. `::selection` as above. `-webkit-font-smoothing: antialiased`.
+
+## 5. The flood (signature layer)
+
+An `aria-hidden` texture layer under `.page` (z-index 0): dozens of mono fragments - fossils of drafts that died of hesitation. It is the graveyard made visible and the only non-calm element at rest.
+
+Corpus register (hard rule): every line is a fossil of hesitation - abandoned, interrupted, rationalized, never finished. Typos welcome. `~strike~` for editor kills. Allowed: "saved as draft. never opened again", "rewrite of the rewrite of the openin", "i paused to check my phone. that was it", "written in my head on the train,\ngone by the platform". Banned: comfort ("the good version is in here somewere" read as hope), writing advice, self-help, product slogans ("if i stop moving this page dies"), proud output ("this is bad but its SOMETHING").
+
+Layout algorithm (JS, seeded RNG, re-run on debounced resize and `document.fonts.ready`):
+
+- Protect the clean column: the paper, the payoff block, and the hero text measured by a `Range` over the h1 (true text width, not block width).
+- Desktop: fragments live only in the left/right gutters beside the clean column (regions are `overflow: hidden` so fragments clip at the column edge - the mess continues "under" the clean sheet) plus one faint full-width band above the hero.
+- Mobile (<700px): fragments live in horizontal bands in the gaps between clean blocks (nav-hero, hero-paper, paper-payoff, below payoff), smaller and sparser; never behind the paper or the hero CTA row.
+- Stratified rows (~96px desktop, 60px mobile) with jitter; corpus shuffled without repeats; sizes 13-28px (mobile 11-15px); rotation ±5deg; opacity `.09-.18` via `--fo` (mobile `.07-.14`, top band `.05-.10`).
+
+States:
+
+- Danger: all fragments `color: var(--red)` and `opacity: min(var(--fo)*3.4, .5)` with a .5s transition - the graveyard closes in.
+- Wipe (joinPile): the lost draft (first ~64 chars, whitespace-collapsed) becomes a new fragment near the paper: red flash at .85 opacity, then settles over 1.6s to faint ink, persisting for the visit in a separate `.flood-joined` layer. "gone. it joined the pile." is a warning, delivered deadpan.
+- No float, drift, or pulse animations. The pile is dead things; dead things do not move.
+
+## 6. The paper (the tool)
+
+The only clean thing on the page. Anatomy, top to bottom:
+
+1. **Spec header inside the paper** (border-bottom): rules attached to the object they constrain - `forward only / 5s warn / 8s wipe / 60s` (slashes in red) left; `Finish ->` (hidden until session) + `T-01:00` clock right. Never put the rules outside the paper.
+2. **Sheet** (`contenteditable`, role textbox multiline): Newsreader 19/1.8, `pre-wrap`, `word-break: break-word`, no outline except `:focus-visible { box-shadow: inset 0 0 0 2px rgba(23,21,15,.35) }`.
+3. **Placeholder** carries the mechanism, italic faint, exactly: "Click here. Type anything. / No deleting, no pasting, no undo. / Stop for eight seconds and it's gone."
+4. **Countdown overlay** (danger only): red mono numeral centered + caption "keep typing or the draft is deleted", `aria-live="polite"`, `pointer-events: none`.
+5. **Footer status line** (border-top): the narrator. Approved lines only:
+   - Idle: "the pile is patient. it gets whatever you stop writing."
+   - Session: "forward only. don't stop."
+   - Blocked action (deny): "no going back." (1.2s, plus a 2px paper shake, 160ms)
+   - Wipe: "gone. it joined the pile." in red, durable until the next session starts.
+   - Right tag: "fwd only".
+6. **Result card** (covers the paper): serif metric `N`, label "words you would not have written", sub "session: Ns - forward only", actions in this order: **Copy full text (primary, ink)**, Copy for AI (ghost), Download .md (ghost), Go again (ghost). On finish: Finish button hides, focus lands on the primary action. Copy for AI = cleanup prompt + raw text via `navigator.clipboard`; Download .md via Blob.
+
+## 7. Danger choreography
+
+Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms, session 60s, tick 100ms.
+
+| Element | Idle/session | Danger (5-8s) | Wipe (8s) |
+|---|---|---|---|
+| Fragments | faint ink | red, opacity x3.4 cap .5, .5s ease | one new fragment joins (see §5) |
+| Veil | transparent | red inset shadow, opacity 1, .35s | clears |
+| Paper | ink border | red border + red ring | sheet `blur(6px)` + opacity 0, .45s |
+| Sheet | full | opacity .35 | clears to empty |
+| Countdown | hidden | red numeral 3-2-1, scale-pulse per tick (180ms WAAPI), caption | hides |
+| Clock | ink | red | resets after aftermath |
+| Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
+
+Recovery: one keystroke clears danger instantly (all classes off, no lingering transitions). After wipe the "gone" message and "Draft deleted" placeholder persist until the user starts again - deletion has a durable consequence, not a 2-second flash.
+
+Demo preview (the page teaches before the user touches it): types the sample once (~30-76ms jitter per char), holds ~5.2s so the decay is felt, shows the danger beat ~2.8s, recovers, then stays static forever. Pauses while offscreen (`IntersectionObserver`, threshold .15) or `document.hidden`; the preview clock only advances while unpaused. Any real input (keydown anywhere, click, IME start) interrupts permanently and clears the sample. Under `prefers-reduced-motion` the completed sample renders statically and nothing ever plays.
+
+## 8. Motion rules
+
+- One-shot only. No ambient loops, ever - no floating, pulsing, shimmering, drifting.
+- Transition budget: interactions `.12-.18s`, state changes `.3-.5s`, wipe ≤ `.62s`. Easing: `ease`/`ease-out`; falls may use `cubic-bezier(.55,0,.85,.36)`.
+- `prefers-reduced-motion: reduce`: all transitions and animations off globally (`* { transition: none !important; animation: none !important }`), color changes remain (danger still turns red), wipe is instant, demo renders static, `scroll-behavior: auto`.
+- Focus-visible everywhere: `2px solid var(--ink)`, offset 2-3px. Never remove outlines.
+
+## 9. Interaction contract
+
+- **First keystroke anywhere starts the session.** A document-level `keydown` (target is body, printable key, no modifiers) synchronously focuses the sheet inside the keystroke so the browser and IME route input to the editor. The page IS the tool; no click required.
+- **Forward-only guards** on `beforeinput`: block `delete*`, `historyUndo/Redo`, `insertFromPaste/Drop/Yank/ReplacementText/Transpose`; allow `insertText/Paragraph/LineBreak/CompositionText` only with a collapsed caret at the very end (`caretAtEnd()`); `paste/cut/drop` prevented. Every block fires the deny nudge ("no going back." + 2px shake) and restores the caret to the end.
+- **IME composition works.** Track `compositionstart/end`; never rewrite the sheet DOM during composition; sync the model on `compositionend`.
+- During live typing the browser owns the sheet DOM (flood renders plain text); styled layers may only rebuild the DOM outside composition and always restore the caret to the end.
+- Cmd/Ctrl+Enter finishes, Finish button finishes, 60s auto-finishes. Finish hides the Finish control and focuses the primary action.
+- No localStorage, no session history, no streaks. The visit remembers nothing except joined fragments (in-DOM only).
+
+## 10. Copy placement map
+
+| Place | Approved copy | Nothing else |
+|---|---|---|
+| Hero | "It's not supposed to be good yet." / "So we made polishing impossible." / CTA "Give it sixty seconds." + hint "or just click the paper and type" | No mechanism, no rules, no kicker |
+| Spec header | "forward only / 5s warn / 8s wipe / 60s" | - |
+| Placeholder | "Click here. Type anything. / No deleting, no pasting, no undo. / Stop for eight seconds and it's gone." | - |
+| Payoff | kicker "What comes out", H2 "Raw goes in. A draft comes back.", raw card (typos: "ok thesis is peopel dont lack ideas they lack permission...") -> clean card ("People don't lack ideas - they lack permission..."), caption "The shaping happens in whatever AI you already use. Copy for AI puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point." | - |
+| Result | "N words you would not have written", "session: Ns - forward only" | - |
+| Footer | "Zero Draft - the draft before the draft", "your writing never leaves this page" | - |
+
+No em dash (U+2014) and no en dash (U+2013) anywhere in code or copy. Use hyphens.
+
+## 11. Layout and responsive
+
+- `.wrap` max-width 1120px, padding 32px (mobile 20px). Paper `min(700px, 100%)`, min-height 460px (mobile 420px).
+- Hero centered, padding 52/26 desktop (40/22 mobile); paper zone padding 24/84 desktop.
+- Breakpoints: 820px (payoff stacks, arrow rotates, hero compresses, paper-foot stacks, spec label 9.5px) and 700px (flood switches to band mode).
+- `overflow-x: hidden` on body; verify `scrollWidth <= viewport` at 390px.
+- Payoff cards: raw = mono 13.5px dashed border, rotate(-.5deg); clean = white paper card, rotate(.4deg). One mild rotation each; never more.
+
+## 12. Anti-patterns (instant rejection)
+
+- Parchment/beige calm, ink blue, Kami tokens, Charter/TsangerJinKai type.
+- SaaS tropes: pill buttons, feature card grids, gradient blobs, icon rows, dashboard chrome, centered success panels.
+- Comfort or therapy copy; reassuring the user about deletion.
+- Ambient animation of any kind; looping demos; parallax.
+- Product slogans or instructions inside the graveyard corpus.
+- More than two type families; synthetic bold; cool grays.
+- Explaining the pile's metaphor in body copy. It is felt through the wipe moment and the footer narrator, never lectured.
+
+## 13. Production port notes
+
+The production `index.html` is Datastar-native; the flood shell ports as skin only. `_session.*` signals stay the single UI truth on `<body>`; `window.FirstLineLandingDemo` stays the stateless browser bridge; JS writes state only by dispatching custom `fl*` events. The demo engine in `flood-v2.html` already mirrors that contract (contenteditable + beforeinput guards + composition flag + document-level first-keystroke), so behaviors port 1:1. The flood layer is an `aria-hidden` DOM layer under `.page`, driven by declarative `data-class` on the danger/complete signals. Zen rendering, the WAAPI morph to the fullscreen trial, and the `#trial` route are untouched. Read the repo AGENTS.md "Web architecture boundary" section before touching production.
+
+## 14. Verification checklist (run for every change)
+
+- Desktop 1440x1000 and mobile 390x844: hero / typed / danger / wipe aftermath / result; `scrollWidth` equals viewport; no console errors.
+- Forward-only: Backspace/Delete/Cmd+Z/X/V, paste, cut, drop, selection-replace all blocked with nudge; IME composes; first keystroke without click starts the session.
+- Demo: plays once, danger beat visible, static after; interrupt clears; hidden tab pauses; reduced-motion renders static.
+- Danger is felt in a full-page screenshot without reading any text.
+- `grep -n $'\u2014' and $'\u2013'` return nothing.
+- Focus ring visible on every interactive element; countdown announced via `aria-live`.

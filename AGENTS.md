@@ -23,12 +23,11 @@ These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do no
 - The trial provides an optional writing prompt behind a "Need a prompt?" toggle. Prompts are suggestions only; they never auto-insert text.
 - The trial does not persist writing statistics, session history, streaks, or any localStorage data. The result card shows only the current session's word count and duration.
 - On all devices, the landing paper shows the demo preview on load. The first keystroke interrupts the demo and starts a live session with no click required: focus is set synchronously inside that keystroke, so the browser and IME route input to the editor (this does not rely on load-time programmatic focus, which is unreliable in real browsers and for IME).
-- Clicking or tapping the paper also activates it - that is how touch users begin, so page load never summons the on-screen keyboard.
-- Activating the paper (first keystroke, click, tap, or Enter/Space while focused) stops any preview playback and turns the paper into an inline session editor with the same forward-only, 60-second, 5-second/8-second contract.
-- An inline session renders zen-style like the fullscreen trial: only the current line is fully visible, the previous line is faint, older lines are transparent, and the current line stays anchored at a fixed point (38% of the paper height) via internal scrolling - the window does not scroll. Result and failure cards render inline in place of the paper. Starting the fullscreen trial from an active inline session carries the draft and remaining time into the fullscreen editor; otherwise the fullscreen trial starts fresh.
+- The landing paper is a preview and an invitation, not the writing room. The first keystroke (or click/tap on the paper) arms the session for one frame, then the handoff WAAPI morph carries the draft and the remaining time into the fullscreen trial. Keys struck mid-morph are buffered and replayed into the trial editor after focus lands. The inline embedded session is a transient arming step, never a destination; IME composition finishes inline before the morph triggers.
+- A writing session renders zen-style in the fullscreen trial: only the current line is fully visible, the previous line is faint, older lines are transparent, and the current line stays anchored at a fixed point (~35% of the viewport height) via internal scrolling - the window does not scroll. Result and failure render over the trial surface.
 - The landing page is the tool: no practice or privacy sections below the hero. The footer carries the one-line privacy promise and the support links.
 - The landing preview (touch devices and the reference animation) uses motion to explain that contract. It should type once when the writing surface enters view, pause long enough to show the real 5-second danger threshold, recover before deletion, and then remain static. Activating the paper stops playback permanently for the visit.
-- Never turn the landing preview into an ambient loop. Pause its timeline while offscreen or while the document is hidden, finish it when entering the trial, and render the completed static draft under `prefers-reduced-motion`. A live inline session never pauses: silence danger and deletion keep running while offscreen or hidden.
+- Never turn the landing preview into an ambient loop. Pause its timeline while offscreen or while the document is hidden, finish it when entering the trial, and render the completed static draft under `prefers-reduced-motion`. A live session never pauses: silence danger and deletion keep running while offscreen or hidden.
 
 ## Web architecture boundary
 
@@ -39,7 +38,7 @@ Runtime on the landing/trial surface: Datastar Pro v1.0.2 (`datastar-pro.js`, lo
 - `window.FirstLineLandingDemo` is a stateless browser-bridge module. It holds no UI state (only genuinely non-UI plumbing: the IME composition flag, timers and observers, demo animation timeline counters, focus return references, and WAAPI/geometry state). Bridge contract:
   - READ UI state from the DOM (element text, the `body.trial-mode` / `.demo-writing-surface.is-live` / `body.trial-morphing` classes (all declarative `data-class`, mirroring `_session.context`/`_session.morphing`), and contenteditable state) or from values passed in by expressions; never from the signal store directly.
   - WRITE UI state by dispatching custom `fl*` DOM events on `document.body` (e.g. `flinput`, `flactivate`, `flentertrial`, `flexittrial`, `flcomplete`, `flfail`, `fldanger`, `fltoast`, `flprompt*`, `flreset`, `flmorphing`, `flroutecheck`). The matching `data-on:fl*` expressions on `<body>` translate each event's `evt.detail` into signal patches.
-- The session ticker is a `data-on-interval__duration.250ms` expression that reads signals and calls the pure `FirstLineLandingDemo.tickDispatch(...)` helper, which dispatches `flcomplete` / `flfail` / `fldanger`. Pure helpers called from expressions are allowed; they must be stateless.
+- The session ticker is a `data-on-interval__duration.100ms` expression that reads signals and calls the pure `FirstLineLandingDemo.tickDispatch(...)` helper, which dispatches `flcomplete` / `flfail` / `fldanger`. Pure helpers called from expressions are allowed; they must be stateless.
 - DOM side-effects of state transitions (blur, contenteditable toggle, focus move, inline chrome hide) run in `FirstLineLandingDemo.onComplete` / `onFail`, invoked from `data-effect` expressions that watch `_session.complete` / `_session.failed`.
 - Custom JavaScript remains only for browser-only capabilities: contenteditable selection and forward-only guards, IME composition, the zen renderer, the WAAPI morph, clipboard and Blob download, and the demo typing sequencer. The session editor subtree carries `data-ignore` so Datastar does not fight the zen-rendered contenteditable DOM; the editors' `is-demo-danger` class is therefore applied imperatively by the bridge while the writing-surface class is declarative (`data-class`).
 - `datastar-inspector.js` is a dev-only tool. It is loaded and the `<datastar-inspector>` element is mounted only when the page is opened with `?debug`; it is never present in production markup.
@@ -53,21 +52,20 @@ Runtime on the landing/trial surface: Datastar Pro v1.0.2 (`datastar-pro.js`, lo
 - Take inspiration from the uninterrupted-output idea behind 750 Words, but do not imply an affiliation or claim features such as streaks, history, accounts, or analytics.
 - Avoid therapeutic, ceremonial, or self-help language such as "honest sentence", "long practice", or "begin when you are ready". Prefer direct labels such as "Start typing", "Keep writing", and "Draft deleted".
 
-## Kami visual system
+## Visual system: Flood (landing) and Kami heritage (supporting pages)
 
-All current web-facing pages use Kami by default:
+The landing page uses the Flood design system defined in `design/DESIGN.md` - that document is the visual constitution for all landing work (tokens, the fossil layer rules, paper anatomy, danger choreography, motion rules, anti-patterns). Read it before changing landing markup or CSS. Its short form:
 
-- parchment canvas `#f5f4ed`
-- ivory surface `#faf9f5` and warm-sand control surface `#e8e6dc`
-- ink-blue accent `#1B365D`, with lighter interactive blue `#2D5A8A`; blue should occupy no more than roughly 5% of the page
-- near-black `#141413`, dark warm `#3D3D3A`, olive `#504e49`, and stone `#6b6a64`; never introduce cool gray
-- serif-led hierarchy and warm neutrals; body uses weight 400 and headings use weight 500 rather than synthetic bold
-- title line-height 1.1-1.3 and reading line-height 1.5-1.55 unless the writing surface needs more room
-- ring or whisper shadows only
-- control radius `8px` and paper radius `16px`
-- restrained, document-like sections
+- canvas: neutral bone `#f1f0eb` (never parchment); the paper is the only clean white surface
+- the background is flooded with aria-hidden mono fossils of drafts that died of hesitation, confined to gutters and small bands outside the clean column; danger turns them red
+- Newsreader (human layer) + IBM Plex Mono (machine layer); red `#c8392f` is reserved for danger and deletion-adjacent marks; blue usage is zero
+- danger is environmental: red veil, reddened fossils, a countdown that hangs above the current line and never prints on top of the draft
+- a wiped draft joins the pile: its first ~64 chars become a new fossil, and the narrator line turns durable red until the next session
+- one-shot motion only; no ambient loops; `prefers-reduced-motion` renders everything static
 
-Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray palettes, or decorative component systems. Footer, FAQ, help, privacy, and release sections must serve a real support, legal, or release need and remain visually consistent with Kami.
+The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) remain self-contained vanilla static pages on the retired Kami heritage (parchment, serif, ink blue). Do not migrate them to a framework or to Flood without explicit authorization.
+
+Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray palettes, or decorative component systems on any page. Footer, FAQ, help, privacy, and release sections must serve a real support, legal, or release need.
 
 ## Historical material
 
@@ -90,7 +88,7 @@ There is no automated root-web test suite. For web changes:
 - exercise the browser trial's typing, danger recovery, failure, completion, keyboard restrictions, and IME behavior when relevant
 - verify focus visibility and `prefers-reduced-motion` behavior for interaction or motion changes
 - verify visual layout consistency: hero content width and left edge must align with the footer; centered elements must be centered; text must not be clipped or orphaned; interactive elements must have consistent radius, color, and spacing
-- capture screenshots of every changed state (landing, demo animation stages, inline typed/danger/failure/complete, trial empty/typed/danger/failure/complete) and inspect them before reporting completion
+- capture screenshots of every changed state (landing hero, demo animation stages, trial typed/danger/failure/complete, morph handoff) and inspect them before reporting completion
 
 For native macOS work, follow the deeper instructions under `apps/macos/AGENTS.md` and `apps/macos/FirstLine/AGENTS.md`. From `apps/macos/FirstLine/`, run:
 

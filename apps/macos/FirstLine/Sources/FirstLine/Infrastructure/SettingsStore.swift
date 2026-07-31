@@ -146,7 +146,7 @@ struct AppSettings: Codable, Equatable {
 
     static let defaultValue = AppSettings(
         theme: .system,
-        defaultDuration: 300,
+        defaultDuration: SessionEngine.defaultDurationSeconds,
         immersiveSessionMode: true,
         reducedMotion: .system,
         trialSessionsUsed: 0,

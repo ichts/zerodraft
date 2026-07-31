@@ -42,25 +42,33 @@ struct PersistenceService {
 
     @MainActor
     func saveSuccessfulSession(from engine: SessionEngine) throws -> URL {
+        try saveSuccessfulSession(text: engine.text, elapsed: engine.elapsed, duration: engine.duration, wordCount: engine.wordCount, sessionID: engine.sessionID)
+    }
+
+    /// Immutable-snapshot variant: retries must not re-read a live engine that may
+    /// already host a newer session.
+    @MainActor
+    func saveSuccessfulSession(text: String, elapsed: TimeInterval, duration: TimeInterval, wordCount: Int, sessionID: UUID) throws -> URL {
         try fileManager.createDirectory(at: libraryDirectory, withIntermediateDirectories: true)
 
         let completedAt = Date()
-        let createdAt = completedAt.addingTimeInterval(-engine.elapsed)
+        let createdAt = completedAt.addingTimeInterval(-elapsed)
         let formatter = formatter
         let timestamp = formatter.string(from: completedAt).replacingOccurrences(of: ":", with: "-")
-        let fileURL = libraryDirectory.appendingPathComponent("\(timestamp)-first-line.md")
+        let uniqueSuffix = String(sessionID.uuidString.prefix(6).lowercased())
+        let fileURL = libraryDirectory.appendingPathComponent("\(timestamp)-\(uniqueSuffix)-first-line.md")
 
         let frontMatter = """
         ---
         id: \(UUID().uuidString)
         created_at: \(formatter.string(from: createdAt))
         completed_at: \(formatter.string(from: completedAt))
-        duration_seconds: \(Int(engine.duration))
-        word_count: \(engine.wordCount)
+        duration_seconds: \(Int(duration))
+        word_count: \(wordCount)
         app_version: \(appVersion)
         ---
 
-        \(engine.text)
+        \(text)
         """
 
         try frontMatter.write(to: fileURL, atomically: true, encoding: .utf8)

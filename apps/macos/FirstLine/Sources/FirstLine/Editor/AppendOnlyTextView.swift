@@ -11,6 +11,7 @@ import CoreText
 final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDelegate {
     var onCommittedText: ((String) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
+    var onDeny: (() -> Void)?
 
     private let compositionTopRatio: CGFloat = 0.35
     private let compositionBottomRatio: CGFloat = 0.65
@@ -92,6 +93,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteBackward(_ sender: Any?) {
         guard hasMarkedText() else {
+            onDeny?()
             return
         }
 
@@ -100,6 +102,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteForward(_ sender: Any?) {
         guard hasMarkedText() else {
+            onDeny?()
             return
         }
 
@@ -107,9 +110,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func cut(_ sender: Any?) {
+        onDeny?()
     }
 
     override func paste(_ sender: Any?) {
+        onDeny?()
+    }
+
+    override func readSelection(from pboard: NSPasteboard) -> Bool {
+        onDeny?()
+        return false
     }
 
     override func dragSelection(with event: NSEvent, offset: NSSize, slideBack: Bool) -> Bool {
@@ -128,6 +138,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             #selector(NSText.paste(_:)),
             #selector(NSResponder.deleteBackward(_:)),
             #selector(NSResponder.deleteForward(_:)),
+            #selector(NSResponder.deleteWordBackward(_:)),
+            #selector(NSResponder.deleteWordForward(_:)),
+            #selector(NSResponder.deleteToBeginningOfLine(_:)),
+            #selector(NSResponder.deleteToEndOfLine(_:)),
+            #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
+            #selector(NSResponder.deleteToEndOfParagraph(_:)),
+            #selector(NSResponder.yank(_:)),
+            #selector(NSResponder.transpose(_:)),
         ]
 
         if blocked.contains(item.action ?? Selector(("_noop:"))) {

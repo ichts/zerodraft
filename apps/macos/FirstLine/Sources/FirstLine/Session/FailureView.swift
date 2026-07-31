@@ -11,28 +11,63 @@ struct FailureView: View {
     @Bindable var appState: AppState
 
     var body: some View {
-        VStack(spacing: FirstLineSpacing.md) {
-            Text("The draft is gone.")
-                .font(FirstLineTypography.title)
-                .foregroundStyle(FirstLineColors.danger)
+        ZStack {
+            VStack(spacing: 0) {
+                Rectangle()
+                    .fill(FirstLineColors.danger)
+                    .frame(height: 2)
+                    .frame(maxWidth: .infinity)
 
-            Text("Eight seconds of silence. That is the rule.")
-                .font(FirstLineTypography.body)
-                .foregroundStyle(FirstLineColors.ui)
+                VStack(alignment: .leading, spacing: FirstLineSpacing.sm) {
+                    Spacer(minLength: FirstLineSpacing.lg)
 
-            HStack(spacing: FirstLineSpacing.md) {
-                Button("Try Again") {
-                    appState.startSession()
+                    Text("Draft deleted.")
+                        .font(FirstLineTypography.title.weight(.medium))
+                        .foregroundStyle(FirstLineColors.ink)
+
+                    Text("You stopped for eight seconds. It joined the pile.")
+                        .font(FirstLineTypography.body)
+                        .foregroundStyle(FirstLineColors.ui)
+
+                    HStack(spacing: FirstLineSpacing.md) {
+                        Button("Try Again") {
+                            appState.startSession()
+                        }
+                        .buttonStyle(FirstLinePrimaryButtonStyle())
+
+                        Button("Back to Home") {
+                            appState.goHome()
+                        }
+                        .buttonStyle(FirstLineSecondaryButtonStyle())
+                    }
+                    .padding(.top, FirstLineSpacing.xs)
+
+                    Spacer()
                 }
-                .buttonStyle(FirstLinePrimaryButtonStyle())
+                .padding(.horizontal, 48)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                Button("Back to Home") {
-                    appState.goHome()
-                }
-                .buttonStyle(FirstLineSecondaryButtonStyle())
+            // the joined fossil: first 64 chars of the wiped draft, dead at the margin
+            if let fossil = joinedFossil {
+                Text(fossil)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(FirstLineColors.ink.opacity(0.14))
+                    .rotationEffect(.degrees(3))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 64)
+                    .allowsHitTesting(false)
             }
         }
-        .padding(FirstLineSpacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var joinedFossil: String? {
+        let text = appState.sessionEngine.wipedText
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard text.isEmpty == false else { return nil }
+        return String(text.prefix(64))
     }
 }

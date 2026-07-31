@@ -11,8 +11,6 @@ struct SettingsView: View {
     @Bindable var appState: AppState
     @State private var settingsLicenseKeyInput: String = ""
 
-    private let durationOptions: [TimeInterval] = [180, 300, 600, 900, 1500]
-
     var body: some View {
         Form {
             Section("Appearance") {
@@ -36,13 +34,11 @@ struct SettingsView: View {
             }
 
             Section("Session") {
-                Picker("Default Duration", selection: Binding(
-                    get: { appState.settings.defaultDuration },
-                    set: { appState.updateDefaultDuration($0) }
-                )) {
-                    ForEach(durationOptions, id: \.self) { duration in
-                        Text("\(Int(duration / 60)) min").tag(duration)
-                    }
+                HStack {
+                    Text("Duration")
+                    Spacer()
+                    Text("60 seconds. Fixed.")
+                        .foregroundStyle(FirstLineColors.ui)
                 }
 
                 Toggle("Immersive Session Mode", isOn: Binding(
@@ -125,13 +121,13 @@ struct SettingsView: View {
             if let error = appState.licenseActivationError {
                 Text(error.errorDescription ?? "Activation failed.")
                     .font(FirstLineTypography.microcopy)
-                    .foregroundStyle(FirstLineColors.danger)
+                    .foregroundStyle(FirstLineColors.ink)
             }
 
             if appState.licenseActivationJustSucceeded {
                 Text("License active. Return to writing.")
                     .font(FirstLineTypography.microcopy)
-                    .foregroundStyle(FirstLineColors.success)
+                    .foregroundStyle(FirstLineColors.ink)
             }
 
             Button("Open Buy page") {

@@ -86,7 +86,7 @@ struct EditorFocusTests {
 
         #expect(commaFont.fontName == wordFont.fontName)
         #expect(commaFont.fontName == periodFont.fontName)
-        #expect(commaFont.fontName.localizedCaseInsensitiveContains("Light"))
+        #expect(commaFont.fontName.localizedCaseInsensitiveContains("Newsreader"))
         #expect(commaFont.pointSize < wordFont.pointSize)
         #expect(commaColor.alphaComponent == wordColor.alphaComponent)
     }
@@ -299,7 +299,7 @@ struct EditorFocusTests {
         let boundaryKern = try #require(storage.attribute(.kern, at: 11, effectiveRange: nil) as? CGFloat)
 
         #expect(textView.string == "飘扬在qianxiong 不怕")
-        #expect(boundaryKern < -10)
+        #expect(boundaryKern < 0)
     }
 
     @Test
@@ -319,6 +319,77 @@ struct EditorFocusTests {
         let after = try glyphBaselineY(in: textView, characterIndex: 0)
 
         #expect(abs(before - after) < 0.5)
+    }
+
+    @Test
+    func blockedEditingCommandsAreNotValidated() {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+
+        let blockedSelectors: [Selector] = [
+            #selector(NSResponder.deleteWordBackward(_:)),
+            #selector(NSResponder.deleteWordForward(_:)),
+            #selector(NSResponder.deleteToBeginningOfLine(_:)),
+            #selector(NSResponder.deleteToEndOfLine(_:)),
+            #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
+            #selector(NSResponder.deleteToEndOfParagraph(_:)),
+            #selector(NSResponder.yank(_:)),
+            #selector(NSResponder.transpose(_:)),
+            #selector(NSResponder.deleteBackward(_:)),
+            #selector(NSResponder.deleteForward(_:)),
+            #selector(UndoManager.undo),
+            Selector(("redo:")),
+            #selector(NSText.cut(_:)),
+            #selector(NSText.paste(_:)),
+        ]
+
+        for selector in blockedSelectors {
+            let item = NSMenuItem(title: "test", action: selector, keyEquivalent: "")
+            #expect(textView.validateUserInterfaceItem(item) == false,
+                    "Expected \(NSStringFromSelector(selector)) to be blocked")
+        }
+    }
+
+    @Test
+    func deleteBackwardWithoutMarkedTextDeniesViaClosure() {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        #expect(textView.hasMarkedText() == false)
+
+        var denied = false
+        textView.onDeny = { denied = true }
+        textView.deleteBackward(nil)
+
+        #expect(denied)
+    }
+
+    @Test
+    func deleteBackwardDuringCompositionDoesNotDeny() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.setMarkedText(
+            "abc",
+            selectedRange: NSRange(location: 3, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        try #require(textView.hasMarkedText())
+
+        var denied = false
+        textView.onDeny = { denied = true }
+        textView.deleteBackward(nil)
+
+        #expect(denied == false)
+    }
+
+    @Test
+    func readSelectionFromPasteboardRefusesAndDenies() {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        var denied = false
+        textView.onDeny = { denied = true }
+
+        let pboard = NSPasteboard(name: NSPasteboard.Name("fl-editor-test"))
+        let accepted = textView.readSelection(from: pboard)
+
+        #expect(accepted == false)
+        #expect(denied)
     }
 
     private func caretRect(for textView: AppendOnlyTextView) throws -> NSRect {

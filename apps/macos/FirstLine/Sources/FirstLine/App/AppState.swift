@@ -31,7 +31,7 @@ final class AppState {
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
 
     var selectedSurface: Surface = .home
-    var selectedDuration: TimeInterval = 300
+    var selectedDuration: TimeInterval = SessionEngine.defaultDurationSeconds
     let sessionEngine: SessionEngine
     let persistenceService: PersistenceService
     let settingsStore: SettingsStore
@@ -49,6 +49,9 @@ final class AppState {
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
 
+    /// 已写盘的 sessionID，确保每场成功 session 只调用一次 saveSuccessfulSession，防止 ticking 重复触发。
+    private var lastPersistedSessionID: UUID?
+
     init(
         sessionEngine: SessionEngine = SessionEngine(),
         persistenceService: PersistenceService = PersistenceService(),
@@ -64,10 +67,21 @@ final class AppState {
         self.installIDStore = installIDStore
         self.clock = clock
         self.settings = (try? settingsStore.load()) ?? .defaultValue
-        self.selectedDuration = self.settings.defaultDuration
+        // Fixed 60s contract: legacy persisted durations are superseded by the engine constant.
+        self.selectedDuration = SessionEngine.defaultDurationSeconds
+        if settings.defaultDuration != SessionEngine.defaultDurationSeconds {
+            settings.defaultDuration = SessionEngine.defaultDurationSeconds
+        }
 
         refreshLibrary()
         launchInitialSurface()
+
+        // onStateChange 由 @MainActor 的 engine 方法触发，始终运行在主线程；用它观察 success 迁移可同时覆盖 timer 与编辑器两条触发路径。
+        sessionEngine.onStateChange = { [weak self] phase in
+            MainActor.assumeIsolated {
+                self?.persistSuccessfulSessionOnSuccess(phase)
+            }
+        }
     }
 
     func startSession(duration: TimeInterval? = nil) {
@@ -78,7 +92,7 @@ final class AppState {
         }
 
         consumeTrialSessionIfNeeded()
-        let resolvedDuration = duration ?? selectedDuration
+        let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
         sessionEngine.start(duration: resolvedDuration)
         selectedSurface = .session
     }
@@ -99,7 +113,7 @@ final class AppState {
         if sessionEngine.phase == .writing || sessionEngine.phase == .danger {
             selectedSurface = .session
         } else {
-            startSession(duration: selectedDuration)
+            startSession()
         }
     }
 
@@ -158,6 +172,9 @@ final class AppState {
 
     func handleTick() {
         sessionEngine.tick()
+        if sessionEngine.phase == .success, lastPersistedSessionID != sessionEngine.sessionID {
+            persistSuccessfulSessionOnSuccess(sessionEngine.phase)
+        }
     }
 
     func updateTheme(_ theme: AppTheme) {
@@ -283,6 +300,57 @@ final class AppState {
 
     private func persistSettings() {
         try? settingsStore.save(settings)
+    }
+
+    /// 会话进入 success 时把草稿写盘一次；按 sessionID 去重，ticking 的重复状态回调不会二次写入。
+    private var saveRetryTask: Task<Void, Never>?
+
+    // Retries persist an immutable snapshot of the succeeded session, so a user
+    // who abandons or starts a new session before the retry can never have the
+    // wrong text saved or the new session's own save suppressed. One task, three
+    // attempts, no rescheduling from inside the loop.
+    private func scheduleSaveRetry(for id: UUID, snapshot: (text: String, elapsed: TimeInterval, duration: TimeInterval, wordCount: Int)) {
+        saveRetryTask?.cancel()
+        saveRetryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for _ in 0..<3 {
+                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                if Task.isCancelled { return }
+                if lastPersistedSessionID == id { return }
+                do {
+                    _ = try persistenceService.saveSuccessfulSession(
+                        text: snapshot.text,
+                        elapsed: snapshot.elapsed,
+                        duration: snapshot.duration,
+                        wordCount: snapshot.wordCount,
+                        sessionID: id
+                    )
+                    lastPersistedSessionID = id
+                    return
+                } catch {
+                    continue
+                }
+            }
+        }
+    }
+
+    private func persistSuccessfulSessionOnSuccess(_ phase: SessionPhase) {
+        guard phase == .success else { return }
+        let id = sessionEngine.sessionID
+        guard lastPersistedSessionID != id else { return }
+        let snapshot = (text: sessionEngine.text, elapsed: sessionEngine.elapsed, duration: sessionEngine.duration, wordCount: sessionEngine.wordCount)
+        do {
+            _ = try persistenceService.saveSuccessfulSession(
+                text: snapshot.text,
+                elapsed: snapshot.elapsed,
+                duration: snapshot.duration,
+                wordCount: snapshot.wordCount,
+                sessionID: id
+            )
+            lastPersistedSessionID = id
+        } catch {
+            scheduleSaveRetry(for: id, snapshot: snapshot)
+        }
     }
 
     private func launchInitialSurface() {

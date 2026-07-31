@@ -1,43 +1,36 @@
 # First Line for macOS
 
-First Line is a distraction-free writing app for macOS with a unique "danger mechanic" – stop typing for 8 seconds and your text fades away. This enforces a "write without looking back" philosophy.
+First Line is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
 
-This is the native macOS implementation, built with Swift and SwiftUI.
+This is the native macOS app, built with Swift and SwiftUI.
 
 ## Features
 
-*   **Distraction-Free Writing**: Clean, minimalist interface.
-*   **Danger Mechanic**: Encourages continuous writing.
-*   **Append-Only**: Focus on generating new content.
+- Forward only. No delete, no paste, no undo. New text appends at the end.
+- Five seconds of silence turns the page red and starts a countdown.
+- Eight seconds of silence deletes the whole draft.
+- A session lasts sixty seconds. Finish it and you keep the draft.
+- Keep the draft three ways: copy full text, copy for AI, or download a Markdown file.
 
-## Installation
+It is not a distraction-free editor. It is a hired threat. This is the draft before the draft.
 
-To install First Line, download the latest release from [Link to Releases Page - TBD] and drag the application to your Applications folder.
+## Building from source
 
-## Building from Source
+You need macOS 14 or later and the Swift toolchain.
 
-1.  Clone this repository:
-    ```bash
-    git clone https://github.com/ichts/zerodraft.git
-    cd zerodraft/apps/macos/FirstLine
-    ```
-2.  Open the `Package.swift` file in Xcode.
-3.  Build and run the `FirstLine` target.
+```bash
+git clone https://github.com/ichts/zerodraft.git
+cd zerodraft/apps/macos/FirstLine
+swift build
+swift test
+```
 
-## Usage
+Or open `Package.swift` in Xcode and run the `FirstLine` target.
 
-*   Launch the application.
-*   Start typing. Don't stop for too long!
-*   Your progress will be saved automatically.
+## Editor behavior
 
-## Contributing
-
-Contributions are welcome! Please see the `CONTRIBUTING.md` (TBD) for guidelines.
+The editor is append-only. Deletion, paste, cut, undo, and selection replacement are blocked. IME composition still works: marked text from a Chinese, Japanese, or Korean input method is counted as activity, so an unfinished composition does not start the danger countdown until it is committed.
 
 ## License
 
-This project is licensed under the [License Name] - see the `LICENSE` file for details.
-
-## Contact
-
-For support or feedback, please open an issue on GitHub.
+First Line is released under the MIT License. See `LICENSE` for details.

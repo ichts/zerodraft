@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppState、SessionEngine、Editor bridge 和 DesignSystem token
- * [OUTPUT]: 提供 SessionView 主写作界面
+ * [OUTPUT]: 提供 SessionView 主写作界面，包含 danger veil、倒计时、narrator strip 与 failure aftermath
  * [POS]: FirstLine 的核心会话模式，负责 append-only 输入与 danger/failure/success 循环
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -10,8 +10,8 @@ import SwiftUI
 struct SessionView: View {
     @Bindable var appState: AppState
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
-    @State private var pulse = false
-    @State private var abandonPromptVisible = false
+    @State private var denyFlashActive = false
+    @State private var denyResetTask: Task<Void, Never>?
 
     var body: some View {
         GeometryReader { proxy in
@@ -19,7 +19,14 @@ struct SessionView: View {
                 FirstLineColors.paper
                     .ignoresSafeArea()
 
-                zenMasks
+                Group {
+                    if isDanger {
+                        FirstLineColors.danger
+                            .opacity(0.07)
+                            .ignoresSafeArea()
+                    }
+                }
+                .animation(shouldReduceMotion ? nil : .easeInOut(duration: 0.3), value: isDanger)
 
                 VStack(spacing: 0) {
                     Spacer(minLength: max(24, proxy.size.height * 0.06))
@@ -31,17 +38,42 @@ struct SessionView: View {
                 }
                 .padding(.horizontal, 48)
 
+                Group {
+                    if isDanger {
+                        countdownCluster
+                            .position(x: proxy.size.width / 2, y: proxy.size.height * 0.62)
+                    }
+                }
+                .animation(shouldReduceMotion ? nil : .easeOut(duration: 0.18), value: isDanger)
+
+                if appState.sessionEngine.phase == .failure, fossilText.isEmpty == false {
+                    Text(fossilText)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(FirstLineColors.ink)
+                        .opacity(0.14)
+                        .rotationEffect(.degrees(3))
+                        .frame(width: 220)
+                        .position(x: proxy.size.width - 150, y: proxy.size.height * 0.5)
+                        .allowsHitTesting(false)
+                }
+
                 topChrome
+
+                narratorStrip
+                    .frame(maxHeight: .infinity, alignment: .bottom)
             }
             .compositingGroup()
             .onReceive(Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()) { _ in
                 appState.handleTick()
             }
-            .onAppear {
-                pulse = appState.sessionEngine.phase == .danger
-            }
-            .onChange(of: appState.sessionEngine.phase) { _, phase in
-                pulse = phase == .danger
+            .onChange(of: appState.sessionEngine.lastDenyAt) { _, newValue in
+                guard newValue != nil else { return }
+                denyFlashActive = true
+                denyResetTask?.cancel()
+                denyResetTask = Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 1_200_000_000)
+                    if Task.isCancelled == false { denyFlashActive = false }
+                }
             }
         }
     }
@@ -60,11 +92,28 @@ struct SessionView: View {
             .frame(height: 2)
             .opacity(appState.sessionEngine.phase == .danger ? 0.92 : 0.42)
 
-            Text(timerText)
-                .font(FirstLineTypography.sessionStatus)
-                .foregroundStyle(timerColor)
-                .padding(.top, FirstLineSpacing.sm)
-                .padding(.trailing, 24)
+            HStack(spacing: FirstLineSpacing.sm) {
+                if canFinish {
+                    Button("Finish") {
+                        appState.sessionEngine.finish()
+                    }
+                    .keyboardShortcut(.return, modifiers: .command)
+                    .font(FirstLineTypography.buttonLabel)
+                    .foregroundStyle(FirstLineColors.ink)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 28)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(FirstLineColors.uiLight, lineWidth: 1)
+                    )
+                }
+
+                Text(timerText)
+                    .font(FirstLineTypography.sessionStatus)
+                    .foregroundStyle(timerColor)
+            }
+            .padding(.top, FirstLineSpacing.sm)
+            .padding(.trailing, 24)
         }
         .frame(maxWidth: .infinity, minHeight: 40, alignment: .top)
     }
@@ -77,8 +126,6 @@ struct SessionView: View {
                 )
                     .id(appState.sessionEngine.sessionID)
                     .frame(minHeight: 520)
-                    .blur(radius: shouldReduceMotion ? 0 : dangerBlurRadius)
-                    .animation(.easeInOut(duration: shouldReduceMotion ? 0 : 3), value: appState.sessionEngine.phase)
 
                 if appState.sessionEngine.hasMultipleLines {
                     LinearGradient(
@@ -93,58 +140,99 @@ struct SessionView: View {
                     )
                     .frame(height: 156)
                     .allowsHitTesting(false)
-                    .transition(.opacity.animation(.easeInOut(duration: 0.18)))
+                    .transition(shouldReduceMotion ? .identity : .opacity.animation(.easeInOut(duration: 0.18)))
+                }
+
+                if appState.sessionEngine.phase == .failure {
+                    Rectangle()
+                        .fill(FirstLineColors.danger)
+                        .frame(height: 2)
+                        .frame(maxWidth: .infinity)
+                        .allowsHitTesting(false)
                 }
             }
-            .shadow(color: shadowColor, radius: shouldReduceMotion ? 2 : (pulse ? 18 : 2), y: shouldReduceMotion ? 2 : (pulse ? 8 : 2))
-            .animation(shouldReduceMotion ? nil : .easeInOut(duration: 2).repeatForever(autoreverses: true), value: pulse)
 
-            HStack(spacing: FirstLineSpacing.md) {
-                Spacer()
-
-                Button("Abandon") {
-                    abandonPromptVisible = true
-                }
-                .buttonStyle(FirstLineSecondaryButtonStyle())
-            }
-        }
-        .alert("Abandon this session?", isPresented: $abandonPromptVisible) {
-            Button("Keep Writing", role: .cancel) { }
-            Button("Abandon", role: .destructive) {
-                appState.abandonSession()
-            }
-        } message: {
-            Text("Current text will be lost.")
         }
     }
 
-    private var zenMasks: some View {
-        VStack(spacing: 0) {
-            LinearGradient(
-                stops: [
-                    .init(color: FirstLineColors.paper, location: 0),
-                    .init(color: FirstLineColors.paper.opacity(0.88), location: 0.42),
-                    .init(color: .clear, location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 240)
+    private var countdownCluster: some View {
+        VStack(spacing: FirstLineSpacing.xs) {
+            Text("\(appState.sessionEngine.secondsUntilDeletion)")
+                .font(.system(size: 104, weight: .regular, design: .monospaced))
+                .monospacedDigit()
+                .foregroundStyle(FirstLineColors.danger)
+
+            Text("keep typing or the draft is deleted")
+                .font(FirstLineTypography.sessionStatus)
+                .textCase(.uppercase)
+                .foregroundStyle(FirstLineColors.ui)
+        }
+        .allowsHitTesting(false)
+    }
+
+    private var narratorStrip: some View {
+        HStack(spacing: FirstLineSpacing.sm) {
+            Text(narratorText)
+                .font(FirstLineTypography.sessionStatus)
+                .textCase(.uppercase)
+                .foregroundStyle(narratorColor)
+                .allowsHitTesting(false)
 
             Spacer()
 
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: FirstLineColors.paper.opacity(0.88), location: 0.52),
-                    .init(color: FirstLineColors.paper, location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 300)
+            if isSessionLive {
+                Button("Abandon - the text is lost") {
+                    appState.abandonSession()
+                }
+                .buttonStyle(.plain)
+                .font(FirstLineTypography.sessionStatus)
+                .foregroundStyle(FirstLineColors.danger)
+            }
+
+            Text("\(appState.sessionEngine.wordCount) words")
+                .font(FirstLineTypography.sessionStatus)
+                .foregroundStyle(FirstLineColors.ui)
+                .allowsHitTesting(false)
         }
-        .allowsHitTesting(false)
+        .padding(.horizontal, 24)
+        .padding(.vertical, FirstLineSpacing.xs)
+    }
+
+    private var narratorText: String {
+        if denyFlashActive {
+            return "no going back."
+        }
+        switch appState.sessionEngine.phase {
+        case .failure:
+            return "draft deleted. it joined the pile."
+        case .danger:
+            return "keep typing or the draft is deleted"
+        default:
+            return "forward only. don't stop."
+        }
+    }
+
+    private var narratorColor: Color {
+        appState.sessionEngine.phase == .failure ? FirstLineColors.danger : FirstLineColors.ui
+    }
+
+    private var fossilText: String {
+        let collapsed = appState.sessionEngine.wipedText
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .joined(separator: " ")
+        return String(collapsed.prefix(64))
+    }
+
+    private var isDanger: Bool {
+        appState.sessionEngine.phase == .danger
+    }
+
+    private var isSessionLive: Bool {
+        appState.sessionEngine.phase == .writing || appState.sessionEngine.phase == .danger
+    }
+
+    private var canFinish: Bool {
+        isSessionLive && appState.sessionEngine.wordCount > 0
     }
 
     private var progress: Double {
@@ -168,10 +256,6 @@ struct SessionView: View {
         return String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
     }
 
-    private var dangerBlurRadius: CGFloat {
-        appState.sessionEngine.phase == .danger ? 3 : 0
-    }
-
     private var shouldReduceMotion: Bool {
         switch appState.settings.reducedMotion {
         case .system:
@@ -181,15 +265,5 @@ struct SessionView: View {
         case .never:
             false
         }
-    }
-
-    private var borderColor: Color {
-        appState.sessionEngine.phase == .danger ? FirstLineColors.danger : FirstLineColors.uiLight
-    }
-
-    private var shadowColor: Color {
-        appState.sessionEngine.phase == .danger
-            ? FirstLineColors.danger.opacity(pulse ? 0.16 : 0.05)
-            : Color.black.opacity(0.01)
     }
 }

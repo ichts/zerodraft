@@ -5,7 +5,7 @@ import Testing
 @MainActor
 struct SmokeFlowTests {
     @Test
-    func happyPathShowsSuccessButDoesNotAutoSave() throws {
+    func happyPathAutoSavesOnSuccess() throws {
         let fm = FileManager.default
         let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
@@ -20,16 +20,16 @@ struct SmokeFlowTests {
             settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
         )
 
-        appState.selectedDuration = 5
-        appState.startSession()
+        appState.startSession(duration: 5)
         engine.registerCommittedText("hello world")
         uptime = 5
         appState.handleTick()
 
         #expect(engine.phase == .success)
-        #expect(appState.librarySessions.isEmpty)
-        #expect(fm.fileExists(atPath: libraryDirectory.path) == false)
-        #expect(try appState.persistenceService.loadLibrary().isEmpty)
+        let saved = try appState.persistenceService.loadLibrary()
+        #expect(saved.count == 1)
+        #expect(saved.first?.body.contains("hello world") == true)
+        #expect(fm.fileExists(atPath: libraryDirectory.path))
     }
 
     @Test
@@ -73,7 +73,7 @@ struct SmokeFlowTests {
 
         #expect(firstRun.selectedSurface == .home)
 
-        let returningSettings = AppSettings(theme: .system, defaultDuration: 300, immersiveSessionMode: true, reducedMotion: .system)
+        let returningSettings = AppSettings(theme: .system, defaultDuration: 60, immersiveSessionMode: true, reducedMotion: .system)
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         try store.save(returningSettings)
 
@@ -147,7 +147,7 @@ struct SmokeFlowTests {
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         try store.save(AppSettings(
             theme: .system,
-            defaultDuration: 300,
+            defaultDuration: 60,
             immersiveSessionMode: true,
             reducedMotion: .system,
             trialSessionsUsed: AppState.trialSessionLimit
@@ -178,7 +178,7 @@ struct SmokeFlowTests {
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         try store.save(AppSettings(
             theme: .system,
-            defaultDuration: 300,
+            defaultDuration: 60,
             immersiveSessionMode: true,
             reducedMotion: .system,
             trialSessionsUsed: AppState.trialSessionLimit,
@@ -214,8 +214,7 @@ struct SmokeFlowTests {
             settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
         )
 
-        appState.selectedDuration = 5
-        appState.startSession()
+        appState.startSession(duration: 5)
         engine.registerCommittedText("hello world")
         uptime = 5
         appState.handleTick()
@@ -346,4 +345,99 @@ struct SmokeFlowTests {
         #expect(engine.text.isEmpty)
         #expect(appState.selectedSurface == .home)
     }
+    @Test
+    func legacyPersistedDurationIsSupersededByFixedSixtySeconds() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        try fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
+        try fm.createDirectory(at: libraryDirectory, withIntermediateDirectories: true)
+
+        let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        var legacy = AppSettings.defaultValue
+        legacy.defaultDuration = 300
+        try store.save(legacy)
+
+        let engine = SessionEngine(now: { 0 })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: store
+        )
+
+        #expect(appState.settings.defaultDuration == SessionEngine.defaultDurationSeconds)
+        appState.startSession()
+        #expect(engine.duration == SessionEngine.defaultDurationSeconds)
+    }
+
+    @Test
+    func manualFinishAutoSavesExactlyOnce() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let engine = SessionEngine(now: { 0 })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: tempRoot.appendingPathComponent("Config", isDirectory: true))
+        )
+
+        appState.startSession()
+        engine.registerCommittedText("finished early")
+        engine.finish()
+        engine.finish()
+        #expect(try appState.persistenceService.loadLibrary().count == 1)
+    }
+
+    @Test
+    func wipedDraftIsExposedForTheJoinedFossil() {
+        var uptime = 100.0
+        let engine = SessionEngine(now: { uptime })
+        engine.start(duration: SessionEngine.defaultDurationSeconds)
+        engine.registerCommittedText("this paragraph will be wiped")
+        uptime = 108.0
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.wipedText == "this paragraph will be wiped")
+        #expect(engine.text.isEmpty)
+    }
+
+    @MainActor
+    @Test
+    func failedSaveRetriesWithSnapshotEvenAfterNewSessionStarts() async throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        let blockingFile = tempRoot.appendingPathComponent("blocked", isDirectory: false)
+        try "file".write(to: blockingFile, atomically: true, encoding: .utf8)
+        let badLibrary = blockingFile.appendingPathComponent("Library", isDirectory: true)
+
+        let engine = SessionEngine(now: { 0 })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: badLibrary),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: tempRoot.appendingPathComponent("Config", isDirectory: true))
+        )
+
+        appState.startSession()
+        engine.registerCommittedText("session A words")
+        engine.finish()
+        #expect((try? appState.persistenceService.loadLibrary().isEmpty) != false)
+
+        appState.abandonSession()
+        appState.startSession()
+        engine.registerCommittedText("session B words")
+        #expect(engine.phase == .writing)
+
+        try fm.removeItem(at: blockingFile)
+        try fm.createDirectory(at: badLibrary, withIntermediateDirectories: true)
+        try await Task.sleep(nanoseconds: 2_600_000_000)
+
+        let saved = try appState.persistenceService.loadLibrary()
+        #expect(saved.count == 1)
+        #expect(saved.first?.body.contains("session A words") == true)
+        #expect(saved.first?.body.contains("session B words") == false)
+    }
+
 }

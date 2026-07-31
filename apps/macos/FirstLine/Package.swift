@@ -16,6 +16,11 @@ let package = Package(
             exclude: [
                 "Info.plist",
                 "Assets.xcassets",
+            ],
+            resources: [
+                // Flood design system fonts + their SIL Open Font License texts.
+                // Processed into Bundle.module so registration resolves them by name.
+                .process("Resources"),
             ]
         ),
         .testTarget(

@@ -1,49 +1,61 @@
 /**
- * [INPUT]: 依赖现有 zerodraft 设计系统的颜色值
- * [OUTPUT]: 提供 FirstLineColors 颜色 token
- * [POS]: FirstLine 原生壳子的设计 token 层
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [INPUT]: Flood design-system color values (DESIGN.md)
+ * [OUTPUT]: FirstLineColors tokens; canvas/paper/ink/dim/faint/danger, with ui/uiLight aliases
+ * [POS]: FirstLine design-token layer; red is danger-only, green does not exist in this product
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ *
+ * Flood values: canvas #f1f0eb, paper #ffffff, ink #17150f, dim #6b665b, faint #b3ada0,
+ * danger #c8392f. Dark-mode values are adaptive approximations of the light Flood palette.
  */
 
-import SwiftUI
 import AppKit
+import SwiftUI
 
 enum FirstLineColors {
-    // Kami-inspired: #f5f4ed parchment (was #FAFAF8)
+    // Canvas: neutral bone background. Never parchment.
+    static let canvas = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 21 / 255, green: 20 / 255, blue: 15 / 255, alpha: 1)
+            : NSColor(srgbRed: 241 / 255, green: 240 / 255, blue: 235 / 255, alpha: 1)
+    })
+
+    // Paper: the only clean white writing surface.
     static let paper = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 30 / 255, green: 30 / 255, blue: 30 / 255, alpha: 1) : 
-            NSColor(red: 245 / 255, green: 244 / 255, blue: 237 / 255, alpha: 1)
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 28 / 255, green: 26 / 255, blue: 21 / 255, alpha: 1)
+            : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
     })
-    
-    // Kami-inspired: #141413 warm olive-black (was #1A1A1A)
+
+    // Ink: primary text color, warm near-black.
     static let ink = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 235 / 255, green: 235 / 255, blue: 235 / 255, alpha: 1) : 
-            NSColor(red: 20 / 255, green: 20 / 255, blue: 19 / 255, alpha: 1)
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 236 / 255, green: 233 / 255, blue: 226 / 255, alpha: 1)
+            : NSColor(srgbRed: 23 / 255, green: 21 / 255, blue: 15 / 255, alpha: 1)
     })
-    
-    static let danger = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 235 / 255, green: 87 / 255, blue: 87 / 255, alpha: 1) : 
-            NSColor(red: 193 / 255, green: 64 / 255, blue: 61 / 255, alpha: 1)
+
+    // Dim: secondary text.
+    static let dim = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 138 / 255, green: 132 / 255, blue: 122 / 255, alpha: 1)
+            : NSColor(srgbRed: 107 / 255, green: 102 / 255, blue: 91 / 255, alpha: 1)
     })
-    
-    static let success = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 87 / 255, green: 166 / 255, blue: 90 / 255, alpha: 1) : 
-            NSColor(red: 46 / 255, green: 89 / 255, blue: 48 / 255, alpha: 1)
+
+    // Faint: low-contrast borders and marks.
+    static let faint = Color(nsColor: NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? NSColor(srgbRed: 70 / 255, green: 66 / 255, blue: 59 / 255, alpha: 1)
+            : NSColor(srgbRed: 179 / 255, green: 173 / 255, blue: 160 / 255, alpha: 1)
     })
-    
-    static let ui = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 110 / 255, green: 110 / 255, blue: 110 / 255, alpha: 1) : 
-            NSColor(red: 139 / 255, green: 139 / 255, blue: 139 / 255, alpha: 1)
+
+    // Danger: reserved for danger and deletion-adjacent marks only. Exactly #c8392f.
+    static let danger = Color(nsColor: NSColor(name: nil) { _ in
+        NSColor(srgbRed: 200 / 255, green: 57 / 255, blue: 47 / 255, alpha: 1)
     })
-    
-    static let uiLight = Color(nsColor: NSColor(name: nil) { appearance in
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? 
-            NSColor(red: 60 / 255, green: 60 / 255, blue: 60 / 255, alpha: 1) : 
-            NSColor(red: 212 / 255, green: 212 / 255, blue: 212 / 255, alpha: 1)
-    })
+
+    // Backward-compatible aliases mapping older token names onto the Flood vocabulary.
+    static let ui = dim
+    static let uiLight = faint
+
+    // Deprecated alias: kept until UpgradeView/SessionView references migrate; never green.
+    static let success = ink
 }

@@ -1,23 +1,17 @@
 /**
- * [INPUT]: 依赖 AppState 和 DesignSystem token
- * [OUTPUT]: 提供 HomeView 极简启动页和 Mac trial 状态
- * [POS]: FirstLine 的 Home launch gate，负责说明规则、选择时长、展示 trial 状态并启动 session
+ * [INPUT]: AppState and DesignSystem tokens
+ * [OUTPUT]: HomeView launch gate; fixed 60s session, no duration picker
+ * [POS]: FirstLine Home surface; explains the rules, shows trial status, starts a session
  * [PROTOCOL]: 变更时更新此头部和 FirstLine/CLAUDE.md
  */
 
 import SwiftUI
 
-private struct DurationOption: Identifiable {
-    let seconds: TimeInterval
-
-    var id: TimeInterval { seconds }
-    var label: String { "\(Int(seconds / 60)) min" }
-}
-
 struct HomeView: View {
     @Bindable var appState: AppState
 
-    private let options = [180.0, 300.0, 600.0, 900.0, 1500.0].map(DurationOption.init)
+    // Session length is fixed at 60 seconds; there is no duration picker.
+    private let sessionDuration: TimeInterval = 60
 
     var body: some View {
         VStack(spacing: FirstLineSpacing.md) {
@@ -45,31 +39,10 @@ struct HomeView: View {
 
             Text(appState.trialStatusText)
                 .font(FirstLineTypography.microcopy)
-                .foregroundStyle(appState.isTrialExhausted ? FirstLineColors.danger : FirstLineColors.ui)
+                .foregroundStyle(appState.isTrialExhausted ? FirstLineColors.ink : FirstLineColors.ui)
 
-            VStack(spacing: FirstLineSpacing.xs) {
-                Text("Choose a sprint")
-                    .font(FirstLineTypography.microcopy)
-                    .foregroundStyle(FirstLineColors.ui)
-
-                HStack(spacing: FirstLineSpacing.sm) {
-                    ForEach(options) { option in
-                        Button(action: { appState.selectedDuration = option.seconds }) {
-                            Text(option.label)
-                                .font(FirstLineTypography.microcopy)
-                                .foregroundStyle(
-                                    appState.selectedDuration == option.seconds
-                                        ? FirstLineColors.ink
-                                        : FirstLineColors.ui.opacity(0.6)
-                                )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-
-            Button(appState.isTrialExhausted ? "Unlock to keep writing" : "Start writing") {
-                appState.startSession()
+            Button("Give it sixty seconds.") {
+                appState.startSession(duration: sessionDuration)
             }
             .buttonStyle(FirstLinePrimaryButtonStyle())
         }

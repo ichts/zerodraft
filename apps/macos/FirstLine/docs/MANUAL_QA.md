@@ -1,4 +1,4 @@
-# First Line MVP — Manual QA Checklist
+# First Line MVP - Manual QA Checklist
 
 Use this checklist before direct distribution.
 
@@ -8,13 +8,13 @@ Use this checklist before direct distribution.
 - Confirm Home appears directly, with no Intro or warm-up screen.
 - Confirm Home says `The first draft only moves forward.`
 - Confirm Home says `Stop for 8 seconds and the page clears.`
-- Confirm the primary action says `Start writing`.
+- Confirm the primary action says `Give it sixty seconds.`.
 - Confirm the microcopy says `No delete. No paste. No undo.`
 
 ## Returning launch
 - Relaunch the app.
 - Confirm the app opens on the same Home screen.
-- Confirm Home shows duration selection, the core 8-second rule, and `Start writing`.
+- Confirm Home has NO duration selection (fixed 60s), shows the core 8-second rule, and the primary action says `Give it sixty seconds.`.
 
 ## Keyboard navigation
 - Press `⌘1` and confirm the app returns to Writing mode.
@@ -52,7 +52,7 @@ Use this checklist before direct distribution.
 
 ## Settings
 - Change theme.
-- Change default duration.
+- Confirm the duration row is informational only: `60 seconds. Fixed.` (no control).
 - Toggle immersive session mode.
 - Change reduced motion override.
 - Use Reveal Library Folder.

@@ -125,7 +125,7 @@ struct UpgradeView: View {
             VStack(spacing: 4) {
                 Text(error.errorDescription ?? "Activation failed.")
                     .font(FirstLineTypography.microcopy)
-                    .foregroundStyle(FirstLineColors.danger)
+                    .foregroundStyle(FirstLineColors.ink)
                     .multilineTextAlignment(.center)
                 if hasInteracted {
                     Text("Try again, or use a different key.")

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖单调时间源和编辑器活动事件
- * [OUTPUT]: 提供 SessionEngine 与 SessionPhase 状态机
+ * [OUTPUT]: 提供 SessionEngine 与 SessionPhase 状态机，暴露 idleSeconds / secondsUntilDeletion / wipedText / lastDenyAt
  * [POS]: FirstLine 核心会话循环，负责 danger / failure / success
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -18,15 +18,30 @@ enum SessionPhase: Equatable {
 @Observable
 @MainActor
 final class SessionEngine {
+    nonisolated static let dangerAfterSeconds: TimeInterval = 5
+    nonisolated static let wipeAfterSeconds: TimeInterval = 8
+    nonisolated static let defaultDurationSeconds: TimeInterval = 60
+
     private let now: () -> TimeInterval
 
     var phase: SessionPhase = .idle
     var text = ""
-    var duration: TimeInterval = 300
+    var duration: TimeInterval = SessionEngine.defaultDurationSeconds
     var elapsed: TimeInterval = 0
-    var remaining: TimeInterval = 300
+    var remaining: TimeInterval = SessionEngine.defaultDurationSeconds
+    /// Silence so far, computed in tick from lastActivityAt.
+    private(set) var idleSeconds: TimeInterval = 0
+    /// Text captured immediately before a failure wiped it; empty otherwise.
+    private(set) var wipedText = ""
+    /// Last time a blocked edit (delete/paste/undo/selection replace) was denied.
+    private(set) var lastDenyAt: TimeInterval?
     private(set) var sessionID = UUID()
     var onStateChange: ((SessionPhase) -> Void)?
+
+    /// Countdown of seconds left before the draft is deleted (3-2-1 in danger).
+    var secondsUntilDeletion: Int {
+        max(0, Int(ceil(SessionEngine.wipeAfterSeconds - idleSeconds)))
+    }
 
     private var startedAt: TimeInterval?
     private var lastActivityAt: TimeInterval?
@@ -49,6 +64,9 @@ final class SessionEngine {
         sessionID = UUID()
         elapsed = 0
         remaining = duration
+        idleSeconds = 0
+        wipedText = ""
+        lastDenyAt = nil
         phase = .writing
         text = ""
         startedAt = current
@@ -71,14 +89,20 @@ final class SessionEngine {
         }
 
         let idle = current - lastActivityAt
-        if idle >= 8 {
+        idleSeconds = max(idle, 0)
+        // An empty draft has nothing to lose: silence danger and deletion only
+        // arm once there is text, so an untouched session never dies (or burns a trial).
+        guard text.isEmpty == false else { return }
+
+        if idle >= SessionEngine.wipeAfterSeconds {
+            wipedText = text
             phase = .failure
             text = ""
             emitStateChange()
             return
         }
 
-        phase = idle >= 5 ? .danger : .writing
+        phase = idle >= SessionEngine.dangerAfterSeconds ? .danger : .writing
         emitStateChange()
     }
 
@@ -87,6 +111,7 @@ final class SessionEngine {
         guard inserted.isEmpty == false else { return }
         text += inserted
         lastActivityAt = now()
+        idleSeconds = 0
         phase = .writing
         tick()
     }
@@ -94,8 +119,25 @@ final class SessionEngine {
     func registerMarkedTextActivity() {
         guard phase == .writing || phase == .danger else { return }
         lastActivityAt = now()
+        idleSeconds = 0
         phase = .writing
         tick()
+    }
+
+    /// Called by the editor bridge when a blocked edit (delete, paste, cut, undo,
+    /// selection replacement) is denied. Only records the timestamp.
+    func registerDeny() {
+        lastDenyAt = now()
+    }
+
+    /// Ends the session into success with the current text, same as natural completion.
+    func finish() {
+        guard phase == .writing || phase == .danger else { return }
+        guard startedAt != nil else { return }
+        elapsed = duration
+        remaining = 0
+        phase = .success
+        emitStateChange()
     }
 
     func abandon() {
@@ -110,6 +152,9 @@ final class SessionEngine {
         phase = .idle
         elapsed = 0
         remaining = duration
+        idleSeconds = 0
+        wipedText = ""
+        lastDenyAt = nil
         if clearText {
             text = ""
         }

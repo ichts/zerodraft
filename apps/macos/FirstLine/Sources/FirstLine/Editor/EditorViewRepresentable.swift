@@ -26,6 +26,9 @@ struct EditorViewRepresentable: NSViewRepresentable {
         textView.onMarkedTextActivity = {
             context.coordinator.engine.registerMarkedTextActivity()
         }
+        textView.onDeny = {
+            context.coordinator.engine.registerDeny()
+        }
         textView.drawsBackground = false
         textView.isRichText = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -79,7 +82,14 @@ struct EditorViewRepresentable: NSViewRepresentable {
             }
         }
 
-        if textView.isEditable {
+        // Activate the app and grab first responder exactly once per session, when the
+        // engine first reaches .writing. Routine phase ticks and text syncs must never
+        // re-steal focus from other apps. The coordinator is recreated per sessionID
+        // (see SessionView .id(sessionEngine.sessionID)), so this flag is per-session.
+        if engine.phase == .writing,
+           context.coordinator.hasActivatedForSession == false,
+           textView.window != nil {
+            context.coordinator.hasActivatedForSession = true
             DispatchQueue.main.async {
                 guard let window = textView.window else { return }
                 if window.firstResponder !== textView {
@@ -93,6 +103,7 @@ struct EditorViewRepresentable: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         let engine: SessionEngine
+        fileprivate var hasActivatedForSession = false
 
         init(engine: SessionEngine) {
             self.engine = engine
@@ -104,9 +115,18 @@ struct EditorViewRepresentable: NSViewRepresentable {
                 Selector(("redo:")),
                 #selector(NSText.paste(_:)),
                 #selector(NSText.cut(_:)),
+                #selector(NSResponder.deleteWordBackward(_:)),
+                #selector(NSResponder.deleteWordForward(_:)),
+                #selector(NSResponder.deleteToBeginningOfLine(_:)),
+                #selector(NSResponder.deleteToEndOfLine(_:)),
+                #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
+                #selector(NSResponder.deleteToEndOfParagraph(_:)),
+                #selector(NSResponder.yank(_:)),
+                #selector(NSResponder.transpose(_:)),
             ]
 
             if blockedSelectors.contains(commandSelector) {
+                engine.registerDeny()
                 return true
             }
 
@@ -117,6 +137,7 @@ struct EditorViewRepresentable: NSViewRepresentable {
 
             if deleteSelectors.contains(commandSelector) {
                 if textView.hasMarkedText() { return false }
+                engine.registerDeny()
                 return true
             }
 
@@ -130,7 +151,13 @@ struct EditorViewRepresentable: NSViewRepresentable {
                 return newSelectedCharRange
             }
 
-            return NSRange(location: textView.string.count, length: 0)
+            let end = NSRange(location: textView.string.count, length: 0)
+            if newSelectedCharRange == end {
+                return newSelectedCharRange
+            }
+
+            engine.registerDeny()
+            return end
         }
     }
 }

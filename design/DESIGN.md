@@ -109,7 +109,7 @@ Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms
 | Sheet | full | opacity .35 | clears to empty |
 | Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
 
-The countdown never prints on top of the draft. It hangs above the current line (or drops below it when the headroom is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
+The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
 | Clock | ink | red | resets after aftermath |
 | Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
 

@@ -244,8 +244,7 @@ window.FirstLineLandingDemo = (() => {
     return el;
   }
 
-  function currentTrialLineRect() {
-    const el = trialEditor();
+  function currentTrialLineRect(el = trialEditor()) {
     const current = el?.querySelector(".trial-thought.is-current");
     if (!current) return null;
     const range = document.createRange();
@@ -256,8 +255,8 @@ window.FirstLineLandingDemo = (() => {
     return rect.height ? rect : null;
   }
 
-  // Danger rides beside the words, never on top of them: numeral + hint in the
-  // margin at the current line's height; if the line starts too far left, above it.
+  // Danger rides below the words, never on top of them: the countdown sits
+  // under the current line and only moves above it when bottom space is tight.
   function positionDangerBesideLine(dangerEl, surfaceEl, editorEl) {
     if (!dangerEl || !surfaceEl || !editorEl) return;
     const current = editorEl.querySelector(".trial-thought.is-current");
@@ -273,15 +272,15 @@ window.FirstLineLandingDemo = (() => {
     const r = rects.length ? rects[rects.length - 1] : current.getBoundingClientRect();
     const sRect = surfaceEl.getBoundingClientRect();
     const gh = dangerEl.offsetHeight || 200;
-    const yAbove = r.top - sRect.top - 20;
-    if (yAbove - gh > 56) {
-      dangerEl.style.setProperty("--dx", "50%");
-      dangerEl.style.setProperty("--dy", `${Math.round(yAbove)}px`);
-      dangerEl.style.setProperty("--dt", "translate(-50%,-100%)");
-    } else {
+    const spaceBelow = sRect.bottom - r.bottom;
+    if (spaceBelow >= gh + 56) {
       dangerEl.style.setProperty("--dx", "50%");
       dangerEl.style.setProperty("--dy", `${Math.round(r.bottom - sRect.top + 40)}px`);
       dangerEl.style.setProperty("--dt", "translate(-50%,0)");
+    } else {
+      dangerEl.style.setProperty("--dx", "50%");
+      dangerEl.style.setProperty("--dy", `${Math.round(r.top - sRect.top - 20)}px`);
+      dangerEl.style.setProperty("--dt", "translate(-50%,-100%)");
     }
   }
   function syncInlineDangerPosition() { positionDangerBesideLine(demoDanger(), demoSurface(), demoEditor()); }
@@ -293,11 +292,10 @@ window.FirstLineLandingDemo = (() => {
     const el = trialEditor();
     if (!surfaceEl) return;
     if (!normalizeTrialText(el?.innerText || "")) { surfaceEl.scrollTo({ top: 0 }); return; }
-    const current = el.querySelector(".trial-thought.is-current") || el;
-    const currentRect = current.getBoundingClientRect();
-    if (!currentRect.height) return;
+    const currentRect = currentTrialLineRect(el);
+    if (!currentRect?.height) return;
     const surfaceRect = surfaceEl.getBoundingClientRect();
-    const targetY = surfaceRect.top + surfaceRect.height * 0.35;
+    const targetY = surfaceRect.top + surfaceRect.height * 0.30;
     const targetScroll = Math.max(0, Math.round(surfaceEl.scrollTop + currentRect.top - targetY));
     if (Math.abs(surfaceEl.scrollTop - targetScroll) > 1) surfaceEl.scrollTop = targetScroll;
   }
@@ -307,9 +305,8 @@ window.FirstLineLandingDemo = (() => {
     const el = sessionEditor();
     if (!el) return;
     if (!normalizeTrialText(el.innerText || "")) { el.scrollTo({ top: 0 }); return; }
-    const current = el.querySelector(".trial-thought.is-current") || el;
-    const currentRect = current.getBoundingClientRect();
-    if (!currentRect.height) return;
+    const currentRect = currentTrialLineRect(el);
+    if (!currentRect?.height) return;
     const elRect = el.getBoundingClientRect();
     const targetY = elRect.top + elRect.height * INLINE_ANCHOR;
     const targetScroll = Math.max(0, Math.round(el.scrollTop + currentRect.top - targetY));
@@ -465,8 +462,10 @@ window.FirstLineLandingDemo = (() => {
     emit("fldanger", opts);
     const ed = dangerEditor();
     if (ed) ed.classList.toggle("is-demo-danger", !!opts.dangerActive);
-    if (opts.dangerActive && isTrial()) syncTrialDangerPosition();
-    if (opts.dangerActive && isInline()) syncInlineDangerPosition();
+    if (opts.dangerActive) requestAnimationFrame(() => {
+      if (isTrial()) syncTrialDangerPosition();
+      if (isInline()) syncInlineDangerPosition();
+    });
   }
 
   function tickDispatch(active, failed, complete, context, startedAt, lastInputAt, duration, text) {
@@ -714,7 +713,10 @@ window.FirstLineLandingDemo = (() => {
       setLandingInert(true);
       trialOverlay()?.setAttribute("aria-hidden", "false");
       if (!handoff) emitPromptReset();
-      renderZen(el, handoff ? handoffText : "");
+      // The data-class:trial-mode binding flushes after this task; render on the
+      // next frame, when contextFromDom() already reads 'trial' and renderZen's
+      // demo guard no longer blocks the write (empty placeholder and handoff text).
+      requestAnimationFrame(() => renderZen(el, handoff ? handoffText : ""));
     }, viewportRect).then(() => {
       // After the morph, re-check the route (covers a route change that arrived
       // while morphing) and move focus into the trial editor.
@@ -820,7 +822,15 @@ window.FirstLineLandingDemo = (() => {
       el.innerHTML = '<div class="demo-paragraph demo-paragraph-followup"></div>';
       followup = el.querySelector(".demo-paragraph-followup");
     }
-    followup.innerHTML = `<span class="typed-current">${escapeHTML(followupText)}</span>`;
+    const lines = followupText.split("\n");
+    let currentIndex = -1;
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      if (lines[i]) { currentIndex = i; break; }
+    }
+    followup.innerHTML = lines.map((line, index) => {
+      const stateClass = index === currentIndex ? " is-current" : index === currentIndex - 1 ? " is-previous" : "";
+      return `<span class="trial-thought${stateClass}">${escapeHTML(line)}</span>`;
+    }).join("");
     document.querySelector(".demo-placeholder")?.classList.toggle("is-hidden", Boolean(followupText));
     updateCount();
   }
@@ -1560,7 +1570,14 @@ if (document.readyState === "loading") {
     pointer-events: none;
     transition: opacity .3s ease, filter .3s ease;
   }
-  .demo-preview .typed-current { white-space: pre-wrap; }
+  .demo-preview .trial-thought {
+    display: block;
+    min-height: 1.8em;
+    color: transparent;
+    transition: color .3s ease;
+  }
+  .demo-preview .trial-thought.is-previous { color: rgba(23, 21, 15, .32); }
+  .demo-preview .trial-thought.is-current { color: var(--ink); }
   body.danger .demo-preview { opacity: .35; }
   .demo-preview.is-demo-danger { opacity: .35; }
   .demo-writing-surface.is-live .demo-preview { display: none; }
@@ -1608,7 +1625,7 @@ if (document.readyState === "loading") {
   .demo-writing-surface.is-live .live-demo-editor { opacity: 1; height: 100%; }
   .demo-writing-surface.is-live[hidden] { display: none; }
 
-  /* danger countdown: above the current line, never on the words */
+  /* danger countdown: below the current line, never on the words */
   .live-demo-danger {
     position: absolute;
     left: var(--dx, 50%);
@@ -1880,6 +1897,13 @@ if (document.readyState === "loading") {
     font-variant-numeric: tabular-nums;
   }
   body.danger .trial-timer { color: var(--red); }
+  .trial-spec {
+    position: fixed;
+    top: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+  }
   .trial-hud-actions { display: flex; align-items: center; gap: 16px; }
   .trial-hud .trial-finish, .trial-exit {
     font-family: var(--mono);
@@ -1909,7 +1933,7 @@ if (document.readyState === "loading") {
     z-index: 3;
     width: 100%;
     min-height: 100vh;
-    padding: calc(35vh - .81em) clamp(20px, 8vw, 160px) calc(65vh - .81em);
+    padding: calc(30vh - .81em) clamp(20px, 8vw, 160px) calc(70vh - .81em);
     color: var(--ink);
     caret-color: rgba(23, 21, 15, .55);
     font-family: var(--serif);
@@ -2043,7 +2067,15 @@ if (document.readyState === "loading") {
     .live-demo-danger { gap: 8px; }
     .live-demo-danger .danger-count { font-size: 84px; }
     .live-demo-danger .danger-hint { white-space: normal; max-width: 15ch; }
-    .trial-spec { display: none; }
+    .trial-spec {
+      position: fixed;
+      top: 44px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      letter-spacing: .1em;
+      white-space: nowrap;
+    }
     .demo-footer { flex-direction: column; gap: 4px; padding: 10px 12px; font-size: 9.5px; letter-spacing: .08em; }
     .live-demo-status { white-space: normal; }
     .feature-section { padding: 64px 20px; }

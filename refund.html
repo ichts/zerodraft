@@ -5,182 +5,188 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="description" content="Refund policy for First Line. Refunds are available within 14 days of purchase." />
 <title>First Line - Refund</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23e8e6dc'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%231b365d'/%3E%3Cpath d='M48 14h5v36h-5z' fill='%232d5a8a'/%3E%3C/svg%3E" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23f1f0eb'/%3E%3Cpath d='M12 20h26v5H12zM12 39h30v5H12z' fill='%2317150f'/%3E%3Cpath d='M12 30h8v5h-8z' fill='%23c8392f'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --parchment: #f5f4ed;
-    --ivory: #faf9f5;
-    --warm-sand: #e8e6dc;
-    --brand: #1b365d;
-    --brand-light: #2d5a8a;
-    --near-black: #141413;
-    --olive: #504e49;
-    --stone: #6b6a64;
-    --paper: var(--parchment);
-    --ink: var(--near-black);
-    --ink-soft: var(--olive);
-    --rust: var(--stone);
-    --line: #d8d5c8;
-    --line-strong: #c9c3b5;
-    --cream: var(--ivory);
-    --radius-control: 8px;
-    --radius-paper: 16px;
-    --font-ui: Charter, Georgia, "Iowan Old Style", Palatino;
-    --font-body: Charter, Georgia, "Iowan Old Style", Palatino;
-    --font-cn: "TsangerJinKai02", "Source Han Serif SC", "Songti SC", serif;
+    --bg: #f1f0eb;
+    --paper: #ffffff;
+    --ink: #17150f;
+    --dim: #6b665b;
+    --faint: #b3ada0;
+    --red: #c8392f;
+    --line: rgba(23, 21, 15, 0.12);
+    --line-strong: rgba(23, 21, 15, 0.2);
+    --radius-control: 3px;
+    --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
     color: var(--ink);
-    background: var(--paper);
-    font-family: var(--font-body), var(--font-cn);
-    font-size: 17px;
-    line-height: 1.65;
+    background: var(--bg);
+    font-family: var(--font-serif);
+    font-size: 18px;
+    line-height: 1.7;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
   }
+  strong, b { font-weight: 500; }
   a { color: inherit; }
-  a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 1px; }
   .sheet {
-    width: min(1120px, calc(100vw - 48px));
+    width: min(760px, calc(100vw - 48px));
     margin: 0 auto;
-    padding: 48px 0 96px;
+    padding: 56px 0 96px;
   }
   .page-header {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     justify-content: space-between;
+    gap: 16px;
     padding-bottom: 28px;
     border-bottom: 1px solid var(--line);
   }
   .brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
     text-decoration: none;
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 15px;
+    font-family: var(--font-mono);
+    font-size: 13px;
     font-weight: 500;
-    letter-spacing: -.02em;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
     color: var(--ink);
   }
-  .seal { width: 28px; height: 28px; display: block; }
+  .brand-underscore { color: var(--red); }
   .header-back {
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 13px;
-    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--dim);
     text-decoration: none;
   }
   .header-back:hover { color: var(--ink); }
   .page-main { padding: 56px 0 0; }
   .eyebrow {
-    margin: 0 0 14px;
-    color: var(--rust);
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 12px;
-    letter-spacing: .16em;
+    margin: 0 0 16px;
+    color: var(--dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
   }
   h1 {
-    margin: 0 0 12px;
-    font-family: var(--font-body), var(--font-cn);
-    font-size: clamp(28px, 3vw, 36px);
+    margin: 0 0 14px;
+    font-family: var(--font-serif);
+    font-size: clamp(28px, 3.4vw, 40px);
     font-weight: 500;
-    letter-spacing: -.02em;
-    line-height: 1.28;
+    letter-spacing: -0.015em;
+    line-height: 1.12;
+    text-wrap: balance;
     max-width: 22ch;
   }
   .page-lede {
-    max-width: 56ch;
+    max-width: 60ch;
     margin: 0 0 48px;
-    color: var(--ink-soft);
-    font-size: 17px;
-    line-height: 1.6;
+    color: var(--dim);
+    font-size: 18px;
+    line-height: 1.65;
   }
   .section {
     display: grid;
     grid-template-columns: minmax(120px, 200px) 1fr;
     gap: 24px 32px;
-    padding: 24px 0;
+    padding: 28px 0;
     border-top: 1px solid var(--line);
   }
   .section-label {
     margin: 0;
-    color: var(--ink-soft);
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 12px;
-    letter-spacing: .14em;
+    color: var(--dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
   }
   .section-body { max-width: 64ch; }
   .section-body p { margin: 0 0 14px; }
   .section-body p:last-child { margin-bottom: 0; }
-  .placeholder { color: var(--ink-soft); font-style: italic; }
+  .placeholder { color: var(--faint); font-style: italic; }
   .meta-table {
     width: 100%;
     border-collapse: collapse;
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 14px;
+    font-size: 15px;
   }
   .meta-table td {
-    padding: 10px 0;
+    padding: 14px 0;
     border-top: 1px solid var(--line);
     vertical-align: top;
   }
   .meta-table tr:first-child td { border-top: 0; }
-  .meta-table td:first-child { width: 38%; color: var(--ink-soft); letter-spacing: .04em; }
+  .meta-table td:first-child {
+    width: 40%;
+    color: var(--dim);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding-right: 16px;
+  }
   .cta {
     display: inline-flex;
     align-items: center;
     gap: 8px;
     height: 40px;
     padding: 0 18px;
-    border: 1px solid var(--line);
+    border: 1px solid var(--ink);
     border-radius: var(--radius-control);
-    background: var(--warm-sand);
-    color: var(--near-black);
-    font-family: var(--font-body), var(--font-cn);
-    font-size: 15px;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    letter-spacing: 0.04em;
     text-decoration: none;
+    cursor: pointer;
   }
-  .page-main a:not(.cta) { color: var(--brand); }
-  .page-main a:not(.cta):hover { color: var(--brand-light); }
-
+  .page-main a:not(.cta) {
+    color: var(--ink);
+    text-decoration: underline;
+    text-decoration-color: var(--faint);
+    text-underline-offset: 3px;
+  }
+  .page-main a:not(.cta):hover { text-decoration-color: var(--ink); }
   .page-footer {
-    margin-top: 80px;
+    margin-top: 72px;
     padding-top: 24px;
     border-top: 1px solid var(--line);
     display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
     gap: 14px;
-    font-family: var(--font-ui), var(--font-cn);
-    font-size: 13px;
-    color: var(--ink-soft);
+    font-family: var(--font-mono);
+    font-size: 12px;
   }
-  .footer-nav { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-  .footer-nav a { text-decoration: none; color: var(--ink-soft); }
+  .footer-tag { margin: 0; }
+  .footer-tag p { margin: 0; color: var(--faint); line-height: 1.7; }
+  .footer-nav { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+  .footer-nav a { text-decoration: none; color: var(--dim); }
   .footer-nav a:hover { color: var(--ink); }
   @media (max-width: 720px) {
     .section { grid-template-columns: 1fr; gap: 8px; }
-    .sheet { padding: 32px 0 64px; }
+    .sheet { padding: 36px 0 72px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { transition: none !important; animation: none !important; }
   }
 </style>
 </head>
 <body>
 <div class="sheet">
   <header class="page-header">
-    <a class="brand" href="index.html">
-      <svg class="seal" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
-        <rect width="64" height="64" fill="#e8e6dc" />
-        <path d="M12 20h26v5H12zM12 39h30v5H12z" fill="#1b365d" />
-        <path d="M48 14h5v36h-5z" fill="#2d5a8a" />
-      </svg>
-      <span>First Line</span>
-    </a>
-    <a class="header-back" href="index.html">Back to landing</a>
+    <a class="brand" href="index.html">ZERO<span class="brand-underscore">_</span>DRAFT</a>
+    <a class="header-back" href="index.html">zerodraft.page</a>
   </header>
 
   <main class="page-main">
@@ -226,6 +232,10 @@
   </main>
 
   <footer class="page-footer">
+    <div class="footer-tag">
+      <p>Zero Draft - the draft before the draft.</p>
+      <p>your writing never leaves this page.</p>
+    </div>
     <nav class="footer-nav" aria-label="Support">
       <a href="help.html">Help</a>
       <a href="privacy.html">Privacy</a>
@@ -234,7 +244,6 @@
       <a href="release-notes.html">Release notes</a>
       <a href="checkout-success.html">After purchase</a>
     </nav>
-    <p>First Line. A forward-only writing app for Mac.</p>
   </footer>
 </div>
 </body>

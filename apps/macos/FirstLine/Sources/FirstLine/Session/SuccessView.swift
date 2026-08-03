@@ -129,17 +129,14 @@ struct SuccessView: View {
         """
     }
 
-    /// Web-canonical cleanup prompt (kept verbatim from index.html AI_CLEANUP_PROMPT).
-    static let copyForAIPrompt =
-        "Below is my raw freewriting draft. Organize it into clear notes. " +
-        "Keep my original wording where possible. List any tasks or open questions separately at the end. " +
-        "Do not add ideas that are not in the draft."
+    // MARK: - Copy-for-AI (forwarded to SuccessText, the pure-logic source of truth)
 
-    /// Builds the Copy-for-AI clipboard payload: prompt + separator + trimmed draft,
-    /// matching the web's `copyForAI` join format.
+    /// Web-canonical cleanup prompt. See `SuccessText.copyForAIPrompt`.
+    static var copyForAIPrompt: String { SuccessText.copyForAIPrompt }
+
+    /// Copy-for-AI payload. See `SuccessText.copyForAIPayload(for:)`.
     static func copyForAIPayload(for text: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        return copyForAIPrompt + "\n\n---\n\n" + trimmed
+        SuccessText.copyForAIPayload(for: text)
     }
 
     private static let timestampFormatter: ISO8601DateFormatter = {

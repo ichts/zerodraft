@@ -42,21 +42,28 @@ window.FirstLineLandingDemo = (() => {
     draftIndex: 0,
     armToTrial: false,
     morphBuffer: [],
+    morphGate: false,
     introTyping: false,
+    demoPauseTerminal: false,
     demoPhase: "idle",
     demoHasPlayed: false,
     returnFocusElement: null,
     typingIndex: 0,
-    typingTimer: null
+    typingTimer: null,
+    // deny feedback sequencing (staleness tokens for the 90ms/1.2s timers),
+    // failure-focus lifecycle handle, and the static-dead idempotency flag.
+    denySeq: 0,
+    denyInFlight: false,
+    failureFocusCleanup: null,
+    staticDeadRendered: false,
+    demoFossilJoined: false
   };
 
   const SILENCE_CLEAR_SECONDS = 8;
   const SILENCE_BLUR_SECONDS = 5;
   const SILENCE_COUNTDOWN_START_SECONDS = SILENCE_BLUR_SECONDS;
   const DEMO_DANGER_DELAY = SILENCE_BLUR_SECONDS * 1000;
-  const DEMO_RECOVERY_DELAY = 7600;
   const DEMO_PAUSE_TICK = 100;
-  const DEMO_RESUME_DELAY = 220;
   const DEMO_START_DELAY = 500;
   const TRIAL_CARET_ANCHOR = "\u200B";
   const TRIAL_MORPH_DURATION = 420;
@@ -128,6 +135,13 @@ window.FirstLineLandingDemo = (() => {
     if (evt.key === "Escape" && contextFromDom() === "trial") {
       evt.preventDefault();
       exitTrial();
+      return;
+    }
+    // While the morph gate holds the focus handoff, drop Cmd/Ctrl+Enter instead
+    // of queueing a finish against an editor that is not yet focused - and say
+    // so explicitly, so the chord never falls through to the browser.
+    if (internal.morphGate) {
+      if (evt.key === "Enter" && (evt.metaKey || evt.ctrlKey)) evt.preventDefault();
       return;
     }
     if (evt.key === "Enter" && (evt.metaKey || evt.ctrlKey) && (isTrial() || isInline())) {
@@ -207,14 +221,12 @@ window.FirstLineLandingDemo = (() => {
     return value.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[char]));
   }
 
-  // Result card word/duration label (pure). `now` is passed in by the caller.
+  // Result card duration subline (pure). `now` is passed in by the caller.
+  // Bound to $_session.resultWords under the metric; renders exactly
+  // 'session: Ns - forward only' with N = actual elapsed seconds.
   function resultWordsFor(text, startedAt, now) {
-    const words = wordCount(text);
     const elapsed = startedAt ? Math.max(1, Math.round((now - startedAt) / 1000)) : 60;
-    const label = elapsed >= 120 ? `in ${Math.round(elapsed / 60)} minutes`
-      : elapsed >= 60 ? "in 1 minute"
-        : `in ${elapsed} second${elapsed === 1 ? "" : "s"}`;
-    return `${words} word${words === 1 ? "" : "s"} ${label}`;
+    return `session: ${elapsed}s - forward only`;
   }
 
   // --- Zen renderer (browser-only; reads the text arg, never signals) ---------
@@ -334,14 +346,19 @@ window.FirstLineLandingDemo = (() => {
     commitInput(el, text);
   }
 
+  // Closed allowlist for the forward-only editor: only forward inserts pass, and
+  // only with a collapsed caret at the very end. Everything else is denied.
+  const ALLOWED_INPUT_TYPES = ["insertText", "insertParagraph", "insertLineBreak", "insertCompositionText"];
+
   function bindSessionEditor(el, mode) {
     const isActiveContext = () => (mode === "inline" ? isInline() : isTrial());
     el.addEventListener("focus", () => { if (isActiveContext()) moveCaretToEnd(el); });
     el.addEventListener("pointerup", () => { if (isActiveContext()) keepCaretAtEnd(el); });
     el.addEventListener("click", () => { if (isActiveContext()) keepCaretAtEnd(el); });
-    el.addEventListener("compositionstart", () => { internal.composing = true; });
+    el.addEventListener("compositionstart", () => { internal.composing = true; el.classList.add("is-composing"); });
     el.addEventListener("compositionend", () => {
       internal.composing = false;
+      el.classList.remove("is-composing");
       if (!isActiveContext()) return;
       commitInput(el, normalizeTrialText(el.innerText));
       if (mode === "inline" && internal.armToTrial) {
@@ -353,23 +370,32 @@ window.FirstLineLandingDemo = (() => {
       if (!isActiveContext()) return;
       const inputType = evt.inputType || "";
       if (!el.isContentEditable) { evt.preventDefault(); return; }
-      if (internal.composing || inputType === "insertCompositionText") return;
+      // IME composition is never intercepted: a composition that started inline
+      // finishes inline, and both composition input types are left to the
+      // browser - insertCompositionText while composing, insertFromComposition
+      // for the commit event the browser fires right after compositionend.
+      if (internal.composing || inputType === "insertCompositionText" || inputType === "insertFromComposition") return;
+      // Closed allowlist: only forward inserts are permitted, and only with a
+      // collapsed caret at the very end. Every other inputType (delete*, history*,
+      // insertFromPaste/Drop/Yank, insertReplacementText, insertTranspose, ...) is
+      // denied and the caret is snapped back to the end.
+      if (!ALLOWED_INPUT_TYPES.includes(inputType)) {
+        evt.preventDefault();
+        deny();
+        moveCaretToEnd(el);
+        return;
+      }
       if (inputType === "insertParagraph" || inputType === "insertLineBreak") {
         evt.preventDefault();
         appendTrialLineBreak(el);
         return;
       }
-      if (inputType.startsWith("delete") || inputType.startsWith("history") || inputType === "insertFromPaste") {
-        evt.preventDefault();
-        moveCaretToEnd(el);
-        return;
-      }
+      // insertText at the end flows through to the `input` handler. Any selection
+      // that is not collapsed-at-end (a selection-replace attempt) is denied.
       if (!selectionIsAtEnd(el)) {
         evt.preventDefault();
-        const insertedText = inputType === "insertText" ? (evt.data || "") : "";
+        deny();
         moveCaretToEnd(el);
-        if (!insertedText) return;
-        commitInput(el, `${normalizeTrialText(el.innerText)}${insertedText}`);
       }
     }, true);
     el.addEventListener("keydown", (evt) => {
@@ -379,9 +405,11 @@ window.FirstLineLandingDemo = (() => {
       const command = evt.metaKey || evt.ctrlKey;
       if (evt.key === "Backspace" || evt.key === "Delete" || (command && ["a", "v", "x", "z", "y"].includes(key))) {
         evt.preventDefault();
+        deny();
         moveCaretToEnd(el);
       } else if (["ArrowLeft", "ArrowUp", "Home", "PageUp"].includes(evt.key)) {
         evt.preventDefault();
+        deny();
         moveCaretToEnd(el);
       }
     }, true);
@@ -389,8 +417,9 @@ window.FirstLineLandingDemo = (() => {
       if (!isActiveContext()) return;
       commitInput(el, normalizeTrialText(el.innerText), { render: !internal.composing });
     });
-    el.addEventListener("paste", (evt) => evt.preventDefault(), true);
-    el.addEventListener("drop", (evt) => evt.preventDefault(), true);
+    el.addEventListener("paste", (evt) => { evt.preventDefault(); deny(); }, true);
+    el.addEventListener("cut", (evt) => { evt.preventDefault(); deny(); }, true);
+    el.addEventListener("drop", (evt) => { evt.preventDefault(); deny(); }, true);
   }
 
   // --- Clipboard + export (browser-only). Text is passed in by expressions. ---
@@ -474,13 +503,27 @@ window.FirstLineLandingDemo = (() => {
     const now = Date.now();
     const elapsed = Math.floor((now - startedAt) / 1000);
     const remaining = Math.max(0, duration - elapsed);
-    if (elapsed >= duration) {
+    // Absolute deadlines. A single catch-up tick after background-tab throttling
+    // can land past both at once: if so, honor whichever deadline occurred first
+    // (tie -> failure wins: the gun is faster than the clock). Payloads stay
+    // identical to the single-deadline paths.
+    const completionDeadline = startedAt + duration * 1000;
+    const silenceDeadline = lastInputAt + SILENCE_CLEAR_SECONDS * 1000;
+    const completionPassed = now >= completionDeadline;
+    const silencePassed = lastInputAt > 0 && now >= silenceDeadline;
+    if (completionPassed && silencePassed) {
+      if (silenceDeadline <= completionDeadline) { emit("flfail", { lostText: text }); return; }
+      const trimmed = (text || "").trim();
+      emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, now), resultWordCount: wordCount(trimmed) });
+      return;
+    }
+    if (completionPassed) {
       const trimmed = (text || "").trim();
       emit("flcomplete", { resultText: trimmed, resultWords: resultWordsFor(trimmed, startedAt, now), resultWordCount: wordCount(trimmed) });
       return;
     }
     const idle = (now - lastInputAt) / 1000;
-    if (idle >= SILENCE_CLEAR_SECONDS) { emit("flfail", { lostText: text }); return; }
+    if (silencePassed) { emit("flfail", { lostText: text }); return; }
     if (idle >= SILENCE_COUNTDOWN_START_SECONDS) {
       setDanger({ remaining, dangerSeconds: Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - idle)), dangerActive: true });
       return;
@@ -641,7 +684,17 @@ window.FirstLineLandingDemo = (() => {
 
   function animateSurfaceChange(source, change, targetRect) {
     const el = source();
-    if (!el || shouldReduceMotion()) { change(); return Promise.resolve(); }
+    if (!el) { change(); return Promise.resolve(); }
+    // The gate opens on EVERY path (animated or reduced-motion) before the
+    // context flip, and the caller closes it only after focus + buffer drain,
+    // so no keystroke can fall between the flip and the handoff completing.
+    internal.morphGate = true;
+    emit("flmorphing", { v: true });
+    if (shouldReduceMotion()) {
+      change();
+      emit("flmorphing", { v: false });
+      return Promise.resolve();
+    }
     const first = el.getBoundingClientRect();
     const ghost = el.cloneNode(true);
     ghost.setAttribute("aria-hidden", "true");
@@ -654,7 +707,6 @@ window.FirstLineLandingDemo = (() => {
     freezeMorphGhostStyles(ghost, el);
     document.body.appendChild(ghost);
     el.style.visibility = "hidden";
-    emit("flmorphing", { v: true });
 
     change();
 
@@ -669,7 +721,11 @@ window.FirstLineLandingDemo = (() => {
       { borderRadius: last.borderRadius || firstStyle.borderRadius, boxShadow: last.boxShadow || firstStyle.boxShadow, opacity: 1, transform: `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})` }
     ], { duration: TRIAL_MORPH_DURATION, easing: TRIAL_MORPH_EASING, fill: "both" });
 
-    return animation.finished.then(() => { el.style.visibility = ""; }).finally(() => {
+    // A cancelled/interrupted animation must not strand the handoff: the
+    // context flip already happened synchronously, so swallow the rejection,
+    // always restore source visibility, and always let the caller's .then run
+    // (it owns focus, buffer drain, and releasing the gate).
+    return animation.finished.catch(() => {}).then(() => { el.style.visibility = ""; }).finally(() => {
       ghost.remove();
       emit("flmorphing", { v: false });
     });
@@ -686,7 +742,8 @@ window.FirstLineLandingDemo = (() => {
 
   function startTrial(event) {
     event?.preventDefault();
-    if (morphingFromDom() || isTrial()) return;
+    if (morphingFromDom() || internal.morphGate || isTrial()) return;
+    clearDeny();
     const el = trialEditor();
     if (!el) return;
     const inlineActive = isInline();
@@ -730,13 +787,16 @@ window.FirstLineLandingDemo = (() => {
             commitInput(el, normalizeTrialText(el.innerText) + buffered);
           }
         }
+        // Clear the gate only after focus is set and the buffer is drained, so no
+        // key struck mid-handoff is lost or reordered.
+        internal.morphGate = false;
         emit("flroutecheck");
       }));
     });
   }
 
   function exitTrial() {
-    if (morphingFromDom() || !isTrial()) return;
+    if (morphingFromDom() || internal.morphGate || !isTrial()) return;
     if (isTrialRoute()) {
       if (history.state?.firstLineTrial) { history.back(); return; }
       replaceHomeRoute();
@@ -751,8 +811,21 @@ window.FirstLineLandingDemo = (() => {
       if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
       emit("flexittrial");
       clearEditorDanger();
+      // After the flip the landing owns the narrator again: flexittrial resets
+      // it to the idle line (unless a durable wipe verdict holds it), and any
+      // deny still in flight is cancelled against the post-exit context - pass
+      // 'demo' explicitly because the body context class flushes after this.
+      clearDeny("demo");
     }, () => elementMorphRect(demoSurface())).then(() => {
       internal.returnFocusElement = null;
+      // Enter and exit handoffs share one buffer but mean opposite things: keys
+      // struck mid-ENTER morph are the new session's first input and replay
+      // into the trial editor (startTrial above); keys struck mid-EXIT morph
+      // belong to a session that is closing, so they are DISCARDED, never
+      // replayed - the first key after landing arms a fresh session through
+      // the normal landing path instead of a ghost buffer.
+      internal.morphBuffer = [];
+      internal.morphGate = false;
       const coarse = Boolean(window.matchMedia?.("(pointer: coarse)").matches);
       if (!coarse) focusWithoutScroll(demoEditor());
       else returnFocusElement?.focus({ preventScroll: true });
@@ -763,30 +836,64 @@ window.FirstLineLandingDemo = (() => {
   // onComplete / onFail: DOM side-effects of state changes (called from
   // data-effect expressions that watch _session.complete / _session.failed).
   function onComplete(context) {
+    cancelFailureFocus();
     const el = sessionEditor();
     if (el) { el.blur(); el.setAttribute("contenteditable", "false"); }
     clearEditorDanger();
+    clearDeny();
     setDeadStatus(false);
-    setStatus("everything you stop writing joins the pile.");
+    setStatus("the pile is patient. it gets whatever you stop writing.");
     if (context === "inline") hideInlineChrome();
     requestAnimationFrame(() => sessionResultEl()?.querySelector(".trial-copy")?.focus({ preventScroll: true }));
   }
+  // Focus the restart button only after the failure card has revealed: it sits
+  // opacity:0 for .55s, so an immediate focus is invisible. Under reduced
+  // motion the reveal is instant, so focus immediately. One cleanup handle owns
+  // both the listener and the fallback timer so restart/re-entry can cancel.
+  function cancelFailureFocus() {
+    internal.failureFocusCleanup?.();
+  }
+  function focusFailureRestartWhenVisible() {
+    const card = sessionFailureEl();
+    const restartBtn = card?.querySelector(".trial-restart");
+    if (!card || !restartBtn) return;
+    if (shouldReduceMotion()) { restartBtn.focus({ preventScroll: true }); return; }
+    let timer = null;
+    const focusRestart = () => restartBtn.focus({ preventScroll: true });
+    const cleanup = () => {
+      card.removeEventListener("animationend", onEnd);
+      if (timer !== null) { window.clearTimeout(timer); timer = null; }
+      if (internal.failureFocusCleanup === cleanup) internal.failureFocusCleanup = null;
+    };
+    const onEnd = (evt) => {
+      if (evt.target !== card || evt.animationName !== "failure-in") return;
+      cleanup();
+      focusRestart();
+    };
+    internal.failureFocusCleanup = cleanup;
+    card.addEventListener("animationend", onEnd);
+    timer = window.setTimeout(() => { cleanup(); focusRestart(); }, 1000); // .55s reveal + .4s anim + buffer fallback
+  }
   function onFail(context) {
+    cancelFailureFocus();
     const el = sessionEditor();
     if (el) { el.blur(); el.innerHTML = ""; el.setAttribute("contenteditable", "false"); }
     clearEditorDanger();
+    clearDeny();
     setStatus("gone. it joined the pile.");
     setDeadStatus(true);
     if (context === "inline") hideInlineChrome();
-    requestAnimationFrame(() => sessionFailureEl()?.querySelector(".trial-restart")?.focus({ preventScroll: true }));
+    focusFailureRestartWhenVisible();
   }
 
   function restart(context) {
+    cancelFailureFocus();
     const el = context === "inline" ? demoEditor() : trialEditor();
     if (el) { el.setAttribute("contenteditable", "true"); el.innerHTML = ""; }
     clearEditorDanger();
+    clearDeny();
     setDeadStatus(false);
-    setStatus("everything you stop writing joins the pile.");
+    setStatus("the pile is patient. it gets whatever you stop writing.");
     renderZen(el, "");
     if (context === "inline") showInlineChrome();
     emitPromptReset();
@@ -809,8 +916,71 @@ window.FirstLineLandingDemo = (() => {
 
   // --- Demo preview sequencer (browser-only). Writes the demo editor DOM and
   //     emits fldanger while paused; reads only internal counters. -------------
-  function setStatus(message) { document.querySelectorAll(".live-demo-status").forEach((el) => { el.textContent = message; }); }
-  function setDeadStatus(on) { document.querySelectorAll(".live-demo-status").forEach((el) => el.classList.toggle("dead", on)); }
+  // --- Narrator / deny bridge. The narrator spans, the .sr-status live region,
+  //     and the writing surfaces are NOT data-ignored, so their text and classes
+  //     are declarative (data-text / data-class on _session.*). These helpers
+  //     only dispatch fl* events; body data-on:fl* expressions write the signals.
+  function setStatus(message) { emit("flnarrator", { text: message }); }
+  function setDeadStatus(on) { emit("flnarratordead", { v: on }); }
+  // Visually-hidden aria-live mirror of the deny nudge: the narrator is
+  // aria-hidden, so the block needs its own polite region for assistive tech.
+  function setSrStatus(message) { emit("flsrstatus", { text: message || "" }); }
+  // The narrator line appropriate right after a deny clears: the session line
+  // when a live editable session owns the paper, the idle line otherwise.
+  function restoreNarratorAfterDeny(context) {
+    // Context must be explicit mid-flip: exitTrial calls clearDeny inside the
+    // surface change, when the body context class has not flushed to 'demo'
+    // yet, so a live DOM read would wrongly restore the session line.
+    const ctx = context || contextFromDom();
+    const el = sessionEditor();
+    if (ctx !== "demo" && el && el.isContentEditable) {
+      setStatus("forward only. don\u2019t stop.");
+    } else {
+      setStatus("the pile is patient. it gets whatever you stop writing.");
+    }
+  }
+  // Cancel every deny beat (shake/hairline/sr) and, when a deny still owns the
+  // narrator, reset its text for the given context (idle on the landing,
+  // session line in a live session). A durable wipe verdict (gone + dead red)
+  // is NOT deny-owned and survives: internal.denyInFlight tells the two apart.
+  function clearDeny(context) {
+    window.clearTimeout(denyTimer);
+    denyTimer = null;
+    internal.denySeq += 1; // invalidate pending hairline/expiry callbacks
+    if (internal.denyInFlight) {
+      internal.denyInFlight = false;
+      emit("fldenyclear");
+      restoreNarratorAfterDeny(context);
+    }
+  }
+
+  // Every blocked action gets a body: the narrator says no, the sheet shakes,
+  // and a red hairline flashes on its border for a beat. All UI writes go
+  // through fl* events; the timers are plumbing guarded by a staleness token.
+  let denyTimer = null;
+  function deny() {
+    internal.denyInFlight = true;
+    internal.denySeq += 1;
+    const seq = internal.denySeq;
+    setStatus("no going back.");
+    setSrStatus("Blocked: no going back.");
+    // Restart the shake/hairline on repeated denies: drop both classes now and
+    // re-add them next frame so the animation retriggers (denyActive also turns
+    // the narrator red via the declarative .dead binding).
+    emit("fldeny", { active: false, hair: false });
+    requestAnimationFrame(() => {
+      if (seq === internal.denySeq) emit("fldeny", { active: true, hair: true });
+    });
+    window.setTimeout(() => { if (seq === internal.denySeq) emit("fldenyhair", { hair: false }); }, 90);
+    window.clearTimeout(denyTimer);
+    denyTimer = window.setTimeout(() => {
+      denyTimer = null;
+      if (seq !== internal.denySeq) return;
+      internal.denyInFlight = false;
+      emit("fldenyclear");
+      restoreNarratorAfterDeny();
+    }, 1200);
+  }
   function visibleText() { return demoPreview()?.innerText || ""; }
   function updateCount() { const el = count(); if (el) el.textContent = `${wordCount(visibleText())} words / characters`; }
 
@@ -842,6 +1012,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoPhase = "idle";
     internal.demoPauseElapsed = 0;
     internal.demoPauseStartedAt = 0;
+    internal.demoPauseTerminal = false;
     setDanger({ dangerSeconds: 0, dangerActive: false });
   }
 
@@ -851,20 +1022,56 @@ window.FirstLineLandingDemo = (() => {
     internal.demoHasPlayed = markPlayed;
     internal.demoPauseIndex = -1;
     internal.demoPauseUsed = false;
+    internal.demoPauseTerminal = false;
     internal.demoPhase = "complete";
     renderDemoEditor(followupContent());
-    setStatus("everything you stop writing joins the pile.");
+    // Idempotently clear any dead state left by a prior wipe so no stale red
+    // narrator survives an interruption or a motion-preference flip.
+    setDeadStatus(false);
+    setStatus("the pile is patient. it gets whatever you stop writing.");
+    const ph = document.querySelector(".demo-placeholder");
+    if (ph) ph.innerHTML = "Click here. Type anything.<br>No deleting, no pasting, no undo.<br>Stop for eight seconds and it's gone.";
   }
   function prepareDemoPlayback() {
     stopIntroTyping();
     internal.demoHasPlayed = false;
     internal.demoPauseIndex = -1;
     internal.demoPauseUsed = false;
+    internal.demoPauseTerminal = false;
     internal.typingIndex = 0;
     renderDemoEditor("");
-    setStatus("everything you stop writing joins the pile.");
+    setStatus("the pile is patient. it gets whatever you stop writing.");
   }
-  function completeDemoPlayback() { restoreSeed({ markPlayed: true }); }
+  // Interruption path (real input, or startTrial entering the trial mid-demo): a
+  // static completed sample, no fossil, no dead state. performDemoWipe() stays
+  // reserved for the demo's own natural 8s silence terminal.
+  function completeDemoPlayback() {
+    restoreSeed({ markPlayed: true });
+  }
+
+  // The demo does not dodge the deletion it advertises: it stalls, counts down,
+  // and dies on the paper. The lost sample becomes a fossil in the gutter, the
+  // narrator goes dead red, and the placeholder becomes the verdict.
+  function performDemoWipe() {
+    const lost = visibleText();
+    internal.demoPauseElapsed = 0;
+    internal.demoPauseStartedAt = 0;
+    internal.demoPauseTerminal = false;
+    internal.demoPhase = "complete";
+    internal.demoHasPlayed = true;
+    internal.introTyping = false;
+    clearDemoTimer();
+    setDanger({ dangerSeconds: 0, dangerActive: false });
+    renderDemoEditor("");
+    if (lost) { internal.demoFossilJoined = true; joinPile(lost); }
+    setStatus("gone. it joined the pile.");
+    setDeadStatus(true);
+    const ph = document.querySelector(".demo-placeholder");
+    if (ph) {
+      ph.innerHTML = "Draft deleted.<br>Type to start over.";
+      ph.classList.remove("is-hidden");
+    }
+  }
 
   function shouldRunDemo() { return internal.introTyping && internal.demoVisible && !document.hidden && !isTrial() && !isInline(); }
   function scheduleDemoStep(callback, delay) {
@@ -881,33 +1088,42 @@ window.FirstLineLandingDemo = (() => {
       setDanger({ dangerSeconds: 0, dangerActive: false });
     }
   }
+  // The mid-sample pause is a teaching beat (recover before the 8s wipe); the
+  // post-sample pause is terminal (die for real at 8s). Both share the
+  // pause-clock machinery and the offscreen/hidden pause semantics.
+  const DEMO_TEACHING_RECOVER_MS = 6500;
   function updateDemoPause() {
     if (!shouldRunDemo() || internal.demoPhase !== "pause") return;
     const elapsed = internal.demoPauseElapsed + performance.now() - internal.demoPauseStartedAt;
-    if (elapsed >= DEMO_RECOVERY_DELAY) {
-      internal.demoPauseElapsed = 0;
-      internal.demoPauseStartedAt = 0;
-      internal.demoPhase = "typing";
-      setDanger({ dangerSeconds: 0, dangerActive: false });
-      setStatus("Typing resumed.");
-      scheduleDemoStep(typeNextFollowupCharacter, DEMO_RESUME_DELAY);
-      return;
-    }
-    if (elapsed >= DEMO_DANGER_DELAY) {
+    const inDanger = elapsed >= DEMO_DANGER_DELAY;
+    if (inDanger) {
       const secondsLeft = Math.max(1, Math.ceil(SILENCE_CLEAR_SECONDS - elapsed / 1000));
       setDanger({ dangerSeconds: secondsLeft, dangerActive: true });
-      setStatus("keep typing or it's gone.");
+      setStatus("keep typing or the draft is deleted.");
     } else {
       setDanger({ dangerSeconds: 0, dangerActive: false });
-      setStatus("Typing paused.");
+      setStatus("silence.");
+    }
+    if (!internal.demoPauseTerminal && elapsed >= DEMO_TEACHING_RECOVER_MS) {
+      // Teaching pause: danger clears and typing resumes (survive the beat).
+      setDanger({ dangerSeconds: 0, dangerActive: false });
+      setStatus("forward only. don\u2019t stop.");
+      internal.demoPhase = "typing";
+      scheduleDemoStep(typeNextFollowupCharacter, 80);
+      return;
+    }
+    if (internal.demoPauseTerminal && elapsed >= SILENCE_CLEAR_SECONDS * 1000) {
+      performDemoWipe();
+      return;
     }
     scheduleDemoStep(updateDemoPause, DEMO_PAUSE_TICK);
   }
-  function beginDemoPause() {
+  function beginDemoPause(terminal) {
     internal.demoPhase = "pause";
+    internal.demoPauseTerminal = Boolean(terminal);
     internal.demoPauseElapsed = 0;
     internal.demoPauseStartedAt = performance.now();
-    setStatus("Typing paused.");
+    setStatus("silence.");
     updateDemoPause();
   }
   function resumeDemoPlayback() {
@@ -941,16 +1157,69 @@ window.FirstLineLandingDemo = (() => {
   function typeNextFollowupCharacter() {
     if (!shouldRunDemo() || internal.demoPhase !== "typing") return;
     const content = followupContent();
-    if (internal.typingIndex >= content.length) { completeDemoPlayback(); return; }
+    // Sample finished: go silent for real and die at the 8s wipe (terminal pause).
+    if (internal.typingIndex >= content.length) { beginDemoPause(true); return; }
     internal.typingIndex += 1;
     renderDemoEditor(content.slice(0, internal.typingIndex));
-    if (!internal.demoPauseUsed && internal.typingIndex >= internal.demoPauseIndex) { internal.demoPauseUsed = true; beginDemoPause(); return; }
+    // Mid-sample newline: a teaching pause that recovers before the wipe.
+    if (!internal.demoPauseUsed && internal.typingIndex >= internal.demoPauseIndex) { internal.demoPauseUsed = true; beginDemoPause(false); return; }
     scheduleDemoStep(typeNextFollowupCharacter, followupTypingDelay(content));
+  }
+  // Reduced-motion end state (design/DESIGN.md): the demo renders the DEAD
+  // state statically - empty sheet, one settled fossil, the durable red line, and
+  // the "Draft deleted" placeholder - instead of restoreSeed's completed sample.
+  // Idempotent: repeated calls (media flips, visibility replays) never add a
+  // second fossil, and the terminal state disconnects the demo observer plumbing.
+  function renderStaticDead() {
+    if (internal.staticDeadRendered) return;
+    internal.staticDeadRendered = true;
+    stopIntroTyping();
+    internal.demoObserver?.disconnect();
+    internal.demoObserver = null;
+    internal.demoHasPlayed = true;
+    internal.demoPauseIndex = -1;
+    internal.demoPauseUsed = false;
+    internal.demoPauseTerminal = false;
+    internal.demoPhase = "complete";
+    renderDemoEditor("");
+    setDanger({ dangerSeconds: 0, dangerActive: false });
+    setStatus("gone. it joined the pile.");
+    setDeadStatus(true);
+    const ph = document.querySelector(".demo-placeholder");
+    if (ph) { ph.innerHTML = "Draft deleted.<br>Type to start over."; ph.classList.remove("is-hidden"); }
+    // The sample's fossil joins once per visit, no matter which path (natural
+    // wipe or static render) produced the dead state first.
+    if (!internal.demoFossilJoined) { internal.demoFossilJoined = true; joinPile(followupContent()); }
+  }
+  // First load under prefers-reduced-motion: bind() runs before Datastar has
+  // attached the body data-on:fl* handlers, so renderStaticDead's flnarrator /
+  // flnarratordead events would be swallowed and the static dead state would
+  // keep the idle narrator. Defer the initial static render until
+  // datastar-ready - the same handshake the initial route check in bind() uses,
+  // with the same 500ms fallback in case the event already fired. Mid-visit
+  // calls (the motion-preference flip listener in setupDemoPlayback) run long
+  // after Datastar is ready, so they stay synchronous.
+  let staticDeadArmed = false;
+  function renderStaticDeadWhenSignalsReady() {
+    if (staticDeadArmed) return;
+    staticDeadArmed = true;
+    let ran = false;
+    const run = () => {
+      if (ran) return;
+      ran = true;
+      // Real input during the wait interrupts the demo permanently, and a
+      // motion flip away from reduce un-requests the dead state: in both cases
+      // the landing no longer belongs to the static render.
+      if (internal.staticDeadRendered || internal.demoHasPlayed || isTrial() || isInline() || !shouldReduceMotion()) return;
+      renderStaticDead();
+    };
+    document.addEventListener("datastar-ready", run, { once: true });
+    window.setTimeout(run, 500);
   }
   function replaySeedTyping() {
     if (isTrial() || isInline()) return;
     stopIntroTyping();
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { restoreSeed(); return; }
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { renderStaticDead(); return; }
     internal.demoHasPlayed = false;
     internal.demoPauseElapsed = 0;
     internal.demoPauseIndex = findNaturalPauseIndex(followupContent());
@@ -960,27 +1229,27 @@ window.FirstLineLandingDemo = (() => {
     internal.typingIndex = 0;
     internal.introTyping = true;
     renderDemoEditor("");
-    setStatus("everything you stop writing joins the pile.");
+    setStatus("the pile is patient. it gets whatever you stop writing.");
     setDanger({ dangerSeconds: 0, dangerActive: false });
     resumeDemoPlayback();
   }
   function setupDemoPlayback() {
     prepareDemoPlayback();
     const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (motionQuery?.matches) { restoreSeed(); return; }
+    // Register the motion-preference listener BEFORE any early return, so a
+    // later flip to reduce always reaches the static dead state.
+    motionQuery?.addEventListener?.("change", (event) => { if (event.matches && !isTrial() && !isInline()) renderStaticDead(); });
+    if (motionQuery?.matches) { renderStaticDeadWhenSignalsReady(); return; }
     const surface = demoSurface();
     if (!surface || !("IntersectionObserver" in window)) { internal.demoVisible = true; replaySeedTyping(); return; }
     internal.demoObserver?.disconnect();
     internal.demoObserver = new IntersectionObserver((entries) => {
       const entry = entries[entries.length - 1];
-      setDemoVisibility(Boolean(entry?.isIntersecting && entry.intersectionRatio >= .2));
-    }, { threshold: [0, .2] });
+      setDemoVisibility(Boolean(entry?.isIntersecting && entry.intersectionRatio >= .15));
+    }, { threshold: [0, .15] });
     internal.demoObserver.observe(surface);
     document.addEventListener("visibilitychange", () => { if (document.hidden) suspendDemoPlayback(); else if (internal.demoVisible) resumeDemoPlayback(); });
-    motionQuery?.addEventListener?.("change", (event) => { if (event.matches && !isTrial() && !isInline()) restoreSeed(); });
   }
-
-  function restartWithSeed() { replaySeedTyping(); }
 
   // --- Flood layer (aria-hidden texture): fossils of drafts that died of
   //     hesitation. Pure DOM plumbing around the page; no UI state lives here. -
@@ -1154,49 +1423,106 @@ window.FirstLineLandingDemo = (() => {
     const bag = FLOOD_CORPUS.map((c, i) => i);
     for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = bag[i]; bag[i] = bag[j]; bag[j] = t; }
     let bagIdx = 0;
-    const colW = Math.max(80, (W - 980) / 2);
-    [{ x: 0, w: colW }, { x: W - colW, w: colW }].forEach((g, gi) => {
-      const rows = Math.max(3, Math.floor(H / 120));
-      for (let r = 0; r < rows; r++) {
-        if (rand() < .35) continue;
-        const f = document.createElement("span");
-        f.className = "frag";
-        f.innerHTML = fragHTML(FLOOD_CORPUS[bag[bagIdx++ % bag.length]]);
-        const fs = 12 + rand() * 10;
-        const fo = .05 + rand() * .06;
-        const rot = (rand() * 8 - 4).toFixed(1);
-        const fx = gi === 0 ? -30 + rand() * (g.w * .5) : g.w * .3 + rand() * (g.w * .8);
-        f.style.left = (g.x + fx).toFixed(0) + "px";
-        f.style.top = (r * 120 + rand() * 50).toFixed(0) + "px";
-        f.style.fontSize = fs.toFixed(1) + "px";
-        f.style.setProperty("--fo", fo.toFixed(3));
-        f.style.transform = `rotate(${rot}deg)`;
-        host.appendChild(f);
-      }
-    });
+    const placeFrag = (x, y, size, op, rot) => {
+      const f = document.createElement("span");
+      f.className = "frag";
+      f.innerHTML = fragHTML(FLOOD_CORPUS[bag[bagIdx++ % bag.length]]);
+      f.style.left = x.toFixed(0) + "px";
+      f.style.top = y.toFixed(0) + "px";
+      f.style.fontSize = size.toFixed(1) + "px";
+      f.style.setProperty("--fo", op.toFixed(3));
+      f.style.transform = `rotate(${rot}deg)`;
+      host.appendChild(f);
+    };
+    if (W < 700) {
+      // Mobile: horizontal bands in the gaps, never under the current-line region
+      // (protect a full-width ~200px band around the ~30% anchor line).
+      const anchorTop = H * 0.30 - 100;
+      const anchorBottom = H * 0.30 + 100;
+      const bands = [
+        { top: 8, h: Math.max(0, anchorTop - 16) },
+        { top: anchorBottom + 8, h: Math.max(0, H - anchorBottom - 24) }
+      ];
+      bands.forEach((b) => {
+        if (b.h < 30) return;
+        const rows = Math.max(1, Math.floor(b.h / 60));
+        for (let r = 0; r < rows; r++) {
+          if (rand() < .3) continue;
+          for (let k = 0; k < 2; k++) {
+            const x = 8 + rand() * Math.max(0, W - 60);
+            const y = b.top + r * 60 + rand() * 26;
+            placeFrag(x, y, 11 + rand() * 4, .07 + rand() * .07, rand() * 10 - 5);
+          }
+        }
+      });
+    } else {
+      // Desktop: strengthened across both margins.
+      const colW = Math.max(80, (W - 980) / 2);
+      [{ x: 0, w: colW }, { x: W - colW, w: colW }].forEach((g) => {
+        const rows = Math.max(3, Math.floor(H / 120));
+        for (let r = 0; r < rows; r++) {
+          if (rand() < .35) continue;
+          const fx = g.x === 0 ? -30 + rand() * (g.w * .5) : g.w * .3 + rand() * (g.w * .8);
+          placeFrag(g.x + fx, r * 120 + rand() * 50, 12 + rand() * 10, .05 + rand() * .06, rand() * 8 - 4);
+        }
+      });
+    }
   }
   function joinPile(lostText) {
-    const host = document.getElementById("floodJoined");
-    if (!host) return;
     const t = (lostText || "").replace(/\s+/g, " ").trim().slice(0, 64);
     if (!t) return;
+    const inTrial = contextFromDom() === "trial";
+    // Trial fossils append into #trialJoined, the persistent joined sublayer of
+    // the trial's aria-hidden fossil layer: layoutTrialFlood() only rebuilds the
+    // generated #trialFlood base, so joined fragments survive font readiness and
+    // debounced-resize relayouts. The layer sits above the bone ground but below
+    // the translucent failure/result cards (no z-index hack). The landing wipe
+    // still appends to #floodJoined in the gutter.
+    const host = inTrial ? document.getElementById("trialJoined") : document.getElementById("floodJoined");
+    if (!host) return;
     const f = document.createElement("span");
     f.className = "frag join-new";
     f.textContent = t;
-    const surface = document.querySelector(".demo-writing-surface");
-    const paperRect = surface && surface.offsetParent ? surface.getBoundingClientRect() : null;
-    const W = document.documentElement.clientWidth;
-    const side = Math.random() < .5;
-    const x = side ? -(Math.random() * 40) : Math.max(W - 260, W * .62);
-    f.style.left = x + "px";
-    const py = paperRect ? paperRect.top + window.scrollY : window.scrollY + 200;
-    const ph = paperRect ? paperRect.height : 300;
-    f.style.top = Math.max(70, py + Math.random() * ph * .7) + "px";
+    if (inTrial) {
+      // Land within ~200px of where the last line was, relative to #trialFlood,
+      // and clamp fully inside the viewport. The draft is gone, so re-top the
+      // surface first: the empty surface's natural scroll state is 0, which keeps
+      // the fossil inside the flood box (overflow: hidden) and at the anchor.
+      const surface = trialSurface();
+      const editor = trialEditor();
+      if (surface) surface.scrollTop = 0;
+      const fh = host.clientHeight || window.innerHeight;
+      const fw = host.clientWidth || window.innerWidth;
+      const hostRect = host.getBoundingClientRect();
+      const editorRect = editor ? editor.getBoundingClientRect() : { left: hostRect.left + fw / 2, width: 0 };
+      let left = (editorRect.left + editorRect.width / 2 - hostRect.left) - 260 + Math.random() * 120;
+      let top = fh * 0.30 + 60 + Math.random() * 140;
+      left = Math.max(24, Math.min(left, fw - 200));
+      top = Math.max(24, Math.min(top, fh - 40));
+      f.style.left = left + "px";
+      f.style.top = top + "px";
+    } else {
+      const surface = demoSurface();
+      const paperRect = surface && surface.offsetParent ? surface.getBoundingClientRect() : null;
+      const W = document.documentElement.clientWidth;
+      const side = Math.random() < .5;
+      const x = side ? -(Math.random() * 40) : Math.max(W - 260, W * .62);
+      f.style.left = x + "px";
+      const py = paperRect ? paperRect.top + window.scrollY : window.scrollY + 200;
+      const ph = paperRect ? paperRect.height : 300;
+      f.style.top = Math.max(70, py + Math.random() * ph * .7) + "px";
+    }
     f.style.transform = `rotate(${((Math.random() * 8) - 4).toFixed(1)}deg)`;
     f.style.setProperty("--fo", ".09");
     host.appendChild(f);
     if (shouldReduceMotion()) { f.classList.add("settle"); return; }
-    requestAnimationFrame(() => requestAnimationFrame(() => f.classList.add("settle")));
+    // hold full red for a beat so the arrival reads, then settle into the pile.
+    // .settling scopes the 1.6s fade to this window only (see the fossil rules):
+    // once it closes, a later danger clear snaps back with no transition.
+    window.setTimeout(() => {
+      f.classList.add("settle", "settling");
+      window.setTimeout(() => f.classList.remove("settling"), 1700);
+    }, 1200);
   }
 
   // --- Wiring ----------------------------------------------------------------
@@ -1241,12 +1567,17 @@ window.FirstLineLandingDemo = (() => {
     if (!coarsePointer && !isTrialRoute()) focusWithoutScroll(demoEl);
 
     document.addEventListener("keydown", (evt) => {
-      // Keys struck mid-morph would otherwise drop into the void: buffer them and
-      // replay into the trial editor once the morph lands and focus is set.
-      if (morphingFromDom() && contextFromDom() === "trial") {
-        if (!evt.metaKey && !evt.ctrlKey && !evt.altKey && evt.key.length === 1) {
-          evt.preventDefault();
-          internal.morphBuffer.push(evt.key);
+      // Keys struck mid-morph would otherwise drop into the void or land out of
+      // order against the replay buffer: while the morph gate holds the handoff,
+      // EVERY printable key goes into the buffer in arrival order - regardless of
+      // which context the class flip currently reports. Enter buffers as a newline
+      // (replay order is preserved; normalizeTrialText keeps newlines). A
+      // composition that started inline finishes inline and is never buffered.
+      if (internal.composing || evt.isComposing) return;
+      if (morphingFromDom() || internal.morphGate) {
+        if (!evt.metaKey && !evt.ctrlKey && !evt.altKey) {
+          if (evt.key.length === 1) { evt.preventDefault(); internal.morphBuffer.push(evt.key); }
+          else if (evt.key === "Enter") { evt.preventDefault(); internal.morphBuffer.push("\n"); }
         }
         return;
       }
@@ -1305,7 +1636,6 @@ window.FirstLineLandingDemo = (() => {
     dismissPrompt,
     onGlobalKeydown,
     emitFlroutecheck,
-    restartWithSeed,
     joinPile
   };
 })();
@@ -1383,13 +1713,26 @@ if (document.readyState === "loading") {
     white-space: pre;
     line-height: 1.5;
     opacity: var(--fo, .1);
-    transition: color .5s ease, opacity .5s ease;
     will-change: opacity;
   }
   .frag s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
-  body.danger .frag { color: var(--red); opacity: min(calc(var(--fo, .1) * 3.4), .5); }
+  /* Danger transitions live ONLY on the danger-state selectors: the graveyard
+     closes in over .5s when danger arrives, but recovery (DESIGN.md: one
+     keystroke clears danger instantly, no lingering transitions) finds no
+     transition property in the after-change state and snaps back in one frame. */
+  body.danger .frag { color: var(--red); opacity: min(calc(var(--fo, .1) * 3.4), .5); transition: color .5s ease, opacity .5s ease; }
   .frag.join-new { color: var(--red); opacity: .85; font-size: 13px; }
-  .frag.join-new.settle { color: var(--ink); opacity: var(--fo, .09); transition: color 1.6s ease, opacity 1.6s ease; }
+  /* The 1.6s settle fade is scoped to the .settling window joinPile opens when
+     it adds .settle (closed once the fade completes), so a danger clear that
+     lands on an already-settled fossil is instant instead of re-fading 1.6s. */
+  .frag.join-new.settle { color: var(--ink); opacity: var(--fo, .09); }
+  .frag.join-new.settling { transition: color 1.6s ease, opacity 1.6s ease; }
+  /* Danger closes in on the whole pile (DESIGN.md states): the plain
+     body.danger .frag rule loses specificity to the two join-new rules above,
+     so restate both states explicitly - the arrival flash keeps its red .85,
+     settled joined fossils redden and strengthen x3.4 like every other fossil. */
+  body.danger .frag.join-new { color: var(--red); opacity: .85; }
+  body.danger .frag.join-new.settle { color: var(--red); opacity: min(calc(var(--fo, .09) * 3.4), .5); transition: color .5s ease, opacity .5s ease; }
 
   .veil {
     position: fixed;
@@ -1445,6 +1788,36 @@ if (document.readyState === "loading") {
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
   .hero-hint { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 14px; }
 
+  .demo-writing-surface.denied, .trial-writing-surface.denied {
+    animation: deny-shake .16s ease;
+  }
+  .demo-writing-surface.deny-hair, .trial-writing-surface.deny-hair {
+    box-shadow: inset 0 0 0 2px var(--red);
+  }
+  /* The hairline must still read during danger: compose it over the danger
+     shadows instead of losing to their higher specificity. */
+  body.danger .demo-writing-surface.deny-hair {
+    box-shadow: inset 0 0 0 2px var(--red), 0 1px 0 rgba(23, 21, 15, .06), 0 24px 60px rgba(23, 21, 15, .1), 0 0 0 4px rgba(200, 57, 47, .08);
+  }
+  body.danger .trial-writing-surface.deny-hair {
+    box-shadow: inset 0 0 0 2px var(--red), inset 0 0 160px rgba(200, 57, 47, .22), inset 0 0 44px rgba(200, 57, 47, .1);
+  }
+  .sr-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  @keyframes deny-shake {
+    0%, 100% { transform: translateX(0); }
+    50% { transform: translateX(-2px); }
+  }
+
   /* ---------- the paper: the only clean thing ---------- */
   .demo-writing-surface {
     position: relative;
@@ -1454,7 +1827,9 @@ if (document.readyState === "loading") {
     border: 1px solid rgba(23, 21, 15, .2);
     border-radius: var(--radius);
     box-shadow: 0 1px 0 rgba(23, 21, 15, .06), 0 24px 60px rgba(23, 21, 15, .1);
-    min-height: 460px;
+    /* 静止态与激活态同高：激活时不跳变，居中 zen 文字有呼吸空间（不逼仄）。 */
+    height: clamp(480px, 62vh, 640px);
+    min-height: 0;
     cursor: text;
     overflow: hidden;
     transition: border-color .3s ease, box-shadow .3s ease, transform .15s ease;
@@ -1549,10 +1924,15 @@ if (document.readyState === "loading") {
 
   .demo-placeholder {
     grid-area: 1 / 1;
-    padding: 26px 30px 76px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: clamp(138px, calc(23.56vh - 45px), 199px) 30px 76px;
     font-style: italic;
-    font-size: 19px;
-    line-height: 1.8;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.62;
+    letter-spacing: -.01em;
+    text-align: center;
     color: var(--faint);
     pointer-events: none;
     transition: opacity .2s ease;
@@ -1561,9 +1941,18 @@ if (document.readyState === "loading") {
   .demo-writing-surface.is-live .demo-placeholder { display: none; }
 
   .demo-preview {
-    padding: 26px 30px 76px;
-    font-size: 19px;
-    line-height: 1.8;
+    /* demo 预览与实时编辑器 .live-demo-editor 视觉一致：居中、同字号/行高/字距，
+       demo→live 交接无跳变，读起来是同一个 zen 写作视图。
+       竖直锚点：首行从纸面 ~38% 起（与 live editor 的 INLINE_ANCHOR=0.38 静止相一致），
+       样本较短无需滚动，向下生长即可。 */
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: clamp(138px, calc(23.56vh - 45px), 199px) 30px 76px;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.62;
+    letter-spacing: -.01em;
+    text-align: center;
     color: var(--ink);
     white-space: pre-wrap;
     overflow-wrap: break-word;
@@ -1614,6 +2003,9 @@ if (document.readyState === "loading") {
     color: var(--faint);
     font-style: italic;
   }
+  /* IME 合成期占位符让位给 marked text（editor 子树是 data-ignore，命令式加类与 is-demo-danger 同款） */
+  .live-demo-editor.is-composing .trial-thought[data-empty="true"]::before,
+  .trial-editor.is-composing .trial-thought[data-empty="true"]::before { content: none; }
   .live-demo-editor.is-demo-danger .trial-thought.is-current { color: rgba(23, 21, 15, .4); }
 
   .demo-writing-surface.is-live {
@@ -1694,9 +2086,51 @@ if (document.readyState === "loading") {
     text-transform: uppercase;
     color: var(--faint);
   }
-  .trial-result-text {
-    display: none;
+  .result-metric-sub {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    color: var(--dim);
   }
+  .trial-result-text {
+    display: block;
+    max-width: 480px;
+    /* Exactly ~3 full line boxes of text: 3 * line-height (5.1em at 13px) plus
+       the 28px vertical padding and 2px border that border-box swallows. */
+    max-height: calc(5.1em + 30px);
+    overflow: hidden;
+    margin-top: 14px;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--dim);
+    text-align: left;
+    white-space: pre-wrap;
+    overflow-wrap: break-word;
+    border: 1px dashed var(--line-strong);
+    transform: rotate(-.5deg);
+  }
+  .trial-result-links {
+    display: flex;
+    gap: 18px;
+    justify-content: center;
+    margin-top: 14px;
+    color: var(--dim);
+  }
+  .trial-result-links a, .trial-result-links button {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    background: none;
+    border: 0;
+    cursor: pointer;
+    /* Pad to a >=32px hit target; negative margin keeps the layout from jumping. */
+    padding: 10px 6px;
+    margin: -10px -6px;
+  }
+  .trial-result-links a:hover, .trial-result-links button:hover { color: var(--ink); }
+  .trial-result-links a:focus-visible, .trial-result-links button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .trial-result-actions {
     display: flex;
     gap: 10px;
@@ -1706,18 +2140,18 @@ if (document.readyState === "loading") {
   }
   .trial-result-actions .cta { font-size: 12px; padding: 12px 18px; }
   .trial-export-actions { margin-top: 22px; }
-  .trial-download-link {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--faint);
-    align-self: center;
-  }
-  .trial-download-link:hover { color: var(--ink); }
   .trial-failure-card { gap: 12px; }
   .demo-failure .trial-result-card, .trial-failure .trial-result-card {
     border-top: 2px solid var(--red);
     box-shadow: 0 1px 0 rgba(23, 21, 15, .05);
     border-radius: 0 0 var(--radius) var(--radius);
+    background: rgba(255, 255, 255, .9);
+  }
+  /* the failure card waits a beat: the fossil lands first, then the verdict */
+  .demo-failure, .trial-failure { animation: failure-in .4s ease .55s both; }
+  @keyframes failure-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .trial-failure-title {
     font-weight: 500;
@@ -1853,7 +2287,7 @@ if (document.readyState === "loading") {
   }
   .site-footer p { margin: 0; }
   .footer-nav { display: flex; gap: 16px; flex-wrap: wrap; }
-  .footer-nav a { color: var(--faint); }
+  .footer-nav a { color: var(--dim); }
   .footer-nav a:hover { color: var(--ink); }
   .footer-nav a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
 
@@ -1871,7 +2305,7 @@ if (document.readyState === "loading") {
     position: absolute;
     inset: 0;
     overflow-y: auto;
-    background: var(--paper);
+    background: var(--bg);
     transition: box-shadow .35s ease;
   }
   body.danger .trial-writing-surface {
@@ -2025,7 +2459,7 @@ if (document.readyState === "loading") {
     display: grid;
     place-items: center;
     padding: 24px;
-    background: var(--paper);
+    background: rgba(255, 255, 255, .72);
   }
   .trial-result .trial-result-card, .trial-failure .trial-result-card {
     width: min(700px, 100%);
@@ -2034,6 +2468,7 @@ if (document.readyState === "loading") {
     flex-direction: column;
     align-items: center;
     gap: 6px;
+    background: rgba(255, 255, 255, .86);
   }
   .trial-toast {
     position: fixed;
@@ -2062,7 +2497,11 @@ if (document.readyState === "loading") {
     .hero-action-block { margin-top: 26px; }
     .demo-writing-surface { min-height: 420px; }
     .paper-head { padding: 10px 12px; font-size: 9.5px; letter-spacing: .08em; }
-    .demo-preview, .demo-placeholder { padding: 22px 20px 88px; font-size: 17px; }
+    /* Zen anchor (padding-top) stays from base: the demo preview/placeholder must
+       stay anchored at ~38% of the sheet on mobile too, identical to the live
+       editor, so the demo->live handoff has no vertical jump. Only tighten the
+       horizontal gutters and share the live editor's mobile font-size. */
+    .demo-preview, .demo-placeholder { padding-left: 20px; padding-right: 20px; font-size: 18px; }
     .live-demo-editor { padding: 22px 20px 88px; font-size: 18px; min-height: 300px; }
     .live-demo-danger { gap: 8px; }
     .live-demo-danger .danger-count { font-size: 84px; }
@@ -2094,12 +2533,10 @@ if (document.readyState === "loading") {
 
 </head>
 <body
-  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false}}'
+  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false,"narrator":"the pile is patient. it gets whatever you stop writing.","narratorDead":false,"srStatus":"","denyActive":false,"denyHair":false}}'
   data-computed:_session.clock="String(Math.floor($_session.remaining/60)).padStart(2,'0')+':'+String($_session.remaining%60).padStart(2,'0')"
   data-computed:_session.liveWords="($_session.text.match(/[\u4e00-\u9fff]/g)||[]).length + ($_session.text.replace(/[\u4e00-\u9fff]/g,' ').match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[]).length"
   data-class:trial-mode="$_session.context === 'trial'"
-  data-class:trial-complete="$_session.complete &amp;&amp; $_session.context === 'trial'"
-  data-class:trial-failed="$_session.failed &amp;&amp; $_session.context === 'trial'"
   data-class:trial-morphing="$_session.morphing"
   data-class:danger="$_session.dangerActive"
   data-on-interval__duration.100ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
@@ -2107,7 +2544,7 @@ if (document.readyState === "loading") {
   data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
   data-on:flactivate="$_session.context = 'inline'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flentertrial="$_session.context = 'trial'; $_session.duration = 60; $_session.failed = false; $_session.complete = false; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; evt.detail.handoff || (($_session.active = false, $_session.text = '', $_session.startedAt = 0, $_session.lastInputAt = 0, $_session.remaining = 60)); $_session.toastVisible = false; $_session.toastText = ''"
-  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
+  data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''; $_session.narratorDead || ($_session.narrator = 'the pile is patient. it gets whatever you stop writing.')"
   data-on:flcomplete="$_session.active = false; $_session.complete = true; $_session.failed = false; $_session.resultText = evt.detail.resultText; $_session.resultWords = evt.detail.resultWords; $_session.resultWordCount = evt.detail.resultWordCount; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flfail="$_session.active = false; $_session.failed = true; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.resultText = ''; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''; FirstLineLandingDemo.joinPile(evt.detail.lostText)"
   data-on:fldanger="$_session.dangerSeconds = evt.detail.dangerSeconds; $_session.dangerActive = evt.detail.dangerActive; (typeof evt.detail.remaining !== 'undefined') &amp;&amp; ($_session.remaining = evt.detail.remaining)"
@@ -2119,12 +2556,19 @@ if (document.readyState === "loading") {
   data-on:flpromptreset="$_session.promptIndex = evt.detail.index; $_session.promptOpen = false; $_session.promptText = FirstLineLandingDemo.promptAt(evt.detail.index)"
   data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.resultText = ''; $_session.resultWords = ''; $_session.resultWordCount = 0; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.toastVisible = false; $_session.toastText = ''"
   data-on:flmorphing="$_session.morphing = evt.detail.v"
+  data-on:flnarrator="$_session.narrator = evt.detail.text"
+  data-on:flnarratordead="$_session.narratorDead = evt.detail.v"
+  data-on:flsrstatus="$_session.srStatus = evt.detail.text"
+  data-on:fldeny="$_session.denyActive = evt.detail.active; $_session.denyHair = evt.detail.hair"
+  data-on:fldenyhair="$_session.denyHair = evt.detail.hair"
+  data-on:fldenyclear="$_session.denyActive = false; $_session.denyHair = false; $_session.srStatus = ''"
   data-on:keydown__document="FirstLineLandingDemo.onGlobalKeydown(evt, $_session.text, $_session.context, $_session.startedAt)"
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
   data-on:flroutecheck="$_session.morphing ? '' : ((location.hash === '#trial' &amp;&amp; $_session.context !== 'trial') ? FirstLineLandingDemo.startTrial(null) : ((location.hash !== '#trial' &amp;&amp; $_session.context === 'trial') ? FirstLineLandingDemo.exitTrial() : ''))"
 >
   <div class="flood" aria-hidden="true"><div class="flood-base" id="floodBase"></div><div class="flood-joined" id="floodJoined"></div></div>
   <div class="veil" aria-hidden="true"></div>
+  <p class="sr-status" role="status" aria-live="polite" data-text="$_session.srStatus"></p>
   <div class="sheet">
     <main id="top">
       <section class="hero-frame">
@@ -2146,7 +2590,7 @@ if (document.readyState === "loading") {
                     <p class="hero-hint">or just click the paper and type</p>
                   </div>
                 </div>
-                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-on:click="evt.target.closest('button, a') ? '' : FirstLineLandingDemo.startTrial(evt)">
+                <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-class:denied="$_session.denyActive &amp;&amp; $_session.context !== 'trial'" data-class:deny-hair="$_session.denyHair &amp;&amp; $_session.context !== 'trial'" data-on:click="evt.target.closest('button, a') ? '' : FirstLineLandingDemo.startTrial(evt)">
                   <div class="paper-head">
                     <span class="spec">forward only <b>/</b> 5s warn <b>/</b> 8s wipe <b>/</b> 60s</span>
                     <div class="head-right">
@@ -2179,6 +2623,7 @@ if (document.readyState === "loading") {
                     <div class="result-metric">
                       <span class="result-metric-number" data-text="$_session.resultWordCount"></span>
                       <span class="result-metric-label">words you would not have written</span>
+                      <span class="result-metric-sub" data-text="$_session.resultWords"></span>
                     </div>
                     <article class="trial-result-text" data-text="$_session.resultText"></article>
                     <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
@@ -2186,9 +2631,9 @@ if (document.readyState === "loading") {
                       <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
                       <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
                     </div>
-                    <div class="trial-result-actions">
-                      <button type="button" class="cta secondary trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
-                      <a class="cta secondary" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write fullscreen</a>
+                    <div class="trial-result-links">
+                      <button type="button" class="trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
+                      <a href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write fullscreen</a>
                     </div>
                   </div>
                 </section>
@@ -2203,7 +2648,7 @@ if (document.readyState === "loading") {
                   </div>
                 </section>
               </div>
-              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status">everything you stop writing joins the pile.</span><span class="live-demo-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
+              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="live-demo-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
               <p class="demo-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context !== 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
             </div>
           </section>
@@ -2238,8 +2683,8 @@ if (document.readyState === "loading") {
     </footer>
   </div>
   <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="Zero Draft writing trial" aria-hidden="true">
-    <div class="trial-writing-surface">
-      <div class="flood trial-flood" id="trialFlood" aria-hidden="true"></div>
+    <div class="trial-writing-surface" data-class:denied="$_session.denyActive &amp;&amp; $_session.context === 'trial'" data-class:deny-hair="$_session.denyHair &amp;&amp; $_session.context === 'trial'">
+      <div class="flood trial-flood" aria-hidden="true"><div class="flood-base" id="trialFlood"></div><div class="flood-joined" id="trialJoined"></div></div>
       <div class="trial-hud" aria-label="Trial status">
         <span class="trial-timer" data-text="$_session.clock">01:00</span>
         <span class="trial-spec">forward only / 5s warn / 8s wipe / 60s</span>
@@ -2263,6 +2708,7 @@ if (document.readyState === "loading") {
           <div class="result-metric">
             <span class="result-metric-number" data-text="$_session.resultWordCount"></span>
             <span class="result-metric-label">words you would not have written</span>
+            <span class="result-metric-sub" data-text="$_session.resultWords"></span>
           </div>
           <article class="trial-result-text" data-text="$_session.resultText"></article>
           <div class="trial-result-actions trial-export-actions" aria-label="Export draft">
@@ -2270,9 +2716,9 @@ if (document.readyState === "loading") {
             <button type="button" class="cta secondary trial-copy-ai" data-on:click="FirstLineLandingDemo.copyForAI($_session.resultText || $_session.text)">Copy for AI</button>
             <button type="button" class="cta secondary trial-download-md" data-on:click="FirstLineLandingDemo.download($_session.resultText || $_session.text)">Download .md</button>
           </div>
-          <div class="trial-result-actions">
-            <button type="button" class="cta secondary trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
-            <button type="button" class="cta secondary trial-close" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
+          <div class="trial-result-links">
+            <button type="button" class="trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
+            <button type="button" class="trial-close" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
           </div>
         </div>
       </section>
@@ -2287,7 +2733,7 @@ if (document.readyState === "loading") {
         </div>
       </section>
       <p class="trial-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context === 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
-      <div class="trial-foot" aria-hidden="true"><span class="live-demo-status">everything you stop writing joins the pile.</span><span class="trial-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
+      <div class="trial-foot" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="trial-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
     </div>
   </div>
   <script>

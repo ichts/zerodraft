@@ -5,7 +5,9 @@
 .pi/
 .pi-subagents/
 .playwright-mcp/
+.lavish/
 tmp/
+pi-session-*.html
 
 # Build artifacts
 .build/

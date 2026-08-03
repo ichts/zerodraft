@@ -71,14 +71,15 @@ Corpus register (hard rule): every line is a fossil of hesitation - abandoned, i
 Layout algorithm (JS, seeded RNG, re-run on debounced resize and `document.fonts.ready`):
 
 - Protect the clean column: the paper, the payoff block, and the hero text measured by a `Range` over the h1 (true text width, not block width).
-- Desktop: fragments live only in the left/right gutters beside the clean column (regions are `overflow: hidden` so fragments clip at the column edge - the mess continues "under" the clean sheet) plus one faint full-width band above the hero.
+- Desktop: fragments live only in the left/right gutters beside the clean column (regions are `overflow: hidden` so fragments clip at the column edge - the mess continues "under" the clean sheet). Gutter opacity `.09-.18` via `--fo`, sizes 13-28px, rotation ±5deg. One near-invisible full-width band (opacity `.05-.10`) may sit above the hero, and one axis band of mess (opacity `.14-.22`, 12-17px, single fragment per row) sits directly in the reading axis between the CTA and the paper - the graveyard reaches the paper's edge without touching the words.
 - Mobile (<700px): fragments live in horizontal bands in the gaps between clean blocks (nav-hero, hero-paper, paper-payoff, below payoff), smaller and sparser; never behind the paper or the hero CTA row.
-- Stratified rows (~96px desktop, 60px mobile) with jitter; corpus shuffled without repeats; sizes 13-28px (mobile 11-15px); rotation ±5deg; opacity `.09-.18` via `--fo` (mobile `.07-.14`, top band `.05-.10`).
+- Stratified rows (~96px desktop, 60px mobile) with jitter; corpus shuffled without repeats; rotation ±5deg.
+- The fullscreen trial runs on the same bone ground (`--bg`): on desktop the fossil layer strengthens across both margins (12-22px, opacity `.05-.11`); on mobile it protects a full-width ~200px band around the ~30% anchor line and places fragments in the bands above and below it, never under the current line - the trial is the same world as the landing, never a calmer white void.
 
 States:
 
 - Danger: all fragments `color: var(--red)` and `opacity: min(var(--fo)*3.4, .5)` with a .5s transition - the graveyard closes in.
-- Wipe (joinPile): the lost draft (first ~64 chars, whitespace-collapsed) becomes a new fragment near the paper: red flash at .85 opacity, then settles over 1.6s to faint ink, persisting for the visit in a separate `.flood-joined` layer. "gone. it joined the pile." is a warning, delivered deadpan.
+- Wipe (joinPile): the lost draft (first ~64 chars, whitespace-collapsed) becomes a new fragment - red flash at .85 opacity, then settles over 1.6s to faint ink, persisting for the visit in a dedicated joined sublayer (`#floodJoined` on the landing, `#trialJoined` in the trial) that flood relayout (debounced resize, font readiness) never rebuilds. When the wipe happens in the fullscreen trial, the fragment lands in the trial's joined layer within ~200px of the last line, and the failure surface holds back ~600ms and stays translucent so the arrival is seen first. "gone. it joined the pile." is a warning, delivered deadpan.
 - No float, drift, or pulse animations. The pile is dead things; dead things do not move.
 
 ## 6. The paper (the tool)
@@ -94,8 +95,10 @@ The only clean thing on the page. Anatomy, top to bottom:
    - Session: "forward only. don't stop."
    - Blocked action (deny): "no going back." (1.2s, plus a 2px paper shake, 160ms)
    - Wipe: "gone. it joined the pile." in red, durable until the next session starts.
-   - Right tag: "fwd only".
-6. **Result card** (covers the paper): serif metric `N`, label "words you would not have written", sub "session: Ns - forward only", actions in this order: **Copy full text (primary, ink)**, Copy for AI (ghost), Download .md (ghost), Go again (ghost). On finish: Finish button hides, focus lands on the primary action. Copy for AI = cleanup prompt + raw text via `navigator.clipboard`; Download .md via Blob.
+   - Right slot: live word count (replaces the fwd-only tag).
+6. **Result card** (covers the paper): serif metric `N`, label "words you would not have written", sub "session: Ns - forward only", and the draft itself printed below the metric in the raw-card treatment (mono ~13px, dashed border, slight rotate, first ~3 lines) - the keep screen shows the goods, not just a number. Actions in this order: **Copy full text (primary, ink)**, Copy for AI (ghost), Download .md (ghost), Go again (text link). On finish: Finish button hides, focus lands on the primary action. Copy for AI = cleanup prompt + raw text via `navigator.clipboard`; Download .md via Blob.
+
+The paper's writing area (preview and live inline editor alike) renders zen-centered: Newsreader, text centered, with the current line anchored at roughly 38% of the sheet height - matching the inline live editor's anchor, so the landing demo and the live session read as one continuous writing view across the handoff. (The fullscreen trial anchors lower, near 30%.)
 
 ## 7. Danger choreography
 
@@ -109,13 +112,15 @@ Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms
 | Sheet | full | opacity .35 | clears to empty |
 | Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
 
-The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft itself stays readable - threat comes from the environment, not from damaging the text.
+The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft dims as silence grows - the threat looks like it is already eating the words - but the words are never edited, blurred out, or deleted before the wipe itself. Threat comes from the environment, not from touching the text.
 | Clock | ink | red | resets after aftermath |
 | Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
 
 Recovery: one keystroke clears danger instantly (all classes off, no lingering transitions). After wipe the "gone" message and "Draft deleted" placeholder persist until the user starts again - deletion has a durable consequence, not a 2-second flash.
 
-Demo preview (the page teaches before the user touches it): types the sample once (~30-76ms jitter per char), holds ~5.2s so the decay is felt, shows the danger beat ~2.8s, recovers, then stays static forever. Pauses while offscreen (`IntersectionObserver`, threshold .15) or `document.hidden`; the preview clock only advances while unpaused. Any real input (keydown anywhere, click, IME start) interrupts permanently and clears the sample. Under `prefers-reduced-motion` the completed sample renders statically and nothing ever plays.
+Every blocked action (delete, paste, cut, undo, selection-replace) has a body: the narrator flashes "no going back." in red for ~1.2s, the paper shakes 2px for 160ms, and a red hairline flashes on its border for 90ms. The teeth are felt, not just logged.
+
+Demo preview (the page teaches before the user touches it): types the sample once at a human cadence (base 120-190ms per char, longer at spaces, punctuation, and newlines), then holds a mid-sample teaching pause: the real 5-second danger beat is felt, and at 6.5 seconds the danger clears and typing resumes. The sample finishes, then goes silent for real: danger 3-2-1, the draft is deleted at 8 seconds, and its first ~64 chars fly out of the paper into the gutter - a red fossil that settles to faint ink while the narrator turns durable red: "gone. it joined the pile." The placeholder becomes "Draft deleted. Type to start over." The one-shot two-pause arc delivers the entire positioning: survive the beat, lose the next one. Pauses while offscreen (`IntersectionObserver`, threshold .15) or `document.hidden`; the preview clock only advances while unpaused. Any real input (keydown anywhere, click, IME start) interrupts permanently: the preview freezes and restores the completed sample - no fossil, no dead state. Under `prefers-reduced-motion` the dead state renders statically: empty sheet, one settled fossil, the dead red line.
 
 ## 8. Motion rules
 

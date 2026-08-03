@@ -30,6 +30,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyResetWorkItem: DispatchWorkItem?
     private var lastObservedDenyAt: TimeInterval?
     private var tickTimer: Timer?
+    private var denyShakeOffset: CGFloat = 0
+    private var denyShakeWorkItem: DispatchWorkItem?
+    private var denyHairlineActive = false
+    private var denyHairlineWorkItem: DispatchWorkItem?
 
     // 子视图
     private var scrollView: NSScrollView!
@@ -41,6 +45,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var topChrome: NSView!
     private var paperContainer: NSView!
     private var veilView: NSView!
+    private var fossilLayer: FossilLayerView!
+    private var denyHairlineView: NSView!
+    private var failureFossilLabel: NSTextField!
     private var countdownLabel: NSTextField!
     private var countdownHint: NSTextField!
     private var narratorLabel: NSTextField!
@@ -73,9 +80,20 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        applyReducedMotionToFossils()
         startTicker()
         installDidBecomeKeyObserver()
         grabFocus()
+    }
+
+    private func applyReducedMotionToFossils() {
+        let reduces: Bool
+        switch appState.settings.reducedMotion {
+        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case .always: reduces = true
+        case .never: reduces = false
+        }
+        fossilLayer.setDanger(engine.phase == .danger, reducesMotion: reduces)
     }
 
     override func viewWillDisappear() {
@@ -190,6 +208,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         veilView.isHidden = true
         view.addSubview(veilView)
 
+        // Fossil soul layer：铺满 bone，只在 gutter，不接事件。
+        fossilLayer = FossilLayerView(paperColumnWidth: 720)
+        fossilLayer.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(fossilLayer, positioned: .below, relativeTo: paperContainer)
+
         countdownLabel = NSTextField(labelWithString: "")
         countdownLabel.translatesAutoresizingMaskIntoConstraints = false
         countdownLabel.font = NSFont.monospacedSystemFont(ofSize: 104, weight: .regular)
@@ -205,6 +228,25 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countdownHint.alignment = .center
         countdownHint.isHidden = true
         view.addSubview(countdownHint)
+
+        // failure wiped-text fossil（被删除草稿的前 64 字作为 margin fossil）
+        failureFossilLabel = NSTextField(labelWithString: "")
+        failureFossilLabel.translatesAutoresizingMaskIntoConstraints = false
+        failureFossilLabel.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
+        failureFossilLabel.textColor = FirstLineColors.inkNSColor.withAlphaComponent(0.14)
+        failureFossilLabel.alignment = .center
+        failureFossilLabel.isHidden = true
+        view.addSubview(failureFossilLabel)
+
+        // deny hairline：闪现的红纸边（90ms），独立 overlay 在纸容器上。
+        denyHairlineView = NSView()
+        denyHairlineView.translatesAutoresizingMaskIntoConstraints = false
+        denyHairlineView.wantsLayer = true
+        denyHairlineView.layer?.cornerRadius = 6
+        denyHairlineView.layer?.borderWidth = 1
+        denyHairlineView.layer?.borderColor = FirstLineColors.dangerNSColor.cgColor
+        denyHairlineView.layer?.opacity = 0
+        paperContainer.addSubview(denyHairlineView)
 
         // 5. narrator strip
         narratorLabel = NSTextField(labelWithString: "")
@@ -266,6 +308,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             scrollView.trailingAnchor.constraint(equalTo: paperContainer.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: paperContainer.bottomAnchor),
 
+            // deny hairline 贴纸边
+            denyHairlineView.topAnchor.constraint(equalTo: paperContainer.topAnchor),
+            denyHairlineView.leadingAnchor.constraint(equalTo: paperContainer.leadingAnchor),
+            denyHairlineView.trailingAnchor.constraint(equalTo: paperContainer.trailingAnchor),
+            denyHairlineView.bottomAnchor.constraint(equalTo: paperContainer.bottomAnchor),
+
             // topChrome
             topChrome.topAnchor.constraint(equalTo: g.topAnchor),
             topChrome.leadingAnchor.constraint(equalTo: g.leadingAnchor),
@@ -293,6 +341,17 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             veilView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             veilView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             veilView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            // fossil 铺满（在 veil 之下、paper 之下）
+            fossilLayer.topAnchor.constraint(equalTo: view.topAnchor),
+            fossilLayer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            fossilLayer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            fossilLayer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            // failure wiped-text fossil：右侧 margin，纵向居中偏下
+            failureFossilLabel.widthAnchor.constraint(equalToConstant: 220),
+            failureFossilLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -150),
+            failureFossilLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
 
             // countdown
             countdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
@@ -396,6 +455,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             }
             denyResetWorkItem = work
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
+            triggerDenyFeedback()
         }
         applyNarrator()
     }
@@ -456,6 +516,26 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
            window.firstResponder !== textView {
             grabFocus()
         }
+
+        // fossil danger 色
+        let reduces: Bool
+        switch appState.settings.reducedMotion {
+        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case .always: reduces = true
+        case .never: reduces = false
+        }
+        fossilLayer.setDanger(isDanger, reducesMotion: reduces)
+
+        // failure wiped-text fossil
+        if phase == .failure {
+            let collapsed = engine.wipedText
+                .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+                .joined(separator: " ")
+            failureFossilLabel.stringValue = String(collapsed.prefix(64))
+            failureFossilLabel.isHidden = collapsed.isEmpty
+        } else {
+            failureFossilLabel.isHidden = true
+        }
     }
 
     private func applyNarrator() {
@@ -489,6 +569,52 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     @objc private func finishTapped() { engine.finish() }
     @objc private func abandonTapped() { appState.abandonSession() }
+
+    // MARK: - Deny feedback (shake + hairline)
+
+    private func triggerDenyFeedback() {
+        // 红 hairline 闪 90ms（色/透明度变化，reduce-motion 下仍允许）。
+        denyHairlineActive = true
+        denyHairlineView.layer?.opacity = 1
+        denyHairlineWorkItem?.cancel()
+        let hairline = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.denyHairlineActive = false
+                self.denyHairlineView.layer?.opacity = 0
+            }
+        }
+        denyHairlineWorkItem = hairline
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09, execute: hairline)
+
+        let reduces: Bool
+        switch appState.settings.reducedMotion {
+        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case .always: reduces = true
+        case .never: reduces = false
+        }
+        guard reduces == false else { return }
+        // 2px 水平摇 ~160ms：-2 -> +2 -> 0
+        denyShakeWorkItem?.cancel()
+        denyShakeOffset = -2
+        paperContainer.layer?.setAffineTransform(CGAffineTransform(translationX: -2, y: 0))
+        let half = 0.08
+        DispatchQueue.main.asyncAfter(deadline: .now() + half) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.paperContainer.layer?.setAffineTransform(CGAffineTransform(translationX: 2, y: 0))
+            }
+        }
+        let reset = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.denyShakeOffset = 0
+                self.paperContainer.layer?.setAffineTransform(.identity)
+            }
+        }
+        denyShakeWorkItem = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + half * 2, execute: reset)
+    }
 
     // MARK: - NSTextViewDelegate（照搬 Coordinator 守卫）
 

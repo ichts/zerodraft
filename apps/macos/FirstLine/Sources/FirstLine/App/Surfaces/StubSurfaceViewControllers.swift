@@ -57,10 +57,9 @@ final class StubSurfaceView: NSView {
 final class HomeViewController: StubSurfaceViewController {
     init(appState: AppState) { super.init(surface: .home, appState: appState) }
 }
-@MainActor
-final class SessionViewController: StubSurfaceViewController {
-    init(appState: AppState) { super.init(surface: .session, appState: appState) }
-}
+// Note: SessionViewController is the real AppKit implementation in
+// Session/SessionViewController.swift (Phase 2a). It is NOT a stub.
+
 @MainActor
 final class FailureViewController: StubSurfaceViewController {
     init(appState: AppState) { super.init(surface: .failure, appState: appState) }

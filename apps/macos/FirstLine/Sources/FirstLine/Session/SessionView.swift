@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppState、SessionEngine、Editor bridge 和 DesignSystem token
- * [OUTPUT]: 提供 SessionView 主写作界面，包含 danger veil、倒计时、narrator strip 与 failure aftermath
+ * [OUTPUT]: 提供 SessionView 主写作界面，包含 Flood bone ground、静态 fossil 层、paper 列、danger veil、倒计时、narrator strip 与 deny 反馈
  * [POS]: FirstLine 的核心会话模式，负责 append-only 输入与 danger/failure/success 循环
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -12,12 +12,22 @@ struct SessionView: View {
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @State private var denyFlashActive = false
     @State private var denyResetTask: Task<Void, Never>?
+    @State private var denyShakeOffset: CGFloat = 0
+    @State private var denyHairlineActive = false
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .top) {
-                FirstLineColors.paper
+                // Flood soul: bone canvas ground, paper is bounded to the writing column.
+                FirstLineColors.canvas
                     .ignoresSafeArea()
+
+                FossilLayer(
+                    isDanger: isDanger,
+                    paperColumnWidth: 720,
+                    reducesMotion: shouldReduceMotion
+                )
+                .ignoresSafeArea()
 
                 Group {
                     if isDanger {
@@ -31,8 +41,7 @@ struct SessionView: View {
                 VStack(spacing: 0) {
                     Spacer(minLength: max(24, proxy.size.height * 0.06))
 
-                    editorStack
-                        .frame(maxWidth: 720)
+                    paperColumn
 
                     Spacer(minLength: max(260, proxy.size.height * 0.38))
                 }
@@ -63,7 +72,7 @@ struct SessionView: View {
                     .frame(maxHeight: .infinity, alignment: .bottom)
             }
             .compositingGroup()
-            .onReceive(Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()) { _ in
+            .onReceive(Timer.publish(every: 0.1, on: .main, in: .common).autoconnect()) { _ in
                 appState.handleTick()
             }
             .onChange(of: appState.sessionEngine.lastDenyAt) { _, newValue in
@@ -74,6 +83,7 @@ struct SessionView: View {
                     try? await Task.sleep(nanoseconds: 1_200_000_000)
                     if Task.isCancelled == false { denyFlashActive = false }
                 }
+                triggerDenyFeedback()
             }
         }
     }
@@ -155,6 +165,49 @@ struct SessionView: View {
         }
     }
 
+    /// The clean white paper: the editor column bounded to maxWidth 720, sitting on
+    /// the bone canvas. White is the surface of the paper only, not the window.
+    private var paperColumn: some View {
+        editorStack
+            .frame(maxWidth: 720)
+            .frame(minHeight: 520)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(FirstLineColors.paper)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(FirstLineColors.faint.opacity(0.5), lineWidth: 1)
+            )
+            .shadow(color: FirstLineColors.ink.opacity(0.06), radius: 24, x: 0, y: 12)
+            // Deny feedback: a 2px horizontal shake of the paper, suppressed under reduced motion.
+            .offset(x: denyShakeOffset)
+            // Deny feedback: a red hairline that flashes on the paper border for ~90ms.
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(FirstLineColors.danger, lineWidth: 1)
+                    .opacity(denyHairlineActive ? 1 : 0)
+            )
+    }
+
+    private func triggerDenyFeedback() {
+        // The red hairline is a color/opacity flash; it is allowed under reduced motion.
+        denyHairlineActive = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 90_000_000)
+            denyHairlineActive = false
+        }
+
+        guard shouldReduceMotion == false else { return }
+        // 2px horizontal shake for ~160ms: -2 -> +2 -> 0.
+        let half = 0.08
+        denyShakeOffset = -2
+        withAnimation(.easeInOut(duration: half)) { denyShakeOffset = 2 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + half) {
+            withAnimation(.easeInOut(duration: half)) { denyShakeOffset = 0 }
+        }
+    }
+
     private var countdownCluster: some View {
         VStack(spacing: FirstLineSpacing.xs) {
             Text("\(appState.sessionEngine.secondsUntilDeletion)")
@@ -213,7 +266,10 @@ struct SessionView: View {
     }
 
     private var narratorColor: Color {
-        appState.sessionEngine.phase == .failure ? FirstLineColors.danger : FirstLineColors.ui
+        if denyFlashActive {
+            return FirstLineColors.danger
+        }
+        return appState.sessionEngine.phase == .failure ? FirstLineColors.danger : FirstLineColors.ui
     }
 
     private var fossilText: String {

@@ -54,7 +54,8 @@ struct SmokeFlowTests {
         appState.handleTick()
 
         #expect(engine.phase == .failure)
-        #expect(appState.librarySessions.isEmpty)
+        let failureSaved = try appState.persistenceService.loadLibrary()
+        #expect(failureSaved.isEmpty)
     }
 
     @Test
@@ -403,6 +404,179 @@ struct SmokeFlowTests {
         #expect(engine.text.isEmpty)
     }
 
+    @Test
+    func emptySessionAtCompletionRoutesHomeAndPersistsNothing() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession(duration: 5)
+        #expect(appState.selectedSurface == .session)
+        // The user never types anything; the deadline arrives.
+        uptime = 5.0
+        appState.handleTick()
+
+        #expect(engine.phase == .idle)
+        #expect(appState.selectedSurface == .home)
+        let emptySaved = try appState.persistenceService.loadLibrary()
+        #expect(emptySaved.isEmpty)
+    }
+
+    // MARK: - Late empty-input routing via state callback (Fix M-B2)
+
+    @Test
+    func lateCommittedTextAfterDeadlineRoutesHomeViaStateCallback() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession(duration: 5)
+        #expect(appState.selectedSurface == .session)
+        // No text is ever typed; the completion deadline has already passed.
+        uptime = 6.0
+        // A late first committed text arrives after the deadline. The engine
+        // adjudicates the empty draft to idle; the state callback routes Home.
+        engine.registerCommittedText("late text")
+
+        #expect(engine.phase == .idle)
+        #expect(appState.selectedSurface == .home)
+        let saved = try appState.persistenceService.loadLibrary()
+        #expect(saved.isEmpty)
+    }
+
+    @Test
+    func lateMarkedTextActivityAfterDeadlineRoutesHome() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession(duration: 5)
+        #expect(appState.selectedSurface == .session)
+        uptime = 6.0
+        // A late IME marked-text event arrives after the completion deadline.
+        engine.registerMarkedTextActivity()
+
+        #expect(engine.phase == .idle)
+        #expect(appState.selectedSurface == .home)
+    }
+
+    // MARK: - 空草稿 finish 永不 success（R4-M1）
+
+    @Test
+    func emptyFinishRoutesHomeAndPersistsNothing() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession(duration: 5)
+        #expect(appState.selectedSurface == .session)
+        // 用户从未输入任何文字，直接 Cmd+Enter。
+        engine.finish()
+
+        #expect(engine.phase == .idle)
+        #expect(appState.selectedSurface == .home)
+        let saved = try appState.persistenceService.loadLibrary()
+        #expect(saved.isEmpty)
+    }
+
+    // MARK: - Durable wipe aftermath (Fix 6)
+
+    @Test
+    func failureCapturesAftermathVisibleAfterGoingHome() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession()
+        engine.registerCommittedText("the lost paragraph text here")
+        uptime = 8.0
+        appState.handleTick()
+
+        #expect(engine.phase == .failure)
+        #expect(appState.lastWipeFossil == "the lost paragraph text here")
+
+        appState.goHome()
+        // The aftermath persists on Home after leaving the failure surface.
+        #expect(appState.lastWipeFossil != nil)
+        #expect(appState.selectedSurface == .home)
+    }
+
+    @Test
+    func startingASessionClearsTheWipeAftermath() throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: configDirectory)
+        )
+
+        appState.startSession()
+        engine.registerCommittedText("doomed draft")
+        uptime = 8.0
+        appState.handleTick()
+        #expect(appState.lastWipeFossil != nil)
+
+        appState.startSession()
+        #expect(appState.lastWipeFossil == nil)
+    }
+
     @MainActor
     @Test
     func failedSaveRetriesWithSnapshotEvenAfterNewSessionStarts() async throws {
@@ -417,7 +591,8 @@ struct SmokeFlowTests {
         let appState = AppState(
             sessionEngine: engine,
             persistenceService: PersistenceService(fileManager: fm, libraryDirectory: badLibrary),
-            settingsStore: SettingsStore(fileManager: fm, configDirectory: tempRoot.appendingPathComponent("Config", isDirectory: true))
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: tempRoot.appendingPathComponent("Config", isDirectory: true)),
+            saveRetryDelayNanoseconds: 20_000_000
         )
 
         appState.startSession()
@@ -432,12 +607,70 @@ struct SmokeFlowTests {
 
         try fm.removeItem(at: blockingFile)
         try fm.createDirectory(at: badLibrary, withIntermediateDirectories: true)
-        try await Task.sleep(nanoseconds: 2_600_000_000)
 
-        let saved = try appState.persistenceService.loadLibrary()
+        let saved = try await waitForSavedCount(1, in: appState.persistenceService, timeoutSeconds: 5)
         #expect(saved.count == 1)
         #expect(saved.first?.body.contains("session A words") == true)
         #expect(saved.first?.body.contains("session B words") == false)
+    }
+
+    @MainActor
+    @Test
+    func concurrentFailingSavesEachGetTheirOwnRetry() async throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        let blockingFile = tempRoot.appendingPathComponent("blocked", isDirectory: false)
+        try "file".write(to: blockingFile, atomically: true, encoding: .utf8)
+        let badLibrary = blockingFile.appendingPathComponent("Library", isDirectory: true)
+
+        let engine = SessionEngine(now: { 0 })
+        let appState = AppState(
+            sessionEngine: engine,
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: badLibrary),
+            settingsStore: SettingsStore(fileManager: fm, configDirectory: tempRoot.appendingPathComponent("Config", isDirectory: true)),
+            saveRetryDelayNanoseconds: 20_000_000
+        )
+
+        // Session A fails to persist; its retry is scheduled (keyed by A's sessionID).
+        appState.startSession()
+        engine.registerCommittedText("session A words")
+        engine.finish()
+
+        appState.abandonSession()
+        // Session B also fails to persist; with the old single-task bug its retry would cancel A's.
+        appState.startSession()
+        engine.registerCommittedText("session B words")
+        engine.finish()
+
+        #expect((try? appState.persistenceService.loadLibrary().isEmpty) != false)
+
+        // Unblock and let both per-session retries persist their own snapshot.
+        try fm.removeItem(at: blockingFile)
+        try fm.createDirectory(at: badLibrary, withIntermediateDirectories: true)
+
+        let saved = try await waitForSavedCount(2, in: appState.persistenceService, timeoutSeconds: 5)
+        #expect(saved.count == 2)
+        let bodies = saved.map(\.body)
+        #expect(bodies.contains(where: { $0.contains("session A words") }))
+        #expect(bodies.contains(where: { $0.contains("session B words") }))
+    }
+
+    /// Polls the library until it reaches `count` entries or `timeoutSeconds` elapses,
+    /// removing the wall-clock fragility of fixed sleeps for the retry path.
+    private func waitForSavedCount(
+        _ count: Int,
+        in service: PersistenceService,
+        timeoutSeconds: TimeInterval
+    ) async throws -> [LibrarySession] {
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        var saved: [LibrarySession] = []
+        while Date() < deadline {
+            saved = (try? service.loadLibrary()) ?? []
+            if saved.count >= count { return saved }
+            try await Task.sleep(nanoseconds: 40_000_000)
+        }
+        return saved
     }
 
 }

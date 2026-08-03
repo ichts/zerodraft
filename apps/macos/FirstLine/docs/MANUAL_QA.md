@@ -28,10 +28,12 @@ Use this checklist before direct distribution.
 - Confirm Backspace / Delete / Paste / Undo do not rewrite prior text.
 
 ## Session feel
-- Confirm there is no obvious bordered editor box in the middle of the session.
-- Confirm the writing area reads like open paper rather than a contained panel.
+- Confirm the session ground is bone canvas with fossils visible in the gutters.
+- Confirm the writing surface is a white paper column (stroked/shadowed, ~720pt) centered on the bone ground.
 - Confirm top chrome uses a subtle progress line plus small timer text.
-- Confirm multiline text still weakens older lines.
+- Confirm multiline text still weakens older lines (zen rendering).
+- Confirm danger turns the fossil layer red (opacity unchanged, color-only transition).
+- Under reduced motion, confirm no fossil animation plays.
 
 ## Chinese IME
 - Switch to Chinese IME.
@@ -41,19 +43,22 @@ Use this checklist before direct distribution.
 
 ## Failure path
 - Start a session.
-- Stop typing for 8 seconds.
+- Type at least one line, then stop typing for 8 seconds.
 - Confirm Failure screen appears.
+- Confirm the narrator line reads `Draft deleted. it joined the pile.` in red.
 - Confirm no new markdown file appears in Library.
+- Return to Home and confirm the durable red aftermath line persists until the next session starts.
 
 ## Success path
 - Complete a session countdown.
 - Confirm Success screen appears.
+- Confirm the primary `Copy full text` button receives focus.
+- Confirm clicking Copy shows a `Copied.` feedback.
 - Confirm markdown file exists in `~/Library/Application Support/First Line/Library/`.
 
 ## Settings
 - Change theme.
 - Confirm the duration row is informational only: `60 seconds. Fixed.` (no control).
-- Toggle immersive session mode.
 - Change reduced motion override.
 - Use Reveal Library Folder.
 
@@ -63,3 +68,26 @@ Use this checklist before direct distribution.
 - Open detail view.
 - Verify Copy Text / Open in Default Editor / Reveal in Finder / Delete.
 - Delete one item and verify file removal from disk.
+
+## Manual QA Record
+
+### 2026-08-02
+
+Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC + Pinyin 输入源。截图存 `/tmp/flqa3/`。
+
+- [x] Session: bone canvas ground、白纸 paper 列（720pt 居中、stroke + shadow）、zen 渲染可见（截图 03/20/21）。
+- [x] Danger: fossil 层变红（纯颜色、opacity 不变）、veil 加强、倒计时 3 + `KEEP TYPING` 文案 + 红色 top hairline（截图 21）。
+- [x] Deny 阻断: Cmd+z undo 与 Backspace 均被阻、文本不变（截图 22/23）。红色 narrator/shake/hairline 的状态驱动有单测覆盖（`EditorFocusTests`）；90ms/1.2s 视觉瞬时未用合成事件捕获（合成事件无权限点不到 90ms 窗口），留真机复核。
+- [x] Failure: 8s 停笔 wipe + FailureView（`Draft deleted.`）+ wiped 文本进 fossil（截图 09/11）；返回 Home 后红色持久行 `Draft deleted. it joined the pile.` + fossil 保持（截图 10）。
+- [x] Success: Cmd+Enter 完成 -> Success 卡（5 words + 预览 + 三动作 + Discard，主 Copy 聚焦蓝色 focus ring）；Copy full text 后 `pbpaste` 实测 = 原文（`deny check draft stays intact`）；markdown 已落盘 `~/Library/Application Support/First Line/Library/`（含 created_at/completed_at/duration/word_count 元数据）；`Copied.` 标签切换未直接观察（AX 按钮名为泛化 `button`，1.2s 窗口未捕获），留真机复核。
+- [x] IME（拼音）: 真实组合 `上` 提交落字成功，marked text 渲染正常（截图 08）；组合期不误触发 failure。
+- [x] 空 session: 60s 空文本到期 -> idle -> 自动回 Home（M-B2 修复实测）；截止瞬间迟到首输入正确裁决为 idle（无卡死 Session 面）。
+- [ ] Reduced motion 视觉项: 未执行（留空）。
+- [ ] Paste/Cut deny: 未执行（留空）。
+- [ ] 980pt 最小宽度 fossil gutter 目测: 未执行（留空）。
+
+#### Notes
+
+- 合成 AX `click at` 无法聚焦编辑器（点 scroll area 后 `AXFocusedUIElement` 仍为 `AXWindow`）；`set focused of text area` 可正常聚焦。真机硬件点击需复核是否自动聚焦编辑器（AppKit NSTextView 在 ScrollView 内点击通常聚焦，但合成事件路径不等价）。
+- session 开始时编辑器不自动聚焦（`AXFocusedUIElement=AXWindow`）。当前 UI 隐藏空草稿 Finish（wordCount > 0 门控），不影响功能；但作为「开场即写」体验，自动聚焦是后续候选改进（audit minor-deferred #3 已记录）。
+- 长 keystroke 字符串在 System Events 下会丢空格（`keystroke "long string"`）；逐 key code 输入（key code 49 = space）正常。这是合成输入的已知限制，非产品缺陷。

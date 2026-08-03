@@ -262,4 +262,40 @@ struct LicenseFlowTests {
         #expect(appState.settings.licenseStatus == .unknown)
         #expect(appState.settings.hasUnlockedFullAccess == false)
     }
+
+    @Test
+    func activationWithFailingPersistenceReportsStorageError() async throws {
+        let fm = FileManager.default
+        let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fm.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        // Make configDirectory uncreatable: its parent is a regular file.
+        let blockingFile = tempRoot.appendingPathComponent("blocked", isDirectory: false)
+        try "file".write(to: blockingFile, atomically: true, encoding: .utf8)
+        let badConfig = blockingFile.appendingPathComponent("Config", isDirectory: true)
+        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
+        defer { try? fm.removeItem(at: tempRoot) }
+
+        let store = SettingsStore(fileManager: fm, configDirectory: badConfig)
+        let mock = MockLicenseClient(activationBehavior: .success)
+        let installStore = InstallIDStore(
+            fileManager: fm,
+            configDirectory: tempRoot.appendingPathComponent("Install", isDirectory: true),
+            now: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+        let appState = AppState(
+            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
+            settingsStore: store,
+            licenseClient: mock,
+            installIDStore: installStore,
+            clock: { Date(timeIntervalSince1970: 1_700_000_000) }
+        )
+
+        await appState.activateLicense(key: "PRO-GOOD-KEY")
+
+        #expect(appState.licenseActivationJustSucceeded == false)
+        #expect(appState.licenseActivationError == .storageFailure)
+        // A failed persist must not leave the app granting access for this run.
+        #expect(appState.settings.licenseStatus != .active)
+        #expect(appState.settings.hasUnlockedFullAccess == false)
+    }
 }

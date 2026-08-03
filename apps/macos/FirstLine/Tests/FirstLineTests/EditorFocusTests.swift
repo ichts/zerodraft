@@ -392,6 +392,193 @@ struct EditorFocusTests {
         #expect(denied)
     }
 
+    // MARK: - UTF-16 offsets (Fix 2)
+
+    @Test
+    func selectionRedirectUsesUTF16LengthForFlagEmoji() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        // 🇯🇵 is one grapheme but four UTF-16 code units; "🇯🇵hi" = 6 UTF-16, 3 graphemes.
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "🇯🇵hi"))
+        let engine = SessionEngine()
+        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
+
+        let redirected = coordinator.textView(
+            textView,
+            willChangeSelectionFromCharacterRange: NSRange(location: 0, length: 0),
+            toCharacterRange: NSRange(location: 1, length: 0)
+        )
+
+        let utf16End = (textView.string as NSString).length
+        #expect(utf16End == 6)
+        #expect(utf16End != textView.string.count)
+        #expect(redirected.location == utf16End)
+        #expect(redirected.length == 0)
+        #expect(engine.lastDenyAt != nil)
+    }
+
+    @Test
+    func selectionRedirectKeepsCaretAtUTF16EndForFamilyEmoji() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        // 👨‍👩‍👧‍👦 is one grapheme (eleven UTF-16 units); the caret-at-end must land past it.
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "a👨‍👩‍👧‍👦b"))
+        let engine = SessionEngine()
+        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
+
+        let utf16End = (textView.string as NSString).length
+        #expect(utf16End == 13)
+        #expect(textView.string.count == 3)
+
+        let redirected = coordinator.textView(
+            textView,
+            willChangeSelectionFromCharacterRange: NSRange(location: 0, length: 0),
+            toCharacterRange: NSRange(location: 2, length: 0)
+        )
+
+        #expect(redirected.location == utf16End)
+    }
+
+    @Test
+    func markedTextCommitAfterNonBMPContentKeepsCaretInUTF16Space() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        // Preload non-BMP content: 🇯🇵 and 🇺🇸 are each 4 UTF-16 code units.
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "flags 🇯🇵🇺🇸"))
+        textView.setSelectedRange(NSRange(location: (textView.string as NSString).length, length: 0))
+
+        // Simulate a real IME composition + commit at the end.
+        textView.setMarkedText(
+            "x",
+            selectedRange: NSRange(location: 1, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        #expect(textView.hasMarkedText())
+
+        var committed: String?
+        textView.onCommittedText = { committed = $0 }
+        textView.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        #expect(textView.hasMarkedText() == false)
+        #expect(committed == "x")
+        // Caret lands at UTF-16 end, not grapheme-count end.
+        let utf16End = (textView.string as NSString).length
+        #expect(textView.selectedRange().location == utf16End)
+        #expect(utf16End != textView.string.count)
+    }
+
+    @Test
+    func insertTextAppendsEmojiWithoutFalseDeny() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "before"))
+        textView.setSelectedRange(NSRange(location: (textView.string as NSString).length, length: 0))
+
+        var committed: String?
+        var denied = false
+        textView.onCommittedText = { committed = $0 }
+        textView.onDeny = { denied = true }
+
+        // insertText at the end via the default NSNotFound range (non-marked-commit path).
+        // Internally TextKit calls replaceCharacters, which must NOT fire a false deny
+        // because isPerformingInsertion guards the append.
+        textView.insertText("😀", replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        #expect(textView.string == "before😀")
+        #expect(committed == "😀")
+        #expect(denied == false)
+    }
+
+    @Test
+    func imeCompositionAndCommitAppendsCommittedText() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+
+        var markedActivity = 0
+        var committed: String?
+        textView.onMarkedTextActivity = { markedActivity += 1 }
+        textView.onCommittedText = { committed = $0 }
+
+        // IME composition phase.
+        textView.setMarkedText(
+            "ni'hao",
+            selectedRange: NSRange(location: 6, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        #expect(textView.hasMarkedText())
+        #expect(markedActivity == 1)
+
+        // Commit: the marked text is replaced by the committed candidate.
+        textView.insertText("你好", replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        #expect(textView.hasMarkedText() == false)
+        #expect(committed == "你好")
+        #expect(textView.string == "你好")
+    }
+
+    @Test
+    func directReplaceCharactersOutsideInsertTextDeniesAndBlocks() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "some text"))
+
+        var denied = false
+        textView.onDeny = { denied = true }
+
+        // Direct replaceCharacters NOT routed through insertText: isPerformingInsertion
+        // is false, so the guard denies and blocks the mutation.
+        textView.replaceCharacters(in: NSRange(location: 0, length: 4), with: "other")
+
+        #expect(denied)
+        #expect(textView.string == "some text")
+    }
+
+    @Test
+    func dragSelectionDenies() {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        var denied = false
+        textView.onDeny = { denied = true }
+
+        let allowed = textView.dragSelection(
+            with: NSEvent(),
+            offset: NSSize(width: 10, height: 0),
+            slideBack: true
+        )
+
+        #expect(allowed == false)
+        #expect(denied)
+    }
+
+    @Test
+    func pasteAndCutRouteThroughDeny() {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        var denied = 0
+        textView.onDeny = { denied += 1 }
+
+        textView.paste(nil)
+        textView.cut(nil)
+
+        #expect(denied == 2)
+    }
+
+    @Test
+    func blockedCommandSelectorsDenyViaEngine() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "some words"))
+        let engine = SessionEngine()
+        engine.start(duration: 60)
+        engine.registerCommittedText("x")
+        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
+
+        let before = engine.lastDenyAt
+        #expect(before == nil)
+
+        let blocked = coordinator.textView(textView, doCommandBy: #selector(UndoManager.undo))
+        #expect(blocked)
+        #expect(engine.lastDenyAt != nil)
+    }
+
     private func caretRect(for textView: AppendOnlyTextView) throws -> NSRect {
         guard let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else {

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: FirstLine 的 AppKit editor core，负责 append-only、IME 安全约束与固定写作字体
+ * [POS]: FirstLine 的 AppKit editor core，负责 append-only、IME 安全约束与固定写作字体；TextKit 位置一律使用 UTF-16 偏移
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -18,6 +18,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private let insetEpsilon: CGFloat = 0.5
     private var lastAppliedViewportHeight: CGFloat = 0
     private(set) var pendingCompositionRefresh = true
+    /// Guards replaceCharacters during a live insertText so the append path never
+    /// trips a false deny. TextKit location/length values are UTF-16 offsets.
+    private var isPerformingInsertion = false
     private let sessionFontSize: CGFloat = 28
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
@@ -62,18 +65,23 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
         let inserted = plainString(from: string)
-        let end = NSRange(location: self.string.count, length: 0)
+        let end = NSRange(location: utf16Length, length: 0)
         let isDefaultRange = replacementRange.location == NSNotFound
         let isMarkedCommit = hasMarkedText()
 
         guard isMarkedCommit || isDefaultRange || replacementRange == end else {
+            onDeny?()
             return
         }
 
         if isMarkedCommit {
+            isPerformingInsertion = true
+            defer { isPerformingInsertion = false }
             super.insertText(string, replacementRange: replacementRange)
         } else {
             selectedRange = end
+            isPerformingInsertion = true
+            defer { isPerformingInsertion = false }
             super.insertText(string, replacementRange: end)
         }
 
@@ -85,6 +93,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func replaceCharacters(in range: NSRange, with string: String) {
         guard hasMarkedText() else {
+            if isPerformingInsertion == false {
+                onDeny?()
+            }
             return
         }
 
@@ -123,7 +134,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func dragSelection(with event: NSEvent, offset: NSSize, slideBack: Bool) -> Bool {
-        false
+        onDeny?()
+        return false
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
@@ -380,7 +392,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let insertionLocation = selectedRange().location
         let lineRect: NSRect
 
-        if insertionLocation == string.count,
+        if insertionLocation == utf16Length,
            string.last == "\n",
            layoutManager.extraLineFragmentRect.isEmpty == false {
             lineRect = layoutManager.extraLineFragmentRect
@@ -433,6 +445,13 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         if let text = value as? String { return text }
         if let text = value as? NSAttributedString { return text.string }
         return ""
+    }
+
+    /// UTF-16 code-unit count of the current text. NSRange/TextKit locations are
+    /// UTF-16 offsets; Swift's `String.count` counts grapheme clusters and
+    /// misplaces the caret after emoji/flags/multi-scalar graphemes.
+    private var utf16Length: Int {
+        (string as NSString).length
     }
 
     private func normalizedMarkedText(_ value: Any) -> Any {

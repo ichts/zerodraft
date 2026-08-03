@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine 与 AppendOnlyTextView
  * [OUTPUT]: 提供 EditorViewRepresentable SwiftUI↔AppKit 编辑器桥
- * [POS]: FirstLine editor bridge，负责把固定字体 NSTextView 嵌进 SwiftUI session 界面
+ * [POS]: FirstLine editor bridge，负责把固定字体 NSTextView 嵌进 SwiftUI session 界面；selection/length 一律使用 UTF-16 偏移
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -71,7 +71,7 @@ struct EditorViewRepresentable: NSViewRepresentable {
         textView.isEditable = engine.phase == .writing || engine.phase == .danger
 
         if isComposing == false {
-            let end = NSRange(location: textView.string.count, length: 0)
+            let end = NSRange(location: (textView.string as NSString).length, length: 0)
             if textView.selectedRange() != end {
                 textView.setSelectedRange(end)
             }
@@ -151,7 +151,7 @@ struct EditorViewRepresentable: NSViewRepresentable {
                 return newSelectedCharRange
             }
 
-            let end = NSRange(location: textView.string.count, length: 0)
+            let end = NSRange(location: (textView.string as NSString).length, length: 0)
             if newSelectedCharRange == end {
                 return newSelectedCharRange
             }

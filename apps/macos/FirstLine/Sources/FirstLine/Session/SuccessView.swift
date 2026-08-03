@@ -1,7 +1,9 @@
 /**
  * [INPUT]: AppState, SessionEngine, DesignSystem tokens
  * [OUTPUT]: SuccessView result surface; word count in ink, export + discard actions
- * [POS]: Session success surface; shows the draft and offers copy / copy-for-AI / download / discard
+ * [POS]: Session success surface; shows the draft and offers copy / copy-for-AI / download / discard.
+ *        Copy feedback is an ink label swap, the primary Copy button takes focus on appear, and
+ *        Copy for AI uses the web-canonical cleanup prompt with the prompt + separator + draft join.
  * [PROTOCOL]: 变更时更新此头部和 FirstLine/CLAUDE.md
  */
 
@@ -10,6 +12,15 @@ import SwiftUI
 
 struct SuccessView: View {
     @Bindable var appState: AppState
+
+    @FocusState private var copyButtonFocused: Bool
+    @State private var copiedFlash: CopiedAction?
+    @State private var copiedResetTask: Task<Void, Never>?
+
+    private enum CopiedAction: Equatable {
+        case fullText
+        case forAI
+    }
 
     var body: some View {
         VStack(spacing: FirstLineSpacing.md) {
@@ -27,13 +38,14 @@ struct SuccessView: View {
             .frame(maxWidth: 640)
 
             VStack(spacing: FirstLineSpacing.sm) {
-                Button("Copy full text") {
+                Button(copyFullTextLabel) {
                     copyFullText()
                 }
                 .buttonStyle(FirstLinePrimaryButtonStyle())
+                .focused($copyButtonFocused)
 
                 HStack(spacing: FirstLineSpacing.sm) {
-                    Button("Copy for AI") {
+                    Button(copyForAILabel) {
                         copyForAI()
                     }
                     .buttonStyle(FirstLineSecondaryButtonStyle())
@@ -44,7 +56,7 @@ struct SuccessView: View {
                     .buttonStyle(FirstLineSecondaryButtonStyle())
                 }
 
-                Button("Discard and start next") {
+                Button("Discard") {
                     appState.abandonSession()
                 }
                 .buttonStyle(.plain)
@@ -54,6 +66,29 @@ struct SuccessView: View {
         }
         .padding(FirstLineSpacing.xl)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .onAppear {
+            // Keyboard-first: land focus on the primary Copy full text button.
+            copyButtonFocused = true
+        }
+    }
+
+    // MARK: - Copy labels
+
+    private var copyFullTextLabel: String {
+        copiedFlash == .fullText ? "Copied." : "Copy full text"
+    }
+
+    private var copyForAILabel: String {
+        copiedFlash == .forAI ? "Copied." : "Copy for AI"
+    }
+
+    private func flashCopied(_ action: CopiedAction) {
+        copiedFlash = action
+        copiedResetTask?.cancel()
+        copiedResetTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_200_000_000)
+            if Task.isCancelled == false { copiedFlash = nil }
+        }
     }
 
     // MARK: - Export actions
@@ -62,12 +97,14 @@ struct SuccessView: View {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(appState.sessionEngine.text, forType: .string)
+        flashCopied(.fullText)
     }
 
     private func copyForAI() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(Self.copyForAIPrompt + appState.sessionEngine.text, forType: .string)
+        pasteboard.setString(Self.copyForAIPayload(for: appState.sessionEngine.text), forType: .string)
+        flashCopied(.forAI)
     }
 
     private func downloadMarkdown() {
@@ -92,11 +129,18 @@ struct SuccessView: View {
         """
     }
 
-    // Cleanup prompt prefixed to the draft for the user's AI-to-Obsidian workflow.
-    private static let copyForAIPrompt =
-        "Below is a zero draft - raw, unedited, typos included. Shape it into a clear first draft. " +
-        "Keep my ideas and my voice; fix structure, spelling, and flow. Do not add claims I didn\u{2019}t make.\n\n" +
-        "---\n\n"
+    /// Web-canonical cleanup prompt (kept verbatim from index.html AI_CLEANUP_PROMPT).
+    static let copyForAIPrompt =
+        "Below is my raw freewriting draft. Organize it into clear notes. " +
+        "Keep my original wording where possible. List any tasks or open questions separately at the end. " +
+        "Do not add ideas that are not in the draft."
+
+    /// Builds the Copy-for-AI clipboard payload: prompt + separator + trimmed draft,
+    /// matching the web's `copyForAI` join format.
+    static func copyForAIPayload(for text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return copyForAIPrompt + "\n\n---\n\n" + trimmed
+    }
 
     private static let timestampFormatter: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()

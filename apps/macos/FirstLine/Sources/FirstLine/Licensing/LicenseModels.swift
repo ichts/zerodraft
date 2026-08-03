@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 Foundation
  * [OUTPUT]: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约
- * [POS]: Licensing 模块的契约层，定义 Mac app 与 LicenseClient 之间共享的数据形状
+ * [POS]: Licensing 模块的契约层，定义 Mac app 与 LicenseClient 之间共享的数据形状；含本地持久化失败的 storageFailure 错误
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -20,9 +20,9 @@ enum LicenseStatus: String, Codable, Sendable {
 /// `/licenses/activate` 成功后保留的关键字段。
 /// 对照 https://docs.dodopayments.com/api-reference/licenses/activate-license 的 response shape。
 struct LicenseActivation: Codable, Equatable, Sendable {
-    /// `lki_...` —— Dodo 返回的 license key instance ID。后续 `/licenses/deactivate` 必填。
+    /// `lki_...` - Dodo 返回的 license key instance ID。后续 `/licenses/deactivate` 必填。
     let instanceID: String
-    /// `lic_...` —— 关联的 license key ID。
+    /// `lic_...` - 关联的 license key ID。
     let licenseKeyID: String
     /// 此激活实例的人类可读名，例如 "First Line Mac abcd1234"。
     let name: String
@@ -66,6 +66,8 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     case emptyKey
     /// Dodo 返回了无法识别的错误。保留原始状态码以便诊断。
     case unexpected(statusCode: Int)
+    /// 激活在 Dodo 侧成功，但无法把 license 状态写盘（磁盘权限/空间等）。
+    case storageFailure
 
     var errorDescription: String? {
         switch self {
@@ -79,6 +81,8 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
             return "Enter the license key from your Dodo receipt email."
         case .unexpected(let statusCode):
             return "Activation failed (HTTP \(statusCode))."
+        case .storageFailure:
+            return "Could not save the license on this Mac. Check disk permissions and try again."
         }
     }
 }

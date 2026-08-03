@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppState、DesignSystem token
  * [OUTPUT]: 提供真实 SettingsView，包含原生 trial 状态
- * [POS]: Settings surface，负责持久化主题、默认时长、immersive mode、reduced motion、trial 状态展示与 library reveal 动作
+ * [POS]: Settings surface，负责持久化主题、reduced motion、trial 状态展示与 library reveal 动作（immersive session toggle 已移除，字段保留用于 settings 文件兼容）
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
 
@@ -40,11 +40,6 @@ struct SettingsView: View {
                     Text("60 seconds. Fixed.")
                         .foregroundStyle(FirstLineColors.ui)
                 }
-
-                Toggle("Immersive Session Mode", isOn: Binding(
-                    get: { appState.settings.immersiveSessionMode },
-                    set: { appState.updateImmersiveMode($0) }
-                ))
             }
 
             Section("Trial & License") {

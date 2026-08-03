@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、PersistenceService、SettingsStore 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、durable wipe aftermath、按 sessionID 分开的保存重试与可验证的 license 持久化
  * [POS]: FirstLine 顶层导航真相源，负责从 Home 启动 session、消耗 trial 与支持面跳转
  * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
  */
@@ -49,8 +49,15 @@ final class AppState {
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
 
+    /// Durable aftermath of the most recent wipe: the first ~64 chars (whitespace
+    /// collapsed) of the lost draft, shown on Home until the next session starts.
+    var lastWipeFossil: String?
+
     /// 已写盘的 sessionID，确保每场成功 session 只调用一次 saveSuccessfulSession，防止 ticking 重复触发。
     private var lastPersistedSessionID: UUID?
+    /// Per-attempt delay for save retries. Defaults to 1s; tests inject a small
+    /// value so retry behaviour is verifiable without wall-clock waits.
+    private let saveRetryDelayNanoseconds: UInt64
 
     init(
         sessionEngine: SessionEngine = SessionEngine(),
@@ -58,7 +65,8 @@ final class AppState {
         settingsStore: SettingsStore = SettingsStore(),
         licenseClient: LicenseClient = MockLicenseClient(),
         installIDStore: InstallIDStore = InstallIDStore(),
-        clock: @escaping () -> Date = Date.init
+        clock: @escaping () -> Date = Date.init,
+        saveRetryDelayNanoseconds: UInt64 = 1_000_000_000
     ) {
         self.sessionEngine = sessionEngine
         self.persistenceService = persistenceService
@@ -66,6 +74,7 @@ final class AppState {
         self.licenseClient = licenseClient
         self.installIDStore = installIDStore
         self.clock = clock
+        self.saveRetryDelayNanoseconds = saveRetryDelayNanoseconds
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         // Fixed 60s contract: legacy persisted durations are superseded by the engine constant.
         self.selectedDuration = SessionEngine.defaultDurationSeconds
@@ -76,10 +85,10 @@ final class AppState {
         refreshLibrary()
         launchInitialSurface()
 
-        // onStateChange 由 @MainActor 的 engine 方法触发，始终运行在主线程；用它观察 success 迁移可同时覆盖 timer 与编辑器两条触发路径。
+        // onStateChange 由 @MainActor 的 engine 方法触发，始终运行在主线程；用它观察 success/failure 迁移可同时覆盖 timer 与编辑器两条触发路径。
         sessionEngine.onStateChange = { [weak self] phase in
             MainActor.assumeIsolated {
-                self?.persistSuccessfulSessionOnSuccess(phase)
+                self?.handleEngineStateChange(phase)
             }
         }
     }
@@ -92,6 +101,8 @@ final class AppState {
         }
 
         consumeTrialSessionIfNeeded()
+        // Starting fresh clears the durable wipe aftermath from Home.
+        lastWipeFossil = nil
         let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
         sessionEngine.start(duration: resolvedDuration)
         selectedSurface = .session
@@ -171,10 +182,10 @@ final class AppState {
     }
 
     func handleTick() {
+        // Central routing and persistence live in handleEngineStateChange (the
+        // engine's onStateChange callback), which fires synchronously inside tick()
+        // on every phase transition. This keeps tick() a pure passthrough.
         sessionEngine.tick()
-        if sessionEngine.phase == .success, lastPersistedSessionID != sessionEngine.sessionID {
-            persistSuccessfulSessionOnSuccess(sessionEngine.phase)
-        }
     }
 
     func updateTheme(_ theme: AppTheme) {
@@ -221,14 +232,22 @@ final class AppState {
         let instanceName = installIDStore.loadOrCreate().shortName
         do {
             let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: instanceName)
+            // Snapshot the pre-activation state so a failed persist cannot leave the
+            // app granting access that is not durable on disk.
+            let preActivation = settings
             settings.licenseKey = trimmed
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
             settings.licenseActivatedAt = clock()
             settings.licenseLastValidatedAt = clock()
             settings.hasUnlockedFullAccess = true
-            persistSettings()
-            licenseActivationJustSucceeded = true
+            do {
+                try persistSettingsThrowing()
+                licenseActivationJustSucceeded = true
+            } catch {
+                settings = preActivation
+                licenseActivationError = .storageFailure
+            }
         } catch let activationError as LicenseActivationError {
             licenseActivationError = activationError
         } catch {
@@ -302,21 +321,61 @@ final class AppState {
         try? settingsStore.save(settings)
     }
 
+    /// License activation is the one path that must not silently claim success
+    /// when the on-disk write failed.
+    private func persistSettingsThrowing() throws {
+        try settingsStore.save(settings)
+    }
+
+    /// Central engine state observer: persists on success, captures the durable
+    /// wipe aftermath on failure.
+    private func handleEngineStateChange(_ phase: SessionPhase) {
+        switch phase {
+        case .success:
+            persistSuccessfulSessionOnSuccess(phase)
+        case .failure:
+            captureWipeAftermath()
+        case .idle:
+            // engine 的 live->idle 转换（空草稿触达完成截止 / 迟到首输入在截止后被裁决为
+            // idle）必须在状态回调里集中路由 Home，否则用户会卡在死掉的 Session 界面。
+            if previousEnginePhase == .writing || previousEnginePhase == .danger {
+                goHome()
+            }
+        default:
+            break
+        }
+        previousEnginePhase = phase
+    }
+
+    private func captureWipeAftermath() {
+        let collapsed = sessionEngine.wipedText
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .joined(separator: " ")
+        lastWipeFossil = collapsed.isEmpty ? nil : String(collapsed.prefix(64))
+    }
+
+    /// 跟踪 engine 上一次的 phase，用于在状态回调里识别 live->idle 转换并集中路由 Home。
+    private var previousEnginePhase: SessionPhase = .idle
+
     /// 会话进入 success 时把草稿写盘一次；按 sessionID 去重，ticking 的重复状态回调不会二次写入。
-    private var saveRetryTask: Task<Void, Never>?
+    private var saveRetryTasks: [UUID: Task<Void, Never>] = [:]
 
     // Retries persist an immutable snapshot of the succeeded session, so a user
     // who abandons or starts a new session before the retry can never have the
-    // wrong text saved or the new session's own save suppressed. One task, three
-    // attempts, no rescheduling from inside the loop.
+    // wrong text saved or the new session's own save suppressed. Retry tasks are
+    // keyed per sessionID so concurrent sessions' retries never cancel each other.
+    // Three attempts each, no rescheduling from inside the loop.
     private func scheduleSaveRetry(for id: UUID, snapshot: (text: String, elapsed: TimeInterval, duration: TimeInterval, wordCount: Int)) {
-        saveRetryTask?.cancel()
-        saveRetryTask = Task { @MainActor [weak self] in
+        saveRetryTasks[id]?.cancel()
+        saveRetryTasks[id] = Task { @MainActor [weak self] in
             guard let self else { return }
             for _ in 0..<3 {
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                try? await Task.sleep(nanoseconds: self.saveRetryDelayNanoseconds)
                 if Task.isCancelled { return }
-                if lastPersistedSessionID == id { return }
+                if lastPersistedSessionID == id {
+                    saveRetryTasks[id] = nil
+                    return
+                }
                 do {
                     _ = try persistenceService.saveSuccessfulSession(
                         text: snapshot.text,
@@ -326,11 +385,13 @@ final class AppState {
                         sessionID: id
                     )
                     lastPersistedSessionID = id
+                    saveRetryTasks[id] = nil
                     return
                 } catch {
                     continue
                 }
             }
+            saveRetryTasks[id] = nil
         }
     }
 
@@ -348,6 +409,10 @@ final class AppState {
                 sessionID: id
             )
             lastPersistedSessionID = id
+            // 直接成功取代了任何已在排队的重试 task；取消并清理，否则完成的 task 会残留在字典里
+            //（它在 lastPersistedSessionID == id 检查处 return 但不清理自己的条目）。
+            saveRetryTasks[id]?.cancel()
+            saveRetryTasks[id] = nil
         } catch {
             scheduleSaveRetry(for: id, snapshot: snapshot)
         }

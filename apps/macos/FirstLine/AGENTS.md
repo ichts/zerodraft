@@ -16,7 +16,7 @@ Sources/FirstLine/Info.plist: Swift Package 目标使用的应用元数据。
 Sources/FirstLine/Assets.xcassets/: 应用图标资源。
 Sources/FirstLine/App/AppState.swift: 顶层导航状态、3-session trial gate 与 license 激活/校验入口。
 Sources/FirstLine/App/RootView.swift: 主导航、session phase 与 upgrade surface 容器。
-Sources/FirstLine/App/HomeView.swift: Home 极简启动入口，固定 60 秒、无时长选择，启动按钮文案 "Give it sixty seconds."，并显示 trial 状态。
+Sources/FirstLine/App/HomeView.swift: Home 极简启动入口，固定 60 秒、无时长选择，启动按钮文案 "Give it sixty seconds."，显示 trial 状态，并在最近一次 wipe 后携带持久红线 “Draft deleted. it joined the pile.” 与一条丢失草稿的 margin fossil，直至下一场 session 开始。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，负责 append-only 和 IME 活动桥接。
 Sources/FirstLine/Editor/EditorViewRepresentable.swift: SwiftUI ↔ AppKit 编辑器桥。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support 路径规范。
@@ -26,14 +26,15 @@ Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约。
 Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖 activate / validate / deactivate 三个公开 endpoint。
 Sources/FirstLine/Licensing/MockLicenseClient.swift: LicenseClient actor 替身，Phase 3 期间不触达真实 Dodo 网络。
-Sources/FirstLine/Session/SessionEngine.swift: danger / failure / success 状态机与单调时间规则。
-Sources/FirstLine/Session/SessionView.swift: Session 主界面，驱动编辑器和会话循环。
+Sources/FirstLine/Session/SessionEngine.swift: danger / failure / success 状态机与单调时间规则；集中式截止时间裁决在 tick / registerCommittedText / registerMarkedTextActivity / finish 入口先于活动应用，空文本永不 success。
+Sources/FirstLine/Session/SessionView.swift: Session 主界面，驱动编辑器和会话循环；bone canvas ground + 静态 fossil 层 + 720 paper 列，danger veil、100ms tick、deny 反馈（narrator 红闪 + paper 抖动 + 红色 hairline）。
 Sources/FirstLine/Session/FailureView.swift: Failure 界面。
-Sources/FirstLine/Session/SuccessView.swift: Success 界面，提供 Copy full text / Copy for AI / Download .md / Discard。
+Sources/FirstLine/Session/SuccessView.swift: Success 界面，提供 Copy full text / Copy for AI / Download .md / Discard；Copy for AI 使用 web-canonical cleanup prompt，Copy 按钮焦点落在主按钮并显示 “Copied.” 回显。
 Sources/FirstLine/Upgrade/UpgradeView.swift: Mac trial 用尽后的 upgrade 引导界面，含 license key 输入、激活全部状态与禁用的 Buy 占位。
 Sources/FirstLine/Library/LibraryView.swift: Library 列表与详情界面。
-Sources/FirstLine/Settings/SettingsView.swift: Settings 界面，含 theme/duration/immersive/reduced motion、Trial & License section 与 library reveal。
+Sources/FirstLine/Settings/SettingsView.swift: Settings 界面，含 theme/duration/reduced motion、Trial & License section 与 library reveal（immersive session toggle 已移除，字段保留用于 settings 文件兼容）。
 Sources/FirstLine/DesignSystem/Colors.swift: 颜色 token。
+Sources/FirstLine/DesignSystem/FossilLayer.swift: Flood 静态 fossil 层，在 bone canvas 的左右 margin（paper 列以外）放置一次性的犹豫草稿 fossil；danger 时仅变红（不透明度恒定，reduced motion 下无过渡），永不移动；窗口缩放时按 gutter 重算位置。
 Sources/FirstLine/DesignSystem/Typography.swift: 字体与字号 token。
 Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong，全部来自 package resources。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。
@@ -44,6 +45,7 @@ Tests/FirstLineTests/PersistenceOnlyTests.swift: 成功存储测试。
 Tests/FirstLineTests/LibraryPersistenceTests.swift: Library 读取、解析、删除测试。
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖 happy path、failure path、首次/回访启动、键盘导航切换、success 阶段导航拦截、trial 计数与解锁。
+Tests/FirstLineTests/SuccessSurfaceTests.swift: Success 面板行为测试，覆盖 web-canonical cleanup prompt 常量、copy-for-AI payload 拼接格式与 trim 语义。
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与 trial gate 交互。
 
 验证命令

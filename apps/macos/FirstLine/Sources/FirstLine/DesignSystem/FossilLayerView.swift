@@ -58,6 +58,11 @@ final class FossilLayerView: NSView {
     // Flipped 视图下直接用 p.center.y，不需手动 height-y 翻转；NSAttributedString 天然正确朝向。
     override var isFlipped: Bool { true }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsLayout = true
+    }
+
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 

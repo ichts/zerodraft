@@ -30,6 +30,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyResetWorkItem: DispatchWorkItem?
     private var lastObservedDenyAt: TimeInterval?
     private var tickTimer: Timer?
+    private var finishKeyMonitor: Any?
     private var denyShakeOffset: CGFloat = 0
     private var denyShakeWorkItem: DispatchWorkItem?
     private var denyHairlineActive = false
@@ -82,6 +83,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         super.viewDidAppear()
         applyReducedMotionToFossils()
         startTicker()
+        installFinishKeyMonitor()
         installDidBecomeKeyObserver()
         grabFocus()
     }
@@ -99,6 +101,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     override func viewWillDisappear() {
         super.viewWillDisappear()
         stopTicker()
+        if let monitor = finishKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            finishKeyMonitor = nil
+        }
         if let obs = didBecomeKeyObserver {
             NotificationCenter.default.removeObserver(obs)
             didBecomeKeyObserver = nil
@@ -188,8 +194,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         finishButton.translatesAutoresizingMaskIntoConstraints = false
         finishButton.bezelStyle = .inline
         finishButton.isBordered = false
+        finishButton.keyEquivalent = "\r"
+        finishButton.keyEquivalentModifierMask = [.command]
         finishButton.font = FirstLineTypography.buttonLabelNSFont
         finishButton.contentTintColor = FirstLineColors.inkNSColor
+        finishButton.setAccessibilityLabel("Finish")
         finishButton.wantsLayer = true
         finishButton.layer?.cornerRadius = 8
         finishButton.layer?.borderWidth = 1
@@ -292,14 +301,18 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             multiplier: 0.62, constant: 0
         )
 
+        let paperPreferredWidth = paperContainer.widthAnchor.constraint(equalToConstant: 720)
+        paperPreferredWidth.priority = .defaultHigh
+
         NSLayoutConstraint.activate([
             // 白纸
-            paperContainer.topAnchor.constraint(greaterThanOrEqualTo: g.topAnchor, constant: 24),
-            paperContainer.bottomAnchor.constraint(lessThanOrEqualTo: g.bottomAnchor, constant: -260),
-            paperContainer.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 48),
-            paperContainer.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -48),
             paperContainer.centerXAnchor.constraint(equalTo: g.centerXAnchor),
+            paperContainer.leadingAnchor.constraint(greaterThanOrEqualTo: g.leadingAnchor, constant: 48),
+            paperContainer.trailingAnchor.constraint(lessThanOrEqualTo: g.trailingAnchor, constant: -48),
             paperContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 720),
+            paperPreferredWidth,
+            paperContainer.topAnchor.constraint(equalTo: g.topAnchor, constant: 48),
+            paperContainer.bottomAnchor.constraint(lessThanOrEqualTo: g.bottomAnchor, constant: -120),
             paperContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 520),
 
             // 编辑器填满纸
@@ -569,6 +582,28 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     @objc private func finishTapped() { engine.finish() }
     @objc private func abandonTapped() { appState.abandonSession() }
+
+    // Cmd+Return must be caught before NSTextView consumes the key-equivalent chain.
+    private func installFinishKeyMonitor() {
+        guard finishKeyMonitor == nil else { return }
+        finishKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard event.modifierFlags.contains(.command), event.keyCode == 36 else { return event }
+            Task { @MainActor [weak self] in
+                guard let self,
+                      self.engine.phase == .writing || self.engine.phase == .danger else { return }
+                self.engine.finish()
+            }
+            return nil
+        }
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.command), event.keyCode == 36 {
+            engine.finish()
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
 
     // MARK: - Deny feedback (shake + hairline)
 

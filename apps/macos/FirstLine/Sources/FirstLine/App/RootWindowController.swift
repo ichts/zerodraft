@@ -49,20 +49,18 @@ final class RootWindowController: NSWindowController {
     private func swapToSurface(_ surface: Surface) {
         // Phase 1 占位 VC 每次新建；Phase 2 起按 surface 复用（尤其 session 的生命周期）。
         let vc = SurfaceFactory.makeViewController(surface: surface, appState: appState)
-        window?.contentViewController = vc
-        // 每个 surface VC 的根 view 必须填满窗口 contentView 并跟随 resize：contentView（NSWindow
-        // 自带）随窗口 autoresize；把 vc.view pin 到它的四边，这样无论各 VC 的 loadView 内部如何设置
-        // translatesAutoresizingMaskIntoConstraints，根 view 都不会被卡在初始尺寸（之前导致内容不填
-        // 满、fossil gutter 被挤窄、宽窗右侧留死带）。
-        guard let host = window?.contentView else { return }
-        let v = vc.view
-        v.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            v.topAnchor.constraint(equalTo: host.topAnchor),
-            v.bottomAnchor.constraint(equalTo: host.bottomAnchor),
-            v.leadingAnchor.constraint(equalTo: host.leadingAnchor),
-            v.trailingAnchor.constraint(equalTo: host.trailingAnchor),
-        ])
+        guard let window else { return }
+        // Preserve the outer window frame across controller assignment. AppKit otherwise sizes
+        // a zero-intrinsic success/failure root down to 0x0 before Auto Layout gets its first pass.
+        let preservedFrame = window.frame
+        let root = vc.view
+        root.frame = window.contentView?.bounds
+            ?? NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        root.translatesAutoresizingMaskIntoConstraints = true
+        root.autoresizingMask = [.width, .height]
+        window.contentViewController = vc
+        window.setFrame(preservedFrame, display: true)
+        root.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
     }
 
     private func armSurfaceObservation() {

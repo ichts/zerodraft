@@ -35,7 +35,39 @@ final class SuccessViewController: NSViewController {
 
     override func viewDidAppear() {
         super.viewDidAppear()
+        sizePreviewDocument()
         view.window?.makeFirstResponder(copyFullButton)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        sizePreviewDocument()
+    }
+
+    private func sizePreviewDocument() {
+        guard let scrollView = previewTextView.enclosingScrollView,
+              let textContainer = previewTextView.textContainer,
+              let layoutManager = previewTextView.layoutManager else { return }
+        let viewportSize = scrollView.contentSize
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return }
+
+        previewTextView.minSize = NSSize(width: 0, height: viewportSize.height)
+        previewTextView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        previewTextView.isHorizontallyResizable = false
+        previewTextView.isVerticallyResizable = true
+        previewTextView.autoresizingMask = [.width]
+        textContainer.containerSize = NSSize(
+            width: viewportSize.width,
+            height: .greatestFiniteMagnitude
+        )
+
+        var frame = previewTextView.frame
+        let laidOutHeight = layoutManager.usedRect(for: textContainer).height
+        let targetSize = NSSize(width: viewportSize.width, height: max(viewportSize.height, laidOutHeight))
+        if abs(frame.width - targetSize.width) > 0.5 || abs(frame.height - targetSize.height) > 0.5 {
+            frame.size = targetSize
+            previewTextView.frame = frame
+        }
     }
 
     private func buildInterface() {
@@ -55,6 +87,7 @@ final class SuccessViewController: NSViewController {
         previewTextView.textContainerInset = NSSize(width: 0, height: 0)
         previewTextView.textContainer?.lineFragmentPadding = 0
         previewTextView.textContainer?.widthTracksTextView = true
+        previewTextView.textContainer?.heightTracksTextView = false
 
         let previewScroll = NSScrollView()
         previewScroll.translatesAutoresizingMaskIntoConstraints = false
@@ -109,6 +142,8 @@ final class SuccessViewController: NSViewController {
     private func updateContent() {
         metricLabel.stringValue = "\(appState.sessionEngine.wordCount) words"
         previewTextView.string = appState.sessionEngine.text
+        previewTextView.font = FirstLineTypography.bodyNSFont
+        previewTextView.textColor = FirstLineColors.inkNSColor
     }
 
     @objc private func copyFullTapped() {

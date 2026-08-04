@@ -85,7 +85,37 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         startTicker()
         installFinishKeyMonitor()
         installDidBecomeKeyObserver()
+        prepareEditorViewport()
         grabFocus()
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        prepareEditorViewport()
+    }
+
+    private func prepareEditorViewport() {
+        let viewportSize = scrollView.contentSize
+        guard viewportSize.width > 0, viewportSize.height > 0 else { return }
+
+        textView.minSize = NSSize(width: 0, height: viewportSize.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+
+        var frame = textView.frame
+        let targetWidth = viewportSize.width
+        let targetHeight = max(frame.height, viewportSize.height)
+        if abs(frame.width - targetWidth) > 0.5 || abs(frame.height - targetHeight) > 0.5 {
+            frame.size = NSSize(width: targetWidth, height: targetHeight)
+            textView.frame = frame
+        }
+
+        refreshCompositionAnchorIfNeeded()
+    }
+
+    private func refreshCompositionAnchorIfNeeded() {
+        guard textView.hasMarkedText() == false, textView.pendingCompositionRefresh else { return }
+        textView.scrollCaretToCompositionAnchor()
+        textView.clearPendingCompositionRefresh()
     }
 
     private func applyReducedMotionToFossils() {
@@ -522,6 +552,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if textView.hasMarkedText() == false {
             let end = NSRange(location: (textView.string as NSString).length, length: 0)
             if textView.selectedRange() != end { textView.setSelectedRange(end) }
+            refreshCompositionAnchorIfNeeded()
         }
 
         if (phase == .writing || phase == .danger),

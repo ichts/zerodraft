@@ -1,8 +1,8 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、App/Surfaces 下的占位 VC、DesignSystem/Colors
- * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> contentViewController）
+ * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> 常驻容器内的子 VC）
  * [POS]: FirstLine 重写 Phase 1 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
- *        映射到占位 NSViewController，并应用 theme 与最小尺寸契约。
+ *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
  *
  * 路由：本控制器观察两个信号：
@@ -19,9 +19,11 @@ import Observation
 @MainActor
 final class RootWindowController: NSWindowController {
     let appState: AppState
+    private let container: RootContainerViewController
 
     init(appState: AppState) {
         self.appState = appState
+        self.container = RootContainerViewController(appState: appState)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
@@ -31,11 +33,17 @@ final class RootWindowController: NSWindowController {
         )
         window.title = "First Line"
         window.contentMinSize = NSSize(width: 980, height: 680)
-        window.center()
 
         super.init(window: window)
+        // 常驻容器是窗口的 contentViewController（只设一次、只 size 一次）；各 surface 作为它的子 VC
+        // 原地切换。之前每次换 contentViewController 会让 AppKit 按 success/failure 的 0-fitting-size
+        // 根视图把窗口缩成 0x0（显示旧 session 残留快照），而在回调里 setFrame 补救又触发递归 layout
+        // 死循环卡死机器。这里把窗口尺寸与 surface 彻底解耦：窗口在此 size 一次，show() 只换子视图。
+        window.contentViewController = container
+        window.setFrame(NSRect(x: 0, y: 0, width: 1040, height: 720), display: false)
+        window.center()
         applyTheme()
-        swapToSurface(appState.selectedSurface)
+        container.show(appState.selectedSurface)
         armSurfaceObservation()
         armPhaseObservation()
         armThemeObservation()
@@ -47,20 +55,8 @@ final class RootWindowController: NSWindowController {
     // MARK: - Routing
 
     private func swapToSurface(_ surface: Surface) {
-        // Phase 1 占位 VC 每次新建；Phase 2 起按 surface 复用（尤其 session 的生命周期）。
-        let vc = SurfaceFactory.makeViewController(surface: surface, appState: appState)
-        guard let window else { return }
-        // Preserve the outer window frame across controller assignment. AppKit otherwise sizes
-        // a zero-intrinsic success/failure root down to 0x0 before Auto Layout gets its first pass.
-        let preservedFrame = window.frame
-        let root = vc.view
-        root.frame = window.contentView?.bounds
-            ?? NSRect(origin: .zero, size: window.contentLayoutRect.size)
-        root.translatesAutoresizingMaskIntoConstraints = true
-        root.autoresizingMask = [.width, .height]
-        window.contentViewController = vc
-        window.setFrame(preservedFrame, display: true)
-        root.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+        // 只在常驻容器内切换子 VC；不碰窗口尺寸、不换 contentViewController，故无 resize / 0x0 / 递归 layout。
+        container.show(surface)
     }
 
     private func armSurfaceObservation() {

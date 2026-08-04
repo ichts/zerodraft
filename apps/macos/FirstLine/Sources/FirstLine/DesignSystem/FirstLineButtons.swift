@@ -48,7 +48,15 @@ enum FirstLineButtons {
 
 private final class FirstLineButton: NSButton {
     enum Role { case primary, secondary }
-    var role: Role = .secondary { didSet { needsDisplay = true } }
+    // contentTintColor 是 content 属性，设它会触发 setNeedsLayout。绝不能在 updateLayer()（layout/display
+    // pass 内）设它，否则触发 _NSViewLayoutFeedbackLoop 无限回环卡死。这里在 role 变更时设一次；
+    // ink/paper 是 dynamic NSColor，自动随明暗适配，无需在 updateLayer 里重设。
+    var role: Role = .secondary {
+        didSet {
+            contentTintColor = role == .primary ? FirstLineColors.paperNSColor : FirstLineColors.inkNSColor
+            needsDisplay = true
+        }
+    }
 
     override var intrinsicContentSize: NSSize {
         let base = super.intrinsicContentSize
@@ -64,12 +72,10 @@ private final class FirstLineButton: NSButton {
         case .primary:
             layer?.borderWidth = 0
             layer?.backgroundColor = FirstLineColors.inkNSColor.cgColor
-            contentTintColor = FirstLineColors.paperNSColor
         case .secondary:
             layer?.borderWidth = 1
             layer?.borderColor = FirstLineColors.uiLightNSColor.cgColor
             layer?.backgroundColor = NSColor.clear.cgColor
-            contentTintColor = FirstLineColors.inkNSColor
         }
     }
 }

@@ -91,3 +91,27 @@ Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC 
 - 合成 AX `click at` 无法聚焦编辑器（点 scroll area 后 `AXFocusedUIElement` 仍为 `AXWindow`）；`set focused of text area` 可正常聚焦。真机硬件点击需复核是否自动聚焦编辑器（AppKit NSTextView 在 ScrollView 内点击通常聚焦，但合成事件路径不等价）。
 - session 开始时编辑器不自动聚焦（`AXFocusedUIElement=AXWindow`）。当前 UI 隐藏空草稿 Finish（wordCount > 0 门控），不影响功能；但作为「开场即写」体验，自动聚焦是后续候选改进（audit minor-deferred #3 已记录）。
 - 长 keystroke 字符串在 System Events 下会丢空格（`keystroke "long string"`）；逐 key code 输入（key code 49 = space）正常。这是合成输入的已知限制，非产品缺陷。
+
+### 2026-08-05  -  Pure-AppKit rewrite
+
+整个 app 从 SwiftUI 壳重写为纯 AppKit（SwiftUI 彻底退役，全仓 `grep import SwiftUI` = 0）；SessionEngine / AppendOnlyTextView / Infrastructure / Licensing / 全部 95 测试复用。Debug build，light theme，真窗。各态经守门狗启动（硬 12s auto-kill）+ 截图多模态目验，每态后查 CPU 无 loop。
+
+- [x] **beep 根治（原核心痛点）**：进 session 后 `AXFocusedUIElement` 角色 = **AXTextArea**（不再是 AXWindow），打字落字、不再 NSBeep。修法：SessionViewController 在 viewDidAppear 稳健重试 makeFirstResponder（校验 firstResponder===textView 才停）+ didBecomeKey 兜底。
+- [x] **卡死循环修复**：曾有一个 `_NSViewLayoutFeedbackLoop` 无限回环（FirstLineButton.updateLayer 在布局 pass 内设 contentTintColor）把机器 CPU 打到 98% 卡死；采样热栈定位后把 tint 移出 updateLayer，CPU 降到 <1%。教训：updateLayer() 绝不能设 content 属性。
+- [x] **Session zen**：文字在白纸内、当前行锚 ~35%、前行淡、不溢出纸顶（单行 + 多行均验）。
+- [x] **Fossils**：左右 gutter 宽短语（flipped NSView draw）；danger 时变红。
+- [x] **Danger**：红 veil + 大倒计时 + `KEEP TYPING OR THE DRAFT IS DELETED` + 红 timer。
+- [x] **Failure**：`Draft deleted.` + `You stopped for eight seconds. It joined the pile.` + Try Again / Back to Home + joined fossil。
+- [x] **Success**：词数 + 草稿预览 + Copy full text / Copy for AI / Download .md / Discard；相位切换不再 0x0/残留（常驻容器 + 子 VC 切换）。
+- [x] **Home**：fresh（标题/tagline/规则/License active/按钮）+ aftermath（红线 + margin fossil）。
+- [x] **Settings**：Appearance/Session/Trial & License/Storage/About + Done。
+- [x] **Upgrade**：trial 用尽 -> upsell + license 输入 + 激活 + 禁用 Buy + Back to Home。
+- [x] **Library**：Cmd+2 -> 分栏列表（时间倒序）+ 详情 + Copy/Open/Reveal/Delete；持久化 session 可见。
+- [x] `swift build` + `swift test` **95/8 全绿**贯穿每个重写阶段。
+
+#### Notes
+
+- 合成 keystroke 在应用获焦后可能被系统切回上次输入法（Pinyin）导致脏字；为干净自测在会话聚焦后强切 ABC（`TISSelectInputSource`）。这是自动化假象，非产品缺陷。
+- SmokeFlowTests 里两个 wall-clock 重试测试（failedSaveRetries / concurrentFailingSaves）在机器重压下会 flake（已观察：并发启动多个 app 实例 + 编译时）；空闲重跑 0.05s 秒过。可改进：像 SessionEngine 那样注入时钟/scheduler 以去 wall-clock 依赖（既有小债，非本次引入）。
+- 真机硬件点击、真 macOS IME 候选窗、reduced-motion 视觉项未用合成事件穷举，留真机复核。
+- L3 头部的 “检查 CLAUDE.md” 为旧约定（仓内无 CLAUDE.md）；按 GEB 协议应指向最近 AGENTS.md，留为 bounded follow-up（不在本次重写范围）。

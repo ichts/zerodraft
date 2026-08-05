@@ -584,6 +584,58 @@ struct EditorFocusTests {
         #expect(engine.lastDenyAt != nil)
     }
 
+    @Test
+    func loadRestoredTextRestoresExistingDraftIntoEmptyEditor() {
+        // 活动会话从 Home 返回 Writing 时，新 SessionVC 用 loadRestoredText 把 engine 草稿写回
+        // 空编辑器。它受控豁免 append-only 守卫（isRestoringProgrammatically），写后重应用 zen 排印
+        // 并把 caret 移到 UTF-16 末尾。
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+
+        textView.loadRestoredText("hello world")
+
+        #expect(textView.string == "hello world")
+        let end = NSRange(location: (textView.string as NSString).length, length: 0)
+        #expect(textView.selectedRange() == end)
+    }
+
+    @Test
+    func loadRestoredTextDoesNotWeakenUserAppendOnlyGuards() {
+        // 恢复入口是受控豁免：flag 仅在 loadRestoredText 执行期间为 true、写后复位。
+        // 用户输入路径（未经 insertText 的直接 replaceCharacters、paste、cut）在恢复之后仍被守卫拦截。
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        var denied = 0
+        textView.onDeny = { denied += 1 }
+
+        textView.loadRestoredText("existing draft stays")
+        #expect(textView.string == "existing draft stays")
+
+        // 恢复后，未经 insertText 的直接 replaceCharacters 仍 deny（未被恢复豁免污染）。
+        let before = denied
+        textView.replaceCharacters(in: NSRange(location: 0, length: 8), with: "other")
+        #expect(denied == before + 1)
+        #expect(textView.string == "existing draft stays")
+
+        // paste / cut 仍 deny。
+        let before2 = denied
+        textView.paste(nil)
+        textView.cut(nil)
+        #expect(denied == before2 + 2)
+    }
+
+    @Test
+    func loadRestoredTextIsNoOpForEmptyText() {
+        // 空 engine 文本不写（避免清空已有内容 / 误触发）。
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "keep me"))
+
+        textView.loadRestoredText("")
+
+        #expect(textView.string == "keep me")
+    }
+
     private func caretRect(for textView: AppendOnlyTextView) throws -> NSRect {
         guard let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else {

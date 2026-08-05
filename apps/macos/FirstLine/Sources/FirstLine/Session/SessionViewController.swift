@@ -1,17 +1,20 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、Session/SessionEngine、Editor/AppendOnlyTextView、DesignSystem
- * [OUTPUT]: SessionViewController - AppKit 主写作界面（Phase 2a 真实现）
+ * [OUTPUT]: SessionViewController - AppKit 主写作界面
  * [POS]: FirstLine 重写核心 surface，负责 append-only 编辑器、稳焦点（beep 根治）、
- *        danger/failure/success 循环驱动、Flood 白纸列与 chrome。接管退役 SwiftUI SessionView。
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ *        danger/failure/success 循环驱动、Flood 白纸列与 chrome（FossilLayer 静态化石、danger veil
+ *        与倒计时、narrator strip、deny 抖动 + 红色 hairline、failure wiped-text fossil）、
+ *        session 重新进入时的草稿恢复，以及 viewDidAppear 外观刷新。接管退役 SwiftUI SessionView。
+ * [PROTOCOL]: 变更时更新此头部，然后检查最近 AGENTS.md
  *
  * 焦点修复（beep 根治）：SwiftUI 版的 EditorViewRepresentable 在 updateNSView 里用
  * 「phase==.writing 且 window!=nil 且未激活」一次性 DispatchQueue.main.async 抓 first responder，
  * 成功前置 hasActivatedForSession=true → 一枪打空（window 还不是 key）就永不重试 → 敲键 NSBeep。
  * 本控制器在 viewDidAppear 稳健重试，校验 firstResponder===textView 才停，并监听 didBecomeKey 兜底。
  *
- * Phase 2a 不含：FossilLayer、deny shake+红 hairline、failure wiped-text fossil、多行顶部 fade、
- * veil/countdown 进出动画（留 Phase 2b）。
+ * 草稿恢复：RootContainerViewController 每次切 surface 新建本 VC；活动 session 从 Home 返回 Writing
+ * 时经 AppendOnlyTextView.loadRestoredText 受控写回 engine.text（isRestoringProgrammatically 豁免
+ * replaceCharacters 的 append-only 守卫），用户输入守卫语义不变。
  */
 
 import AppKit
@@ -79,8 +82,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         applyNarrator()
     }
 
+    // paperContainer / Finish borders 用 dynamic NSColor 一次性 .cgColor，window appearance 切换后会
+    // 保留旧解析值。paperContainer 是 AppearanceBorderedView（自己的 viewDidChangeEffectiveAppearance
+    // 重解析 borderColor）；Finish 按钮描边在每次进入 surface（viewDidAppear）重设，覆盖 Home->Writing 切换。
     override func viewDidAppear() {
         super.viewDidAppear()
+        finishButton.layer?.borderColor = FirstLineColors.uiLightNSColor.cgColor
         applyReducedMotionToFossils()
         startTicker()
         installFinishKeyMonitor()
@@ -152,12 +159,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func buildInterface() {
         // 1. 白纸列容器
-        paperContainer = FloodCanvasView(fillColor: FirstLineColors.paperNSColor)
+        paperContainer = FloodCanvasView(
+            fillColor: FirstLineColors.paperNSColor,
+            borderColor: FirstLineColors.faintNSColor.withAlphaComponent(0.5),
+            borderWidth: 1
+        )
         paperContainer.translatesAutoresizingMaskIntoConstraints = false
         paperContainer.wantsLayer = true
         paperContainer.layer?.cornerRadius = 6
-        paperContainer.layer?.borderWidth = 1
-        paperContainer.layer?.borderColor = FirstLineColors.faintNSColor.withAlphaComponent(0.5).cgColor
         paperContainer.shadow = NSShadow()
         paperContainer.layer?.shadowOpacity = 0.06
         paperContainer.layer?.shadowRadius = 24
@@ -415,9 +424,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func configureEditor() {
-        if textView.string != engine.text {
-            textView.string = engine.text
-            textView.applySessionTypographyToExistingText()
+        if engine.text.isEmpty == false && textView.string.isEmpty {
+            textView.loadRestoredText(engine.text)
         }
         let end = NSRange(location: (textView.string as NSString).length, length: 0)
         if textView.selectedRange() != end { textView.setSelectedRange(end) }
@@ -543,9 +551,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         wordCountLabel.stringValue = "\(engine.wordCount) words"
 
-        if textView.hasMarkedText() == false && textView.string != engine.text {
-            textView.string = engine.text
-            textView.applySessionTypographyToExistingText()
+        if textView.hasMarkedText() == false && engine.text.isEmpty == false && textView.string.isEmpty {
+            textView.loadRestoredText(engine.text)
             let end = NSRange(location: (textView.string as NSString).length, length: 0)
             if textView.selectedRange() != end { textView.setSelectedRange(end) }
         }

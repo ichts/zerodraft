@@ -21,6 +21,12 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
+    /// Guards replaceCharacters during a programmatic restore of an existing engine
+    /// draft (loadRestoredText). The append-only user-input guards behave identically
+    /// whenever this flag is false; it only allows the controlled restore path to write
+    /// the already-existing engine text back into the view when re-entering a live
+    /// session surface (Home -> Writing). User input is never weakened.
+    private var isRestoringProgrammatically = false
     private let sessionFontSize: CGFloat = 28
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
@@ -93,7 +99,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func replaceCharacters(in range: NSRange, with string: String) {
         guard hasMarkedText() else {
-            if isPerformingInsertion == false {
+            if isPerformingInsertion == false && isRestoringProgrammatically == false {
                 onDeny?()
             }
             return
@@ -347,6 +353,24 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     func applySessionTypographyToExistingText() {
         applyFocusTypographyToExistingText()
+    }
+
+    /// Controlled restore of an existing engine draft when re-entering a live session
+    /// surface (Home -> Writing). Unlike a user input path, this writes directly via the
+    /// textStorage while isRestoringProgrammatically is set, so the append-only guard in
+    /// replaceCharacters lets the write through. The user-input guards are unchanged when
+    /// this flag is false. Re-applies zen typography and moves the caret to the UTF-16 end.
+    func loadRestoredText(_ text: String) {
+        guard text.isEmpty == false else { return }
+        guard let textStorage else { return }
+        isRestoringProgrammatically = true
+        defer { isRestoringProgrammatically = false }
+        let whole = NSRange(location: 0, length: textStorage.length)
+        textStorage.replaceCharacters(in: whole, with: text)
+        applyFocusTypographyToExistingText()
+        let end = NSRange(location: utf16Length, length: 0)
+        if selectedRange() != end { setSelectedRange(end) }
+        pendingCompositionRefresh = true
     }
 
     func applyFocusTypographyToExistingText() {

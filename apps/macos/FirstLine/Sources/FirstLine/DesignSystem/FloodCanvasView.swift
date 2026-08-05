@@ -22,10 +22,25 @@ final class FloodCanvasView: NSView {
         didSet { needsDisplay = true }
     }
 
+    /// 可选描边色（appearance-aware；updateLayer 重解析，切换明暗时跟随）。
+    var borderColor: NSColor? {
+        didSet { needsDisplay = true }
+    }
+    /// 描边宽度（pt）。borderColor 非空时生效。
+    var borderWidth: CGFloat = 0 {
+        didSet { needsDisplay = true }
+    }
+
     init(fillColor: NSColor = FirstLineColors.canvasNSColor) {
         self.fillColor = fillColor
         super.init(frame: .zero)
         commonInit()
+    }
+
+    convenience init(fillColor: NSColor, borderColor: NSColor?, borderWidth: CGFloat) {
+        self.init(fillColor: fillColor)
+        self.borderColor = borderColor
+        self.borderWidth = borderWidth
     }
 
     @available(*, unavailable)
@@ -43,6 +58,13 @@ final class FloodCanvasView: NSView {
     override func updateLayer() {
         super.updateLayer()
         layer?.backgroundColor = fillColor.cgColor
+        if let borderColor {
+            layer?.borderWidth = borderWidth
+            layer?.borderColor = borderColor.cgColor
+        } else {
+            layer?.borderWidth = 0
+            layer?.borderColor = nil
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {

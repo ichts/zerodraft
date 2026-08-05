@@ -1,13 +1,12 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem/Colors
- * [OUTPUT]: 七个 surface 占位 NSViewController（Home/Session/Failure/Success/Settings/Upgrade/Library）
- * [POS]: FirstLine 重写 Phase 1 占位界面；下阶段（Phase 2+）逐个替换为真实 NSViewController。
- *        每个 VC 持有 appState、画 bone canvas 背景并居中显示 surface 名，便于视觉验收确认路由通。
+ * [OUTPUT]: Settings/Upgrade/Library 三个 surface 的占位 NSViewController
+ * [POS]: FirstLine 重写过渡期占位界面；Home/Session/Failure/Success 已由真实 AppKit controller 替换。
+ *        每个剩余 stub 持有 appState、画 bone canvas 背景并居中显示 surface 名，便于确认路由通。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
  *
- * 重写决策：Phase 1 用一个共享 StubSurfaceViewController 承载七个 surface 的占位实现，
- * 七个具名类型（HomeViewController 等）继承它以稳定 surface 工厂的类型契约；Phase 2+ 替换
- * 具名类型的实现时，SurfaceFactory 无需改动。
+ * 重写决策：Phase 1 用共享 StubSurfaceViewController 承载全部 surface 的占位实现；真实 controller
+ * 落地时逐个移除对应具名 stub，SurfaceFactory 的类型契约保持不变。
  */
 
 import AppKit
@@ -51,15 +50,10 @@ final class StubSurfaceView: NSView {
     override var isFlipped: Bool { false }
 }
 
-// MARK: - Concrete surface stub types (Phase 2+ replaces these)
+// MARK: - Concrete surface stub types (Phase 3 replaces these)
 
-@MainActor
-final class HomeViewController: StubSurfaceViewController {
-    init(appState: AppState) { super.init(surface: .home, appState: appState) }
-}
-// Note: SessionViewController (Phase 2a), FailureViewController and
-// SuccessViewController (Phase 3) are real AppKit implementations in
-// Session/*ViewController.swift. They are NOT stubs.
+// HomeViewController, SessionViewController, FailureViewController and SuccessViewController
+// are real AppKit implementations. They are NOT stubs.
 
 @MainActor
 final class SettingsViewController: StubSurfaceViewController {

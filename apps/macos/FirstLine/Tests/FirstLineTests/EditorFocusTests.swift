@@ -401,19 +401,20 @@ struct EditorFocusTests {
         // 🇯🇵 is one grapheme but four UTF-16 code units; "🇯🇵hi" = 6 UTF-16, 3 graphemes.
         textView.textStorage?.setAttributedString(NSAttributedString(string: "🇯🇵hi"))
         let engine = SessionEngine()
-        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
 
-        let redirected = coordinator.textView(
-            textView,
-            willChangeSelectionFromCharacterRange: NSRange(location: 0, length: 0),
-            toCharacterRange: NSRange(location: 1, length: 0)
+        // 守卫判定已抽到 AppendOnlyInputPolicy；重定向时 SessionViewController 的 delegate 会 registerDeny。
+        let redirected = AppendOnlyInputPolicy.redirectedSelection(
+            proposed: NSRange(location: 1, length: 0),
+            fullLength: (textView.string as NSString).length,
+            hasMarkedText: textView.hasMarkedText()
         )
+        if redirected != nil { engine.registerDeny() }
 
         let utf16End = (textView.string as NSString).length
         #expect(utf16End == 6)
         #expect(utf16End != textView.string.count)
-        #expect(redirected.location == utf16End)
-        #expect(redirected.length == 0)
+        #expect(redirected?.location == utf16End)
+        #expect(redirected?.length == 0)
         #expect(engine.lastDenyAt != nil)
     }
 
@@ -424,19 +425,19 @@ struct EditorFocusTests {
         // 👨‍👩‍👧‍👦 is one grapheme (eleven UTF-16 units); the caret-at-end must land past it.
         textView.textStorage?.setAttributedString(NSAttributedString(string: "a👨‍👩‍👧‍👦b"))
         let engine = SessionEngine()
-        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
 
         let utf16End = (textView.string as NSString).length
         #expect(utf16End == 13)
         #expect(textView.string.count == 3)
 
-        let redirected = coordinator.textView(
-            textView,
-            willChangeSelectionFromCharacterRange: NSRange(location: 0, length: 0),
-            toCharacterRange: NSRange(location: 2, length: 0)
+        let redirected = AppendOnlyInputPolicy.redirectedSelection(
+            proposed: NSRange(location: 2, length: 0),
+            fullLength: (textView.string as NSString).length,
+            hasMarkedText: textView.hasMarkedText()
         )
+        if redirected != nil { engine.registerDeny() }
 
-        #expect(redirected.location == utf16End)
+        #expect(redirected?.location == utf16End)
     }
 
     @Test
@@ -569,13 +570,17 @@ struct EditorFocusTests {
         let engine = SessionEngine()
         engine.start(duration: 60)
         engine.registerCommittedText("x")
-        let coordinator = EditorViewRepresentable.Coordinator(engine: engine)
 
         let before = engine.lastDenyAt
         #expect(before == nil)
 
-        let blocked = coordinator.textView(textView, doCommandBy: #selector(UndoManager.undo))
+        // 守卫判定已抽到 AppendOnlyInputPolicy；deny 时 SessionViewController 的 delegate 会 registerDeny。
+        let blocked = AppendOnlyInputPolicy.shouldDenyCommand(
+            #selector(UndoManager.undo),
+            hasMarkedText: textView.hasMarkedText()
+        )
         #expect(blocked)
+        if blocked { engine.registerDeny() }
         #expect(engine.lastDenyAt != nil)
     }
 

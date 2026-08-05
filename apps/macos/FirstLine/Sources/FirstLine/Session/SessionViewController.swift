@@ -682,46 +682,27 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + half * 2, execute: reset)
     }
 
-    // MARK: - NSTextViewDelegate（照搬 Coordinator 守卫）
+    // MARK: - NSTextViewDelegate（append-only 守卫，逻辑来源 AppendOnlyInputPolicy）
 
     func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        let blocked: [Selector] = [
-            #selector(UndoManager.undo),
-            Selector(("redo:")),
-            #selector(NSText.paste(_:)),
-            #selector(NSText.cut(_:)),
-            #selector(NSResponder.deleteWordBackward(_:)),
-            #selector(NSResponder.deleteWordForward(_:)),
-            #selector(NSResponder.deleteToBeginningOfLine(_:)),
-            #selector(NSResponder.deleteToEndOfLine(_:)),
-            #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
-            #selector(NSResponder.deleteToEndOfParagraph(_:)),
-            #selector(NSResponder.yank(_:)),
-            #selector(NSResponder.transpose(_:)),
-        ]
-        if blocked.contains(commandSelector) {
+        let deny = AppendOnlyInputPolicy.shouldDenyCommand(commandSelector, hasMarkedText: textView.hasMarkedText())
+        if deny {
             engine.registerDeny()
-            return true
         }
-        let deleteSelectors: [Selector] = [
-            #selector(NSResponder.deleteBackward(_:)),
-            #selector(NSResponder.deleteForward(_:)),
-        ]
-        if deleteSelectors.contains(commandSelector) {
-            if textView.hasMarkedText() { return false }
-            engine.registerDeny()
-            return true
-        }
-        return false
+        return deny
     }
 
     func textView(_ textView: NSTextView,
                   willChangeSelectionFromCharacterRange oldSelectedCharRange: NSRange,
                   toCharacterRange newSelectedCharRange: NSRange) -> NSRange {
-        if textView.hasMarkedText() { return newSelectedCharRange }
-        let end = NSRange(location: (textView.string as NSString).length, length: 0)
-        if newSelectedCharRange == end { return newSelectedCharRange }
-        engine.registerDeny()
-        return end
+        if let end = AppendOnlyInputPolicy.redirectedSelection(
+            proposed: newSelectedCharRange,
+            fullLength: (textView.string as NSString).length,
+            hasMarkedText: textView.hasMarkedText()
+        ) {
+            engine.registerDeny()
+            return end
+        }
+        return newSelectedCharRange
     }
 }

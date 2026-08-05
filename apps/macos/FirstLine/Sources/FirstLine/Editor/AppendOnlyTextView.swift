@@ -336,8 +336,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         defaultParagraphStyle = paragraph
         typingAttributes = attributes
-        insertionPointColor = NSColor(FirstLineColors.ink).withAlphaComponent(0.55)
-        textColor = NSColor(FirstLineColors.ink)
+        insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
+        textColor = FirstLineColors.inkNSColor
         font = sessionFont
         alignment = .center
         layoutManager?.delegate = self
@@ -607,7 +607,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private func activeTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: sessionFont,
-            .foregroundColor: NSColor(FirstLineColors.ink),
+            .foregroundColor: FirstLineColors.inkNSColor,
             .paragraphStyle: paragraph,
         ]
     }
@@ -616,11 +616,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let shadow = NSShadow()
         shadow.shadowBlurRadius = 3.5
         shadow.shadowOffset = .zero
-        shadow.shadowColor = NSColor(FirstLineColors.ink).withAlphaComponent(0.26)
+        shadow.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.26)
 
         return [
             .font: sessionFont,
-            .foregroundColor: NSColor(FirstLineColors.ink).withAlphaComponent(0.12),
+            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.12),
             .paragraphStyle: paragraph,
             .shadow: shadow,
         ]
@@ -629,7 +629,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private func hiddenTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: sessionFont,
-            .foregroundColor: NSColor(FirstLineColors.ink).withAlphaComponent(0),
+            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0),
             .paragraphStyle: paragraph,
         ]
     }

@@ -4,7 +4,7 @@
  * [POS]: FirstLine 重写 Phase 1 菜单构造器；以 target-action 桥接 AppDelegate 上的 @objc 方法，
  *        validateMenuItem(_:) 负责启用/禁用（Settings/Library 在会话中禁用，Writing/Home 在 success 禁用）。
  *        Cmd+, 打开站内 Settings surface；Cmd+2 打开 Library。
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit

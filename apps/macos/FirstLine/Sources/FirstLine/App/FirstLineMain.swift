@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
  * [OUTPUT]: 提供 FirstLine 的纯 AppKit 入口（@main），替代原 SwiftUI WindowGroup 入口
  * [POS]: FirstLine 重写 Phase 1 应用骨架根入口；建立 NSApplication、主菜单、主窗口与路由，不再使用 SwiftUI 生命周期
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
  * `@main enum FirstLineMain` 提供：main() 在主线程构造 NSApplication、AppDelegate 与

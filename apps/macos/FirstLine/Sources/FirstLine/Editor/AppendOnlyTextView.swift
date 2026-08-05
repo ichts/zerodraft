@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 NSTextView 输入事件与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
  * [POS]: FirstLine 的 AppKit editor core，负责 append-only、IME 安全约束与固定写作字体；TextKit 位置一律使用 UTF-16 偏移
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import AppKit

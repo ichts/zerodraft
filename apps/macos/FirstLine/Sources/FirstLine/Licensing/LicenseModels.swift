@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 Foundation
  * [OUTPUT]: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约
  * [POS]: Licensing 模块的契约层，定义 Mac app 与 LicenseClient 之间共享的数据形状；含本地持久化失败的 storageFailure 错误
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

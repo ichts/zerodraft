@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppPaths.configDirectory 与 FileManager
  * [OUTPUT]: InstallIDStore + InstallID，生成并持久化稳定的本机 install UUID
  * [POS]: Infrastructure 身份层；给 Dodo `/licenses/activate` 提供非侵入式的 instance 标识
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  *
  * 设计取舍：
  * - 不使用硬件序列号 / IOPlatformUUID 等侵入式设备指纹。

@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 LicenseModels
  * [OUTPUT]: LicenseClient protocol，覆盖 activate / validate / deactivate 三个 Dodo 公开 license endpoint
  * [POS]: Licensing 抽象层，让 Mac app 在没有真实 Dodo 网络调用时也能测试与运行
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

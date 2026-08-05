@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 FileManager 提供用户 Application Support 目录
  * [OUTPUT]: 提供 First Line 的 library / recovery / config 路径
  * [POS]: Infrastructure 路径规范层，统一文件落点
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

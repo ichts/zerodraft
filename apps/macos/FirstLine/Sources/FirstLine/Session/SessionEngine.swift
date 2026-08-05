@@ -2,7 +2,7 @@
  * [INPUT]: 依赖单调时间源和编辑器活动事件
  * [OUTPUT]: 提供 SessionEngine 与 SessionPhase 状态机，暴露 idleSeconds / secondsUntilDeletion / wipedText / lastDenyAt
  * [POS]: FirstLine 核心会话循环，负责 danger / failure / success；集中式截止时间裁决在 tick / registerCommittedText / registerMarkedTextActivity / finish 入口先于活动应用
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem（Colors/Typography/FirstLineButtons/FloodCanvasView）
  * [OUTPUT]: FailureViewController - 失败界面（Draft deleted. + Try Again / Back to Home + joined fossil）
  * [POS]: FirstLine 重写 Phase 3 的 failure surface；退役 SwiftUI FailureView，不保存失败文本
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 复刻 SwiftUI FailureView：顶部 2pt danger 红条；左对齐标题/正文；Try Again（主钮，startSession）+
  * Back to Home（次钮，goHome）；右下角 joined fossil（wipedText 前 64 字，mono 11，ink 0.14，旋转 3 度）。

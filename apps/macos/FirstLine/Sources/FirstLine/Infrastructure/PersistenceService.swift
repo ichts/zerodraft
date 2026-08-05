@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 SessionEngine、AppPaths 和 markdown 文件
  * [OUTPUT]: 提供成功 session 的保存、读取、删除能力
  * [POS]: Infrastructure 持久化层，负责 library markdown 文件的完整生命周期
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

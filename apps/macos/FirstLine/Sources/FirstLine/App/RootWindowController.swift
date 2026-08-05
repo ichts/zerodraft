@@ -3,7 +3,7 @@
  * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> 常驻容器内的子 VC）
  * [POS]: FirstLine 重写 Phase 1 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 路由：本控制器观察两个信号：
  *   1) selectedSurface -> 换 contentViewController；

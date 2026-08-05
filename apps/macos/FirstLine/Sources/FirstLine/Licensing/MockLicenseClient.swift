@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 LicenseClient、LicenseModels
  * [OUTPUT]: MockLicenseClient，Phase 3 期间在 Mac app 内替换真实 Dodo 调用
  * [POS]: Licensing 测试替身；让 UpgradeView / SettingsView / AppState 在 Dodo 产品尚未上线前可跑可测
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

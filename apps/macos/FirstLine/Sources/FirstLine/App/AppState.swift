@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 SessionEngine、PersistenceService、SettingsStore 管理应用状态
  * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、durable wipe aftermath、按 sessionID 分开的保存重试与可验证的 license 持久化
  * [POS]: FirstLine 顶层导航真相源，负责从 Home 启动 session、消耗 trial 与支持面跳转
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppKit、App/AppState、Session/SuccessText、DesignSystem
  * [OUTPUT]: SuccessViewController - 词数、可滚动草稿与 copy/download/discard actions
  * [POS]: First Line AppKit success surface；复刻退役 SwiftUI SuccessView 的纵向节奏与键盘焦点
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit

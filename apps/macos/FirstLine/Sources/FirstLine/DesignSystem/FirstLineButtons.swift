@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppKit、DesignSystem/Colors、DesignSystem/Typography
  * [OUTPUT]: FirstLineButtons - appearance-aware AppKit 主/次/链接按钮工厂
  * [POS]: First Line AppKit surface 共用按钮规格；与 SwiftUI ButtonStyles 的 24pt 水平 padding、44pt 高度一致
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit

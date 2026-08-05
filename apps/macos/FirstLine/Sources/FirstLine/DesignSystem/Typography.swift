@@ -2,7 +2,7 @@
  * [INPUT]: BundledFonts (Newsreader human serif, IBM Plex Mono machine mono)
  * [OUTPUT]: FirstLineTypography font tokens for the Flood design system (AppKit NSFont).
  * [POS]: FirstLine typography layer; titles/body in Newsreader, chrome in IBM Plex Mono
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Flood layers: Newsreader is the human layer (titles, body, tagline); IBM Plex Mono is the
  * machine layer (sidebar labels, microcopy/rules, clock/status, buttons). If a family is not

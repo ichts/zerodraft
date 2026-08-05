@@ -2,7 +2,7 @@
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
  * [OUTPUT]: 提供 AppSettings、AppTheme、ReducedMotionOverride、SettingsStore，包含原生 trial 计数
  * [POS]: Infrastructure 设置层，负责默认值与 settings.json 持久化
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

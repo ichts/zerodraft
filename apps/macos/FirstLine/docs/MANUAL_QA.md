@@ -61,12 +61,14 @@ Use this checklist before direct distribution.
 - Confirm the duration row is informational only: `60 seconds. Fixed.` (no control).
 - Change reduced motion override.
 - Use Reveal Library Folder.
+- With an active license, confirm Trial & License shows only the status line and metadata (no key field, no Activate button, no buy link, no prefilled key).
+- With an inactive license, confirm the trial status, explanation, empty key field, Activate, and Open Buy page.
 
 ## Library
 - Open Library.
 - Confirm reverse chronological order.
 - Open detail view.
-- Verify Copy Text / Open in Default Editor / Reveal in Finder / Delete.
+- Verify Copy Text plus the More menu (Open in Default Editor / Reveal in Finder / Delete, separated).
 - Delete one item and verify file removal from disk.
 
 ## Manual QA Record
@@ -114,4 +116,15 @@ Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC 
 - 合成 keystroke 在应用获焦后可能被系统切回上次输入法（Pinyin）导致脏字；为干净自测在会话聚焦后强切 ABC（`TISSelectInputSource`）。这是自动化假象，非产品缺陷。
 - SmokeFlowTests 里两个 wall-clock 重试测试（failedSaveRetries / concurrentFailingSaves）在机器重压下会 flake（已观察：并发启动多个 app 实例 + 编译时）；空闲重跑 0.05s 秒过。可改进：像 SessionEngine 那样注入时钟/scheduler 以去 wall-clock 依赖（既有小债，非本次引入）。
 - 真机硬件点击、真 macOS IME 候选窗、reduced-motion 视觉项未用合成事件穷举，留真机复核。
-- L3 头部的 “检查 CLAUDE.md” 为旧约定（仓内无 CLAUDE.md）；按 GEB 协议应指向最近 AGENTS.md，留为 bounded follow-up（不在本次重写范围）。
+- L3 头部的 “检查 CLAUDE.md” 旧约定已在 review round 1 清扫：23 个 Swift 头部统一改指 AGENTS.md（仓内仍无 CLAUDE.md）。
+
+### 2026-08-05  -  Review round 1 (fix loop)
+
+Reviewer 复审 pure-AppKit 重写后接受 1 个 BLOCKER + 4 个 FIX-NOW。Debug build，light theme，守门狗启动 + 截图多模态目验。修复提交：357a37f（BLOCKER + 描边）、280343d（Library + Settings + FirstLineMain 头部）。
+
+- [x] **活动 session 草稿恢复（BLOCKER）**：Writing 中打字 -> Home -> 返回 Writing，草稿完整保留、与 engine 不分叉（截图 /tmp/restore-after-home.png）。修法：AppendOnlyTextView.loadRestoredText() 受控恢复入口（isRestoringProgrammatically + defer 复位），SessionViewController 仅在 engine 有稿且 editor 空时调用；用户 append-only 守卫语义不变（新测试验证恢复后 paste / cut / replaceCharacters 仍 deny）。
+- [x] **描边 appearance-aware**：Session 白纸与 Finish 描边从一次性 cgColor 改为 FloodCanvasView updateLayer 重解析 + viewDidAppear 重设，浅 / 深主题切换正确。
+- [x] **Library 布局**：正文顶对齐（FlippedDocumentView），不再沉底；操作栏 Copy Text + More 菜单（Open / Reveal / Delete），980pt 最小宽无裁切（截图 /tmp/lib-fix.png、/tmp/lib-more.png）。
+- [x] **Settings license 状态**：active 仅显示 `License active.` + 元数据，无 key 输入框 / Activate / 明文（截图 /tmp/settings-active.png）；inactive 显示 trial 状态 + 说明 + 空 key 框 + Activate + Open Buy page（截图 /tmp/settings-inactive.png）。
+- [x] **GEB 文档漂移**：apps/macos/AGENTS.md 改述纯 AppKit；FirstLineMain / SessionViewController 头部更新到当前职责；23 个 Swift 头部 CLAUDE.md 引用统一改指 AGENTS.md。
+- [x] `swift build` + `swift test` 98/8 全绿（95 -> 98，新增恢复入口 + 守卫未削弱 + 空恢复 no-op 三测试）。

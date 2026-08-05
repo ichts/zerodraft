@@ -3,7 +3,7 @@
  * [OUTPUT]: FossilLayerView - AppKit 版静态 hesitation fossil 纹理层（移植自 SwiftUI FossilLayer）
  * [POS]: FirstLine 重写 Phase 2b Flood soul 层；bone 地面上一次 seeded 放置的 mono 片段，
  *        只在 paper 列外的 gutter 内；danger 时纯色变红（opacity 不变）；几何显著变化时重算。
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 与 SwiftUI 版的等价：seeded mulberry RNG（seed 0x1337）、同一 corpus、同一 gutter 边界
  * （halfFrag 内缩）、同一 danger 行为（只换 foreground，opacity 恒定）。

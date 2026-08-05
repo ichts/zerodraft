@@ -3,7 +3,7 @@
  * [OUTPUT]: RootContainerViewController - 常驻窗口内容控制器，用子 VC 承载各 surface 并原地切换
  * [POS]: FirstLine AppKit 壳的 surface 宿主；窗口只设一次尺寸，切 surface 只换子视图，避免每次
  *        换 contentViewController 触发的窗口 resize / 0x0 fitting-size / 递归 layout
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 为什么不每次换 window.contentViewController：那会让 AppKit 按新 VC 的 fitting size 调整窗口，
  * 而 success/failure 的约束根视图 fitting size 会塌成 0x0（窗口显示旧 session 残留快照），任何

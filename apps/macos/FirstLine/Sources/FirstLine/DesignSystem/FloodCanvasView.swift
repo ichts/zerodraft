@@ -4,7 +4,7 @@
  * [POS]: FirstLine 重写 Phase 2a 视觉底座；为白纸 / bone 地面 / 任何纯色填充提供
  *        appearance 变化时自动重解析 CGColor 的正确模式，取代 Phase 1 stub 的
  *        静态 `layer.backgroundColor = nsColor.cgColor` 暗色 bug。
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 为什么存在：`NSColor.cgColor` 在创建瞬间按当前 effective appearance 解析一次，写入
  * layer 后不再随系统/窗口外观变化更新（Phase 1 stub 因此在 dark 系统下显示暗底）。

@@ -2,7 +2,7 @@
  * [INPUT]: 依赖现有 zerodraft 垂直间距系统
  * [OUTPUT]: 提供 FirstLineSpacing 间距 token
  * [POS]: FirstLine 原生壳子的布局节奏层
- * [PROTOCOL]: 变更时更新此头部，然后检查 CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation

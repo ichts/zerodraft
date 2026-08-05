@@ -2,7 +2,7 @@
  * [INPUT]: Bundle.module fonts (Flood human/machine/CJK families) + OFL licenses under Resources/
  * [OUTPUT]: BundledFonts registration + WritingFontCandidate / ChineseFontCandidate writing fonts
  * [POS]: FirstLine writing-font layer; fonts register from the bundle and resolve by PostScript name
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Flood design-system fonts are bundled (SIL Open Font License, see Resources/OFL-*.txt):
  *   - Newsreader (variable upright + italic): human serif layer

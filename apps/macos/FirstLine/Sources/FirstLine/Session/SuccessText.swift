@@ -3,7 +3,7 @@
  * [OUTPUT]: SuccessText - pure-logic success-surface text constants and payload builders
  * [POS]: Decoupled from SwiftUI/AppKit so AppKit-side rewrite surfaces and tests can consume
  *        the web-canonical cleanup prompt and Copy-for-AI payload without importing a View.
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
+ * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Extracted verbatim from SuccessView so the canonical prompt string and join/trim semantics
  * have a single source of truth shared by the SwiftUI SuccessView (today) and the AppKit

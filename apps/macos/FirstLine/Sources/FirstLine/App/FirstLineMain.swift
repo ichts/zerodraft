@@ -49,6 +49,7 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }
     @objc func goHome(_ sender: Any?) { appState.goHome() }
+    @objc func openLibrary(_ sender: Any?) { appState.openLibrary() }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
     @objc func terminateApp(_ sender: Any?) { NSApp.terminate(nil) }
     @objc func orderFrontStandardAboutPanel(_ sender: Any?) {
@@ -61,7 +62,7 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 extension FirstLineAppDelegate: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(openSettings):
+        case #selector(openSettings), #selector(openLibrary):
             return appState.canNavigateToSupportSurface
         case #selector(openWriting), #selector(goHome):
             // success 阶段锁定导航（复刻原 SwiftUI .disabled 语义）。

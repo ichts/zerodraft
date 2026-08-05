@@ -2,8 +2,8 @@
  * [INPUT]: 依赖 AppKit、App/AppState
  * [OUTPUT]: MainMenuBuilder.buildMenu - 构建纯 AppKit 主菜单（App 菜单 + Navigate 菜单）
  * [POS]: FirstLine 重写 Phase 1 菜单构造器；以 target-action 桥接 AppDelegate 上的 @objc 方法，
- *        validateMenuItem(_:) 负责启用/禁用（Settings 在会话中禁用，Writing/Home 在 success 禁用）。
- *        Cmd+, 原本开独立 SwiftUI Settings 窗口，本重写简化为站内 .settings surface。
+ *        validateMenuItem(_:) 负责启用/禁用（Settings/Library 在会话中禁用，Writing/Home 在 success 禁用）。
+ *        Cmd+, 打开站内 Settings surface；Cmd+2 打开 Library。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/CLAUDE.md
  */
 
@@ -72,6 +72,14 @@ enum MainMenuBuilder {
         )
         writingItem.target = validationOwner
         navigateMenu.addItem(writingItem)
+
+        let libraryItem = NSMenuItem(
+            title: "Library",
+            action: #selector(FirstLineAppDelegate.openLibrary(_:)),
+            keyEquivalent: "2"
+        )
+        libraryItem.target = validationOwner
+        navigateMenu.addItem(libraryItem)
 
         let homeItem = NSMenuItem(
             title: "Home",

@@ -10,9 +10,12 @@ import AppKit
 @MainActor
 final class SettingsViewController: NSViewController {
     private let appState: AppState
-    private var licenseField: NSTextField!
-    private var activateButton: NSButton!
+    private var licenseField: NSTextField?
+    private var activateButton: NSButton?
     private var licenseStatusLabel: NSTextField!
+    private var licenseEntryView: NSView?
+    private var licenseExplanationLabel: NSTextField?
+    private var buyPageButton: NSButton?
 
     init(appState: AppState) {
         self.appState = appState
@@ -80,26 +83,35 @@ final class SettingsViewController: NSViewController {
 
     private func licenseRows() -> [NSView] {
         licenseStatusLabel = muted(appState.trialStatusText)
-        licenseField = NSTextField(string: appState.settings.licenseKey ?? "")
-        licenseField.placeholderString = "Paste license key"
-        licenseField.font = FirstLineTypography.microcopyNSFont
-        licenseField.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
-        activateButton = primary("Activate", #selector(activateTapped))
+        var rows: [NSView] = [licenseStatusLabel]
 
-        let entry = NSStackView(views: [licenseField, activateButton])
-        entry.orientation = .horizontal
-        entry.alignment = .centerY
-        entry.spacing = 12
-
-        var rows: [NSView] = [licenseStatusLabel, entry]
         if appState.settings.licenseStatus == .active {
             if let date = appState.settings.licenseActivatedAt { rows.append(muted("Activated \(formatted(date))")) }
             if let id = appState.settings.licenseInstanceID { rows.append(muted("Instance: \(id)")) }
             if let date = appState.settings.licenseLastValidatedAt { rows.append(muted("Last validated \(formatted(date))")) }
-        } else {
-            rows.append(muted("The Mac trial includes three writing sessions. Activate a license key to keep writing."))
+            return rows
         }
-        rows.append(link("Open Buy page", #selector(openBuyTapped)))
+
+        let explanation = muted("The Mac trial includes three writing sessions. Activate a license key to keep writing.")
+        licenseExplanationLabel = explanation
+
+        let field = NSTextField(string: "")
+        field.placeholderString = "Paste license key"
+        field.font = FirstLineTypography.microcopyNSFont
+        field.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
+        licenseField = field
+
+        let button = primary("Activate", #selector(activateTapped))
+        activateButton = button
+        let entry = NSStackView(views: [field, button])
+        entry.orientation = .horizontal
+        entry.alignment = .centerY
+        entry.spacing = 12
+        licenseEntryView = entry
+
+        let buy = link("Open Buy page", #selector(openBuyTapped))
+        buyPageButton = buy
+        rows.append(contentsOf: [explanation, entry, buy])
         return rows
     }
 
@@ -203,6 +215,7 @@ final class SettingsViewController: NSViewController {
     }
 
     @objc private func activateTapped() {
+        guard let licenseField, let activateButton else { return }
         activateButton.isEnabled = false
         licenseStatusLabel.stringValue = "Activating..."
         Task { @MainActor [weak self] in
@@ -213,6 +226,10 @@ final class SettingsViewController: NSViewController {
                 licenseStatusLabel.stringValue = error.errorDescription ?? "Activation failed."
             } else {
                 licenseStatusLabel.stringValue = appState.trialStatusText
+                licenseField.stringValue = ""
+                licenseEntryView?.isHidden = true
+                licenseExplanationLabel?.isHidden = true
+                buyPageButton?.isHidden = true
             }
         }
     }

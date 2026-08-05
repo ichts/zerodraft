@@ -15,6 +15,7 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
     private var metadataLabel: NSTextField!
     private var bodyLabel: NSTextField!
     private var actionRow: NSStackView!
+    private var moreButton: NSButton!
 
     init(appState: AppState) {
         self.appState = appState
@@ -97,8 +98,12 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
         detailTitle = heading("Select a saved session.")
         detailTitle.translatesAutoresizingMaskIntoConstraints = false
         detailTitle.maximumNumberOfLines = 2
+        detailTitle.lineBreakMode = .byWordWrapping
+        detailTitle.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         metadataLabel = muted("")
         metadataLabel.translatesAutoresizingMaskIntoConstraints = false
+        metadataLabel.lineBreakMode = .byTruncatingTail
+        metadataLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         bodyLabel = NSTextField(wrappingLabelWithString: "")
         bodyLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -107,7 +112,9 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
         bodyLabel.isSelectable = true
         bodyLabel.maximumNumberOfLines = 0
         bodyLabel.lineBreakMode = .byWordWrapping
-        let document = NSView()
+        bodyLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let document = FlippedDocumentView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(bodyLabel)
         let scroll = NSScrollView()
@@ -121,14 +128,14 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
             bodyLabel.topAnchor.constraint(equalTo: document.topAnchor),
             bodyLabel.leadingAnchor.constraint(equalTo: document.leadingAnchor),
             bodyLabel.trailingAnchor.constraint(equalTo: document.trailingAnchor),
-            document.bottomAnchor.constraint(greaterThanOrEqualTo: bodyLabel.bottomAnchor),
+            bodyLabel.bottomAnchor.constraint(equalTo: document.bottomAnchor),
         ])
 
+        moreButton = FirstLineButtons.secondary(title: "More", target: self, action: #selector(moreTapped))
+        moreButton.setAccessibilityLabel("More")
         actionRow = NSStackView(views: [
             FirstLineButtons.primary(title: "Copy Text", target: self, action: #selector(copyTapped)),
-            FirstLineButtons.secondary(title: "Open in Default Editor", target: self, action: #selector(openTapped)),
-            FirstLineButtons.secondary(title: "Reveal in Finder", target: self, action: #selector(revealTapped)),
-            FirstLineButtons.link(title: "Delete", target: self, action: #selector(deleteTapped)),
+            moreButton,
         ])
         actionRow.translatesAutoresizingMaskIntoConstraints = false
         actionRow.orientation = .horizontal
@@ -151,6 +158,7 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
             scroll.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -48),
             scroll.bottomAnchor.constraint(equalTo: actionRow.topAnchor, constant: -24),
             actionRow.leadingAnchor.constraint(equalTo: detailTitle.leadingAnchor),
+            actionRow.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -48),
             actionRow.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -40),
         ])
         return container
@@ -244,6 +252,16 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
         appState.copyLibrarySessionText(session)
     }
 
+    @objc private func moreTapped() {
+        let menu = NSMenu()
+        menu.addItem(withTitle: "Open in Default Editor", action: #selector(openTapped), keyEquivalent: "")
+        menu.addItem(withTitle: "Reveal in Finder", action: #selector(revealTapped), keyEquivalent: "")
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Delete", action: #selector(deleteTapped), keyEquivalent: "")
+        for item in menu.items { item.target = self }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: moreButton.bounds.maxY + 4), in: moreButton)
+    }
+
     @objc private func openTapped() {
         guard let session = appState.selectedLibrarySession else { return }
         appState.openLibrarySessionInDefaultEditor(session)
@@ -268,4 +286,9 @@ final class LibraryViewController: NSViewController, NSTableViewDataSource, NSTa
     }
 
     @objc private func doneTapped() { appState.goHome() }
+}
+
+/// Scroll documents are top-left based so saved drafts read downward from the detail header.
+private final class FlippedDocumentView: NSView {
+    override var isFlipped: Bool { true }
 }

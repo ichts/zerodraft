@@ -7,7 +7,8 @@
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
  * `@main enum FirstLineMain` 提供：main() 在主线程构造 NSApplication、AppDelegate 与
  * AppState，applicationDidFinishLaunching 里构建主菜单、显示主窗口并激活 app。
- * 这是「全量 AppKit 重写」的 Phase 1：窗口与菜单路由通，真实界面仍是占位 VC（Phase 2+）。
+ * 完整 AppKit 应用由 RootWindowController 托管常驻 RootContainerViewController；Home、Writing、
+ * Failure、Success、Settings、Upgrade 与 Library 都是容器内切换的真实原生 AppKit surface。
  */
 
 import AppKit

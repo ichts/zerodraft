@@ -7,7 +7,6 @@
 
 import Foundation
 import AppKit
-import SwiftUI
 
 enum Surface: String, CaseIterable, Hashable, Identifiable {
     case home = "Home"

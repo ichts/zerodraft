@@ -6,7 +6,6 @@
  */
 
 import Foundation
-import SwiftUI
 
 enum AppTheme: String, Codable, CaseIterable, Identifiable {
     case system
@@ -15,14 +14,6 @@ enum AppTheme: String, Codable, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: nil
-        case .light: .light
-        case .dark: .dark
-        }
-    }
 }
 
 enum ReducedMotionOverride: String, Codable, CaseIterable, Identifiable {

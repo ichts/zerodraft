@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prototype - landing siege (squeeze)</title>
+<!--
+  REVIEW ARTIFACT - not production.
+  Question: should the landing's danger beat borrow the game-siege mechanic?
+  Mechanic under test: while the demo is silent, the left/right fossil piles
+  advance inward and the paper scales down (1 -> 0.84); one keystroke (here:
+  recovery at 6.5s) snaps everything back; at the 8s wipe the paper slams to
+  0.78, the draft joins the pile, and the paper returns to full size.
+  Toggle "siege" top-right compares against the current landing behavior
+  (fossils only redden; paper geometry never moves).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f1f0eb; --paper: #ffffff; --ink: #17150f; --dim: #6b665b; --faint: #b3ada0;
+    --red: #c8392f; --line: rgba(23,21,15,.1); --radius: 3px;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --serif: "Newsreader", Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: var(--serif); }
+  body { min-height: 100vh; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  ::selection { background: rgba(200,57,47,.22); }
+
+  .field { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .frag {
+    position: absolute; left: 0; top: 0; font-family: var(--mono); color: var(--ink);
+    white-space: pre; line-height: 1.5; opacity: var(--fo, .1);
+    will-change: transform, opacity;
+    overflow: hidden; text-overflow: clip;
+  }
+  .frag s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
+  /* Non-siege comparison mode: fossils only redden/strengthen, never move.
+     In siege mode the rAF loop owns color/opacity inline, so the blanket rules
+     must not fight it (redAt staggering would be defeated). */
+  body.danger:not(.siege-on) .frag { color: var(--red); opacity: min(calc(var(--fo, .1) * 3.4), .5); transition: color .5s ease, opacity .5s ease; }
+  .frag.join-new { color: var(--red); opacity: .85; font-size: 13px; }
+  .frag.join-new.settle { color: var(--ink); opacity: .09; transition: color 1.6s ease, opacity 1.6s ease; }
+
+  .veil {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
+    box-shadow: inset 0 0 140px rgba(200,57,47,.3), inset 0 0 40px rgba(200,57,47,.12);
+    transition: opacity .35s ease;
+  }
+  body.danger .veil { opacity: 1; }
+
+  .page { position: relative; z-index: 1; }
+  .nav {
+    max-width: 1120px; margin: 0 auto; padding: 24px 32px;
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: var(--mono); font-size: 13px; letter-spacing: .14em;
+  }
+  .brand b { color: var(--red); font-weight: 500; }
+  .toggle {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--dim); background: none; border: 1px solid var(--faint); border-radius: 2px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  .toggle.on { color: var(--ink); border-color: var(--ink); }
+
+  .hero { text-align: center; padding: 52px 20px 26px; }
+  .hero h1 {
+    font-weight: 500; font-size: clamp(40px, 5.4vw, 64px); line-height: 1.06;
+    letter-spacing: -.015em; text-wrap: balance;
+  }
+  .hero .sub { font-style: italic; font-size: clamp(17px, 2vw, 21px); color: var(--dim); margin-top: 16px; }
+  .hero .sub s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
+  .cta {
+    display: inline-block; margin-top: 30px; font-family: var(--mono); font-size: 13px;
+    letter-spacing: .1em; background: var(--ink); color: var(--bg); border: 0;
+    padding: 15px 22px; cursor: pointer;
+  }
+  .hint { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 14px; }
+
+  .sheet-zone { padding: 24px 20px 84px; }
+  .paper {
+    position: relative; width: min(700px, 100%); margin: 58px auto 0;
+    background: var(--paper); border: 1px solid rgba(23,21,15,.2); border-radius: var(--radius);
+    box-shadow: 0 1px 0 rgba(23,21,15,.06), 0 24px 60px rgba(23,21,15,.1);
+    height: clamp(480px, 62vh, 640px);
+    overflow: hidden;
+    transform-origin: center center;
+    transition: border-color .3s ease, box-shadow .3s ease;
+    will-change: transform;
+  }
+  body.danger .paper {
+    border-color: rgba(200,57,47,.55);
+    box-shadow: 0 1px 0 rgba(23,21,15,.06), 0 24px 60px rgba(23,21,15,.1), 0 0 0 4px rgba(200,57,47,.08);
+  }
+  .paper-head {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    padding: 12px 18px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+  }
+  .spec { color: var(--faint); }
+  .spec b { color: var(--red); font-weight: 500; }
+  .clock { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; }
+  body.danger .clock { color: var(--red); }
+
+  .preview {
+    padding: clamp(80px, 14vh, 130px) 30px 76px;
+    font-size: clamp(20px, 2vw, 26px); line-height: 1.62; letter-spacing: -.01em;
+    text-align: center; white-space: pre-wrap; overflow-wrap: break-word;
+    transition: opacity .3s ease;
+  }
+  .preview .ln { display: block; min-height: 1.62em; color: transparent; transition: color .3s ease; }
+  .preview .ln.prev { color: rgba(23,21,15,.32); }
+  .preview .ln.cur { color: var(--ink); }
+  body.danger .preview { opacity: .35; }
+
+  .danger-count {
+    position: absolute; left: 50%; top: 60%; transform: translate(-50%, 0);
+    z-index: 6; pointer-events: none; text-align: center;
+    font-family: var(--mono); font-weight: 500; font-size: clamp(90px, 12vw, 140px);
+    line-height: 1; color: var(--red); font-variant-numeric: tabular-nums;
+    display: none;
+  }
+  body.danger .danger-count { display: block; }
+  .danger-hint {
+    font-family: var(--mono); font-weight: 400; font-size: 10.5px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--dim); line-height: 1.6; margin-top: 10px;
+  }
+
+  .paper-foot {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 12px 18px; border-top: 1px solid var(--line);
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--faint); background: var(--paper);
+  }
+  .paper-foot .narrator.dead { color: var(--red); }
+  body.danger .paper-foot .narrator { color: var(--red); }
+
+  .replay {
+    display: block; margin: 26px auto 60px; font-family: var(--mono); font-size: 11px;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--dim);
+    background: none; border: 1px solid var(--faint); border-radius: 2px; padding: 8px 14px; cursor: pointer;
+  }
+  .replay:hover { color: var(--ink); border-color: var(--ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="field" id="field" aria-hidden="true"></div>
+  <div class="veil" aria-hidden="true"></div>
+  <div class="page">
+    <nav class="nav">
+      <span class="brand">ZERO<b>_</b>DRAFT</span>
+      <button class="toggle on" id="siegeToggle" type="button">siege: on</button>
+    </nav>
+    <section class="hero">
+      <h1>It's not supposed to be good yet.</h1>
+      <p class="sub">So we made <s>polishing</s> impossible.</p>
+      <button class="cta" type="button">Give it sixty seconds.</button>
+      <p class="hint">or just click the paper and type</p>
+    </section>
+    <div class="sheet-zone">
+      <div class="paper" id="paper">
+        <div class="paper-head">
+          <span class="spec">forward only <b>/</b> 5s warn <b>/</b> 8s wipe <b>/</b> 60s</span>
+          <span class="clock">01:00</span>
+        </div>
+        <div class="preview" id="preview"></div>
+        <div class="danger-count" id="cd"><span id="cdn">3</span><div class="danger-hint">keep typing<br>or the draft<br>is deleted</div></div>
+        <div class="paper-foot">
+          <span class="narrator" id="narrator">the pile is patient. it gets whatever you stop writing.</span>
+          <span id="wc">0 words</span>
+        </div>
+      </div>
+    </div>
+    <button class="replay" id="replay" type="button">replay demo</button>
+  </div>
+
+<script>
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CORPUS = [
+  "dont delte this whatever you do","the first sentence is still the only sentence","why cant i just START",
+  "~dear journal~ no wait","ok ok ok think think","~i will write every morning~","brain dump number four hundered",
+  "fix it LATER. later later later","zero readers, and still i didnt start","i had the idea and then it left",
+  "reread it nine times. sent zero","unsent email no. 12","the good version needed one more week. it got none",
+  "stopped editing mid-sentence. never resumed","~dear hiring manager~ hi dana,","chapter one, attempt seven",
+  "it made sense at 1am","spoken out loud once. never typed","~opening line~ gave up on it mid-wor",
+  "untitled (37). untitled (38). untitled (39)","i will start when i know how it ends","somewhere between a text and a novel",
+  "so many typos i stopped noticing. then i stopped","almost. always almost","waited for the muse. she was on break",
+  "half a thought. the other half left","dear future me: this page was never finished","i was going to finish this one",
+  "saved as draft. never opened again","the second sentence killed it","i thought about it so hard it disappeared",
+  "rewrite of the rewrite of the openin","opening line pending since march","the idea was there a second ago",
+  "just one more reread before i","to whom it may concern. thats as far as i got","the ending was supposed to come later",
+  "first draft? more like first and last","written in my head on the train, gone by the platform",
+  "the notes app has forty of these","i paused to check my phone. that was it","this paragraph had one job. RIP",
+  "i highlighted it all. then what","thoughts, unsorted, mostly loud","stopped to find the perfect word. found nothing"
+];
+const SAMPLE = "the idea is that meetings\nare where decisions go to wait.\ni cant prove it yet. it might be\nthe only true thing i beleive";
+const DANGER_AT = 5000, GONE_AT = 8000, ARM_AT = 1000, RECOVER_AT = 6500;
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const esc = (s) => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/~/g,"");
+const fragHTML = (t) => { const i = t.indexOf("~"); const j = t.lastIndexOf("~"); if (i >= 0 && j > i) return esc(t.slice(0,i)) + "<s>" + esc(t.slice(i+1,j)) + "</s>" + esc(t.slice(j+1)); return esc(t); };
+
+const field = document.getElementById("field");
+const paper = document.getElementById("paper");
+const preview = document.getElementById("preview");
+const narrator = document.getElementById("narrator");
+const wc = document.getElementById("wc");
+const cdn = document.getElementById("cdn");
+
+let siegeOn = true;
+let frags = [];
+
+function buildField() {
+  field.querySelectorAll(".frag:not(.join-new)").forEach((f) => f.remove());
+  frags = [];
+  const W = innerWidth, H = Math.max(innerHeight, 700);
+  const pr = paper.getBoundingClientRect();
+  basePaper = { cx: pr.left + pr.width / 2, w: pr.width, top: pr.top + scrollY, h: pr.height };
+  const rand = mulberry32(20260808);
+  const bag = CORPUS.map((c, i) => i);
+  for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); const t = bag[i]; bag[i] = bag[j]; bag[j] = t; }
+  let bi = 0;
+  const next = () => CORPUS[bag[bi++ % bag.length]];
+  // The siege reads as ranks in lanes, never a scatter: each fragment owns a
+  // horizontal lane (one per rank per side, no same-lane collisions), starts
+  // OUTWARD of its pressed position by a positive travel (direction unanimous:
+  // inward only), and the front rank presses INTO the paper edge (negative gap
+  // slides its tip under the paper, which paints above the field). Press targets
+  // track the LIVE scaled paper edge per frame, so contact holds while the
+  // paper yields. Back ranks are still closing when the wipe lands.
+  const mob = W < 700;
+  RANKS = [
+    { n: mob ? 3 : 4, fs: [20, 26], mw: mob ? 240 : 320, gap: [-14, 2], travel: [130, 220], speed: [1.25, 1.55], fo: [.10, .16] },
+    { n: mob ? 4 : 6, fs: [15, 20], mw: mob ? 210 : 280, gap: [4, 18], travel: [180, 320], speed: [.95, 1.2], fo: [.08, .13] },
+    { n: mob ? 5 : 7, fs: [11, 15], mw: mob ? 190 : 240, gap: [24, 70], travel: [240, 460], speed: [.62, .85], fo: [.06, .10] }
+  ];
+  // Unified lane pool per side: slots step across the paper's span (never
+  // closer than ~44px), dealt center-out - the front rank holds the text-zone
+  // lanes, mid ranks flank them, back ranks take the spill above/below the
+  // paper. No two fragments on a side can ever share a band.
+  const totalN = RANKS.reduce((s, R) => s + R.n, 0);
+  const spanTop = basePaper.top - 50, spanH = basePaper.h + 100;
+  const step = Math.max(44, spanH / totalN);
+  const slots = [];
+  for (let i = 0; i < totalN; i++) slots.push(spanTop + step * (i + 0.5));
+  const centerOut = slots.sort((a, b) => Math.abs(a - (basePaper.top + basePaper.h * 0.36)) - Math.abs(b - (basePaper.top + basePaper.h * 0.36)));
+  laneSlots = centerOut;
+  let slotIdx = 0;
+  RANKS.forEach((R) => {
+    const mySlots = centerOut.slice(slotIdx, slotIdx + R.n); slotIdx += R.n;
+    [0, 1].forEach((side) => {
+      for (let i = 0; i < R.n; i++) {
+        const el = document.createElement("span");
+        el.className = "frag";
+        el.innerHTML = fragHTML(next());
+        const fs = R.fs[0] + rand() * (R.fs[1] - R.fs[0]);
+        el.style.fontSize = fs.toFixed(1) + "px";
+        el.style.maxWidth = R.mw + "px";
+        const fo = R.fo[0] + rand() * (R.fo[1] - R.fo[0]);
+        el.style.setProperty("--fo", fo.toFixed(3));
+        field.appendChild(el);
+        const w = el.offsetWidth || 160;
+        const gap = R.gap[0] + rand() * (R.gap[1] - R.gap[0]);
+        const travel = R.travel[0] + rand() * (R.travel[1] - R.travel[0]);
+        // rest position: outward of the pressed edge by exactly `travel`
+        const edgeAtRest = side === 0 ? pr.left - w - gap : pr.right + gap;
+        const x0 = side === 0 ? edgeAtRest - travel : edgeAtRest + travel;
+        const y = mySlots[i] + (rand() * 12 - 6);
+        frags.push({
+          el, side, gap, x0, w, y: Math.max(8, y), rot: (rand() * 8 - 4).toFixed(1),
+          speed: R.speed[0] + rand() * (R.speed[1] - R.speed[0]),
+          fo, redE: .55 + rand() * .37,
+          rank: RANKS.indexOf(R), born: 0, e: 0, e0: 0
+        });
+      }
+    });
+  });
+  renderField(0, -1);
+}
+
+// Per-fragment approach: each fossil has its own clock (born), so reinforcements
+// joining mid-siege start from outside instead of teleporting mid-way.
+function fragE(f, idle) {
+  const Li = Math.max(0, Math.min(1, ((idle - f.born) - ARM_AT) / (GONE_AT - ARM_AT)));
+  const p = Math.min(1, Li * f.speed);
+  return p * p * (3 - 2 * p);
+}
+// The paper only yields to CONTACT: its scale is driven by the front rank's
+// closest approach (engaged after e > .72), not by the raw silence clock - the
+// pile visibly arrives first, then the paper compresses.
+function contactL() {
+  let eFront = 0;
+  for (const f of frags) if (f.rank === 0 && f.e > eFront) eFront = f.e;
+  return Math.max(0, Math.min(1, (eFront - 0.72) / 0.28));
+}
+function paintField(kd, scaleL) {
+  const halfW = basePaper.w * (1 - 0.16 * scaleL) / 2;
+  const pl = basePaper.cx - halfW, prr = basePaper.cx + halfW;
+  for (const f of frags) {
+    const e = f.e;
+    const x1 = f.side === 0 ? pl - f.w - f.gap : prr + f.gap;
+    const x = x1 + (f.x0 - x1) * (1 - e);
+    f.el.style.transform = `translate(${x.toFixed(1)}px, ${f.y.toFixed(1)}px) rotate(${f.rot}deg)`;
+    if (!siegeOn) continue; // color/opacity stay CSS-owned in comparison mode
+    f.el.style.opacity = Math.min(.55, f.fo + e * .38).toFixed(3);
+    const red = e >= f.redE || kd >= 1;
+    if (red !== f._red) { f._red = red; f.el.style.color = red ? "var(--red)" : ""; }
+  }
+}
+function renderField(idle, kd) {
+  for (const f of frags) f.e = fragE(f, idle);
+  const scaleL = contactL();
+  paintField(kd, scaleL);
+  return scaleL;
+}
+// Reinforcements: the pile is infinite. While the siege runs, fresh fossils
+// keep arriving from beyond the viewport edges (mid/back rank profiles), so
+// the outside never empties. Capped for perf; they persist across pauses.
+let lastSpawn = 0, spawnSide = 0, laneSlots = [], RANKS = [];
+function maybeSpawn(idle) {
+  if (!siegeOn || REDUCED) return;
+  if (idle - lastSpawn < 460 || frags.length >= 64 || !laneSlots.length) return;
+  lastSpawn = idle;
+  spawnSide = 1 - spawnSide;
+  const side = spawnSide;
+  const R = RANKS[1 + Math.floor(Math.random() * 2)];
+  const rand = Math.random;
+  const el = document.createElement("span");
+  el.className = "frag";
+  el.innerHTML = fragHTML(CORPUS[Math.floor(rand() * CORPUS.length)]);
+  const fs = R.fs[0] + rand() * (R.fs[1] - R.fs[0]);
+  el.style.fontSize = fs.toFixed(1) + "px";
+  el.style.maxWidth = R.mw + "px";
+  const fo = R.fo[0] + rand() * (R.fo[1] - R.fo[0]);
+  el.style.setProperty("--fo", fo.toFixed(3));
+  field.appendChild(el);
+  const w = el.offsetWidth || 160;
+  const gap = R.gap[0] + rand() * (R.gap[1] - R.gap[0]);
+  const x0 = side === 0 ? (-w - 24 - rand() * 120) : (innerWidth + 24 + rand() * 120);
+  const y = Math.max(8, laneSlots[Math.floor(rand() * laneSlots.length)] + (rand() * 12 - 6));
+  frags.push({
+    el, side, gap, x0, w, y, rot: ((rand() * 8) - 4).toFixed(1),
+    speed: R.speed[0] + rand() * (R.speed[1] - R.speed[0]),
+    fo, redE: .55 + rand() * .37,
+    rank: RANKS.indexOf(R), born: idle, e: 0, e0: 0
+  });
+}
+// Flank pressure made visible on the paper itself: inset shadows on the two
+// vertical edges, dark while the siege arms and blood-red once danger starts.
+function renderFlank(L, kd) {
+  if (!siegeOn || REDUCED || L <= 0) { paper.style.boxShadow = ""; return; }
+  const a = (0.20 * L).toFixed(3);
+  const dx = (18 * Math.min(1, L)).toFixed(0);
+  const col = kd >= 0 ? `rgba(200,57,47,${a})` : `rgba(23,21,15,${(0.10 * L).toFixed(3)})`;
+  paper.style.boxShadow = `0 1px 0 rgba(23,21,15,.06), 0 24px 60px rgba(23,21,15,.1), inset ${dx}px 0 30px -18px ${col}, inset ${-dx}px 0 30px -18px ${col}`;
+}
+function clearInlineFx() {
+  for (const f of frags) { f._red = false; f.el.style.color = ""; f.el.style.opacity = ""; }
+}
+
+// ---- motion engine: rAF owns all continuous movement ----
+// The 100ms logic ticker never writes transforms; it only flips discrete state
+// (danger class, countdown numeral, narrator). Continuous motion lives in a
+// per-frame loop so the press reads at display refresh rate, and recovery is a
+// bounded 180ms ease-out tween - one keystroke reverses the siege instantly.
+let rafId = 0, pressLive = false, curL = 0, basePaper = { cx: 0, w: 0, top: 0, h: 0 };
+function stopMotion() { pressLive = false; cancelAnimationFrame(rafId); }
+function setPaperScaleDirect(s) { paper.style.transform = `scale(${s.toFixed(4)})`; }
+
+function pressFrame(now) {
+  if (!pressLive || (phase !== "pause" && phase !== "terminal")) { pressLive = false; return; }
+  const idle = now - pauseStart;
+  curL = Math.max(0, Math.min(1, (idle - ARM_AT) / (GONE_AT - ARM_AT)));
+  const kd = idle >= DANGER_AT ? Math.min(1, (idle - DANGER_AT) / (GONE_AT - DANGER_AT)) : -1;
+  const scaleL = renderField(idle, kd);
+  renderFlank(scaleL, kd);
+  setPaperScaleDirect(1 - 0.16 * scaleL);
+  maybeSpawn(idle);
+  rafId = requestAnimationFrame(pressFrame);
+}
+function startPress() {
+  stopMotion();
+  if (REDUCED || !siegeOn) return;
+  paper.style.transition = "none";
+  pressLive = true;
+  rafId = requestAnimationFrame(pressFrame);
+}
+function recoverMotion() {
+  stopMotion();
+  if (REDUCED || !siegeOn) { renderField(0, -1); renderFlank(0, -1); return; }
+  const fromL = contactL();
+  if (fromL <= 0) { for (const f of frags) f.e = 0; paintField(-1, 0); renderFlank(0, -1); setPaperScaleDirect(1); return; }
+  for (const f of frags) f.e0 = f.e; // snapshot; uniform 180ms retreat
+  paper.style.transition = "none";
+  const t0 = performance.now();
+  const loop = (now) => {
+    const t = Math.min(1, (now - t0) / 180);
+    const m = 1 - (1 - Math.pow(1 - t, 3));
+    for (const f of frags) f.e = f.e0 * (1 - m);
+    const scaleL = fromL * (1 - m);
+    paintField(-1, scaleL);
+    renderFlank(scaleL, -1);
+    setPaperScaleDirect(1 - 0.16 * scaleL);
+    if (t < 1) rafId = requestAnimationFrame(loop);
+    else { curL = 0; for (const f of frags) f.e = 0; paintField(-1, 0); renderFlank(0, -1); }
+  };
+  rafId = requestAnimationFrame(loop);
+}
+
+function applyScale(target, ms) { // discrete jumps only (slam / restore)
+  if (REDUCED) return;
+  paper.style.transition = `transform ${ms}ms ease`;
+  paper.style.transform = `scale(${target.toFixed(3)})`;
+}
+
+// ---- demo sequencer ----
+let timer = null, phase = "idle", idx = 0, pauseStart = 0, lastCd = null;
+function setNarrator(t, dead) { narrator.textContent = t; narrator.classList.toggle("dead", !!dead); }
+function render() {
+  const text = SAMPLE.slice(0, idx);
+  const lines = text.split("\n");
+  let cur = -1;
+  for (let i = lines.length - 1; i >= 0; i--) if (lines[i]) { cur = i; break; }
+  preview.innerHTML = lines.map((l, i) => `<span class="ln${i === cur ? " cur" : i === cur - 1 ? " prev" : ""}">${esc(l)}</span>`).join("");
+  wc.textContent = (text.match(/[\p{L}\p{N}]+/gu) || []).length + " words";
+}
+function delayFor(ch) {
+  if (ch === "\n") return 620;
+  if (/[.,!?]/.test(ch)) return 480;
+  if (ch === " ") return 200;
+  return 120 + Math.random() * 70;
+}
+function schedule(fn, ms) { clearTimeout(timer); timer = setTimeout(fn, ms); }
+
+function typeNext() {
+  if (phase !== "typing") return;
+  if (idx >= SAMPLE.length) { beginPause(true); return; }
+  idx++;
+  const ch = SAMPLE[idx - 1];
+  render();
+  if (idx === SAMPLE.indexOf("\n") + 1) { beginPause(false); return; }
+  schedule(typeNext, delayFor(ch));
+}
+
+function beginPause(terminal) {
+  phase = terminal ? "terminal" : "pause";
+  pauseStart = performance.now();
+  setNarrator("silence.");
+  startPress();
+  tickPause();
+}
+
+function tickPause() {
+  if (phase !== "pause" && phase !== "terminal") return;
+  const idle = performance.now() - pauseStart;
+  const danger = idle >= DANGER_AT;
+  document.body.classList.toggle("danger", danger);
+  if (danger) {
+    const c = Math.max(1, Math.ceil((GONE_AT - idle) / 1000));
+    if (c !== lastCd) { lastCd = c; cdn.textContent = c; }
+    setNarrator("keep typing or the draft is deleted.");
+  }
+  if (phase === "pause" && idle >= RECOVER_AT) {
+    // recovery: one keystroke reverses everything instantly
+    document.body.classList.remove("danger");
+    lastCd = null;
+    recoverMotion();
+    setNarrator("forward only. don't stop.");
+    phase = "typing";
+    schedule(typeNext, 120);
+    return;
+  }
+  if (phase === "terminal" && idle >= GONE_AT) { wipe(); return; }
+  schedule(() => tickPause(), 100);
+}
+
+function wipe() {
+  phase = "dead";
+  stopMotion();
+  document.body.classList.remove("danger");
+  if (siegeOn && !REDUCED) {
+    // the pile takes it: one collective surge - every fragment (reinforcements
+    // included) to its contact position and red, synchronized with the 0.78
+    // slam. The fossil then flies out through the siege lines to join them.
+    for (const f of frags) { f.e = 1; f._red = true; f.el.style.color = "var(--red)"; }
+    const halfW = basePaper.w * 0.78 / 2;
+    const pl = basePaper.cx - halfW, prr = basePaper.cx + halfW;
+    for (const f of frags) {
+      const x1 = f.side === 0 ? pl - f.w - f.gap : prr + f.gap;
+      f.el.style.transform = `translate(${x1.toFixed(1)}px, ${f.y.toFixed(1)}px) rotate(${f.rot}deg)`;
+      f.el.style.opacity = Math.min(.55, f.fo + .38).toFixed(3);
+    }
+    renderFlank(1, 1);
+    applyScale(0.78, 120);
+  }
+  const lost = SAMPLE.replace(/\s+/g, " ").slice(0, 64);
+  setTimeout(() => {
+    preview.innerHTML = '<span style="color:var(--faint);font-style:italic">Draft deleted.<br>Type to start over.</span>';
+    wc.textContent = "0 words";
+    applyScale(1, 300);
+    for (const f of frags) f.e = 0;
+    paintField(-1, 0);
+    renderFlank(0, -1);
+    // fossil joins near the paper
+    const f = document.createElement("span");
+    f.className = "frag join-new";
+    f.textContent = lost;
+    f.style.fontSize = "13px";
+    field.appendChild(f);
+    const pr = paper.getBoundingClientRect();
+    const fx = Math.max(8, Math.min(innerWidth - f.offsetWidth - 8, pr.left - f.offsetWidth - 30 + Math.random() * 40));
+    f.style.transform = `translate(${fx.toFixed(0)}px, ${(pr.top + scrollY + pr.height * .5).toFixed(0)}px) rotate(${(Math.random() * 8 - 4).toFixed(1)}deg)`;
+    setTimeout(() => f.classList.add("settle"), 900);
+    setNarrator("gone. it joined the pile.", true);
+  }, siegeOn && !REDUCED ? 520 : 0);
+}
+
+function start() {
+  clearTimeout(timer);
+  stopMotion();
+  idx = 0; lastCd = null; phase = "typing"; curL = 0;
+  document.body.classList.remove("danger");
+  preview.innerHTML = ""; wc.textContent = "0 words";
+  setNarrator("forward only. don't stop.");
+  field.querySelectorAll(".join-new").forEach((f) => f.remove());
+  buildField();
+  lastSpawn = 0;
+  applyScale(1, 0);
+  schedule(typeNext, 500);
+}
+
+document.getElementById("replay").addEventListener("click", start);
+document.getElementById("siegeToggle").addEventListener("click", (e) => {
+  siegeOn = !siegeOn;
+  e.target.textContent = "siege: " + (siegeOn ? "on" : "off");
+  e.target.classList.toggle("on", siegeOn);
+  document.body.classList.toggle("siege-on", siegeOn);
+  stopMotion();
+  if (!siegeOn) { curL = 0; for (const f of frags) f.e = 0; paintField(-1, 0); clearInlineFx(); renderFlank(0, -1); applyScale(1, 180); }
+  else if (phase === "pause" || phase === "terminal") startPress();
+});
+document.body.classList.add("siege-on");
+addEventListener("resize", () => { clearTimeout(start._r); start._r = setTimeout(buildField, 200); });
+if (REDUCED) { /* no squeeze; danger colors still change */ }
+start();
+</script>
+</body>
+</html>

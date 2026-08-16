@@ -38,6 +38,13 @@ window.FirstLineLandingDemo = (() => {
     demoPauseIndex: -1,
     demoPauseStartedAt: 0,
     demoPauseUsed: false,
+    demoDenyUsed: false,
+    // Deny-beat resumable substate: "" | "hesitate" | "dwell", plus the frozen
+    // clock pair (elapsed ms; startedAt null when the clock is not running) so
+    // an offscreen/hidden suspend resumes the SAME substep instead of dropping it.
+    demoDenyPhase: "",
+    demoDenyElapsed: 0,
+    demoDenyStartedAt: null,
     demoVisible: false,
     draftIndex: 0,
     armToTrial: false,
@@ -56,7 +63,10 @@ window.FirstLineLandingDemo = (() => {
     denyInFlight: false,
     failureFocusCleanup: null,
     staticDeadRendered: false,
-    demoFossilJoined: false
+    demoFossilJoined: false,
+    // Wipe-flight handle (the airborne WAAPI animation) so a session start
+    // mid-flight can cancel cleanly; null when no flight is airborne.
+    fossilFlight: null
   };
 
   const SILENCE_CLEAR_SECONDS = 8;
@@ -85,6 +95,10 @@ window.FirstLineLandingDemo = (() => {
     "the idea is that meetings\nare where decisions go to wait.\ni cant prove it yet. it might be\nthe only true thing i beleive",
     "i am not mad. thats the line\ni keep starting with. not true.\ni waited forty minutes.\nyou never said why."
   ];
+  // One deny (typo) word per demo draft, indexed in lockstep with demoDrafts.
+  // The scripted deny beat fires the first time the typed-so-far ends with this
+  // word: the writer notices the typo, tries Backspace, and is denied.
+  const demoDenyWords = ["tomorow", "beleive", "thats"];
 
   // --- DOM helpers -----------------------------------------------------------
   function demoEditor() { return document.querySelector(".live-demo-editor"); }
@@ -96,7 +110,6 @@ window.FirstLineLandingDemo = (() => {
   function status() { return document.querySelector(".live-demo-status"); }
   function demoDanger() { return document.querySelector(".live-demo-danger"); }
   function trialDanger() { return document.querySelector(".trial-danger"); }
-  function count() { return document.querySelector(".live-demo-count"); }
   function trialResult() { return document.querySelector(".trial-result"); }
   function trialFailure() { return document.querySelector(".trial-failure"); }
   function demoResult() { return document.querySelector(".demo-result"); }
@@ -297,6 +310,7 @@ window.FirstLineLandingDemo = (() => {
   }
   function syncInlineDangerPosition() { positionDangerBesideLine(demoDanger(), demoSurface(), demoEditor()); }
   function syncTrialDangerPosition() { positionDangerBesideLine(trialDanger(), trialSurface(), trialEditor()); }
+  function syncDemoDangerPosition() { positionDangerBesideLine(demoDanger(), demoSurface(), demoPreview()); }
 
   function scrollTrialCaretToAnchor() {
     if (!isTrial()) return;
@@ -494,6 +508,7 @@ window.FirstLineLandingDemo = (() => {
     if (opts.dangerActive) requestAnimationFrame(() => {
       if (isTrial()) syncTrialDangerPosition();
       if (isInline()) syncInlineDangerPosition();
+      if (isDemo()) syncDemoDangerPosition();
     });
   }
 
@@ -570,6 +585,8 @@ window.FirstLineLandingDemo = (() => {
 
   function armInline() {
     if (contextFromDom() !== "demo" || morphingFromDom()) return;
+    // A session start mid-flight cancels the fall; the fossil still lands.
+    cancelFossilFlight();
     stopIntroTyping();
     internal.demoHasPlayed = true;
     internal.demoObserver?.disconnect();
@@ -742,8 +759,19 @@ window.FirstLineLandingDemo = (() => {
 
   function startTrial(event) {
     event?.preventDefault();
-    if (morphingFromDom() || internal.morphGate || isTrial()) return;
+    // A click mid-handoff is not dropped: record its intent in the URL so the
+    // handoff-completion flroutecheck re-enters the trial automatically. isTrial()
+    // stays a plain no-op (a click while already in the trial needs nothing).
+    if (morphingFromDom() || internal.morphGate) {
+      pushTrialRoute();
+      return;
+    }
+    if (isTrial()) return;
+    siegeReset();
     clearDeny();
+    clearDemoDenyBeatClasses();
+    // A direct trial launch mid-flight cancels the fall; the fossil still lands.
+    cancelFossilFlight();
     const el = trialEditor();
     if (!el) return;
     const inlineActive = isInline();
@@ -982,7 +1010,6 @@ window.FirstLineLandingDemo = (() => {
     }, 1200);
   }
   function visibleText() { return demoPreview()?.innerText || ""; }
-  function updateCount() { const el = count(); if (el) el.textContent = `${wordCount(visibleText())} words / characters`; }
 
   function renderDemoEditor(followupText) {
     const el = demoPreview();
@@ -1002,12 +1029,37 @@ window.FirstLineLandingDemo = (() => {
       return `<span class="trial-thought${stateClass}">${escapeHTML(line)}</span>`;
     }).join("");
     document.querySelector(".demo-placeholder")?.classList.toggle("is-hidden", Boolean(followupText));
-    updateCount();
+    emit("fldemowords", { words: wordCount(followupText) });
+    // Pin the current line at the same ~38% rest anchor the live editor uses, so
+    // a long sample stays centered instead of growing past the paper midpoint.
+    // One-line samples leave scrollTop at 0; empty renders reset to 0.
+    const current = el.querySelector(".trial-thought.is-current");
+    if (current) {
+      const padTop = parseFloat(getComputedStyle(el).paddingTop) || 0;
+      const previewRect = el.getBoundingClientRect();
+      const currentRect = current.getBoundingClientRect();
+      el.scrollTop = Math.max(0, Math.round(el.scrollTop + (currentRect.top - previewRect.top) - padTop));
+    } else {
+      el.scrollTop = 0;
+    }
   }
 
   function clearDemoTimer() { if (internal.typingTimer) window.clearTimeout(internal.typingTimer); internal.typingTimer = null; }
   function stopIntroTyping() {
     clearDemoTimer();
+    siegeReset();
+    // A permanent demo stop must leave zero deny residue: cancel deny()'s
+    // in-flight timers (rAF / 90ms hairline / 1200ms narrator restore; the
+    // denySeq bump no-ops any callback already queued) and drop the beat
+    // substate. Callers write their final narrator AFTER this (restoreSeed,
+    // renderStaticDead, replaySeedTyping, prepareDemoPlayback); armInline's new
+    // live session re-asserts the session line via commitInput. clearDeny() is
+    // a no-op when no deny is in flight (no fl* events, no signal churn).
+    clearDeny();
+    clearDemoDenyBeatClasses();
+    internal.demoDenyPhase = "";
+    internal.demoDenyElapsed = 0;
+    internal.demoDenyStartedAt = null;
     internal.introTyping = false;
     internal.demoPhase = "idle";
     internal.demoPauseElapsed = 0;
@@ -1022,6 +1074,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoHasPlayed = markPlayed;
     internal.demoPauseIndex = -1;
     internal.demoPauseUsed = false;
+    internal.demoDenyUsed = false;
     internal.demoPauseTerminal = false;
     internal.demoPhase = "complete";
     renderDemoEditor(followupContent());
@@ -1037,6 +1090,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoHasPlayed = false;
     internal.demoPauseIndex = -1;
     internal.demoPauseUsed = false;
+    internal.demoDenyUsed = false;
     internal.demoPauseTerminal = false;
     internal.typingIndex = 0;
     renderDemoEditor("");
@@ -1054,6 +1108,13 @@ window.FirstLineLandingDemo = (() => {
   // narrator goes dead red, and the placeholder becomes the verdict.
   function performDemoWipe() {
     const lost = visibleText();
+    // Plan the flight while the sample is still on the paper: the fossil text,
+    // the gutter landing spot, and the current-line origin rect all need
+    // pre-clear geometry. Reduced motion skips the flight (direct joinPile).
+    const flight = shouldReduceMotion() ? null : planFossilFlight(lost);
+    // The siege kill owns the fossil timing when it runs: the flight takes off
+    // at the pounce impact (~120ms). Otherwise the flight starts here, as before.
+    const killRunning = siegeKill(flight, lost);
     internal.demoPauseElapsed = 0;
     internal.demoPauseStartedAt = 0;
     internal.demoPauseTerminal = false;
@@ -1063,7 +1124,10 @@ window.FirstLineLandingDemo = (() => {
     clearDemoTimer();
     setDanger({ dangerSeconds: 0, dangerActive: false });
     renderDemoEditor("");
-    if (lost) { internal.demoFossilJoined = true; joinPile(lost); }
+    if (lost && !killRunning) {
+      internal.demoFossilJoined = true;
+      if (flight) flyFossilToPile(flight); else joinPile(lost);
+    }
     setStatus("gone. it joined the pile.");
     setDeadStatus(true);
     const ph = document.querySelector(".demo-placeholder");
@@ -1087,11 +1151,24 @@ window.FirstLineLandingDemo = (() => {
       internal.demoPauseStartedAt = 0;
       setDanger({ dangerSeconds: 0, dangerActive: false });
     }
+    siegeCancelPress();
+    // Freeze the deny-beat clock exactly like the pause clock, so a hidden/
+    // offscreen suspend mid-beat resumes the SAME substep on return instead of
+    // silently dropping the beat (demoDenyUsed is already true).
+    if (internal.demoDenyPhase && internal.demoDenyStartedAt !== null) {
+      internal.demoDenyElapsed += performance.now() - internal.demoDenyStartedAt;
+      internal.demoDenyStartedAt = null;
+    }
   }
   // The mid-sample pause is a teaching beat (recover before the 8s wipe); the
   // post-sample pause is terminal (die for real at 8s). Both share the
   // pause-clock machinery and the offscreen/hidden pause semantics.
-  const DEMO_TEACHING_RECOVER_MS = 6500;
+  const DEMO_TEACHING_RECOVER_MS = 7600;
+  // Scripted deny beat ("tries Backspace, is denied"): a brief hesitation when
+  // the writer notices a typo, then the live deny() feedback, a readable dwell,
+  // and a coherent resume. Reuses the real-session deny path verbatim.
+  const DEMO_DENY_HESITATION_MS = 350;
+  const DEMO_DENY_DWELL_MS = 650;
   function updateDemoPause() {
     if (!shouldRunDemo() || internal.demoPhase !== "pause") return;
     const elapsed = internal.demoPauseElapsed + performance.now() - internal.demoPauseStartedAt;
@@ -1107,6 +1184,7 @@ window.FirstLineLandingDemo = (() => {
     if (!internal.demoPauseTerminal && elapsed >= DEMO_TEACHING_RECOVER_MS) {
       // Teaching pause: danger clears and typing resumes (survive the beat).
       setDanger({ dangerSeconds: 0, dangerActive: false });
+      siegeRecover();
       setStatus("forward only. don\u2019t stop.");
       internal.demoPhase = "typing";
       scheduleDemoStep(typeNextFollowupCharacter, 80);
@@ -1123,14 +1201,24 @@ window.FirstLineLandingDemo = (() => {
     internal.demoPauseTerminal = Boolean(terminal);
     internal.demoPauseElapsed = 0;
     internal.demoPauseStartedAt = performance.now();
+    // Each silence window spawns reinforcements on its own 1.35-7.75 cadence;
+    // staged fragments from a prior pause persist (held by their staged flag).
+    siege.nextSpawnT = 1.35;
+    siege.consecSide = 0;
+    siege.lastSpawnSide = "";
     setStatus("silence.");
     updateDemoPause();
+    siegeStart();
   }
   function resumeDemoPlayback() {
     if (!internal.introTyping || !internal.demoVisible || document.hidden || isTrial() || isInline()) return;
-    if (internal.demoPhase === "pause") { internal.demoPauseStartedAt = performance.now(); updateDemoPause(); return; }
+    if (internal.demoPhase === "pause") { internal.demoPauseStartedAt = performance.now(); updateDemoPause(); siegeStart(); return; }
     if (internal.demoPhase === "waiting") { scheduleDemoStep(beginFollowupTyping, DEMO_START_DELAY); return; }
-    if (internal.demoPhase === "typing") scheduleDemoStep(typeNextFollowupCharacter, 80);
+    if (internal.demoPhase === "typing") {
+      // A suspended deny beat resumes the SAME substep; plain typing resumes typing.
+      if (internal.demoDenyPhase) { resumeDemoDenyBeat(); return; }
+      scheduleDemoStep(typeNextFollowupCharacter, 80);
+    }
   }
   function setDemoVisibility(visible) {
     internal.demoVisible = visible;
@@ -1138,7 +1226,16 @@ window.FirstLineLandingDemo = (() => {
     if (!internal.demoHasPlayed && !internal.introTyping) { replaySeedTyping(); return; }
     resumeDemoPlayback();
   }
-  function findNaturalPauseIndex(content) { const i = content.indexOf("\n"); return i >= 0 ? i + 1 : content.length; }
+  function findNaturalPauseIndex(content) {
+    // Mid-sample teaching pause, re-timed earlier: the first space at or after
+    // char 12 (a word boundary ~13 chars in) so the first red countdown lands
+    // soon after load instead of the old first-newline beat (~25 chars in).
+    // Fallback chain: first newline, then 40% of content length.
+    let i = content.indexOf(" ", 12);
+    if (i < 0) i = content.indexOf("\n");
+    if (i < 0) i = Math.floor(content.length * 0.4) - 1;
+    return i >= 0 ? i + 1 : content.length;
+  }
 
   function beginFollowupTyping() { if (!shouldRunDemo()) return; internal.demoPhase = "typing"; typeNextFollowupCharacter(); }
   function followupTypingDelay(content) {
@@ -1161,9 +1258,81 @@ window.FirstLineLandingDemo = (() => {
     if (internal.typingIndex >= content.length) { beginDemoPause(true); return; }
     internal.typingIndex += 1;
     renderDemoEditor(content.slice(0, internal.typingIndex));
-    // Mid-sample newline: a teaching pause that recovers before the wipe.
+    // Mid-sample teaching pause (first space at/after char 12): recovers
+    // before the wipe.
     if (!internal.demoPauseUsed && internal.typingIndex >= internal.demoPauseIndex) { internal.demoPauseUsed = true; beginDemoPause(false); return; }
+    // Scripted deny beat: once per playback, when the typed-so-far first ends
+    // with this draft's typo word. The writer notices it, tries Backspace, and
+    // is denied; typing then resumes with the typo left in (forward only).
+    if (!internal.demoDenyUsed) {
+      const denyWord = demoDenyWords[internal.draftIndex];
+      if (denyWord && content.slice(0, internal.typingIndex).endsWith(denyWord)) {
+        internal.demoDenyUsed = true;
+        beginDemoDenyBeat();
+        return;
+      }
+    }
     scheduleDemoStep(typeNextFollowupCharacter, followupTypingDelay(content));
+  }
+  // Scripted deny beat as a resumable substate ("" | "hesitate" | "dwell")
+  // with a frozen clock, mirroring the pause machinery: suspendDemoPlayback
+  // freezes demoDenyElapsed, resumeDemoDenyBeat continues the SAME substep.
+  // Real input cancels everything via stopIntroTyping (which also kills
+  // deny()'s timers); deny() fires exactly once per playback (demoDenyUsed).
+  // Demo-only deny emphasis (page-level shake + teach caption) is toggled
+  // imperatively on body / .demo-writing-surface, never via signals or fl*
+  // events, so the live session's deny feedback stays byte-identical. Added at
+  // the deny fire step, removed at dwell end and on every demo interruption.
+  function clearDemoDenyBeatClasses() {
+    document.body.classList.remove("deny-world");
+    demoSurface()?.classList.remove("deny-teach");
+  }
+  function beginDemoDenyBeat() {
+    // (a) brief hesitation as if the writer noticed the typo.
+    internal.demoDenyPhase = "hesitate";
+    internal.demoDenyElapsed = 0;
+    internal.demoDenyStartedAt = performance.now();
+    scheduleDemoStep(demoDenyHesitateDone, DEMO_DENY_HESITATION_MS);
+  }
+  // (a) hesitation over -> (b) the exact live deny feedback, reused verbatim.
+  function demoDenyHesitateDone() {
+    internal.demoDenyPhase = "dwell";
+    internal.demoDenyElapsed = 0;
+    internal.demoDenyStartedAt = performance.now();
+    deny();
+    // Page-level deny: shake the whole world (.sheet + .flood) so the refusal
+    // reads at a glance, and show the "backspace is not allowed" teach caption
+    // on the paper for the deny window. Demo-only; removed at dwell end and on
+    // every interruption. The nested .denied shake on the paper itself stays.
+    document.body.classList.add("deny-world");
+    demoSurface()?.classList.add("deny-teach");
+    scheduleDemoStep(demoDenyDwellDone, DEMO_DENY_DWELL_MS);
+  }
+  // (c) dwell over -> end coherently: cancel deny's own ~1.2s restore (it
+  // resets the demo narrator to the idle line), re-assert the typing session
+  // line, and resume. The typo stays in (forward only). Also the resume target
+  // after a hidden dwell suspend: never re-fires deny(), so the live deny still
+  // fires exactly once per playback.
+  function demoDenyDwellDone() {
+    internal.demoDenyPhase = "";
+    internal.demoDenyElapsed = 0;
+    internal.demoDenyStartedAt = null;
+    clearDeny();
+    clearDemoDenyBeatClasses();
+    setStatus("forward only. don\u2019t stop.");
+    scheduleDemoStep(typeNextFollowupCharacter, 80);
+  }
+  // Resume the SAME beat substep after an offscreen/hidden suspend: hesitation
+  // reschedules its remaining time; the dwell completes coherently instead of
+  // re-firing deny() (deny()'s wall-clock timers may already have expired while
+  // hidden - clearDeny() absorbs both cases).
+  function resumeDemoDenyBeat() {
+    if (internal.demoDenyPhase === "hesitate") {
+      internal.demoDenyStartedAt = performance.now();
+      scheduleDemoStep(demoDenyHesitateDone, Math.max(0, DEMO_DENY_HESITATION_MS - internal.demoDenyElapsed));
+      return;
+    }
+    demoDenyDwellDone();
   }
   // Reduced-motion end state (design/DESIGN.md): the demo renders the DEAD
   // state statically - empty sheet, one settled fossil, the durable red line, and
@@ -1179,6 +1348,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoHasPlayed = true;
     internal.demoPauseIndex = -1;
     internal.demoPauseUsed = false;
+    internal.demoDenyUsed = false;
     internal.demoPauseTerminal = false;
     internal.demoPhase = "complete";
     renderDemoEditor("");
@@ -1225,6 +1395,7 @@ window.FirstLineLandingDemo = (() => {
     internal.demoPauseIndex = findNaturalPauseIndex(followupContent());
     internal.demoPauseStartedAt = 0;
     internal.demoPauseUsed = false;
+    internal.demoDenyUsed = false;
     internal.demoPhase = "waiting";
     internal.typingIndex = 0;
     internal.introTyping = true;
@@ -1238,7 +1409,13 @@ window.FirstLineLandingDemo = (() => {
     const motionQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
     // Register the motion-preference listener BEFORE any early return, so a
     // later flip to reduce always reaches the static dead state.
-    motionQuery?.addEventListener?.("change", (event) => { if (event.matches && !isTrial() && !isInline()) renderStaticDead(); });
+    motionQuery?.addEventListener?.("change", (event) => {
+      // A flip to reduce mid-flight lands the fossil immediately (no airborne
+      // ghost under reduce); the canceled flight still appends exactly once.
+      if (event.matches) cancelFossilFlight();
+      if (event.matches) siegeReset();
+      if (event.matches && !isTrial() && !isInline()) renderStaticDead();
+    });
     if (motionQuery?.matches) { renderStaticDeadWhenSignalsReady(); return; }
     const surface = demoSurface();
     if (!surface || !("IntersectionObserver" in window)) { internal.demoVisible = true; replaySeedTyping(); return; }
@@ -1367,8 +1544,8 @@ window.FirstLineLandingDemo = (() => {
     } else {
       const colL = Math.min.apply(null, blockRects.map((r) => r.left)) - 16;
       const colR = Math.max.apply(null, blockRects.map((r) => r.right)) + 16;
-      if (colL > 36) regions.push({ x: 0, y: 0, w: colL, h: H });
-      if (W - colR > 36) regions.push({ x: colR, y: 0, w: W - colR, h: H });
+      if (colL > 36) regions.push({ x: 0, y: 0, w: colL, h: H, siege: "left" });
+      if (W - colR > 36) regions.push({ x: colR, y: 0, w: W - colR, h: H, siege: "right" });
       if (heroTextTop > 130) regions.push({ x: 20, y: 64, w: W - 40, h: heroTextTop - 80, faint: true });
       // one band of mess directly in the reading axis, between the CTA and the paper
       if (paperTop - heroTextBottom > 30) regions.push({ x: colL + 24, y: heroTextBottom + 8, w: colR - colL - 48, h: Math.min(44, paperTop - heroTextBottom - 10), axis: true });
@@ -1384,6 +1561,7 @@ window.FirstLineLandingDemo = (() => {
       const host = document.createElement("div");
       host.className = "region";
       host.style.cssText = `left:${reg.x}px;top:${reg.y}px;width:${reg.w}px;height:${reg.h}px`;
+      if (reg.siege) host.dataset.siege = reg.siege;
       base.appendChild(host);
       const rowH = mobile ? 60 : 96;
       const rows = Math.max(1, Math.floor(reg.h / rowH));
@@ -1412,6 +1590,9 @@ window.FirstLineLandingDemo = (() => {
         }
       }
     });
+    // Reparent the siege-source gutter fragments and cache their motion params.
+    // Desktop only; mobile and the trial/inline contexts keep today's behavior.
+    siegeCapture();
   }
   function layoutTrialFlood() {
     const host = document.getElementById("trialFlood");
@@ -1468,10 +1649,100 @@ window.FirstLineLandingDemo = (() => {
       });
     }
   }
-  function joinPile(lostText) {
-    const t = (lostText || "").replace(/\s+/g, " ").trim().slice(0, 64);
+  // The fossil line a wiped draft leaves behind: first ~64 chars, whitespace
+  // collapsed. Single source for joinPile and the wipe flight ghost.
+  function fossilText(lostText) { return (lostText || "").replace(/\s+/g, " ").trim().slice(0, 64); }
+
+  // The landing-context gutter spot where a wiped draft's fossil settles, in
+  // document coordinates (the landing flood layer is document-positioned).
+  // Computed once and shared by the flight ghost and the final append, so the
+  // fossil lands exactly where the ghost stopped.
+  function pileLandingSpot() {
+    const surface = demoSurface();
+    const paperRect = surface && surface.offsetParent ? surface.getBoundingClientRect() : null;
+    const W = document.documentElement.clientWidth;
+    const side = Math.random() < .5;
+    const py = paperRect ? paperRect.top + window.scrollY : window.scrollY + 200;
+    const ph = paperRect ? paperRect.height : 300;
+    return {
+      left: side ? -(Math.random() * 40) : Math.max(W - 260, W * .62),
+      top: Math.max(70, py + Math.random() * ph * .7),
+      rotDeg: (Math.random() * 8) - 4
+    };
+  }
+
+  // Capture everything the wipe flight needs while the sample is still on the
+  // paper (performDemoWipe plans before clearing): the fossil text, the gutter
+  // landing spot, and the flight origin - the preview's current-line box,
+  // converted to document coordinates. Returns null when there is nothing
+  // measurable to fly (empty fossil text or missing preview); the caller then
+  // falls back to the direct joinPile append.
+  function planFossilFlight(lostText) {
+    const text = fossilText(lostText);
+    const preview = demoPreview();
+    if (!text || !preview) return null;
+    const originEl = preview.querySelector(".trial-thought.is-current") || preview;
+    const rect = originEl.getBoundingClientRect();
+    if (!rect.width && !rect.height) return null;
+    return {
+      text,
+      spot: pileLandingSpot(),
+      origin: { left: rect.left + window.scrollX, top: rect.top + window.scrollY }
+    };
+  }
+
+  // The promised beat: the lost draft's first ~64 chars fly out of the paper
+  // into the gutter. A mono red ghost (already styled as the fossil it is
+  // becoming) is spawned at the pre-clear origin and WAAPI-carried to the
+  // precomputed landing spot in one 480ms fall - inside the .62s wipe budget
+  // (DESIGN.md section 8) - then replaced by the real fossil in the same
+  // microtask, so there is no visual jump. The ghost lives on document.body in
+  // document coordinates, the same space the landing flood uses, at z-index 3
+  // (above the sheet) so the fall reads over the paper.
+  function flyFossilToPile(plan) {
+    const ghost = document.createElement("span");
+    ghost.className = "fossil-flight";
+    ghost.textContent = plan.text;
+    ghost.setAttribute("aria-hidden", "true");
+    ghost.style.left = plan.origin.left + "px";
+    ghost.style.top = plan.origin.top + "px";
+    document.body.appendChild(ghost);
+    const dx = plan.spot.left - plan.origin.left;
+    const dy = plan.spot.top - plan.origin.top;
+    const animation = ghost.animate([
+      { transform: "translate(0px, 0px) rotate(0deg)" },
+      { transform: `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) rotate(${plan.spot.rotDeg.toFixed(1)}deg)` }
+    ], { duration: 480, easing: "cubic-bezier(.55, 0, .85, .36)", fill: "forwards" });
+    // Idempotent landing: exactly one fossil append and one ghost removal,
+    // whether the flight finishes or a session start cancels it mid-air.
+    let landed = false;
+    const land = () => {
+      if (landed) return;
+      landed = true;
+      internal.fossilFlight = null;
+      ghost.remove();
+      joinPile(plan.text, plan.spot);
+    };
+    internal.fossilFlight = animation;
+    animation.finished.then(land, land);
+  }
+
+  // Session start (keystroke, click, IME) mid-flight: cancel the fall. The
+  // rejected finished promise runs the same landing path, so the ghost never
+  // leaks and the fossil still joins the pile immediately.
+  function cancelFossilFlight() {
+    if (internal.fossilFlight) internal.fossilFlight.cancel();
+  }
+
+  function joinPile(lostText, precomputedSpot) {
+    const t = fossilText(lostText);
     if (!t) return;
-    const inTrial = contextFromDom() === "trial";
+    // A flight carrying a precomputed spot ALWAYS lands in the landing pile
+    // (#floodJoined) at that document-coordinate spot: its destination was
+    // fixed when the demo wipe was planned, so a context flip to trial before
+    // the landing microtask runs (cancel on the startTrial path) cannot reroute
+    // the demo's fossil into #trialJoined.
+    const inTrial = !precomputedSpot && contextFromDom() === "trial";
     // Trial fossils append into #trialJoined, the persistent joined sublayer of
     // the trial's aria-hidden fossil layer: layoutTrialFlood() only rebuilds the
     // generated #trialFlood base, so joined fragments survive font readiness and
@@ -1502,17 +1773,14 @@ window.FirstLineLandingDemo = (() => {
       f.style.left = left + "px";
       f.style.top = top + "px";
     } else {
-      const surface = demoSurface();
-      const paperRect = surface && surface.offsetParent ? surface.getBoundingClientRect() : null;
-      const W = document.documentElement.clientWidth;
-      const side = Math.random() < .5;
-      const x = side ? -(Math.random() * 40) : Math.max(W - 260, W * .62);
-      f.style.left = x + "px";
-      const py = paperRect ? paperRect.top + window.scrollY : window.scrollY + 200;
-      const ph = paperRect ? paperRect.height : 300;
-      f.style.top = Math.max(70, py + Math.random() * ph * .7) + "px";
+      // The flight passes its precomputed spot in so the fossil lands exactly
+      // where the ghost stopped; the static/direct path computes a fresh one.
+      const spot = precomputedSpot || pileLandingSpot();
+      f.style.left = spot.left + "px";
+      f.style.top = spot.top + "px";
     }
-    f.style.transform = `rotate(${((Math.random() * 8) - 4).toFixed(1)}deg)`;
+    const rotDeg = precomputedSpot && !inTrial ? precomputedSpot.rotDeg : (Math.random() * 8) - 4;
+    f.style.transform = `rotate(${rotDeg.toFixed(1)}deg)`;
     f.style.setProperty("--fo", ".09");
     host.appendChild(f);
     if (shouldReduceMotion()) { f.classList.add("settle"); return; }
@@ -1523,6 +1791,704 @@ window.FirstLineLandingDemo = (() => {
       f.classList.add("settle", "settling");
       window.setTimeout(() => f.classList.remove("settling"), 1700);
     }, 1200);
+  }
+
+  // --- Siege motion (demo danger beats, desktop only) ---------------------
+  // Internal plumbing only: a requestAnimationFrame loop that squeezes the demo
+  // paper as the silence clock runs, driven by the SAME pause-clock origin the
+  // danger countdown and 8s wipe use. No _session writes, no fl* events: the
+  // geometry lives entirely here and the declarative body.danger class. Model:
+  // .pi/context/plans/siege-motion-model.md (deadline progress, pressure
+  // integral, reinforcement supply, collective kill, 180ms recovery).
+  const SIEGE_ARM_T = 1.0;
+  const SIEGE_CAP = 48;
+  const SIEGE_SEED = 909090;
+  // Per-rank width caps (restore the clean-column read: fossils clip mid-word)
+  // and per-rank travel budgets from the model's D ranges (inward-only motion).
+  const SIEGE_RANK_CAP = { front: 320, mid: 280, back: 240 };
+  const SIEGE_TRAVEL = { front: [130, 220], mid: [180, 320], back: [240, 460] };
+  const siege = {
+    rafId: 0, killRaf: 0, recoverRaf: 0, armTimer: 0,
+    armed: false, killing: false, recovering: false, poolReady: false, willOn: false,
+    pendingFossil: null,
+    strongSide: 1,
+    base: { c0: 0, w: 0, el0: 0, er0: 0, lineY: 0, floodLeft: 0, floodTop: 0, docW: 0, desktop: false },
+    frags: [], reinfs: [], reinfPool: [], reinfNext: 0,
+    nextSpawnT: 1.35, lastSpawnSide: "", consecSide: 0, sideCounts: { left: 0, right: 0 },
+    spawnRand: null,
+    lastP: 0, lastTx: 0, lastSx: 1, lastSy: 1, lastFlankL: 0, lastFlankR: 0,
+    counts: { front: 0, mid: 0, back: 0 },
+    flankL: null, flankR: null, shellEl: null
+  };
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  function clampN(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function siegeShell() { return document.querySelector(".siege-shell"); }
+  // Desktop gating reads the cached evaluation (set at capture/resize), never
+  // layout, so the rAF path performs no documentElement read per frame.
+  function siegeDesktop() { return siege.base.desktop; }
+  function siegeContextOk() { return isDemo() && !isTrial() && !isInline(); }
+  function siegeParseRot(el) {
+    const m = /rotate\(([-\d.]+)deg\)/.exec(el.style.transform || "");
+    return m ? parseFloat(m[1]) : 0;
+  }
+  // Silence seconds from the pause machinery's own origin (demoPauseElapsed +
+  // the running startedAt), clamped to [0, 8]. Identical to the countdown origin.
+  function siegeSilenceT(now) {
+    const started = internal.demoPauseStartedAt ? now - internal.demoPauseStartedAt : 0;
+    return clampN((internal.demoPauseElapsed + started) / 1000, 0, 8);
+  }
+  function siegePauseActive() {
+    return siegeContextOk() && !shouldReduceMotion() && siegeDesktop() && internal.demoPhase === "pause";
+  }
+
+  // Reparent the eligible left/right-gutter flood fragments into #floodBase at
+  // identical positioning boxes, cap their widths per rank (fossils clip
+  // mid-word at the clean column), rank them by capped edge distance, give each
+  // an inward-only travel budget, and cache every per-fragment siege parameter
+  // with a fresh seeded RNG. Called at the end of layoutFlood (and so after the
+  // fonts.ready relayout). Desktop only.
+  function siegeCapture() {
+    siegeCancelAll();
+    siege.frags = []; siege.reinfs = []; siege.reinfPool = []; siege.reinfNext = 0;
+    siege.nextSpawnT = 1.35; siege.lastSpawnSide = ""; siege.consecSide = 0;
+    siege.sideCounts = { left: 0, right: 0 };
+    siege.counts = { front: 0, mid: 0, back: 0 };
+    siege.armed = false; siege.killing = false; siege.recovering = false; siege.poolReady = false;
+    siege.lastP = 0; siege.lastTx = 0; siege.lastSx = 1; siege.lastSy = 1;
+    const shell = siegeShell();
+    siege.shellEl = shell;
+    siege.flankL = shell ? shell.querySelector(".siege-flank-l") : null;
+    siege.flankR = shell ? shell.querySelector(".siege-flank-r") : null;
+    // Cache the desktop evaluation here (the capture/resize point) so the rAF
+    // loop's gate never reads layout per frame.
+    siege.base.desktop = document.documentElement.clientWidth >= 700;
+    // Reset any stale siege transform FIRST so the captured paper geometry is
+    // the REST shape (a resize mid-siege would otherwise measure a scaled paper).
+    siegeInstantIdentity();
+    if (!siegeDesktop() || !shell) { return; }
+    const base = document.getElementById("floodBase");
+    const surface = demoSurface();
+    if (!base || !surface) { return; }
+    const rand = mulberry32(SIEGE_SEED);
+    siege.spawnRand = mulberry32(SIEGE_SEED + 7);
+    // Base paper geometry at REST (shell is identity here): center, width, edges.
+    // All in viewport coords; fragment x0/y0 are converted to viewport too so the
+    // translate deltas are correct regardless of #floodBase's offset parent.
+    const fb = base.getBoundingClientRect();
+    siege.base.floodLeft = fb.left;
+    siege.base.floodTop = fb.top;
+    siege.base.docW = document.documentElement.clientWidth;
+    const pr = surface.getBoundingClientRect();
+    siege.base.c0 = pr.left + pr.width / 2;
+    siege.base.w = pr.width;
+    siege.base.el0 = pr.left;
+    siege.base.er0 = pr.left + pr.width;
+    siege.base.lineY = pr.top + pr.height * INLINE_ANCHOR;
+    // Flank overlays pinned to the paper's vertical edges inside the shell.
+    const sr = shell.getBoundingClientRect();
+    const pl = pr.left - sr.left, pt = pr.top - sr.top;
+    if (siege.flankL) {
+      siege.flankL.style.left = pl + "px";
+      siege.flankL.style.top = pt + "px";
+      siege.flankL.style.height = pr.height + "px";
+      siege.flankL.style.opacity = "0";
+    }
+    if (siege.flankR) {
+      siege.flankR.style.left = (pl + pr.width - 28) + "px";
+      siege.flankR.style.top = pt + "px";
+      siege.flankR.style.height = pr.height + "px";
+      siege.flankR.style.opacity = "0";
+    }
+    // One batched pass: reparent gutter-region fragments into #floodBase at the
+    // exact same positioning box (region offset + fragment offset). Axis-band and
+    // full-width top-band fragments stay in their regions (redden-only). Width
+    // reads are batched AFTER all writes (one reflow per pass).
+    const reparented = [];
+    const regions = Array.prototype.slice.call(base.querySelectorAll(".region[data-siege]"));
+    regions.forEach((region) => {
+      const side = region.dataset.siege;
+      const sideSign = side === "left" ? 1 : -1;
+      const regLeft = parseFloat(region.style.left) || 0;
+      const regTop = parseFloat(region.style.top) || 0;
+      const frags = Array.prototype.slice.call(region.querySelectorAll(".frag"));
+      frags.forEach((f) => {
+        const fl = parseFloat(f.style.left) || 0;
+        const ft = parseFloat(f.style.top) || 0;
+        f.style.left = (regLeft + fl) + "px";
+        f.style.top = (regTop + ft) + "px";
+        base.appendChild(f);
+        reparented.push({ el: f, side, sideSign, region, regLeft, regTop, fl, ft });
+      });
+    });
+    if (!reparented.length) { siegeInstantIdentity(); return; }
+    // Pass 1: raw widths. offsetWidth ignores the rotate transform, so style
+    // coords and measured width live in the same (unrotated) space.
+    reparented.forEach((r) => {
+      r.wRaw = r.el.offsetWidth;
+      r.x0 = siege.base.floodLeft + r.regLeft + r.fl;
+      r.y0 = siege.base.floodTop + r.regTop + r.ft;
+      r.fontSize = parseFloat(r.el.style.fontSize) || 14;
+      r.fo = parseFloat(r.el.style.getPropertyValue("--fo")) || 0.1;
+      r.rot = siegeParseRot(r.el);
+    });
+    // Provisional rank per side (raw edge distance) so each fragment gets its
+    // rank's width cap; the cap restores the clean-column read (mid-word clip).
+    ["left", "right"].forEach((side) => {
+      const list = reparented.filter((r) => r.side === side);
+      const edge = side === "left" ? siege.base.el0 : siege.base.er0;
+      list.forEach((r) => { r.distRaw = side === "left" ? edge - (r.x0 + r.wRaw) : r.x0 - edge; });
+      list.sort((a, b) => a.distRaw - b.distRaw);
+      const n = list.length, frontN = Math.max(1, Math.round(n * 0.25)), midN = Math.max(0, Math.round(n * 0.35));
+      list.forEach((r, i) => { r.provRank = i < frontN ? "front" : i < frontN + midN ? "mid" : "back"; });
+    });
+    reparented.forEach((r) => {
+      r.appliedCap = SIEGE_RANK_CAP[r.provRank];
+      r.el.style.maxWidth = r.appliedCap + "px";
+      r.el.style.overflow = "hidden";
+      r.el.style.textOverflow = "clip";
+    });
+    // Pass 2: capped widths, measured AFTER capping (batched: one reflow).
+    reparented.forEach((r) => { r.width = r.el.offsetWidth; });
+    // Return a fragment to its region exactly as layoutFlood left it (excluded
+    // and over-cap fragments keep the region clip and redden-only behavior).
+    const restoreFrag = (r) => {
+      r.el.style.left = r.fl + "px";
+      r.el.style.top = r.ft + "px";
+      r.el.style.maxWidth = "";
+      r.el.style.overflow = "";
+      r.el.style.textOverflow = "";
+      r.region.appendChild(r.el);
+    };
+    // Edge distance with the capped width. Anything still crossing the paper
+    // edge after capping is excluded from the siege (keeps CSS reddening only).
+    const included = [];
+    reparented.forEach((r) => {
+      r.dist = r.side === "left" ? siege.base.el0 - (r.x0 + r.width) : r.x0 - siege.base.er0;
+      if (r.dist < 0) restoreFrag(r); else included.push(r);
+    });
+    // Total cap across seeds + reinforcements: a huge viewport keeps only the
+    // nearest SIEGE_CAP seeds; the rest return to their regions.
+    if (included.length > SIEGE_CAP) {
+      included.sort((a, b) => a.dist - b.dist);
+      while (included.length > SIEGE_CAP) restoreFrag(included.pop());
+    }
+    // Every side fields at least 3 fragments: synthesize seeded siege fragments
+    // in that side's gutter when the layout produced fewer.
+    ["left", "right"].forEach((side) => {
+      const have = included.filter((c) => c.side === side).length;
+      const deficit = Math.min(3 - have, SIEGE_CAP - included.length);
+      for (let i = 0; i < deficit; i++) included.push(siegeSynthesize(side, included, rand));
+    });
+    // Final rank per side by capped edge distance (nearest = front).
+    ["left", "right"].forEach((side) => {
+      const list = included.filter((c) => c.side === side);
+      list.sort((a, b) => a.dist - b.dist);
+      const n = list.length;
+      const frontN = Math.max(1, Math.round(n * 0.25));
+      const midN = Math.max(0, Math.round(n * 0.35));
+      const front = list.slice(0, frontN);
+      const mid = list.slice(frontN, frontN + midN);
+      const back = list.slice(frontN + midN);
+      front.forEach((c) => { c.rank = "front"; });
+      mid.forEach((c) => { c.rank = "mid"; });
+      back.forEach((c) => { c.rank = "back"; });
+      // front/mid lead = closest vertically to the current line.
+      const byLine = (arr) => arr.slice().sort((a, b) => Math.abs(a.y0 - siege.base.lineY) - Math.abs(b.y0 - siege.base.lineY))[0];
+      if (front.length) byLine(front).isLead = true;
+      if (mid.length) byLine(mid).isLead = true;
+      // one back straggler per side pinned at A=7.000 (the farthest back).
+      if (back.length) back.slice().sort((a, b) => b.dist - a.dist)[0].isStraggler = true;
+    });
+    // Re-stabilize widths to the FINAL rank cap (the provisional cap was only a
+    // measuring aid): apply cap changes in one write pass, then re-measure only
+    // the changed fragments in one read pass, so the cap contract holds by final
+    // rank and contact targets/travel use the corrected width.
+    let recappedAny = false;
+    included.forEach((c) => {
+      const cap = SIEGE_RANK_CAP[c.rank];
+      if (c.appliedCap !== cap) { c.el.style.maxWidth = cap + "px"; c.appliedCap = cap; c.recapped = true; recappedAny = true; }
+    });
+    if (recappedAny) included.forEach((c) => { if (c.recapped) { c.width = c.el.offsetWidth; c.recapped = false; } });
+    // Seed parameters in a stable document order (side, top, left) so the same
+    // layout + seed reproduces identical h(i,k) on replay and resize-rebuild.
+    included.sort((a, b) => (a.side !== b.side ? (a.side < b.side ? -1 : 1) : (a.y0 - b.y0) || (a.x0 - b.x0)));
+    included.forEach((c) => {
+      c.h0 = rand(); c.h1 = rand(); c.h2 = rand(); c.travelSeed = rand();
+      siegeAssignDeadline(c);
+      c.underlap = c.rank === "front" ? 2 + 8 * rand() : c.rank === "mid" ? 5 * rand() : 3 * rand();
+      // Inward-only travel by rank (model D ranges, seeded jitter), with both a
+      // floor and a ceiling: effective travel is clamped to
+      // [rankMin, min(rankMax, gutterAvailable)]. The rest contact target x1 is
+      // live-edge-based (final capped width). A rest position shorter than the
+      // floor moves OUTWARD to the floor; one longer than the ceiling moves
+      // INWARD to the ceiling (never past the clean-column boundary, since the
+      // floor is positive by construction). On a viewport whose gutter is
+      // narrower than rankMax the gutter boundary wins - an accepted constraint.
+      const tr = SIEGE_TRAVEL[c.rank];
+      const seeded = tr[0] + (tr[1] - tr[0]) * c.travelSeed;
+      const x1 = c.side === "left" ? siege.base.el0 - c.width : siege.base.er0;
+      c.x1 = x1;
+      const natural = c.side === "left" ? x1 - c.x0 : c.x0 - x1;
+      const gutterAvail = c.side === "left" ? x1 : siege.base.docW - x1 - c.width;
+      const ceiling = Math.min(tr[1], Math.max(gutterAvail, 1));
+      const floor = Math.min(seeded, ceiling);
+      if (natural < floor) {
+        c.x0 = c.side === "left" ? x1 - floor : x1 + floor;
+        c.el.style.left = (c.x0 - siege.base.floodLeft) + "px";
+        c.travel = floor;
+      } else if (natural > ceiling) {
+        c.x0 = c.side === "left" ? x1 - ceiling : x1 + ceiling;
+        c.el.style.left = (c.x0 - siege.base.floodLeft) + "px";
+        c.travel = ceiling;
+      } else {
+        c.travel = natural;
+      }
+      c.restDx = 0;
+      siege.frags.push(c);
+    });
+    siege.counts.front = siege.frags.filter((c) => c.rank === "front").length;
+    siege.counts.mid = siege.frags.filter((c) => c.rank === "mid").length;
+    siege.counts.back = siege.frags.filter((c) => c.rank === "back").length;
+    siege.strongSide = rand() < 0.5 ? 1 : -1;
+    siegeBuildReinfPool();
+    siegeInstantIdentity();
+    // A pause already in progress (e.g. a resize mid-silence) re-arms on the
+    // fresh geometry; its clock is unchanged.
+    if (siegePauseActive()) siegeStart();
+  }
+  function siegeAssignDeadline(c) {
+    const h0 = c.h0, h1 = c.h1, h2 = c.h2;
+    if (c.rank === "front") {
+      c.s = 1.00 + 0.18 * h0; c.a = c.isLead ? 5.000 : 5.040 + 0.180 * h2; c.gamma = 2.30 + 0.30 * h1;
+      c.rho = 0.85; c.w = 1.00;
+    } else if (c.rank === "mid") {
+      c.s = 1.06 + 0.24 * h0; c.a = c.isLead ? 6.000 : 6.040 + 0.200 * h2; c.gamma = 2.10 + 0.30 * h1;
+      c.rho = 0.65; c.w = 0.65;
+    } else {
+      c.s = 1.12 + 0.32 * h0; c.a = c.isStraggler ? 7.000 : 6.680 + 0.320 * h2; c.gamma = 1.90 + 0.30 * h1;
+      c.rho = 0.45; c.w = 0.40;
+    }
+  }
+
+  // Synthesize one seeded siege fragment in a side's gutter (used when a side
+  // fields fewer than 3 eligible fragments): mono fossil text, per-rank font
+  // size and width cap, lane-checked center, and an inward travel budget so the
+  // param pass positions it exactly like a natural fragment.
+  function siegeSynthesize(side, included, rand) {
+    const base = document.getElementById("floodBase");
+    const sideSign = side === "left" ? 1 : -1;
+    const f = document.createElement("span");
+    f.className = "frag";
+    f.innerHTML = fragHTML(FLOOD_CORPUS[Math.floor(rand() * FLOOD_CORPUS.length)]);
+    // Rank intent is a seeded pick so a thin side gets a full spread over time.
+    const intentRank = ["front", "mid", "back"][Math.floor(rand() * 3)];
+    const fs = intentRank === "front" ? 18 + rand() * 10 : intentRank === "mid" ? 15 + rand() * 7 : 13 + rand() * 5;
+    f.style.fontSize = fs.toFixed(1) + "px";
+    f.style.setProperty("--fo", (0.09 + rand() * 0.09).toFixed(3));
+    f.style.maxWidth = SIEGE_RANK_CAP[intentRank] + "px";
+    f.style.overflow = "hidden";
+    f.style.textOverflow = "clip";
+    f.style.left = "-9999px";
+    f.style.top = "0px";
+    const rot = parseFloat((rand() * 10 - 5).toFixed(1));
+    f.style.transform = "rotate(" + rot + "deg)";
+    base.appendChild(f);
+    const width = f.offsetWidth;
+    // Lane center >= 38px from same-side centers (retry 6, then accept last).
+    const centers = included.filter((c) => c.side === side).map((c) => c.y0);
+    let y = siege.base.lineY;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const cy = (siege.base.lineY - 220) + rand() * 440;
+      let minD = Infinity;
+      for (let k = 0; k < centers.length; k++) { const d = Math.abs(centers[k] - cy); if (d < minD) minD = d; }
+      if (minD >= 38 || attempt === 5) { y = cy; break; }
+    }
+    // Placed exactly at its travel budget behind the rest contact target, so its
+    // displacement is inward from the start.
+    const tr = SIEGE_TRAVEL[intentRank];
+    const dist = tr[0] + (tr[1] - tr[0]) * rand();
+    const x1 = side === "left" ? siege.base.el0 - width : siege.base.er0;
+    const x0 = side === "left" ? x1 - dist : x1 + dist;
+    f.style.left = (x0 - siege.base.floodLeft) + "px";
+    f.style.top = (y - siege.base.floodTop) + "px";
+    return { el: f, side, sideSign, x0, y0: y, width, dist, x1, synth: true, rot,
+      appliedCap: SIEGE_RANK_CAP[intentRank],
+      fontSize: fs, fo: parseFloat(f.style.getPropertyValue("--fo")) || 0.1, restDx: 0 };
+  }
+
+  // Pre-create reinforcement DOM once (no insertion happens inside the rAF).
+  // Each pool element stays offscreen until activated at its spawn time.
+  function siegeBuildReinfPool() {
+    const base = document.getElementById("floodBase");
+    if (!base) return;
+    const rand = siege.spawnRand;
+    const max = Math.max(0, SIEGE_CAP - siege.frags.length);
+    const pool = [];
+    const created = [];
+    for (let i = 0; i < max; i++) {
+      const f = document.createElement("span");
+      f.className = "frag";
+      f.innerHTML = fragHTML(FLOOD_CORPUS[Math.floor(rand() * FLOOD_CORPUS.length)]);
+      const isBack = rand() < 0.7;
+      const fs = isBack ? 11 + rand() * 4 : 15 + rand() * 5;
+      f.style.fontSize = fs.toFixed(1) + "px";
+      f.style.setProperty("--fo", (0.09 + rand() * 0.07).toFixed(3));
+      f.style.left = "-9999px";
+      f.style.top = "0px";
+      f.style.transform = "rotate(" + (rand() * 10 - 5).toFixed(1) + "deg)";
+      created.push({ f, isBack, fs, rot: siegeParseRot(f),
+        hStage: rand(), hAr: rand(), hGamma: rand(), hCadence: rand(), hSide: rand(),
+        underlap: isBack ? 3 * rand() : 5 * rand() });
+      base.appendChild(f);
+    }
+    created.forEach((c) => {
+      pool.push({ el: c.f, width: 0, rot: c.rot, fontSize: c.fs, profile: c.isBack ? "back" : "mid",
+        hStage: c.hStage, hAr: c.hAr, hGamma: c.hGamma, hCadence: c.hCadence, hSide: c.hSide,
+        underlap: c.underlap, sideSign: 1, restDx: 0, staged: false,
+        x0: -9999, birthT: 0, a: 7, gamma: 1.9, targetX: 0, isLate: false, side: "left", active: false, curDx: 0 });
+    });
+    siege.reinfPool = pool;
+    siege.poolReady = false;
+    // Appends happen in this task; widths are measured in the next frame's read
+    // phase (offsetWidth ignores rotation), so no layout is forced mid-task.
+    const myPool = pool;
+    requestAnimationFrame(() => {
+      if (siege.reinfPool !== myPool) return; // a rebuild superseded this pool
+      for (let i = 0; i < myPool.length; i++) myPool[i].width = myPool[i].el.offsetWidth;
+      siege.poolReady = true;
+    });
+  }
+
+  // Arm the press loop. Below the arm threshold the loop is SCHEDULED from the
+  // pause clock (one timer, no continuous rAF), so the pile stays exactly at
+  // rest for the first second of silence. At/after the threshold it starts now.
+  function siegeStart() {
+    if (siege.killing || siege.recovering) return;
+    if (!siegeDesktop() || shouldReduceMotion()) return;
+    if (siege.rafId || siege.armTimer) return;
+    const t = siegeSilenceT(performance.now());
+    if (t >= SIEGE_ARM_T) { siegeBeginPress(); return; }
+    // Two-frame epsilon: the timer fires at the deadline but the rAF executes
+    // with a vsync timestamp that lags wall time by up to one frame tick, so
+    // schedule slightly past the threshold for the first frame to land armed.
+    siege.armTimer = window.setTimeout(siegeBeginPress, (SIEGE_ARM_T - t) * 1000 + 34);
+  }
+  function siegeBeginPress() {
+    siege.armTimer = 0;
+    if (siege.rafId || siege.killing || siege.recovering) return;
+    if (!siegePauseActive() || !internal.demoVisible || document.hidden) return;
+    siege.rafId = requestAnimationFrame(siegeFrame);
+  }
+  // will-change:transform lives on the siege fragments only while they move
+  // (armed/recovering/killing); identity removes it (no resident promotion).
+  function siegeSetWillChange(on) {
+    if (siege.willOn === on) return;
+    siege.willOn = on;
+    const v = on ? "transform, opacity" : "";
+    for (let i = 0; i < siege.frags.length; i++) siege.frags[i].el.style.willChange = v;
+    for (let i = 0; i < siege.reinfs.length; i++) siege.reinfs[i].el.style.willChange = v;
+  }
+  // One rAF frame. Per-frame order: progress -> contact loads -> pressure ->
+  // shell transform -> live edges -> fragment positions -> reinforcements ->
+  // flank opacities. No layout reads inside the loop.
+  function siegeFrame(now) {
+    siege.rafId = 0;
+    if (siege.killing || siege.recovering) return;
+    if (!siegePauseActive()) return;
+    const t = siegeSilenceT(now);
+    // Below the arm threshold the pile stays at rest (no busy rAF in the first
+    // second): instead of dying, re-arm from the live clock with an epsilon
+    // that covers the vsync timestamp lag (one frame tick) - a frame that lands
+    // just shy of the threshold retries instead of stalling the whole pause.
+    if (t < SIEGE_ARM_T) {
+      if (!siege.armTimer) siege.armTimer = window.setTimeout(siegeBeginPress, (SIEGE_ARM_T - t) * 1000 + 50);
+      return;
+    }
+    if (!siege.armed) { siege.armed = true; siegeSetWillChange(true); }
+    // 1+2: per-fragment deadline progress and contact load; accumulate pressure.
+    let qSumL = 0, wSumL = 0, qSumR = 0, wSumR = 0;
+    for (let i = 0; i < siege.frags.length; i++) {
+      const f = siege.frags[i];
+      const q = clamp01((t - f.s) / (f.a - f.s));
+      f.p = Math.pow(q, f.gamma);
+      const z = clamp01((t - f.a) / f.rho);
+      f.c = 1 - (1 - z) * (1 - z);
+      if (f.side === "left") { qSumL += f.w * f.c; wSumL += f.w; } else { qSumR += f.w * f.c; wSumR += f.w; }
+    }
+    const qL = wSumL > 0 ? qSumL / wSumL : 0;
+    const qR = wSumR > 0 ? qSumR / wSumR : 0;
+    const P = clamp01((qL + qR) / 2);
+    // 3+4: shell transform from the pressure integral (single direction only).
+    const sx = 1 - 0.16 * Math.pow(P, 1.10);
+    const sy = 1 - 0.035 * Math.pow(P, 1.30);
+    const qLb = (1 + 0.05 * siege.strongSide) * qL;
+    const qRb = (1 - 0.05 * siege.strongSide) * qR;
+    const dQ = qLb - qRb;
+    const tx = Math.abs(dQ) < 0.015 ? 0 : clampN(40 * dQ, -6, 6);
+    // 5: live paper edges from the captured rest center/width + current transform.
+    const eL = siege.base.c0 + tx - siege.base.w * sx / 2;
+    const eR = siege.base.c0 + tx + siege.base.w * sx / 2;
+    // 6: fragment positions (translate3d writes) and track the pack's outer edge.
+    let outerL = Infinity, outerR = -Infinity;
+    for (let i = 0; i < siege.frags.length; i++) {
+      const f = siege.frags[i];
+      const xedge = f.side === "left" ? eL - f.width : eR;
+      const dx = (xedge - f.x0) * f.p + f.sideSign * f.underlap * f.c;
+      f.curDx = dx;
+      f.el.style.transform = "translate3d(" + dx.toFixed(2) + "px,0,0) rotate(" + f.rot + "deg)";
+      const cx = f.x0 + dx;
+      if (f.side === "left") { if (cx < outerL) outerL = cx; } else { if (cx > outerR) outerR = cx; }
+    }
+    siegeAdvanceReinfs(t, outerL, outerR);
+    // 7: flank opacities (contact pressure only, danger-gated).
+    const danger = document.body.classList.contains("danger");
+    siege.lastFlankL = 0.04 * qL + (danger ? 0.14 * qL : 0);
+    siege.lastFlankR = 0.04 * qR + (danger ? 0.14 * qR : 0);
+    if (siege.flankL) siege.flankL.style.opacity = siege.lastFlankL.toFixed(4);
+    if (siege.flankR) siege.flankR.style.opacity = siege.lastFlankR.toFixed(4);
+    siegeApplyShell(tx, sx, sy);
+    siege.lastP = P; siege.lastTx = tx; siege.lastSx = sx; siege.lastSy = sy;
+    siege.rafId = requestAnimationFrame(siegeFrame);
+  }
+  function siegeApplyShell(tx, sx, sy) {
+    const shell = siege.shellEl;
+    if (shell) shell.style.transform = "translate3d(" + tx.toFixed(2) + "px,0,0) scale(" + sx.toFixed(5) + "," + sy.toFixed(5) + ")";
+  }
+  function siegeInstantIdentity() {
+    if (siege.flankL) siege.flankL.style.opacity = "0";
+    if (siege.flankR) siege.flankR.style.opacity = "0";
+    const shell = siege.shellEl;
+    if (shell) shell.style.transform = "";
+    for (let i = 0; i < siege.frags.length; i++) siege.frags[i].el.style.transform = "rotate(" + siege.frags[i].rot + "deg)";
+    for (let i = 0; i < siege.reinfs.length; i++) {
+      const r = siege.reinfs[i];
+      r.el.style.transform = "translate3d(" + (r.restDx || 0).toFixed(2) + "px,0,0) rotate(" + r.rot + "deg)";
+    }
+    document.body.classList.remove("siege-kill");
+    siegeSetWillChange(false);
+    // Identity is the debug truth too: derived fields read as identity whenever
+    // the engine restores identity (identity/reset/recovery end/kill end).
+    siege.lastP = 0; siege.lastTx = 0; siege.lastSx = 1; siege.lastSy = 1;
+    siege.lastFlankL = 0; siege.lastFlankR = 0; siege.armed = false;
+  }
+  function siegeCancelPress() {
+    if (siege.rafId) { cancelAnimationFrame(siege.rafId); siege.rafId = 0; }
+    if (siege.armTimer) { window.clearTimeout(siege.armTimer); siege.armTimer = 0; }
+  }
+  function siegeCancelAll() {
+    siegeCancelPress();
+    if (siege.killRaf) { cancelAnimationFrame(siege.killRaf); siege.killRaf = 0; }
+    if (siege.recoverRaf) { cancelAnimationFrame(siege.recoverRaf); siege.recoverRaf = 0; }
+    // An interrupted kill must not swallow the wipe's fossil: if the pounce
+    // never reached its impact frame, the lost draft joins the pile directly.
+    if (siege.killing && siege.pendingFossil && !siege.pendingFossil.started) {
+      internal.demoFossilJoined = true;
+      joinPile(siege.pendingFossil.lost);
+    }
+    siege.pendingFossil = null;
+    siege.killing = false; siege.recovering = false;
+  }
+  // Instant identity + cancel everything. Hard stops: real input, startTrial,
+  // reduced-motion flip.
+  function siegeReset() { siegeCancelAll(); siege.armed = false; siegeInstantIdentity(); }
+
+  // Reinforcement spawn (from the pre-built pool) + advance. No DOM insertion.
+  // One spawn per frame; the birth clock is the SCHEDULED slot, not the rAF
+  // frame's t, so a delayed frame can neither burst spawns nor reclassify a seed.
+  function siegeAdvanceReinfs(t, outerL, outerR) {
+    const rand = siege.spawnRand;
+    const docW = siege.base.docW;
+    if (siege.poolReady && siege.reinfNext < siege.reinfPool.length && siege.nextSpawnT < 7.75 && t >= siege.nextSpawnT && (siege.frags.length + siege.reinfs.length) < SIEGE_CAP) {
+      const r = siege.reinfPool[siege.reinfNext];
+      const birthT = siege.nextSpawnT;
+      // Side: seeded, balanced within 2, never 3 consecutive same side. Counters
+      // are committed ONLY on a successful birth, never on a lane-retry failure.
+      let side = r.hSide < 0.5 ? "left" : "right";
+      const sameConsec = siege.lastSpawnSide === side && siege.consecSide >= 2;
+      const balanceBroken = side === "left" ? siege.sideCounts.left - siege.sideCounts.right >= 2 : siege.sideCounts.right - siege.sideCounts.left >= 2;
+      if (sameConsec || balanceBroken) side = side === "left" ? "right" : "left";
+      // Lane center >= 38px from same-side fragment/reinforcement centers.
+      const centers = siege.frags.filter((f) => f.side === side).map((f) => f.y0)
+        .concat(siege.reinfs.filter((rr) => rr.side === side).map((rr) => rr.y0));
+      let y = -1, ok = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const cy = (siege.base.lineY - 220) + rand() * 440;
+        let minD = Infinity;
+        for (let k = 0; k < centers.length; k++) { const d = Math.abs(centers[k] - cy); if (d < minD) minD = d; }
+        if (minD >= 38) { y = cy; ok = true; break; }
+      }
+      if (ok) {
+        if (siege.lastSpawnSide === side) siege.consecSide++; else { siege.consecSide = 1; siege.lastSpawnSide = side; }
+        siege.sideCounts[side]++;
+        r.side = side; r.sideSign = side === "left" ? 1 : -1;
+        r.y0 = y;
+        // Spawn fully offscreen 24-120px beyond the viewport edge (viewport coords).
+        const gap = 24 + 96 * rand();
+        r.x0 = side === "left" ? -(r.width + gap) : (docW + gap);
+        // #floodBase-local style offsets (viewport x0/y0 minus its origin).
+        r.el.style.left = (r.x0 - siege.base.floodLeft) + "px";
+        r.el.style.top = (y - siege.base.floodTop) + "px";
+        r.birthT = birthT;
+        r.isLate = birthT > 6.45;
+        if (r.isLate) {
+          // Late: stop 12px outside the viewport edge until the kill pounce.
+          r.targetX = side === "left" ? -(r.width + 12) : (docW + 12);
+        } else {
+          // Active: stage 36-110px behind the current outermost same-side fragment
+          // (fall back to the paper edge if that side has no wall yet).
+          const behind = 36 + 74 * r.hStage;
+          const ref = side === "left" ? (isFinite(outerL) ? outerL : siege.base.el0) : (isFinite(outerR) ? outerR : siege.base.er0);
+          r.targetX = side === "left" ? ref - behind : ref + behind;
+        }
+        r.restDx = r.targetX - r.x0;
+        r.a = Math.min(7.000, Math.max(r.birthT + 0.550, 6.700 + 0.300 * r.hAr));
+        r.gamma = 1.90 + 0.30 * r.hGamma;
+        r.active = true;
+        if (siege.willOn) r.el.style.willChange = "transform, opacity";
+        siege.reinfs.push(r);
+        siege.reinfNext++;
+      }
+      // The schedule advances deterministically whether the slot birthed or was
+      // skipped on lane failure (the pool element is retried at the next slot).
+      siege.nextSpawnT += 0.540 + 0.240 * r.hCadence;
+    }
+    for (let i = 0; i < siege.reinfs.length; i++) {
+      const r = siege.reinfs[i];
+      // A reinforcement that has reached its staging/reserve face holds there
+      // across pauses (the silence clock resets each pause, so a stale birthT
+      // must not snap a staged fragment back to its spawn point).
+      let dx;
+      if (r.staged) {
+        dx = r.restDx;
+      } else {
+        const q = clamp01((t - r.birthT) / (r.a - r.birthT));
+        const p = Math.pow(q, r.gamma);
+        if (p >= 1) r.staged = true;
+        dx = (r.targetX - r.x0) * p;
+      }
+      r.curDx = dx;
+      r.el.style.transform = "translate3d(" + dx.toFixed(2) + "px,0,0) rotate(" + r.rot + "deg)";
+    }
+  }
+
+  // Collective kill (performDemoWipe): snapshot, pounce to the 0.78-scaled paper
+  // edge, hold, then settle back to rest/identity. The fossil flight takes off at
+  // the pounce impact (~120ms post-wipe, per the model); the narrator/dead flow
+  // stays in performDemoWipe. Runs whenever a wipe needs it (armed or not); a
+  // kill already in flight is the only refusal (double-kill guard).
+  function siegeKill(flight, lost) {
+    if (siege.killing || shouldReduceMotion() || !siegeDesktop() || !siege.frags.length) return false;
+    siegeCancelPress();
+    if (siege.recoverRaf) { cancelAnimationFrame(siege.recoverRaf); siege.recoverRaf = 0; }
+    siege.killing = true;
+    siege.recovering = false;
+    siegeSetWillChange(true);
+    document.body.classList.add("siege-kill");
+    const startTx = siege.lastTx, startSx = siege.lastSx, startSy = siege.lastSy;
+    const startFlankL = siege.lastFlankL, startFlankR = siege.lastFlankR;
+    const c0 = siege.base.c0, w = siege.base.w;
+    const el78 = c0 - w * 0.78 / 2, er78 = c0 + w * 0.78 / 2;
+    const snap = [];
+    for (let i = 0; i < siege.frags.length; i++) {
+      const f = siege.frags[i];
+      const xedge = f.side === "left" ? el78 - f.width : er78;
+      snap.push({ el: f.el, rot: f.rot, fromDx: f.curDx || 0, toDx: (xedge - f.x0) + f.sideSign * f.underlap, restDx: 0 });
+    }
+    for (let i = 0; i < siege.reinfs.length; i++) {
+      const r = siege.reinfs[i];
+      const xedge = r.side === "left" ? el78 - r.width : er78;
+      snap.push({ el: r.el, rot: r.rot, fromDx: r.curDx || 0, toDx: (xedge - r.x0) + r.sideSign * r.underlap, restDx: r.restDx || 0 });
+    }
+    const startTime = performance.now();
+    // If the kill is interrupted before the impact frame, cancel-All joins the
+    // fossil directly so a wipe always leaves one (see siegeCancelAll).
+    siege.pendingFossil = lost ? { flight, lost, started: false } : null;
+    let fossilStarted = false;
+    function step() {
+      siege.killRaf = 0;
+      const k = performance.now() - startTime;
+      // The lost draft takes off at the pounce impact (~120ms post-wipe): the
+      // fossil flight (or the direct join) fires once, inside the kill timeline.
+      if (!fossilStarted && k >= 120) {
+        fossilStarted = true;
+        if (siege.pendingFossil) siege.pendingFossil.started = true;
+        if (lost) {
+          internal.demoFossilJoined = true;
+          if (flight) flyFossilToPile(flight); else joinPile(lost);
+        }
+      }
+      if (k >= 500) {
+        siege.killing = false;
+        siege.pendingFossil = null;
+        siegeInstantIdentity();
+        return;
+      }
+      // Flank shadows fade out across the whole kill (the wipe ends the pressure).
+      const fade = 1 - k / 500;
+      if (siege.flankL) siege.flankL.style.opacity = (startFlankL * fade).toFixed(4);
+      if (siege.flankR) siege.flankR.style.opacity = (startFlankR * fade).toFixed(4);
+      let fragT, shellT;
+      if (k < 120) { const u = k / 120; const K = Math.pow(u, 2.60); fragT = K; shellT = K; }
+      else if (k < 180) { fragT = 1; shellT = 1; }
+      else { const v = (k - 180) / 320; const R = 1 - Math.pow(1 - v, 3); document.body.classList.remove("siege-kill");
+        for (let i = 0; i < snap.length; i++) { const s = snap[i]; const dx = lerp(s.toDx, s.restDx, R); s.el.style.transform = "translate3d(" + dx.toFixed(2) + "px,0,0) rotate(" + s.rot + "deg)"; }
+        siegeApplyShell(0, lerp(0.78, 1, R), lerp(0.78, 1, R));
+        siege.killRaf = requestAnimationFrame(step); return;
+      }
+      for (let i = 0; i < snap.length; i++) { const s = snap[i]; const dx = lerp(s.fromDx, s.toDx, fragT); s.el.style.transform = "translate3d(" + dx.toFixed(2) + "px,0,0) rotate(" + s.rot + "deg)"; }
+      siegeApplyShell(lerp(startTx, 0, shellT), lerp(startSx, 0.78, shellT), lerp(startSy, 0.78, shellT));
+      siege.killRaf = requestAnimationFrame(step);
+    }
+    siege.killRaf = requestAnimationFrame(step);
+    return true;
+  }
+
+  // 180ms retreat (teaching-beat recovery and any resume during pause): snapshot
+  // -> rest/staging/identity with one shared cubic curve. Danger colors AND flank
+  // shadows clear in frame 1; only geometry retreats over the 180ms.
+  function siegeRecover() {
+    if (!siege.armed || !siege.frags.length) return;
+    siegeCancelPress();
+    siege.recovering = true;
+    siege.killing = false;
+    siegeSetWillChange(true);
+    // Flank shadows clear immediately, matching the caller's danger-off frame.
+    if (siege.flankL) siege.flankL.style.opacity = "0";
+    if (siege.flankR) siege.flankR.style.opacity = "0";
+    const startTx = siege.lastTx, startSx = siege.lastSx, startSy = siege.lastSy;
+    const snap = [];
+    for (let i = 0; i < siege.frags.length; i++) { const f = siege.frags[i]; snap.push({ el: f.el, rot: f.rot, fromDx: f.curDx || 0, restDx: 0 }); }
+    for (let i = 0; i < siege.reinfs.length; i++) { const r = siege.reinfs[i]; snap.push({ el: r.el, rot: r.rot, fromDx: r.curDx || 0, restDx: r.restDx || 0 }); }
+    const startTime = performance.now();
+    function step() {
+      siege.recoverRaf = 0;
+      const e = performance.now() - startTime;
+      if (e >= 180) {
+        siege.recovering = false;
+        siegeInstantIdentity();
+        // A pause that began while the retreat was running re-arms now: the new
+        // press takes over from current (identity-restored) positions, because
+        // the press derives geometry purely from the live pause clock - and its
+        // arm threshold (1s) lands long after this 180ms retreat completes.
+        if (siegePauseActive()) siegeStart();
+        return;
+      }
+      const u = e / 180, R = 1 - Math.pow(1 - u, 3);
+      for (let i = 0; i < snap.length; i++) { const s = snap[i]; const dx = lerp(s.fromDx, s.restDx, R); s.el.style.transform = "translate3d(" + dx.toFixed(2) + "px,0,0) rotate(" + s.rot + "deg)"; }
+      siegeApplyShell(startTx * (1 - R), lerp(startSx, 1, R), lerp(startSy, 1, R));
+      siege.recoverRaf = requestAnimationFrame(step);
+    }
+    siege.recoverRaf = requestAnimationFrame(step);
+  }
+
+  // Dev-only pure getter for the parent's E2E instrumentation.
+  function siegeDebug() {
+    return {
+      t: siegeSilenceT(performance.now()), P: siege.lastP, tx: siege.lastTx, sx: siege.lastSx, sy: siege.lastSy,
+      armed: siege.armed, killing: siege.killing,
+      counts: { front: siege.counts.front, mid: siege.counts.mid, back: siege.counts.back, reinforcements: siege.reinfs.length }
+    };
   }
 
   // --- Wiring ----------------------------------------------------------------
@@ -1600,7 +2566,6 @@ window.FirstLineLandingDemo = (() => {
 
     window.addEventListener("resize", () => { if (isTrial() && trialDanger()) syncTrialDangerPosition(); });
 
-    updateCount();
     // The initial route check must run only after Datastar has attached its
     // data-on handlers. data-init on <body> fires too early for this in v1.0.2,
     // so wait for datastar-ready, with a timeout fallback in case it already
@@ -1636,7 +2601,9 @@ window.FirstLineLandingDemo = (() => {
     dismissPrompt,
     onGlobalKeydown,
     emitFlroutecheck,
-    joinPile
+    joinPile,
+    // dev-only pure getter for E2E siege instrumentation
+    siegeDebug
   };
 })();
 
@@ -1713,7 +2680,6 @@ if (document.readyState === "loading") {
     white-space: pre;
     line-height: 1.5;
     opacity: var(--fo, .1);
-    will-change: opacity;
   }
   .frag s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
   /* Danger transitions live ONLY on the danger-state selectors: the graveyard
@@ -1733,6 +2699,24 @@ if (document.readyState === "loading") {
      settled joined fossils redden and strengthen x3.4 like every other fossil. */
   body.danger .frag.join-new { color: var(--red); opacity: .85; }
   body.danger .frag.join-new.settle { color: var(--red); opacity: min(calc(var(--fo, .09) * 3.4), .5); transition: color .5s ease, opacity .5s ease; }
+
+  /* The wipe flight ghost (landing demo only): the lost draft's first ~64
+     chars, already styled as the fossil they are becoming, fly from the paper
+     to the gutter in one 480ms fall, then the real .frag.join-new replaces the
+     ghost with no visual jump. Document-positioned on body (the landing
+     flood's coordinate space), above the sheet so the fall reads over the
+     paper. Never animated under prefers-reduced-motion (no ghost is spawned). */
+  .fossil-flight {
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre;
+    color: var(--red);
+    opacity: .85;
+  }
 
   .veil {
     position: fixed;
@@ -1769,6 +2753,21 @@ if (document.readyState === "loading") {
   .live-demo { display: block; }
   .demo-window { display: block; }
   .demo-body { display: block; }
+  /* ---------- siege geometry shell (demo danger beats, desktop only) ----------
+     A nested transform owner around the demo paper/result/failure/footer so the
+     silence pressure never collides with the writing surface's own transform
+     (deny shake) or the WAAPI morph clone. Identity by default; only the siege
+     rAF and the kill/recovery timelines write its transform. */
+  .siege-shell { position: relative; display: block; transform-origin: center; will-change: transform; }
+  /* Flank shadows: per-side contact-pressure gradient overlays pinned to the
+     paper's vertical edges. Width is fixed at build (the Q=1 maximum); the rAF
+     drives only opacity, so no per-frame layout. Red, danger-gated. */
+  .siege-flank { position: absolute; width: 28px; pointer-events: none; opacity: 0; z-index: 1; }
+  .siege-flank-l { background: linear-gradient(to right, rgba(200, 57, 47, .9), rgba(200, 57, 47, 0)); }
+  .siege-flank-r { background: linear-gradient(to left, rgba(200, 57, 47, .9), rgba(200, 57, 47, 0)); }
+  /* Collective kill beat: every fragment snaps to full red/danger opacity at
+     impact with no transition, then settles back when the class is removed. */
+  body.siege-kill .frag { color: var(--red); opacity: min(calc(var(--fo, .1) * 3.4), .5); transition: none; }
   .hero-copy { text-align: center; }
   .hero-lead {
     font-weight: 500;
@@ -1817,12 +2816,51 @@ if (document.readyState === "loading") {
     0%, 100% { transform: translateX(0); }
     50% { transform: translateX(-2px); }
   }
+  /* Demo-only page-level deny: when the preview acts out a forbidden Backspace,
+     the whole world (.sheet + .flood) shakes once so the refusal reads at a
+     glance, not just the paper. Shares the paper's deny-shape; the paper keeps
+     its own deny-shake, so the nested stack reads ~4px for 160ms (intended
+     emphasis). Body-scoped and toggled imperatively by the beat; the live deny
+     stays untouched. The global prefers-reduced-motion rule below kills it. */
+  body.deny-world .sheet,
+  body.deny-world .flood {
+    animation: deny-shake .16s ease;
+  }
+  /* Teach caption during the demo deny beat: the only new copy, and it is
+     deletion-adjacent (allowed red). A class-driven ::after (same pattern as
+     .trial-thought[data-empty="true"]::before), pinned below the current line
+     so it never covers the words. Fades in over .18s; the pseudo-element is
+     destroyed the instant deny-teach drops, so removal is instant (no lingering
+     transition). Base opacity 0 plus the reduced-motion animation-kill keep a
+     stray class invisible (and the beat never fires under reduce anyway). */
+  .demo-writing-surface.deny-teach::after {
+    content: "backspace is not allowed";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 72%;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--red);
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    pointer-events: none;
+    opacity: 0;
+    animation: deny-teach-in .18s ease forwards;
+  }
+  @keyframes deny-teach-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
 
   /* ---------- the paper: the only clean thing ---------- */
   .demo-writing-surface {
     position: relative;
+    display: flex;
+    flex-direction: column;
     width: min(700px, 100%);
-    margin: 58px auto 0;
+    margin: 30px auto 0;
     background: var(--paper);
     border: 1px solid rgba(23, 21, 15, .2);
     border-radius: var(--radius);
@@ -1841,6 +2879,7 @@ if (document.readyState === "loading") {
   }
 
   .paper-head {
+    flex: none;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1918,7 +2957,7 @@ if (document.readyState === "loading") {
   }
   .trial-prompt-dismiss:hover { color: var(--ink); }
 
-  .demo-editor-stack { display: grid; position: relative; }
+  .demo-editor-stack { display: grid; position: relative; flex: 1; min-height: 0; }
   .demo-editor-stack .demo-preview,
   .demo-editor-stack .live-demo-editor { grid-area: 1 / 1; }
 
@@ -1943,12 +2982,17 @@ if (document.readyState === "loading") {
   .demo-preview {
     /* demo 预览与实时编辑器 .live-demo-editor 视觉一致：居中、同字号/行高/字距，
        demo→live 交接无跳变，读起来是同一个 zen 写作视图。
-       竖直锚点：首行从纸面 ~38% 起（与 live editor 的 INLINE_ANCHOR=0.38 静止相一致），
-       样本较短无需滚动，向下生长即可。 */
+       竖直锚点：首行从纸面 ~38% 起（与 live editor 的 INLINE_ANCHOR=0.38 静止相一致）。
+       多行样本把当前行钉在该锚点（overflow hidden + 命令式 scrollTop，与 live editor
+       scrollInlineCaretToAnchor 同款）；空预览重置为 scrollTop 0。 */
     display: flex;
     flex-direction: column;
+    height: 100%;
+    overflow-y: hidden;
     justify-content: flex-start;
-    padding: clamp(138px, calc(23.56vh - 45px), 199px) 30px 76px;
+    /* 底部 62vh 内边距制造可滚动余量（与 trial editor 的 calc(70vh - .81em) 同款）：
+       从第二行起 scrollHeight > clientHeight，scrollTop 锚定才能生效。 */
+    padding: clamp(138px, calc(23.56vh - 45px), 199px) 30px calc(62vh);
     font-size: clamp(20px, 2vw, 26px);
     line-height: 1.62;
     letter-spacing: -.01em;
@@ -1961,6 +3005,8 @@ if (document.readyState === "loading") {
   }
   .demo-preview .trial-thought {
     display: block;
+    /* flex:none：行盒不被 flex 列压缩，min-height 1.8em 始终生效，内容可向下溢出。 */
+    flex: none;
     min-height: 1.8em;
     color: transparent;
     transition: color .3s ease;
@@ -2051,12 +3097,12 @@ if (document.readyState === "loading") {
     max-width: 17ch;
     text-shadow: 0 1px 10px rgba(255, 255, 255, .95), 0 0 24px rgba(255, 255, 255, .92);
   }
-  body.danger .live-demo-editor, body.danger .demo-preview { opacity: .35; }
+  body.danger .demo-writing-surface.is-live .live-demo-editor { opacity: .35; }
 
   /* ---------- result / failure: the card takes the paper's place ---------- */
   .demo-result, .demo-failure {
     width: min(700px, 100%);
-    margin: 58px auto 0;
+    margin: 30px auto 0;
   }
   .demo-result .trial-result-card,
   .demo-failure .trial-result-card {
@@ -2131,6 +3177,10 @@ if (document.readyState === "loading") {
   }
   .trial-result-links a:hover, .trial-result-links button:hover { color: var(--ink); }
   .trial-result-links a:focus-visible, .trial-result-links button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .result-app-link { margin-top: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; }
+  .result-app-link a { color: var(--dim); }
+  .result-app-link a:hover { color: var(--ink); }
+  .result-app-link a:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   .trial-result-actions {
     display: flex;
     gap: 10px;
@@ -2389,7 +3439,7 @@ if (document.readyState === "loading") {
   .trial-editor .trial-thought.is-previous { color: rgba(23, 21, 15, .3); }
   .trial-editor .trial-thought.is-current { color: var(--ink); }
   .trial-editor.is-demo-danger .trial-thought.is-current { color: rgba(23, 21, 15, .55); }
-  .trial-flood { z-index: 1; }
+  .trial-flood { position: fixed; inset: 0; z-index: 1; }
   .trial-writing-surface { z-index: 2; }
   .trial-foot {
     position: fixed;
@@ -2487,7 +3537,7 @@ if (document.readyState === "loading") {
   }
 
   .trial-morph-ghost { z-index: 2000; }
-  .trial-morph-ghost .trial-hud, .trial-morph-ghost .trial-prompt { display: none; }
+  .trial-morph-ghost .trial-hud, .trial-morph-ghost .trial-prompt, .trial-morph-ghost .trial-flood { display: none; }
 
   /* ---------- responsive ---------- */
   @media (max-width: 820px) {
@@ -2533,9 +3583,10 @@ if (document.readyState === "loading") {
 
 </head>
 <body
-  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false,"narrator":"the pile is patient. it gets whatever you stop writing.","narratorDead":false,"srStatus":"","denyActive":false,"denyHair":false}}'
+  data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"resultText":"","resultWords":"","resultWordCount":0,"promptOpen":false,"promptIndex":0,"promptText":"","toastVisible":false,"toastText":"","morphing":false,"narrator":"the pile is patient. it gets whatever you stop writing.","narratorDead":false,"srStatus":"","denyActive":false,"denyHair":false,"demowords":0}}'
   data-computed:_session.clock="String(Math.floor($_session.remaining/60)).padStart(2,'0')+':'+String($_session.remaining%60).padStart(2,'0')"
-  data-computed:_session.liveWords="($_session.text.match(/[\u4e00-\u9fff]/g)||[]).length + ($_session.text.replace(/[\u4e00-\u9fff]/g,' ').match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[]).length"
+  data-computed:_session.livewords="($_session.text.match(/[\u4e00-\u9fff]/g)||[]).length + ($_session.text.replace(/[\u4e00-\u9fff]/g,' ').match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[]).length"
+  data-computed:_session.displaywords="$_session.context === 'demo' ? $_session.demowords : $_session.livewords"
   data-class:trial-mode="$_session.context === 'trial'"
   data-class:trial-morphing="$_session.morphing"
   data-class:danger="$_session.dangerActive"
@@ -2562,6 +3613,7 @@ if (document.readyState === "loading") {
   data-on:fldeny="$_session.denyActive = evt.detail.active; $_session.denyHair = evt.detail.hair"
   data-on:fldenyhair="$_session.denyHair = evt.detail.hair"
   data-on:fldenyclear="$_session.denyActive = false; $_session.denyHair = false; $_session.srStatus = ''"
+  data-on:fldemowords="$_session.demowords = evt.detail.words"
   data-on:keydown__document="FirstLineLandingDemo.onGlobalKeydown(evt, $_session.text, $_session.context, $_session.startedAt)"
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
   data-on:flroutecheck="$_session.morphing ? '' : ((location.hash === '#trial' &amp;&amp; $_session.context !== 'trial') ? FirstLineLandingDemo.startTrial(null) : ((location.hash !== '#trial' &amp;&amp; $_session.context === 'trial') ? FirstLineLandingDemo.exitTrial() : ''))"
@@ -2590,6 +3642,7 @@ if (document.readyState === "loading") {
                     <p class="hero-hint">or just click the paper and type</p>
                   </div>
                 </div>
+                <div class="siege-shell">
                 <div class="demo-writing-surface" aria-label="Live writing surface. Select to start typing." data-class:is-live="$_session.context === 'inline'" data-class:is-demo-danger="$_session.dangerActive &amp;&amp; $_session.context !== 'trial'" data-class:denied="$_session.denyActive &amp;&amp; $_session.context !== 'trial'" data-class:deny-hair="$_session.denyHair &amp;&amp; $_session.context !== 'trial'" data-on:click="evt.target.closest('button, a') ? '' : FirstLineLandingDemo.startTrial(evt)">
                   <div class="paper-head">
                     <span class="spec">forward only <b>/</b> 5s warn <b>/</b> 8s wipe <b>/</b> 60s</span>
@@ -2635,6 +3688,7 @@ if (document.readyState === "loading") {
                       <button type="button" class="trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
                       <a href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Write fullscreen</a>
                     </div>
+                    <p class="result-app-link"><a href="download.html">keep writing on your Mac - early bird $5</a></p>
                   </div>
                 </section>
                 <section class="demo-failure" data-show="$_session.failed &amp;&amp; $_session.context === 'inline'" aria-live="polite" aria-label="Session failed">
@@ -2647,8 +3701,11 @@ if (document.readyState === "loading") {
                     </div>
                   </div>
                 </section>
+                <div class="siege-flank siege-flank-l" aria-hidden="true"></div>
+                <div class="siege-flank siege-flank-r" aria-hidden="true"></div>
+                <div class="demo-footer" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="live-demo-count" data-text="$_session.displaywords + ' words'">0 words</span></div>
+                </div>
               </div>
-              <div class="demo-footer" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="live-demo-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
               <p class="demo-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context !== 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
             </div>
           </section>
@@ -2720,6 +3777,7 @@ if (document.readyState === "loading") {
             <button type="button" class="trial-next" data-on:click="FirstLineLandingDemo.restart($_session.context)">Go again</button>
             <button type="button" class="trial-close" data-on:click="FirstLineLandingDemo.exitTrial()">Exit</button>
           </div>
+          <p class="result-app-link"><a href="download.html">keep writing on your Mac - early bird $5</a></p>
         </div>
       </section>
       <section class="trial-failure" data-show="$_session.failed &amp;&amp; $_session.context === 'trial'" aria-live="polite" aria-label="Trial failed">
@@ -2733,7 +3791,7 @@ if (document.readyState === "loading") {
         </div>
       </section>
       <p class="trial-toast" data-show="$_session.toastVisible &amp;&amp; $_session.context === 'trial'" data-text="$_session.toastText" aria-live="polite"></p>
-      <div class="trial-foot" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="trial-count" data-text="$_session.liveWords + ' words'">0 words</span></div>
+      <div class="trial-foot" aria-hidden="true"><span class="live-demo-status" data-text="$_session.narrator" data-class:dead="$_session.narratorDead || $_session.denyActive">the pile is patient. it gets whatever you stop writing.</span><span class="trial-count" data-text="$_session.displaywords + ' words'">0 words</span></div>
     </div>
   </div>
   <script>

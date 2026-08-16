@@ -1,0 +1,72 @@
+- generic [ref=e1] [box=0,0,1440,1604]:
+  - generic [box=0,0,1440,900]:
+    - generic [box=0,0,1440,900]:
+      - generic [box=0,0,214,1604]:
+        - generic [box=82,19,368,52]: fix it LATER. later later later
+        - generic [box=2,290,367,38]: i thought about it so hard it disappeared
+        - generic [box=33,573,595,42]: stopped to find the perfect word. found nothing
+        - generic [box=26,785,492,95]: written in my head on the train, gone by the platform
+        - generic [box=71,872,654,77]: the first sentence is still the only sentence
+        - generic [box=84,971,568,62]: the good version needed one more week. it got none
+        - generic [box=8,1061,524,74]: untitled (37). untitled (38). untitled (39)
+        - generic [box=-17,1164,348,46]: opening line pending since march
+        - generic [box=21,1257,500,81]: this paragraph had one job. RIP
+        - generic [box=19,1357,281,45]: ok ok ok think think
+        - generic [box=-24,1442,421,54]: so many typos i stopped noticing. then i stopped
+      - generic [box=1226,0,214,1604]:
+        - generic [box=1401,8,410,57]: dont delte this whatever you do
+        - generic [box=1439,99,313,30]: thoughts, unsorted, mostly loud
+        - generic [box=1432,299,522,44]: the ending was supposed to come later
+        - generic [box=1285,401,462,50]: the second sentence killed it
+        - generic [box=1286,601,435,36]: i highlighted it all. then what
+        - generic [box=1416,679,155,51]: "unsent email no. 12 re: nothing. hi."
+        - generic [box=1392,776,299,36]: saved as draft. never opened again
+        - generic [box=1313,864,209,38]: dear journal no wait
+        - generic [box=1366,985,419,46]: dear hiring manager hi dana,
+        - generic [box=1271,1165,500,57]: the idea was there a second ago
+        - generic [box=1375,1341,369,38]: i had the idea and then it left
+        - generic [box=1399,1439,344,32]: rewrite of the rewrite of the openin
+      - generic [box=238,366,964,36]:
+        - generic [box=966,382,242,26]: reread it nine times. sent zero
+        - generic [box=410,374,339,46]: half a thought. the other half left
+        - generic [box=878,382,209,22]: i will write every morning
+  - generic [ref=e2] [box=0,0,1440,1604]:
+    - main [ref=e3] [box=0,0,1440,932]:
+      - generic [ref=e4] [box=160,0,1120,932]:
+        - navigation "Primary" [ref=e5] [box=192,0,1056,68]:
+          - link "ZERO_DRAFT" [ref=e6] [cursor=pointer] [box=224,24,96,20]:
+            - /url: "#top"
+          - link "mac release ->" [ref=e8] [cursor=pointer] [box=1115,25,101,19]:
+            - /url: download.html
+        - region "It's not supposed to be good yet." [ref=e9] [box=192,68,1056,864]:
+          - region "Zero Draft product preview" [ref=e10] [box=192,120,1056,786]:
+            - generic [ref=e11] [box=192,120,1056,786]:
+              - generic [ref=e12] [box=192,120,1056,744]:
+                - generic [ref=e13] [box=192,120,1056,226]
+                - generic "Live writing surface. Select to start typing." [ref=e20] [box=370,404,700,460]
+              - generic [ref=e27] [box=370,863,700,42]:
+                - generic [ref=e28] [box=389,876,325,16]: everything you stop writing joins the pile.
+                - generic [ref=e29] [box=1013,876,38,16]: words
+    - region [ref=e30] [box=160,932,1120,575]:
+      - paragraph [ref=e31] [box=192,1016,1056,17]: What comes out
+      - heading "Raw goes in. A draft comes back." [level=2] [ref=e32] [box=192,1047,1056,50]
+      - generic [ref=e33] [box=230,1136,980,201]:
+        - figure "zero draft - 58s" [ref=e34] [box=229,1134,459,205]:
+          - generic [ref=e36] [box=257,1190,404,125]: "ok thesis is peopel dont lack ideas they lack permission, the editor in your head kills sentences befor they land. evidence: i rewrote my first paragraph five times yesterday and posted nothing."
+        - generic [ref=e37] [box=709,1223,22,28]: "->"
+        - figure "first draft - via your AI" [ref=e38] [box=752,1156,458,161]:
+          - generic [ref=e40] [box=779,1211,404,82]: "People don't lack ideas - they lack permission. The editor in your head kills sentences before they land: yesterday I rewrote one opening paragraph five times and published nothing."
+      - paragraph [ref=e41] [box=497,1370,446,61]: The shaping happens in whatever AI you already use. Copy for AI puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point.
+    - contentinfo [ref=e42] [box=160,1507,1120,97]:
+      - paragraph [ref=e43] [box=192,1539,576,17]: Zero Draft - the draft before the draft. Your writing never leaves this page.
+      - navigation "Support" [ref=e44] [box=922,1539,326,17]:
+        - link "Help" [ref=e45] [cursor=pointer] [box=922,1539,30,17]:
+          - /url: help.html
+        - link "Privacy" [ref=e46] [cursor=pointer] [box=968,1539,52,17]:
+          - /url: privacy.html
+        - link "Terms" [ref=e47] [cursor=pointer] [box=1036,1539,37,17]:
+          - /url: terms.html
+        - link "Refund" [ref=e48] [cursor=pointer] [box=1090,1539,45,17]:
+          - /url: refund.html
+        - link "Release notes" [ref=e49] [cursor=pointer] [box=1151,1539,97,17]:
+          - /url: release-notes.html

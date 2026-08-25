@@ -151,7 +151,7 @@ Demo preview (the page teaches before the user touches it): types the sample onc
 
 | Place | Approved copy | Nothing else |
 |---|---|---|
-| Hero | "It's not supposed to be good yet." / "So we made polishing impossible." / CTA "Give it sixty seconds." + hint "or just click the paper and type" | No mechanism, no rules, no kicker |
+| Hero | "It's not supposed to be good yet." / "We force you to write something down. You leave with words." / CTA "Give it sixty seconds." + hint "or just click the paper and type" | No rules list, no kicker |
 | Spec header | "forward only / 5s warn / 8s wipe / 60s" | - |
 | Placeholder | "Click here. Type anything. / No deleting, no pasting, no undo. / Stop for eight seconds and it's gone." | - |
 | Payoff | kicker "What comes out", H2 "Raw goes in. A draft comes back.", raw card (typos: "ok thesis is peopel dont lack ideas they lack permission...") -> clean card ("People don't lack ideas - they lack permission..."), caption "The shaping happens in whatever AI you already use. Copy for AI puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point." | - |

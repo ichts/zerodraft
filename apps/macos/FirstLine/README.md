@@ -1,8 +1,8 @@
-# First Line for macOS
+# Zero Draft for macOS
 
-First Line is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
+Zero Draft is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
 
-This is the native macOS app, built with Swift and SwiftUI.
+This is the native macOS app, built with Swift and AppKit.
 
 ## Features
 
@@ -33,4 +33,4 @@ The editor is append-only. Deletion, paste, cut, undo, and selection replacement
 
 ## License
 
-First Line is released under the MIT License. See `LICENSE` for details.
+Zero Draft is released under the MIT License. See `LICENSE` for details.

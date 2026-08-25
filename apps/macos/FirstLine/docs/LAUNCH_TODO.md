@@ -1,13 +1,13 @@
-# First Line — Launch TODO
+# Zero Draft - Launch TODO
 
-This is the execution checklist for turning First Line into a paid direct-download Mac product while Dodo Payments and Apple Developer access are still in progress.
+This is the execution checklist for turning Zero Draft into a paid direct-download Mac product while Dodo Payments and Apple Developer access are still in progress.
 
 Related references:
 
-- `docs/LAUNCH_PLAN.md` — launch strategy and constraints.
-- `docs/LICENSE_PAYMENT_SPEC.md` — Dodo/license behavior and app activation rules.
-- `docs/RELEASE_CHECKLIST.md` — final signed/notarized DMG release gate.
-- `docs/MANUAL_QA.md` — manual app verification checklist.
+- `docs/LAUNCH_PLAN.md` - launch strategy and constraints.
+- `docs/LICENSE_PAYMENT_SPEC.md` - Dodo/license behavior and app activation rules.
+- `docs/RELEASE_CHECKLIST.md` - final signed/notarized DMG release gate.
+- `docs/MANUAL_QA.md` - manual app verification checklist.
 
 ## Current status
 
@@ -26,7 +26,7 @@ Use these constants everywhere:
 
 | Area | Value |
 |---|---|
-| Product | First Line |
+| Product | Zero Draft |
 | Offer | Early-bird license |
 | Price | USD $5 |
 | Payment model | One-time purchase. No subscription. |
@@ -41,7 +41,7 @@ Do not headline the web trial as unlimited on the landing page.
 ## Hard rules for agents
 
 - Keep the landing minimal. Do not add FAQ or footer back to `index.html` unless the user explicitly asks.
-- All web pages must use the Kami visual system: parchment canvas, ink-blue accent, serif-led hierarchy, warm neutrals, restrained document sections.
+- All web pages must use the Flood visual system defined in `design/DESIGN.md`: bone `#f1f0eb` canvas, white paper as the only clean surface, Newsreader + IBM Plex Mono, restrained document sections. The 7 support pages migrated to Flood in commit `662cab4`.
 - Do not claim the Mac app is downloadable until a real artifact exists.
 - Do not claim the Mac app is signed or notarized until Developer ID signing and notarization are complete.
 - Do not add GitHub as a primary trust/navigation element for the paid product.
@@ -50,24 +50,24 @@ Do not headline the web trial as unlimited on the landing page.
 - If Dodo license activation requires a private key from the app, stop and ask whether to add a backend.
 - Do not invent support email, copyright owner, company name, final domain, or app icon source. Use `Unknown / to fill`.
 
-## Phase 1 — Dodo review waiting work
+## Phase 1 - Dodo review waiting work
 
 Goal: use Test Mode to prepare the product and learn the exact license flow without touching live payments.
 
 ### 1.1 Brand cleanup
 
 - [ ] Check whether the user-facing Dodo brand/storefront name is still `Dodo Games`.
-- [ ] Rename visible brand/storefront to `First Line` if Dodo shows it to buyers.
+- [ ] Rename visible brand/storefront to `Zero Draft` if Dodo shows it to buyers.
 - [ ] Keep legal/business identity accurate if Dodo separates legal name from storefront brand.
 
 Acceptance:
 
-- Buyer-facing checkout, receipt, and license emails should say `First Line`, not `Dodo Games`.
+- Buyer-facing checkout, receipt, and license emails should say `Zero Draft`, not `Dodo Games`.
 
 ### 1.2 Create Test Mode product
 
 - [ ] Create one-time product in Dodo Test Mode.
-- [ ] Product name: `First Line Early Bird License`.
+- [ ] Product name: `Zero Draft Early Bird License`.
 - [ ] Category: software / digital product / digital downloadable content, whichever Dodo offers.
 - [ ] Price: `USD $5`.
 - [ ] Billing: one-time.
@@ -78,7 +78,7 @@ Acceptance:
 Product description:
 
 ```text
-First Line is a forward-only writing app for finishing first drafts.
+Zero Draft is a forward-only writing app for finishing first drafts.
 
 Stop typing for eight seconds and the draft disappears. No deleting. No editing backward. Just keep the line moving.
 
@@ -136,13 +136,13 @@ Acceptance:
 - Any gap in license delivery is documented as a blocker.
 - Test Mode URLs are clearly marked as test-only.
 
-## Phase 2 — Web readiness pages
+## Phase 2 - Web readiness pages
 
 Goal: create the small support/legal/download surfaces needed for launch without bloating the landing.
 
 ### 2.1 Inspect before editing
 
-- [ ] Read root `CLAUDE.md`.
+- [ ] Read root `AGENTS.md`.
 - [ ] Read `design/DESIGN.md`.
 - [ ] Read `index.html`.
 - [ ] Read `docs/LAUNCH_PLAN.md`.
@@ -162,7 +162,7 @@ Create these root-level static pages unless deployment routing says otherwise:
 
 Acceptance:
 
-- Pages use Kami visual system.
+- Pages use the Flood visual system defined in `design/DESIGN.md`.
 - Pages are useful and short.
 - Pages do not add noise to `index.html`.
 
@@ -180,7 +180,7 @@ Suggested copy:
 
 ```text
 The Mac download is being prepared.
-First Line will be available here after Developer ID signing and notarization are complete.
+Zero Draft will be available here after Developer ID signing and notarization are complete.
 ```
 
 Acceptance:
@@ -237,7 +237,7 @@ Acceptance:
 
 ### 2.8 `help.html`
 
-- [ ] Explain buying First Line.
+- [ ] Explain buying Zero Draft.
 - [ ] Explain finding the Dodo license key email.
 - [ ] Explain activating the Mac app.
 - [ ] Explain 2-Mac limit.
@@ -274,13 +274,13 @@ Acceptance:
 - Landing remains short.
 - Download links go somewhere real and truthful.
 
-## Phase 3 — Mac license UI
+## Phase 3 - Mac license UI
 
 Goal: make the native app ready to accept a Dodo license key after the 3-session trial.
 
 ### 3.1 Inspect before editing
 
-- [ ] `apps/macos/FirstLine/CLAUDE.md`
+- [ ] `apps/macos/FirstLine/AGENTS.md`
 - [ ] `Package.swift`
 - [ ] `Sources/FirstLine/App/AppState.swift`
 - [ ] `Sources/FirstLine/Infrastructure/SettingsStore.swift`
@@ -332,7 +332,7 @@ Acceptance:
 - [ ] Add license key input.
 - [ ] Add activate button.
 - [ ] Add loading, success, invalid-key, and network-error messages.
-- [ ] Keep copy sparse and Kami-native.
+- [ ] Keep copy sparse and Flood-native.
 - [ ] If checkout URL is not ready, show honest disabled/placeholder state.
 
 Required copy facts:
@@ -385,7 +385,7 @@ Acceptance:
 
 - Temporary network failure does not immediately lock out a valid user.
 
-## Phase 4 — Real Dodo activation
+## Phase 4 - Real Dodo activation
 
 Goal: wire the app to Dodo only after the API contract is verified.
 
@@ -417,7 +417,7 @@ Acceptance:
 - Invalid key is rejected.
 - Activation-limit behavior is understood and documented.
 
-## Phase 5 — Release packaging prep
+## Phase 5 - Release packaging prep
 
 Goal: prepare the Mac release pipeline without pretending final public distribution is ready.
 
@@ -471,7 +471,7 @@ Acceptance:
 - Internal unsigned package can be built for QA.
 - Public DMG remains blocked until Developer ID certificate and notarization work.
 
-## Phase 6 — Live launch switch
+## Phase 6 - Live launch switch
 
 Do this only after Dodo and Apple are ready.
 
@@ -560,7 +560,7 @@ Constraints:
 - index.html is the canonical landing.
 - Do not edit kami-landing.html.
 - Keep landing minimal; no FAQ, no footer, no GitHub nav.
-- All web pages must use Kami visual system.
+- All web pages must use the Flood visual system from design/DESIGN.md: bone #f1f0eb canvas, white paper, Newsreader + IBM Plex Mono.
 - Do not fake a Mac download or signed/notarized status.
 - Preserve trial selectors in index.html.
 

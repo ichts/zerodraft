@@ -1,6 +1,6 @@
-# First Line — License and Payment Spec
+# Zero Draft - License and Payment Spec
 
-This spec describes the first paid direct-download launch path for First Line. It assumes a Mole-style hosted checkout and a macOS app distributed outside the Mac App Store.
+This spec describes the first paid direct-download launch path for Zero Draft. It assumes a Mole-style hosted checkout and a macOS app distributed outside the Mac App Store.
 
 ## Decisions
 
@@ -17,7 +17,7 @@ This spec describes the first paid direct-download launch path for First Line. I
 
 ## Why Dodo-first
 
-Mole’s public FAQ states that checkout billing/address is handled by Dodo Payments and license keys are delivered from the Dodo email. Dodo’s public docs also match First Line’s needs:
+Mole’s public FAQ states that checkout billing/address is handled by Dodo Payments and license keys are delivered from the Dodo email. Dodo’s public docs also match Zero Draft’s needs:
 
 - One-time products for lifetime access / software licenses.
 - Hosted checkout sessions and payment links.
@@ -36,19 +36,19 @@ Landing
   -> Dodo payment success
   -> Dodo issues license key
   -> customer receives license key by email
-  -> customer downloads First Line
+  -> customer downloads Zero Draft
   -> app asks for license key after 3 Mac sessions
   -> app activates / validates key with Dodo
   -> local settings cache full access
 ```
 
-The first version should not require a First Line account.
+The first version should not require a Zero Draft account.
 
 ## Dodo dashboard setup
 
 Create one product:
 
-- Name: `First Line Early Bird`
+- Name: `Zero Draft Early Bird`
 - Price: `USD $5`
 - Type: one-time payment
 - Entitlement: license key
@@ -56,12 +56,12 @@ Create one product:
 - License duration: no expiry, unless Dodo requires an explicit lifetime setting
 - Customer email: required
 - Refund policy copy: 14-day refund
-- Success URL: First Line `/download` or `/checkout/success`
+- Success URL: Zero Draft `/download` or `/checkout/success`
 
 Unknowns that require Dodo account access:
 
 - Exact dashboard naming for license-key entitlements.
-- Whether Dodo email alone is enough for key delivery, or if First Line should add its own email later.
+- Whether Dodo email alone is enough for key delivery, or if Zero Draft should add its own email later.
 - Exact webhook event names available in the account; public docs mention `entitlement_grant.delivered` and `entitlement_grant.revoked`.
 
 ## Mac app behavior
@@ -165,7 +165,7 @@ The Mac app uses Test Mode during development and Live Mode in shipped builds. S
 
 **Public endpoints (no API key required)**
 
-Dodo documents three public license endpoints. Authentication is the license key itself, supplied in the request body. No `Authorization` header, no bearer token, no developer API key is needed — these endpoints are designed to be called from desktop apps, CLIs, and browser clients without exposing secrets.
+Dodo documents three public license endpoints. Authentication is the license key itself, supplied in the request body. No `Authorization` header, no bearer token, no developer API key is needed - these endpoints are designed to be called from desktop apps, CLIs, and browser clients without exposing secrets.
 
 1. `POST /licenses/activate`
    - Request body:
@@ -192,7 +192,7 @@ Dodo documents three public license endpoints. Authentication is the license key
        "id": "lki_123",
        "license_key_id": "lic_123",
        "name": "First Line Mac abcd1234",
-       "product": { "product_id": "...", "name": "First Line Early Bird License" }
+       "product": { "product_id": "...", "name": "Zero Draft Early Bird License" }
      }
      ```
    - Persist `id` (license_key_instance_id). Required for `/licenses/deactivate`.
@@ -217,7 +217,7 @@ Dodo documents three public license endpoints. Authentication is the license key
        "license_key_instance_id": "lki_123"
      }
      ```
-   - Returns 200 on success. Not used in v1 user-facing flow, but the API exists — useful when adding self-serve device management later.
+   - Returns 200 on success. Not used in v1 user-facing flow, but the API exists - useful when adding self-serve device management later.
 
 **SDK availability**
 
@@ -250,7 +250,7 @@ When a backend exists, listen for:
 - Receipt / checkout completion events.
 - `entitlement_grant.delivered` to know a license key was issued.
 - `entitlement_grant.revoked` to disable refunded/revoked keys.
-- `subscription.updated` / `subscription.plan_changed` if First Line ever adds subscription billing (not in v1 scope).
+- `subscription.updated` / `subscription.plan_changed` if Zero Draft ever adds subscription billing (not in v1 scope).
 
 Webhook handling must verify signatures using the Dodo webhook signing key (dashboard → Webhooks). Use the official `standardwebhooks` library for the backend language, not hand-rolled HMAC. Headers documented by Dodo:
 
@@ -262,16 +262,16 @@ Webhook handling must verify signatures using the Dodo webhook signing key (dash
 
 Landing remains minimal. Add these pages separately:
 
-- `/download` — current version, install steps, checksum, “signed/notarized” status.
-- `/checkout/success` — check your email for license key, download link, support note.
-- `/help` — buy, activate, switch Macs, failed activation.
-- `/privacy` — writing stays local; license key validation contacts Dodo.
-- `/refund` — 14-day refund and support email.
-- `/terms` — one license covers 2 Macs, no subscription.
+- `/download` - current version, install steps, checksum, “signed/notarized” status.
+- `/checkout/success` - check your email for license key, download link, support note.
+- `/help` - buy, activate, switch Macs, failed activation.
+- `/privacy` - writing stays local; license key validation contacts Dodo.
+- `/refund` - 14-day refund and support email.
+- `/terms` - one license covers 2 Macs, no subscription.
 
 ## Implementation slices
 
-### Slice 1 — Product and support surfaces
+### Slice 1 - Product and support surfaces
 
 Objective: publish the non-checkout web pages and copy.
 
@@ -279,15 +279,15 @@ Files to inspect:
 
 - `index.html`
 - `design/DESIGN.md`
-- root `CLAUDE.md`
+- root `AGENTS.md`
 
 Acceptance:
 
 - Landing stays minimal.
-- Support pages use Kami visual system.
+- Support pages use the Flood visual system defined in `design/DESIGN.md`.
 - `$5`, `2 Macs`, `14-day refund`, and `one-time purchase` are consistent.
 
-### Slice 2 — License UI without live activation
+### Slice 2 - License UI without live activation
 
 Objective: replace preview-only Upgrade copy with real license entry UI.
 
@@ -307,7 +307,7 @@ Acceptance:
 - No real network call yet.
 - Existing trial tests still pass.
 
-### Slice 3 — Dodo activation client
+### Slice 3 - Dodo activation client
 
 Objective: implement activation / validation through Dodo public license endpoints.
 
@@ -324,7 +324,7 @@ Acceptance:
 - Activation limit errors show useful copy.
 - License key is not logged.
 
-### Slice 4 — Checkout link and download flow
+### Slice 4 - Checkout link and download flow
 
 Objective: connect app and website to Dodo checkout/download pages once Dodo product exists.
 
@@ -334,7 +334,7 @@ Acceptance:
 - Success URL explains download and license email.
 - Download page can show placeholder until signed DMG exists.
 
-### Slice 5 — Signed release
+### Slice 5 - Signed release
 
 Objective: use Apple Developer ID to ship trusted DMG.
 

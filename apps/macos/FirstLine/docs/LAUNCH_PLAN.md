@@ -1,4 +1,4 @@
-# First Line — Mole-Style Direct Launch Plan
+# Zero Draft - Mole-Style Direct Launch Plan
 
 This plan covers the paid direct-download macOS launch. Apple Developer enrollment is currently blocked, so work is split into what can be prepared now and what waits for Developer ID signing / notarization.
 
@@ -30,13 +30,13 @@ Visible Mole evidence: its FAQ states checkout billing/address is handled by **D
 
 ## Recommended payment direction
 
-Start with Dodo Payments first, because Mole uses it publicly and Dodo has one-time product plus license-key entitlement docs that match First Line. Keep Lemon Squeezy and Paddle as backups.
+Start with Dodo Payments first, because Mole uses it publicly and Dodo has one-time product plus license-key entitlement docs that match Zero Draft. Keep Lemon Squeezy and Paddle as backups.
 
 - Dodo Payments
 - Lemon Squeezy
 - Paddle
 
-Do not build Stripe billing first unless First Line needs custom account billing. The first launch needs license delivery, tax handling, refunds, and receipts more than billing flexibility.
+Do not build Stripe billing first unless Zero Draft needs custom account billing. The first launch needs license delivery, tax handling, refunds, and receipts more than billing flexibility.
 
 Implementation details live in `docs/LICENSE_PAYMENT_SPEC.md`.
 
@@ -44,12 +44,12 @@ Implementation details live in `docs/LICENSE_PAYMENT_SPEC.md`.
 
 Keep the landing minimal. Add small support pages instead of stuffing the landing.
 
-- `/download` — latest Mac build, version, checksum, installation note.
-- `/help` — buy, activate, switch Macs, license support.
-- `/privacy` — local writing data, license check, email capture.
-- `/refund` — 14-day refund policy and support email.
-- `/terms` — license terms, permitted seats, no warranty.
-- `/release-notes` — user-visible changes per version.
+- `/download` - latest Mac build, version, checksum, installation note.
+- `/help` - buy, activate, switch Macs, license support.
+- `/privacy` - local writing data, license check, email capture.
+- `/refund` - 14-day refund policy and support email.
+- `/terms` - license terms, permitted seats, no warranty.
+- `/release-notes` - user-visible changes per version.
 
 ## License behavior
 
@@ -66,7 +66,7 @@ The current local `hasUnlockedFullAccess` flag is not a production license syste
 
 ## License system minimum
 
-With Dodo-first integration, First Line can avoid a custom license backend for v1. Dodo can issue license keys, enforce activation limits, and expose public activate / validate endpoints for the desktop app.
+With Dodo-first integration, Zero Draft can avoid a custom license backend for v1. Dodo can issue license keys, enforce activation limits, and expose public activate / validate endpoints for the desktop app.
 
 Minimum responsibilities:
 

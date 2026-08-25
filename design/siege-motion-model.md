@@ -44,8 +44,10 @@ desktop, with motion allowed:
   Datastar `data-on-interval` ticker owns live sessions, which have no siege.
 - Continuous geometry is owned by one rAF loop that writes only `transform`
   (translate3d + rotate) and the two flank opacities. No layout reads inside the
-  loop; `will-change` is applied only while the pile moves and removed at
-  identity.
+  loop. On fragments and reinforcements `will-change` is applied only while the
+  pile moves and removed at identity (`siegeSetWillChange`); `.siege-shell`
+  carries a resident `will-change: transform` in the stylesheet by design, so
+  the one compressing element is never re-promoted mid-motion.
 
 ## Capture (seeding)
 
@@ -100,7 +102,8 @@ pressure weight `w`, with `h` a fresh seeded uniform [0,1) per parameter:
 ## Pressure and the shell
 
 - Per-side aggregate: `qL`, `qR` = weighted mean of contact loads `c` by weight
-  `w`. Overall pressure `P = (qL + qR) / 2` (0 before first contact, so the shell
+  `w`, over the seeded fragments only - reinforcements never enter the sum.
+  Overall pressure `P = (qL + qR) / 2` (0 before first contact, so the shell
   never compresses early).
 - Shell compression (`.siege-shell` is the one transform owner wrapping paper +
   result/failure + footer): `sx = 1 - 0.16 * P^1.10`, `sy = 1 - 0.035 * P^1.30` -
@@ -137,6 +140,14 @@ measured in the next frame's read phase.
 - A reinforcement that reaches its staging face holds there across pauses (the
   silence clock resets each pause; a stale birth clock must never snap a staged
   fragment back to its spawn point).
+- Underlap: a reinforcement carries its own seeded underlap, drawn with the press
+  section's per-profile formula for its profile (seeded `back` at 70%, else
+  `mid`). It is never applied during the press - a reinforcement only ever travels
+  to its staging or reserve face - and is added exactly once, to the kill pounce
+  target.
+- Pressure: reinforcements never contribute to `qL`/`qR`, so the shell's
+  compression is driven exclusively by the seeded fragments' contact loads. A
+  reinforcement reaching its staging face changes nothing about the squeeze.
 
 ## Collective kill (the wipe)
 
@@ -176,7 +187,8 @@ These are what keep the siege from ever becoming a layout feedback loop:
   happen at capture, never mid-loop
 - geometry is a pure function of the silence clock - no per-frame accumulation
 - at rest (before arm, after recovery, after the kill, in the dead state) no rAF
-  runs and no `will-change` promotion remains
+  runs and no `will-change` promotion remains on any fragment or reinforcement;
+  the shell's single resident promotion is the one deliberate exception
 
 ## Verification record
 

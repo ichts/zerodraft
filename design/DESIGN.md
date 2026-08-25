@@ -119,10 +119,10 @@ The wipe is a collective kill: a snapshot, a hard pounce of every fragment (rese
 | Paper | ink border | red border + red ring | sheet `blur(6px)` + opacity 0, .45s |
 | Sheet | full | opacity .35 | clears to empty |
 | Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
-
-The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft dims as silence grows - the threat looks like it is already eating the words - but the words are never edited, blurred out, or deleted before the wipe itself. Threat comes from the environment, not from touching the text.
 | Clock | ink | red | resets after aftermath |
 | Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
+
+The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft dims as silence grows - the threat looks like it is already eating the words - but the words are never edited, blurred out, or deleted before the wipe itself. Threat comes from the environment, not from touching the text.
 
 Recovery: one keystroke clears danger instantly (all classes off, no lingering transitions). After wipe the "gone" message and "Draft deleted" placeholder persist until the user starts again - deletion has a durable consequence, not a 2-second flash.
 

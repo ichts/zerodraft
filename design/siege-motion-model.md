@@ -64,8 +64,7 @@ resize). Deterministic per layout: all randomness comes from `mulberry32(909090)
   nearest 25% are front, the next 35% mid, the rest back.
 - Leads: per side, the front fragment and the mid fragment vertically closest to
   the current line (the paper's rest anchor, `design/DESIGN.md` section 6) are
-  leads. Per side, the farthest
-  back fragment is the straggler.
+  leads. Per side, the farthest back fragment is the straggler.
 - A side with fewer than 3 eligible fragments gets seeded synthetic fossils so
   both flanks always field a wall.
 - Travel budgets (inward-only motion by construction): front 130-220px,

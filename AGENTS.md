@@ -1,6 +1,6 @@
 # Project instructions
 
-These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do not duplicate global rules here. The sections below add the discipline and product contracts that are specific to First Line; the global file still owns the universal rules (no em dash, no unrequested co-authored trailer, no editing generated files, no exposed secrets, and no commit/push/deploy without authorization).
+These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do not duplicate global rules here. The sections below add the discipline and product contracts that are specific to Zero Draft; the global file still owns the universal rules (no em dash, no unrequested co-authored trailer, no editing generated files, no exposed secrets, and no commit/push/deploy without authorization). `VISION.md` is the acceptance policy that governs whether a change may land; it does not override `design/DESIGN.md` (the visual constitution) or this file (process).
 
 ## How to work here
 
@@ -60,9 +60,9 @@ Design authority: the web surface answers to `design/DESIGN.md` (Flood); the mac
 
 ## Current product and scope
 
-- First Line is the current product. The root web surface is its public landing site and browser trial.
+- Zero Draft is the current product and its outward-facing name; the First Line name is retired for outward use. The root web surface is its public landing site and browser trial.
 - `apps/macos/FirstLine/` is the native macOS implementation. It is a separate Swift-native track and does not share a Datastar runtime with the web surface.
-- Zero Draft is the historical product origin. Historical files are not requirements for current First Line work unless the task explicitly targets them.
+- The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.
 
 ## Root web surface
@@ -106,11 +106,11 @@ Attribute-name gotcha: HTML lowercases attribute names, so any signal key declar
 ## Product voice
 
 - Explain the mechanism and consequence in short, plain sentences.
-- Position First Line as an opinionated forced-output writing tool: the user writes forward, cannot edit the first draft, and loses it after eight seconds of silence.
+- Position Zero Draft as an opinionated forced-output writing tool: the user writes forward, cannot edit the first draft, and loses it after eight seconds of silence.
 - Take inspiration from the uninterrupted-output idea behind 750 Words, but do not imply an affiliation or claim features such as streaks, history, accounts, or analytics.
 - Avoid therapeutic, ceremonial, or self-help language such as "honest sentence", "long practice", or "begin when you are ready". Prefer direct labels such as "Start typing", "Keep writing", and "Draft deleted".
 
-## Visual system: Flood (landing) and Kami heritage (supporting pages)
+## Visual system: Flood (all public pages)
 
 The landing page uses the Flood design system defined in `design/DESIGN.md` - that document is the visual constitution for all landing work (tokens, the fossil layer rules, paper anatomy, danger choreography, motion rules, anti-patterns). Read it before changing landing markup or CSS. Its short form:
 
@@ -121,13 +121,13 @@ The landing page uses the Flood design system defined in `design/DESIGN.md` - th
 - a wiped draft joins the pile: its first ~64 chars become a new fossil, and the narrator line turns durable red until the next session
 - one-shot motion only; no ambient loops; `prefers-reduced-motion` renders everything static
 
-The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) remain self-contained vanilla static pages on the retired Kami heritage (parchment, serif, ink blue). Do not migrate them to a framework or to Flood without explicit authorization.
+The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) are self-contained vanilla static pages styled with the Flood design system (bone `#f1f0eb` canvas, Newsreader + IBM Plex Mono) since commit `662cab4`; they carry no fossil layer, which belongs to the landing only. Keep them framework-free: do not migrate them to a framework.
 
 Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray palettes, or decorative component systems on any page. Footer, FAQ, help, privacy, and release sections must serve a real support, legal, or release need.
 
 ## Historical material
 
-- `prototype.html`, `src/styles/`, `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app, except that `datastar-pro.js` and `datastar-inspector.js` are now ALSO the live runtime/dev-tool for the First Line landing (see "Web architecture boundary"); treat them as active there.
+- `prototype.html`, `src/styles/`, `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app, except that `datastar-pro.js` and `datastar-inspector.js` are now ALSO the live runtime/dev-tool for the Zero Draft landing (see "Web architecture boundary"); treat them as active there.
 - `zerodraft-prd.md` and `docs/design-system.md` describe the historical product and design system.
 - Do not restore Datastar behavior, legacy signals, old visual tokens, or `zerodraft_history` persistence into the current landing unless explicitly requested.
 
@@ -176,3 +176,10 @@ The map must match the terrain. Code is the machine view; the `AGENTS.md` files 
 The web surface is a single `index.html`, so its durable truth lives in `design/DESIGN.md` (visual constitution), the "Web architecture boundary" section above, and the `_session` signals - not in an L2/L3 hierarchy. Apply L3 headers only to hand-written, structured source with a real responsibility; do not spray them onto generated or vendored files (`datastar-pro.js`, `datastar-inspector.js`) or the supporting static pages.
 
 Workflow after a code change: code -> nearest header and L2 check -> L1 check -> validation -> done. Before entering a module: nearest `AGENTS.md` -> module `AGENTS.md` -> relevant L3 header -> code.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.

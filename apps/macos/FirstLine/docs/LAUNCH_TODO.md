@@ -1,6 +1,6 @@
-# First Line — Launch TODO
+# Zero Draft - Launch TODO
 
-This is the execution checklist for turning First Line into a paid direct-download Mac product while Dodo Payments and Apple Developer access are still in progress.
+This is the execution checklist for turning Zero Draft into a paid direct-download Mac product while Dodo Payments and Apple Developer access are still in progress.
 
 Related references:
 
@@ -26,7 +26,7 @@ Use these constants everywhere:
 
 | Area | Value |
 |---|---|
-| Product | First Line |
+| Product | Zero Draft |
 | Offer | Early-bird license |
 | Price | USD $5 |
 | Payment model | One-time purchase. No subscription. |
@@ -57,17 +57,17 @@ Goal: use Test Mode to prepare the product and learn the exact license flow with
 ### 1.1 Brand cleanup
 
 - [ ] Check whether the user-facing Dodo brand/storefront name is still `Dodo Games`.
-- [ ] Rename visible brand/storefront to `First Line` if Dodo shows it to buyers.
+- [ ] Rename visible brand/storefront to `Zero Draft` if Dodo shows it to buyers.
 - [ ] Keep legal/business identity accurate if Dodo separates legal name from storefront brand.
 
 Acceptance:
 
-- Buyer-facing checkout, receipt, and license emails should say `First Line`, not `Dodo Games`.
+- Buyer-facing checkout, receipt, and license emails should say `Zero Draft`, not `Dodo Games`.
 
 ### 1.2 Create Test Mode product
 
 - [ ] Create one-time product in Dodo Test Mode.
-- [ ] Product name: `First Line Early Bird License`.
+- [ ] Product name: `Zero Draft Early Bird License`.
 - [ ] Category: software / digital product / digital downloadable content, whichever Dodo offers.
 - [ ] Price: `USD $5`.
 - [ ] Billing: one-time.
@@ -78,7 +78,7 @@ Acceptance:
 Product description:
 
 ```text
-First Line is a forward-only writing app for finishing first drafts.
+Zero Draft is a forward-only writing app for finishing first drafts.
 
 Stop typing for eight seconds and the draft disappears. No deleting. No editing backward. Just keep the line moving.
 
@@ -180,7 +180,7 @@ Suggested copy:
 
 ```text
 The Mac download is being prepared.
-First Line will be available here after Developer ID signing and notarization are complete.
+Zero Draft will be available here after Developer ID signing and notarization are complete.
 ```
 
 Acceptance:
@@ -237,7 +237,7 @@ Acceptance:
 
 ### 2.8 `help.html`
 
-- [ ] Explain buying First Line.
+- [ ] Explain buying Zero Draft.
 - [ ] Explain finding the Dodo license key email.
 - [ ] Explain activating the Mac app.
 - [ ] Explain 2-Mac limit.

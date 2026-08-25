@@ -1,4 +1,4 @@
-# First Line — Direct Distribution Release Checklist
+# Zero Draft - Direct Distribution Release Checklist
 
 This checklist is for signed + notarized DMG release preparation. It does not assume App Store distribution.
 

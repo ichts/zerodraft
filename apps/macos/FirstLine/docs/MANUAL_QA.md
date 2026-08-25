@@ -1,4 +1,4 @@
-# First Line MVP - Manual QA Checklist
+# Zero Draft MVP - Manual QA Checklist
 
 Use this checklist before direct distribution.
 

@@ -1,6 +1,6 @@
-# First Line — License and Payment Spec
+# Zero Draft - License and Payment Spec
 
-This spec describes the first paid direct-download launch path for First Line. It assumes a Mole-style hosted checkout and a macOS app distributed outside the Mac App Store.
+This spec describes the first paid direct-download launch path for Zero Draft. It assumes a Mole-style hosted checkout and a macOS app distributed outside the Mac App Store.
 
 ## Decisions
 
@@ -17,7 +17,7 @@ This spec describes the first paid direct-download launch path for First Line. I
 
 ## Why Dodo-first
 
-Mole’s public FAQ states that checkout billing/address is handled by Dodo Payments and license keys are delivered from the Dodo email. Dodo’s public docs also match First Line’s needs:
+Mole’s public FAQ states that checkout billing/address is handled by Dodo Payments and license keys are delivered from the Dodo email. Dodo’s public docs also match Zero Draft’s needs:
 
 - One-time products for lifetime access / software licenses.
 - Hosted checkout sessions and payment links.
@@ -36,19 +36,19 @@ Landing
   -> Dodo payment success
   -> Dodo issues license key
   -> customer receives license key by email
-  -> customer downloads First Line
+  -> customer downloads Zero Draft
   -> app asks for license key after 3 Mac sessions
   -> app activates / validates key with Dodo
   -> local settings cache full access
 ```
 
-The first version should not require a First Line account.
+The first version should not require a Zero Draft account.
 
 ## Dodo dashboard setup
 
 Create one product:
 
-- Name: `First Line Early Bird`
+- Name: `Zero Draft Early Bird`
 - Price: `USD $5`
 - Type: one-time payment
 - Entitlement: license key
@@ -56,12 +56,12 @@ Create one product:
 - License duration: no expiry, unless Dodo requires an explicit lifetime setting
 - Customer email: required
 - Refund policy copy: 14-day refund
-- Success URL: First Line `/download` or `/checkout/success`
+- Success URL: Zero Draft `/download` or `/checkout/success`
 
 Unknowns that require Dodo account access:
 
 - Exact dashboard naming for license-key entitlements.
-- Whether Dodo email alone is enough for key delivery, or if First Line should add its own email later.
+- Whether Dodo email alone is enough for key delivery, or if Zero Draft should add its own email later.
 - Exact webhook event names available in the account; public docs mention `entitlement_grant.delivered` and `entitlement_grant.revoked`.
 
 ## Mac app behavior
@@ -192,7 +192,7 @@ Dodo documents three public license endpoints. Authentication is the license key
        "id": "lki_123",
        "license_key_id": "lic_123",
        "name": "First Line Mac abcd1234",
-       "product": { "product_id": "...", "name": "First Line Early Bird License" }
+       "product": { "product_id": "...", "name": "Zero Draft Early Bird License" }
      }
      ```
    - Persist `id` (license_key_instance_id). Required for `/licenses/deactivate`.
@@ -250,7 +250,7 @@ When a backend exists, listen for:
 - Receipt / checkout completion events.
 - `entitlement_grant.delivered` to know a license key was issued.
 - `entitlement_grant.revoked` to disable refunded/revoked keys.
-- `subscription.updated` / `subscription.plan_changed` if First Line ever adds subscription billing (not in v1 scope).
+- `subscription.updated` / `subscription.plan_changed` if Zero Draft ever adds subscription billing (not in v1 scope).
 
 Webhook handling must verify signatures using the Dodo webhook signing key (dashboard → Webhooks). Use the official `standardwebhooks` library for the backend language, not hand-rolled HMAC. Headers documented by Dodo:
 

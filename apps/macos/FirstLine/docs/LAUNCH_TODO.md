@@ -41,7 +41,7 @@ Do not headline the web trial as unlimited on the landing page.
 ## Hard rules for agents
 
 - Keep the landing minimal. Do not add FAQ or footer back to `index.html` unless the user explicitly asks.
-- All web pages must use the Kami visual system: parchment canvas, ink-blue accent, serif-led hierarchy, warm neutrals, restrained document sections.
+- All web pages must use the Flood visual system defined in `design/DESIGN.md`: bone `#f1f0eb` canvas, white paper as the only clean surface, Newsreader + IBM Plex Mono, restrained document sections. The 7 support pages migrated to Flood in commit `662cab4`.
 - Do not claim the Mac app is downloadable until a real artifact exists.
 - Do not claim the Mac app is signed or notarized until Developer ID signing and notarization are complete.
 - Do not add GitHub as a primary trust/navigation element for the paid product.
@@ -560,7 +560,7 @@ Constraints:
 - index.html is the canonical landing.
 - Do not edit kami-landing.html.
 - Keep landing minimal; no FAQ, no footer, no GitHub nav.
-- All web pages must use Kami visual system.
+- All web pages must use the Flood visual system from design/DESIGN.md: bone #f1f0eb canvas, white paper, Newsreader + IBM Plex Mono.
 - Do not fake a Mac download or signed/notarized status.
 - Preserve trial selectors in index.html.
 

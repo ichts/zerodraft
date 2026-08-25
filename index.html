@@ -479,11 +479,11 @@ window.FirstLineLandingDemo = (() => {
     if (!trimmed) { showToast("Nothing to download."); return; }
     const now = new Date();
     const time = `${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    const markdown = `---\ncreated: ${localDateKey(now)} ${time.slice(0, 2)}:${time.slice(2)}\nsource: First Line\nwords: ${wordCount(trimmed)}\n---\n\n${trimmed}\n`;
+    const markdown = `---\ncreated: ${localDateKey(now)} ${time.slice(0, 2)}:${time.slice(2)}\nsource: Zero Draft\nwords: ${wordCount(trimmed)}\n---\n\n${trimmed}\n`;
     const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `first-line-${localDateKey(now)}-${time}.md`;
+    anchor.download = `zero-draft-${localDateKey(now)}-${time}.md`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -2782,7 +2782,6 @@ if (document.readyState === "loading") {
     color: var(--dim);
     margin-top: 16px;
   }
-  .hero-lead-sub s { text-decoration-color: var(--red); text-decoration-thickness: 1.5px; }
   .hero-action-block { margin-top: 30px; }
   .hero-actions { display: flex; align-items: center; justify-content: center; gap: 18px; flex-wrap: wrap; }
   .hero-hint { font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 14px; }
@@ -3403,14 +3402,22 @@ if (document.readyState === "loading") {
   .trial-hud .trial-finish:hover, .trial-exit:hover { color: var(--ink); }
   .trial-exit:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 
+  /* Upper-center, directly beneath the trial-spec rules line. */
   .trial-prompt {
     position: fixed;
-    top: 56px;
-    left: 24px;
+    top: 52px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 1003;
     font-family: var(--mono);
   }
-  .trial-prompt .trial-prompt-card { position: absolute; top: calc(100% + 10px); left: 0; right: auto; }
+  /* The prompt toggle must read as a control, not inert decoration: a quiet
+     dotted underline (the Flood dashed-line register) that firms up on
+     hover/focus. No pill, no chrome. */
+  .trial-prompt .trial-prompt-toggle { text-decoration: underline dotted var(--faint); text-underline-offset: 4px; }
+  .trial-prompt .trial-prompt-toggle:hover,
+  .trial-prompt .trial-prompt-toggle:focus-visible { text-decoration-color: var(--ink); }
+  .trial-prompt .trial-prompt-card { position: absolute; top: calc(100% + 10px); left: 50%; right: auto; transform: translateX(-50%); }
 
   .trial-editor {
     position: relative;
@@ -3572,7 +3579,7 @@ if (document.readyState === "loading") {
     .ba-arrow { transform: rotate(90deg); text-align: center; }
     .site-footer { padding: 28px 20px 44px; }
     .trial-hud { padding: 14px 16px; }
-    .trial-prompt { left: 16px; top: 52px; }
+    .trial-prompt { top: 64px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -3634,7 +3641,7 @@ if (document.readyState === "loading") {
               <div class="demo-body">
                 <div class="hero-copy">
                   <h1 id="hero-title" class="hero-lead">It's not supposed to be good yet.</h1>
-                  <p class="hero-lead-sub">So we made <s>polishing</s> impossible.</p>
+                  <p class="hero-lead-sub">We force you to write something down. You leave with words.</p>
                   <div class="hero-action-block">
                     <div class="hero-actions">
                       <a class="cta primary-cta" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Give it sixty seconds.</a>

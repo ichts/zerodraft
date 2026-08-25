@@ -2913,11 +2913,6 @@ if (document.readyState === "loading") {
     padding: 4px 0;
   }
   .trial-prompt-toggle:hover, .trial-finish:hover { color: var(--ink); }
-  /* The prompt toggle must read as a control, not inert decoration: a quiet
-     dotted underline (the Flood dashed-line register) that firms up on
-     hover/focus. No pill, no chrome. */
-  .trial-prompt-toggle { text-decoration: underline dotted var(--faint); text-underline-offset: 4px; }
-  .trial-prompt-toggle:hover, .trial-prompt-toggle:focus-visible { text-decoration-color: var(--ink); }
   .trial-prompt-toggle:focus-visible, .trial-finish:focus-visible,
   .trial-prompt-next:focus-visible, .trial-prompt-dismiss:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .trial-prompt-card {
@@ -3416,6 +3411,12 @@ if (document.readyState === "loading") {
     z-index: 1003;
     font-family: var(--mono);
   }
+  /* The prompt toggle must read as a control, not inert decoration: a quiet
+     dotted underline (the Flood dashed-line register) that firms up on
+     hover/focus. No pill, no chrome. */
+  .trial-prompt .trial-prompt-toggle { text-decoration: underline dotted var(--faint); text-underline-offset: 4px; }
+  .trial-prompt .trial-prompt-toggle:hover,
+  .trial-prompt .trial-prompt-toggle:focus-visible { text-decoration-color: var(--ink); }
   .trial-prompt .trial-prompt-card { position: absolute; top: calc(100% + 10px); left: 50%; right: auto; transform: translateX(-50%); }
 
   .trial-editor {

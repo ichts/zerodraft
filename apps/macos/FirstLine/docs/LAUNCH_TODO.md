@@ -280,7 +280,7 @@ Goal: make the native app ready to accept a Dodo license key after the 3-session
 
 ### 3.1 Inspect before editing
 
-- [ ] `apps/macos/FirstLine/CLAUDE.md`
+- [ ] `apps/macos/FirstLine/AGENTS.md`
 - [ ] `Package.swift`
 - [ ] `Sources/FirstLine/App/AppState.swift`
 - [ ] `Sources/FirstLine/Infrastructure/SettingsStore.swift`

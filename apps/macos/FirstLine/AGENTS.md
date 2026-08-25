@@ -5,7 +5,7 @@ Parent instructions: `../AGENTS.md`
 成员清单
 Package.swift: Swift Package 入口，支持 macOS 14+，先保证 `swift build` 与 `swift test` 通过。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
-docs/LAUNCH_PLAN.md: 历史发布规划参考；其中 Mole-style 网站方向已被根目录 `AGENTS.md` 的 Kami 规则取代。
+docs/LAUNCH_PLAN.md: 历史发布规划参考；其中 Mole-style 网站方向已被根目录 `AGENTS.md` 与 `design/DESIGN.md` 的 Flood 视觉规则取代。
 docs/LICENSE_PAYMENT_SPEC.md: Dodo-first 支付、license entitlement、Mac 激活与支持页面规格。
 docs/LAUNCH_TODO.md: Dodo 审核等待期到正式发布的可执行 TODO，给接手 agent 按阶段推进。
 docs/MANUAL_QA.md: MVP 手动验证清单与结果记录模板。

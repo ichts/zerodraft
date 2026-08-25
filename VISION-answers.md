@@ -5,7 +5,7 @@
 ## 已定
 
 - 仓库此前没有 VISION.md；本次加入的是第一份，作为验收政策，管一个改动能否合入。
-- 产品对外名称是 Zero Draft；First Line 不再作为对外名称使用。内部命名保持不变（目录 `apps/macos/FirstLine`、Swift 类型与模块名、bundle 标识、`window.FirstLineLandingDemo` 等）。
+- 产品对外名称是 Zero Draft；First Line 不再作为对外名称使用。内部命名保持不变（目录 `apps/macos/FirstLine`、Swift 类型与模块名、bundle 标识、`window.FirstLineLandingDemo` 等）。macOS 应用里由 Swift 代码渲染的用户可见文案本次也没有改，仍然是 First Line：应用标题与窗口标题、Settings 中的产品名、购买项 "First Line Early Bird License"（网页端已改为 "Zero Draft Early Bird License"）。原因是 macOS 应用源码不在本次改动范围内，这部分留给单独任务。
 - VISION.md 的位阶：视觉事项低于 `design/DESIGN.md`（视觉宪法），流程事项低于 AGENTS.md。
 - 根 AGENTS.md 中支持页停在退休 Kami 视觉（羊皮纸、衬线、墨蓝）的过期说法已改正：七张支持页自 commit `662cab4` 起使用 Flood（`#f1f0eb` 底、Newsreader + IBM Plex Mono）；"无框架纯静态页"的结构规则保留。
 - 围城运动（siege）的合同应放在仓库里，不放在私人 `.pi` 目录里。

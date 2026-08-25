@@ -332,7 +332,7 @@ Acceptance:
 - [ ] Add license key input.
 - [ ] Add activate button.
 - [ ] Add loading, success, invalid-key, and network-error messages.
-- [ ] Keep copy sparse and Kami-native.
+- [ ] Keep copy sparse and Flood-native.
 - [ ] If checkout URL is not ready, show honest disabled/placeholder state.
 
 Required copy facts:

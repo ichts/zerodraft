@@ -142,7 +142,7 @@ Goal: create the small support/legal/download surfaces needed for launch without
 
 ### 2.1 Inspect before editing
 
-- [ ] Read root `CLAUDE.md`.
+- [ ] Read root `AGENTS.md`.
 - [ ] Read `design/DESIGN.md`.
 - [ ] Read `index.html`.
 - [ ] Read `docs/LAUNCH_PLAN.md`.

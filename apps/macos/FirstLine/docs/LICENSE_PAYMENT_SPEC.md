@@ -279,7 +279,7 @@ Files to inspect:
 
 - `index.html`
 - `design/DESIGN.md`
-- root `CLAUDE.md`
+- root `AGENTS.md`
 
 Acceptance:
 

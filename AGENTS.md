@@ -176,10 +176,3 @@ The map must match the terrain. Code is the machine view; the `AGENTS.md` files 
 The web surface is a single `index.html`, so its durable truth lives in `design/DESIGN.md` (visual constitution), the "Web architecture boundary" section above, and the `_session` signals - not in an L2/L3 hierarchy. Apply L3 headers only to hand-written, structured source with a real responsibility; do not spray them onto generated or vendored files (`datastar-pro.js`, `datastar-inspector.js`) or the supporting static pages.
 
 Workflow after a code change: code -> nearest header and L2 check -> L1 check -> validation -> done. Before entering a module: nearest `AGENTS.md` -> module `AGENTS.md` -> relevant L3 header -> code.
-
-## Maintaining this file
-
-Keep this file for knowledge useful to almost every future agent session in this project.
-Do not repeat what the codebase already shows; point to the authoritative file or command instead.
-Prefer rewriting or pruning existing entries over appending new ones.
-When updating this file, preserve this bar for all agents and keep entries concise.

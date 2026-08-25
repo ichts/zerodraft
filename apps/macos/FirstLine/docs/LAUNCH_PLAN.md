@@ -44,12 +44,12 @@ Implementation details live in `docs/LICENSE_PAYMENT_SPEC.md`.
 
 Keep the landing minimal. Add small support pages instead of stuffing the landing.
 
-- `/download` — latest Mac build, version, checksum, installation note.
-- `/help` — buy, activate, switch Macs, license support.
-- `/privacy` — local writing data, license check, email capture.
-- `/refund` — 14-day refund policy and support email.
-- `/terms` — license terms, permitted seats, no warranty.
-- `/release-notes` — user-visible changes per version.
+- `/download` - latest Mac build, version, checksum, installation note.
+- `/help` - buy, activate, switch Macs, license support.
+- `/privacy` - local writing data, license check, email capture.
+- `/refund` - 14-day refund policy and support email.
+- `/terms` - license terms, permitted seats, no warranty.
+- `/release-notes` - user-visible changes per version.
 
 ## License behavior
 

@@ -4,10 +4,10 @@ This is the execution checklist for turning Zero Draft into a paid direct-downlo
 
 Related references:
 
-- `docs/LAUNCH_PLAN.md` — launch strategy and constraints.
-- `docs/LICENSE_PAYMENT_SPEC.md` — Dodo/license behavior and app activation rules.
-- `docs/RELEASE_CHECKLIST.md` — final signed/notarized DMG release gate.
-- `docs/MANUAL_QA.md` — manual app verification checklist.
+- `docs/LAUNCH_PLAN.md` - launch strategy and constraints.
+- `docs/LICENSE_PAYMENT_SPEC.md` - Dodo/license behavior and app activation rules.
+- `docs/RELEASE_CHECKLIST.md` - final signed/notarized DMG release gate.
+- `docs/MANUAL_QA.md` - manual app verification checklist.
 
 ## Current status
 
@@ -50,7 +50,7 @@ Do not headline the web trial as unlimited on the landing page.
 - If Dodo license activation requires a private key from the app, stop and ask whether to add a backend.
 - Do not invent support email, copyright owner, company name, final domain, or app icon source. Use `Unknown / to fill`.
 
-## Phase 1 — Dodo review waiting work
+## Phase 1 - Dodo review waiting work
 
 Goal: use Test Mode to prepare the product and learn the exact license flow without touching live payments.
 
@@ -136,7 +136,7 @@ Acceptance:
 - Any gap in license delivery is documented as a blocker.
 - Test Mode URLs are clearly marked as test-only.
 
-## Phase 2 — Web readiness pages
+## Phase 2 - Web readiness pages
 
 Goal: create the small support/legal/download surfaces needed for launch without bloating the landing.
 
@@ -274,7 +274,7 @@ Acceptance:
 - Landing remains short.
 - Download links go somewhere real and truthful.
 
-## Phase 3 — Mac license UI
+## Phase 3 - Mac license UI
 
 Goal: make the native app ready to accept a Dodo license key after the 3-session trial.
 
@@ -385,7 +385,7 @@ Acceptance:
 
 - Temporary network failure does not immediately lock out a valid user.
 
-## Phase 4 — Real Dodo activation
+## Phase 4 - Real Dodo activation
 
 Goal: wire the app to Dodo only after the API contract is verified.
 
@@ -417,7 +417,7 @@ Acceptance:
 - Invalid key is rejected.
 - Activation-limit behavior is understood and documented.
 
-## Phase 5 — Release packaging prep
+## Phase 5 - Release packaging prep
 
 Goal: prepare the Mac release pipeline without pretending final public distribution is ready.
 
@@ -471,7 +471,7 @@ Acceptance:
 - Internal unsigned package can be built for QA.
 - Public DMG remains blocked until Developer ID certificate and notarization work.
 
-## Phase 6 — Live launch switch
+## Phase 6 - Live launch switch
 
 Do this only after Dodo and Apple are ready.
 

@@ -2,7 +2,7 @@
 
 Zero Draft is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
 
-This is the native macOS app, built with Swift and SwiftUI.
+This is the native macOS app, built with Swift and AppKit.
 
 ## Features
 

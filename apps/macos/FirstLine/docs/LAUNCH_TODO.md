@@ -162,7 +162,7 @@ Create these root-level static pages unless deployment routing says otherwise:
 
 Acceptance:
 
-- Pages use Kami visual system.
+- Pages use the Flood visual system defined in `design/DESIGN.md`.
 - Pages are useful and short.
 - Pages do not add noise to `index.html`.
 

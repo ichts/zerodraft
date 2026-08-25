@@ -284,7 +284,7 @@ Files to inspect:
 Acceptance:
 
 - Landing stays minimal.
-- Support pages use Kami visual system.
+- Support pages use the Flood visual system defined in `design/DESIGN.md`.
 - `$5`, `2 Macs`, `14-day refund`, and `one-time purchase` are consistent.
 
 ### Slice 2 - License UI without live activation

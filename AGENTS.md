@@ -51,12 +51,12 @@ Bad smells to challenge: rigidity, needless duplication, cyclic ownership, fragi
 Before adding a new pattern, check how this codebase already handles the same class of problem, then match it:
 
 - Web UI state: the only truth is the `_session.*` signals on `<body>`; write them only through the `fl*` custom-event bridge (see "Web architecture boundary"). Never introduce a second state system or a `root`/`mergePaths` write path.
-- Web visuals: reuse the `design/DESIGN.md` tokens, fossil rules, and danger choreography before inventing a variant.
+- Web visuals: reuse the `design/DESIGN.md` tokens (CSS custom properties) and danger choreography (wash, snap, step numeral) before inventing a variant.
 - macOS: follow the existing deadline adjudication, navigation routing, persistence, deny-feedback, and reduced-motion patterns; extend the existing types instead of adding a parallel one. New top-level modals must join the existing pending-modal routing, not each go their own way.
 
 The goal is that code from ten contributors reads as one design language.
 
-Design authority: the web surface answers to `design/DESIGN.md` (Flood); the macOS app answers to Apple HIG first (see `apps/macos/FirstLine/AGENTS.md`). Generic design and motion skills are transferable methodology only and never override the platform constitution.
+Design authority: the web surface answers to `design/DESIGN.md` (constitution v2); the macOS app answers to Apple HIG first (see `apps/macos/FirstLine/AGENTS.md`). Generic design and motion skills are transferable methodology only and never override the platform constitution.
 
 ## Current product and scope
 
@@ -67,38 +67,33 @@ Design authority: the web surface answers to `design/DESIGN.md` (Flood); the mac
 
 ## Root web surface
 
-- `index.html` is the canonical landing page and deployment source of truth.
+- `index.html` is the canonical landing page and deployment source of truth. It implements visual constitution v2 (`design/DESIGN.md`): interrogation-room minimal - one paper, one clock, one door; the graveyard (fossils, siege, narrator) is closed.
 - `kami-landing.html` is a visual reference copy. Do not assume it is synchronized with `index.html`.
 - `download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, and `release-notes.html` are supporting public pages.
-- The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) are self-contained static HTML with inline vanilla CSS and JavaScript and no framework.
+- The supporting public pages are self-contained static HTML with inline vanilla CSS and JavaScript and no framework.
 - `index.html` (the landing and trial surface) is Datastar-native: it loads `datastar-pro.js` as an ES module and keeps inline CSS plus an inline browser-bridge module. Do not add any other build framework. Do not regress the landing back to a parallel vanilla state machine.
-- The trial/demo API is `window.FirstLineLandingDemo`. It is now the browser-bridge layer (see "Web architecture boundary"): a set of stateless functions that read the DOM, perform browser-only work, and dispatch custom `fl*` DOM events. Preserve `.demo-writing-surface`, `.live-demo-editor`, `.demo-session-bar`, `.demo-result`, `.demo-failure`, `.demo-toast`, `.demo-prompt`, `.trial-overlay`, `.trial-writing-surface`, `.trial-editor`, `[data-trial-launch]`, and the `#trial` route.
-- Preserve the forward-only writing contract: input appends at the end; deletion, paste, cut, undo, and selection replacement stay blocked; IME composition remains usable; danger begins after 5 seconds of silence and failure clears the current draft at 8 seconds.
-- A trial session completes either by writing for the full 60 seconds or by clicking Finish (also Cmd/Ctrl+Enter). Both paths lead to the same result card.
-- The trial result card offers Copy full text, Copy for AI, and Download .md as export actions. Copy for AI formats the draft with a cleanup prompt for the user's AI-to-Obsidian workflow. Below the export actions and links, one quiet mono line hands the win to the app: "keep writing on your Mac - early bird $5" (links to download.html). Result cards only; the failure card carries no upsell.
-- The trial provides an optional writing prompt behind a "Need a prompt?" toggle. Prompts are suggestions only; they never auto-insert text.
-- The trial does not persist writing statistics, session history, streaks, or any localStorage data. The result card shows only the current session's word count and duration.
-- On all devices, the landing paper shows the demo preview on load. The first keystroke interrupts the demo and starts a live session with no click required: focus is set synchronously inside that keystroke, so the browser and IME route input to the editor (this does not rely on load-time programmatic focus, which is unreliable in real browsers and for IME).
-- The landing paper is a preview and an invitation, not the writing room. The first keystroke (or click/tap on the paper) arms the session for one frame, then the handoff WAAPI morph carries the draft and the remaining time into the fullscreen trial. Keys struck mid-morph are buffered and replayed into the trial editor after focus lands. The inline embedded session is a transient arming step, never a destination; IME composition finishes inline before the morph triggers.
-- A writing session renders zen-style in the fullscreen trial: only the current line is fully visible, the previous line is faint, older lines are transparent, and the current line stays anchored at a fixed point (~35% of the viewport height) via internal scrolling - the window does not scroll. Result and failure render over the trial surface.
-- The landing page is the tool: no practice or privacy sections below the hero. The footer carries the one-line privacy promise and the support links.
-- The landing preview (touch devices and the reference animation) uses motion to explain that contract. It should type once when the writing surface enters view, pause early (first word boundary at/after ~13 chars) so the first red countdown lands within the first ~10 seconds of the visit, hold the full 3-2-1 and recover at the brink (7.6s - typing resumes, danger clears), and once per playback act out a denied deletion at the sample's own typo (a ~350ms hesitation, then the real deny feedback - the world shakes once (`.sheet` + `.flood` ride the deny-shake keyframes, the paper's own shake nesting on top), the narrator flashes "no going back.", a transient red mono caption reads "backspace is not allowed" at ~72% of the paper, then forward again; the typo stays). It then finishes the sample, goes silent for real, and dies at the 8-second wipe - leaving a fossil that visibly flies from the paper into the pile, and the durable red dead state - and then remains static. Activating the paper stops playback permanently for the visit.
-- The landing's danger is spatial: while a silence window runs, the pile closes in from both gutters (the siege, desktop only - see `design/DESIGN.md` section 7; the math contract is `design/siege-motion-model.md`). The front lead contacts the paper's edge exactly at the 5s warn, the wall completes encirclement by countdown "1", the paper's `.siege-shell` compresses under the contact pressure only after first contact, reinforcements keep arriving from offscreen, and the wipe ends in a collective pounce and slam before the fossil flies out through the siege lines. The demo's scripted recovery retreats the siege on a short curve; a real keystroke resets it instantly into the trial morph. `prefers-reduced-motion` keeps it fully static. The demo pause machinery's 100ms timeout chain owns the siege's discrete state (the Datastar `data-on-interval` ticker owns live sessions, which have no siege); one rAF owns the continuous geometry; no signals are added.
-- Never turn the landing preview into an ambient loop. Pause its timeline while offscreen or while the document is hidden, finish it when entering the trial, and render the dead state statically under `prefers-reduced-motion` (empty sheet, one settled fossil, the dead red line). A live session never pauses: silence danger and deletion keep running while offscreen or hidden.
+- The landing holds four objects: logotype (the `MAC RELEASE ->` link rides with it as one nav unit), headline, door (the CTA `Give it sixty seconds.`), demo paper. No second entrance: the demo paper is watch-only theater, and pointer or keystrokes on the landing do nothing. The CTA is the only way in; the `#trial` route is preserved.
+- The demo paper runs a scripted loop at real speed (types ~7s, 5s of nothing, warn wash + 3-2-1, wipe at 8, machine report holds 2s, rearms at 1:00) with absolute carry+origin clocks so timer drift never cheats the numbers. It pauses offscreen/hidden and is fully static (sample typed, clock at 1:00) under `prefers-reduced-motion`.
+- Preserve the forward-only writing contract: input appends at the end; deletion, paste, cut, drop, undo, and selection replacement stay blocked; IME composition remains usable and counts as activity; danger begins after 5 seconds of silence and failure clears the current draft at 8 seconds. A blocked action fires the deny body (2px shake, 90ms red hairline, SR line); warn itself never moves the paper.
+- A trial session completes only when the 60s deadline lands. Session-end adjudication is explicit (`design/DESIGN.md` section 5): the deadline and the wipe line race as absolute deadlines, whichever comes first wins, and a tie goes to the wipe.
+- The trial is the cleaner room: paper-white room, chrome in the corners (rules TL, timer TR, ESC - EXIT BL, words BR), the full draft visible in Newsreader 21/1.6 on a 62ch measure. Warn ramps the wash (seconds 5-8) and lands the step numeral 3-2-1; one keystroke during warn returns the wash and numeral on the 120ms snap; at the eighth second the wash steps one step deeper for the <=200ms cut, then exits. The wipe report (`DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.`) is literal - the editor stays armed and the next keystroke starts a fresh session. The kept surface returns the paper to the bone wall with the words, the receipt `0:00 - N WORDS KEPT.`, one action COPY TEXT (completed state COPIED), one mono link RUN IT AGAIN, and the caption NOTHING HERE IS SAVED.
+- ESC and EXIT are the same act: leave the room immediately, back to the landing; the session (active, paused, kept, or wiped) ends without ceremony and nothing is saved. Focus returns to the door.
+- The trial does not persist writing statistics, session history, streaks, or any localStorage data.
+- The footer carries the one-line privacy promise and the support links.
 
 ## Web architecture boundary
 
 Runtime on the landing/trial surface: Datastar Pro v1.0.2 (`datastar-pro.js`, loaded as `type="module"`). v1 colon syntax only (`data-signals`, `data-computed`, `data-text`, `data-show`, `data-class`, `data-attr`, `data-on:*`, `data-on-interval`, `data-effect`, `data-ignore`). Pure frontend: no backend, no SSE, no `@get/@post`, no `data-persist`, no `data-query-string`.
 Attribute-name gotcha: HTML lowercases attribute names, so any signal key declared through an attribute name (`data-computed:_session.xxx`, `data-signals:_session.xxx`) must be all-lowercase. A camelCase key silently registers lowercased while camelCase reads in attribute VALUES keep their case and miss (this killed `_session.liveWords`). Keys inside `data-signals` JSON and expression values are unaffected.
 
-- Signals are the ONLY UI-state truth. The session state lives in the `_session.*` signal object declared on `<body>` via `data-signals` (context, active, failed, complete, text, startedAt, duration, lastInputAt, remaining, dangerSeconds, dangerActive, resultText, resultWords, promptOpen, promptIndex, promptText, toastVisible, toastText, morphing). `_session.clock` is `data-computed`. There is NO parallel JS state object.
+- Signals are the ONLY UI-state truth. The session state lives in the `_session.*` signal object declared on `<body>` via `data-signals` (context, active, failed, complete, text, startedAt, duration, lastInputAt, remaining, dangerSeconds, dangerActive, wiping, resultText, resultWordCount, wipeReport, copied, srStatus, denyActive, denyHair). `_session.clock` and `_session.livewords` are `data-computed`. There is NO parallel JS state object.
 - The runtime also exports `root`, `mergePatch`, `mergePaths`, and `getPath`. `root` IS the same page signal store the bindings read, and writing it from JavaScript does update bindings. Those exports are a thinly documented, version-sensitive programmatic surface, not an officially preferred application API. The project deliberately does NOT write signals through them. Its single JS-to-signal policy is the custom-event bridge: JavaScript dispatches custom `fl*` DOM events and `data-on:fl*` expressions write the signals. This is a project-chosen boundary, not a runtime limitation. Do not switch to `root`/`mergePaths` writes and do not mix the two write policies.
-- `window.FirstLineLandingDemo` is a stateless browser-bridge module. It holds no UI state (only genuinely non-UI plumbing: the IME composition flag, timers and observers, demo animation timeline counters, focus return references, and WAAPI/geometry state). Bridge contract:
-  - READ UI state from the DOM (element text, the `body.trial-mode` / `.demo-writing-surface.is-live` / `body.trial-morphing` classes (all declarative `data-class`, mirroring `_session.context`/`_session.morphing`), and contenteditable state) or from values passed in by expressions; never from the signal store directly.
-  - WRITE UI state by dispatching custom `fl*` DOM events on `document.body` (e.g. `flinput`, `flactivate`, `flentertrial`, `flexittrial`, `flcomplete`, `flfail`, `fldanger`, `fltoast`, `flprompt*`, `flreset`, `flmorphing`, `flroutecheck`). The matching `data-on:fl*` expressions on `<body>` translate each event's `evt.detail` into signal patches.
-- The session ticker is a `data-on-interval__duration.100ms` expression that reads signals and calls the pure `FirstLineLandingDemo.tickDispatch(...)` helper, which dispatches `flcomplete` / `flfail` / `fldanger`. Pure helpers called from expressions are allowed; they must be stateless.
-- DOM side-effects of state transitions (blur, contenteditable toggle, focus move, inline chrome hide) run in `FirstLineLandingDemo.onComplete` / `onFail`, invoked from `data-effect` expressions that watch `_session.complete` / `_session.failed`.
-- Custom JavaScript remains only for browser-only capabilities: contenteditable selection and forward-only guards, IME composition, the zen renderer, the WAAPI morph, clipboard and Blob download, and the demo typing sequencer. The session editor subtree carries `data-ignore` so Datastar does not fight the zen-rendered contenteditable DOM; the editors' `is-demo-danger` class is therefore applied imperatively by the bridge while the writing-surface class is declarative (`data-class`).
+- `window.FirstLineLandingDemo` is a stateless browser-bridge module. It holds no UI state (only genuinely non-UI plumbing: the IME composition flag, timers and observers, demo theater clocks, the deny staleness token, and focus return references). Bridge contract:
+  - READ UI state from the DOM (element text, the `body.trial-mode` class (declarative `data-class` mirroring `_session.context`), the `.sr-only` live region's text, and contenteditable state) or from values passed in by expressions; never from the signal store directly.
+  - WRITE UI state by dispatching custom `fl*` DOM events on `document.body` (`flinput`, `flentertrial`, `flexittrial`, `flreset`, `flcomplete`, `flfail`, `fldanger`, `flwipe`, `flcopied`, `flsrstatus`, `fldeny`, `fldenyhair`, `fldenyclear`, `flroutecheck`). The matching `data-on:fl*` expressions on `<body>` translate each event's `evt.detail` into signal patches.
+- The session ticker is a `data-on-interval__duration.100ms` expression that reads signals and calls the pure `FirstLineLandingDemo.tickDispatch(...)` helper, which dispatches `fldanger` / `flwipe`+`flfail` / `flcomplete`. Pure helpers called from expressions are allowed; they must be stateless.
+- DOM side-effects of state transitions (blur, contenteditable toggle, focus move) run in `FirstLineLandingDemo.onComplete` / `onFail`, invoked from a `data-effect` expression that watches `_session.complete` / `_session.failed`. Because a `data-effect` re-executes on every signal change, these handlers must never emit an `fl*` event whose signal patch differs on re-run (identical writes are deduped; different writes loop until the stack blows). The deny bridge guards with an in-flight flag and every SR write is value-guarded against the `.sr-only` region's current text.
+- Custom JavaScript remains only for browser-only capabilities: contenteditable selection and forward-only guards, IME composition, clipboard copy, the route (`#trial`) push/pop plumbing, and the demo theater sequencer. The trial editor subtree carries `data-ignore` so Datastar does not fight the contenteditable DOM; its `is-composing` class is therefore applied imperatively by the bridge.
 - `datastar-inspector.js` is a dev-only tool. It is loaded and the `<datastar-inspector>` element is mounted only when the page is opened with `?debug`; it is never present in production markup.
 - Do not maintain duplicate truth in signals and JavaScript. Durable business truth would belong to the server; the landing has no server, so the transient UI signals on `<body>` are the whole truth.
 - The supporting public pages remain vanilla static HTML with no framework. Do not migrate them without explicit authorization.
@@ -110,26 +105,26 @@ Attribute-name gotcha: HTML lowercases attribute names, so any signal key declar
 - Take inspiration from the uninterrupted-output idea behind 750 Words, but do not imply an affiliation or claim features such as streaks, history, accounts, or analytics.
 - Avoid therapeutic, ceremonial, or self-help language such as "honest sentence", "long practice", or "begin when you are ready". Prefer direct labels such as "Start typing", "Keep writing", and "Draft deleted".
 
-## Visual system: Flood (all public pages)
+## Visual system: constitution v2 (all public pages)
 
-The landing page uses the Flood design system defined in `design/DESIGN.md` - that document is the visual constitution for all landing work (tokens, the fossil layer rules, paper anatomy, danger choreography, motion rules, anti-patterns). Read it before changing landing markup or CSS. Its short form:
+The landing page implements visual constitution v2, defined in `design/DESIGN.md` - that document is the visual constitution for all landing work (tokens as CSS custom properties, the four-objects landing, corner chrome, the wash, the step numeral, machine-voice captions, motion law, anti-patterns). Read it before changing landing markup or CSS. Its short form:
 
-- canvas: neutral bone `#f1f0eb` (never parchment); the paper is the only clean white surface
-- the background is flooded with aria-hidden mono fossils of drafts that died of hesitation, confined to gutters and small bands outside the clean column; danger turns them red
-- Newsreader (human layer) + IBM Plex Mono (machine layer); red `#c8392f` is reserved for danger and deletion-adjacent marks; blue usage is zero
-- danger is environmental: red veil, reddened fossils, a countdown that hangs above the current line and never prints on top of the draft
-- a wiped draft joins the pile: its first ~64 chars become a new fossil, and the narrator line turns durable red until the next session
-- one-shot motion only; no ambient loops; `prefers-reduced-motion` renders everything static
+- interrogation-room minimal: one paper, one clock, one door; the trial is the cleaner room, not a different product
+- canvas: bone `#f1f0eb`; the paper `#ffffff` is the only white object; radius 0; one shadow (the paper's lift)
+- Newsreader (the human) + IBM Plex Mono (the machine); red `#c8392f` is spent only on the warn numeral and the wipe cut; blue usage is zero; the logotype underscore is ink
+- danger appears only while the writer pauses: the wash ramps bone/paper to 88% color-mix danger over seconds 5-8, steps one step deeper at the eighth second, and exits on the 120ms snap; the numeral 3-2-1 never tweens
+- the wall stays blank: no fossil text, no eulogies, no ambient loops; `prefers-reduced-motion` renders everything static (the wash steps once per second, the warn still lands on time)
+- dark mode is forbidden; repeated pauses never escalate
 
-The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) are self-contained vanilla static pages styled with the Flood design system (bone `#f1f0eb` canvas, Newsreader + IBM Plex Mono) since commit `662cab4`; they carry no fossil layer, which belongs to the landing only. Keep them framework-free: do not migrate them to a framework.
+The supporting public pages (`download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`) are self-contained vanilla static pages styled with the same bone canvas and Newsreader + IBM Plex Mono faces. Keep them framework-free: do not migrate them to a framework.
 
 Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray palettes, or decorative component systems on any page. Footer, FAQ, help, privacy, and release sections must serve a real support, legal, or release need.
 
 ## Historical material
 
-- `prototype.html`, `src/styles/`, `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app, except that `datastar-pro.js` and `datastar-inspector.js` are now ALSO the live runtime/dev-tool for the Zero Draft landing (see "Web architecture boundary"); treat them as active there.
-- `zerodraft-prd.md` and `docs/design-system.md` describe the historical product and design system.
-- Do not restore Datastar behavior, legacy signals, old visual tokens, or `zerodraft_history` persistence into the current landing unless explicitly requested.
+- `prototype.html`, `src/styles/`, `design-demos/` (including `flood-v2.html`, the reference implementation of the retired Flood system), `datastar-inspector.js`, and `datastar-pro.js` belong to the legacy Zero Draft web app, except that `datastar-pro.js` and `datastar-inspector.js` are now ALSO the live runtime/dev-tool for the Zero Draft landing (see "Web architecture boundary"); treat them as active there.
+- `zerodraft-prd.md` and `docs/design-system.md` describe the historical product and design system. The Flood system (fossils, the siege, the narrator, zen rendering, the morph handoff) is retired; `design/siege-motion-model.md` is its retirement notice and points to the last live commit.
+- Do not restore the fossil layer, siege, zen rendering, morph, prompts, or legacy signals into the current landing unless explicitly requested.
 
 ## Development and validation
 
@@ -146,7 +141,7 @@ There is no automated root-web test suite. For web changes:
 - exercise the browser trial's typing, danger recovery, failure, completion, keyboard restrictions, and IME behavior when relevant
 - verify focus visibility and `prefers-reduced-motion` behavior for interaction or motion changes
 - verify visual layout consistency: hero content width and left edge must align with the footer; centered elements must be centered; text must not be clipped or orphaned; interactive elements must have consistent radius, color, and spacing
-- capture screenshots of every changed state (landing hero, demo animation stages, trial typed/danger/failure/complete, morph handoff) and inspect them before reporting completion
+- capture screenshots of every changed state (landing hero, demo typing/warn/wipe/report stages, trial at rest/typed/warn/recovery/wipe/kept, COPY TEXT completed state, ESC and EXIT outcomes) and inspect them before reporting completion
 
 For native macOS work, follow the deeper instructions under `apps/macos/AGENTS.md` and `apps/macos/FirstLine/AGENTS.md`. From `apps/macos/FirstLine/`, run:
 
@@ -173,6 +168,13 @@ The map must match the terrain. Code is the machine view; the `AGENTS.md` files 
 - L2 `/{module}/AGENTS.md`: module map, members, exposed interface, and local boundaries (for example `apps/macos/AGENTS.md` and `apps/macos/FirstLine/AGENTS.md`).
 - L3 source-file headers: the macOS Swift sources carry `[INPUT] / [OUTPUT] / [POS] / [PROTOCOL]` contract headers; keep them current when dependencies, exports, or responsibility change.
 
-The web surface is a single `index.html`, so its durable truth lives in `design/DESIGN.md` (visual constitution, which points to `design/siege-motion-model.md` as the sole authority for the siege math), the "Web architecture boundary" section above, and the `_session` signals - not in an L2/L3 hierarchy. Apply L3 headers only to hand-written, structured source with a real responsibility; do not spray them onto generated or vendored files (`datastar-pro.js`, `datastar-inspector.js`) or the supporting static pages.
+The web surface is a single `index.html`, so its durable truth lives in `design/DESIGN.md` (visual constitution v2; `design/siege-motion-model.md` is the retired Flood-era motion contract, kept as a notice), the "Web architecture boundary" section above, and the `_session` signals - not in an L2/L3 hierarchy. Apply L3 headers only to hand-written, structured source with a real responsibility; do not spray them onto generated or vendored files (`datastar-pro.js`, `datastar-inspector.js`) or the supporting static pages.
 
 Workflow after a code change: code -> nearest header and L2 check -> L1 check -> validation -> done. Before entering a module: nearest `AGENTS.md` -> module `AGENTS.md` -> relevant L3 header -> code.
+
+## Maintaining this file
+
+Keep this file for knowledge useful to almost every future agent session in this project.
+Do not repeat what the codebase already shows; point to the authoritative file or command instead.
+Prefer rewriting or pruning existing entries over appending new ones.
+When updating this file, preserve this bar for all agents and keep entries concise.

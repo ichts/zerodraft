@@ -1,192 +1,207 @@
-# Zero Draft Web Design System (Flood)
+# Zero Draft Web Design System (Constitution v2)
 
-This is the visual constitution for all web-facing pages in this repo. It supersedes the Kami system (kept in git history only). Every new page, component, section, or experiment must reference this document. The reference implementation is `design-demos/flood-v2.html`.
+This is the visual constitution for all web-facing pages in this repo. It supersedes the Flood system (kept in git history only; `design-demos/flood-v2.html` is an archive, not a reference). The authority upstream of this file is the captain's accepted constitution document; this file is the in-repo map and must match the terrain (`index.html`). Every new page, component, section, or experiment must reference this document.
 
-## 1. Product soul
+Interrogation-room minimal. One paper. One clock. One door. Danger enters the room only while you are stopped, and it always states what happens next.
 
-Zero Draft is a threat the user hires. Two pains created it:
+The graveyard is closed: no fossil text, no eulogies, no always-on dread. Pressure is conditional, legible, and spent only on the clock.
 
-- Opening a notes app and writing nothing: the inner editor kills sentences before they land.
-- A head too full to articulate: the only way out is a stream-of-consciousness dump.
+## 1. Soul
 
-The 8-second deletion is a forcing mechanism: the gun must be faster than the inner editor. Stopping is death; forward motion is survival. The draft you produce is the words that escaped the graveyard.
+Eight lines. Memorize.
 
-Positioning line: **删掉草稿的不是这个工具，是你的停顿。纸堆就是证据。** (The tool does not delete your draft; your pause does. The pile is the evidence.)
+1. The user hires a threat. Be one that keeps its word - exact numbers, every time. 5 means 5.
+2. Danger is felt only during pause. Typing buys total silence; the room reacts to stopping, never to writing.
+3. One paper. One clock. One door. Everything else is wall.
+4. Every alarming pixel answers: what happens if I stay stopped? If it can't answer, it's scenery. Cut it.
+5. Messy is the user's text. Urgent is the clock. Raw is the wipe. The three jobs never trade.
+6. Rules print on the object they constrain: forward only / 5s warn / 8s wipe / 60s, on the paper's edge.
+7. Deletion is a result, not a funeral. Report it in machine voice. Rearm.
+8. The realer the session, the emptier the room. The landing holds four objects; the trial holds two.
 
-Lineage: The Most Dangerous Writing App. Zero Draft adds a bounded 60-second session and an artifact you keep.
+Voice: short, plain sentences about mechanism and consequence. Machine captions state what happened or what happens next. Banned registers: therapeutic, ceremonial, self-help, eulogy ("gone", "it joined the pile", mourning the draft), and any copy that says deletion is okay. Deletion stays flat and unsentimental.
 
-What we are NOT: a gentle, comforting writing companion. Never soften the deletion into "compost" or reassurance. The threat keeps its teeth.
+## 2. Tokens
 
-### Voice
+Tokens ship as CSS custom properties in the `:root` block of `index.html`. Values are never copied inline; if a value is not a token, it does not exist.
 
-Short, plain sentences about mechanism and consequence. Direct labels: "Start typing", "Keep writing", "Draft deleted". Banned registers: therapeutic, ceremonial, self-help ("honest sentence", "begin when you are ready", "honor your practice"), product advertising inside the graveyard, and any copy that says deletion is okay.
-
-## 2. Design principles
-
-1. **Messy, urgent, raw - never calm or polished.** The old Kami system (parchment, serif serenity, ink blue, printable composure) is dead. This app is a mess in progress.
-2. **Copy appears at the moment it explains.** Hero keeps one hook + one CTA. Mechanism lives as spec annotations on the paper. Rules sit beside the objects they constrain. Payoff waits below. No paragraph where a glance works.
-3. **Danger is the dramatic climax and must be felt in the body,** not read in small text. Every screen needs a danger state that changes the environment, not just a widget.
-4. **The pile does three jobs and no more.** It is the only non-calm element (tone). It reframes nothing - it warns (the graveyard is where stopped drafts go). It replaces a paragraph of persuasion (quantity without judgment, shown not said).
-5. **Threat grammar, applicable to any future concept:** the threat is visible at rest, it advances continuously through the silence window, it is violent at the end, and a single keystroke reverses it instantly.
-
-## 3. Color
+### Color - six colors + one alarm
 
 | Token | Value | Use |
 |---|---|---|
-| `--bg` | `#f1f0eb` | Page canvas. Neutral bone, never parchment, never beige-calm. |
-| `--paper` | `#ffffff` | The one clean surface. Only the paper and result/payoff cards. |
-| `--ink` | `#17150f` | Text, primary buttons, borders. |
-| `--dim` | `#6b665b` | Secondary text, chrome labels. |
-| `--faint` | `#b3ada0` | Placeholders, captions, annotations. |
-| `--red` | `#c8392f` | Danger. See the discipline below. |
+| `--bone` | `#f1f0eb` | The wall. Environment, everywhere. |
+| `--paper` | `#ffffff` | The one object. Nothing else in the product is white. |
+| `--ink` | `#17150f` | Words, primary chrome, the door. |
+| `--dim` | `#6b665b` | Secondary chrome, reports, receipts. |
+| `--faint` | `#b3ada0` | Receded chrome while typing. The quietest legal text. |
+| `--line` | `#dedcd5` | Hairlines only. 1px, never thicker. |
+| `--danger` | `#c8392f` | The warn numeral and the wipe cut. Nothing else. |
 
-Red discipline: `#c8392f` means danger, deletion, or a graveyard mark. The only pre-approved non-danger uses are the wordmark underscore, strikethroughs inside fragments, the raw-card tag, and the payoff arrow - all deletion-adjacent. Never spend red on decoration, links, success, or generic accents. UI feedback (copied/saved) uses ink. Blue usage: zero. Selection: `rgba(200,57,47,.22)` (blood-adjacent by nature, allowed).
+Red is a budget: it means "you are losing the draft". The logotype underscore is ink. No red on links, borders, emphasis, or decoration. No blue. Selection is an ink tint (`rgba(23,21,15,.18)`).
 
-Shadows: whisper + one diffuse layer max on the paper (`0 1px 0 rgba(23,21,15,.06), 0 24px 60px rgba(23,21,15,.1)`). No hard floating cards, no colored glows outside danger. Danger glow: `0 0 0 4px rgba(200,57,47,.08)` plus the veil (`inset 0 0 140px rgba(200,57,47,.3), inset 0 0 40px rgba(200,57,47,.12)`).
+The wash exists only during warn, seconds 5-8:
 
-## 4. Typography
-
-Two families, no more.
-
-- **Newsreader** (serif): the human layer. H1/H2 weight 500, draft text and result metric weight 400-500, placeholders italic.
-- **IBM Plex Mono**: the machine layer. Fragments, spec annotations, status lines, buttons, clocks, countdown, corpus. Chrome labels uppercase with `.12-.18em` tracking.
-
-Scale:
-
-- H1: `clamp(40px, 5.4vw, 64px)`, line-height 1.06, letter-spacing `-.015em`, `text-wrap: balance`.
-- Lead italic: `clamp(17px, 2vw, 21px)`, `--dim`.
-- Draft on paper: 19px / 1.8 (mobile 17px).
-- Chrome labels: 10-10.5px mono uppercase (mobile 9-9.5px, tracking `.08em`).
-- Countdown numeral: mono 500, `clamp(110px, 16vw, 180px)`, `text-align: center`.
-- Result metric: `clamp(72px, 9vw, 96px)` serif 500.
-
-Rules: headings use 500, never synthetic bold. All numerals `font-variant-numeric: tabular-nums`. Body weight 400. `::selection` as above. `-webkit-font-smoothing: antialiased`. CJK text deliberately falls back to the system serif (PingFang SC / Songti) - no bundled CJK face; TsangerJinKai02 belonged to the dead system and is banned.
-
-## 5. The flood (signature layer)
-
-An `aria-hidden` texture layer under `.page` (z-index 0): dozens of mono fragments - fossils of drafts that died of hesitation. It is the graveyard made visible and the only non-calm element at rest.
-
-Corpus register (hard rule): every line is a fossil of hesitation - abandoned, interrupted, rationalized, never finished. Typos welcome. `~strike~` for editor kills. Allowed: "saved as draft. never opened again", "rewrite of the rewrite of the openin", "i paused to check my phone. that was it", "written in my head on the train,\ngone by the platform". Banned: comfort ("the good version is in here somewere" read as hope), writing advice, self-help, product slogans ("if i stop moving this page dies"), proud output ("this is bad but its SOMETHING").
-
-Layout algorithm (JS, seeded RNG, re-run on debounced resize and `document.fonts.ready`):
-
-- Protect the clean column: the paper, the payoff block, and the hero text measured by a `Range` over the h1 (true text width, not block width).
-- Desktop: fragments live only in the left/right gutters beside the clean column (regions are `overflow: hidden` so fragments clip at the column edge - the mess continues "under" the clean sheet). Gutter opacity `.09-.18` via `--fo`, sizes 13-28px, rotation ±5deg. One near-invisible full-width band (opacity `.05-.10`) may sit above the hero, and one axis band of mess (opacity `.14-.22`, 12-17px, single fragment per row) sits directly in the reading axis between the CTA and the paper - the graveyard reaches the paper's edge without touching the words.
-- Mobile (<700px): fragments live in horizontal bands in the gaps between clean blocks (nav-hero, hero-paper, paper-payoff, below payoff), smaller and sparser; never behind the paper or the hero CTA row.
-- Stratified rows (~96px desktop, 60px mobile) with jitter; corpus shuffled without repeats; rotation ±5deg.
-- The fullscreen trial runs on the same bone ground (`--bg`): on desktop the fossil layer strengthens across both margins (12-22px, opacity `.05-.11`); on mobile it protects a full-width ~200px band around the ~30% anchor line and places fragments in the bands above and below it, never under the current line - the trial is the same world as the landing, never a calmer white void.
-
-States:
-
-- Danger: all fragments `color: var(--red)` and `opacity: min(var(--fo)*3.4, .5)` with a .5s transition - the graveyard closes in.
-- Wipe (joinPile): the lost draft (first ~64 chars, whitespace-collapsed) becomes a new fragment - red flash at .85 opacity, then settles over 1.6s to faint ink, persisting for the visit in a dedicated joined sublayer (`#floodJoined` on the landing, `#trialJoined` in the trial) that flood relayout (debounced resize, font readiness) never rebuilds. When the wipe happens in the fullscreen trial, the fragment lands in the trial's joined layer within ~200px of the last line, and the failure surface holds back ~600ms and stays translucent so the arrival is seen first. "gone. it joined the pile." is a warning, delivered deadpan.
-- No float, drift, or pulse animations. The pile is dead things; dead things do not move.
-
-## 6. The paper (the tool)
-
-The only clean thing on the page. Anatomy, top to bottom:
-
-1. **Spec header inside the paper** (border-bottom): rules attached to the object they constrain - `forward only / 5s warn / 8s wipe / 60s` (slashes in red) left; `Finish ->` (hidden until session) + `T-01:00` clock right. Never put the rules outside the paper.
-2. **Sheet** (`contenteditable`, role textbox multiline): Newsreader 19/1.8, `pre-wrap`, `word-break: break-word`, no outline except `:focus-visible { box-shadow: inset 0 0 0 2px rgba(23,21,15,.35) }`.
-3. **Placeholder** carries the mechanism, italic faint, exactly: "Click here. Type anything. / No deleting, no pasting, no undo. / Stop for eight seconds and it's gone."
-4. **Countdown overlay** (danger only): red mono numeral centered + caption "keep typing or the draft is deleted", `aria-live="polite"`, `pointer-events: none`.
-5. **Footer status line** (border-top): the narrator. Approved lines only:
-   - Idle: "the pile is patient. it gets whatever you stop writing."
-   - Session: "forward only. don't stop."
-   - Blocked action (deny): "no going back." (1.2s, plus a 2px paper shake, 160ms)
-   - Wipe: "gone. it joined the pile." in red, durable until the next session starts.
-   - Right slot: live word count (replaces the fwd-only tag).
-6. **Result card** (covers the paper): serif metric `N`, label "words you would not have written", sub "session: Ns - forward only", and the draft itself printed below the metric in the raw-card treatment (mono ~13px, dashed border, slight rotate, first ~3 lines) - the keep screen shows the goods, not just a number. Actions in this order: **Copy full text (primary, ink)**, Copy for AI (ghost), Download .md (ghost), Go again (text link). On finish: Finish button hides, focus lands on the primary action. Copy for AI = cleanup prompt + raw text via `navigator.clipboard`; Download .md via Blob.
-
-The paper's writing area (preview and live inline editor alike) renders zen-centered: Newsreader, text centered, with the current line anchored at roughly 38% of the sheet height - matching the inline live editor's anchor, so the landing demo and the live session read as one continuous writing view across the handoff. (The fullscreen trial anchors lower, near 30%.)
-
-## 7. Danger choreography
-
-Timings are contract, not taste: danger at 5000ms of silence, deletion at 8000ms, session 60s, tick 100ms. The ticker's authority is exactness.
-
-### The siege (landing, desktop)
-
-On the landing the pile does not only redden - it closes in. While a silence window runs, the gutter fossils of `#floodBase` advance on the paper in ranks and lanes, driven by one rAF loop on the shared silence clock; the demo's 100ms pause ticker keeps owning fail/countdown, the rAF owns only continuous geometry. The math is contract and lives in `design/siege-motion-model.md` - one set of numbers, one owner; this section only tells the story. The pile holds still for the first breath of silence, then advances on per-fragment deadlines: the front lead touches the paper's edge exactly on the danger beat, the wall completes encirclement by countdown "1", and every seeded fragment holds contact before the wipe - the wall itself is a second countdown. Arrival is ease-in with momentum, no deceleration, no spring. After contact, load aggregates into a per-side pressure that compresses the shell (`.siege-shell`, the one transform owner wrapping paper + result/failure + footer) with a seeded asymmetric drift - a squeeze, never a zoom-out, and never before first contact. Reinforcements arrive from beyond the viewport on an irregular seeded cadence so the outside never empties; each has its own birth clock and a staging face behind the seed wall. Red and the veil stay danger-gated as the table below says; per-side flank shadows carry contact pressure only. Fragments keep their clean-column max-width caps; every travel is inward by construction.
-
-The wipe is a collective kill: a snapshot, a hard pounce of every fragment (reserves included) to the slammed-down paper's edge with all fragments forced red (`body.siege-kill`), a beat of hold, then a cubic settle back to rest while the lost draft's fossil flies out through the siege lines and joins them (the flight takes off at the pounce's impact, then the existing flash + settle). The reversal beat - colors and flanks clearing in the first frame, geometry retreating snapshot -> rest on one shared curve - is the demo's scripted teaching recovery; a real keystroke resets the siege to identity instantly, because the trial morph takes over the screen in the same beat. `prefers-reduced-motion`: no siege motion ever (engine off); danger colors still change; wipe and fossil render statically. Mobile (below the band-mode breakpoint) keeps the table's behavior for now - no spatial siege there yet.
-
-### The table
-
-| Element | Idle/session | Danger (5-8s) | Wipe (8s) |
-|---|---|---|---|
-| Fragments | faint ink | red, opacity x3.4 cap .5, .5s ease | one new fragment joins (see §5) |
-| Veil | transparent | red inset shadow, opacity 1, .35s | clears |
-| Paper | ink border | red border + red ring | sheet `blur(6px)` + opacity 0, .45s |
-| Sheet | full | opacity .35 | clears to empty |
-| Countdown | hidden | red numeral 3-2-1 in the margin beside the current line (never on the words), hint stacked under it, caption | hides |
-| Clock | ink | red | resets after aftermath |
-| Placeholder | mechanism copy | hidden | "Draft deleted. Type to start over." until next session |
-
-The countdown never prints on top of the draft. It sits below the current line (or moves above it when the bottom space is tight); the veil and the reddened fragments carry the environmental half of the beat. The draft dims as silence grows - the threat looks like it is already eating the words - but the words are never edited, blurred out, or deleted before the wipe itself. Threat comes from the environment, not from touching the text.
-
-Recovery: one keystroke clears danger instantly (all classes off, no lingering transitions). After wipe the "gone" message and "Draft deleted" placeholder persist until the user starts again - deletion has a durable consequence, not a 2-second flash.
-
-Every blocked action (delete, paste, cut, undo, selection-replace) has a body: the narrator flashes "no going back." in red for ~1.2s, the paper shakes 2px for 160ms, and a red hairline flashes on its border for 90ms. The teeth are felt, not just logged.
-
-Demo preview (the page teaches before the user touches it): types the sample once at a human cadence (base 120-190ms per char, longer at spaces, punctuation, and newlines), then holds the teaching pause early (first word boundary at/after ~13 chars, so the first red number lands within the first ~10 seconds of the visit): the real 5-second danger beat begins, the full 3-2-1 stays up, and at 7.6 seconds - at the brink - typing resumes and the danger clears. Once per playback, when the sample's own typo lands ("tomorow"/"beleive"/"thats"), the preview acts out a denied deletion: ~350ms of hesitation, then the real deny feedback (the narrator flashes "no going back.", the 2px shake, the 90ms hairline), a ~650ms dwell, and forward again - the typo stays. The sample finishes, then goes silent for real: danger 3-2-1, the draft is deleted at 8 seconds, and its first ~64 chars fly out of the paper into the gutter - a red fossil that settles to faint ink while the narrator turns durable red: "gone. it joined the pile." The placeholder becomes "Draft deleted. Type to start over." The one-shot two-pause arc delivers the entire positioning: survive the beat, lose the next one. Pauses while offscreen (`IntersectionObserver`, threshold .15) or `document.hidden`; the preview clock only advances while unpaused. Any real input (keydown anywhere, click, IME start) interrupts permanently: the preview freezes and restores the completed sample - no fossil, no dead state. Under `prefers-reduced-motion` the dead state renders statically: empty sheet, one settled fossil, the dead red line.
-
-## 8. Motion rules
-
-- One-shot only. No ambient loops, ever - no floating, pulsing, shimmering, drifting.
-- Transition budget: interactions `.12-.18s`, state changes `.3-.5s`, wipe ≤ `.62s`. Easing: `ease`/`ease-out`; falls may use `cubic-bezier(.55,0,.85,.36)`.
-- `prefers-reduced-motion: reduce`: all transitions and animations off globally (`* { transition: none !important; animation: none !important }`), color changes remain (danger still turns red), wipe is instant, demo renders static, `scroll-behavior: auto`.
-- Focus-visible everywhere: `2px solid var(--ink)`, offset 2-3px. Never remove outlines.
-
-## 9. Interaction contract
-
-- **First keystroke anywhere starts the session.** A document-level `keydown` (target is body, printable key, no modifiers) synchronously focuses the editor inside the keystroke so the browser and IME route input to it. The page IS the tool; no click required.
-- **Typing or clicking the paper goes straight to the fullscreen trial.** The landing paper is a preview and an invitation, not the writing room: the first input arms the session for one frame, the handoff morph carries the draft into the trial, and keys struck mid-morph are buffered and replayed after focus lands. The inline embedded session is a transient arming step, never a destination.
-- **Forward-only guards** on `beforeinput`: block `delete*`, `historyUndo/Redo`, `insertFromPaste/Drop/Yank/ReplacementText/Transpose`; allow `insertText/Paragraph/LineBreak/CompositionText` only with a collapsed caret at the very end (`caretAtEnd()`); `paste/cut/drop` prevented. Every block fires the deny nudge ("no going back." + 2px shake) and restores the caret to the end.
-- **IME composition works.** Track `compositionstart/end`; never rewrite the sheet DOM during composition; sync the model on `compositionend`.
-- During live typing the browser owns the sheet DOM (flood renders plain text); styled layers may only rebuild the DOM outside composition and always restore the caret to the end.
-- Cmd/Ctrl+Enter finishes, Finish button finishes, 60s auto-finishes. Finish hides the Finish control and focuses the primary action.
-- No localStorage, no session history, no streaks. The visit remembers nothing except joined fragments (in-DOM only).
-
-## 10. Copy placement map
-
-| Place | Approved copy | Nothing else |
+| Token | Value | Use |
 |---|---|---|
-| Hero | "It's not supposed to be good yet." / "We force you to write something down. You leave with words." / CTA "Give it sixty seconds." + hint "or just click the paper and type" | No mechanism, no rules, no kicker |
-| Spec header | "forward only / 5s warn / 8s wipe / 60s" | - |
-| Placeholder | "Click here. Type anything. / No deleting, no pasting, no undo. / Stop for eight seconds and it's gone." | - |
-| Payoff | kicker "What comes out", H2 "Raw goes in. A draft comes back.", raw card (typos: "ok thesis is peopel dont lack ideas they lack permission...") -> clean card ("People don't lack ideas - they lack permission..."), caption "The shaping happens in whatever AI you already use. Copy for AI puts your raw text and a cleanup prompt on the clipboard - Zero Draft itself has no AI inside. That's the point." | - |
-| Result | "N words you would not have written", "session: Ns - forward only", "keep writing on your Mac - early bird $5" (link to download.html, quiet mono, below the actions) | - |
-| Footer | "Zero Draft - the draft before the draft", "your writing never leaves this page" | - |
+| `--wash-wall` | `color-mix(in oklab, bone 88%, danger)` | The landing wall during warn. |
+| `--wash-paper` | `color-mix(in oklab, paper 88%, danger)` | The paper (and the trial room) during warn. |
+| `--wash-wall-deep` / `--wash-paper-deep` | color-mix at 76% | The eighth second goes one step deeper: at 8.0s the wash deepens to double the danger share for the wipe-cut beat, then exits. |
+| `--wash-*-1` / `--wash-*-2` | color-mix at 96% / 92% | Reduced-motion wash steps (see §6). |
 
-No em dash (U+2014) and no en dash (U+2013) anywhere in code or copy. Use hyphens.
+### Type - two faces
 
-## 11. Layout and responsive
+Newsreader is the human. IBM Plex Mono is the machine. The machine never speaks serif; the human never speaks mono.
 
-- `.wrap` max-width 1120px, padding 32px (mobile 20px). Paper `min(700px, 100%)`, min-height 460px (mobile 420px).
-- Hero centered, padding 52/26 desktop (40/22 mobile); paper zone padding 24/84 desktop.
-- Breakpoints: 820px (payoff stacks, arrow rotates, hero compresses, paper-foot stacks, spec label 9.5px) and 700px (flood switches to band mode).
-- `overflow-x: hidden` on body; verify `scrollWidth <= viewport` at 390px.
-- Payoff cards: raw = mono 13.5px dashed border, rotate(-.5deg); clean = white paper card, rotate(.4deg). One mild rotation each; never more.
+| Style | Spec | Use |
+|---|---|---|
+| display | Newsreader 500 · clamp(44px, 6vw, 72px)/1.04 · -.015em | Landing headline only |
+| deck | Newsreader italic 400 · 24/1.45 · `--dim` | "It's not supposed to be good yet." |
+| script | Newsreader 400 · 21/1.6 · measure <=62ch · never justified | The user's words. Typos survive. |
+| numeral | Plex Mono 600 · min(40vh, 360px) · tabular · `--danger` | Exists only while paused >=5s. The loudest object we own. |
+| timer | Plex Mono 500 · 16/1 · tabular | Always running during a session, never blinking |
+| label | Plex Mono 500 · 11/1.5 · caps · .16em | Rules, counts, captions |
+| system | Plex Mono 400 · 13/1.9 · caps · .08em | Reports and receipts |
 
-## 12. Anti-patterns (instant rejection)
+All numerals are `font-variant-numeric: tabular-nums`. The receipt example is written one way everywhere: `0:00 - 148 WORDS KEPT.` (the old draft of this constitution wobbled between 48 and 148; the code shows the real count and the doc example is always 148).
 
-- Parchment/beige calm, ink blue, Kami tokens, Charter/TsangerJinKai type.
-- SaaS tropes: pill buttons, feature card grids, gradient blobs, icon rows, dashboard chrome, centered success panels.
-- Comfort or therapy copy; reassuring the user about deletion.
-- Ambient animation of any kind; looping demos; parallax.
-- Product slogans or instructions inside the graveyard corpus.
-- More than two type families; synthetic bold; cool grays.
-- Explaining the pile's metaphor in body copy. It is felt through the wipe moment and the footer narrator, never lectured.
+### Space
 
-## 13. Production port notes
+Seven steps: `--s1: 4` `--s2: 8` `--s3: 12` `--s4: 20` `--s5: 32` `--s6: 56` `--s7: 96`. The wall may be most of the frame; emptiness is load-bearing.
 
-The production `index.html` is Datastar-native; the flood shell ports as skin only. `_session.*` signals stay the single UI truth on `<body>`; `window.FirstLineLandingDemo` stays the stateless browser bridge; JS writes state only by dispatching custom `fl*` events. The demo engine in `flood-v2.html` already mirrors that contract (contenteditable + beforeinput guards + composition flag + document-level first-keystroke), so behaviors port 1:1. The flood layer is an `aria-hidden` DOM layer under `.page`, driven by declarative `data-class` on the danger/complete signals. Zen rendering, the WAAPI morph to the fullscreen trial, and the `#trial` route are untouched. Read the repo AGENTS.md "Web architecture boundary" section before touching production.
+### Radius and shadow
 
-## 14. Verification checklist (run for every change)
+`--radius: 0`. Round nothing. If an element wants softening, delete it instead.
 
-- Desktop 1440x1000 and mobile 390x844: hero / typed / danger / wipe aftermath / result; `scrollWidth` equals viewport; no console errors.
-- Forward-only: Backspace/Delete/Cmd+Z/X/V, paste, cut, drop, selection-replace all blocked with nudge; IME composes; first keystroke without click starts the session.
-- Demo: plays once, danger beat visible, static after; interrupt clears; hidden tab pauses; reduced-motion renders static.
+One shadow in the product, `--lift`: `0 1px 0 rgba(23,21,15,.04), 0 24px 48px -32px rgba(23,21,15,.3)` - the paper's lift off the wall. Warn changes the room, never the object: the lift is constant.
+
+### Motion
+
+Linear or step. Easing is persuasion, and we don't persuade.
+
+| Token | Value | Use |
+|---|---|---|
+| `--snap` | 120ms linear | Chrome state switches. On, then off. Nothing glides. |
+| `--wash-ramp` | 3000ms linear | The environment tint, second 5 to second 8. The only slow thing we own, because it is a fuse. |
+| `--wipe-cut` | 200ms | A cut, not a dissolve. No letter-by-letter ceremony, no merciful fade. |
+| numeral | step, never tweens | It does not arrive; it is suddenly there. 3, 2, 1 swap in a single frame. |
+| focus | 1px ink, 3px offset | Square outline. No glow. |
+
+The recovery snap: one keystroke during warn (say at 6.5s of silence) ends the warn. The wash and the numeral return on the 120ms snap: the numeral vanishes in one frame, the wash transitions back over 120ms linear. The snap is the only return idiom - wipe exit and adjudicated completion use it too. Implementation: entering warn applies `transition: background-color var(--wash-ramp) linear` from the `body.danger` selector; leaving it finds only the base 120ms snap, so the return is always 120ms regardless of how warn ended.
+
+## 3. Surfaces
+
+One world end to end; the session sheds objects as it gets real. Objects on stage: landing 4 → trial 2 → warn 3 → wipe 2 → kept 3.
+
+### 3.1 Landing - four objects
+
+Logotype · headline · door · demo paper. That's four. The `MAC RELEASE ->` link rides with the logotype as one nav unit; it is not a fifth object.
+
+- Copy hierarchy is law: (1) `We force you to write something down. You leave with words.` (2) `It's not supposed to be good yet.` - load-bearing; it kills the inner editor. Do not cut. (3) the door: `Give it sixty seconds.`
+- One door: the CTA. No second entrance, no whisper under the button. The demo paper is theater, not an entrance - pointer and keystrokes on the landing do nothing.
+- The wall is blank. Permitted texture: none. Never sentences.
+- The footer carries the one-line privacy promise and the support links. That is a legal/support need, not a fifth object on stage.
+
+### 3.2 The demo paper - watch-only theater
+
+A scripted loop at real speed; the demo never cheats its own numbers. Loop: types ~7s → stops → 5s of nothing → warn (wash + 3-2-1) → wipe at 8 → the machine report holds 2s → rearms at 1:00 and loops. Rules print on its edge; its timer runs and burns through the silence exactly like a live session, and the report states the real unused seconds. The loop pauses while offscreen or while the tab is hidden and resumes the same beat (its clocks are absolute: carry + origin, so timer drift cannot cheat the numbers). Under `prefers-reduced-motion` the theater is fully static: the sample fully typed, the clock parked at 1:00, no loop.
+
+The demo's numeral scales to its paper (the theater is a scale model of the room); the min(40vh, 360px) numeral token owns the trial.
+
+### 3.3 Trial, typing - two objects
+
+The wall is gone; the paper is the room (the room is paper white). Objects: paper · clock. Chrome lives in the corners: rules TL · timer TR · exit BL · words BR. Idle chrome is full ink; while keys arrive it recedes to faint (the timer runs at dim). Nothing reacts to a keystroke - no sparks, no shake, no sound. The reward for writing is silence.
+
+The empty room carries one hint in faint mono caps: `Type here. The law is live: 5s warn, 8s wipe, 60s to keep.`
+
+### 3.4 Trial, warn (paused 5-8s) - three objects
+
+The only time the environment moves. The wash ramps linearly, peaking at second 8. The numeral counts the grace: 3 → 2 → 1, full size, instantly, no entrance animation. The caption: KEEP TYPING OR THE DRAFT IS DELETED. Chrome snaps from faint to ink. The 60s clock keeps burning through the warn: pausing costs twice.
+
+Warn does not move the object. The paper never translates, scales, shakes, or changes its lift during warn; only the room (the wash) and the chrome change. (The deny shake is a different beat - rule enforcement for a blocked action, over in 160ms - and is not warn.)
+
+### 3.5 Wipe (8.0s lands) - two objects
+
+A cut, not a ceremony: the text is gone in <=200ms, one pass. At the eighth second the wash steps one step deeper (`--wash-*-deep`) for the cut beat, then exits on the snap; bone returns. The machine report states the cost: `DRAFT WIPED - 0:37 UNUSED.` then rearms: `TYPE TO RESTART.` - and it is literal: the editor stays armed, and the next keystroke starts a fresh 60s session. The timer rearms to 1:00. No ash, no fade, no italic, no condolences.
+
+### 3.6 Kept (0:00 reached) - three objects
+
+The only quiet surface. The clock stops at 0:00; the paper returns to the wall (the room goes bone, the paper sits on it with the lift). Receipt, not praise: `0:00 - 148 WORDS KEPT.` No confetti, no "well done." One action: COPY TEXT (its completed state is COPIED - same door, feedback in ink). One mono link: RUN IT AGAIN (fresh 60s, same room). One caption: NOTHING HERE IS SAVED. The words are the biggest thing on the surface; they won, let them.
+
+## 4. State matrix
+
+| State | Environment (wall · paper) | Chrome (clock · rules · counts) | Voice | Reduced motion |
+|---|---|---|---|---|
+| IDLE - before the first key | bone wall, paper lifted, still | full ink; timer parked at 1:00 | label: rules on the paper's edge | identical |
+| TYPING - keys arriving | unchanged; the room never reacts to a keystroke | recedes to faint; timer runs at dim | the user's serif - the only mess allowed | identical |
+| PAUSE <5S - 0-5.0s still | nothing changes; restraint is deliberate | caret blinks; timer keeps running | - | identical |
+| WARN 5-8S - second 5.0 lands | wash ramps linearly, peaking at 8s; the only environmental motion | snaps to ink; numeral 3→2→1 in danger, min(40vh,360px); caption KEEP TYPING OR THE DRAFT IS DELETED | machine caps; states the consequence | wash steps once per second (96%, 92%, 88% mixes); numeral identical; nothing withheld |
+| WIPE @8S - second 8.0 lands | wash steps one step deeper for the <=200ms cut, then exits on the snap | text cut in one pass; timer rearms to 1:00 | DRAFT WIPED - 0:37 UNUSED. TYPE TO RESTART. | the cut is already a step |
+| KEPT @0:00 - the clock reaches zero | bone; still; the room lets go | timer stops at 0:00, ink; receipt row + COPY TEXT | receipt: 0:00 - 148 WORDS KEPT. | identical |
+
+Reduced motion removes ramps, never information. Warn still lands at 5.0s - red, huge, on time.
+
+## 5. The clock and the silence (behavioral law)
+
+The timing contract is 5s warn, 8s wipe, 60s session, 100ms tick. It does not bend.
+
+Session end adjudication is explicit: the 60s deadline and the 8s wipe line race as absolute deadlines on the same tick, and whichever comes first wins. A pause at 0:54 warns at 0:59, but the wipe line (1:02) is never reached - the 1:00 deadline lands first and the draft is KEPT. A pause at 0:52 reaches the wipe line at exactly 1:00 - a tie, and the tie goes to the wipe: eight seconds of silence means eight seconds. A catch-up tick after background-tab throttling can land past both deadlines at once; the same comparison honors whichever occurred first.
+
+Three things in plain words:
+
+1. The first five seconds of silence are deliberate. Before 5.0s nothing changes - no tint, no numeral, no hint of the clock's opinion. The grace is the design, not a delay in the machinery.
+2. Dark mode is forbidden. One bone room, one paper, one alarm. No dark variant, ever.
+3. Repeated pauses never escalate the punishment. The tenth pause looks exactly like the first: same 5s grace, same wash, same 3-2-1. No ratchet, no stacking penalty, no memory of past pauses.
+
+## 6. The door out (ESC / EXIT)
+
+ESC and the EXIT corner are the same act with the same consequence: leave the room immediately and return to the landing, on the snap. No confirmation - the threat does not negotiate, and nothing is saved anywhere:
+
+- An active or paused draft is discarded. No wipe cut, no receipt, no fossil. The clock stops and rearms to 1:00 for the next visit.
+- A kept draft you did not copy is gone. The receipt says nothing here is saved; leaving is the proof.
+- A wipe report simply closes.
+- Focus returns to the door. ESC on the landing does nothing.
+
+## 7. Captions
+
+One consistent form: Plex Mono caps, label or system style, machine voice. Every caption carries its reading - it states what happened or what happens next. The full set:
+
+- Hint (empty trial): TYPE HERE. THE LAW IS LIVE: 5S WARN, 8S WIPE, 60S TO KEEP.
+- Warn: KEEP TYPING OR THE DRAFT IS DELETED.
+- Wipe: DRAFT WIPED - 0:37 UNUSED. / TYPE TO RESTART.
+- Kept: 0:00 - 148 WORDS KEPT. / NOTHING HERE IS SAVED.
+- Copy completed: COPIED.
+- Deny (screen reader only): BLOCKED. FORWARD ONLY.
+
+CTA capitalization is consistent within each voice: the door speaks human sentence case (`Give it sixty seconds.`); machine actions and links go caps (COPY TEXT, RUN IT AGAIN, ESC - EXIT, MAC RELEASE ->).
+
+## 8. Interaction contract
+
+- Forward-only guards on `beforeinput`: block `delete*`, `historyUndo/Redo`, `insertFromPaste/Drop/Yank/ReplacementText/Transpose`; allow `insertText/Paragraph/LineBreak/CompositionText` only with a collapsed caret at the very end. `paste/cut/drop` prevented. Backward caret motion keys (ArrowLeft/Up, Home, PageUp) denied.
+- Every blocked action has a body: the room shakes 2px for 160ms, a red hairline flashes on the paper's edge for 90ms, and the screen-reader line says BLOCKED. FORWARD ONLY. This is rule enforcement, not danger.
+- IME composition works: `compositionstart/end` tracked, composition input types never intercepted, the model syncs on `compositionend`, and composition counts as activity - never a false deny, never a false silence.
+- The demo paper is watch-only. The CTA is the only way in. The `#trial` route is preserved (direct links and Back work).
+- No localStorage, no session history, no streaks. The visit remembers nothing.
+- Signals are the only UI-state truth (`_session.*` on `<body>`); JavaScript is the stateless bridge that writes only through `fl*` custom events.
+
+## 9. What not to become
+
+- Kami/parchment: fiber textures, warm sepia, the paper mattering more than the clock.
+- Medium: typography tuned for an audience. This draft has no audience yet.
+- Notion: toolbars, blocks, a second object on the desk.
+- Headspace: rounded corners, breathing animations, "you did great."
+- Literary magazine: drop caps and pull quotes - the draft starts performing.
+- TMDWA clone: all threat, no artifact - a timer in 8pt and nothing kept at the end.
+- The graveyard (our own past): readable dead-draft fragments, fossil piles, eulogy copy. Closed.
+
+The test: if a frame would hang comfortably in any of these rooms, keep deleting until it wouldn't.
+
+## 10. Verification checklist (run for every change)
+
+- Desktop 1440x900 and phone 390x844: landing at rest, demo typing/warn/wipe/report, trial at rest, typing, warn, recovery, wipe aftermath, kept, COPIED state, ESC and EXIT outcomes; `scrollWidth` equals viewport; no console errors.
+- Forward-only: Backspace/Delete/Cmd+Z/X/A, paste, cut, drop, selection-replace all blocked with the deny body; IME composes and counts as activity.
+- Demo: loop timing is exact (warn at 5.0s of silence, wipe at 8.0s, report 2s, rearm); pauses offscreen and when hidden; static under reduced motion.
+- Timing: warn at 5.0s, wipe at 8.0s, kept at 60s; the 54s-pause adjudication keeps the draft; the tie goes to the wipe.
 - Danger is felt in a full-page screenshot without reading any text.
-- `grep -n $'\u2014' and $'\u2013'` return nothing.
-- Focus ring visible on every interactive element; countdown announced via `aria-live`.
+- `grep` for U+2014 and U+2013 returns nothing.
+- Focus ring (1px ink, 3px offset) on every interactive element; the numeral is announced via `aria-live`.
+- Reduced motion: fully static ramps, stepped wash, warn on time, wipe instant.

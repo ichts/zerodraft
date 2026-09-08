@@ -56,7 +56,7 @@ struct PersistenceService {
         let formatter = formatter
         let timestamp = formatter.string(from: completedAt).replacingOccurrences(of: ":", with: "-")
         let uniqueSuffix = String(sessionID.uuidString.prefix(6).lowercased())
-        let fileURL = libraryDirectory.appendingPathComponent("\(timestamp)-\(uniqueSuffix)-first-line.md")
+        let fileURL = libraryDirectory.appendingPathComponent("\(timestamp)-\(uniqueSuffix)-zero-draft.md")
 
         let frontMatter = """
         ---

@@ -32,7 +32,7 @@ Sources/FirstLine/Session/SessionEngine.swift: danger / failure / success 状态
 Sources/FirstLine/Session/SessionViewController.swift: Session 主界面（AppKit）；托管 AppendOnlyTextView、稳健 first-responder 获取（viewDidAppear 重试 + didBecomeKey 兜底）、100ms tick、Flood 环境（bone ground + 720 白纸列 + FossilLayerView + danger veil/倒计时 + narrator + deny 抖动/红 hairline）；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Session/FailureViewController.swift: Failure 界面（Draft deleted 文案 + Try Again / Back to Home + joined fossil）。
 Sources/FirstLine/Session/SuccessViewController.swift: Success 界面，提供词数 + 草稿预览 + Copy full text / Copy for AI / Download .md / Discard；Copy for AI 使用 web-canonical cleanup prompt，Copy 主按钮显示 “Copied.” 回显。
-Sources/FirstLine/Session/SuccessText.swift: 纯逻辑 success 文案与 copy-for-AI payload（web-canonical cleanup prompt），供 SuccessViewController 与 SuccessSurfaceTests 共用。
+Sources/FirstLine/Session/SuccessText.swift: 纯逻辑 success 文案、copy-for-AI payload（web-canonical cleanup prompt）与 export 命名（`zero-draft-*.md` 文件名、`source: Zero Draft` front matter），供 SuccessViewController 与 SuccessSurfaceTests 共用。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的 upgrade 界面，含 license key 输入、激活全部状态、禁用的 Buy 占位与 Back to Home。
 Sources/FirstLine/Library/LibraryViewController.swift: Library 分栏（列表按时间倒序 + 详情正文/元数据）与 Copy / Open in Default Editor / Reveal in Finder / Delete。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 Appearance（theme / reduced motion）、Session（固定 60 秒）、Trial & License、Storage（Reveal Library Folder）、About 与 Done 返回 Home。
@@ -49,7 +49,7 @@ Tests/FirstLineTests/PersistenceOnlyTests.swift: 成功存储测试。
 Tests/FirstLineTests/LibraryPersistenceTests.swift: Library 读取、解析、删除测试。
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖 happy path、failure path、首次/回访启动、键盘导航切换、success 阶段导航拦截、trial 计数与解锁。
-Tests/FirstLineTests/SuccessSurfaceTests.swift: Success 面板行为测试，覆盖 web-canonical cleanup prompt 常量、copy-for-AI payload 拼接格式与 trim 语义。
+Tests/FirstLineTests/SuccessSurfaceTests.swift: Success 面板行为测试，覆盖 web-canonical cleanup prompt 常量、copy-for-AI payload 拼接格式与 trim 语义，以及 export 文件名与 front matter 的 Zero Draft 命名。
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与 trial gate 交互。
 
 验证命令

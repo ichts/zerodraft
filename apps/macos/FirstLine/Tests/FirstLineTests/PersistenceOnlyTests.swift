@@ -23,6 +23,7 @@ struct PersistenceOnlyTests {
         #expect(content.contains("duration_seconds: 300"))
         #expect(content.contains("word_count: 2"))
         #expect(content.contains("hello world"))
+        #expect(url.lastPathComponent.hasSuffix("-zero-draft.md"))
     }
     @MainActor
     @Test

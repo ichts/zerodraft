@@ -28,4 +28,17 @@ struct SuccessSurfaceTests {
         #expect(payload.hasSuffix("messy edges"))
         #expect(payload.contains("\n\n---\n\nmessy edges"))
     }
+
+    @Test
+    func exportFileNameUsesZeroDraftPrefix() {
+        #expect(SuccessText.exportFileName(timestamp: "2026-09-08-142530") == "zero-draft-2026-09-08-142530.md")
+    }
+
+    @Test
+    func exportMarkdownRecordsZeroDraftSource() {
+        let markdown = SuccessText.exportMarkdown(created: "2026-09-08T14:25:30Z", wordCount: 7, body: "hello world")
+
+        #expect(markdown.hasPrefix("---\ncreated: 2026-09-08T14:25:30Z\nsource: Zero Draft\nwords: 7\n---\n\n"))
+        #expect(markdown.hasSuffix("hello world"))
+    }
 }

@@ -936,9 +936,13 @@ if (document.readyState === "loading") {
     transition: background-color var(--snap) linear;
   }
   body.danger .trial-writing-surface { background: var(--wash-paper); transition: background-color var(--wash-ramp) linear; }
-  body.wiping .trial-writing-surface { background: var(--wash-paper-deep); transition: none; }
-  /* Kept: the clock reaches zero, the paper returns to the wall. */
+  /* Wiped and kept: the room lets go of the paper and bone returns (§3.5, §3.6).
+     Declared BEFORE the cut rule: body.wiping overlaps body.failed for the
+     <=200ms cut beat and must win it; when the cut clears, the 120ms base snap
+     carries the exit - the same idiom as the landing wall. */
+  body.failed .trial-writing-surface,
   body.complete .trial-writing-surface { background: var(--bone); }
+  body.wiping .trial-writing-surface { background: var(--wash-paper-deep); transition: none; }
 
   /* Chrome lives in the corners: rules TL, timer TR, exit BL, words BR.
      Idle: full ink. While keys arrive (body.quiet): faint, the timer dim.

@@ -14,8 +14,9 @@ struct LibraryPersistenceTests {
 
         let service = PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory)
 
+        // 旧命名文件（-first-line.md）必须保持可读：改名前的历史库不能丢。
         let older = libraryDirectory.appendingPathComponent("2026-04-20T10-00-00Z-first-line.md")
-        let newer = libraryDirectory.appendingPathComponent("2026-04-20T11-00-00Z-first-line.md")
+        let newer = libraryDirectory.appendingPathComponent("2026-04-20T11-00-00Z-zero-draft.md")
 
         try sampleMarkdown(id: "1", completedAt: "2026-04-20T10:00:00Z", body: "older line").write(to: older, atomically: true, encoding: .utf8)
         try sampleMarkdown(id: "2", completedAt: "2026-04-20T11:00:00Z", body: "newer line").write(to: newer, atomically: true, encoding: .utf8)

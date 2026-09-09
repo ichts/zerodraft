@@ -18,7 +18,7 @@ protocol LicenseClient: Sendable {
     /// 对应 `POST /licenses/activate`。
     /// - Parameters:
     ///   - licenseKey: 用户粘贴的 key，已 trim。
-    ///   - instanceName: 传给 Dodo 的 `name` 字段。推荐 "First Line Mac <short-install-id>"。
+    ///   - instanceName: 传给 Dodo 的 `name` 字段。推荐 "Zero Draft Mac <short-install-id>"。
     /// - Returns: 激活后的实例信息（含 `instanceID`，需要持久化以便将来 deactivate）。
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation
 

@@ -18,10 +18,10 @@ struct InstallID: Codable, Equatable, Sendable {
     /// 首次生成时间，仅记录用途。
     let createdAt: Date
 
-    /// 返回 "First Line Mac abcd1234" 形式的短名，用作 Dodo activate 的 `name` 字段。
+    /// 返回 "Zero Draft Mac abcd1234" 形式的短名，用作 Dodo activate 的 `name` 字段。
     var shortName: String {
         let short = String(uuid.uuidString.prefix(8))
-        return "First Line Mac \(short)"
+        return "Zero Draft Mac \(short)"
     }
 }
 

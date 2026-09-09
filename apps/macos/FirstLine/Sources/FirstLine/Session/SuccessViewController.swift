@@ -165,12 +165,12 @@ final class SuccessViewController: NSViewController {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        panel.nameFieldStringValue = "first-line-\(formatter.string(from: Date())).md"
+        panel.nameFieldStringValue = SuccessText.exportFileName(timestamp: formatter.string(from: Date()))
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let created = ISO8601DateFormatter().string(from: Date())
         let body = appState.sessionEngine.text
         let words = appState.sessionEngine.wordCount
-        let markdown = "---\ncreated: \(created)\nsource: First Line\nwords: \(words)\n---\n\n\(body)"
+        let markdown = SuccessText.exportMarkdown(created: created, wordCount: words, body: body)
         try? markdown.write(to: url, atomically: true, encoding: .utf8)
     }
 

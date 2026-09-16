@@ -1,10 +1,12 @@
+import { denyFeedback } from './feedback.js';
+import { wordCount } from './session.mjs';
 
 (function () {
   "use strict";
   var LINES = [
-    "cant say this out loud but",
-    "i dont want the promotoin",
-    "promotion. i want time off"
+    "my nmae",
+    "name. i cant erase that",
+    "so i keep writing"
   ];
   var PAUSES = [1200, 1000, 0];
   var TYPE_END = 15000, SILENT_END = 20000, WARN_END = 23000, CUT_END = 23200, LOOP = 25000;
@@ -30,6 +32,8 @@
   var numeralEl = document.getElementById("numeral");
   var reportEl = document.getElementById("report");
   var countEl = document.getElementById("count");
+  var keyEl = document.getElementById("demo-key");
+  var denied = false;
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   var t0 = Date.now();
@@ -53,7 +57,7 @@
   }
   function words(d) {
     var s = d.done.concat([d.cur]).join(" ").trim();
-    var w = s ? s.split(/\s+/).length : 0;
+    var w = wordCount(s);
     return w + (w === 1 ? " WORD" : " WORDS");
   }
 
@@ -83,6 +87,11 @@
   }
 
   function render(t) {
+    var backspace = t >= SEGS[0].t1 && t < SEGS[1].t0;
+    if (backspace && !denied) denyFeedback(paper);
+    denied = backspace;
+    var draft = draftAt(t);
+    put(keyEl, 'key', backspace ? 'BACKSPACE - BLOCKED' : t < TYPE_END ? 'KEY: ' + (draft.cur.slice(-1) === ' ' ? 'SPACE' : draft.cur.slice(-1)) : t < SILENT_END ? 'NO TYPING' : '');
     if (t < SILENT_END) {
       setPhase("type");
       setWash(null);
@@ -115,6 +124,8 @@
   }
 
   function renderReduced() {
+    put(keyEl, 'key', 'BACKSPACE IS BLOCKED. KEEP WRITING.');
+    denied = false;
     setPhase("still");
     setWash(null);
     put(numeralEl, "num", "");

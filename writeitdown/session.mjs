@@ -26,6 +26,10 @@ export function clock(seconds) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
+const wordSegments = new Intl.Segmenter(undefined, { granularity: 'word' });
+
+// Han characters count individually; other scripts use Unicode word boundaries.
 export function wordCount(text) {
-  return text.trim() ? text.trim().split(/\s+/u).length : 0;
+  const separated = text.replace(/(\p{Script=Han}\p{Mark}*)/gu, ' $1 ');
+  return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
 }

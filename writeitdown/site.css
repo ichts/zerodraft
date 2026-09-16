@@ -54,8 +54,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .paper.warn,.paper.cut,.paper.report,.paper.still{--chrome:var(--ink);--timer:var(--ink)}
 .paper.cut .caret{background:transparent}
 
-.chrome-row{position:absolute;top:20px;left:20px;right:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.rules{flex:1;min-width:0;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;color:var(--chrome)}
+.chrome-row{position:absolute;top:20px;left:20px;right:20px;display:flex;align-items:flex-start;justify-content:flex-end;gap:12px}
 .clock{flex:none;font-family:var(--mono);font-weight:500;font-size:16px;line-height:1;font-variant-numeric:tabular-nums;color:var(--timer)}
 
 .prev-band{position:absolute;left:20px;right:20px;bottom:calc(62% + 42px);height:round(down, calc(38% - 98px), var(--lh));overflow:hidden;pointer-events:none}
@@ -90,33 +89,34 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-phase="warn"] .wash,.room[data-cut="true"] .wash{transition:none}
 .room[data-cut="true"] .room-wall-wash{background:var(--deep-wall)}
 .room[data-cut="true"] .room-paper-wash{background:var(--deep-paper)}
-.writing-area{position:absolute;inset:96px 32px 48%;display:flex;justify-content:center}
-#editor{display:block;width:100%;max-width:62ch;height:100%;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 26px/1.6 var(--serif);padding:8px;overflow:auto}
+.writing-area{position:absolute;inset:72px 32px 80px;display:flex;align-items:center;justify-content:center}
+#editor{display:block;width:100%;max-width:62ch;height:auto;max-height:50%;text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 26px/1.6 var(--serif);padding:8px;overflow:auto}
 #editor::placeholder{color:var(--mute)}
 #editor:focus{outline:none}
 #editor:focus-visible{outline:none}
-.room-danger{position:absolute;top:54%;bottom:110px;left:20px;right:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none}
-#room-numeral{font:600 min(24vh,240px)/.85 var(--mono);font-variant-numeric:tabular-nums;color:var(--alarm)}
+.room-danger{position:absolute;top:68%;bottom:76px;left:20px;right:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none}
+#room-numeral{font:600 min(16vh,144px)/.85 var(--mono);font-variant-numeric:tabular-nums;color:var(--alarm)}
 #room-warning{text-align:center;color:var(--ink)}
 .room-report{position:absolute;bottom:76px;left:20px;right:20px;text-align:center}
-.room[data-phase="kept"] .writing-area{bottom:80px;overflow:auto}
-#kept{width:100%;max-width:62ch}
+.room[data-phase="kept"] .writing-area{align-items:safe center;overflow:auto}
+#kept{width:100%;max-width:62ch;text-align:center}
 #kept h1{font:500 clamp(32px,5vw,48px)/1.1 var(--serif);margin:0 0 24px}
 .kept-text{font:400 26px/1.6 var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
-.kept-actions{display:flex;align-items:center;gap:24px;flex-wrap:wrap}
+.kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
 .kept-actions .door{margin:0}
 .kept-actions .mini-link{min-height:44px;padding:0}
-.room[data-denied="true"] .room-paper{outline:1px solid var(--alarm)}
+.demo-key{position:absolute;top:50%;left:20px;right:20px;text-align:center;color:var(--mute)}
+#landing .foot{justify-content:flex-end}
 .legal{max-width:760px;width:100%;margin:0 auto;padding:56px var(--gut);font:400 21px/1.6 var(--serif)}
 .legal h1{font-weight:500;font-size:48px;line-height:1.1}
 .legal h2{font-weight:500;font-size:28px;margin-top:32px}
 .legal a{text-decoration:underline;text-underline-offset:3px}
 @media(max-width:767px){
   .nav{gap:12px}.foot-links{gap:20px}.foot-links a{min-height:44px;display:flex;align-items:center}
-  .room{padding:12px}.writing-area{inset:92px 20px 48%}
+  .room{padding:12px}.writing-area{inset:64px 20px 80px}
   #editor,.kept-text{font-size:21px}
-  #room-numeral{font-size:min(20vh,160px)}
-  .room-danger{bottom:150px;gap:12px}
+  #room-numeral{font-size:min(13vh,110px)}
+  .room-danger{bottom:108px;gap:12px}
   .room-report{bottom:76px;font-size:11px}
 }
 @media (prefers-reduced-motion: reduce){.caret{animation:none!important;opacity:1}.room .wash{transition:none}}

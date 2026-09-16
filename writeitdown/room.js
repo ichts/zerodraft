@@ -1,4 +1,5 @@
 import { fresh, advance, append, clock, wordCount } from './session.mjs';
+import { denyFeedback } from './feedback.js';
 
 const $ = id => document.getElementById(id);
 const room = $('room');
@@ -7,7 +8,6 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const insertions = new Set(['insertText', 'insertParagraph', 'insertLineBreak']);
 let state = fresh();
 let compositionBase = null;
-let deniedUntil = 0;
 let copyGeneration = 0;
 
 function announce(text) {
@@ -33,12 +33,12 @@ function render(now = performance.now()) {
   $('room-report').textContent = state.phase === 'wipe' ? `DRAFT WIPED - ${clock(state.unused)} UNUSED. TYPE TO RESTART.` : '';
   editor.hidden = kept;
   $('kept').hidden = !kept;
-  room.dataset.denied = String(now < deniedUntil);
   if (previous === state.phase) return;
   if (warning) announce('Keep typing or the draft is deleted. Three seconds left.');
   if (state.phase === 'wipe') {
     compositionBase = null;
     editor.value = '';
+    fitEditor();
     editor.blur();
     editor.focus({ preventScroll: true });
     announce($('room-report').textContent);
@@ -61,10 +61,16 @@ function tick() {
 
 function deny(event) {
   event.preventDefault();
-  deniedUntil = performance.now() + 160;
+  denyFeedback(room.querySelector('.room-paper'));
   announce('BLOCKED. FORWARD ONLY.');
   render();
 }
+
+function fitEditor() {
+  editor.style.height = '0px';
+  editor.style.height = `${editor.scrollHeight}px`;
+}
+window.addEventListener('resize', fitEditor);
 
 function endCaret() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
@@ -80,6 +86,7 @@ function reset() {
   $('copy').textContent = 'COPY TEXT';
   $('status').textContent = '';
   render();
+  fitEditor();
 }
 
 function route() {
@@ -88,7 +95,7 @@ function route() {
   $('landing').hidden = active;
   room.hidden = !active;
   reset();
-  if (active) editor.focus({ preventScroll: true });
+  if (active) { fitEditor(); editor.focus({ preventScroll: true }); }
   else if (returning) document.querySelector('.door').focus({ preventScroll: true });
 }
 
@@ -125,6 +132,7 @@ editor.addEventListener('input', event => {
     state = { ...active, text: editor.value };
   } else state = append(state, addition, performance.now());
   render();
+  fitEditor();
   editor.scrollTop = editor.scrollHeight;
 });
 

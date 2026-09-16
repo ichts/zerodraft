@@ -59,3 +59,13 @@ test('clock and word labels', () => {
   assert.equal(wordCount('  two\nwords '), 2);
   assert.equal(wordCount(''), 0);
 });
+
+test('Unicode words, individual Han characters, and non-word input', () => {
+  const cases = [
+    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 6],
+    ['你好，world！', 3], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
+    ['こんにちは世界', 3], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
+    ['𠀀中文', 3], ['你好👩🏽‍💻world', 3]
+  ];
+  for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
+});

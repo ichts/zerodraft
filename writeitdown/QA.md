@@ -1,4 +1,8 @@
-# Phase-two acceptance
+# Current acceptance
+
+Phase three was validated locally on September 16, 2026. See [`data/zd-writeitdown-polish-s2/REPORT.md`](../data/zd-writeitdown-polish-s2/REPORT.md) for the multilingual counting rule, all eight requested changes, checks, screenshots and limits. There are now 8 deterministic tests and 10 installed production files. Browser evidence covers 1440x900 and 390x844, both themes and reduced motion, with real full-minute kept runs. The deployment handoff is `writeitdown-phase3-deploy-bundle.tar.gz`; local validation does not claim a live release.
+
+# Phase-two acceptance (historical)
 
 Validated locally on September 16, 2026. Deployment and HTTPS acceptance remain the supervisor's responsibility.
 

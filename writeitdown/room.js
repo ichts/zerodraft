@@ -4,6 +4,7 @@ const $ = id => document.getElementById(id);
 const room = $('room');
 const editor = $('editor');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const insertions = new Set(['insertText', 'insertParagraph', 'insertLineBreak']);
 let state = fresh();
 let compositionBase = null;
 let deniedUntil = 0;
@@ -26,7 +27,9 @@ function render(now = performance.now()) {
   $('room-warning').textContent = warning ? 'KEEP TYPING OR THE DRAFT IS DELETED.' : '';
   const remaining = kept ? 0 : state.started === null ? 60 : Math.max(0, Math.ceil((state.started + 60000 - now) / 1000));
   $('room-clock').textContent = clock(remaining);
-  $('room-count').textContent = `${wordCount(state.text)} WORDS`;
+  const count = wordCount(state.text);
+  const words = `${count} ${count === 1 ? 'WORD' : 'WORDS'}`;
+  $('room-count').textContent = words;
   $('room-report').textContent = state.phase === 'wipe' ? `DRAFT WIPED - ${clock(state.unused)} UNUSED. TYPE TO RESTART.` : '';
   editor.hidden = kept;
   $('kept').hidden = !kept;
@@ -43,7 +46,7 @@ function render(now = performance.now()) {
   if (kept) {
     compositionBase = null;
     $('kept-text').textContent = state.text;
-    $('receipt').textContent = `0:00 - ${wordCount(state.text)} WORDS KEPT.`;
+    $('receipt').textContent = `0:00 - ${words} KEPT.`;
     announce('You wrote it down. Copy your text before leaving.');
     $('copy').focus({ preventScroll: true });
   }
@@ -80,12 +83,13 @@ function reset() {
 }
 
 function route() {
+  const returning = !room.hidden;
   const active = location.hash === '#trial';
   $('landing').hidden = active;
   room.hidden = !active;
   reset();
   if (active) editor.focus({ preventScroll: true });
-  else document.querySelector('.door').focus({ preventScroll: true });
+  else if (returning) document.querySelector('.door').focus({ preventScroll: true });
 }
 
 function exit() {
@@ -97,7 +101,7 @@ editor.addEventListener('beforeinput', event => {
   tick();
   if (state.phase === 'kept') { event.preventDefault(); return; }
   if (event.isComposing || /Composition/.test(event.inputType)) return;
-  if (!['insertText', 'insertParagraph', 'insertLineBreak'].includes(event.inputType)) {
+  if (!insertions.has(event.inputType)) {
     deny(event);
     return;
   }
@@ -108,7 +112,8 @@ editor.addEventListener('input', event => {
   tick();
   if (state.phase === 'kept') { editor.value = state.text; return; }
   const base = compositionBase ?? state.text;
-  if (!editor.value.startsWith(base)) {
+  const composing = event.isComposing || /Composition/.test(event.inputType);
+  if ((!composing && !insertions.has(event.inputType)) || !editor.value.startsWith(base)) {
     editor.value = state.text;
     endCaret();
     deny(event);

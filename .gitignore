@@ -7,6 +7,7 @@
 .pi-subagents/
 .playwright-mcp/
 .lavish/
+.task/
 tmp/
 pi-session-*.html
 

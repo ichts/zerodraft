@@ -61,6 +61,7 @@ Design authority: the web surface answers to `design/DESIGN.md` (constitution v2
 ## Current product and scope
 
 - Zero Draft is the current product and its outward-facing name; the First Line name is retired for outward use. The root web surface is its public landing site and browser trial.
+- `writeitdown/` is the separate writeitdown.app static deployment. Its approved LAMPLIGHT/DAYLIGHT and vanilla-browser contracts are scoped in `writeitdown/AGENTS.md`; they do not change the root landing's Datastar or bone-only rules.
 - `apps/macos/FirstLine/` is the native macOS implementation. It is a separate Swift-native track and does not share a Datastar runtime with the web surface.
 - The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.

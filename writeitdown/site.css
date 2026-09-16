@@ -72,12 +72,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 
 .paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
 .report{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
-.count{font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
+.count{flex:none;white-space:nowrap;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
 
 .foot{padding:var(--gut);display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .foot-note{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
 .foot-links{display:flex;gap:20px}
 
+.nav-actions{display:flex;align-items:baseline;gap:20px}
 .theme-toggle,.paper-foot button{min-height:44px;padding:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{padding:var(--gut);height:100dvh;min-height:360px;--chrome:var(--ink);--timer:var(--ink)}
@@ -93,7 +94,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 #editor{display:block;width:100%;max-width:62ch;height:100%;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 26px/1.6 var(--serif);padding:8px;overflow:auto}
 #editor::placeholder{color:var(--mute)}
 #editor:focus{outline:none}
-#editor:focus-visible{outline:1px solid var(--mute);outline-offset:3px}
+#editor:focus-visible{outline:none}
 .room-danger{position:absolute;top:54%;bottom:110px;left:20px;right:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none}
 #room-numeral{font:600 min(24vh,240px)/.85 var(--mono);font-variant-numeric:tabular-nums;color:var(--alarm)}
 #room-warning{text-align:center;color:var(--ink)}

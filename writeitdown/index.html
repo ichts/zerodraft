@@ -8,95 +8,27 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box}
-html,body{margin:0;padding:0}
-body{background:#15140f}
-::selection{background:rgba(236,231,217,.18)}
-a{color:#8f897a;text-decoration:none}
-a:hover{color:#ece7d9}
-a:focus-visible,.door:focus-visible{outline:1px solid #ece7d9;outline-offset:3px}
-@keyframes wid-caret{0%,49%{opacity:1}50%,100%{opacity:0}}
-
-.stage{
-  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--alarm:#f2a93b;
-  --wash-wall:#2e1712;--wash-paper:#3a1c15;--deep-wall:#3d1d15;--deep-paper:#4a2318;
-  --h1:clamp(44px,6cqw,72px);--deck:24px;--script:26px;--lh:41.6px;--num:72px;
-  --gut:32px;--heroy:56px;--doorh:52px;
-  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
-  --serif:'Newsreader',Georgia,'Times New Roman',serif;
-  container-type:inline-size;position:relative;width:100%;min-height:100vh;min-height:100dvh;
-  background:var(--wall);overflow:hidden;display:flex;flex-direction:column;
-  -webkit-font-smoothing:antialiased;
-}
-@media (max-width:767px){
-  .stage{--h1:clamp(36px,11cqw,48px);--deck:19px;--script:21px;--lh:33.6px;--num:48px;--gut:20px;--heroy:32px;--doorh:56px}
-}
-
-.wash{position:absolute;inset:0;pointer-events:none}
-.col{position:relative;display:flex;flex-direction:column;flex:1;min-height:0}
-.row{width:100%;max-width:1120px;margin:0 auto}
-
-.nav{padding:var(--gut) var(--gut) 0;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
-.logotype{font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.14em;color:var(--ink)}
-.mini-link{font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;color:var(--mute)}
-
-.hero{padding:var(--heroy) var(--gut) 0;display:flex;flex-direction:column;align-items:center;gap:20px}
-.h1{margin:0;font-family:var(--serif);font-weight:500;font-size:var(--h1);line-height:1.04;letter-spacing:-.015em;color:var(--ink);text-wrap:balance;text-align:center;max-width:26ch}
-.deck{margin:0;font-family:var(--serif);font-style:italic;font-weight:400;font-size:var(--deck);line-height:1.45;color:var(--mute);text-align:center;max-width:46ch}
-.door{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;min-height:var(--doorh);padding:0 28px;border:0;border-radius:0;background:var(--ink);color:var(--wall);font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.12em;cursor:pointer;transition:none}
-.door:hover{color:var(--wall)}
-
-.demo-wrap{padding:20px var(--gut) 0;flex:1;min-height:0;display:flex}
-.paper{position:relative;width:100%;flex:1;min-height:220px;background:var(--paper);box-shadow:0 1px 0 rgba(0,0,0,.25),0 24px 48px -32px rgba(0,0,0,.65);border-radius:0;overflow:hidden;--chrome:var(--faint);--timer:var(--mute)}
-.paper.warn,.paper.cut,.paper.report,.paper.still{--chrome:var(--ink);--timer:var(--ink)}
-.paper.cut .caret{background:transparent}
-
-.chrome-row{position:absolute;top:20px;left:20px;right:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-.rules{flex:1;min-width:0;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;color:var(--chrome)}
-.clock{flex:none;font-family:var(--mono);font-weight:500;font-size:16px;line-height:1;font-variant-numeric:tabular-nums;color:var(--timer)}
-
-.prev-band{position:absolute;left:20px;right:20px;bottom:calc(62% + 42px);height:round(down, calc(38% - 98px), var(--lh));overflow:hidden;pointer-events:none}
-.prev-stack{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column-reverse;align-items:center}
-.prev-line{width:100%;max-width:62ch;font-family:var(--serif);font-weight:400;font-size:var(--script);line-height:var(--lh);color:var(--ink);text-align:center}
-.prev-line:first-child{opacity:.22}
-.prev-line:nth-child(2){opacity:.07}
-
-.anchor-wrap{position:absolute;left:20px;right:20px;top:calc(38% - 42px);display:flex;justify-content:center}
-.script{margin:0;width:100%;max-width:62ch;font-family:var(--serif);font-weight:400;font-size:var(--script);line-height:var(--lh);color:var(--ink);text-align:center}
-.caret{display:inline-block;width:1px;height:1em;margin-left:1px;vertical-align:-.12em;background:var(--ink);animation:wid-caret 1.06s steps(1,end) infinite}
-
-.numeral-band{position:absolute;left:20px;right:20px;top:calc(38% + 18px);bottom:44px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:var(--num);line-height:.82;font-variant-numeric:tabular-nums;color:var(--alarm);pointer-events:none}
-
-.paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
-.report{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
-.count{font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
-
-.foot{padding:var(--gut);display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.foot-note{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
-.foot-links{display:flex;gap:20px}
-
-@media (prefers-reduced-motion: reduce){.caret{animation:none!important;opacity:1}}
-</style>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="site.css">
 </head>
 <body>
-<main class="stage">
+<main class="stage" id="landing">
   <div class="wash" id="wash-wall" aria-hidden="true"></div>
   <div class="col">
     <nav class="row nav">
       <div class="logotype">WRITE_IT_DOWN</div>
-      <a class="mini-link" href="#mac">MAC RELEASE &#8594;</a>
+      <button class="mini-link theme-toggle" type="button" data-theme-toggle>LIGHT</button>
     </nav>
     <header class="row hero">
       <h1 class="h1">We force you to write it down.</h1>
       <p class="deck">With a clock: stop for eight seconds and your draft is deleted.</p>
-      <a class="door" href="#demo">Give it sixty seconds.</a>
+      <a class="door" href="#trial">Give it sixty seconds.</a>
     </header>
-    <section class="row demo-wrap" id="demo" aria-label="Live demo: the sixty second writing room">
+    <section class="row demo-wrap" id="demo" aria-label="Scripted preview, not the live trial">
       <div class="paper" id="paper">
         <div class="wash" id="wash-paper" aria-hidden="true"></div>
         <div class="chrome-row">
-          <div class="rules">FORWARD ONLY / 5S WARN / 8S WIPE / 60S</div>
+          <div class="rules">PREVIEW / FORWARD ONLY / 5S WARN / 8S WIPE / 60S</div>
           <div class="clock" id="clock">1:00</div>
         </div>
         <div class="prev-band" aria-hidden="true">
@@ -118,146 +50,42 @@ a:focus-visible,.door:focus-visible{outline:1px solid #ece7d9;outline-offset:3px
     <footer class="row foot">
       <div class="foot-note">NOTHING HERE IS SAVED. THE TRIAL KEEPS NO TEXT.</div>
       <div class="foot-links">
-        <a class="mini-link" href="#support">SUPPORT</a>
-        <a class="mini-link" href="#privacy">PRIVACY</a>
+        <a class="mini-link" href="support.html">SUPPORT</a>
+        <a class="mini-link" href="privacy.html">PRIVACY</a>
+        <a class="mini-link" href="terms.html">TERMS</a>
       </div>
     </footer>
   </div>
 </main>
-<script>
-(function () {
-  "use strict";
-  var LINES = [
-    "cant say this out loud but",
-    "i dont want the promotoin",
-    "promotion. i want time off"
-  ];
-  var PAUSES = [1200, 1000, 0];
-  var TYPE_END = 15000, SILENT_END = 20000, WARN_END = 23000, CUT_END = 23200, LOOP = 25000;
-
-  var SEGS = (function () {
-    var chars = LINES.reduce(function (n, l) { return n + l.length; }, 0);
-    var pauses = PAUSES.reduce(function (a, b) { return a + b; }, 0);
-    var per = (TYPE_END - pauses) / chars;
-    var t = 0;
-    return LINES.map(function (l, i) {
-      var seg = { i: i, t0: t, t1: t + l.length * per };
-      t = seg.t1 + PAUSES[i];
-      return seg;
-    });
-  })();
-
-  var paper = document.getElementById("paper");
-  var washWall = document.getElementById("wash-wall");
-  var washPaper = document.getElementById("wash-paper");
-  var clockEl = document.getElementById("clock");
-  var prevEls = [document.getElementById("prev-0"), document.getElementById("prev-1")];
-  var curEl = document.getElementById("cur");
-  var numeralEl = document.getElementById("numeral");
-  var reportEl = document.getElementById("report");
-  var countEl = document.getElementById("count");
-
-  var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var t0 = Date.now();
-  var seen = {};
-
-  function draftAt(t) {
-    var done = [], cur = "", s, l, i;
-    for (i = 0; i < SEGS.length; i++) {
-      s = SEGS[i]; l = LINES[s.i];
-      if (t >= s.t1) { done.push(l); cur = l; }
-      else if (t > s.t0) { cur = l.slice(0, Math.round(l.length * (t - s.t0) / (s.t1 - s.t0))); break; }
-      else break;
-    }
-    if (done.length && cur === done[done.length - 1]) done = done.slice(0, -1);
-    return { done: done, cur: cur };
-  }
-  function full() { return { done: LINES.slice(0, -1), cur: LINES[LINES.length - 1] }; }
-  function clockAt(t) {
-    var left = Math.max(0, 60 - Math.floor(t / 1000));
-    return left === 60 ? "1:00" : "0:" + String(left).padStart(2, "0");
-  }
-  function words(d) {
-    var s = d.done.concat([d.cur]).join(" ").trim();
-    var w = s ? s.split(/\s+/).length : 0;
-    return w + (w === 1 ? " WORD" : " WORDS");
-  }
-
-  function put(el, key, v) {
-    if (seen[key] !== v) { seen[key] = v; el.textContent = v; }
-  }
-  function setPhase(name) {
-    if (seen.ph !== name) { seen.ph = name; paper.className = "paper " + name; }
-  }
-  function setWash(k) {
-    var wall, pap;
-    if (k === "deep") { wall = "var(--deep-wall)"; pap = "var(--deep-paper)"; }
-    else if (k == null) { wall = "none"; pap = "none"; }
-    else {
-      wall = "color-mix(in oklab, var(--wash-wall) " + Math.round(k * 100) + "%, transparent)";
-      pap = "color-mix(in oklab, var(--wash-paper) " + Math.round(k * 100) + "%, transparent)";
-    }
-    if (seen.ww !== wall) { seen.ww = wall; washWall.style.background = wall; }
-    if (seen.wp !== pap) { seen.wp = pap; washPaper.style.background = pap; }
-  }
-  function renderDraft(d) {
-    var r = d.done.slice().reverse();
-    put(prevEls[0], "p0", r[0] || "");
-    put(prevEls[1], "p1", r[1] || "");
-    put(curEl, "cur", d.cur);
-    put(countEl, "count", words(d));
-  }
-
-  function render(t) {
-    if (t < SILENT_END) {
-      setPhase("type");
-      setWash(null);
-      put(numeralEl, "num", "");
-      put(reportEl, "rep", "");
-      renderDraft(t < TYPE_END ? draftAt(t) : full());
-      put(clockEl, "clock", clockAt(t));
-    } else if (t < WARN_END) {
-      setPhase("warn");
-      setWash((t - SILENT_END) / 3000);
-      put(numeralEl, "num", String(3 - Math.floor((t - SILENT_END) / 1000)));
-      put(reportEl, "rep", "");
-      renderDraft(full());
-      put(clockEl, "clock", clockAt(t));
-    } else if (t < CUT_END) {
-      setPhase("cut");
-      setWash("deep");
-      put(numeralEl, "num", "");
-      put(reportEl, "rep", "");
-      renderDraft({ done: [], cur: "" });
-      put(clockEl, "clock", "1:00");
-    } else {
-      setPhase("report");
-      setWash(null);
-      put(numeralEl, "num", "");
-      put(reportEl, "rep", "DRAFT WIPED - 0:37 UNUSED. TYPE TO RESTART.");
-      renderDraft({ done: [], cur: "" });
-      put(clockEl, "clock", "1:00");
-    }
-  }
-
-  function renderReduced() {
-    setPhase("still");
-    setWash(null);
-    put(numeralEl, "num", "");
-    put(reportEl, "rep", "");
-    renderDraft(full());
-    put(clockEl, "clock", "1:00");
-  }
-
-  function tick() {
-    if (reducedMq.matches) { renderReduced(); return; }
-    render((Date.now() - t0) % LOOP);
-  }
-
-  tick();
-  setInterval(tick, 50);
-  if (reducedMq.addEventListener) reducedMq.addEventListener("change", tick);
-})();
-</script>
+<section class="stage room" id="room" aria-label="Sixty-second writing room" hidden>
+  <div class="wash room-wall-wash" aria-hidden="true"></div>
+  <div class="room-paper">
+    <div class="wash room-paper-wash" aria-hidden="true"></div>
+    <div class="chrome-row">
+      <div class="rules" id="room-rules">FORWARD ONLY / 5S WARN / 8S WIPE / 60S</div>
+      <div class="clock" id="room-clock">1:00</div>
+    </div>
+    <div class="writing-area">
+      <label class="sr-only" for="editor">Write forward. Stop for eight seconds and your draft is deleted.</label>
+      <textarea id="editor" aria-describedby="room-rules" placeholder="Start typing." spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+      <div id="kept" hidden>
+        <h1>You wrote it down.</h1>
+        <div class="kept-text" id="kept-text"></div>
+        <p class="report" id="receipt"></p>
+        <div class="kept-actions"><button class="door" id="copy" type="button">COPY TEXT</button><button class="mini-link" id="restart" type="button">RUN IT AGAIN</button></div>
+        <p class="report">NOTHING HERE IS SAVED.</p>
+      </div>
+    </div>
+    <div class="room-danger" aria-hidden="true"><div id="room-numeral"></div><div class="mini-link" id="room-warning"></div></div>
+    <div class="room-report report" id="room-report"></div>
+    <div class="paper-foot">
+      <button class="mini-link" id="exit" type="button">ESC - EXIT</button>
+      <div class="count" id="room-count">0 WORDS</div>
+    </div>
+  </div>
+  <div class="sr-only" id="status" role="status" aria-live="polite"></div>
+</section>
+<script src="demo.js" defer></script>
+<script type="module" src="room.js"></script>
 </body>
 </html>

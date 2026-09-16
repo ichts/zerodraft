@@ -6,7 +6,10 @@ A static browser writing room. Open `index.html#trial` over HTTP to enter direct
 python3 -m http.server 8000
 # http://localhost:8000/writeitdown/
 node --test writeitdown/session.test.mjs
+cd writeitdown && npm ci && npx playwright test
 ```
+
+The browser suite uses installed Google Chrome, starts its own local server, and accelerates the session/demo clocks. It captures all acceptance states across two viewport sizes, both themes, and both motion preferences. Playwright is a development-only dependency; installation does not ship Node or npm assets. Set `WID_QA_OUTPUT` to choose the evidence directory.
 
 The first input starts sixty seconds. Five seconds of silence warns; eight wipes the draft. The earlier deadline wins, and a tie wipes. Kept text remains available to copy until the user leaves. No draft is stored or sent anywhere.
 

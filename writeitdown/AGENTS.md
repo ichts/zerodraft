@@ -15,12 +15,13 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `session.test.mjs`: deterministic timing and multilingual-count regressions.
 - `qa/input-regression.js`: browser event-path checks, including synthetic IME composition; not an OS input-method test.
 - `qa/zen-regression.js`: long multilingual text, fixed zen geometry, scroll containment, and deny-feedback regressions.
+- `qa/phase4.spec.mjs`, `playwright.config.mjs`: executable eight-project browser acceptance, accelerated clocks, screenshots, and console/network checks. Playwright is test-only; the deployed site has no package runtime.
 - `install.sh`: fixed-target, backed-up deployment inside `/var/www/writeitdown.app/` only.
 - `QA.md`: browser acceptance and remaining limits.
 
 The design references are the phase-two Landing/Room deliverables, not their `.dc.html` preview scaffolding. `site.css` is the production token contract. No frameworks, analytics, rounded UI, or design-board runtime.
 
-Validate with `node --test writeitdown/session.test.mjs`, then serve over HTTP and exercise both themes at 1440x900 and 390x844 in an isolated browser. The room starts on first input, not entry. Kept text is visible only until exit/reload. Never store or submit writing. New support contact details require a confirmed address; do not invent one.
+Validate with `node --test writeitdown/session.test.mjs` and `cd writeitdown && npm ci && npx playwright test` (installed Chrome required). The browser suite serves HTTP and covers both themes at 1440x900 and 390x844, normal and reduced motion, with accelerated clocks. The room starts on first input, not entry. Kept text is visible only until exit/reload. Never store or submit writing. New support contact details require a confirmed address; do not invent one.
 
 ## Maintaining this file
 

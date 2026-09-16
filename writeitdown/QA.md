@@ -1,6 +1,8 @@
 # Current acceptance
 
-Phase four is a local-only tested bundle, not a live deployment. The phase-four handoff includes `REPORT.html`, contact sheets, individual screenshots, and the browser command log.
+Phase four is a local-only tested bundle, not a live deployment. Final acceptance is executable: from `writeitdown/`, run `npx playwright test`. All 24 specs pass across eight viewport/theme/motion projects in 20.8 seconds; 108 screenshots are captured by the specs and inspected in contact sheets. The suite asserts the native input paths, no writing scrollbar/page overflow, three visible text lines, opaque active band, vertical center, historical sample, absent subtitles, centered report, 600ms deny with its final still hold, and reduced-motion behavior. Eight mocked sixty-second sessions reach kept and verify clipboard contents and Escape. Script exceptions, failed application assets, and non-GET requests fail acceptance. Google Chrome and `npm ci` are the prerequisites; there is no runtime dependency change.
+
+The phase-four handoff includes `REPORT.html`, executable specs, contact sheets, individual screenshots, and command logs. Earlier real-time browser runs below remain supporting reproduction evidence, not the final acceptance workflow.
 
 - Reproduced the textarea scrollbar with native insertion of 378 multilingual writing units: 342px client height versus 765px content. Short drafts hid the overflow. Fixed-height masked text and symmetric padding replace content-driven growth, keeping the active line centered and two previous lines faded.
 - Restored the sample verbatim from `4bef933:writeitdown/demo.js`; removed all key subtitles and centered the demo report.

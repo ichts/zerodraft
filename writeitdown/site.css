@@ -91,6 +91,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-cut="true"] .room-wall-wash{background:var(--deep-wall)}
 .room[data-cut="true"] .room-paper-wash{background:var(--deep-paper)}
 .writing-area{position:absolute;inset:72px 32px 80px;display:flex;align-items:center;justify-content:center}
+/* Match the demo's upper-third active line; kept retains its readable result area. */
+.room:not([data-phase="kept"]) .writing-area{top:32%;bottom:auto;transform:translateY(-50%)}
 #editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 8px;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(transparent,rgba(0,0,0,.07) 10%,rgba(0,0,0,.22) 30%,#000 40%,#000 60%,rgba(0,0,0,.22) 70%,transparent)}
 #editor::-webkit-scrollbar{display:none}
 #editor::placeholder{color:var(--mute)}

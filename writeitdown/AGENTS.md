@@ -10,7 +10,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `demo.js`: watch-only private messy-draft preview with blocked-backspace feedback and a centered wipe report. Never owns the actual trial.
 - `feedback.js`: shared deny shake and gesture-gated sound; reduced motion suppresses spatial movement.
 - `session.mjs`: pure deadline adjudication and Unicode writing-unit count. Earlier deadline wins; ties wipe. See `README.md` for counting semantics.
-- `room.js`: transient session owner, native textarea/IME enforcement, centered three-visible-line zen viewport, routing, clipboard. Writing never exposes a scrollbar; kept text remains readable. No draft persistence or network transport.
+- `room.js`: transient session owner, native textarea/IME enforcement, upper-third three-visible-line zen viewport, routing, clipboard. Writing never exposes a scrollbar; kept text remains readable. No draft persistence or network transport.
 - `privacy.html`, `terms.html`, `support.html`: honest static help/legal pages with the shared theme.
 - `session.test.mjs`: deterministic timing and multilingual-count regressions.
 - `qa/input-regression.js`: browser event-path checks, including synthetic IME composition; not an OS input-method test.

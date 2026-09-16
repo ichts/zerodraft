@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
 const browserEvidence = new WeakMap();
+const demoGeometry = new WeakMap();
 
 async function enter(page) {
   await page.locator('#landing .door').click();
@@ -20,7 +21,11 @@ async function assertZen(page) {
     return {
       height: e.clientHeight, line, overflow: style.overflowY, scrollbar: style.scrollbarWidth,
       mask: style.maskImage, bottomGap: e.scrollHeight - e.clientHeight - e.scrollTop,
-      centerOffset: activeCenter - (paper.top + paper.height / 2),
+      centerOffset: activeCenter - (rect.top + rect.height / 2),
+      activeCenter, paperTop: paper.top, paperHeight: paper.height,
+      ratio: (activeCenter - paper.top) / paper.height,
+      apertureTop: rect.top,
+      chromeBottom: e.closest('.room-paper').querySelector('.chrome-row').getBoundingClientRect().bottom,
       visibleTextLines: [0, 1, 2, 3].filter(previous => activeCenter - previous * line > rect.top).length,
       pageHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
       pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
@@ -28,7 +33,13 @@ async function assertZen(page) {
   });
   expect(Math.abs(geometry.height - geometry.line * 5)).toBeLessThan(1);
   expect(geometry.visibleTextLines).toBe(3);
-  expect(Math.abs(geometry.centerOffset)).toBeLessThan(16);
+  expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
+  const demo = demoGeometry.get(page);
+  // Compare line-box centers in their own papers, allowing only a quarter
+  // demo line of proportional drift, not a loose viewport midpoint bound.
+  expect(Math.abs(geometry.ratio - demo.ratio)).toBeLessThan(demo.line / (4 * demo.paperHeight));
+  expect(geometry.activeCenter).toBeLessThan(geometry.viewportHeight / 2);
+  expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.bottomGap).toBeLessThan(2);
   expect(geometry.overflow).toBe('hidden');
   expect(geometry.scrollbar).toBe('none');
@@ -39,12 +50,18 @@ async function assertZen(page) {
   expect(geometry.mask).toContain('rgba(0, 0, 0, 0.22) 30%');
   expect(geometry.pageHeight).toBe(geometry.viewportHeight);
   expect(geometry.pageWidth).toBe(geometry.viewportWidth);
+  return geometry;
 }
 
 test.beforeEach(async ({ page }) => {
-  const evidence = { errors: [], requests: [], failedAssets: [] };
+  const evidence = { errors: [], consoleErrors: [], requests: [], failedAssets: [], failedRequests: [] };
   browserEvidence.set(page, evidence);
   page.on('pageerror', error => evidence.errors.push(error.message));
+  page.on('console', message => {
+    if (message.type() === 'error') evidence.consoleErrors.push(message.text());
+  });
+  page.on('requestfailed', request => evidence.failedRequests.push(request.url()));
+  await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
   page.on('request', request => evidence.requests.push({ method: request.method(), url: request.url() }));
   page.on('response', response => {
     if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) evidence.failedAssets.push(response.url());
@@ -53,14 +70,37 @@ test.beforeEach(async ({ page }) => {
   await page.clock.pauseAt(new Date('2026-09-16T12:00:01Z'));
   await page.goto('./');
   await page.evaluate(() => document.fonts.ready);
+  demoGeometry.set(page, await page.locator('.script').evaluate(e => {
+    const rect = e.getBoundingClientRect();
+    const paper = e.closest('.paper').getBoundingClientRect();
+    return { line: parseFloat(getComputedStyle(e).lineHeight), paperHeight: paper.height,
+      ratio: (rect.top + rect.height / 2 - paper.top) / paper.height };
+  }));
 });
 
 test.afterEach(async ({ page }, info) => {
   const evidence = browserEvidence.get(page);
   await info.attach('browser-evidence', { body: JSON.stringify(evidence), contentType: 'application/json' });
   expect(evidence.errors).toEqual([]);
+  expect(evidence.consoleErrors).toEqual([]);
+  expect(evidence.failedRequests).toEqual([]);
   expect(evidence.failedAssets).toEqual([]);
   expect(evidence.requests.every(request => request.method === 'GET')).toBe(true);
+});
+
+test('demo and trial active-line placement', async ({ page }, info) => {
+  if (info.project.use.reducedMotion !== 'reduce') await page.clock.fastForward(15050);
+  const demo = demoGeometry.get(page);
+  await capture(page, info, 'placement-demo');
+  await enter(page);
+  const states = {};
+  for (const [state, text] of Object.entries({ empty: '', short: 'A fresh line.', cjk: '中文继续写。'.repeat(120) })) {
+    if (text) await page.keyboard.insertText(text);
+    states[state] = await assertZen(page);
+    await capture(page, info, `placement-${state}`);
+  }
+  await info.attach('placement', { body: JSON.stringify({ demo, states }), contentType: 'application/json' });
+  console.log(info.project.name, JSON.stringify({ demo, states }));
 });
 
 test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ page }, info) => {
@@ -81,10 +121,16 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   await editor(page).hover();
   await page.mouse.wheel(0, -600);
   expect(await editor(page).evaluate(e => e.scrollTop)).toBe(position);
-  for (const key of ['Backspace', 'Delete', 'ControlOrMeta+x', 'ArrowUp', 'PageUp']) {
-    await page.keyboard.press(key);
-    await expect(editor(page)).toHaveValue(text);
-  }
+  // Playwright's clock controls session timers, not WAAPI's document timeline.
+  // Freeze feedback in the native key event, before runner latency can consume it.
+  await page.locator('.room-paper').evaluate(paper => {
+    paper.getAnimations().forEach(a => a.finish());
+    document.addEventListener('keydown', () => {
+      paper.getAnimations().forEach(a => { a.pause(); a.currentTime = 230; });
+    }, { once: true });
+  });
+  await page.keyboard.press('Backspace');
+  await expect(editor(page)).toHaveValue(text);
   const feedback = await page.locator('.room-paper').evaluate(paper => paper.getAnimations().map(a => ({
     duration: a.effect.getTiming().duration, frames: a.effect.getKeyframes(),
   })));
@@ -99,8 +145,14 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   }
   await page.locator('.room-paper').evaluate(paper => paper.getAnimations().forEach(a => { a.pause(); a.currentTime = 230; }));
   await capture(page, info, 'deny');
+  for (const key of ['Delete', 'ControlOrMeta+x', 'ArrowUp', 'PageUp']) {
+    await page.keyboard.press(key);
+    await expect(editor(page)).toHaveValue(text);
+  }
+  await page.locator('.room-paper').evaluate(paper => paper.getAnimations().forEach(a => a.finish()));
   await page.clock.fastForward(5500);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'warn');
+  await assertZen(page);
   await capture(page, info, 'warn');
   await page.keyboard.insertText(' Keep writing.');
   await expect(editor(page)).toHaveValue(text + ' Keep writing.');
@@ -110,6 +162,7 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   await page.clock.fastForward(8350);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
   await expect(editor(page)).toHaveValue('');
+  await assertZen(page);
   await capture(page, info, 'wipe-report');
   await page.locator('#exit').click();
   await expect(page.locator('#landing .door')).toBeFocused();

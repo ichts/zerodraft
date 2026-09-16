@@ -1,5 +1,15 @@
 # Current acceptance
 
+Phase five changes only the trial writing aperture's placement. The active-line center now sits at 32% of the paper height. At 1440x900 it moved from y=446 to y=299.52; at 390x844, from y=414 to y=274.39. The unchanged demo measures 33.33% and 31.56% of its own paper respectively. The old test checked proximity to the paper midpoint, so it could not detect this mismatch.
+
+`cd writeitdown && npx playwright test` passes all 32 tests across eight viewport/theme/motion projects. The placement regression compares line-box centers normalized to each paper, allowing at most one quarter of a demo line of proportional drift. It also checks that the active line is in the upper half of the viewport and the aperture clears the timer. Empty, short Latin, long CJK, multiline typing, warning, recovery and wipe retain the fixed aperture, opaque active band and no page/editor scrollbar. Mock clocks cover timed states, including kept and copy.
+
+The suite captures 140 screenshots. Representative before/after screenshots were reviewed individually; no contact-sheet success is claimed. Console errors, script exceptions, failed requests/assets and non-GET requests fail acceptance. The absent optional favicon is fulfilled with an empty test-only response. Deny evidence is frozen inside the native key event because Playwright's clock does not control the WAAPI document timeline; this removes a runner-latency race from the prior test.
+
+Eight session unit tests, JavaScript syntax checks, installer shell syntax and whitespace checks pass. Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. This is a local-only handoff, not a deployment.
+
+# Phase-four acceptance (historical)
+
 Phase four is a local-only tested bundle, not a live deployment. Final acceptance is executable: from `writeitdown/`, run `npx playwright test`. All 24 specs pass across eight viewport/theme/motion projects in 20.8 seconds; 108 screenshots are captured by the specs and inspected in contact sheets. The suite asserts the native input paths, no writing scrollbar/page overflow, three visible text lines, opaque active band, vertical center, historical sample, absent subtitles, centered report, 600ms deny with its final still hold, and reduced-motion behavior. Eight mocked sixty-second sessions reach kept and verify clipboard contents and Escape. Script exceptions, failed application assets, and non-GET requests fail acceptance. Google Chrome and `npm ci` are the prerequisites; there is no runtime dependency change.
 
 The phase-four handoff includes `REPORT.html`, executable specs, contact sheets, individual screenshots, and command logs. Earlier real-time browser runs below remain supporting reproduction evidence, not the final acceptance workflow.

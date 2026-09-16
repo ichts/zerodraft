@@ -1,4 +1,5 @@
 let audio;
+const feedback = new WeakMap();
 
 function unlock(event) {
   if (!event.isTrusted) return;
@@ -11,13 +12,19 @@ document.addEventListener('pointerdown', unlock);
 document.addEventListener('keydown', unlock);
 
 export function denyFeedback(paper) {
-  paper.getAnimations().forEach(animation => animation.cancel());
+  if (feedback.get(paper)?.playState === 'running') return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) paper.animate([
-    { transform: 'translateX(0)' }, { transform: 'translateX(-2px)' },
-    { transform: 'translateX(2px)' }, { transform: 'translateX(0)' }
-  ], { duration: 160 });
-  paper.animate([{ outline: '1px solid var(--alarm)' }, { outline: '1px solid var(--alarm)' }], { duration: 90 });
+    { transform: 'translateX(0)', offset: 0 },
+    { transform: 'translateX(-4px)', offset: .18 },
+    { transform: 'translateX(4px)', offset: .38 },
+    { transform: 'translateX(-2px)', offset: .56 },
+    { transform: 'translateX(0)', offset: .7 },
+    { transform: 'translateX(0)', offset: 1 }
+  ], { duration: 600 });
+  feedback.set(paper, paper.animate([
+    { outline: '1px solid var(--alarm)' }, { outline: '1px solid var(--alarm)' }
+  ], { duration: 600 }));
   if (audio?.state !== 'running') return;
   const tone = audio.createOscillator();
   const gain = audio.createGain();

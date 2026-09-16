@@ -67,10 +67,11 @@ function deny(event) {
 }
 
 function fitEditor() {
-  editor.style.height = '0px';
-  editor.style.height = `${editor.scrollHeight}px`;
+  // Symmetric padding keeps the last native text line at the zen window's center.
+  editor.scrollTop = editor.scrollHeight;
 }
 window.addEventListener('resize', fitEditor);
+document.fonts.ready.then(fitEditor);
 
 function endCaret() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
@@ -92,6 +93,7 @@ function reset() {
 function route() {
   const returning = !room.hidden;
   const active = location.hash === '#trial';
+  document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;
   room.hidden = !active;
   reset();
@@ -133,7 +135,6 @@ editor.addEventListener('input', event => {
   } else state = append(state, addition, performance.now());
   render();
   fitEditor();
-  editor.scrollTop = editor.scrollHeight;
 });
 
 editor.addEventListener('compositionstart', () => {
@@ -147,7 +148,7 @@ editor.addEventListener('compositionend', () => {
 });
 editor.addEventListener('keydown', event => {
   if (event.isComposing) return;
-  if (['Backspace', 'Delete'].includes(event.key) || ((event.metaKey || event.ctrlKey) && ['z', 'y', 'x', 'v'].includes(event.key.toLowerCase()))) deny(event);
+  if (['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'PageUp', 'PageDown'].includes(event.key) || ((event.metaKey || event.ctrlKey) && ['z', 'y', 'x', 'v'].includes(event.key.toLowerCase()))) deny(event);
 });
 for (const name of ['paste', 'cut', 'drop']) editor.addEventListener(name, deny);
 editor.addEventListener('pointerup', () => { if (compositionBase === null) endCaret(); });

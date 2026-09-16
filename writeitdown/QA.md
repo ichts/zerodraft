@@ -1,5 +1,17 @@
 # Current acceptance
 
+Phase four is a local-only tested bundle, not a live deployment. The phase-four handoff includes `REPORT.html`, contact sheets, individual screenshots, and the browser command log.
+
+- Reproduced the textarea scrollbar with native insertion of 378 multilingual writing units: 342px client height versus 765px content. Short drafts hid the overflow. Fixed-height masked text and symmetric padding replace content-driven growth, keeping the active line centered and two previous lines faded.
+- Restored the sample verbatim from `4bef933:writeitdown/demo.js`; removed all key subtitles and centered the demo report.
+- Deny feedback lasts 600ms (420ms shake, 180ms still hold). Input and deadline clocks are never paused. Repeats do not restart the shake; reduced motion retains the hairline without movement.
+- Eight session unit tests pass. Run `qa/input-regression.js` and `qa/zen-regression.js` as browser evaluation functions while in `#trial`: 15 input-path and 14 zen checks pass across 1440x900/390x844, both themes, normal/reduced motion.
+- Browser matrix covers empty, focused, long Latin/CJK/emoji text, denied deletion/cut, warn, real recovery, wipe, exit, and kept. Four real full-minute sessions cover both widths and motion preferences; each kept result is captured in both themes. Copy and Escape pass. Demo typing/warn/cut/report frames are captured in both sizes and themes.
+- Presentation frames freeze an observed clock or animation to survive CLI screenshot latency. Real wipe/recovery and full-minute checks use unchanged session clocks. Initial stale typing/recovery captures were replaced after visual inspection caught CLI delays.
+- Real OS IME, iOS Safari/virtual keyboard, and human audio evaluation remain unverified. Synthetic composition and Chrome viewport tests are not substitutes for those checks.
+
+# Phase-three acceptance (historical)
+
 Phase three was validated locally on September 16, 2026. See [`data/zd-writeitdown-polish-s2/REPORT.md`](../data/zd-writeitdown-polish-s2/REPORT.md) for the multilingual counting rule, all eight requested changes, checks, screenshots and limits. There are now 8 deterministic tests and 10 installed production files. Browser evidence covers 1440x900 and 390x844, both themes and reduced motion, with real full-minute kept runs. The deployment handoff is `writeitdown-phase3-deploy-bundle.tar.gz`; local validation does not claim a live release.
 
 # Phase-two acceptance (historical)

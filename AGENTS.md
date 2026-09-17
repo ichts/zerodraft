@@ -148,7 +148,7 @@ The root-web acceptance commands are the Playwright specs under `writeitdown/` (
 - exercise the browser trial's typing, danger recovery, failure, completion, keyboard restrictions, and IME behavior when relevant
 - verify focus visibility and `prefers-reduced-motion` behavior for interaction or motion changes
 - verify visual layout consistency: hero content width and left edge must align with the footer; centered elements must be centered; text must not be clipped or orphaned; interactive elements must have consistent radius, color, and spacing
-- capture screenshots of every changed state (landing hero, demo typing/warn/wipe/report stages, trial at rest/typed/warn/recovery/wipe/kept, COPY TEXT completed state, ESC and EXIT outcomes) and inspect them before reporting completion
+- capture screenshots of every changed state (landing hero, demo typing/warn/wipe/report stages, trial at rest/typed/warn/recovery/wipe/kept, COPY TEXT completed state, ESC and EXIT outcomes) and inspect them
 
 For native macOS work, follow the deeper instructions under `apps/macos/AGENTS.md` and `apps/macos/FirstLine/AGENTS.md`. From `apps/macos/FirstLine/`, run:
 

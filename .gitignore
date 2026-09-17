@@ -21,3 +21,6 @@ apps/macos/FirstLine/build/
 
 # Existing
 tmp/font-candidates/
+
+# Dependencies
+node_modules/

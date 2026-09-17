@@ -126,6 +126,13 @@ Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray pal
 - `zerodraft-prd.md` and `docs/design-system.md` describe the historical product and design system. The Flood system (fossils, the siege, the narrator, zen rendering, the morph handoff) is retired; `design/siege-motion-model.md` is its retirement notice and points to the last live commit.
 - Do not restore the fossil layer, siege, zen rendering, morph, prompts, or legacy signals into the current landing unless explicitly requested.
 
+## Testing gate
+
+- Regression is proven only by deterministic commands: Playwright specs (`npm test` in `writeitdown/`) for the web surface, `swift build` and `swift test` (from `apps/macos/FirstLine/`) for the macOS app.
+- Agents write and modify tests, scripts, and fixtures; never use Sol, Fable, Grok, or any model-driven MCP clicking as a regression run.
+- Exploration may use real clicking (AXe, Jev, a human); once the same path is stable twice, it must be scripted.
+- Reporting done requires the acceptance command and its result; without a command, the work is not done.
+
 ## Development and validation
 
 Preview the web surface over HTTP:
@@ -135,13 +142,13 @@ python3 -m http.server 8000
 # Open http://localhost:8000/index.html
 ```
 
-There is no automated root-web test suite. For web changes:
+The root-web acceptance commands are the Playwright specs under `writeitdown/` (`npm test` there); the checks below are exploration support, not the exit condition. For web changes:
 
 - inspect affected pages at desktop and mobile widths
 - exercise the browser trial's typing, danger recovery, failure, completion, keyboard restrictions, and IME behavior when relevant
 - verify focus visibility and `prefers-reduced-motion` behavior for interaction or motion changes
 - verify visual layout consistency: hero content width and left edge must align with the footer; centered elements must be centered; text must not be clipped or orphaned; interactive elements must have consistent radius, color, and spacing
-- capture screenshots of every changed state (landing hero, demo typing/warn/wipe/report stages, trial at rest/typed/warn/recovery/wipe/kept, COPY TEXT completed state, ESC and EXIT outcomes) and inspect them before reporting completion
+- capture screenshots of every changed state (landing hero, demo typing/warn/wipe/report stages, trial at rest/typed/warn/recovery/wipe/kept, COPY TEXT completed state, ESC and EXIT outcomes) and inspect them
 
 For native macOS work, follow the deeper instructions under `apps/macos/AGENTS.md` and `apps/macos/FirstLine/AGENTS.md`. From `apps/macos/FirstLine/`, run:
 
@@ -150,7 +157,7 @@ swift build
 swift test
 ```
 
-UI, editor, or motion changes on the macOS app must also be exercised in a real debug window (typing, danger, failure, aftermath, deny feedback, success, reduced motion, and the fossil gutter at the minimum window width) and the result recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`.
+UI, editor, or motion changes on the macOS app must also be exercised in a real debug window (typing, danger, failure, aftermath, deny feedback, success, reduced motion, and the fossil gutter at the minimum window width) as exploration alongside `swift test`, with the result recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`.
 
 ## Delivery contract
 

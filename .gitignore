@@ -2,7 +2,8 @@
 .DS_Store
 
 # Tool / agent artifacts
-.pi/
+.pi/*
+!.pi/skills/
 .pi-subagents/
 .playwright-mcp/
 .lavish/

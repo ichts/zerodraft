@@ -1,27 +1,16 @@
-import { denyFeedback } from './feedback.js';
-import { wordCount } from './session.mjs';
+import { LINES, TIMELINE } from './demo-timeline.mjs';
+import { clock, wordCount } from './session.mjs';
 
 (function () {
   "use strict";
-  var LINES = [
-    "cant say this out loud but",
-    "i dont want the promotoin",
-    "promotion. i want time off"
-  ];
-  var PAUSES = [1200, 1000, 0];
-  var TYPE_END = 15000, SILENT_END = 20000, WARN_END = 23000, CUT_END = 23200, LOOP = 25000;
-
-  var SEGS = (function () {
-    var chars = LINES.reduce(function (n, l) { return n + l.length; }, 0);
-    var pauses = PAUSES.reduce(function (a, b) { return a + b; }, 0);
-    var per = (TYPE_END - pauses) / chars;
-    var t = 0;
-    return LINES.map(function (l, i) {
-      var seg = { i: i, t0: t, t1: t + l.length * per };
-      t = seg.t1 + PAUSES[i];
-      return seg;
-    });
-  })();
+  // TIMELINE paces the typing like a person: uneven keystrokes, word and
+  // punctuation pauses, one visible backspace correction. The danger beats
+  // stay absolute - 5s of silence after the last key, 3s of warn (wash and
+  // 3-2-1), the 200ms cut, then the report holds 2s before the loop restarts.
+  var TYPE_END = TIMELINE.typeEnd;
+  var SILENT_END = TYPE_END + 5000, WARN_END = SILENT_END + 3000,
+      CUT_END = WARN_END + 200, LOOP = CUT_END + 2000;
+  var EVENTS = TIMELINE.events;
 
   var paper = document.getElementById("paper");
   var washWall = document.getElementById("wash-wall");
@@ -32,22 +21,18 @@ import { wordCount } from './session.mjs';
   var numeralEl = document.getElementById("numeral");
   var reportEl = document.getElementById("report");
   var countEl = document.getElementById("count");
-  var denied = false;
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   var t0 = Date.now();
   var seen = {};
 
   function draftAt(t) {
-    var done = [], cur = "", s, l, i;
-    for (i = 0; i < SEGS.length; i++) {
-      s = SEGS[i]; l = LINES[s.i];
-      if (t >= s.t1) { done.push(l); cur = l; }
-      else if (t > s.t0) { cur = l.slice(0, Math.round(l.length * (t - s.t0) / (s.t1 - s.t0))); break; }
-      else break;
+    var snap = { dn: 0, cur: "" }, i;
+    for (i = 0; i < EVENTS.length; i++) {
+      if (EVENTS[i].t > t) break;
+      snap = EVENTS[i];
     }
-    if (done.length && cur === done[done.length - 1]) done = done.slice(0, -1);
-    return { done: done, cur: cur };
+    return { done: LINES.slice(0, snap.dn), cur: snap.cur };
   }
   function full() { return { done: LINES.slice(0, -1), cur: LINES[LINES.length - 1] }; }
   function clockAt(t) {
@@ -86,9 +71,6 @@ import { wordCount } from './session.mjs';
   }
 
   function render(t) {
-    var backspace = t >= SEGS[1].t1 && t < SEGS[2].t0;
-    if (backspace && !denied) denyFeedback(paper);
-    denied = backspace;
     if (t < SILENT_END) {
       setPhase("type");
       setWash(null);
@@ -114,14 +96,13 @@ import { wordCount } from './session.mjs';
       setPhase("report");
       setWash(null);
       put(numeralEl, "num", "");
-      put(reportEl, "rep", "DRAFT WIPED - 0:37 UNUSED. TYPE TO RESTART.");
+      put(reportEl, "rep", "DRAFT WIPED - " + clock(60 - Math.round(CUT_END / 1000)) + " UNUSED. TYPE TO RESTART.");
       renderDraft({ done: [], cur: "" });
       put(clockEl, "clock", "1:00");
     }
   }
 
   function renderReduced() {
-    denied = false;
     setPhase("still");
     setWash(null);
     put(numeralEl, "num", "");

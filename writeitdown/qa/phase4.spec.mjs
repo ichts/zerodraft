@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
+import { TIMELINE } from '../demo-timeline.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -48,9 +49,45 @@ async function assertZen(page) {
   expect(geometry.mask).toContain('rgb(0, 0, 0) 60%');
   expect(geometry.mask).toContain('rgba(0, 0, 0, 0.07) 10%');
   expect(geometry.mask).toContain('rgba(0, 0, 0, 0.22) 30%');
+  // iA Writer Focus: the falloff above the clear band mirrors the falloff
+  // below it - same stop positions, same alpha ladder - at every width.
+  const stops = maskStops(geometry.mask);
+  expect(stops).toHaveLength(8);
+  for (const stop of stops) {
+    const mirror = stops.find(other => Math.abs(other.pos - (100 - stop.pos)) < 0.5);
+    expect(mirror, `no mirror stop for ${JSON.stringify(stop)} in ${geometry.mask}`).toBeTruthy();
+    expect(Math.abs(mirror.alpha - stop.alpha)).toBeLessThan(0.011);
+  }
+  const bandLines = geometry.height * 0.2 / geometry.line;
+  expect(bandLines).toBeGreaterThanOrEqual(1);
+  expect(bandLines).toBeLessThanOrEqual(2);
   expect(geometry.pageHeight).toBe(geometry.viewportHeight);
   expect(geometry.pageWidth).toBe(geometry.viewportWidth);
   return geometry;
+}
+
+// Parse a computed linear-gradient into {pos, alpha} pairs; unpositioned
+// first/last stops are 0%/100%. Computed colors look like rgb(0, 0, 0),
+// rgba(0, 0, 0, 0.07).
+function maskStops(maskImage) {
+  const body = maskImage.slice(maskImage.indexOf('(') + 1, maskImage.lastIndexOf(')'));
+  const tokens = [];
+  let depth = 0, token = '';
+  for (const ch of body) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ',' && depth === 0) { tokens.push(token.trim()); token = ''; }
+    else token += ch;
+  }
+  tokens.push(token.trim());
+  return tokens.map((stop, index) => {
+    const match = stop.match(/^(.*?)(?:\s+([\d.]+%))?$/);
+    const alpha = match[1].match(/,\s*([\d.]+)\)$/);
+    return {
+      pos: match[2] ? parseFloat(match[2]) : index === 0 ? 0 : 100,
+      alpha: /^rgb\(/.test(match[1]) ? 1 : alpha ? parseFloat(alpha[1]) : NaN,
+    };
+  });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -89,7 +126,7 @@ test.afterEach(async ({ page }, info) => {
 });
 
 test('demo and trial active-line placement', async ({ page }, info) => {
-  if (info.project.use.reducedMotion !== 'reduce') await page.clock.fastForward(15050);
+  if (info.project.use.reducedMotion !== 'reduce') await page.clock.fastForward(TIMELINE.typeEnd + 250);
   const demo = demoGeometry.get(page);
   await capture(page, info, 'placement-demo');
   await enter(page);
@@ -190,27 +227,53 @@ test('mocked sixty-second kept, copy and Escape', async ({ page, context }, info
   await capture(page, info, 'escape');
 });
 
+test('demo correction beat: visible rhythmic deletion, then retype', async ({ page }, info) => {
+  test.skip(info.project.use.reducedMotion === 'reduce', 'reduced motion renders the static draft');
+  expect(TIMELINE.typeEnd).toBeGreaterThan(16500); // the retired uniform pace ended at 15000
+  const events = TIMELINE.events;
+  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotoin'));
+  const backs = events.filter(event => event.kind === 'back');
+  const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
+  expect(backs).toHaveLength(3);
+  let at = 0;
+  const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
+  await seek(typo.t + 55); // a 50ms tick lands past the event, before the next one
+  await expect(page.locator('#cur')).toHaveText('i dont want the promotoin');
+  await capture(page, info, 'correction-typo');
+  await seek(backs[1].t + 55);
+  await expect(page.locator('#cur')).toHaveText(backs[1].cur);
+  expect(backs[1].cur.length).toBe(typo.cur.length - 2);
+  await capture(page, info, 'correction-deleting');
+  await seek(fixed.t + 55);
+  await expect(page.locator('#cur')).toHaveText('i dont want the promotion');
+  await capture(page, info, 'correction-fixed');
+});
+
 test('historical demo sample without subtitles, centered report', async ({ page }, info) => {
   await expect(page.locator('#demo-key')).toHaveCount(0);
-  if (info.project.use.reducedMotion !== 'reduce') await page.clock.fastForward(15050);
+  const typeEnd = TIMELINE.typeEnd, SILENT = typeEnd + 5000, WARN = SILENT + 3000, CUT = WARN + 200;
+  let at = 0;
+  const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
+  if (info.project.use.reducedMotion !== 'reduce') await seek(typeEnd + 250);
   await expect(page.locator('#prev-1')).toHaveText('cant say this out loud but');
-  await expect(page.locator('#prev-0')).toHaveText('i dont want the promotoin');
+  // The demo corrects its typo on screen now, so the kept line shows the fix.
+  await expect(page.locator('#prev-0')).toHaveText('i dont want the promotion');
   await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
   await capture(page, info, 'demo-typing');
   if (info.project.use.reducedMotion === 'reduce') {
-    await page.clock.fastForward(25000);
+    await page.clock.fastForward(30000);
     await expect(page.locator('#clock')).toHaveText('1:00');
     await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
     return;
   }
-  await page.clock.fastForward(5000);
+  await seek(SILENT + 150);
   await expect(page.locator('#paper')).toHaveClass('paper warn');
   await capture(page, info, 'demo-warn');
-  await page.clock.fastForward(3000);
+  await seek(WARN + 100);
   await expect(page.locator('#paper')).toHaveClass('paper cut');
   await capture(page, info, 'demo-cut');
-  await page.clock.fastForward(200);
-  await expect(page.locator('#report')).toContainText('DRAFT WIPED');
+  await seek(CUT + 300);
+  await expect(page.locator('#report')).toContainText(`DRAFT WIPED - 0:${60 - Math.round(CUT / 1000)} UNUSED`);
   const centers = await page.evaluate(() => {
     const p = document.querySelector('#paper').getBoundingClientRect();
     const range = document.createRange();

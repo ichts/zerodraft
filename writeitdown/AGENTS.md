@@ -7,7 +7,8 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `index.html`: landing and directly addressable `#trial` room.
 - `site.css`: shared geometry and semantic tokens. Both themes keep paper brighter than wall, including wash and cut.
 - `theme.js`: appearance preference only. System appearance is the default; `writeitdown-theme` is the only localStorage key.
-- `demo.js`: watch-only private messy-draft preview with blocked-backspace feedback and a centered wipe report. Never owns the actual trial.
+- `demo.js`: watch-only private messy-draft preview replaying `demo-timeline.mjs` - human-rhythm typing with a visible self-correction and a centered wipe report. Never owns the actual trial; deny feedback fires only in the trial.
+- `demo-timeline.mjs`: deterministic seeded typing script (lines, correction beat, pacing) shared by `demo.js` and the qa specs.
 - `feedback.js`: shared deny shake and gesture-gated sound; reduced motion suppresses spatial movement.
 - `session.mjs`: pure deadline adjudication and Unicode writing-unit count. Earlier deadline wins; ties wipe. See `README.md` for counting semantics.
 - `room.js`: transient session owner, native textarea/IME enforcement, upper-third three-visible-line zen viewport, routing, clipboard. Writing never exposes a scrollbar; kept text remains readable. No draft persistence or network transport.

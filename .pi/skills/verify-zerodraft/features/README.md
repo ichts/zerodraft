@@ -8,4 +8,4 @@ The user-facing features of the Zero Draft web surface, from the user's point of
 | Trial session kept (60s deadline) | `trial-session-kept.md` | root, default branch |
 | Trial silence wipe + rearm | `trial-silence-wipe.md` | root, default branch |
 | Supporting static pages | `static-support-pages.md` | root, default branch |
-| writeitdown site + Playwright suite | `writeitdown-site.md` | `writeitdown/`, NOT yet merged to the default branch |
+| writeitdown site + Playwright suite | `writeitdown-site.md` | `writeitdown/`, default branch |

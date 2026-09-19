@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WRITE_IT_DOWN - We force you to write it down.</title>
+<meta name="description" content="A writing room with a clock: stop for eight seconds and your draft is deleted. Sixty seconds. Forward only.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="theme.js"></script>
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<main class="stage" id="landing">
+  <div class="wash" id="wash-wall" aria-hidden="true"></div>
+  <div class="col">
+    <nav class="row nav">
+      <div class="logotype">WRITE_IT_DOWN</div>
+      <div class="nav-actions"><a class="mini-link" href="support.html#mac">MAC RELEASE &#8594;</a><button class="mini-link theme-toggle" type="button" data-theme-toggle>LIGHT</button></div>
+    </nav>
+    <header class="row hero">
+      <h1 class="h1">We force you to write it down.</h1>
+      <p class="deck">With a clock: stop for eight seconds and your draft is deleted.</p>
+      <a class="door" href="#trial">Give it sixty seconds.</a>
+    </header>
+    <section class="row demo-wrap" id="demo" aria-label="Scripted preview, not the live trial">
+      <p class="sr-only">Backspace is blocked, so the typo stays. Eight seconds without typing deletes the draft.</p>
+      <div class="paper" id="paper">
+        <div class="wash" id="wash-paper" aria-hidden="true"></div>
+        <div class="chrome-row">
+          <div class="clock" id="clock">1:00</div>
+        </div>
+        <div class="prev-band" aria-hidden="true">
+          <div class="prev-stack">
+            <div class="prev-line" id="prev-0"></div>
+            <div class="prev-line" id="prev-1"></div>
+          </div>
+        </div>
+        <div class="anchor-wrap">
+          <p class="script"><span id="cur"></span><span class="caret" data-caret="1" aria-hidden="true"></span></p>
+        </div>
+        <div class="numeral-band" id="numeral" aria-hidden="true"></div>
+        <div class="report" id="report"></div>
+        <div class="paper-foot">
+          <div class="count" id="count">0 WORDS</div>
+        </div>
+      </div>
+    </section>
+    <footer class="row foot">
+      <div class="foot-links">
+        <a class="mini-link" href="support.html">SUPPORT</a>
+        <a class="mini-link" href="privacy.html">PRIVACY</a>
+        <a class="mini-link" href="terms.html">TERMS</a>
+      </div>
+    </footer>
+  </div>
+</main>
+<section class="stage room" id="room" aria-label="Sixty-second writing room" hidden>
+  <div class="wash room-wall-wash" aria-hidden="true"></div>
+  <div class="room-paper">
+    <div class="wash room-paper-wash" aria-hidden="true"></div>
+    <div class="chrome-row">
+      <div class="clock" id="room-clock">1:00</div>
+    </div>
+    <div class="writing-area">
+      <label class="sr-only" for="editor">Write forward. Stop for eight seconds and your draft is deleted.</label>
+      <textarea id="editor" aria-describedby="count-rule" placeholder="Start typing." spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+      <div id="kept" hidden>
+        <h1>You wrote it down.</h1>
+        <div class="kept-text" id="kept-text"></div>
+        <p class="report" id="receipt"></p>
+        <div class="kept-actions"><button class="door" id="copy" type="button">COPY TEXT</button><button class="mini-link" id="restart" type="button">RUN IT AGAIN</button></div>
+      </div>
+    </div>
+    <div class="room-danger" aria-hidden="true"><div id="room-numeral"></div><div class="mini-link" id="room-warning"></div></div>
+    <div class="room-report report" id="room-report"></div>
+    <div class="paper-foot">
+      <button class="mini-link" id="exit" type="button">ESC - EXIT</button>
+      <div class="count" id="room-count" title="Words; Chinese characters count individually. Punctuation and emoji do not count.">0 WORDS</div>
+    </div>
+  </div>
+  <p class="sr-only" id="count-rule">Words; Chinese characters count individually. Punctuation and emoji do not count.</p>
+  <div class="sr-only" id="status" role="status" aria-live="polite"></div>
+</section>
+<script type="module" src="demo.js"></script>
+<script type="module" src="room.js"></script>
+</body>
+</html>

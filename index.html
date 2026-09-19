@@ -131,6 +131,32 @@ window.FirstLineLandingDemo = (() => {
     selection.addRange(range);
   }
 
+  // focus() into the trial editor is a silent no-op while the overlay (or any
+  // ancestor) still computes visibility:hidden. The trial-mode class lands a
+  // frame or two after flentertrial (signal -> data-class mirror), so a single
+  // rAF can fire inside that window and the focus is lost for good - the
+  // reported door-to-trial focus defect. Retry per frame until the overlay
+  // computes visible: visibility interpolates discretely, so it flips to
+  // visible at the first style recalc after the class lands (under
+  // prefers-reduced-motion transitions are disabled and it flips instantly).
+  // Termination: success within a frame or two on every real path, the
+  // isTrial() guard if the user exits first, and a hard 1s cap so this can
+  // never loop if the overlay somehow never appears.
+  function focusTrialEditorWhenVisible(el) {
+    if (!el) return;
+    const giveUpAt = performance.now() + 1000;
+    const attempt = () => {
+      if (!isTrial()) return;
+      const overlay = trialOverlay();
+      if (overlay && getComputedStyle(overlay).visibility === "visible") {
+        moveCaretToEnd(el);
+        return;
+      }
+      if (performance.now() < giveUpAt) requestAnimationFrame(attempt);
+    };
+    requestAnimationFrame(attempt);
+  }
+
   function selectionIsAtEnd(el) {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return true;
@@ -362,7 +388,7 @@ window.FirstLineLandingDemo = (() => {
     if (el) {
       el.innerHTML = "";
       el.setAttribute("contenteditable", "true");
-      requestAnimationFrame(() => { if (isTrial()) moveCaretToEnd(el); });
+      focusTrialEditorWhenVisible(el);
     }
     demoSync();
   }

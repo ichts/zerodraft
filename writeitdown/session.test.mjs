@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fresh, advance, append, clock, wordCount } from './session.mjs';
+import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
 test('rest has no running deadline', () => {
   assert.deepEqual(advance(fresh(), 999999), fresh());
@@ -50,6 +51,36 @@ test('late input cannot rescue an expired draft', () => {
 test('whitespace does not produce a kept draft', () => {
   const state = { ...fresh(), phase: 'typing', started: 0, lastInput: 59000, text: ' \n ' };
   assert.equal(advance(state, 60000).phase, 'wipe');
+});
+
+test('demo timeline is deterministic and paced like a person', () => {
+  assert.deepEqual(buildTimeline(), TIMELINE);
+  const { events, typeEnd } = TIMELINE;
+  // The retired uniform pace finished its draft at 15000ms; a human rhythm is
+  // slower but still a preview, not a marathon.
+  assert.ok(typeEnd > 16500, `typing ends at ${typeEnd}, expected slower than the old 15000`);
+  assert.ok(typeEnd < 20000, `typing ends at ${typeEnd}, expected under 20000`);
+  const gaps = events.slice(1).map((event, i) => event.t - events[i].t);
+  const min = Math.min(...gaps), max = Math.max(...gaps);
+  assert.ok(max > min * 5, `gap spread ${min}-${max}ms must not read as a metronome`);
+  assert.ok(gaps.some(gap => gap >= 350), 'word and punctuation pauses exist');
+  assert.equal(events.filter(event => event.kind === 'line').length, LINES.length - 1);
+});
+
+test('demo correction beat deletes the typo visibly, then retypes it', () => {
+  const { events } = TIMELINE;
+  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotoin'));
+  const backs = events.filter(event => event.kind === 'back');
+  const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
+  assert.ok(typo, 'the typo word is typed in full');
+  assert.equal(backs.length, 3, 'three rhythmic backspaces');
+  assert.ok(backs.every(back => back.t > typo.t), 'deletion starts after a pause, not instantly');
+  assert.deepEqual(backs.map(back => back.cur.length),
+    [backs[0].cur.length, backs[0].cur.length - 1, backs[0].cur.length - 2],
+    'each backspace visibly removes exactly one character');
+  assert.equal(LINES[1], 'i dont want the promotoin'.slice(0, -3) + 'ion');
+  assert.ok(fixed && fixed.t > backs[2].t, 'the corrected word appears after the deletion');
+  assert.equal(fixed.cur, LINES[1]);
 });
 
 test('clock and word labels', () => {

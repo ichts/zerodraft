@@ -62,6 +62,7 @@ Design authority: the web surface answers to `design/DESIGN.md` (constitution v2
 
 - Zero Draft is the current product and its outward-facing name; the First Line name is retired for outward use. The root web surface is its public landing site and browser trial.
 - `writeitdown/` is the separate writeitdown.app static deployment. Its approved LAMPLIGHT/DAYLIGHT and vanilla-browser contracts are scoped in `writeitdown/AGENTS.md`; they do not change the root landing's Datastar or bone-only rules.
+- writeitdown.app releases stay bundle installs, never a deploy from this repository: the source lives here, but a release still means transferring a tested bundle to the Hetzner host and running `sh writeitdown/install.sh` there (it copies exactly the ten production files into `/var/www/writeitdown.app`). Nothing in this repository - no workflow, hook, or credential - deploys anything.
 - `apps/macos/FirstLine/` is the native macOS implementation. It is a separate Swift-native track and does not share a Datastar runtime with the web surface.
 - The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.
@@ -129,7 +130,7 @@ Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray pal
 
 ## Testing gate
 
-- Regression is proven only by deterministic commands: Playwright specs (`npm test` in `writeitdown/`) for the web surface, `swift build` and `swift test` (from `apps/macos/FirstLine/`) for the macOS app.
+- Regression is proven only by deterministic commands: for the web surface, the repository-root `npm test` (the minimal landing/trial Playwright harness; it is not full root coverage) and `cd writeitdown && npm test` (the acceptance suite for the writeitdown.app sibling site, not for the root page); `swift build` and `swift test` (from `apps/macos/FirstLine/`) for the macOS app.
 - Agents write and modify tests, scripts, and fixtures; never use Sol, Fable, Grok, or any model-driven MCP clicking as a regression run.
 - Exploration may use real clicking (AXe, Jev, a human); once the same path is stable twice, it must be scripted.
 - Reporting done requires the acceptance command and its result; without a command, the work is not done.
@@ -143,7 +144,7 @@ python3 -m http.server 8000
 # Open http://localhost:8000/index.html
 ```
 
-The root-web acceptance commands are the Playwright specs under `writeitdown/` (`npm test` there); the checks below are exploration support, not the exit condition. For web changes:
+The root-web acceptance command is the repository-root `npm test`: the minimal Playwright harness added by https://github.com/ichts/zerodraft/pull/12, which drives the trial focus flow. The root page has no fuller suite yet - do not claim root coverage it does not have. The writeitdown suite (`cd writeitdown && npm test`) accepts only the writeitdown.app sibling site. The checks below are exploration support, not the exit condition. For web changes:
 
 - inspect affected pages at desktop and mobile widths
 - exercise the browser trial's typing, danger recovery, failure, completion, keyboard restrictions, and IME behavior when relevant

@@ -10,7 +10,7 @@ Zero Draft's web surface is pure static HTML: no backend, no build step. Verific
 ## Surfaces
 
 - **Root static surface (on the default branch):** `index.html` (Datastar landing + `#trial` browser trial) and the supporting pages `download.html`, `checkout-success.html`, `help.html`, `privacy.html`, `refund.html`, `terms.html`, `release-notes.html`. Serve the repo root; done.
-- **writeitdown site (NOT yet on the default branch):** the site and its Playwright harness (`writeitdown/package.json`, `playwright.config.mjs`, `qa/phase4.spec.mjs`) exist only on the unmerged local branch `main` and the `fm/zd-writeitdown-*` branches (7 commits past `8e4abfd`). On `origin/main`, `writeitdown/` contains only an untracked `node_modules/`. The writeitdown sections below apply the moment that branch lands; until then, running `cd writeitdown && npm test` on the default branch fails with `ENOENT: no such file or directory, open 'writeitdown/package.json'` — that is a base-condition finding to report, not a failure of this skill.
+- **writeitdown site:** the writeitdown.app sibling site (`writeitdown/index.html`, `demo.js`, `room.js`, `theme.js`, `session.mjs`, `site.css`, legal/support pages) plus its Playwright harness (`writeitdown/package.json`, `playwright.config.mjs`, `qa/phase4.spec.mjs`). It shares the forward-only, 8-second-wipe mechanism with the root trial but is a separate vanilla static site; its suite validates writeitdown, not the root landing.
 
 ## Launch
 
@@ -28,7 +28,7 @@ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/index.html
 curl -s http://127.0.0.1:8000/index.html | grep -c 'Give it sixty seconds.'
 ```
 
-writeitdown surface (once merged): no manual server. `writeitdown/playwright.config.mjs` declares its own `webServer` (`python3 -m http.server 8015 --bind 127.0.0.1 --directory ..`) and Playwright starts and stops it. Launch is `cd writeitdown && npm install && npm test`.
+writeitdown surface: no manual server. `writeitdown/playwright.config.mjs` declares its own `webServer` (`python3 -m http.server 8015 --bind 127.0.0.1 --directory ..`) and Playwright starts and stops it. Launch is `cd writeitdown && npm install && npm test`.
 
 ## Doctor
 
@@ -81,7 +81,7 @@ for p in download checkout-success help privacy refund terms release-notes; do
 done
 ```
 
-writeitdown surface (once merged): `cd writeitdown && npm test` runs `qa/phase4.spec.mjs` across 12 projects (1440/390 widths x dark/light x reduced-motion on/off) against `http://127.0.0.1:8015/writeitdown/`. Drive a single project while iterating: `npx playwright test --project=1440-light-no-preference`.
+writeitdown surface: `cd writeitdown && npm test` runs `qa/phase4.spec.mjs` across 8 projects - 32 tests (1440/390 widths x dark/light x reduced-motion on/off) against `http://127.0.0.1:8015/writeitdown/`. Drive a single project while iterating: `npx playwright test --project=1440-light-no-preference`.
 
 ## Evidence
 
@@ -121,4 +121,4 @@ Cleanup removes the server process and any scratch you created outside `tmp/veri
 
 ## Maintenance
 
-When the app changes (new page, new trial state, writeitdown merge), run `/maintain-verification-skill` to re-audit this skill and its feature map against the code.
+When the app changes (new page, new trial state, writeitdown suite change), run `/maintain-verification-skill` to re-audit this skill and its feature map against the code.

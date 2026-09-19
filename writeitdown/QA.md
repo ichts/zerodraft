@@ -54,7 +54,7 @@ Used separate headless Chrome profiles through `chrome-devtools-axi`, never the 
 - A second isolated Chrome instance with reduced motion forced on showed a static preview and a full, non-transitioning warning wash at five seconds.
 - Final product-page console had no errors. Network requests were limited to static site assets and the disclosed Google Fonts resources; no writing requests were made.
 
-Screenshots in `qa/` cover both widths and themes, plus warning recovery, reduced motion, legal pages, exit, and composition. Images were inspected individually and in contact sheets. Paper stays brighter than wall; the mobile nav fits; the warning numeral does not overprint the editor. A wrapping mobile word count found during review was fixed with `white-space: nowrap`.
+Screenshots in `qa/` covered both widths and themes, plus warning recovery, reduced motion, legal pages, exit, and composition; images were inspected individually and in contact sheets at QA time. The PNG binaries were stripped before this history entered the repository, so they survive only in the pre-transplant local commits. Paper stays brighter than wall; the mobile nav fits; the warning numeral does not overprint the editor. A wrapping mobile word count found during review was fixed with `white-space: nowrap`.
 
 The CLI's `wait` and script `run` APIs failed in this environment. Approval was obtained to use shell timing and `eval` promises instead. Browser insertion at two-second intervals kept the real sixty-second sessions alive; the model clock was never patched.
 

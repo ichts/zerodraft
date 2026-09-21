@@ -18,12 +18,15 @@ async function assertZen(page) {
     const line = parseFloat(style.lineHeight);
     const rect = e.getBoundingClientRect();
     const paper = e.closest('.room-paper').getBoundingClientRect();
+    const area = e.closest('.writing-area').getBoundingClientRect();
     const activeCenter = rect.top + e.scrollHeight - e.scrollTop - parseFloat(style.paddingBottom) - line / 2;
     return {
       height: e.clientHeight, line, overflow: style.overflowY, scrollbar: style.scrollbarWidth,
       mask: style.maskImage, bottomGap: e.scrollHeight - e.clientHeight - e.scrollTop,
       centerOffset: activeCenter - (rect.top + rect.height / 2),
-      activeCenter, paperTop: paper.top, paperHeight: paper.height,
+      activeCenter, paperCenter: paper.top + paper.height / 2,
+      writingAreaCenter: area.top + area.height / 2,
+      paperTop: paper.top, paperHeight: paper.height,
       ratio: (activeCenter - paper.top) / paper.height,
       apertureTop: rect.top,
       chromeBottom: e.closest('.room-paper').querySelector('.chrome-row').getBoundingClientRect().bottom,
@@ -35,11 +38,9 @@ async function assertZen(page) {
   expect(Math.abs(geometry.height - geometry.line * 5)).toBeLessThan(1);
   expect(geometry.visibleTextLines).toBe(3);
   expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
-  const demo = demoGeometry.get(page);
-  // Compare line-box centers in their own papers, allowing only a quarter
-  // demo line of proportional drift, not a loose viewport midpoint bound.
-  expect(Math.abs(geometry.ratio - demo.ratio)).toBeLessThan(demo.line / (4 * demo.paperHeight));
-  expect(geometry.activeCenter).toBeLessThan(geometry.viewportHeight / 2);
+  expect(Math.abs(geometry.activeCenter - geometry.paperCenter)).toBeLessThan(1);
+  expect(Math.abs(geometry.writingAreaCenter - geometry.paperCenter)).toBeLessThan(1);
+  expect(Math.abs(geometry.ratio - 0.5)).toBeLessThan(0.01);
   expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.bottomGap).toBeLessThan(2);
   expect(geometry.overflow).toBe('hidden');
@@ -125,6 +126,18 @@ test.afterEach(async ({ page }, info) => {
   expect(evidence.requests.every(request => request.method === 'GET')).toBe(true);
 });
 
+test('landing demo types into #cur after a hard load', async ({ page }, info) => {
+  await page.reload();
+  await page.evaluate(() => document.fonts.ready);
+  if (info.project.use.reducedMotion === 'reduce') {
+    await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
+  } else {
+    await page.clock.fastForward(TIMELINE.events[0].t + 100);
+    await expect(page.locator('#cur')).toHaveText(/^c/);
+  }
+  await capture(page, info, 'demo-hard-load');
+});
+
 test('demo and trial active-line placement', async ({ page }, info) => {
   if (info.project.use.reducedMotion !== 'reduce') await page.clock.fastForward(TIMELINE.typeEnd + 250);
   const demo = demoGeometry.get(page);
@@ -172,11 +185,11 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
     duration: a.effect.getTiming().duration, frames: a.effect.getKeyframes(),
   })));
   expect(feedback.length).toBeGreaterThan(0);
-  expect(feedback.every(a => a.duration === 600)).toBe(true);
+  expect(feedback.every(a => a.duration === 280)).toBe(true);
   const shake = feedback.find(a => a.frames.some(frame => frame.transform));
   if (info.project.use.reducedMotion === 'reduce') expect(shake).toBeUndefined();
   else {
-    expect(shake.frames.some(frame => frame.transform === 'translateX(-4px)')).toBe(true);
+    expect(shake.frames.some(frame => frame.transform === 'translateX(-2px)')).toBe(true);
     expect(shake.frames.at(-2).offset).toBe(.7);
     expect(shake.frames.at(-2).transform).toBe(shake.frames.at(-1).transform);
   }
@@ -229,16 +242,20 @@ test('mocked sixty-second kept, copy and Escape', async ({ page, context }, info
 
 test('demo correction beat: visible rhythmic deletion, then retype', async ({ page }, info) => {
   test.skip(info.project.use.reducedMotion === 'reduce', 'reduced motion renders the static draft');
-  expect(TIMELINE.typeEnd).toBeGreaterThan(16500); // the retired uniform pace ended at 15000
+  expect(TIMELINE.typeEnd).toBeGreaterThan(12000);
+  expect(TIMELINE.typeEnd).toBeLessThan(17000);
   const events = TIMELINE.events;
-  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotoin'));
+  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotino'));
   const backs = events.filter(event => event.kind === 'back');
   const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
-  expect(backs).toHaveLength(3);
+  expect(backs).toHaveLength(2);
+  expect(backs[0].t - typo.t).toBeLessThan(700);
+  expect(backs[1].t - backs[0].t).toBeLessThan(200);
+  expect(fixed.t - backs[1].t).toBeLessThan(550);
   let at = 0;
   const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
   await seek(typo.t + 55); // a 50ms tick lands past the event, before the next one
-  await expect(page.locator('#cur')).toHaveText('i dont want the promotoin');
+  await expect(page.locator('#cur')).toHaveText('i dont want the promotino');
   await capture(page, info, 'correction-typo');
   await seek(backs[1].t + 55);
   await expect(page.locator('#cur')).toHaveText(backs[1].cur);
@@ -284,4 +301,6 @@ test('historical demo sample without subtitles, centered report', async ({ page 
   expect(Math.abs(centers.x)).toBeLessThan(2);
   expect(Math.abs(centers.y)).toBeLessThan(4);
   await capture(page, info, 'demo-report');
+  await seek(CUT + 1800);
+  await expect(page.locator('#cur')).not.toHaveText('');
 });

@@ -1,5 +1,6 @@
 let audio;
 const feedback = new WeakMap();
+const FEEDBACK_DURATION = 280;
 
 function unlock(event) {
   if (!event.isTrusted) return;
@@ -16,15 +17,15 @@ export function denyFeedback(paper) {
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) paper.animate([
     { transform: 'translateX(0)', offset: 0 },
-    { transform: 'translateX(-4px)', offset: .18 },
-    { transform: 'translateX(4px)', offset: .38 },
-    { transform: 'translateX(-2px)', offset: .56 },
+    { transform: 'translateX(-2px)', offset: .18 },
+    { transform: 'translateX(2px)', offset: .38 },
+    { transform: 'translateX(-1px)', offset: .56 },
     { transform: 'translateX(0)', offset: .7 },
     { transform: 'translateX(0)', offset: 1 }
-  ], { duration: 600 });
+  ], { duration: FEEDBACK_DURATION, easing: 'ease-out' });
   feedback.set(paper, paper.animate([
     { outline: '1px solid var(--alarm)' }, { outline: '1px solid var(--alarm)' }
-  ], { duration: 600 }));
+  ], { duration: FEEDBACK_DURATION }));
   if (audio?.state !== 'running') return;
   const tone = audio.createOscillator();
   const gain = audio.createGain();

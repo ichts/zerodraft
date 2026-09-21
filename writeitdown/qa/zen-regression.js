@@ -28,7 +28,7 @@ async () => {
   editor.dispatchEvent(cut);
   check('cut blocked', cut.defaultPrevented && editor.value === text);
   const animations = editor.closest('.room-paper').getAnimations();
-  check('deny feedback holds for 600ms without restarting on repeat', animations.length > 0 && animations.every(a => a.effect.getTiming().duration === 600));
+  check('deny feedback holds for 280ms without restarting on repeat', animations.length > 0 && animations.every(a => a.effect.getTiming().duration === 280));
   check('reduced motion has no spatial deny', !matchMedia('(prefers-reduced-motion: reduce)').matches || animations.every(a => a.effect.getKeyframes().every(frame => !frame.transform)));
   return results;
 }

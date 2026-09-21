@@ -56,10 +56,10 @@ test('whitespace does not produce a kept draft', () => {
 test('demo timeline is deterministic and paced like a person', () => {
   assert.deepEqual(buildTimeline(), TIMELINE);
   const { events, typeEnd } = TIMELINE;
-  // The retired uniform pace finished its draft at 15000ms; a human rhythm is
-  // slower but still a preview, not a marathon.
-  assert.ok(typeEnd > 16500, `typing ends at ${typeEnd}, expected slower than the old 15000`);
-  assert.ok(typeEnd < 20000, `typing ends at ${typeEnd}, expected under 20000`);
+  // The preview keeps a human rhythm without making the correction a
+  // performance: it should finish in roughly fifteen seconds.
+  assert.ok(typeEnd > 12000, `typing ends at ${typeEnd}, expected over 12000`);
+  assert.ok(typeEnd < 17000, `typing ends at ${typeEnd}, expected under 17000`);
   const gaps = events.slice(1).map((event, i) => event.t - events[i].t);
   const min = Math.min(...gaps), max = Math.max(...gaps);
   assert.ok(max > min * 5, `gap spread ${min}-${max}ms must not read as a metronome`);
@@ -69,17 +69,20 @@ test('demo timeline is deterministic and paced like a person', () => {
 
 test('demo correction beat deletes the typo visibly, then retypes it', () => {
   const { events } = TIMELINE;
-  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotoin'));
+  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotino'));
   const backs = events.filter(event => event.kind === 'back');
   const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
   assert.ok(typo, 'the typo word is typed in full');
-  assert.equal(backs.length, 3, 'three rhythmic backspaces');
+  assert.equal(backs.length, 2, 'two quick backspaces keep the correction legible');
   assert.ok(backs.every(back => back.t > typo.t), 'deletion starts after a pause, not instantly');
+  assert.ok(backs[0].t - typo.t < 700, 'the correction starts without a long performance pause');
+  assert.ok(backs[1].t - backs[0].t < 200, 'backspace beats stay close together');
   assert.deepEqual(backs.map(back => back.cur.length),
-    [backs[0].cur.length, backs[0].cur.length - 1, backs[0].cur.length - 2],
+    [backs[0].cur.length, backs[0].cur.length - 1],
     'each backspace visibly removes exactly one character');
-  assert.equal(LINES[1], 'i dont want the promotoin'.slice(0, -3) + 'ion');
-  assert.ok(fixed && fixed.t > backs[2].t, 'the corrected word appears after the deletion');
+  assert.equal(LINES[1], 'i dont want the promotino'.slice(0, -2) + 'on');
+  assert.ok(fixed && fixed.t > backs[1].t, 'the corrected word appears after the deletion');
+  assert.ok(fixed.t - backs[1].t < 550, 'the retype follows the correction quickly');
   assert.equal(fixed.cur, LINES[1]);
 });
 

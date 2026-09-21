@@ -6,10 +6,11 @@ import { clock, wordCount } from './session.mjs';
   // TIMELINE paces the typing like a person: uneven keystrokes, word and
   // punctuation pauses, one visible backspace correction. The danger beats
   // stay absolute - 5s of silence after the last key, 3s of warn (wash and
-  // 3-2-1), the 200ms cut, then the report holds 2s before the loop restarts.
+  // 3-2-1), the 200ms cut, then a short report before the loop restarts.
   var TYPE_END = TIMELINE.typeEnd;
-  var SILENT_END = TYPE_END + 5000, WARN_END = SILENT_END + 3000,
-      CUT_END = WARN_END + 200, LOOP = CUT_END + 2000;
+  var SILENCE_MS = 5000, WARN_MS = 3000, CUT_MS = 200, REPORT_HOLD_MS = 1000;
+  var SILENT_END = TYPE_END + SILENCE_MS, WARN_END = SILENT_END + WARN_MS,
+      CUT_END = WARN_END + CUT_MS, LOOP = CUT_END + REPORT_HOLD_MS;
   var EVENTS = TIMELINE.events;
 
   var paper = document.getElementById("paper");
@@ -80,7 +81,7 @@ import { clock, wordCount } from './session.mjs';
       put(clockEl, "clock", clockAt(t));
     } else if (t < WARN_END) {
       setPhase("warn");
-      setWash((t - SILENT_END) / 3000);
+      setWash((t - SILENT_END) / WARN_MS);
       put(numeralEl, "num", String(3 - Math.floor((t - SILENT_END) / 1000)));
       put(reportEl, "rep", "");
       renderDraft(full());

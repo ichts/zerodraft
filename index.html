@@ -64,7 +64,7 @@ window.FirstLineLandingDemo = (() => {
   // The demo theater loop (DESIGN.md section 3): types ~7s, stops, 5s of
   // nothing, warn (wash + 3-2-1), wipe at 8, report holds 2s, rearms.
   const DEMO_REPORT_MS = 2000;
-  const DEMO_SAMPLE = "the pitch is simple. we charge for the exit not the entry, no wait - backwards, keep going. the point is teh exit fee makes leaving legible";
+  const DEMO_SAMPLE = "ok so the thing i keep not writing is the email to dana. not the apology, teh actual ask. no wait, the ask first, then";
 
   // --- DOM helpers -----------------------------------------------------------
   function trialOverlay() { return document.querySelector(".trial-overlay"); }
@@ -777,7 +777,7 @@ if (document.readyState === "loading") {
     text-transform: uppercase;
   }
 
-  /* ---------- nav: the logotype unit (the mac release link rides with it) --- */
+  /* ---------- nav: the logotype unit (the mac app link rides with it) ------- */
   .nav {
     max-width: 1120px;
     margin: 0 auto;
@@ -866,7 +866,7 @@ if (document.readyState === "loading") {
     padding: var(--s3) var(--s4);
     border-bottom: 1px solid var(--line);
   }
-  .rules { color: var(--faint); white-space: nowrap; }
+  .rules { color: var(--ink); white-space: nowrap; }
   .rules-compact { display: none; }
   .demo-clock {
     font-family: var(--machine);
@@ -879,7 +879,7 @@ if (document.readyState === "loading") {
   body.danger .rules, body.danger .demo-clock { color: var(--ink); }
   .demo-stage {
     position: relative;
-    min-height: 300px;
+    min-height: 320px;
     padding: var(--s5) var(--s5) var(--s6);
   }
   .demo-text {
@@ -914,6 +914,11 @@ if (document.readyState === "loading") {
     justify-content: center;
     gap: var(--s4);
     pointer-events: none;
+  }
+  .demo .danger-overlay {
+    inset: auto 0 0;
+    height: calc(clamp(96px, 16vh, 168px) + var(--s4) + 17px);
+    justify-content: flex-start;
   }
   .numeral {
     font-family: var(--machine);
@@ -1174,7 +1179,7 @@ if (document.readyState === "loading") {
     .deck { font-size: 19px; }
     .door { min-height: 56px; } /* phone hit area */
     .demo { padding: var(--s5) var(--s4) var(--s7); }
-    .demo-stage { min-height: 260px; padding: var(--s4) var(--s4) var(--s5); }
+    .demo-stage { min-height: 320px; padding: var(--s4) var(--s4) var(--s5); }
     .demo-text { font-size: 17px; }
     .rules-full { display: none; }
     .rules-compact { display: inline; }
@@ -1246,11 +1251,11 @@ if (document.readyState === "loading") {
   <div class="room">
     <header class="nav">
       <a class="brand" href="#top"><span class="brand-name">ZERO<b>_</b>DRAFT</span></a>
-      <a class="nav-mac" href="download.html">Mac release -&gt;</a>
+      <a class="nav-mac" href="download.html">Mac app -&gt;</a>
     </header>
     <main id="top">
       <section class="hero" aria-labelledby="hero-title">
-        <h1 id="hero-title" class="display">We force you to write something down.<br>You leave with words.</h1>
+        <h1 id="hero-title" class="display">We force you to write something down.<br>You leave with a draft.</h1>
         <p class="deck">It&rsquo;s not supposed to be good yet.</p>
         <a class="door" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Give it sixty seconds.</a>
       </section>

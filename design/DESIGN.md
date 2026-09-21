@@ -166,13 +166,13 @@ ESC and the EXIT corner are the same act with the same consequence: leave the ro
 One consistent form: Plex Mono caps, label or system style, machine voice. Every caption carries its reading - it states what happened or what happens next. The full set:
 
 - Hint (empty trial): TYPE HERE. THE LAW IS LIVE: 5S WARN, 8S WIPE, 60S TO KEEP.
-- Warn: KEEP TYPING OR THE DRAFT IS DELETED.
+- Warn: KEEP TYPING OR THE DRAFT IS DELETED
 - Wipe: DRAFT WIPED - 0:37 UNUSED. / TYPE TO RESTART.
 - Kept: 0:00 - 148 WORDS KEPT. / NOTHING HERE IS SAVED.
 - Copy completed: COPIED.
 - Deny (screen reader only): BLOCKED. FORWARD ONLY.
 
-CTA capitalization is consistent within each voice: the door speaks human sentence case (`Give it sixty seconds.`); machine actions and links go caps (COPY TEXT, RUN IT AGAIN, ESC - EXIT, MAC RELEASE ->).
+CTA capitalization is consistent within each voice: the door speaks human sentence case (`Give it sixty seconds.`); machine actions and links go caps (COPY TEXT, RUN IT AGAIN, ESC - EXIT, MAC APP ->). Labels do not take trailing periods; system sentences do.
 
 ## 8. Interaction contract
 

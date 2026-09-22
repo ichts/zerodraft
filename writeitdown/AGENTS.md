@@ -17,6 +17,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `qa/input-regression.js`: browser event-path checks, including synthetic IME composition; not an OS input-method test.
 - `qa/zen-regression.js`: long multilingual text, fixed zen geometry, scroll containment, and deny-feedback regressions.
 - `qa/phase4.spec.mjs`, `playwright.config.mjs`: executable eight-project browser acceptance, accelerated clocks, screenshots, and console/network checks. Playwright is test-only; the deployed site has no package runtime.
+- `og.png`: 1200×630 light-theme social share card referenced by landing metadata.
 - `install.sh`: fixed-target, backed-up deployment inside `/var/www/writeitdown.app/` only.
 - `QA.md`: browser acceptance and remaining limits.
 

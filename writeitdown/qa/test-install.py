@@ -11,7 +11,7 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source.parent / 'd
     payload.mkdir()
     target = base / 'www' / 'writeitdown.app'
     target.mkdir(parents=True)
-    files = ['index.html', 'site.css', 'theme.js', 'demo.js', 'feedback.js', 'session.mjs', 'room.js', 'privacy.html', 'terms.html', 'support.html']
+    files = ['index.html', 'og.png', 'site.css', 'theme.js', 'demo.js', 'demo-timeline.mjs', 'feedback.js', 'session.mjs', 'room.js', 'privacy.html', 'terms.html', 'support.html']
     for name in files:
         shutil.copyfile(source / name, payload / name)
     script = (source / 'install.sh').read_text()
@@ -34,4 +34,4 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source.parent / 'd
     assert rejected.returncode != 0
     assert 'Refusing symlink' in rejected.stderr
     assert victim.read_text() == 'protected'
-print('PASS: ten exact production files, preserved backup, repeat installation, rejected symlink.')
+print('PASS: twelve exact production files, preserved backup, repeat installation, rejected symlink.')

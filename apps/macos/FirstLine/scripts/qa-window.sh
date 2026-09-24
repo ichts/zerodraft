@@ -37,36 +37,58 @@ wid=$(window_id)
 if [[ ! "$wid" =~ ^[0-9]+$ ]]; then echo 'No app window found' >&2; exit 1; fi
 shot() { screencapture -x -l "$wid" "$output/$1.png"; }
 type() { osascript -e 'tell application "System Events" to repeat with characterToType in characters of '"\"$1\"" -e 'keystroke characterToType' -e 'end repeat'; }
+wait_for_button() {
+  local title=$1
+  for _ in {1..40}; do
+    if [[ $(osascript -e "tell application \"System Events\" to exists button \"$title\" of window 1 of process \"WriteItDown\"" 2>/dev/null) == true ]]; then return 0; fi
+    sleep 0.25
+  done
+  echo "Timed out waiting for $title" >&2
+  return 1
+}
+wait_for_theme() {
+  local theme=$1
+  for _ in {1..40}; do
+    if [[ $(osascript -e 'tell application "System Events" to get value of pop up button 1 of window 1 of process "WriteItDown"' 2>/dev/null) == "$theme" ]]; then return 0; fi
+    sleep 0.25
+  done
+  echo "Timed out waiting for $theme theme" >&2
+  return 1
+}
 if [[ "$batch" == 3 ]]; then
   osascript -e 'tell application "System Events" to keystroke "," using command down'
-  sleep 1
+  wait_for_button 'Done'
   osascript -e 'tell application "System Events" to click menu item "Light" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
+  wait_for_theme 'Light'
   osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
-  sleep 1
+  wait_for_button 'Give it sixty seconds.'
   shot start-light
 else
   shot start
 fi
 # Enter by clicking the primary button; Return is not a start shortcut yet.
 osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
-sleep 1
 if [[ "$batch" == 3 ]]; then
+  wait_for_button 'Abandon - the text is lost'
   shot room-light
   osascript -e 'tell application "System Events" to click button "Abandon - the text is lost" of window 1 of process "WriteItDown"'
+  wait_for_button 'Give it sixty seconds.'
   osascript -e 'tell application "System Events" to keystroke "," using command down'
-  sleep 1
+  wait_for_button 'Done'
   shot settings-light
-  # The independent graphical session should verify this accessibility path.
   osascript -e 'tell application "System Events" to click menu item "Dark" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
-  sleep 1
+  wait_for_theme 'Dark'
   shot settings-dark
   osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
+  wait_for_button 'Give it sixty seconds.'
   shot start-dark
   osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
+  wait_for_button 'Abandon - the text is lost'
   shot room-dark
   printf 'Captured %s; inspect every image in independent Computer Use acceptance.\n' "$output"
   exit 0
 fi
+sleep 1
 if [[ "$batch" == 2 ]]; then
   sleep 3
   shot rest-after-three-seconds

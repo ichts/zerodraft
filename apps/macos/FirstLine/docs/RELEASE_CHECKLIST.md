@@ -1,30 +1,27 @@
-# Zero Draft - Direct Distribution Release Checklist
+# Write It Down - Direct Distribution Release Checklist
 
-This checklist is for signed + notarized DMG release preparation. It does not assume App Store distribution.
-
-Commercial launch rules live in `docs/LAUNCH_PLAN.md`.
-License/payment implementation rules live in `docs/LICENSE_PAYMENT_SPEC.md`.
+This checklist is for the signed and notarized DMG. Current product and pricing decisions live in `WRITEITDOWN_PLAN.md`; license implementation details live in `LICENSE_PAYMENT_SPEC.md`. `LAUNCH_PLAN.md` is historical.
 
 ## Commercial readiness
-- [ ] Confirm early-bird USD $5 one-time purchase copy
+- [ ] Confirm purchase copy matches the price in `WRITEITDOWN_PLAN.md`
 - [ ] Confirm 2 Macs per license
 - [ ] Confirm 14-day refund policy
-- [ ] Choose payment provider / merchant of record
+- [ ] Confirm Dodo merchant account is ready
 - [ ] Create Dodo one-time product draft
 - [ ] Enable 2-Mac license-key entitlement
 - [ ] Create license activation support path
 - [ ] Publish help / privacy / refund / terms / download pages
 
 ## Metadata and assets
-- [ ] Finalize `build/darwin/Info.plist`
-- [ ] Export production app icon set into `build/darwin/AppIcon/`
+- [ ] Finalize `Sources/FirstLine/Info.plist`
+- [ ] Export production app icon set into `Sources/FirstLine/Assets.xcassets/AppIcon.appiconset/`
 - [ ] Confirm bundle name, version, build number, copyright
 
 ## Build and QA
 - [ ] `swift build`
 - [ ] `swift test`
-- [ ] Complete `docs/MANUAL_QA.md`
-- [ ] Confirm library / config paths behave correctly on a clean machine
+- [ ] Run batch 7 window QA from `WRITEITDOWN_PLAN.md` and record results in `MANUAL_QA.md`
+- [ ] Confirm config path and absence of draft files on a clean machine
 
 ## Signing
 - [ ] Install Apple Developer ID Application certificate
@@ -48,4 +45,4 @@ License/payment implementation rules live in `docs/LICENSE_PAYMENT_SPEC.md`.
 ## Final ship gate
 - [ ] No known blocker remains for English keyboard input
 - [ ] No known blocker remains for Chinese IME
-- [ ] No known blocker remains for library delete / reveal / open actions
+- [ ] No known blocker remains for license activation or purchase

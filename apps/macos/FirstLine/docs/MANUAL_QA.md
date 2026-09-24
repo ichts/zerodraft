@@ -1,6 +1,6 @@
-# Zero Draft MVP - Manual QA Checklist
+# macOS manual QA record
 
-Use this checklist before direct distribution.
+Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
 ## First launch
 - Delete `~/Library/Application Support/First Line/Config/settings.json`.
@@ -64,6 +64,13 @@ Use this checklist before direct distribution.
 - With an inactive license, confirm the trial status, explanation, empty key field, Activate, and Open Buy page.
 
 ## Manual QA Record
+
+### 2026-09-24 - writeitdown batch 3, brand and tokens
+
+- `swift build` exit 0; `swift test` exit 0 (105 Swift Testing tests, 7 suites). Five batch-3 named filters and all 12 batch-2 named filters individually exit 0. The inherited storage-reference `! rg`, early-Finish `! rg`, and batch-3 brand/color `! rg` each exit 0 with no matches. `bash -n scripts/qa-window.sh` exits 0.
+- The package target and executable are `WriteItDown`; the source path remains `FirstLine`. `Info.plist` carries the bundle metadata for the future packaged app. Dynamic light/dark colors and the site-derived placeholder icon are covered by token tests and assets, not by an installed-app screenshot.
+- **Window QA pending independent Computer Use acceptance**: this background session cannot capture the screen or use System Events. `scripts/qa-window.sh 3` now describes start and room in light appearance, Settings in light, then Settings, start, and room in dark; it was not run here. A fresh graphical session must inspect those states and record screenshots and pass/fail. Finder identity, packaged About identity, and actual icon rendering remain batch-7 checks.
+- Physical IME and frame-level feedback are not verified here; neither interaction changes in batch 3.
 
 ### 2026-09-24 - writeitdown batch 2, engine parity
 
@@ -143,3 +150,18 @@ Reviewer 复审 pure-AppKit 重写后接受 1 个 BLOCKER + 4 个 FIX-NOW。Debu
 - [x] **Settings license 状态**：active 仅显示 `License active.` + 元数据，无 key 输入框 / Activate / 明文（截图 /tmp/settings-active.png）；inactive 显示 trial 状态 + 说明 + 空 key 框 + Activate + Open Buy page（截图 /tmp/settings-inactive.png）。
 - [x] **GEB 文档漂移**：apps/macos/AGENTS.md 改述纯 AppKit；FirstLineMain / SessionViewController 头部更新到当前职责；23 个 Swift 头部 CLAUDE.md 引用统一改指 AGENTS.md。
 - [x] `swift build` + `swift test` 98/8 全绿（95 -> 98，新增恢复入口 + 守卫未削弱 + 空恢复 no-op 三测试）。
+
+### Independent acceptance - Batch 2 (2026-09-24, 3f3fd31683b66a071b138028a8d9d1d8bc3c19b6)
+
+- PASS: `swift build` exit 0; `swift test` exit 0 (93 tests, 5 suites). All 12 named Batch 2/deadline filters exited 0, each with one passing test. The inherited removed-symbol `! rg` and the additional early-Finish `! rg` both exited 0 with no matches. Logs: `logs/` alongside the independent report.
+- PASS: On the Mini, Codex Computer Use targeted only the temporary FirstLine.app window. Clicking the start button entered the room; the clock stayed at `01:00` after three idle seconds (`shots/rest-entry.jpg`, `shots/rest-three-seconds.jpg`). First input started it (`shots/typed.jpg`, `00:58`). After 5.57 seconds idle the warning showed `3` (`shots/warn.jpg`); after 8.56 seconds the same room showed an empty editor and `DRAFT WIPED - 0:52 UNUSED. TYPE TO RESTART.` (`shots/wiped.jpg`). Typing restarted a fresh minute (`shots/restarted.jpg`).
+- PASS: No Finish button was present. Cmd+Return did not complete an active session (`shots/command-return.jpg`). A full real-time minute with inputs less than five seconds apart reached kept with the complete 17-word draft and only `Copy full text` and `Discard` (`shots/kept.jpg`). The app was then quit via Computer Use.
+- NOT VERIFIED: Physical IME candidate UI, a real 60-minute window, and signed Finder packaging. Their engine rules are covered by named tests where applicable. This is a temporary debug bundle, not a distribution build.
+- HARNESS NOTE: `scripts/qa-window.sh 2` was not run because its System Events/screencapture capture route conflicts with the mandated authorized Mini Computer Use path. An equivalent real-window flow and screenshots were captured via Computer Use. The dark system appearance and legacy fossil treatment await the visual batches.
+
+### Independent acceptance - Batch 2 (2026-09-24, 36943c795394dbfcf983ef03c21d87015d9ec7ae)
+
+- PASS: `swift build` exit 0; `swift test` exit 0 (100 Swift Testing tests, 5 suites). All 12 Batch 2 named filters and seven additional targeted regression filters exited 0, one test each. The negative removed-symbol `rg` gate exited 0 with no matches. Evidence: `data/zd-wid-mac-b2-reaccept/logs/`.
+- PASS: On the Mini, Codex Computer Use captured the FirstLine window only. The clock stayed at `01:00` after 3.054 seconds idle (`shots/rest-three-seconds.jpg`), started on first input (`shots/typed.jpg`), showed the warning at 5.579 seconds (`shots/warn.jpg`), and wiped in the same room at 8.569 seconds with `0:52 UNUSED` and 0 words (`shots/wiped.jpg`). Typing `new draft` restarted at 2 words (`shots/restarted.jpg`); Cmd+Return did not finish and no Finish button appeared (`shots/command-return.jpg`). A real 60-second run reached the kept screen with 21 words, Copy full text and Discard (`shots/kept.jpg`). An exhausted isolated trial reached Upgrade rather than bypassing the gate (`shots/mixed-restart.jpg`). Relative screenshot paths resolve under `data/zd-wid-mac-b2-reaccept/`.
+- NOT VERIFIED: Physical Chinese IME marked-text warning/wipe, caret movement inside composition and blocking after commit. The available Computer Use typing submitted Latin text instead of creating candidates; the matching named filters passed. The live website counted `Hello 世界 こんにちは friend.` as 5 words (`shots/web-mixed.png`), but native Computer Use entered only `Hello friend.` (`shots/mixed-count.jpg`); same-sentence visual parity remains unverified. Engine Unicode word-count and reset filters passed.
+- HARNESS NOTE: The original `scripts/qa-window.sh 2` uses System Events and screencapture and was not run because this acceptance required Mini Computer Use. An initial ephemeral Computer Use call was denied; a normal `gpt-5.6-sol` invocation completed the window QA. No background screenshot was used.

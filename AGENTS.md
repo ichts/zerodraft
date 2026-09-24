@@ -63,7 +63,7 @@ Design authority: the web surface answers to `design/DESIGN.md` (constitution v2
 - Zero Draft is the current product and its outward-facing name; the First Line name is retired for outward use. The root web surface is its public landing site and browser trial.
 - `writeitdown/` is the separate writeitdown.app static deployment. Its approved LAMPLIGHT/DAYLIGHT and vanilla-browser contracts are scoped in `writeitdown/AGENTS.md`; they do not change the root landing's Datastar or bone-only rules.
 - writeitdown.app releases stay bundle installs, never a deploy from this repository: the source lives here, but a release still means transferring a tested bundle to the Hetzner host and running `sh writeitdown/install.sh` there (it copies exactly the twelve production files into `/var/www/writeitdown.app`). Nothing in this repository - no workflow, hook, or credential - deploys anything.
-- `apps/macos/FirstLine/` is the native macOS implementation. It is a separate Swift-native track and does not share a Datastar runtime with the web surface.
+- `apps/macos/FirstLine/` is the native AppKit writeitdown implementation (historical source path). Its batch plan is `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`; it does not share a browser runtime with either web surface.
 - The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.
 
@@ -159,7 +159,7 @@ swift build
 swift test
 ```
 
-UI, editor, or motion changes on the macOS app must also be exercised in a real debug window (typing, danger, failure, aftermath, deny feedback, success, reduced motion, and the fossil gutter at the minimum window width) as exploration alongside `swift test`, with the result recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`.
+UI, editor, or motion changes on the macOS app require the batch-specific real-window QA in `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` alongside `swift test`, with evidence recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`. Background sessions without screen access must mark window QA pending independent Computer Use acceptance.
 
 ## Delivery contract
 

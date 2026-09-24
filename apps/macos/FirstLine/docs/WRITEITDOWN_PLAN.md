@@ -219,7 +219,7 @@ The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收�
 - Distribution is a Developer ID signed, hardened-runtime, notarized, stapled DMG downloaded from writeitdown.app. There is no Mac App Store build. This matches the existing `docs/RELEASE_CHECKLIST.md`.
 - The app is paid with a one-time purchase through Dodo Payments. It reuses `docs/LICENSE_PAYMENT_SPEC.md`: a hosted checkout, a license key by email, 2 Macs per license, a 14-day refund, a 3-session Mac trial, and a 7-day offline grace period, all rebranded to writeitdown.
 - The price is USD $4.99, paid once. Every piece of copy that names a price reads `$4.99`.
-- The price is configuration, not code. The app reads the display price (`$4.99`) and the checkout URL from two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. Swift sources and tests never contain the literal price. The charged amount lives in the Dodo product, and the site's Mac section shows the same `$4.99`. A later price change edits the Dodo product, the two copies of the display string, and nothing else.
+- In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the Dodo product. Once checkout is live, price changes must update the Dodo product, app configuration, and the site's Mac copy together.
 - One trial session is counted when its first keystroke lands, not when the room opens. That matches the web's start rule and means an untouched room never costs a trial.
 
 ### 8.1 Owner-account steps (needed at the release batch)
@@ -429,11 +429,11 @@ All ten findings are incorporated into the affected batch or acceptance sections
 
 ## 12. Risks
 
-- Governance: `VISION.md` fixes sixty seconds, and the root `AGENTS.md` describes the macOS app as Zero Draft. Batches 3 and 5 update the relevant product contracts. Batch 4 must also update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them. Reviewers may flag the change until those updates land.
+- Governance: `VISION.md` still fixes sixty seconds; batch 5 updates it for the picker. Batch 4 must update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them.
 - The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 60-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
 - The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
 - Notarization, the Dodo product, and the checkout URL depend on the owner-account steps. Without them, batch 7 stops at an unsigned local package, and batch 6 ships with test mode only.
-- Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. Batch 3's release note tells the writer they may delete it. The app does not delete user folders on its own.
+- Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. The app does not delete user folders on its own; migration guidance belongs in the release instructions at batch 7.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

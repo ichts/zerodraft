@@ -48,7 +48,7 @@ final class SettingsViewController: NSViewController {
         ]))
         content.addArrangedSubview(section("Trial & License", rows: licenseRows()))
         content.addArrangedSubview(section("About", rows: [
-            settingRow("First Line", detail: "Version 0.1.0"),
+            settingRow("Write It Down", detail: "Version 0.1.0"),
         ]))
 
         let document = NSView()

@@ -1,38 +1,21 @@
-# Zero Draft for macOS
+# Write It Down for macOS
 
-> This app is being rebuilt as the writeitdown macOS app. The plan is `docs/WRITEITDOWN_PLAN.md`; until those batches land, the text below describes the current Zero Draft build.
+A native AppKit writing room. Write forward: deletion, paste, cut, undo and selection replacement are blocked. The clock starts on the first input. After five seconds of silence a warning appears; after eight seconds your draft is deleted. Reach the deadline first to keep and copy your text. Writing is not saved to disk or uploaded.
 
-Zero Draft is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
+The brand-and-token transition is batch 3 of `docs/WRITEITDOWN_PLAN.md`. The room visuals, duration picker, paid license integration and signed DMG are separate later batches; do not mistake the SwiftPM executable for a distributable app.
 
-This is the native macOS app, built with Swift and AppKit.
+## Build and test
 
-## Features
-
-- Forward only. No delete, no paste, no undo. New text appends at the end.
-- Five seconds of silence turns the page red and starts a countdown.
-- Eight seconds of silence deletes the whole draft.
-- The sixty-second clock starts on first input. Reach zero before the wipe and you keep the draft.
-- On success, copy the full text or discard the draft.
-
-It is not a distraction-free editor. It is a hired threat. This is the draft before the draft.
-
-## Building from source
-
-You need macOS 14 or later and the Swift toolchain.
+Requires macOS 14 or later and a Swift toolchain.
 
 ```bash
-git clone https://github.com/ichts/zerodraft.git
-cd zerodraft/apps/macos/FirstLine
+cd apps/macos/FirstLine
 swift build
 swift test
 ```
 
-Or open `Package.swift` in Xcode and run the `FirstLine` target.
-
-## Editor behavior
-
-The editor is append-only. Deletion, paste, cut, undo, and selection replacement are blocked. IME composition still works: marked text from a Chinese, Japanese, or Korean input method starts the clock and counts as activity. If composition stops for five seconds, the warning appears; after eight seconds, the draft is wiped. The room stays open for the next input, subject to the three-session trial limit.
+The executable product is `WriteItDown`. The source directory retains its historical path. The Mac trial and licensing cache remain in place; see `docs/LICENSE_PAYMENT_SPEC.md` and the batch plan.
 
 ## License
 
-Zero Draft is released under the MIT License. See `LICENSE` for details.
+Source is MIT licensed; see `LICENSE`. Distribution licensing for the app is described separately in `docs/WRITEITDOWN_PLAN.md`.

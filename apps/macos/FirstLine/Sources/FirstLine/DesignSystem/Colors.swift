@@ -1,76 +1,34 @@
 /**
- * [INPUT]: Flood design-system color values (DESIGN.md)
- * [OUTPUT]: FirstLineColors NSColor tokens; canvas/paper/ink/dim/faint/danger, with ui/uiLight aliases.
- * [POS]: FirstLine design-token layer (AppKit-native); red is danger-only, green does not exist in this product
- * [PROTOCOL]: 变更时更新此头部
- *
- * Flood values: canvas #f1f0eb, paper #ffffff, ink #17150f, dim #6b665b, faint #b3ada0,
- * danger #c8392f. Dark-mode values are adaptive approximations of the light Flood palette.
- *
- * SwiftUI Color wrappers were retired with the SwiftUI shell; all surfaces now consume the
- * NSColor accessors directly. The accessors are computed because NSColor is not Sendable;
- * NSColor dynamic providers are cheap and cached internally by AppKit.
+ * [INPUT]: writeitdown/site.css light and dark palette
+ * [OUTPUT]: Dynamic AppKit colors for wall, paper, ink, chrome, alarm, wash and cut.
+ * [POS]: Shared native color tokens; room choreography consumes wash/cut in batch 4.
+ * [PROTOCOL]: Keep token values aligned with site.css and check FirstLine/AGENTS.md.
  */
 
 import AppKit
 
 enum FirstLineColors {
-    // Canvas: neutral bone background. Never parchment.
-    static var canvasNSColor: NSColor {
+    private static func adaptive(light: UInt32, dark: UInt32) -> NSColor {
         NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 21 / 255, green: 20 / 255, blue: 15 / 255, alpha: 1)
-                : NSColor(srgbRed: 241 / 255, green: 240 / 255, blue: 235 / 255, alpha: 1)
+            let rgb = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(srgbRed: CGFloat((rgb >> 16) & 255) / 255,
+                           green: CGFloat((rgb >> 8) & 255) / 255,
+                           blue: CGFloat(rgb & 255) / 255, alpha: 1)
         }
     }
 
-    // Paper: the only clean white writing surface.
-    static var paperNSColor: NSColor {
-        NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 28 / 255, green: 26 / 255, blue: 21 / 255, alpha: 1)
-                : NSColor(srgbRed: 1, green: 1, blue: 1, alpha: 1)
-        }
-    }
+    static var canvasNSColor: NSColor { adaptive(light: 0xd8d2c3, dark: 0x15140f) }
+    static var paperNSColor: NSColor { adaptive(light: 0xf7f4ea, dark: 0x211f18) }
+    static var inkNSColor: NSColor { adaptive(light: 0x1a1813, dark: 0xece7d9) }
+    static var dimNSColor: NSColor { adaptive(light: 0x6f6a5d, dark: 0x8f897a) }
+    static var faintNSColor: NSColor { adaptive(light: 0xb3ada0, dark: 0x5c574c) }
+    static var dangerNSColor: NSColor { adaptive(light: 0x8f4405, dark: 0xf2a93b) }
+    static var washWallNSColor: NSColor { adaptive(light: 0xd1c1ac, dark: 0x2e1712) }
+    static var washPaperNSColor: NSColor { adaptive(light: 0xebdfce, dark: 0x3a1c15) }
+    static var deepWallNSColor: NSColor { adaptive(light: 0xc6b095, dark: 0x3d1d15) }
+    static var deepPaperNSColor: NSColor { adaptive(light: 0xdecab3, dark: 0x4a2318) }
 
-    // Ink: primary text color, warm near-black.
-    static var inkNSColor: NSColor {
-        NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 236 / 255, green: 233 / 255, blue: 226 / 255, alpha: 1)
-                : NSColor(srgbRed: 23 / 255, green: 21 / 255, blue: 15 / 255, alpha: 1)
-        }
-    }
-
-    // Dim: secondary text.
-    static var dimNSColor: NSColor {
-        NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 138 / 255, green: 132 / 255, blue: 122 / 255, alpha: 1)
-                : NSColor(srgbRed: 107 / 255, green: 102 / 255, blue: 91 / 255, alpha: 1)
-        }
-    }
-
-    // Faint: low-contrast borders and marks.
-    static var faintNSColor: NSColor {
-        NSColor(name: nil) { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 70 / 255, green: 66 / 255, blue: 59 / 255, alpha: 1)
-                : NSColor(srgbRed: 179 / 255, green: 173 / 255, blue: 160 / 255, alpha: 1)
-        }
-    }
-
-    // Danger: reserved for danger and deletion-adjacent marks only. Exactly #c8392f.
-    static var dangerNSColor: NSColor {
-        NSColor(name: nil) { _ in
-            NSColor(srgbRed: 200 / 255, green: 57 / 255, blue: 47 / 255, alpha: 1)
-        }
-    }
-
-    // Backward-compatible aliases mapping older token names onto the Flood vocabulary.
     static var uiNSColor: NSColor { dimNSColor }
     static var uiLightNSColor: NSColor { faintNSColor }
-
-    // Deprecated alias: kept for the success timer color; never green.
     static var successNSColor: NSColor { inkNSColor }
 }

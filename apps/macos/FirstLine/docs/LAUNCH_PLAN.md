@@ -1,5 +1,7 @@
 # Zero Draft - Mole-Style Direct Launch Plan
 
+> Superseded for the writeitdown macOS app: see `WRITEITDOWN_PLAN.md` (distribution, pricing, and batches). This file is historical Zero Draft planning.
+
 This plan covers the paid direct-download macOS launch. Apple Developer enrollment is currently blocked, so work is split into what can be prepared now and what waits for Developer ID signing / notarization.
 
 ## Commercial decisions

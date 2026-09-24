@@ -13,7 +13,6 @@ struct LicenseFlowTests {
     ) throws -> (AppState, MockLicenseClient, SettingsStore, FileManager, URL) {
         let fm = FileManager.default
         let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
         let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         if let initialSettings {
@@ -125,7 +124,6 @@ struct LicenseFlowTests {
         let exhausted = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             trialSessionsUsed: AppState.trialSessionLimit,
             licenseStatus: .active
@@ -145,7 +143,6 @@ struct LicenseFlowTests {
         let revoked = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             trialSessionsUsed: AppState.trialSessionLimit,
             licenseStatus: .revoked
@@ -164,7 +161,6 @@ struct LicenseFlowTests {
         let active = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             licenseKey: "PRO-VALID",
             licenseStatus: .active,
@@ -191,7 +187,6 @@ struct LicenseFlowTests {
         let active = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             licenseKey: "PRO-REFUNDED",
             licenseStatus: .active,
@@ -207,7 +202,6 @@ struct LicenseFlowTests {
         await appState.validateLicenseIfNeeded()
 
         #expect(appState.settings.licenseStatus == .revoked)
-        #expect(appState.settings.hasUnlockedFullAccess == false)
     }
 
     @Test
@@ -217,7 +211,6 @@ struct LicenseFlowTests {
         let active = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             licenseKey: "PRO-OFFLINE",
             licenseStatus: .active,
@@ -243,7 +236,6 @@ struct LicenseFlowTests {
         let active = AppSettings(
             theme: .system,
             defaultDuration: 300,
-            immersiveSessionMode: true,
             reducedMotion: .system,
             licenseKey: "PRO-EXPIRED",
             licenseStatus: .active,
@@ -260,7 +252,6 @@ struct LicenseFlowTests {
         await appState.validateLicenseIfNeeded()
 
         #expect(appState.settings.licenseStatus == .unknown)
-        #expect(appState.settings.hasUnlockedFullAccess == false)
     }
 
     @Test
@@ -272,7 +263,6 @@ struct LicenseFlowTests {
         let blockingFile = tempRoot.appendingPathComponent("blocked", isDirectory: false)
         try "file".write(to: blockingFile, atomically: true, encoding: .utf8)
         let badConfig = blockingFile.appendingPathComponent("Config", isDirectory: true)
-        let libraryDirectory = tempRoot.appendingPathComponent("Library", isDirectory: true)
         defer { try? fm.removeItem(at: tempRoot) }
 
         let store = SettingsStore(fileManager: fm, configDirectory: badConfig)
@@ -283,7 +273,6 @@ struct LicenseFlowTests {
             now: { Date(timeIntervalSince1970: 1_700_000_000) }
         )
         let appState = AppState(
-            persistenceService: PersistenceService(fileManager: fm, libraryDirectory: libraryDirectory),
             settingsStore: store,
             licenseClient: mock,
             installIDStore: installStore,
@@ -296,6 +285,5 @@ struct LicenseFlowTests {
         #expect(appState.licenseActivationError == .storageFailure)
         // A failed persist must not leave the app granting access for this run.
         #expect(appState.settings.licenseStatus != .active)
-        #expect(appState.settings.hasUnlockedFullAccess == false)
     }
 }

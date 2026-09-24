@@ -34,14 +34,8 @@ enum ReducedMotionOverride: String, Codable, CaseIterable, Identifiable {
 struct AppSettings: Codable, Equatable {
     var theme: AppTheme
     var defaultDuration: TimeInterval
-    var immersiveSessionMode: Bool
     var reducedMotion: ReducedMotionOverride
     var trialSessionsUsed: Int
-
-    /// Legacy v0.1 全局解锁标志。新代码应读写 `licenseStatus`。
-    /// 保留是为了让旧 settings.json 仍能加载并自动迁移到 `licenseStatus = .active`。
-    /// 删除时机：v0.3 之后所有用户都已经升级到 v0.2 一次以上。
-    var hasUnlockedFullAccess: Bool
 
     /// v0.2 新增：结构化 license 状态。来自 Dodo activate / validate 调用。
     var licenseKey: String?
@@ -53,7 +47,6 @@ struct AppSettings: Codable, Equatable {
     init(
         theme: AppTheme,
         defaultDuration: TimeInterval,
-        immersiveSessionMode: Bool,
         reducedMotion: ReducedMotionOverride,
         trialSessionsUsed: Int = 0,
         hasUnlockedFullAccess: Bool = false,
@@ -65,7 +58,6 @@ struct AppSettings: Codable, Equatable {
     ) {
         self.theme = theme
         self.defaultDuration = defaultDuration
-        self.immersiveSessionMode = immersiveSessionMode
         self.reducedMotion = reducedMotion
         self.trialSessionsUsed = trialSessionsUsed
         self.licenseKey = licenseKey
@@ -80,14 +72,11 @@ struct AppSettings: Codable, Equatable {
         } else {
             self.licenseStatus = licenseStatus
         }
-        // 让旧字段与新状态保持镜像，避免下游旧代码看到过期值。
-        self.hasUnlockedFullAccess = hasUnlockedFullAccess || (self.licenseStatus == .active)
     }
 
     private enum CodingKeys: String, CodingKey {
         case theme
         case defaultDuration
-        case immersiveSessionMode
         case reducedMotion
         case trialSessionsUsed
         case hasUnlockedFullAccess
@@ -102,32 +91,28 @@ struct AppSettings: Codable, Equatable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         theme = try container.decode(AppTheme.self, forKey: .theme)
         defaultDuration = try container.decode(TimeInterval.self, forKey: .defaultDuration)
-        immersiveSessionMode = try container.decode(Bool.self, forKey: .immersiveSessionMode)
         reducedMotion = try container.decode(ReducedMotionOverride.self, forKey: .reducedMotion)
         trialSessionsUsed = try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0
-        hasUnlockedFullAccess = try container.decodeIfPresent(Bool.self, forKey: .hasUnlockedFullAccess) ?? false
+        let legacyUnlocked = try container.decodeIfPresent(Bool.self, forKey: .hasUnlockedFullAccess) ?? false
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
         licenseInstanceID = try container.decodeIfPresent(String.self, forKey: .licenseInstanceID)
 
         let decodedStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
-        if hasUnlockedFullAccess && decodedStatus == .trial {
+        if legacyUnlocked && decodedStatus == .trial {
             licenseStatus = .active
         } else {
             licenseStatus = decodedStatus
         }
-        hasUnlockedFullAccess = hasUnlockedFullAccess || (licenseStatus == .active)
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(theme, forKey: .theme)
         try container.encode(defaultDuration, forKey: .defaultDuration)
-        try container.encode(immersiveSessionMode, forKey: .immersiveSessionMode)
         try container.encode(reducedMotion, forKey: .reducedMotion)
         try container.encode(trialSessionsUsed, forKey: .trialSessionsUsed)
-        try container.encode(hasUnlockedFullAccess, forKey: .hasUnlockedFullAccess)
         try container.encodeIfPresent(licenseKey, forKey: .licenseKey)
         try container.encode(licenseStatus, forKey: .licenseStatus)
         try container.encodeIfPresent(licenseActivatedAt, forKey: .licenseActivatedAt)
@@ -138,10 +123,8 @@ struct AppSettings: Codable, Equatable {
     static let defaultValue = AppSettings(
         theme: .system,
         defaultDuration: SessionEngine.defaultDurationSeconds,
-        immersiveSessionMode: true,
         reducedMotion: .system,
         trialSessionsUsed: 0,
-        hasUnlockedFullAccess: false,
         licenseKey: nil,
         licenseStatus: .trial,
         licenseActivatedAt: nil,

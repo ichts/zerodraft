@@ -1,5 +1,7 @@
 # Zero Draft for macOS
 
+> This app is being rebuilt as the writeitdown macOS app. The plan is `docs/WRITEITDOWN_PLAN.md`; until those batches land, the text below describes the current Zero Draft build.
+
 Zero Draft is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
 
 This is the native macOS app, built with Swift and AppKit.
@@ -10,7 +12,7 @@ This is the native macOS app, built with Swift and AppKit.
 - Five seconds of silence turns the page red and starts a countdown.
 - Eight seconds of silence deletes the whole draft.
 - A session lasts sixty seconds. Finish it and you keep the draft.
-- Keep the draft three ways: copy full text, copy for AI, or download a Markdown file.
+- On success, copy the full text or discard the draft.
 
 It is not a distraction-free editor. It is a hired threat. This is the draft before the draft.
 

@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 AppKit、Observation、App/AppState、App/Surfaces 下的占位 VC、DesignSystem/Colors
+ * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
  * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> 常驻容器内的子 VC）
  * [POS]: FirstLine 重写 Phase 1 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
@@ -130,7 +130,6 @@ enum SurfaceFactory {
         case .session:  return SessionViewController(appState: appState)
         case .failure:  return FailureViewController(appState: appState)
         case .success:  return SuccessViewController(appState: appState)
-        case .library:  return LibraryViewController(appState: appState)
         case .settings: return SettingsViewController(appState: appState)
         case .upgrade:  return UpgradeViewController(appState: appState)
         }

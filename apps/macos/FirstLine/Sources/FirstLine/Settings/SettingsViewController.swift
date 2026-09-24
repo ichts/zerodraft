@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, session, license, storage and about settings
+ * [OUTPUT]: SettingsViewController - appearance, session, license and about settings
  * [POS]: First Line AppKit Settings surface; consumes existing AppState settings and license APIs
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -47,10 +47,6 @@ final class SettingsViewController: NSViewController {
             settingRow("Duration", detail: "60 seconds. Fixed."),
         ]))
         content.addArrangedSubview(section("Trial & License", rows: licenseRows()))
-        content.addArrangedSubview(section("Storage", rows: [
-            settingRow("Library", control: secondary("Reveal Library Folder", #selector(revealLibraryTapped))),
-            muted(AppPaths.libraryDirectory.path),
-        ]))
         content.addArrangedSubview(section("About", rows: [
             settingRow("First Line", detail: "Version 0.1.0"),
         ]))
@@ -189,10 +185,6 @@ final class SettingsViewController: NSViewController {
         FirstLineButtons.primary(title: title, target: self, action: action)
     }
 
-    private func secondary(_ title: String, _ action: Selector) -> NSButton {
-        FirstLineButtons.secondary(title: title, target: self, action: action)
-    }
-
     private func link(_ title: String, _ action: Selector) -> NSButton {
         FirstLineButtons.link(title: title, target: self, action: action)
     }
@@ -234,7 +226,6 @@ final class SettingsViewController: NSViewController {
         }
     }
 
-    @objc private func revealLibraryTapped() { appState.revealLibraryFolder() }
     @objc private func openBuyTapped() { appState.openLaunchWebsite() }
     @objc private func doneTapped() { appState.goHome() }
 }

@@ -46,7 +46,7 @@ Use this checklist before direct distribution.
 - Type at least one line, then stop typing for 8 seconds.
 - Confirm Failure screen appears.
 - Confirm the narrator line reads `Draft deleted. it joined the pile.` in red.
-- Confirm no new markdown file appears in Library.
+- Confirm no new draft text or draft file appears under `~/Library/Application Support/First Line/`.
 - Return to Home and confirm the durable red aftermath line persists until the next session starts.
 
 ## Success path
@@ -54,22 +54,14 @@ Use this checklist before direct distribution.
 - Confirm Success screen appears.
 - Confirm the primary `Copy full text` button receives focus.
 - Confirm clicking Copy shows a `Copied.` feedback.
-- Confirm markdown file exists in `~/Library/Application Support/First Line/Library/`.
+- Confirm no new draft text or draft file appears under `~/Library/Application Support/First Line/` after success.
 
 ## Settings
 - Change theme.
 - Confirm the duration row is informational only: `60 seconds. Fixed.` (no control).
 - Change reduced motion override.
-- Use Reveal Library Folder.
 - With an active license, confirm Trial & License shows only the status line and metadata (no key field, no Activate button, no buy link, no prefilled key).
 - With an inactive license, confirm the trial status, explanation, empty key field, Activate, and Open Buy page.
-
-## Library
-- Open Library.
-- Confirm reverse chronological order.
-- Open detail view.
-- Verify Copy Text plus the More menu (Open in Default Editor / Reveal in Finder / Delete, separated).
-- Delete one item and verify file removal from disk.
 
 ## Manual QA Record
 
@@ -93,6 +85,23 @@ Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC 
 - 合成 AX `click at` 无法聚焦编辑器（点 scroll area 后 `AXFocusedUIElement` 仍为 `AXWindow`）；`set focused of text area` 可正常聚焦。真机硬件点击需复核是否自动聚焦编辑器（AppKit NSTextView 在 ScrollView 内点击通常聚焦，但合成事件路径不等价）。
 - session 开始时编辑器不自动聚焦（`AXFocusedUIElement=AXWindow`）。当前 UI 隐藏空草稿 Finish（wordCount > 0 门控），不影响功能；但作为「开场即写」体验，自动聚焦是后续候选改进（audit minor-deferred #3 已记录）。
 - 长 keystroke 字符串在 System Events 下会丢空格（`keystroke "long string"`）；逐 key code 输入（key code 49 = space）正常。这是合成输入的已知限制，非产品缺陷。
+
+### 2026-09-24 - writeitdown batch 1, storage removal
+
+- Debug build: `swift build` exited 0; `swift test` exited 0 with 88 tests in 5 suites. All four named batch-1 filters exited 0, one test each. The expanded `! rg` storage-reference gate exited 0.
+- Real-window QA: **not verified in this background session**. `scripts/qa-window.sh 1` built and launched the binary but System Events timed out (-1712) before the first capture. A direct `screencapture -x` returned `could not create image from display` (exit 1). No window screenshot was produced here. A fresh independent session subsequently accepted Batch 1 through authorized Computer Use in a graphical session; see the record below.
+- Physical IME and exact deny feedback were not tested; neither changes in this batch.
+
+### Independent acceptance - Batch 1 (2026-09-24, 118bc0e1db78ca04e6d59cb4a4510197a22c3420)
+
+- PASS: `swift build` exit 0; `swift test` exit 0 (88 tests, 5 suites). Each of the four Batch 1 named filters exited 0 with one passing test. The negative `rg` check printed nothing (`rg` exit 1, negated exit 0).
+- PASS: Computer Use real-window start (`shots/start.png`) and typed draft (`shots/typed.png`). The start page has no Library entry. An immediate Cmd+2 check within 455.496 ms kept the editor and text in place (`shots/command-two-immediate.png`). The earlier `shots/command-two.png` records an eight-second idle wipe during a slower call, not a shortcut failure.
+- PASS: A fresh real-time 60-second run reached kept with only the Copy full text action (shown as `Copied.`) and Discard; no Copy for AI or Download .md (`shots/kept.png`). Discard then Cmd+, opened Settings, which has no Storage section and retains the trial/license controls (`shots/settings.png`, `Mac trial: 2 of 3 sessions used`).
+- PASS: The isolated user home contained only `Config/settings.json`; no draft files or synthetic draft text were found after wipe and kept. The named kept/wiped tests also check that their isolated flows do not modify the real user root.
+- NOT VERIFIED: Live license activation/revocation, physical IME, and a before/after runtime snapshot of the real user root. These are not Batch 1 window acceptance requirements.
+- QA SCRIPT ISSUE: `scripts/qa-window.sh` assumes Return opens the room, but this version has no Return binding on Home. The authorized Computer Use acceptance used a click on the primary button instead. The script also uses System Events and screencapture, so it was not run in this Mini Computer Use session. Fix this acceptance harness separately; no Batch 1 product regression was observed.
+
+Screenshot paths above are relative to `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-b1-accept/` and the full independent report is `report.md` in that directory.
 
 ### 2026-08-05  -  Pure-AppKit rewrite
 

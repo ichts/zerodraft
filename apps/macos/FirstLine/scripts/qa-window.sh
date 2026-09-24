@@ -73,7 +73,6 @@ if [[ "$batch" == 4 ]]; then
   sleep 1; shot rest-light
   type 'A'; sleep 0.2
   osascript -e 'tell application "System Events" to key code 51'
-  shot deny-light
   type ' writing room stays alive'; shot typing-light
   sleep 5.5; shot warn-light
   type ' keep'; shot recovered-light
@@ -93,7 +92,7 @@ if [[ "$batch" == 4 ]]; then
   osascript -e 'tell application "System Events" to key code 53'
   wait_for_button 'Give it sixty seconds.'; shot exit-light
   # The independent graphical session additionally captures dark rest/warn/kept and reduced motion.
-  printf 'Captured %s; inspect states, clipboard, dark appearance and reduced motion independently.\n' "$output"
+  printf 'Captured %s; inspect states, clipboard, dark appearance and reduced motion independently. The 280 ms deny frame is unverified by this script.\n' "$output"
   exit 0
 fi
 if [[ "$batch" == 3 ]]; then

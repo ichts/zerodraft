@@ -15,8 +15,12 @@ enum RoomPresentation {
         "DRAFT WIPED - \(clock(unused)) UNUSED. TYPE TO RESTART."
     }
 
+    static func wordLabel(_ count: Int) -> String {
+        "\(count) \(count == 1 ? "WORD" : "WORDS")"
+    }
+
     static func keptReceipt(words: Int) -> String {
-        "0:00 - \(words) WORDS KEPT."
+        "0:00 - \(wordLabel(words)) KEPT."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool) -> CGFloat {

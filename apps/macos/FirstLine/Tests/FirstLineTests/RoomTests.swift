@@ -16,6 +16,9 @@ struct RoomTests {
 
     @Test func keptReceiptTextMatchesWeb() {
         #expect(RoomPresentation.keptReceipt(words: 12) == "0:00 - 12 WORDS KEPT.")
+        #expect(RoomPresentation.keptReceipt(words: 1) == "0:00 - 1 WORD KEPT.")
+        #expect(RoomPresentation.wordLabel(1) == "1 WORD")
+        #expect(RoomPresentation.wordLabel(0) == "0 WORDS")
     }
 
     @Test func copyTextPutsExactDraftOnPasteboard() {

@@ -47,6 +47,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var exitButton: NSButton!
     private var keptView: NSView!
     private var keptText: NSTextView!
+    private var keptScrollView: NSScrollView!
     private var receiptLabel: NSTextField!
     private var copyButton: NSButton!
     private var keyMonitor: Any?
@@ -57,6 +58,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var deny = DenyFeedbackState()
     private var lastPhase: SessionPhase = .idle
     private var cutWork: DispatchWorkItem?
+    private var washIsCut = false
     private var denyWork: DispatchWorkItem?
 
     init(appState: AppState) {
@@ -90,6 +92,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         prepareViewport()
+        sizeKeptDocument()
     }
 
     override func viewWillDisappear() {
@@ -197,7 +200,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         keptText.textContainerInset = .zero
         keptText.textContainer?.lineFragmentPadding = 0
         keptText.textContainer?.widthTracksTextView = true
+        keptText.textContainer?.heightTracksTextView = false
+        keptText.isHorizontallyResizable = false
+        keptText.isVerticallyResizable = true
+        keptText.autoresizingMask = [.width]
         let preview = NSScrollView()
+        keptScrollView = preview
         preview.documentView = keptText
         preview.hasVerticalScroller = true
         preview.drawsBackground = false
@@ -285,6 +293,19 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
+    private func sizeKeptDocument() {
+        guard let container = keptText.textContainer, let layout = keptText.layoutManager else { return }
+        let size = keptScrollView.contentSize
+        guard size.width > 0, size.height > 0 else { return }
+        keptText.minSize = NSSize(width: 0, height: size.height)
+        keptText.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        container.containerSize = NSSize(width: size.width, height: CGFloat.greatestFiniteMagnitude)
+        let height = max(size.height, layout.usedRect(for: container).height)
+        if abs(keptText.frame.width - size.width) > 0.5 || abs(keptText.frame.height - height) > 0.5 {
+            keptText.frame.size = NSSize(width: size.width, height: height)
+        }
+    }
+
     private func installInputMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, event.window === self.view.window, event.keyCode == 53,
@@ -332,7 +353,20 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             keptText.string = engine.text
             receiptLabel.stringValue = RoomPresentation.keptReceipt(words: engine.wordCount)
             copyButton.title = "COPY TEXT"
-            DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
+            DispatchQueue.main.async { [weak self] in
+                self?.sizeKeptDocument()
+                self?.focusForPhase()
+            }
+        }
+        if phase == .danger, lastPhase != .danger {
+            announce("Keep typing or the draft is deleted. Three seconds left.")
+        }
+        if phase == .failure, lastPhase != .failure,
+           let unused = engine.unusedSeconds {
+            announce(RoomPresentation.wipeReport(unused: unused))
+        }
+        if phase == .success, lastPhase != .success {
+            announce("You wrote it down. Copy your text before leaving.")
         }
         lastPhase = phase
         let isKept = phase == .success
@@ -347,24 +381,26 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         let seconds = max(0, Int(ceil(engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
-        countLabel.stringValue = "\(engine.wordCount) WORDS"
+        countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
         warningLabel.isHidden = !warning
         if warning { numeralLabel.stringValue = "\(engine.secondsUntilDeletion)" }
         let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion) : 0
         if cutWork == nil { setWash(strength, cut: false) }
-        outline.needsDisplay = true
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
         if !textView.hasMarkedText() { prepareViewport() }
     }
 
     private func setWash(_ opacity: CGFloat, cut: Bool) {
-        wallWash.fillColor = cut ? FirstLineColors.deepWallNSColor : FirstLineColors.washWallNSColor
-        paperWash.fillColor = cut ? FirstLineColors.deepPaperNSColor : FirstLineColors.washPaperNSColor
-        wallWash.alphaValue = opacity
-        paperWash.alphaValue = opacity
+        if washIsCut != cut {
+            washIsCut = cut
+            wallWash.fillColor = cut ? FirstLineColors.deepWallNSColor : FirstLineColors.washWallNSColor
+            paperWash.fillColor = cut ? FirstLineColors.deepPaperNSColor : FirstLineColors.washPaperNSColor
+        }
+        if wallWash.alphaValue != opacity { wallWash.alphaValue = opacity }
+        if paperWash.alphaValue != opacity { paperWash.alphaValue = opacity }
     }
 
     private func showCut() {
@@ -378,15 +414,21 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
+    private func announce(_ text: String) {
+        NSAccessibility.post(element: textView as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
+    }
+
     private func showDeny() {
         guard deny.begin(reducesMotion: reducesMotion) else { return }
         outline.alphaValue = 1
-        NSAccessibility.post(element: textView as Any, notification: .announcementRequested,
-                             userInfo: [.announcement: "Blocked. Forward only.", .priority: NSAccessibilityPriorityLevel.high.rawValue])
-        if !reducesMotion { paper.layer?.setAffineTransform(CGAffineTransform(translationX: -2, y: 0)) }
+        announce("Blocked. Forward only.")
+        if deny.shakeOffset != 0 {
+            paper.layer?.setAffineTransform(CGAffineTransform(translationX: deny.shakeOffset, y: 0))
+        }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
-            guard let self, self.deny.outlineVisible, !self.reducesMotion else { return }
-            self.paper.layer?.setAffineTransform(CGAffineTransform(translationX: 2, y: 0))
+            guard let self, self.deny.outlineVisible, self.deny.shakeOffset != 0 else { return }
+            self.paper.layer?.setAffineTransform(CGAffineTransform(translationX: -self.deny.shakeOffset, y: 0))
         }
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }

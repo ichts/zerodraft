@@ -289,7 +289,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - Remove `finish()` and every UI entry point that invokes it: Finish button, Cmd+Return monitor, `performKeyEquivalent`, and their early-finish tests. This is a minimum functional removal; visual room cleanup stays in batch 4.
   - Implement the minimum in-room wipe report and next-keystroke restart routing in `RootWindowController` and `SessionViewController` in this batch. Leave detailed layout and animation for batch 4; the intermediate state must be usable.
   - Validate durations identically in every build: unsupported or unreadable stored values fall back to 60 seconds. Never use a debug-only precondition or a release-only clamp.
-  - After a wipe, the next keystroke starts a new session with the same duration.
+  - After a wipe, the next keystroke starts a new session with the same duration through `AppState.startSession`, so an exhausted trial routes to Upgrade rather than restarting. Batch 6 changes when a trial use is consumed, not this gate.
 - Named tests:
   - `SessionEngineTests/clockStartsOnFirstInputNotOnStart`.
   - `SessionEngineTests/markedTextStartsTheClock`.

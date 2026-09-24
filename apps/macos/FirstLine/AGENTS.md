@@ -33,7 +33,7 @@ Sources/FirstLine/Session/SuccessViewController.swift: 过渡期 Success 界面�
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的 upgrade 界面，含 license key 输入、激活全部状态、禁用的 Buy 占位与 Back to Home。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 Appearance（theme / reduced motion）、Session（固定 60 秒）、Trial & License、About 与 Done 返回 Home。
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
-Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader + IBM Plex Mono）。
+Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware bone/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
 Sources/FirstLine/DesignSystem/FossilLayerView.swift: Flood 静态 fossil 纹理层（flipped NSView draw）；bone canvas 左右 margin（paper 列以外）seeded 放置犹豫草稿 fossil，danger 时仅变红，几何变化重算。

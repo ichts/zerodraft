@@ -10,6 +10,7 @@ import AppKit
 @MainActor
 final class UpgradeViewController: NSViewController {
     private let appState: AppState
+    private static let displayPrice = "$4.99"
     private var licenseField: NSTextField!
     private var activateButton: NSButton!
     private var feedbackLabel: NSTextField!
@@ -38,7 +39,7 @@ final class UpgradeViewController: NSViewController {
         let title = label("Trial complete", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
         let subtitle = label("You used the three free Mac writing sessions.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
         let licenseName = label("writeitdown license", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
-        let pricing = label("One-time $5. 2 Macs. No subscription. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
+        let pricing = label("One-time \(Self.displayPrice). 2 Macs. No subscription. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false

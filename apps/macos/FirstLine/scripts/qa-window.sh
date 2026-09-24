@@ -52,7 +52,7 @@ osascript -e 'tell application "System Events" to click button "Give it sixty se
 sleep 1
 if [[ "$batch" == 3 ]]; then
   shot room-light
-  osascript -e 'tell application "System Events" to keystroke "0" using command down'
+  osascript -e 'tell application "System Events" to click button "Abandon - the text is lost" of window 1 of process "WriteItDown"'
   osascript -e 'tell application "System Events" to keystroke "," using command down'
   sleep 1
   shot settings-light

@@ -26,13 +26,23 @@ final class HomeViewController: NSViewController {
     }
 
     private func buildInterface() {
+        let logotypeFont = FirstLineTypography.logotypeNSFont ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
+        let logotype = label("WRITE_IT_DOWN", font: logotypeFont, color: FirstLineColors.inkNSColor)
+        logotype.attributedStringValue = NSAttributedString(
+            string: "WRITE_IT_DOWN",
+            attributes: [
+                .font: logotypeFont,
+                .foregroundColor: FirstLineColors.inkNSColor,
+                .kern: 1.82,
+            ]
+        )
         let identityGroup = verticalGroup(
             views: [
-                label("WRITE_IT_DOWN", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor),
+                logotype,
                 label(
                     "We force you to write it down.",
-                    font: FirstLineTypography.taglineNSFont,
-                    color: FirstLineColors.uiNSColor
+                    font: FirstLineTypography.titleNSFont,
+                    color: FirstLineColors.inkNSColor
                 ),
             ],
             spacing: CGFloat(FirstLineSpacing.sm)

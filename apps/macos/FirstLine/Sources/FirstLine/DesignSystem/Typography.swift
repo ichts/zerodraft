@@ -21,6 +21,9 @@ enum FirstLineTypography {
     static var bodyNSFont: NSFont? { humanSerifNSFont(size: 24) }
 
     // Machine layer: bundled IBM Plex Mono.
+    static var logotypeNSFont: NSFont? {
+        BundledFonts.registeredFont(postScriptName: BundledFonts.plexMonoMediumPostScript, size: 13)
+    }
     static var sidebarNSFont: NSFont? { machineMonoNSFont(size: 11) }
     static var microcopyNSFont: NSFont? { machineMonoNSFont(size: 13) }
     static var buttonLabelNSFont: NSFont? { machineMonoNSFont(size: 13) }

@@ -65,6 +65,24 @@ struct RoomTests {
         now += 1
     }
 
+    @Test func homeRestoresStartButtonFocusWithoutStartingSession() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root))
+        state.startSession()
+        state.abandonSession()
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        home.viewDidAppear()
+        let button = try #require(window.firstResponder as? NSButton)
+        #expect(button.title == "Give it sixty seconds.")
+        #expect(button.accessibilityRole() == .button)
+        #expect(state.selectedSurface == .home)
+        #expect(state.sessionEngine.phase == .idle)
+    }
+
     @Test func warnWashOpacityRampsFromFiveToEightSeconds() {
         #expect(RoomPresentation.washOpacity(idle: 4.9, reducesMotion: false) == 0)
         #expect(RoomPresentation.washOpacity(idle: 5, reducesMotion: false) == 0)

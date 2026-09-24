@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem tokens 与 FirstLineButtons
  * [OUTPUT]: HomeViewController - 固定 60 秒启动入口与 trial 状态
- * [POS]: writeitdown start screen
+ * [POS]: writeitdown start screen and keyboard focus return target
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -10,6 +10,7 @@ import AppKit
 @MainActor
 final class HomeViewController: NSViewController {
     private let appState: AppState
+    private var startButton: NSButton!
 
     init(appState: AppState) {
         self.appState = appState
@@ -23,6 +24,11 @@ final class HomeViewController: NSViewController {
         let canvas = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
         self.view = canvas
         buildInterface()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        view.window?.makeFirstResponder(startButton)
     }
 
     private func buildInterface() {
@@ -70,11 +76,13 @@ final class HomeViewController: NSViewController {
             color: appState.isTrialExhausted ? FirstLineColors.inkNSColor : FirstLineColors.uiNSColor
         )
 
-        let startButton = FirstLineButtons.primary(
+        startButton = FirstLineButtons.primary(
             title: "Give it sixty seconds.",
             target: self,
             action: #selector(startSession)
         )
+        startButton.setAccessibilityRole(.button)
+        startButton.setAccessibilityLabel(startButton.title)
         let primaryViews: [NSView] = [identityGroup, ruleGroup, trialStatus, startButton]
 
         let content = verticalGroup(

@@ -128,6 +128,23 @@ struct SessionEngineTests {
     }
 
     @Test
+    func uncommittedCompositionWarnsAndWipesOnSilence() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        engine.start(duration: 60)
+        engine.registerMarkedTextActivity()
+        #expect(engine.text.isEmpty)
+        uptime = 5
+        engine.tick()
+        #expect(engine.phase == .danger)
+        #expect(engine.secondsUntilDeletion == 3)
+        uptime = 8
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.unusedSeconds == 52)
+    }
+
+    @Test
     func markedTextActivityResetsDanger() {
         var uptime = 10.0
         let engine = SessionEngine(now: { uptime })

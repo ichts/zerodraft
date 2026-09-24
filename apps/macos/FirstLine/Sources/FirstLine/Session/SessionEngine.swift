@@ -91,7 +91,6 @@ final class SessionEngine {
         elapsed = min(max(current - startedAt, 0), duration)
         remaining = max(duration - elapsed, 0)
         idleSeconds = max(current - lastActivityAt, 0)
-        guard !text.isEmpty else { return }
         phase = idleSeconds >= Self.dangerAfterSeconds ? .danger : .writing
         emitStateChange()
     }
@@ -124,7 +123,7 @@ final class SessionEngine {
         let current = now()
         let finish = startedAt + duration
         let wipe = lastActivityAt + Self.wipeAfterSeconds
-        let wipePassed = !text.isEmpty && current >= wipe
+        let wipePassed = current >= wipe
         let finishPassed = current >= finish
         guard wipePassed || finishPassed else { return false }
         if wipePassed && (!finishPassed || wipe <= finish) ||

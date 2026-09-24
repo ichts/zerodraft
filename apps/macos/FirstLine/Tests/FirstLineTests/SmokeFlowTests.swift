@@ -350,6 +350,30 @@ struct SmokeFlowTests {
     }
 
     @Test
+    func uncommittedCompositionWarnsAndClearsTheEditor() async throws {
+        var now = 0.0
+        let (state, root) = makeState(now: { now })
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        let controller = SessionViewController(appState: state)
+        let input = try #require(editor(in: controller.view))
+        input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                            replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.hasMarkedText())
+        #expect(state.sessionEngine.text.isEmpty)
+        controller.viewDidAppear()
+        defer { controller.viewWillDisappear() }
+        now = 5
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(state.sessionEngine.phase == .danger)
+        now = 8
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(state.sessionEngine.phase == .failure)
+        #expect(input.string.isEmpty)
+        #expect(!input.hasMarkedText())
+    }
+
+    @Test
     func wipeDuringCompositionClearsOldDraftBeforeNextCandidate() throws {
         var now = 0.0
         let (state, root) = makeState(now: { now })

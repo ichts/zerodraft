@@ -3,6 +3,21 @@ import Testing
 @testable import FirstLine
 
 struct SettingsStoreTests {
+    @Test func invalidStoredDurationFallsBackToSixtySeconds() throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        for value in ["0", "42", "-60", "null", "\"bad\"", "1e999"] {
+            let json = """
+            {"theme":"system","defaultDuration":\(value),"reducedMotion":"system"}
+            """
+            try Data(json.utf8).write(to: root.appendingPathComponent("settings.json"))
+            #expect(try store.load().defaultDuration == 60, "\(value)")
+        }
+    }
+
     @Test
     func settingsRoundTrip() throws {
         let fm = FileManager.default

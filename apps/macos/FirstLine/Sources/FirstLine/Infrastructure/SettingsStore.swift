@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
  * [OUTPUT]: 提供 AppSettings、AppTheme、ReducedMotionOverride、SettingsStore，包含原生 trial 计数
- * [POS]: Infrastructure 设置层，负责默认值与 settings.json 持久化
+ * [POS]: Infrastructure 设置层，负责时长统一校验、默认值与 settings.json 持久化
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -57,7 +57,7 @@ struct AppSettings: Codable, Equatable {
         licenseInstanceID: String? = nil
     ) {
         self.theme = theme
-        self.defaultDuration = defaultDuration
+        self.defaultDuration = SessionEngine.validDuration(defaultDuration)
         self.reducedMotion = reducedMotion
         self.trialSessionsUsed = trialSessionsUsed
         self.licenseKey = licenseKey
@@ -90,7 +90,7 @@ struct AppSettings: Codable, Equatable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         theme = try container.decode(AppTheme.self, forKey: .theme)
-        defaultDuration = try container.decode(TimeInterval.self, forKey: .defaultDuration)
+        defaultDuration = SessionEngine.validDuration((try? container.decode(TimeInterval.self, forKey: .defaultDuration)) ?? SessionEngine.defaultDurationSeconds)
         reducedMotion = try container.decode(ReducedMotionOverride.self, forKey: .reducedMotion)
         trialSessionsUsed = try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0
         let legacyUnlocked = try container.decodeIfPresent(Bool.self, forKey: .hasUnlockedFullAccess) ?? false
@@ -110,7 +110,7 @@ struct AppSettings: Codable, Equatable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(theme, forKey: .theme)
-        try container.encode(defaultDuration, forKey: .defaultDuration)
+        try container.encode(SessionEngine.validDuration(defaultDuration), forKey: .defaultDuration)
         try container.encode(reducedMotion, forKey: .reducedMotion)
         try container.encode(trialSessionsUsed, forKey: .trialSessionsUsed)
         try container.encodeIfPresent(licenseKey, forKey: .licenseKey)

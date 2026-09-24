@@ -4,7 +4,7 @@
  * [POS]: FirstLine 重写核心 surface，负责 append-only 编辑器、稳焦点（beep 根治）、
  *        danger/failure/success 循环驱动、Flood 白纸列与 chrome（FossilLayer 静态化石、danger veil
  *        与倒计时、narrator strip、deny 抖动 + 红色 hairline、failure wiped-text fossil）、
- *        session 重新进入时的草稿恢复，以及 viewDidAppear 外观刷新。接管退役 SwiftUI SessionView。
+ *        原房间 wipe 报告及下一键重启、session 草稿恢复。成功仅由计时截止产生。
  * [PROTOCOL]: 变更时更新此头部，然后检查最近 AGENTS.md
  *
  * 焦点修复（beep 根治）：SwiftUI 版的 EditorViewRepresentable 在 updateNSView 里用
@@ -33,7 +33,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyResetWorkItem: DispatchWorkItem?
     private var lastObservedDenyAt: TimeInterval?
     private var tickTimer: Timer?
-    private var finishKeyMonitor: Any?
     private var denyShakeOffset: CGFloat = 0
     private var denyShakeWorkItem: DispatchWorkItem?
     private var denyHairlineActive = false
@@ -44,7 +43,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var textView: AppendOnlyTextView!
     private var progressTrack: NSView!
     private var progressFill: NSView!
-    private var finishButton: NSButton!
+    private var wipeReportLabel: NSTextField!
     private var timerLabel: NSTextField!
     private var topChrome: NSView!
     private var paperContainer: NSView!
@@ -82,15 +81,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         applyNarrator()
     }
 
-    // paperContainer / Finish borders 用 dynamic NSColor 一次性 .cgColor，window appearance 切换后会
-    // 保留旧解析值。paperContainer 是 AppearanceBorderedView（自己的 viewDidChangeEffectiveAppearance
-    // 重解析 borderColor）；Finish 按钮描边在每次进入 surface（viewDidAppear）重设，覆盖 Home->Writing 切换。
     override func viewDidAppear() {
         super.viewDidAppear()
-        finishButton.layer?.borderColor = FirstLineColors.uiLightNSColor.cgColor
         applyReducedMotionToFossils()
         startTicker()
-        installFinishKeyMonitor()
         installDidBecomeKeyObserver()
         prepareEditorViewport()
         grabFocus()
@@ -138,10 +132,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     override func viewWillDisappear() {
         super.viewWillDisappear()
         stopTicker()
-        if let monitor = finishKeyMonitor {
-            NSEvent.removeMonitor(monitor)
-            finishKeyMonitor = nil
-        }
         if let obs = didBecomeKeyObserver {
             NotificationCenter.default.removeObserver(obs)
             didBecomeKeyObserver = nil
@@ -229,20 +219,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         progressFill.wantsLayer = true
         topChrome.addSubview(progressFill)
 
-        finishButton = NSButton(title: "Finish", target: self, action: #selector(finishTapped))
-        finishButton.translatesAutoresizingMaskIntoConstraints = false
-        finishButton.bezelStyle = .inline
-        finishButton.isBordered = false
-        finishButton.keyEquivalent = "\r"
-        finishButton.keyEquivalentModifierMask = [.command]
-        finishButton.font = FirstLineTypography.buttonLabelNSFont
-        finishButton.contentTintColor = FirstLineColors.inkNSColor
-        finishButton.setAccessibilityLabel("Finish")
-        finishButton.wantsLayer = true
-        finishButton.layer?.cornerRadius = 8
-        finishButton.layer?.borderWidth = 1
-        finishButton.layer?.borderColor = FirstLineColors.uiLightNSColor.cgColor
-        topChrome.addSubview(finishButton)
+        wipeReportLabel = NSTextField(labelWithString: "")
+        wipeReportLabel.translatesAutoresizingMaskIntoConstraints = false
+        wipeReportLabel.font = FirstLineTypography.sessionStatusNSFont
+        wipeReportLabel.textColor = FirstLineColors.dangerNSColor
+        wipeReportLabel.alignment = .center
+        wipeReportLabel.isHidden = true
+        paperContainer.addSubview(wipeReportLabel)
 
         timerLabel = NSTextField(labelWithString: "")
         timerLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -381,12 +364,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             progressFill.topAnchor.constraint(equalTo: progressTrack.topAnchor),
             progressFill.heightAnchor.constraint(equalToConstant: 2),
 
-            finishButton.topAnchor.constraint(equalTo: topChrome.topAnchor, constant: CGFloat(FirstLineSpacing.sm)),
-            finishButton.trailingAnchor.constraint(equalTo: topChrome.trailingAnchor, constant: -24),
-            finishButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
-
-            timerLabel.centerYAnchor.constraint(equalTo: finishButton.centerYAnchor),
-            timerLabel.trailingAnchor.constraint(equalTo: finishButton.leadingAnchor, constant: -CGFloat(FirstLineSpacing.sm)),
+            timerLabel.topAnchor.constraint(equalTo: topChrome.topAnchor, constant: CGFloat(FirstLineSpacing.sm)),
+            timerLabel.trailingAnchor.constraint(equalTo: topChrome.trailingAnchor, constant: -24),
+            wipeReportLabel.centerXAnchor.constraint(equalTo: paperContainer.centerXAnchor),
+            wipeReportLabel.centerYAnchor.constraint(equalTo: paperContainer.centerYAnchor),
+            wipeReportLabel.widthAnchor.constraint(lessThanOrEqualTo: paperContainer.widthAnchor, constant: -24),
 
             // veil 铺满
             veilView.topAnchor.constraint(equalTo: view.topAnchor),
@@ -517,7 +499,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let phase = engine.phase
         let isDanger = phase == .danger
 
-        textView.isEditable = phase == .writing || phase == .danger
+        textView.isEditable = phase == .writing || phase == .danger || phase == .failure
+        if phase == .failure && !textView.string.isEmpty && !textView.hasMarkedText() {
+            textView.clearWipedText()
+        }
+        if let unused = engine.unusedSeconds, phase == .failure {
+            wipeReportLabel.stringValue = String(format: "DRAFT WIPED - %d:%02d UNUSED. TYPE TO RESTART.", unused / 60, unused % 60)
+            wipeReportLabel.isHidden = false
+        } else {
+            wipeReportLabel.isHidden = true
+        }
 
         let totalSeconds = max(Int(ceil(engine.remaining)), 0)
         timerLabel.stringValue = String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
@@ -535,9 +526,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         let topOpacity: CGFloat = isDanger ? 0.92 : 0.42
         topChrome.alphaValue = topOpacity
-
-        let canFinish = (phase == .writing || phase == .danger) && engine.wordCount > 0
-        finishButton.isHidden = !canFinish
 
         veilView.isHidden = !isDanger
         countdownLabel.isHidden = !isDanger
@@ -562,7 +550,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             refreshCompositionAnchorIfNeeded()
         }
 
-        if (phase == .writing || phase == .danger),
+        if (phase == .writing || phase == .danger || phase == .failure),
            let window = view.window,
            window.firstResponder !== textView {
             grabFocus()
@@ -618,30 +606,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     // MARK: - Actions
 
-    @objc private func finishTapped() { engine.finish() }
     @objc private func abandonTapped() { appState.abandonSession() }
-
-    // Cmd+Return must be caught before NSTextView consumes the key-equivalent chain.
-    private func installFinishKeyMonitor() {
-        guard finishKeyMonitor == nil else { return }
-        finishKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.modifierFlags.contains(.command), event.keyCode == 36 else { return event }
-            Task { @MainActor [weak self] in
-                guard let self,
-                      self.engine.phase == .writing || self.engine.phase == .danger else { return }
-                self.engine.finish()
-            }
-            return nil
-        }
-    }
-
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.contains(.command), event.keyCode == 36 {
-            engine.finish()
-            return true
-        }
-        return super.performKeyEquivalent(with: event)
-    }
 
     // MARK: - Deny feedback (shake + hairline)
 

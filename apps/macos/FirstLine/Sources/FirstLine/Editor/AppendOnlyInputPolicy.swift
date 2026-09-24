@@ -3,7 +3,7 @@
  * [OUTPUT]: AppendOnlyInputPolicy - 编辑器 append-only 守卫的单一可测来源
  * [POS]: First Line 编辑器输入策略；封装两块 append-only 守卫逻辑，供 SessionViewController 的
  *        NSTextViewDelegate 与 EditorFocusTests 共用，消除此前 Coordinator/SessionViewController
- *        双份重复。逻辑与原 Coordinator 逐字等价：被屏蔽命令一律 deny；deleteBackward/Forward 在有
+ *        双份重复。移动命令显式 deny，不依赖选区变化；deleteBackward/Forward 在有
  *        marked text 时放行（让 IME 删候选），否则 deny；选区重定向在无 marked text 时强制移到 UTF-16
  *        末尾。
  * [PROTOCOL]: 变更时更新此头部
@@ -34,6 +34,11 @@ enum AppendOnlyInputPolicy {
         #selector(NSResponder.deleteToEndOfParagraph(_:)),
         #selector(NSResponder.yank(_:)),
         #selector(NSResponder.transpose(_:)),
+        Selector(("moveLeft:")),
+        Selector(("moveUp:")),
+        Selector(("moveToBeginningOfDocument:")),
+        Selector(("pageUp:")),
+        Selector(("moveWordLeft:")),
     ]
 
     /// 删除单字符命令（hasMarkedText 时放行给 IME 删候选，否则 deny）。

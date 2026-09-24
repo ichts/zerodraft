@@ -48,9 +48,13 @@ struct SmokeFlowTests {
         let realRootBefore = fileMetadata(at: AppPaths.applicationSupportRoot)
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         state.sessionEngine.registerCommittedText("private kept draft")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         #expect(state.sessionEngine.text == "private kept draft")
@@ -126,9 +130,13 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         state.sessionEngine.registerCommittedText("hello world")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         state.openSettings()
@@ -197,10 +205,14 @@ struct SmokeFlowTests {
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(state.canNavigateToSupportSurface)
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         #expect(!state.canNavigateToSupportSurface)
         state.sessionEngine.registerCommittedText("hello")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         #expect(!state.canNavigateToSupportSurface)
@@ -237,15 +249,15 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func emptySessionAtCompletionRoutesHome() {
+    func untouchedRoomHasNoDeadline() {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 5
+        state.startSession(duration: 60)
+        now = 65
         state.handleTick()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
     }
 
     @Test
@@ -253,11 +265,11 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 6
-        state.sessionEngine.registerCommittedText("late text")
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        state.startSession(duration: 60)
+        now = 65
+        state.sessionEngine.registerCommittedText("first text")
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
     }
 
     @Test
@@ -265,11 +277,11 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 6
+        state.startSession(duration: 60)
+        now = 65
         state.sessionEngine.registerMarkedTextActivity()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
     }
 
     @Test
@@ -286,13 +298,4 @@ struct SmokeFlowTests {
         #expect(state.lastWipeFossil == nil)
     }
 
-    @Test
-    func emptyFinishRoutesHomeAndPersistsNothing() throws {
-        let (state, root) = makeState()
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        state.sessionEngine.finish()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
-    }
 }

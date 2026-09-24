@@ -5,8 +5,8 @@
 set -euo pipefail
 
 batch=${1:-}
-if [[ "$batch" != 1 ]]; then
-  echo 'Batch 1 is the only scripted window flow so far.' >&2
+if [[ "$batch" != 1 && "$batch" != 2 ]]; then
+  echo 'Only batch 1 and batch 2 have scripted window flows.' >&2
   exit 2
 fi
 cd "$(dirname "$0")/.."
@@ -38,11 +38,28 @@ if [[ ! "$wid" =~ ^[0-9]+$ ]]; then echo 'No app window found' >&2; exit 1; fi
 shot() { screencapture -x -l "$wid" "$output/$1.png"; }
 type() { osascript -e 'tell application "System Events" to repeat with characterToType in characters of '"\"$1\"" -e 'keystroke characterToType' -e 'end repeat'; }
 shot start
-# Home has no Return binding in Batch 1; enter by clicking its primary button.
+# Enter by clicking the primary button; Return is not a start shortcut yet.
 osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "FirstLine"'
 sleep 1
-type 'batch one draft'
-shot typed
+if [[ "$batch" == 2 ]]; then
+  sleep 3
+  shot rest-after-three-seconds
+  type 'batch two draft'
+  shot typed
+  sleep 5
+  shot warn
+  sleep 3
+  shot wipe-in-room
+  type 'new draft'
+  shot restarted
+  if [[ $(osascript -e 'tell application "System Events" to exists button "Finish" of window 1 of process "FirstLine"') == true ]]; then
+    echo 'Early Finish button still exists' >&2
+    exit 1
+  fi
+else
+  type 'batch one draft'
+  shot typed
+fi
 osascript -e 'tell application "System Events" to keystroke "2" using command down'
 shot command-two
 # Keep typing until the sixty-second deadline produces the kept surface.

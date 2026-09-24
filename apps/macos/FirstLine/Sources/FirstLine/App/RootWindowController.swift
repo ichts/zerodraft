@@ -7,7 +7,7 @@
  *
  * 路由：本控制器观察两个信号：
  *   1) selectedSurface -> 换 contentViewController；
- *   2) sessionEngine.phase -> 当变为 .failure/.success 时把它写回 selectedSurface，接管退役
+ *   2) sessionEngine.phase -> 成功切 kept surface；失败留在 room 以便下一键重启，接管退役
  *      SwiftUI RootView.onChange(of: phase) 的确切职责（AppState.handleEngineStateChange
  *      只做持久化(success)/aftermath(failure)/idle->Home，不设 failure/success 的 surface）。
  * Observation 的 withObservationTracking 只触发一次回调，因此在回调里重新 arm 观察实现持续跟踪。
@@ -82,9 +82,7 @@ final class RootWindowController: NSWindowController {
                 guard let self else { return }
                 switch self.appState.sessionEngine.phase {
                 case .failure:
-                    if self.appState.selectedSurface != .failure {
-                        self.appState.selectedSurface = .failure
-                    }
+                    break
                 case .success:
                     if self.appState.selectedSurface != .success {
                         self.appState.selectedSurface = .success

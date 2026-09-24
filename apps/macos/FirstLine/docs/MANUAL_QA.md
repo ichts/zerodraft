@@ -65,6 +65,12 @@ Use this checklist before direct distribution.
 
 ## Manual QA Record
 
+### 2026-09-24 - writeitdown batch 2, engine parity
+
+- `swift build` exit 0; `swift test` exit 0 (93 tests in 5 suites). All 12 named batch-2 filters individually exited 0. The inherited storage-reference and price-literal `! rg` gates exited 0. Window QA is **pending independent Computer Use acceptance**; this background session has no screen capture or System Events permission and did not run `scripts/qa-window.sh 2`.
+- The scripted window flow now clicks the primary start button, waits three seconds to capture the unchanged clock, then captures typing, warning, in-room wipe, restart, kept, and the missing early Finish button. Independent acceptance must inspect each image and confirm the wipe's unused time derives from deadlines rather than delayed sampling.
+- Physical IME candidate selection and exact feedback frames remain not verified here.
+
 ### 2026-08-02
 
 Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC + Pinyin 输入源。截图存 `/tmp/flqa3/`。

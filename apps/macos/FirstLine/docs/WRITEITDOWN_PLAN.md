@@ -193,7 +193,7 @@ The following code inside kept files is also deleted:
 ## 6. Brand and visuals
 
 - The app name in Finder and the menu bar is `Write It Down`. The in-app logotype is `WRITE_IT_DOWN`, matching the site. The window title is `Write It Down`.
-- The bundle identifier is `app.writeitdown.mac`. The Swift package product and executable target are renamed from `FirstLine` to `WriteItDown` in batch 3. The directory `apps/macos/FirstLine/` keeps its path until batch 7, so that every path in this plan stays valid while the batches run. Batch 7 may rename it with a pure `git mv`.
+- The bundle identifier is `app.writeitdown.mac`. The Swift package product and executable target are renamed from `FirstLine` to `WriteItDown` in batch 3. The directory `apps/macos/FirstLine/` keeps its path; the app name and distribution do not depend on the source directory name.
 - `AppPaths` changes its folder from `~/Library/Application Support/First Line/` to `~/Library/Application Support/WriteItDown/`. Nothing is migrated. The old folder held drafts, which the new app must not read, and license data from a mock client that never sold a key.
 - Colors come from `writeitdown/site.css` for both appearances:
   - Light: wall `#d8d2c3`, paper `#f7f4ea`, ink `#1a1813`, mute `#6f6a5d`, faint `#b3ada0`, and alarm `#8f4405`. The wash is `#d1c1ac` on the wall and `#ebdfce` on the paper, and the deeper cut is `#c6b095` and `#decab3`.
@@ -333,7 +333,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - Warn uses the wash ramp from 5 s to 8 s and the alarm numeral with `KEEP TYPING OR THE DRAFT IS DELETED.`.
   - The wipe is a 200 ms deeper cut followed by the in-room report `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.`.
   - The kept view shows `You wrote it down.`, the full text (scrollable), `0:00 - N WORDS KEPT.`, `COPY TEXT` (which becomes `COPIED`, or `TRY COPY AGAIN` on failure), and `RUN IT AGAIN`. Focus goes to COPY TEXT.
-  - Deny feedback is 280 ms with a 2 px shake, a 1 px alarm outline, no restart while running, and a VoiceOver announcement `Blocked. Forward only.`. Reduced motion drops the shake.
+  - Deny feedback is 280 ms with a 2 px shake, a 1 px alarm outline, no restart while running, and a VoiceOver announcement `Blocked. Forward only.`. Reduced motion drops the shake. The requirement's "red line" means this deny outline in the site's alarm color, not the old Zero Draft red.
   - Escape outside IME composition, and the ESC - EXIT control, return to the start screen.
   - Delete `FailureViewController.swift`, `FossilLayerView.swift`, the narrator, the already-unused Finish UI remnants, the Abandon button, and the progress bar. Keep batch 2's in-room wipe/restart semantics.
 - Named tests:
@@ -367,6 +367,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - Pick 60 from the Session menu and confirm `60:00`.
   - Confirm the menu's lengths are disabled in the room.
   - Run one full kept session at 3 minutes in real time.
+  - In a test or QA harness, seed a large draft by programmatic appends through the existing append-only input path and measure typing speed. Do not add an app surface or input bypass.
 - Done when the common set is green and the QA record covers the listed states, including physical focus with Full Keyboard Access and the picker with VoiceOver on (a screenshot plus the spoken label noted).
 
 ### Batch 6: License rebrand and live Dodo client
@@ -399,7 +400,6 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - Add `scripts/release-dmg.sh`, which signs with the hardened runtime, builds the DMG, notarizes with `notarytool`, staples, verifies with `spctl` and `codesign --verify --deep --strict`, and writes a SHA-256 checksum.
   - Update `docs/RELEASE_CHECKLIST.md` for writeitdown.
   - Draft the Mac section for `writeitdown/support.html` and the site privacy line.
-  - Optionally rename the directory to `apps/macos/WriteItDown/`.
 - Blocking inputs: the owner-account steps in section 8.1.
 - Acceptance:
   - The common set passes.
@@ -432,8 +432,8 @@ All ten findings are incorporated into the affected batch or acceptance sections
 - Governance: `VISION.md` fixes sixty seconds, and the root `AGENTS.md` describes the macOS app as Zero Draft. Batches 3 and 5 update the relevant product contracts. Batch 4 must also update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them. Reviewers may flag the change until those updates land.
 - The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
-- A 60-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 QA includes a typing-speed check after pasting a large seed through the restore path in a debug build. If it lags, the restyle is limited to the last few paragraphs.
-- The dark alarm `#f2a93b` and light alarm `#8f4405` are not red. They follow the site, so anyone expecting red danger from the old app should use the site as the reference.
+- A 60-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
+- The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
 - Notarization, the Dodo product, and the checkout URL depend on the owner-account steps. Without them, batch 7 stops at an unsigned local package, and batch 6 ships with test mode only.
 - Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. Batch 3's release note tells the writer they may delete it. The app does not delete user folders on its own.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

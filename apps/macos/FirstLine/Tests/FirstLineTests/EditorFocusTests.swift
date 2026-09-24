@@ -321,6 +321,53 @@ struct EditorFocusTests {
         #expect(abs(before - after) < 0.5)
     }
 
+    @Test func movementCommandsDenyAndKeepCaretAtEnd() {
+        let engine = SessionEngine()
+        let controller = SessionViewController(appState: AppState(sessionEngine: engine))
+        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        editor.loadRestoredText("hello world")
+        for selector in ["moveLeft:", "moveRight:", "moveUp:", "moveDown:",
+                         "moveToBeginningOfDocument:", "moveToEndOfDocument:",
+                         "moveToBeginningOfLine:", "moveToEndOfLine:",
+                         "moveToBeginningOfParagraph:", "moveToEndOfParagraph:",
+                         "moveToLeftEndOfLine:", "moveToRightEndOfLine:",
+                         "pageUp:", "pageDown:", "moveWordLeft:", "moveWordRight:",
+                         "moveWordForward:", "moveWordBackward:",
+                         "moveLeftAndModifySelection:", "moveRightAndModifySelection:",
+                         "moveUpAndModifySelection:", "moveDownAndModifySelection:",
+                         "moveWordLeftAndModifySelection:", "moveWordRightAndModifySelection:",
+                         "moveToBeginningOfDocumentAndModifySelection:",
+                         "moveToEndOfDocumentAndModifySelection:",
+                         "pageUpAndModifySelection:", "pageDownAndModifySelection:"] {
+            #expect(controller.textView(editor, doCommandBy: Selector((selector))))
+            #expect(editor.selectedRange() == NSRange(location: 11, length: 0))
+            #expect(engine.lastDenyAt != nil)
+        }
+    }
+
+    @Test
+    func imeMovementStaysWithinMarkedRange() throws {
+        let engine = SessionEngine()
+        let controller = SessionViewController(appState: AppState(sessionEngine: engine))
+        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        editor.configureSessionTypography()
+        editor.loadRestoredText("draft")
+        editor.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+        let marked = try #require(editor.hasMarkedText() ? editor.markedRange() : nil)
+        let inside = NSRange(location: marked.location + 2, length: 0)
+        let outside = NSRange(location: 0, length: 0)
+        #expect(controller.textView(editor, doCommandBy: Selector(("moveLeft:"))) == false)
+        #expect(controller.textView(editor, willChangeSelectionFromCharacterRange: editor.selectedRange(),
+                                    toCharacterRange: inside) == inside)
+        #expect(engine.lastDenyAt == nil)
+        #expect(controller.textView(editor, willChangeSelectionFromCharacterRange: inside,
+                                    toCharacterRange: outside) == NSRange(location: NSMaxRange(marked), length: 0))
+        #expect(engine.lastDenyAt != nil)
+        #expect(controller.textView(editor, doCommandBy: Selector(("moveRight:"))) == false)
+        #expect(controller.textView(editor, doCommandBy: #selector(NSResponder.deleteWordBackward(_:))))
+    }
+
     @Test
     func blockedEditingCommandsAreNotValidated() {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
@@ -406,7 +453,7 @@ struct EditorFocusTests {
         let redirected = AppendOnlyInputPolicy.redirectedSelection(
             proposed: NSRange(location: 1, length: 0),
             fullLength: (textView.string as NSString).length,
-            hasMarkedText: textView.hasMarkedText()
+            markedRange: textView.hasMarkedText() ? textView.markedRange() : nil
         )
         if redirected != nil { engine.registerDeny() }
 
@@ -433,7 +480,7 @@ struct EditorFocusTests {
         let redirected = AppendOnlyInputPolicy.redirectedSelection(
             proposed: NSRange(location: 2, length: 0),
             fullLength: (textView.string as NSString).length,
-            hasMarkedText: textView.hasMarkedText()
+            markedRange: textView.hasMarkedText() ? textView.markedRange() : nil
         )
         if redirected != nil { engine.registerDeny() }
 

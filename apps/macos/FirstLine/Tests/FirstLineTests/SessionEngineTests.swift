@@ -112,37 +112,6 @@ struct SessionEngineTests {
     }
 
     @Test
-    func finishEndsLiveSessionIntoSuccess() {
-        var uptime = 0.0
-        let engine = SessionEngine(now: { uptime })
-
-        engine.start(duration: 60)
-        engine.registerCommittedText("kept moving")
-        engine.finish()
-        #expect(engine.phase == .success)
-        #expect(engine.text == "kept moving")
-        #expect(engine.remaining == 0)
-    }
-
-    // MARK: - 空草稿 finish 永不 success（R4-M1）
-
-    @Test
-    func finishOnEmptyDraftGoesIdleNotSuccess() {
-        var uptime = 0.0
-        let engine = SessionEngine(now: { uptime })
-
-        engine.start(duration: 60)
-        // 用户从未输入任何文字，直接 Cmd+Enter 完成。
-        engine.finish()
-
-        #expect(engine.phase == .idle)
-        #expect(engine.text.isEmpty)
-        #expect(engine.wipedText.isEmpty)
-        // 剩余时间重置为完整时长，未产生 success。
-        #expect(engine.remaining == engine.duration)
-    }
-
-    @Test
     func committedTextResetsDanger() {
         var uptime = 50.0
         let engine = SessionEngine(now: { uptime })
@@ -156,6 +125,23 @@ struct SessionEngineTests {
         engine.registerCommittedText("你")
         #expect(engine.phase == .writing)
         #expect(engine.text == "start你")
+    }
+
+    @Test
+    func uncommittedCompositionWarnsAndWipesOnSilence() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+        engine.start(duration: 60)
+        engine.registerMarkedTextActivity()
+        #expect(engine.text.isEmpty)
+        uptime = 5
+        engine.tick()
+        #expect(engine.phase == .danger)
+        #expect(engine.secondsUntilDeletion == 3)
+        uptime = 8
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.unusedSeconds == 52)
     }
 
     @Test
@@ -179,10 +165,13 @@ struct SessionEngineTests {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
 
-        engine.start(duration: 5)
+        engine.start(duration: 60)
         engine.registerCommittedText("hello")
-
-        uptime = 5.0
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        uptime = 60.0
         engine.tick()
         #expect(engine.phase == .success)
         #expect(engine.wordCount == 1)
@@ -238,10 +227,10 @@ struct SessionEngineTests {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
 
-        engine.start(duration: 10)
+        engine.start(duration: 60)
         engine.registerCommittedText("draft")
-        // wipeDeadline = 8, completionDeadline = 10. At 12 both passed; wipe (8) is first.
-        uptime = 12.0
+        // Both deadlines have passed; wipe (8) was first.
+        uptime = 100.0
         engine.tick()
 
         #expect(engine.phase == .failure)
@@ -253,13 +242,16 @@ struct SessionEngineTests {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
 
-        engine.start(duration: 10)
+        engine.start(duration: 60)
         engine.registerCommittedText("draft")
-        uptime = 6.0
-        // Keep the draft alive: lastActivityAt moves to 6, wipeDeadline becomes 14.
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        uptime = 56
         engine.registerCommittedText(" more")
-        // completionDeadline = 10, wipeDeadline = 14. At 15 both passed; completion (10) is first.
-        uptime = 15.0
+        // Completion at 60 precedes wipe at 64, even though tick arrives late.
+        uptime = 100.0
         engine.tick()
 
         #expect(engine.phase == .success)
@@ -267,29 +259,20 @@ struct SessionEngineTests {
     }
 
     @Test
-    func finishCalledAfterWipeDeadlineResolvesToFailure() {
+    func exactDeadlineTieResolvesToFailure() {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
 
         engine.start(duration: 60)
         engine.registerCommittedText("draft")
-        // wipeDeadline (8) passed; Cmd+Enter must not rescue the draft into success.
-        uptime = 9.0
-        engine.finish()
-
-        #expect(engine.phase == .failure)
-        #expect(engine.wipedText == "draft")
-    }
-
-    @Test
-    func exactDeadlineTieResolvesToFailure() {
-        var uptime = 0.0
-        let engine = SessionEngine(now: { uptime })
-
-        // completionDeadline = 0 + 8 = 8, wipeDeadline = 0 + 8 = 8: exact tie.
-        engine.start(duration: 8)
-        engine.registerCommittedText("draft")
-        uptime = 8.0
+        for second in stride(from: 6.0, through: 48.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        uptime = 52
+        engine.registerMarkedTextActivity()
+        // Completion and wipe both land at 60.
+        uptime = 60.0
         engine.tick()
 
         #expect(engine.phase == .failure)
@@ -318,14 +301,154 @@ struct SessionEngineTests {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
 
-        engine.start(duration: 5)
-        // No text is ever typed.
-        uptime = 5.0
+        engine.start(duration: 60)
+        // No text is ever typed, so there is no deadline.
+        uptime = 65.0
         engine.tick()
 
-        #expect(engine.phase == .idle)
+        #expect(engine.phase == .writing)
         #expect(engine.text.isEmpty)
         #expect(engine.wipedText.isEmpty)
+    }
+
+    @Test func clockStartsOnFirstInputNotOnStart() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        time = 30
+        engine.tick()
+        #expect(engine.remaining == 60)
+        engine.registerCommittedText("go")
+        time = 31
+        engine.tick()
+        #expect(engine.remaining == 59)
+    }
+
+    @Test func markedTextStartsTheClock() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        time = 20
+        engine.registerMarkedTextActivity()
+        time = 21
+        engine.registerCommittedText("你")
+        #expect(engine.remaining == 59)
+    }
+
+    @Test func whitespaceOnlyDraftAtDeadlineWipes() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        engine.registerCommittedText(" \n ")
+        time = 54
+        engine.registerMarkedTextActivity()
+        time = 60
+        engine.tick()
+        #expect(engine.phase == .failure)
+    }
+
+    @Test func wipeReportsUnusedSeconds() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        engine.registerCommittedText("draft")
+        time = 100
+        engine.tick()
+        #expect(engine.unusedSeconds == 52)
+        engine.start(duration: 60)
+        engine.registerCommittedText("new")
+        #expect(engine.unusedSeconds == nil)
+        #expect(engine.remaining == 60)
+        engine.start(duration: 60)
+        engine.registerCommittedText("tie")
+        for second in stride(from: 106.0, through: 148.0, by: 6.0) {
+            time = second
+            engine.registerMarkedTextActivity()
+        }
+        time = 152
+        engine.registerMarkedTextActivity()
+        time = 160
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.unusedSeconds == 0)
+        engine.start(duration: 180)
+        engine.registerCommittedText("long")
+        time = 168
+        engine.tick()
+        #expect(engine.unusedSeconds == 172)
+    }
+
+    @Test func keystrokeAfterWipeStartsFreshSessionWithSameDuration() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 180)
+        engine.registerCommittedText("lost")
+        let oldID = engine.sessionID
+        time = 8
+        engine.tick()
+        engine.start(duration: 180)
+        engine.registerCommittedText("again")
+        #expect(engine.phase == .writing)
+        #expect(engine.text == "again")
+        #expect(engine.duration == 180)
+        #expect(engine.sessionID != oldID)
+        #expect(engine.unusedSeconds == nil)
+    }
+
+    @Test func wordCountMatchesWebCases() {
+        let cases: [(String, Int)] = [
+            ("  two\nwords ", 2), ("", 0), (" \n\t", 0), ("中文测试", 4),
+            ("hello world 中文测试", 6), ("你好，world！", 3),
+            ("café cafe\u{0301}", 2), ("مرحبا بالعالم", 2),
+            ("こんにちは世界", 3), ("これはテストです。明日も書きます。", 10),
+            ("👨‍👩‍👧‍👦 👍🏽 🇨🇳", 0),
+            ("...，！？", 0), ("𠀀中文", 3), ("你好👩🏽‍💻world", 3)
+        ]
+        let engine = SessionEngine()
+        for (text, count) in cases {
+            engine.start(duration: 60)
+            engine.registerCommittedText(text)
+            #expect(engine.wordCount == count, "\(text)")
+        }
+    }
+
+    @Test func wordCountTracksDraftAcrossActivityAndResets() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        #expect(engine.wordCount == 0)
+        engine.registerCommittedText("hello")
+        #expect(engine.wordCount == 1)
+        time = 4
+        engine.registerMarkedTextActivity()
+        engine.tick()
+        #expect(engine.wordCount == 1)
+        engine.registerCommittedText(" 中文")
+        #expect(engine.wordCount == 3)
+        time = 12
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.wordCount == 0)
+        engine.start(duration: 60)
+        #expect(engine.wordCount == 0)
+        engine.registerCommittedText("new draft")
+        #expect(engine.wordCount == 2)
+        engine.abandon()
+        #expect(engine.wordCount == 0)
+    }
+
+    @Test func fiveAndEightSecondRulesHoldForSixtyMinuteSession() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 3600)
+        engine.registerCommittedText("go")
+        time = 5
+        engine.tick()
+        #expect(engine.phase == .danger)
+        time = 8
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.unusedSeconds == 3592)
     }
 
     // MARK: - Suspend-inclusive default clock (Fix M-B1)

@@ -48,9 +48,13 @@ struct SmokeFlowTests {
         let realRootBefore = fileMetadata(at: AppPaths.applicationSupportRoot)
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         state.sessionEngine.registerCommittedText("private kept draft")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         #expect(state.sessionEngine.text == "private kept draft")
@@ -126,9 +130,13 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         state.sessionEngine.registerCommittedText("hello world")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         state.openSettings()
@@ -197,10 +205,14 @@ struct SmokeFlowTests {
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
         #expect(state.canNavigateToSupportSurface)
-        state.startSession(duration: 5)
+        state.startSession(duration: 60)
         #expect(!state.canNavigateToSupportSurface)
         state.sessionEngine.registerCommittedText("hello")
-        now = 5
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            now = second
+            state.sessionEngine.registerMarkedTextActivity()
+        }
+        now = 60
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         #expect(!state.canNavigateToSupportSurface)
@@ -237,15 +249,15 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func emptySessionAtCompletionRoutesHome() {
+    func untouchedRoomHasNoDeadline() {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 5
+        state.startSession(duration: 60)
+        now = 65
         state.handleTick()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
     }
 
     @Test
@@ -253,11 +265,11 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 6
-        state.sessionEngine.registerCommittedText("late text")
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        state.startSession(duration: 60)
+        now = 65
+        state.sessionEngine.registerCommittedText("first text")
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
     }
 
     @Test
@@ -265,11 +277,121 @@ struct SmokeFlowTests {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        now = 6
+        state.startSession(duration: 60)
+        now = 65
         state.sessionEngine.registerMarkedTextActivity()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .session)
+    }
+
+    private func editor(in view: NSView) -> AppendOnlyTextView? {
+        if let editor = view as? AppendOnlyTextView { return editor }
+        for child in view.subviews {
+            if let found = editor(in: child) { return found }
+        }
+        return nil
+    }
+
+    @Test
+    func exhaustedTrialBlocksBothLateKeystrokeAndIMEAfterWipe() throws {
+        for marked in [false, true] {
+            var now = 0.0
+            let (state, root) = makeState(now: { now })
+            defer { try? FileManager.default.removeItem(at: root) }
+            state.settings.trialSessionsUsed = AppState.trialSessionLimit - 1
+            state.startSession()
+            state.sessionEngine.registerCommittedText("old draft")
+            let controller = SessionViewController(appState: state)
+            let input = try #require(editor(in: controller.view))
+            input.loadRestoredText("old draft")
+            now = 9
+            if marked {
+                input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            } else {
+                input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            #expect(state.selectedSurface == .upgrade)
+            #expect(state.sessionEngine.phase == .failure)
+            #expect(state.settings.trialSessionsUsed == AppState.trialSessionLimit)
+            #expect(input.string.isEmpty)
+        }
+    }
+
+    @Test
+    func licensedRestartKeepsOnlyNewInputIncludingIMECommit() throws {
+        for marked in [false, true] {
+            var now = 0.0
+            let (state, root) = makeState(now: { now })
+            defer { try? FileManager.default.removeItem(at: root) }
+            state.settings.licenseStatus = .active
+            state.startSession()
+            state.sessionEngine.registerCommittedText("old draft")
+            let oldID = state.sessionEngine.sessionID
+            let controller = SessionViewController(appState: state)
+            let input = try #require(editor(in: controller.view))
+            input.loadRestoredText("old draft")
+            if marked {
+                input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            now = 9
+            if marked {
+                let oldEnd = NSRange(location: (input.string as NSString).length, length: 0)
+                input.insertText("你", replacementRange: oldEnd)
+            } else {
+                input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            let expected = marked ? "你" : "new"
+            #expect(state.selectedSurface == .session)
+            #expect(state.sessionEngine.sessionID != oldID)
+            #expect(state.sessionEngine.text == expected)
+            #expect(input.string == expected)
+            #expect(state.settings.trialSessionsUsed == 0)
+        }
+    }
+
+    @Test
+    func uncommittedCompositionWarnsAndClearsTheEditor() async throws {
+        var now = 0.0
+        let (state, root) = makeState(now: { now })
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        let controller = SessionViewController(appState: state)
+        let input = try #require(editor(in: controller.view))
+        input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                            replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.hasMarkedText())
+        #expect(state.sessionEngine.text.isEmpty)
+        controller.viewDidAppear()
+        defer { controller.viewWillDisappear() }
+        now = 5
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(state.sessionEngine.phase == .danger)
+        now = 8
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(state.sessionEngine.phase == .failure)
+        #expect(input.string.isEmpty)
+        #expect(!input.hasMarkedText())
+    }
+
+    @Test
+    func wipeDuringCompositionClearsOldDraftBeforeNextCandidate() throws {
+        var now = 0.0
+        let (state, root) = makeState(now: { now })
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.settings.licenseStatus = .active
+        state.startSession()
+        state.sessionEngine.registerCommittedText("old draft")
+        let controller = SessionViewController(appState: state)
+        let input = try #require(editor(in: controller.view))
+        input.loadRestoredText("old draft")
+        input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.hasMarkedText())
+        now = 8
+        state.handleTick()
+        #expect(state.sessionEngine.phase == .failure)
+        input.insertText("好", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.sessionEngine.text == "好")
+        #expect(input.string == "好")
     }
 
     @Test
@@ -286,13 +408,4 @@ struct SmokeFlowTests {
         #expect(state.lastWipeFossil == nil)
     }
 
-    @Test
-    func emptyFinishRoutesHomeAndPersistsNothing() throws {
-        let (state, root) = makeState()
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession(duration: 5)
-        state.sessionEngine.finish()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .home)
-    }
 }

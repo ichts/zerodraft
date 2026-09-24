@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
  * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、内存中的 wipe aftermath 与可验证的 license 持久化
- * [POS]: FirstLine 顶层导航真相源，负责从 Home 启动 session、消耗 trial 与支持面跳转
+ * [POS]: FirstLine 顶层导航真相源，负责全部 session 启动（含删稿后输入）、消耗 trial 与支持面跳转
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -88,6 +88,15 @@ final class AppState {
         let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
         sessionEngine.start(duration: resolvedDuration)
         selectedSurface = .session
+    }
+
+    func prepareSessionInput() -> Bool {
+        sessionEngine.tick()
+        if sessionEngine.phase == .failure {
+            startSession(duration: sessionEngine.duration)
+        }
+        return selectedSurface == .session &&
+            (sessionEngine.phase == .writing || sessionEngine.phase == .danger)
     }
 
     func goHome() {

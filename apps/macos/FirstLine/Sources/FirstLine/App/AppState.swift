@@ -1,6 +1,6 @@
 /**
- * [INPUT]: 依赖 SessionEngine、PersistenceService、SettingsStore 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、durable wipe aftermath、按 sessionID 分开的保存重试与可验证的 license 持久化
+ * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、内存中的 wipe aftermath 与可验证的 license 持久化
  * [POS]: FirstLine 顶层导航真相源，负责从 Home 启动 session、消耗 trial 与支持面跳转
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -13,13 +13,12 @@ enum Surface: String, CaseIterable, Hashable, Identifiable {
     case session = "Session"
     case failure = "Failure"
     case success = "Success"
-    case library = "Library"
     case settings = "Settings"
     case upgrade = "Upgrade"
 
     var id: String { rawValue }
 
-    static let navigationCases: [Surface] = [.home, .session, .failure, .success, .library, .settings]
+    static let navigationCases: [Surface] = [.home, .session, .failure, .success, .settings]
 }
 
 @MainActor
@@ -32,48 +31,33 @@ final class AppState {
     var selectedSurface: Surface = .home
     var selectedDuration: TimeInterval = SessionEngine.defaultDurationSeconds
     let sessionEngine: SessionEngine
-    let persistenceService: PersistenceService
     let settingsStore: SettingsStore
     let licenseClient: LicenseClient
     let installIDStore: InstallIDStore
     let clock: () -> Date
     var settings: AppSettings
-    var librarySessions: [LibrarySession] = []
-    var selectedLibrarySession: LibrarySession?
-    var deleteTarget: LibrarySession?
-    var deletePromptVisible = false
 
     /// UpgradeView / SettingsView 读取这些字段渲染激活状态。
     var licenseActivationInFlight = false
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
 
-    /// Durable aftermath of the most recent wipe: the first ~64 chars (whitespace
+    /// In-memory aftermath of the most recent wipe: the first ~64 chars (whitespace
     /// collapsed) of the lost draft, shown on Home until the next session starts.
     var lastWipeFossil: String?
 
-    /// 已写盘的 sessionID，确保每场成功 session 只调用一次 saveSuccessfulSession，防止 ticking 重复触发。
-    private var lastPersistedSessionID: UUID?
-    /// Per-attempt delay for save retries. Defaults to 1s; tests inject a small
-    /// value so retry behaviour is verifiable without wall-clock waits.
-    private let saveRetryDelayNanoseconds: UInt64
-
     init(
         sessionEngine: SessionEngine = SessionEngine(),
-        persistenceService: PersistenceService = PersistenceService(),
         settingsStore: SettingsStore = SettingsStore(),
         licenseClient: LicenseClient = MockLicenseClient(),
         installIDStore: InstallIDStore = InstallIDStore(),
-        clock: @escaping () -> Date = Date.init,
-        saveRetryDelayNanoseconds: UInt64 = 1_000_000_000
+        clock: @escaping () -> Date = Date.init
     ) {
         self.sessionEngine = sessionEngine
-        self.persistenceService = persistenceService
         self.settingsStore = settingsStore
         self.licenseClient = licenseClient
         self.installIDStore = installIDStore
         self.clock = clock
-        self.saveRetryDelayNanoseconds = saveRetryDelayNanoseconds
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         // Fixed 60s contract: legacy persisted durations are superseded by the engine constant.
         self.selectedDuration = SessionEngine.defaultDurationSeconds
@@ -81,10 +65,9 @@ final class AppState {
             settings.defaultDuration = SessionEngine.defaultDurationSeconds
         }
 
-        refreshLibrary()
         launchInitialSurface()
 
-        // onStateChange 由 @MainActor 的 engine 方法触发，始终运行在主线程；用它观察 success/failure 迁移可同时覆盖 timer 与编辑器两条触发路径。
+        // onStateChange 由 @MainActor 的 engine 方法触发，覆盖 timer 与编辑器两条状态迁移路径。
         sessionEngine.onStateChange = { [weak self] phase in
             MainActor.assumeIsolated {
                 self?.handleEngineStateChange(phase)
@@ -112,12 +95,6 @@ final class AppState {
         selectedSurface = .home
     }
 
-    func openLibrary() {
-        guard canNavigateToSupportSurface else { return }
-        refreshLibrary()
-        selectedSurface = .library
-    }
-
     func openWritingMode() {
         guard sessionEngine.phase != .success else { return }
         if sessionEngine.phase == .writing || sessionEngine.phase == .danger {
@@ -132,58 +109,13 @@ final class AppState {
         selectedSurface = .settings
     }
 
-    func selectLibrarySession(_ session: LibrarySession) {
-        selectedLibrarySession = session
-    }
-
-    func requestDelete(_ session: LibrarySession) {
-        deleteTarget = session
-        deletePromptVisible = true
-    }
-
-    func confirmDelete() {
-        guard let session = deleteTarget else { return }
-        try? persistenceService.deleteSession(at: session.fileURL)
-        deleteTarget = nil
-        deletePromptVisible = false
-        refreshLibrary()
-        if selectedLibrarySession?.id == session.id {
-            selectedLibrarySession = librarySessions.first
-        }
-    }
-
-    func cancelDelete() {
-        deleteTarget = nil
-        deletePromptVisible = false
-    }
-
-    func copyLibrarySessionText(_ session: LibrarySession) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(session.body, forType: .string)
-    }
-
-    func openLibrarySessionInDefaultEditor(_ session: LibrarySession) {
-        NSWorkspace.shared.open(session.fileURL)
-    }
-
-    func revealLibrarySessionInFinder(_ session: LibrarySession) {
-        NSWorkspace.shared.activateFileViewerSelecting([session.fileURL])
-    }
-
     func abandonSession() {
         sessionEngine.abandon()
         selectedSurface = .home
     }
 
-    func copySuccessText() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(sessionEngine.text, forType: .string)
-    }
-
     func handleTick() {
-        // Central routing and persistence live in handleEngineStateChange (the
-        // engine's onStateChange callback), which fires synchronously inside tick()
-        // on every phase transition. This keeps tick() a pure passthrough.
+        // Engine phase routing runs synchronously through onStateChange.
         sessionEngine.tick()
     }
 
@@ -195,11 +127,6 @@ final class AppState {
     func updateDefaultDuration(_ duration: TimeInterval) {
         settings.defaultDuration = duration
         selectedDuration = duration
-        persistSettings()
-    }
-
-    func updateImmersiveMode(_ enabled: Bool) {
-        settings.immersiveSessionMode = enabled
         persistSettings()
     }
 
@@ -239,7 +166,6 @@ final class AppState {
             settings.licenseInstanceID = activation.instanceID
             settings.licenseActivatedAt = clock()
             settings.licenseLastValidatedAt = clock()
-            settings.hasUnlockedFullAccess = true
             do {
                 try persistSettingsThrowing()
                 licenseActivationJustSucceeded = true
@@ -281,7 +207,6 @@ final class AppState {
 
     private func applyRevokedState() {
         settings.licenseStatus = .revoked
-        settings.hasUnlockedFullAccess = false
         persistSettings()
     }
 
@@ -289,30 +214,12 @@ final class AppState {
         let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt
         guard let last else {
             settings.licenseStatus = .unknown
-            settings.hasUnlockedFullAccess = false
-            persistSettings()
+                persistSettings()
             return
         }
         if clock().timeIntervalSince(last) > Self.licenseOfflineGraceInterval {
             settings.licenseStatus = .unknown
-            settings.hasUnlockedFullAccess = false
-            persistSettings()
-        }
-    }
-
-    func revealLibraryFolder() {
-        try? FileManager.default.createDirectory(at: AppPaths.libraryDirectory, withIntermediateDirectories: true)
-        NSWorkspace.shared.activateFileViewerSelecting([AppPaths.libraryDirectory])
-    }
-
-    private func refreshLibrary() {
-        librarySessions = (try? persistenceService.loadLibrary()) ?? []
-        if selectedLibrarySession == nil {
-            selectedLibrarySession = librarySessions.first
-        }
-        if let selected = selectedLibrarySession,
-           let refreshed = librarySessions.first(where: { $0.id == selected.id }) {
-            selectedLibrarySession = refreshed
+                persistSettings()
         }
     }
 
@@ -326,12 +233,9 @@ final class AppState {
         try settingsStore.save(settings)
     }
 
-    /// Central engine state observer: persists on success, captures the durable
-    /// wipe aftermath on failure.
+    /// Central engine state observer: routes idle and captures in-memory wipe aftermath.
     private func handleEngineStateChange(_ phase: SessionPhase) {
         switch phase {
-        case .success:
-            persistSuccessfulSessionOnSuccess(phase)
         case .failure:
             captureWipeAftermath()
         case .idle:
@@ -355,67 +259,6 @@ final class AppState {
 
     /// 跟踪 engine 上一次的 phase，用于在状态回调里识别 live->idle 转换并集中路由 Home。
     private var previousEnginePhase: SessionPhase = .idle
-
-    /// 会话进入 success 时把草稿写盘一次；按 sessionID 去重，ticking 的重复状态回调不会二次写入。
-    private var saveRetryTasks: [UUID: Task<Void, Never>] = [:]
-
-    // Retries persist an immutable snapshot of the succeeded session, so a user
-    // who abandons or starts a new session before the retry can never have the
-    // wrong text saved or the new session's own save suppressed. Retry tasks are
-    // keyed per sessionID so concurrent sessions' retries never cancel each other.
-    // Three attempts each, no rescheduling from inside the loop.
-    private func scheduleSaveRetry(for id: UUID, snapshot: (text: String, elapsed: TimeInterval, duration: TimeInterval, wordCount: Int)) {
-        saveRetryTasks[id]?.cancel()
-        saveRetryTasks[id] = Task { @MainActor [weak self] in
-            guard let self else { return }
-            for _ in 0..<3 {
-                try? await Task.sleep(nanoseconds: self.saveRetryDelayNanoseconds)
-                if Task.isCancelled { return }
-                if lastPersistedSessionID == id {
-                    saveRetryTasks[id] = nil
-                    return
-                }
-                do {
-                    _ = try persistenceService.saveSuccessfulSession(
-                        text: snapshot.text,
-                        elapsed: snapshot.elapsed,
-                        duration: snapshot.duration,
-                        wordCount: snapshot.wordCount,
-                        sessionID: id
-                    )
-                    lastPersistedSessionID = id
-                    saveRetryTasks[id] = nil
-                    return
-                } catch {
-                    continue
-                }
-            }
-            saveRetryTasks[id] = nil
-        }
-    }
-
-    private func persistSuccessfulSessionOnSuccess(_ phase: SessionPhase) {
-        guard phase == .success else { return }
-        let id = sessionEngine.sessionID
-        guard lastPersistedSessionID != id else { return }
-        let snapshot = (text: sessionEngine.text, elapsed: sessionEngine.elapsed, duration: sessionEngine.duration, wordCount: sessionEngine.wordCount)
-        do {
-            _ = try persistenceService.saveSuccessfulSession(
-                text: snapshot.text,
-                elapsed: snapshot.elapsed,
-                duration: snapshot.duration,
-                wordCount: snapshot.wordCount,
-                sessionID: id
-            )
-            lastPersistedSessionID = id
-            // 直接成功取代了任何已在排队的重试 task；取消并清理，否则完成的 task 会残留在字典里
-            //（它在 lastPersistedSessionID == id 检查处 return 但不清理自己的条目）。
-            saveRetryTasks[id]?.cancel()
-            saveRetryTasks[id] = nil
-        } catch {
-            scheduleSaveRetry(for: id, snapshot: snapshot)
-        }
-    }
 
     private func launchInitialSurface() {
         selectedSurface = .home

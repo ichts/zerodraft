@@ -8,7 +8,7 @@
  * `@main enum FirstLineMain` 提供：main() 在主线程构造 NSApplication、AppDelegate 与
  * AppState，applicationDidFinishLaunching 里构建主菜单、显示主窗口并激活 app。
  * 完整 AppKit 应用由 RootWindowController 托管常驻 RootContainerViewController；Home、Writing、
- * Failure、Success、Settings、Upgrade 与 Library 都是容器内切换的真实原生 AppKit surface。
+ * Failure、Success、Settings 与 Upgrade 都是容器内切换的真实原生 AppKit surface。
  */
 
 import AppKit
@@ -50,7 +50,6 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }
     @objc func goHome(_ sender: Any?) { appState.goHome() }
-    @objc func openLibrary(_ sender: Any?) { appState.openLibrary() }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
     @objc func terminateApp(_ sender: Any?) { NSApp.terminate(nil) }
     @objc func orderFrontStandardAboutPanel(_ sender: Any?) {
@@ -63,7 +62,7 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 extension FirstLineAppDelegate: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(openSettings), #selector(openLibrary):
+        case #selector(openSettings):
             return appState.canNavigateToSupportSurface
         case #selector(openWriting), #selector(goHome):
             // success 阶段锁定导航（复刻原 SwiftUI .disabled 语义）。

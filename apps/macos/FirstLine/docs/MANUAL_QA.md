@@ -94,6 +94,12 @@ Debug build (`./.build/debug/FirstLine`)，light theme，真窗 1920x1054，ABC 
 - session 开始时编辑器不自动聚焦（`AXFocusedUIElement=AXWindow`）。当前 UI 隐藏空草稿 Finish（wordCount > 0 门控），不影响功能；但作为「开场即写」体验，自动聚焦是后续候选改进（audit minor-deferred #3 已记录）。
 - 长 keystroke 字符串在 System Events 下会丢空格（`keystroke "long string"`）；逐 key code 输入（key code 49 = space）正常。这是合成输入的已知限制，非产品缺陷。
 
+### 2026-09-24 - writeitdown batch 1, storage removal
+
+- Debug build: `swift build` exited 0; `swift test` exited 0 with 88 tests in 5 suites. All four named batch-1 filters exited 0, one test each. The expanded `! rg` storage-reference gate exited 0.
+- Real-window QA: **not verified**. `scripts/qa-window.sh 1` built and launched the binary but System Events timed out (-1712) before the first capture. A direct `screencapture -x` returned `could not create image from display` (exit 1). This session has no usable display capture; no start, typed, Cmd+2, Settings, or kept window screenshot was produced. The flow must be rerun in a logged-in graphical session before batch 1 can be accepted.
+- Physical IME and exact deny feedback were not tested; neither changes in this batch.
+
 ### 2026-08-05  -  Pure-AppKit rewrite
 
 整个 app 从 SwiftUI 壳重写为纯 AppKit（SwiftUI 彻底退役，全仓 `grep import SwiftUI` = 0）；SessionEngine / AppendOnlyTextView / Infrastructure / Licensing / 全部 95 测试复用。Debug build，light theme，真窗。各态经守门狗启动（硬 12s auto-kill）+ 截图多模态目验，每态后查 CPU 无 loop。

@@ -1,6 +1,6 @@
 /**
- * [INPUT]: 依赖 AppKit、App/AppState、Session/SuccessText、DesignSystem
- * [OUTPUT]: SuccessViewController - 词数、可滚动草稿与 copy/download/discard actions
+ * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem
+ * [OUTPUT]: SuccessViewController - 词数、可滚动草稿与 copy/discard actions
  * [POS]: First Line AppKit success surface；复刻退役 SwiftUI SuccessView 的纵向节奏与键盘焦点
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -13,11 +13,7 @@ final class SuccessViewController: NSViewController {
     private var metricLabel: NSTextField!
     private var previewTextView: NSTextView!
     private var copyFullButton: NSButton!
-    private var copyAIButton: NSButton!
     private var copiedResetWorkItem: DispatchWorkItem?
-    private var copiedAction: CopiedAction?
-
-    private enum CopiedAction: Equatable { case fullText, forAI }
 
     init(appState: AppState) {
         self.appState = appState
@@ -101,22 +97,11 @@ final class SuccessViewController: NSViewController {
         copyFullButton = FirstLineButtons.primary(
             title: "Copy full text", target: self, action: #selector(copyFullTapped)
         )
-        copyAIButton = FirstLineButtons.secondary(
-            title: "Copy for AI", target: self, action: #selector(copyAITapped)
-        )
-        let downloadButton = FirstLineButtons.secondary(
-            title: "Download .md", target: self, action: #selector(downloadTapped)
-        )
         let discardButton = FirstLineButtons.link(
             title: "Discard", target: self, action: #selector(discardTapped)
         )
 
-        let secondaryRow = NSStackView(views: [copyAIButton, downloadButton])
-        secondaryRow.orientation = .horizontal
-        secondaryRow.spacing = FirstLineSpacing.sm
-        secondaryRow.alignment = .centerY
-
-        let actions = NSStackView(views: [copyFullButton, secondaryRow, discardButton])
+        let actions = NSStackView(views: [copyFullButton, discardButton])
         actions.translatesAutoresizingMaskIntoConstraints = false
         actions.orientation = .vertical
         actions.spacing = FirstLineSpacing.sm
@@ -150,47 +135,20 @@ final class SuccessViewController: NSViewController {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(appState.sessionEngine.text, forType: .string)
-        flashCopied(.fullText)
-    }
-
-    @objc private func copyAITapped() {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(SuccessText.copyForAIPayload(for: appState.sessionEngine.text), forType: .string)
-        flashCopied(.forAI)
-    }
-
-    @objc private func downloadTapped() {
-        let panel = NSSavePanel()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd-HHmmss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        panel.nameFieldStringValue = SuccessText.exportFileName(timestamp: formatter.string(from: Date()))
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        let created = ISO8601DateFormatter().string(from: Date())
-        let body = appState.sessionEngine.text
-        let words = appState.sessionEngine.wordCount
-        let markdown = SuccessText.exportMarkdown(created: created, wordCount: words, body: body)
-        try? markdown.write(to: url, atomically: true, encoding: .utf8)
+        flashCopied()
     }
 
     @objc private func discardTapped() { appState.abandonSession() }
 
-    private func flashCopied(_ action: CopiedAction) {
+    private func flashCopied() {
         copiedResetWorkItem?.cancel()
-        copiedAction = action
-        applyCopyLabels()
+        copyFullButton.title = "Copied."
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            self.copiedAction = nil
-            self.applyCopyLabels()
+            self.copyFullButton.title = "Copy full text"
         }
         copiedResetWorkItem = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
     }
 
-    private func applyCopyLabels() {
-        copyFullButton.title = copiedAction == .fullText ? "Copied." : "Copy full text"
-        copyAIButton.title = copiedAction == .forAI ? "Copied." : "Copy for AI"
-    }
 }

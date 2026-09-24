@@ -1,6 +1,6 @@
 # Zero Draft - Launch TODO
 
-> Superseded for the writeitdown macOS app: see `docs/WRITEITDOWN_PLAN.md`. The Zero Draft price and naming below are historical.
+> Superseded for the writeitdown macOS app: see `WRITEITDOWN_PLAN.md`. The Zero Draft price and naming below are historical.
 
 This is the execution checklist for turning Zero Draft into a paid direct-download Mac product while Dodo Payments and Apple Developer access are still in progress.
 

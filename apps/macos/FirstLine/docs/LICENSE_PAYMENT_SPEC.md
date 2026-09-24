@@ -1,6 +1,6 @@
 # Zero Draft - License and Payment Spec
 
-> The writeitdown macOS app reuses this license design, rebranded, at USD $4.99 one-time (set by the captain on 2026-09-24; held in configuration). The $5 below is historical Zero Draft pricing. See `docs/WRITEITDOWN_PLAN.md` section 8.
+> The writeitdown macOS app reuses this license design, rebranded, at USD $4.99 one-time (set by the captain on 2026-09-24; held in configuration). The $5 below is historical Zero Draft pricing. See `WRITEITDOWN_PLAN.md` section 8.
 
 This spec describes the first paid direct-download launch path for Zero Draft. It assumes a Mole-style hosted checkout and a macOS app distributed outside the Mac App Store.
 

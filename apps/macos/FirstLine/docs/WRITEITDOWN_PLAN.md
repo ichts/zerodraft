@@ -1,6 +1,6 @@
 # writeitdown for macOS - Build Plan
 
-Status: batch 0 (this document). Written 2026-09-24. No Swift source changes land with this batch.
+Status: batch 0 reviewed; batch 1 follows. Written 2026-09-24. No Swift source changes landed with batch 0.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 
@@ -66,13 +66,13 @@ The web column cites the file that owns each rule today. The native column cites
 | 2 | Only appending is allowed. Deletion, cut, paste, drop, undo, redo, arrow keys, Home, and Page Up or Down are blocked. IME composition still works. | `writeitdown/room.js` (`beforeinput`, `keydown`, paste/cut/drop listeners) | `Sources/Editor/AppendOnlyInputPolicy.swift` and `Sources/Editor/AppendOnlyTextView.swift`. Arrow and Home moves are caught by the selection redirect in `Sources/Session/SessionViewController.swift`. | Keep. Batch 2 adds explicit tests for the movement commands. |
 | 3 | A blocked action shakes the paper by 2 px, shows a 1 px alarm outline for 280 ms, announces `BLOCKED. FORWARD ONLY.`, and does not restart while running. Reduced motion keeps the outline and drops the shake. | `writeitdown/feedback.js`, `writeitdown/room.js` (`deny`) | `Sources/Session/SessionViewController.swift` (`triggerDenyFeedback`): a 90 ms red hairline, a 160 ms shake, and the narrator line `NO GOING BACK.` | Batch 4 matches the web timing, color, announcement, and no-restart rule. |
 | 4 | After 5 s of silence the wash ramps in, and the numeral counts 3, 2, 1 in the alarm color over `KEEP TYPING OR THE DRAFT IS DELETED.` | `writeitdown/room.js` (`render`), `writeitdown/site.css` | `Sources/Session/SessionEngine.swift` (`dangerAfterSeconds = 5`), with the veil and countdown in `SessionViewController.swift`. | Keep the rule. Batch 4 restyles the wash and numeral with site tokens. |
-| 5 | After 8 s of silence the draft is wiped. The room stays open with `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.` and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 exposes the unused time. Batch 4 moves the wipe report into the room and deletes the Failure screen. |
+| 5 | After 8 s of silence the draft is wiped. The room stays open with `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.` and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 captures unused time and provides a minimal in-room wipe/restart route. Batch 4 removes the obsolete Failure screen and polishes the report. |
 | 6 | The earlier deadline wins, and a tie goes to the wipe. | `writeitdown/session.mjs` | `SessionEngine.swift` (`adjudicateDeadlines`) | Keep. |
 | 7 | A whitespace-only draft at the deadline is wiped, not kept. | `writeitdown/session.mjs` (`!state.text.trim()`) | `SessionEngine.swift` ends an empty draft as idle and keeps a whitespace-only draft. | Batch 2 adopts the web rule. |
 | 8 | When the clock runs out, the draft is kept: `You wrote it down.`, the full text, `0:00 - N WORDS KEPT.`, `COPY TEXT` (then `COPIED`), and `RUN IT AGAIN`. Focus goes to COPY TEXT. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | `Sources/Session/SuccessViewController.swift` offers Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaves the draft to disk. | Batch 1 removes autosave, Copy for AI, and Download. Batch 4 matches the web copy and layout. |
 | 9 | The count is Unicode words, and each Han character counts as one. Punctuation and emoji do not count. | `writeitdown/session.mjs` (`wordCount`) | `SessionEngine.swift` (`wordCount`) splits on whitespace only. | Batch 2 ports the web rule. |
 | 10 | ESC and the `ESC - EXIT` control leave the room right away. Nothing is saved. | `writeitdown/room.js` (`exit`) | `SessionViewController.swift` has the `Abandon - the text is lost` button. `Cmd+0` goes Home. | Batch 4 adds `ESC - EXIT` at the bottom left and handles Escape outside IME composition. |
-| 11 | There is no early finish. A session ends only at the deadline or by exiting. | `writeitdown/room.js` | `SessionViewController.swift` has a `Finish` button and Cmd+Return. `SessionEngine.swift` has `finish()`. | Batch 2 removes `finish()`. Batch 4 removes the button. |
+| 11 | There is no early finish. A session ends only at the deadline or by exiting. | `writeitdown/room.js` | `SessionViewController.swift` has a `Finish` button and Cmd+Return. `SessionEngine.swift` has `finish()`. | Batch 2 removes the engine method, button, Cmd+Return paths, and tests together. |
 | 12 | The clock shows `M:SS` at the top right, and the count shows `N WORDS` at the bottom right. | `writeitdown/index.html`, `writeitdown/site.css` | `SessionViewController.swift` shows `MM:SS`, a progress bar, and lowercase `N words`. | Batch 4. |
 | 13 | Appearance follows the system by default and can be switched between light and dark. | `writeitdown/theme.js`, `writeitdown/site.css` | `Sources/Infrastructure/SettingsStore.swift` (`AppTheme`), `Sources/DesignSystem/Colors.swift` (the Zero Draft bone palette with red `#c8392f`). | Batch 3 ports the site tokens for both appearances. |
 | 14 | No draft is stored. Only the appearance preference persists. | `writeitdown/theme.js` (`writeitdown-theme` is the only key) | `Sources/Infrastructure/PersistenceService.swift` writes kept drafts as Markdown. `Sources/Library/LibraryViewController.swift` browses them. | Batch 1 deletes both. Settings keep only preferences and the license cache (section 7). |
@@ -123,7 +123,7 @@ stateDiagram-v2
 ### 4.3 Keyboard access
 
 - On the start screen the picker is the first key view and the primary button is the default button, so Return starts a session.
-- Left Arrow and Right Arrow move the selection inside the focused picker. Tab moves to the button. This requires Full Keyboard Access for the segmented control, so the menu below is the always-available path.
+- Left Arrow and Right Arrow move the selection inside the focused picker when Full Keyboard Access is enabled. Tab moves to the button. The menu below is the always-available keyboard path, without requiring that system setting.
 - A `Session` menu in the menu bar lists the eight lengths as items with a checkmark on the current one. It also lists `Start Writing` (Cmd+N) and `Exit Room` (Esc as a displayed shortcut). The duration items are disabled while a session is live. This follows the HIG rule that every command is reachable from the menu bar.
 - Cmd+1 through Cmd+8 select the eight lengths from the start screen. The existing `Cmd+1` Writing and `Cmd+0` Home items in `Sources/App/MainMenuBuilder.swift` are replaced, because there is no longer a Library or a separate Home to navigate between.
 
@@ -160,15 +160,15 @@ Paths are relative to `apps/macos/FirstLine/`.
 
 The following code inside kept files is also deleted:
 
-- In `Sources/FirstLine/App/AppState.swift`: the library state, the save retries, `lastWipeFossil`, the Library and delete actions, `revealLibraryFolder`, the `.library` and `.failure` surfaces, `updateImmersiveMode`, and `openLaunchWebsite` pointing at the old Zero Draft site.
+- In `Sources/FirstLine/App/AppState.swift`: batch 1 removes the library state, save retries, Library and delete actions, `revealLibraryFolder`, `.library`, and `updateImmersiveMode`. Batch 4 removes the in-memory `lastWipeFossil` aftermath and `.failure` surface. Batch 6 rebrands `openLaunchWebsite` and license help; neither license nor checkout entry points are removed in batch 1.
 - In `Sources/FirstLine/Infrastructure/AppPaths.swift`: `libraryDirectory` and `recoveryDirectory`.
-- In `Sources/FirstLine/Infrastructure/SettingsStore.swift`: `immersiveSessionMode` and `hasUnlockedFullAccess`, which is superseded by `licenseStatus`. Decoding keeps ignoring unknown keys.
+- In `Sources/FirstLine/Infrastructure/SettingsStore.swift`: `immersiveSessionMode` and the writable `hasUnlockedFullAccess` mirror. Preserve read-only decoding of the legacy key so an existing unlocked configuration migrates to `licenseStatus = .active`; activation and revocation update only `licenseStatus`. This guarantee applies to the old configuration directory; batch 3's new brand directory does not import it.
 - In `Sources/FirstLine/Session/SessionEngine.swift`: `finish()`.
 - In `Sources/FirstLine/Session/SessionViewController.swift`: the fossils, the narrator strip, the Finish button, the Cmd+Return monitor, the progress bar, and the Abandon button.
 - In `Sources/FirstLine/App/HomeViewController.swift`: the wipe aftermath line and fossil.
 - In `Sources/FirstLine/Settings/SettingsViewController.swift`: the Storage section.
 - In `Sources/FirstLine/App/MainMenuBuilder.swift`: the Library item.
-- In `Tests/FirstLineTests/SmokeFlowTests.swift`: the tests that cover autosave, the Library, the wipe aftermath, `finish`, and save retries. These include `happyPathAutoSavesOnSuccess`, `manualFinishAutoSavesExactlyOnce`, `failedSaveRetriesWithSnapshotEvenAfterNewSessionStarts`, `concurrentFailingSavesEachGetTheirOwnRetry`, `failureCapturesAftermathVisibleAfterGoingHome`, `startingASessionClearsTheWipeAftermath`, `wipedDraftIsExposedForTheJoinedFossil`, `emptyFinishRoutesHomeAndPersistsNothing`, and `legacyPersistedDurationIsSupersededByFixedSixtySeconds`. The two save-retry tests are the wall-clock tests that `docs/MANUAL_QA.md` records as flaky under load, so this also removes that flake.
+- In `Tests/FirstLineTests/SmokeFlowTests.swift`: the tests that cover autosave, the Library, and save retries. Batch 2 removes `finish` tests, and batch 4 removes wipe aftermath tests. Batch 1 removes `happyPathAutoSavesOnSuccess`, `manualFinishAutoSavesExactlyOnce`, `failedSaveRetriesWithSnapshotEvenAfterNewSessionStarts`, `concurrentFailingSavesEachGetTheirOwnRetry`, `failureCapturesAftermathVisibleAfterGoingHome`, `startingASessionClearsTheWipeAftermath`, `wipedDraftIsExposedForTheJoinedFossil`, `legacyPersistedDurationIsSupersededByFixedSixtySeconds`. Keep the license migration tests and update their assertions for the read-only legacy key. The two save-retry tests are the wall-clock tests that `docs/MANUAL_QA.md` records as flaky under load, so this also removes that flake.
 
 ### 5.2 Keep and adapt
 
@@ -206,7 +206,7 @@ The following code inside kept files is also deleted:
 
 ## 7. Privacy
 
-- Writing stays in memory. It is never written to disk, never logged, and never sent anywhere. Batch 1 adds a test that runs a full kept session and a wipe with the app's storage root pointed at a temporary directory, then asserts that the directory contains no file with draft text.
+- Writing stays in memory. It is never written to disk, never logged, and never sent anywhere. Batch 1 isolates both the configuration root and the former draft root in temporary directories for kept and wiped sessions, and observes that no draft text or draft file appears in either. Tests also check that these flows do not write to the real user root. Configuration and install ID persistence remain legitimate and are tested separately; an empty directory is not the criterion.
 - `settings.json` holds only the appearance, the reduced-motion override, the chosen duration, the trial count, and the license cache (key, status, dates, and instance ID), as the license spec allows. `install-id.json` holds a random install UUID.
 - The only network traffic is the license flow: Dodo's public `activate` and `validate` license endpoints, called with the license key and install name only, plus opening the checkout page in the default browser. No analytics, no crash reporting, and no update checks are added.
 - The fonts are bundled, so the app makes no font requests, unlike the site.
@@ -269,13 +269,13 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
 
 ### Batch 1: Remove storage and leftovers
 
-- Scope: delete the files in section 5.1 marked batch 1, along with autosave, save retries, the Library menu item and surface, the Storage settings section, Copy for AI, and Download .md. The kept screen keeps only `Copy full text` and `Discard` until batch 4 restyles it. Add `scripts/qa-window.sh`.
+- Scope: delete the files in section 5.1 marked batch 1, along with autosave, save retries, the Library menu item and surface, the Storage settings section, Copy for AI, and Download .md. Preserve license data, the legacy unlocked-key read-only migration, and activation/revocation without the writable mirror. The kept screen temporarily keeps only `Copy full text` and `Discard` until batch 4 restyles it; this is not yet web parity. Add `scripts/qa-window.sh`.
 - Named tests:
-  - `SmokeFlowTests/keptSessionWritesNoFiles`: a kept session with the storage root in a temporary directory leaves no draft on disk.
-  - `SmokeFlowTests/wipedSessionWritesNoFiles`.
-  - `SmokeFlowTests/libraryIsNotANavigationTarget`: the Surface enum has no library case, and the menu has no Library item.
-  - `SettingsStoreTests/settingsIgnoreRemovedStorageFields`: an old `settings.json` with removed keys still decodes.
-- Checks: `rg -n "PersistenceService|LibraryViewController|copyForAI|exportMarkdown|libraryDirectory" Sources Tests` prints nothing.
+  - `SmokeFlowTests/keptSessionWritesNoFiles`: a kept session with isolated configuration and draft roots leaves no writing on disk and causes no real-root write.
+  - `SmokeFlowTests/wipedSessionWritesNoFiles`: the same isolation and no-writing assertion after a wipe.
+  - `SmokeFlowTests/libraryIsNotANavigationTarget`: the menu and observable navigation do not expose a Library.
+  - `SettingsStoreTests/settingsIgnoreRemovedStorageFields`: old storage preferences decode, while `hasUnlockedFullAccess` still upgrades an old unlocked license to active.
+- Checks: `! rg -n 'PersistenceService|LibraryViewController|copyForAI|exportMarkdown|libraryDirectory|recoveryDirectory|Surface\.library|openLibrary|LibrarySession|revealLibraryFolder|lastPersistedSessionID|saveRetryTasks|Copy for AI|Download \.md|SuccessText' Sources Tests` exits 0. Check remaining write paths for draft content, while allowing isolated `settings.json` and `install-id.json`. These tests and the QA script are created in this batch, not pre-existing.
 - Window QA: the start screen, a typed session, Cmd+2 doing nothing, Settings without Storage, and the kept screen with two actions.
 - Done when the common set is green, the checks print nothing, and the QA record is appended.
 
@@ -284,22 +284,24 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
 - Scope: in `SessionEngine`:
   - The clock starts on the first committed or marked text. `start(duration:)` only readies the room.
   - A whitespace-only draft at the deadline wipes.
-  - The engine exposes `unusedSeconds` at the wipe for the report, computed as in `writeitdown/session.mjs`.
+  - The engine captures `unusedSeconds = ceil((finishDeadline - wipeDeadline) / 1 second)` from absolute deadlines before clearing text, as `writeitdown/session.mjs` does. It clears that report when the next input starts a fresh session. A delayed tick must not change the number.
   - The web word count is ported: Unicode word segments, each Han character counted alone, punctuation and emoji not counted. Use `NSString.enumerateSubstrings(in:options: .byWords)` after splitting Han characters out, or an equivalent.
-  - `finish()` is removed.
-  - Durations outside the section 4.1 set are rejected with a precondition in debug builds and clamped to 60 in release builds.
+  - Remove `finish()` and every UI entry point that invokes it: Finish button, Cmd+Return monitor, `performKeyEquivalent`, and their early-finish tests. This is a minimum functional removal; visual room cleanup stays in batch 4.
+  - Implement the minimum in-room wipe report and next-keystroke restart routing in `RootWindowController` and `SessionViewController` in this batch. Leave detailed layout and animation for batch 4; the intermediate state must be usable.
+  - Validate durations identically in every build: unsupported or unreadable stored values fall back to 60 seconds. Never use a debug-only precondition or a release-only clamp.
   - After a wipe, the next keystroke starts a new session with the same duration.
 - Named tests:
   - `SessionEngineTests/clockStartsOnFirstInputNotOnStart`.
   - `SessionEngineTests/markedTextStartsTheClock`.
   - `SessionEngineTests/whitespaceOnlyDraftAtDeadlineWipes`.
-  - `SessionEngineTests/wipeReportsUnusedSeconds`.
+  - `SessionEngineTests/wipeReportsUnusedSeconds`, including late ticks, deadline ties, and changed durations.
   - `SessionEngineTests/keystrokeAfterWipeStartsFreshSessionWithSameDuration`.
   - `SessionEngineTests/wordCountMatchesWebCases`, which ports every case in `writeitdown/session.test.mjs`.
   - `SessionEngineTests/fiveAndEightSecondRulesHoldForSixtyMinuteSession`.
+  - `SettingsStoreTests/invalidStoredDurationFallsBackToSixtySeconds`.
   - `EditorFocusTests/movementCommandsDenyAndKeepCaretAtEnd`, which covers `moveLeft:`, `moveUp:`, `moveToBeginningOfDocument:`, `pageUp:`, and `moveWordLeft:`.
   - The existing deadline tests are kept and updated: `exactDeadlineTieResolvesToFailure`, `bothDeadlinesPassedWithSilenceEarlierResolvesToFailure`, and `lateActivityAfterWipeDeadlineIsRejectedAndPhaseIsFailure`.
-- Window QA: the clock holds at `1:00` for 3 s before typing, then counts down after the first key. Warn appears at 5 s. The wipe at 8 s stays in the room, and typing again restarts.
+- Window QA: the clock holds at `1:00` for 3 s before typing, then counts down after the first key. Warn appears at 5 s. The wipe at 8 s stays in the room, displays deadline-based unused time, and typing again restarts. The former early Finish entry points are gone, while `Copy full text` and `Discard` remain temporary kept-screen actions.
 - Done when the common set is green and every named test passes.
 
 ### Batch 3: Brand and tokens
@@ -321,7 +323,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - `DesignTokenTests/alarmIsOnlyNonNeutralColor`.
 - Checks: `rg -n '"First Line|"Zero Draft|c8392f' Sources` prints nothing.
 - Window QA: the start screen, the room, and Settings in light, then again in dark.
-- Done when the common set is green, the checks print nothing, and the QA record includes both appearances.
+- Done when the common set is green, the checks print nothing, and the QA record includes both appearances. `BrandTests/infoPlistNamesWriteItDown` checks the source plist only: Finder name, About bundle identifier, and icon require the packaged app in batch 7.
 
 ### Batch 4: Room parity
 
@@ -333,7 +335,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - The kept view shows `You wrote it down.`, the full text (scrollable), `0:00 - N WORDS KEPT.`, `COPY TEXT` (which becomes `COPIED`, or `TRY COPY AGAIN` on failure), and `RUN IT AGAIN`. Focus goes to COPY TEXT.
   - Deny feedback is 280 ms with a 2 px shake, a 1 px alarm outline, no restart while running, and a VoiceOver announcement `Blocked. Forward only.`. Reduced motion drops the shake.
   - Escape outside IME composition, and the ESC - EXIT control, return to the start screen.
-  - Delete `FailureViewController.swift`, `FossilLayerView.swift`, the narrator, the Finish button, the Abandon button, and the progress bar.
+  - Delete `FailureViewController.swift`, `FossilLayerView.swift`, the narrator, the already-unused Finish UI remnants, the Abandon button, and the progress bar. Keep batch 2's in-room wipe/restart semantics.
 - Named tests:
   - `RoomTests/clockFormatsAsMinutesAndSeconds`.
   - `RoomTests/wipeReportTextMatchesWeb`.
@@ -345,7 +347,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - `RoomTests/escapeReturnsToStartAndDropsDraft`.
   - `RoomTests/warnWashOpacityRampsFromFiveToEightSeconds`.
 - Window QA: rest, typing, a Backspace deny, warn at about 5.5 s, recovery, the wipe report, a full real 60 s kept run, COPY TEXT then `COPIED` with `pbpaste` matching the typed text, RUN IT AGAIN, Escape, and reduced motion on. All in light, with a dark pass for rest, warn, and kept.
-- Done when the common set is green and the QA record shows every listed state with screenshots, side by side with the matching `wid-*.png` web screenshot for visual parity.
+- Done when the common set is green and the QA record shows every listed state with screenshots. Capture fresh web references in light 1440x900 at `https://writeitdown.app/#trial` for matching rest, warn, wipe, and kept stages; compare comparable states, not machine-private screenshot paths.
 
 ### Batch 5: Duration picker
 
@@ -360,12 +362,12 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - `DurationPickerTests/segmentsHaveAccessibilityLabels`.
   - `SessionEngineTests/chosenDurationDrivesCompletionDeadline`.
 - Window QA:
-  - Pick 3 with the arrow keys and start with Return. Confirm the room shows `3:00` and holds it until the first key.
+  - Enable Full Keyboard Access, pick 3 with arrow keys, and start with Return. Confirm the room shows `3:00` and holds it until the first key. Repeat the length selection through the Session menu without Full Keyboard Access.
   - Relaunch and confirm 3 is still selected.
   - Pick 60 from the Session menu and confirm `60:00`.
   - Confirm the menu's lengths are disabled in the room.
   - Run one full kept session at 3 minutes in real time.
-- Done when the common set is green and the QA record covers the listed states, including the picker with VoiceOver on (a screenshot plus the spoken label noted).
+- Done when the common set is green and the QA record covers the listed states, including physical focus with Full Keyboard Access and the picker with VoiceOver on (a screenshot plus the spoken label noted).
 
 ### Batch 6: License rebrand and live Dodo client
 
@@ -403,7 +405,7 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - The common set passes.
   - `scripts/package-app.sh` produces an app that launches from Finder on a clean user account.
   - `scripts/release-dmg.sh` produces a stapled DMG that `spctl -a -t open --context context:primary-signature -v` accepts.
-  - Batch 4's window QA is repeated on the packaged app.
+  - Batch 4's window QA is repeated on the packaged app on a clean user account; verify the bundled fonts load through `Bundle.module`, the signed resources, Finder name, About bundle identifier, and icon.
 - Done when a notarized DMG and its checksum exist and the QA record covers the packaged app. Uploading the DMG and installing the site bundle stay captain actions.
 
 ## 10. Independent acceptance of each batch
@@ -413,13 +415,21 @@ After a batch merges, a fresh session with no memory of the build session accept
 1. The accepting session reads this document, the batch's section, and the merged pull request's description. It does not read the build session's conversation.
 2. It checks out the merge commit in a clean worktree.
 3. From `apps/macos/FirstLine/`, it runs `swift build`, `swift test`, each named test with `swift test --filter <Suite>/<function>`, and every `rg` check listed for the batch, and it records the exit codes.
-4. It runs `scripts/qa-window.sh <batch>` itself and inspects every screenshot against the batch's done conditions and against the web screenshots listed in section 2.2.
+4. It runs `scripts/qa-window.sh <batch>` itself and inspects every screenshot against the batch's done conditions. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
 5. It appends a record under `Independent acceptance - Batch N` to `docs/MANUAL_QA.md` with the commit, the date, each done condition marked pass or fail with its evidence, and anything not verified.
 6. Any failure opens a fix batch before the next batch starts. The accepting session reports the failure and does not fix it silently.
 
-## 11. Risks
+## 11. Independent review record (246be57, Sol)
 
-- Governance: `VISION.md` fixes sixty seconds, and the root `AGENTS.md` describes the macOS app as Zero Draft. Batches 3 and 5 update both. Reviewers may flag the change until those updates land.
+The independent review report is `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan-review/report.md`. Its copy-ready conclusion follows verbatim:
+
+> 独立审查结论为带修改通过，可以启动第 1 批删库施工。现有 Swift 基线 `swift build` 和 `swift test` 均通过，测试为 100 个、8 个 suite；线上写作间的首输入启动、禁止退格和八秒删稿与方案方向一致。第 1 批必须保留许可状态及旧字段迁移语义，补强无草稿落盘的隔离验证及删库残留检查；第 2 批须同时移除全部 Finish 调用，并提前实现可留在房间的 wipe/restart，否则按原批次无法编译或通过窗口验收。根网页的暗色禁令不适用于单独的 writeitdown 网站和原生应用。
+
+All ten findings are incorporated into the affected batch or acceptance sections above, except the suggestion to compare against external screenshots as a hard gate, which is replaced by fresh, reproducible captures. The dark-mode observation is already covered by the separate site contract in section 6.
+
+## 12. Risks
+
+- Governance: `VISION.md` fixes sixty seconds, and the root `AGENTS.md` describes the macOS app as Zero Draft. Batches 3 and 5 update the relevant product contracts. Batch 4 must also update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them. Reviewers may flag the change until those updates land.
 - The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 60-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 QA includes a typing-speed check after pasting a large seed through the restore path in a debug build. If it lags, the restyle is limited to the last few paragraphs.

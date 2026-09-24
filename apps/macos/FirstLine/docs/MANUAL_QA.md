@@ -1,6 +1,6 @@
-# Zero Draft MVP - Manual QA Checklist
+# macOS manual QA record
 
-Use this checklist before direct distribution.
+Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
 ## First launch
 - Delete `~/Library/Application Support/First Line/Config/settings.json`.

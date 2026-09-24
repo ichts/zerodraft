@@ -6,17 +6,17 @@ Parent instructions: `../AGENTS.md`
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
-docs/LAUNCH_PLAN.md: 历史发布规划参考；其中 Mole-style 网站方向已被根目录 `AGENTS.md` 与 `design/DESIGN.md` 的 Flood 视觉规则取代。
+docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
 docs/LICENSE_PAYMENT_SPEC.md: Dodo-first 支付、license entitlement、Mac 激活与支持页面规格。
 docs/LAUNCH_TODO.md: Dodo 审核等待期到正式发布的可执行 TODO，给接手 agent 按阶段推进。
-docs/MANUAL_QA.md: MVP 手动验证清单与结果记录模板。
+docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；当前验收项目以 `docs/WRITEITDOWN_PLAN.md` 为准。
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
 Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口（NSApplication + FirstLineAppDelegate）；持有 AppState、构建主菜单、创建并显示 RootWindowController、激活应用；含菜单动作（openWriting/goHome/openSettings）与 validateMenuItem 启用规则。
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（App 菜单：Settings Cmd+, / Quit；Navigate 菜单：Writing Cmd+1 / Home Cmd+0）。
 Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、sessionEngine.phase（success 路由，failure 留在原房间）、settings.theme（窗口 appearance）。
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
 Sources/FirstLine/App/AppState.swift: 顶层导航状态、全部会话启动与输入前 trial gate、license 激活/校验入口（@Observable，来自 Observation，非 SwiftUI）；成功正文不落盘。
-Sources/FirstLine/App/HomeViewController.swift: Home 启动界面（Flood 居中标题/tagline/规则/trial 状态 + 固定 60 秒 "Give it sixty seconds." 按钮）；最近一次 wipe 后携带持久红线 “Draft deleted. it joined the pile.” 与一条丢失草稿的 margin fossil，直至下一场 session。
+Sources/FirstLine/App/HomeViewController.swift: Home 启动界面（小号等宽 WRITE_IT_DOWN、大号 Newsreader 标题、规则、trial 状态与固定 60 秒按钮）；仍暂存最近一次 wipe 的红线与 margin fossil，待第 4 批删除。
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
@@ -35,7 +35,7 @@ Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 A
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
 Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
-Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware bone/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
+Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
 Sources/FirstLine/DesignSystem/FossilLayerView.swift: Flood 静态 fossil 纹理层（flipped NSView draw）；bone canvas 左右 margin（paper 列以外）seeded 放置犹豫草稿 fossil，danger 时仅变红，几何变化重算。
 Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong，全部来自 package resources。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。

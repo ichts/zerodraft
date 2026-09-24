@@ -83,7 +83,7 @@ final class AppState {
         }
 
         consumeTrialSessionIfNeeded()
-        // Starting fresh clears the durable wipe aftermath from Home.
+        // Starting fresh clears the in-memory wipe aftermath from Home.
         lastWipeFossil = nil
         let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
         sessionEngine.start(duration: resolvedDuration)
@@ -214,12 +214,12 @@ final class AppState {
         let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt
         guard let last else {
             settings.licenseStatus = .unknown
-                persistSettings()
+            persistSettings()
             return
         }
         if clock().timeIntervalSince(last) > Self.licenseOfflineGraceInterval {
             settings.licenseStatus = .unknown
-                persistSettings()
+            persistSettings()
         }
     }
 

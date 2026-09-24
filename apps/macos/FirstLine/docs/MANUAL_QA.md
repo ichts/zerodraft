@@ -46,7 +46,7 @@ Use this checklist before direct distribution.
 - Type at least one line, then stop typing for 8 seconds.
 - Confirm Failure screen appears.
 - Confirm the narrator line reads `Draft deleted. it joined the pile.` in red.
-- Confirm no new markdown file appears in Library.
+- Confirm no new draft text or draft file appears under `~/Library/Application Support/First Line/`.
 - Return to Home and confirm the durable red aftermath line persists until the next session starts.
 
 ## Success path
@@ -54,22 +54,14 @@ Use this checklist before direct distribution.
 - Confirm Success screen appears.
 - Confirm the primary `Copy full text` button receives focus.
 - Confirm clicking Copy shows a `Copied.` feedback.
-- Confirm markdown file exists in `~/Library/Application Support/First Line/Library/`.
+- Confirm no new draft text or draft file appears under `~/Library/Application Support/First Line/` after success.
 
 ## Settings
 - Change theme.
 - Confirm the duration row is informational only: `60 seconds. Fixed.` (no control).
 - Change reduced motion override.
-- Use Reveal Library Folder.
 - With an active license, confirm Trial & License shows only the status line and metadata (no key field, no Activate button, no buy link, no prefilled key).
 - With an inactive license, confirm the trial status, explanation, empty key field, Activate, and Open Buy page.
-
-## Library
-- Open Library.
-- Confirm reverse chronological order.
-- Open detail view.
-- Verify Copy Text plus the More menu (Open in Default Editor / Reveal in Finder / Delete, separated).
-- Delete one item and verify file removal from disk.
 
 ## Manual QA Record
 

@@ -1,10 +1,11 @@
 /*
- * [INPUT]: 单调时间源与编辑器提交、IME 活动
+ * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
  * [OUTPUT]: SessionEngine / SessionPhase、词数、截止时间与失败时 unusedSeconds
  * [POS]: 首次输入启动时钟与绝对截止时间裁决；重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
 import Foundation
+import NaturalLanguage
 
 enum SessionPhase: Equatable {
     case idle, writing, danger, failure, success
@@ -28,7 +29,6 @@ final class SessionEngine {
     }
 
     private static let hanPattern = try! NSRegularExpression(pattern: "(\\p{Script=Han}\\p{Mark}*)")
-    private static let kanaPattern = try! NSRegularExpression(pattern: "[\\p{Script=Hiragana}\\p{Script=Katakana}]+")
 
     private let now: () -> TimeInterval
     var phase: SessionPhase = .idle
@@ -54,9 +54,15 @@ final class SessionEngine {
     var wordCount: Int {
         let source = text as NSString
         let separated = Self.hanPattern.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: source.length), withTemplate: " $1 ")
-        let normalized = Self.kanaPattern.stringByReplacingMatches(in: separated, range: NSRange(location: 0, length: (separated as NSString).length), withTemplate: " word ") as NSString
+        let tokenizer = NLTokenizer(unit: .word)
+        tokenizer.string = separated
         var count = 0
-        normalized.enumerateSubstrings(in: NSRange(location: 0, length: normalized.length), options: .byWords) { _, _, _, _ in count += 1 }
+        tokenizer.enumerateTokens(in: separated.startIndex..<separated.endIndex) { range, _ in
+            if separated[range].unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) {
+                count += 1
+            }
+            return true
+        }
         return count
     }
 

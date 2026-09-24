@@ -78,11 +78,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
         let inserted = plainString(from: string)
-        let end = NSRange(location: utf16Length, length: 0)
+        let previousEnd = NSRange(location: utf16Length, length: 0)
         let isDefaultRange = replacementRange.location == NSNotFound
         let isMarkedCommit = hasMarkedText()
 
-        guard isMarkedCommit || isDefaultRange || replacementRange == end else {
+        guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd else {
             onDeny?()
             return
         }
@@ -90,6 +90,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         if !isUpdatingMarkedText && !isRestoringProgrammatically {
             guard onPrepareInput?() ?? true else { return }
         }
+        let end = NSRange(location: utf16Length, length: 0)
         if isMarkedCommit && hasMarkedText() {
             isPerformingInsertion = true
             defer { isPerformingInsertion = false }

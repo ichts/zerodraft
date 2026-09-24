@@ -679,7 +679,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if let end = AppendOnlyInputPolicy.redirectedSelection(
             proposed: newSelectedCharRange,
             fullLength: (textView.string as NSString).length,
-            hasMarkedText: textView.hasMarkedText()
+            markedRange: textView.hasMarkedText() ? textView.markedRange() : nil
         ) {
             engine.registerDeny()
             return end

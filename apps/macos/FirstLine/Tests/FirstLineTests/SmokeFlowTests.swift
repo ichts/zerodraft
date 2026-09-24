@@ -335,7 +335,8 @@ struct SmokeFlowTests {
             }
             now = 9
             if marked {
-                input.insertText("你", replacementRange: NSRange(location: NSNotFound, length: 0))
+                let oldEnd = NSRange(location: (input.string as NSString).length, length: 0)
+                input.insertText("你", replacementRange: oldEnd)
             } else {
                 input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
             }

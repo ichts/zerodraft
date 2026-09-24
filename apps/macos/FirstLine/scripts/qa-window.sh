@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Run this System Events/screencapture flow only in a graphical session with
+# accessibility and screen-recording permissions. Background sessions cannot
+# capture the display; Mini Computer Use is the alternative when these APIs fail.
 set -euo pipefail
 
 batch=${1:-}
@@ -33,10 +36,10 @@ for window in windows where (window[kCGWindowOwnerPID as String] as? Int32) == p
 wid=$(window_id)
 if [[ ! "$wid" =~ ^[0-9]+$ ]]; then echo 'No app window found' >&2; exit 1; fi
 shot() { screencapture -x -l "$wid" "$output/$1.png"; }
-key() { osascript -e 'tell application "System Events" to key code '"$1"; }
 type() { osascript -e 'tell application "System Events" to repeat with characterToType in characters of '"\"$1\"" -e 'keystroke characterToType' -e 'end repeat'; }
 shot start
-key 36 # Return opens the room.
+# Home has no Return binding in Batch 1; enter by clicking its primary button.
+osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "FirstLine"'
 sleep 1
 type 'batch one draft'
 shot typed

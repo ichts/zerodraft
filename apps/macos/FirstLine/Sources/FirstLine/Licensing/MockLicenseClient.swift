@@ -58,7 +58,7 @@ actor MockLicenseClient: LicenseClient {
                 businessID: "biz_mock",
                 createdAt: ISO8601DateFormatter().string(from: Date()),
                 productID: "prod_mock",
-                productName: "First Line Early Bird License"
+                productName: "writeitdown license"
             )
         case .invalidKey:
             throw LicenseActivationError.invalidKey

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState
  * [OUTPUT]: MainMenuBuilder.buildMenu - 构建纯 AppKit 主菜单（App 菜单 + Navigate 菜单）
- * [POS]: FirstLine 重写 Phase 1 菜单构造器；以 target-action 桥接 AppDelegate 上的 @objc 方法，
+ * [POS]: writeitdown AppKit 菜单构造器；以 target-action 桥接 AppDelegate 上的 @objc 方法，
  *        validateMenuItem(_:) 负责启用/禁用（Settings 在会话中禁用，Writing/Home 在 success 禁用）。
  *        Cmd+, 打开站内 Settings surface。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -16,13 +16,13 @@ enum MainMenuBuilder {
         mainMenu.autoenablesItems = false
 
         // App 菜单（标题对 app 名；macOS 会把第一项的标题替换为 app 名）。
-        let appMenuItem = NSMenuItem()
+        let appMenuItem = NSMenuItem(title: "Write It Down", action: nil, keyEquivalent: "")
         mainMenu.addItem(appMenuItem)
         let appMenu = NSMenu()
         appMenuItem.submenu = appMenu
 
         let aboutItem = NSMenuItem(
-            title: "About First Line",
+            title: "About Write It Down",
             action: #selector(FirstLineAppDelegate.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: ""
         )
@@ -41,7 +41,7 @@ enum MainMenuBuilder {
 
         appMenu.addItem(.separator())
 
-        let hideItem = NSMenuItem(title: "Hide First Line", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideItem = NSMenuItem(title: "Hide Write It Down", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(hideItem)
         let hideOthersItem = NSMenuItem(title: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
         hideOthersItem.keyEquivalentModifierMask = [.command, .option]
@@ -52,7 +52,7 @@ enum MainMenuBuilder {
         appMenu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "Quit First Line",
+            title: "Quit Write It Down",
             action: #selector(FirstLineAppDelegate.terminateApp(_:)),
             keyEquivalent: "q"
         )

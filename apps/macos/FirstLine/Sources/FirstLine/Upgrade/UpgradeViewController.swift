@@ -37,7 +37,7 @@ final class UpgradeViewController: NSViewController {
     private func buildInterface() {
         let title = label("Trial complete", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
         let subtitle = label("You used the three free Mac writing sessions.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
-        let licenseName = label("First Line Early Bird License", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
+        let licenseName = label("writeitdown license", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
         let pricing = label("One-time $5. 2 Macs. No subscription. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
@@ -101,7 +101,7 @@ final class UpgradeViewController: NSViewController {
             activateButton.isEnabled = true
             activateButton.title = "Activate"
             if appState.licenseActivationJustSucceeded {
-                feedbackLabel.stringValue = "License active. First Line is unlocked on this Mac."
+                feedbackLabel.stringValue = "License active on this Mac."
                 feedbackLabel.textColor = FirstLineColors.inkNSColor
                 feedbackLabel.isHidden = false
                 activateButton.title = "Start writing"

@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import FirstLine
+@testable import WriteItDown
 
 struct SettingsStoreTests {
     @Test func invalidStoredDurationFallsBackToSixtySeconds() throws {

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 import Testing
-@testable import FirstLine
+@testable import WriteItDown
 
 @MainActor
 struct SmokeFlowTests {

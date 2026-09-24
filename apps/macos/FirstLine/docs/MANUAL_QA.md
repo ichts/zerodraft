@@ -65,6 +65,13 @@ Use this checklist before direct distribution.
 
 ## Manual QA Record
 
+### 2026-09-24 - writeitdown batch 3, brand and tokens
+
+- `swift build` exit 0; `swift test` exit 0 (105 Swift Testing tests, 7 suites). Five batch-3 named filters and all 12 batch-2 named filters individually exit 0. The inherited storage-reference `! rg`, early-Finish `! rg`, and batch-3 brand/color `! rg` each exit 0 with no matches. `bash -n scripts/qa-window.sh` exits 0.
+- The package target and executable are `WriteItDown`; the source path remains `FirstLine`. `Info.plist` carries the bundle metadata for the future packaged app. Dynamic light/dark colors and the site-derived placeholder icon are covered by token tests and assets, not by an installed-app screenshot.
+- **Window QA pending independent Computer Use acceptance**: this background session cannot capture the screen or use System Events. `scripts/qa-window.sh 3` now describes start and room in light appearance, Settings in light, then Settings, start, and room in dark; it was not run here. A fresh graphical session must inspect those states and record screenshots and pass/fail. Finder identity, packaged About identity, and actual icon rendering remain batch-7 checks.
+- Physical IME and frame-level feedback are not verified here; neither interaction changes in batch 3.
+
 ### 2026-09-24 - writeitdown batch 2, engine parity
 
 - `swift build` exit 0; `swift test` exit 0 (93 tests in 5 suites). All 12 named batch-2 filters individually exited 0. The inherited storage-reference and price-literal `! rg` gates exited 0. Window QA is **pending independent Computer Use acceptance**; this background session has no screen capture or System Events permission and did not run `scripts/qa-window.sh 2`.

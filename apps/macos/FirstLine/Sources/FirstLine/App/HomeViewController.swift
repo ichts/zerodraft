@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem tokens 与 FirstLineButtons
  * [OUTPUT]: HomeViewController - 固定 60 秒启动入口、trial 状态与 durable wipe aftermath
- * [POS]: First Line AppKit Home surface；复刻退役 SwiftUI HomeView 的极简 Flood 启动界面
+ * [POS]: writeitdown start screen；临时 wipe aftermath 待第 4 批删除
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -28,9 +28,9 @@ final class HomeViewController: NSViewController {
     private func buildInterface() {
         let identityGroup = verticalGroup(
             views: [
-                label("First Line", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor),
+                label("WRITE_IT_DOWN", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor),
                 label(
-                    "The first draft only moves forward.",
+                    "We force you to write it down.",
                     font: FirstLineTypography.taglineNSFont,
                     color: FirstLineColors.uiNSColor
                 ),
@@ -41,7 +41,7 @@ final class HomeViewController: NSViewController {
         let ruleGroup = verticalGroup(
             views: [
                 label(
-                    "Stop for 8 seconds and the page clears.",
+                    "With a clock: stop for eight seconds and your draft is deleted.",
                     font: FirstLineTypography.bodyNSFont,
                     color: FirstLineColors.inkNSColor
                 ),

@@ -24,7 +24,7 @@ struct LicenseActivation: Codable, Equatable, Sendable {
     let instanceID: String
     /// `lic_...` - 关联的 license key ID。
     let licenseKeyID: String
-    /// 此激活实例的人类可读名，例如 "Zero Draft Mac abcd1234"。
+    /// 此激活实例的人类可读名，例如 "writeitdown Mac abcd1234"。
     let name: String
     /// `business_id`。仅作记录，不参与本地决策。
     let businessID: String

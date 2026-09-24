@@ -5,8 +5,8 @@
 set -euo pipefail
 
 batch=${1:-}
-if [[ "$batch" != 1 && "$batch" != 2 ]]; then
-  echo 'Only batch 1 and batch 2 have scripted window flows.' >&2
+if [[ "$batch" != 1 && "$batch" != 2 && "$batch" != 3 ]]; then
+  echo 'Only batches 1 through 3 have scripted window flows.' >&2
   exit 2
 fi
 cd "$(dirname "$0")/.."
@@ -20,7 +20,7 @@ cleanup() {
 }
 trap cleanup EXIT
 swift build
-CFFIXED_USER_HOME="$qa_home" .build/debug/FirstLine >"$output/app.log" 2>&1 &
+CFFIXED_USER_HOME="$qa_home" .build/debug/WriteItDown >"$output/app.log" 2>&1 &
 pid=$!
 sleep 2
 
@@ -37,10 +37,36 @@ wid=$(window_id)
 if [[ ! "$wid" =~ ^[0-9]+$ ]]; then echo 'No app window found' >&2; exit 1; fi
 shot() { screencapture -x -l "$wid" "$output/$1.png"; }
 type() { osascript -e 'tell application "System Events" to repeat with characterToType in characters of '"\"$1\"" -e 'keystroke characterToType' -e 'end repeat'; }
-shot start
+if [[ "$batch" == 3 ]]; then
+  osascript -e 'tell application "System Events" to keystroke "," using command down'
+  sleep 1
+  osascript -e 'tell application "System Events" to click menu item "Light" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
+  osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
+  sleep 1
+  shot start-light
+else
+  shot start
+fi
 # Enter by clicking the primary button; Return is not a start shortcut yet.
-osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "FirstLine"'
+osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
 sleep 1
+if [[ "$batch" == 3 ]]; then
+  shot room-light
+  osascript -e 'tell application "System Events" to keystroke "0" using command down'
+  osascript -e 'tell application "System Events" to keystroke "," using command down'
+  sleep 1
+  shot settings-light
+  # The independent graphical session should verify this accessibility path.
+  osascript -e 'tell application "System Events" to click menu item "Dark" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
+  sleep 1
+  shot settings-dark
+  osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
+  shot start-dark
+  osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
+  shot room-dark
+  printf 'Captured %s; inspect every image in independent Computer Use acceptance.\n' "$output"
+  exit 0
+fi
 if [[ "$batch" == 2 ]]; then
   sleep 3
   shot rest-after-three-seconds
@@ -52,7 +78,7 @@ if [[ "$batch" == 2 ]]; then
   shot wipe-in-room
   type 'new draft'
   shot restarted
-  if [[ $(osascript -e 'tell application "System Events" to exists button "Finish" of window 1 of process "FirstLine"') == true ]]; then
+  if [[ $(osascript -e 'tell application "System Events" to exists button "Finish" of window 1 of process "WriteItDown"') == true ]]; then
     echo 'Early Finish button still exists' >&2
     exit 1
   fi
@@ -65,16 +91,16 @@ shot command-two
 # Keep typing until the sixty-second deadline produces the kept surface.
 for _ in $(seq 1 16); do
   sleep 4
-  if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "FirstLine"') == true ]]; then break; fi
+  if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "WriteItDown"') == true ]]; then break; fi
   type ' keep'
 done
-if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "FirstLine"') != true ]]; then
+if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "WriteItDown"') != true ]]; then
   echo 'Kept surface did not appear' >&2
   exit 1
 fi
 shot kept
 # Discard, then open Settings through the standard menu shortcut.
-osascript -e 'tell application "System Events" to click button "Discard" of window 1 of process "FirstLine"'
+osascript -e 'tell application "System Events" to click button "Discard" of window 1 of process "WriteItDown"'
 osascript -e 'tell application "System Events" to keystroke "," using command down'
 sleep 1
 shot settings

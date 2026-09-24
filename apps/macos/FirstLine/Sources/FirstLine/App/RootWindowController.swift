@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
  * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> 常驻容器内的子 VC）
- * [POS]: FirstLine 重写 Phase 1 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
+ * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
@@ -31,7 +31,7 @@ final class RootWindowController: NSWindowController {
             backing: .buffered,
             defer: false
         )
-        window.title = "First Line"
+        window.title = "Write It Down"
         window.contentMinSize = NSSize(width: 980, height: 680)
 
         super.init(window: window)

@@ -1,17 +1,15 @@
-# Zero Draft macOS module instructions
+# writeitdown macOS module instructions
 
 Parent instructions: `../AGENTS.md`
 
 成员清单
-Package.swift: Swift Package 入口，支持 macOS 14+，先保证 `swift build` 与 `swift test` 通过。
+Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史发布规划参考；其中 Mole-style 网站方向已被根目录 `AGENTS.md` 与 `design/DESIGN.md` 的 Flood 视觉规则取代。
 docs/LICENSE_PAYMENT_SPEC.md: Dodo-first 支付、license entitlement、Mac 激活与支持页面规格。
 docs/LAUNCH_TODO.md: Dodo 审核等待期到正式发布的可执行 TODO，给接手 agent 按阶段推进。
 docs/MANUAL_QA.md: MVP 手动验证清单与结果记录模板。
-build/darwin/Info.plist: 预置的 macOS 应用元数据骨架。
-build/darwin/AppIcon/README.md: 图标导出占位说明。
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
 Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口（NSApplication + FirstLineAppDelegate）；持有 AppState、构建主菜单、创建并显示 RootWindowController、激活应用；含菜单动作（openWriting/goHome/openSettings）与 validateMenuItem 启用规则。
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（App 菜单：Settings Cmd+, / Quit；Navigate 菜单：Writing Cmd+1 / Home Cmd+0）。
@@ -22,7 +20,7 @@ Sources/FirstLine/App/HomeViewController.swift: Home 启动界面（Flood 居中
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
-Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support 配置路径规范；草稿不落盘。
+Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
 Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、时长校验与旧许可键的只读迁移（v0.1 hasUnlockedFullAccess → v0.2 licenseStatus），不再写旧许可键与沉浸模式。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，作为 Dodo activate 的 instance name。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约。
@@ -34,8 +32,8 @@ Sources/FirstLine/Session/FailureViewController.swift: Failure 界面（Draft de
 Sources/FirstLine/Session/SuccessViewController.swift: 过渡期 Success 界面，提供词数 + 草稿预览 + Copy full text / Discard；Copy 主按钮显示 “Copied.” 回显。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的 upgrade 界面，含 license key 输入、激活全部状态、禁用的 Buy 占位与 Back to Home。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 Appearance（theme / reduced motion）、Session（固定 60 秒）、Trial & License、About 与 Done 返回 Home。
-Sources/FirstLine/DesignSystem/Colors.swift: Flood 颜色 token（NSColor dynamic provider，明暗自适应）。
-Sources/FirstLine/DesignSystem/Typography.swift: 字体与字号 token（NSFont，Newsreader + IBM Plex Mono）。
+Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
+Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader + IBM Plex Mono）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware bone/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
 Sources/FirstLine/DesignSystem/FossilLayerView.swift: Flood 静态 fossil 纹理层（flipped NSView draw）；bone canvas 左右 margin（paper 列以外）seeded 放置犹豫草稿 fossil，danger 时仅变红，几何变化重算。
@@ -51,8 +49,8 @@ Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径�
 从本目录运行 `swift build` 和 `swift test`。界面、编辑器、键盘、IME 或发布流程变更还必须执行相关的 `docs/MANUAL_QA.md` 项目，并记录无法执行的检查。
 
 对外暴露
-可执行目标 `FirstLine`
+可执行目标 `WriteItDown`
 
-法则: 草稿只在内存中，许可与设置仍可持久化；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；所有启动都进入同一个极简 Home，不提供单独 intro / warm-up onboarding；无侧边栏，单一写作界面，导航通过 AppState.selectedSurface 路由；success 阶段仅允许复制或丢弃，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复；不扩大到 AI / 同步 / WebView；license 激活只走 Dodo 公开 endpoint，Mac app 永不嵌入 developer API key；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：沉默 5 秒触发红色 veil 与倒计时，8 秒清空草稿、留下持久文案 "Draft deleted. it joined the pile." 与一条丢失草稿的 fossil，红色 #c8392f 仅保留给 danger
+法则: 草稿只在内存中，许可与设置仍可持久化；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；所有启动都进入同一个极简 Home，不提供单独 intro / warm-up onboarding；无侧边栏，单一写作界面，导航通过 AppState.selectedSurface 路由；success 阶段仅允许复制或丢弃，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复；不扩大到 AI / 同步 / WebView；license 激活只走 Dodo 公开 endpoint，Mac app 永不嵌入 developer API key；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：沉默 5 秒触发红色 veil 与倒计时，8 秒清空草稿、留下持久文案 "Draft deleted. it joined the pile." 与一条丢失草稿的 fossil，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。

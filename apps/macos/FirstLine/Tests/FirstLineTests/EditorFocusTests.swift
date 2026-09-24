@@ -1,6 +1,6 @@
 import AppKit
 import Testing
-@testable import FirstLine
+@testable import WriteItDown
 
 @MainActor
 struct EditorFocusTests {

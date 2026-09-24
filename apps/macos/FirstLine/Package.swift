@@ -2,30 +2,30 @@
 import PackageDescription
 
 let package = Package(
-    name: "FirstLine",
+    name: "WriteItDown",
     platforms: [
         .macOS(.v14),
     ],
     products: [
-        .executable(name: "FirstLine", targets: ["FirstLine"]),
+        .executable(name: "WriteItDown", targets: ["WriteItDown"]),
     ],
     targets: [
         .executableTarget(
-            name: "FirstLine",
+            name: "WriteItDown",
             path: "Sources/FirstLine",
             exclude: [
                 "Info.plist",
                 "Assets.xcassets",
             ],
             resources: [
-                // Flood design system fonts + their SIL Open Font License texts.
+                // Bundled writing fonts and SIL Open Font License texts.
                 // Processed into Bundle.module so registration resolves them by name.
                 .process("Resources"),
             ]
         ),
         .testTarget(
-            name: "FirstLineTests",
-            dependencies: ["FirstLine"],
+            name: "WriteItDownTests",
+            dependencies: ["WriteItDown"],
             path: "Tests/FirstLineTests"
         )
     ]

@@ -284,6 +284,91 @@ struct SmokeFlowTests {
         #expect(state.selectedSurface == .session)
     }
 
+    private func editor(in view: NSView) -> AppendOnlyTextView? {
+        if let editor = view as? AppendOnlyTextView { return editor }
+        for child in view.subviews {
+            if let found = editor(in: child) { return found }
+        }
+        return nil
+    }
+
+    @Test
+    func exhaustedTrialBlocksBothLateKeystrokeAndIMEAfterWipe() throws {
+        for marked in [false, true] {
+            var now = 0.0
+            let (state, root) = makeState(now: { now })
+            defer { try? FileManager.default.removeItem(at: root) }
+            state.settings.trialSessionsUsed = AppState.trialSessionLimit - 1
+            state.startSession()
+            state.sessionEngine.registerCommittedText("old draft")
+            let controller = SessionViewController(appState: state)
+            let input = try #require(editor(in: controller.view))
+            input.loadRestoredText("old draft")
+            now = 9
+            if marked {
+                input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            } else {
+                input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            #expect(state.selectedSurface == .upgrade)
+            #expect(state.sessionEngine.phase == .failure)
+            #expect(state.settings.trialSessionsUsed == AppState.trialSessionLimit)
+            #expect(input.string.isEmpty)
+        }
+    }
+
+    @Test
+    func licensedRestartKeepsOnlyNewInputIncludingIMECommit() throws {
+        for marked in [false, true] {
+            var now = 0.0
+            let (state, root) = makeState(now: { now })
+            defer { try? FileManager.default.removeItem(at: root) }
+            state.settings.licenseStatus = .active
+            state.startSession()
+            state.sessionEngine.registerCommittedText("old draft")
+            let oldID = state.sessionEngine.sessionID
+            let controller = SessionViewController(appState: state)
+            let input = try #require(editor(in: controller.view))
+            input.loadRestoredText("old draft")
+            if marked {
+                input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            now = 9
+            if marked {
+                input.insertText("你", replacementRange: NSRange(location: NSNotFound, length: 0))
+            } else {
+                input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
+            }
+            let expected = marked ? "你" : "new"
+            #expect(state.selectedSurface == .session)
+            #expect(state.sessionEngine.sessionID != oldID)
+            #expect(state.sessionEngine.text == expected)
+            #expect(input.string == expected)
+            #expect(state.settings.trialSessionsUsed == 0)
+        }
+    }
+
+    @Test
+    func wipeDuringCompositionClearsOldDraftBeforeNextCandidate() throws {
+        var now = 0.0
+        let (state, root) = makeState(now: { now })
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.settings.licenseStatus = .active
+        state.startSession()
+        state.sessionEngine.registerCommittedText("old draft")
+        let controller = SessionViewController(appState: state)
+        let input = try #require(editor(in: controller.view))
+        input.loadRestoredText("old draft")
+        input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.hasMarkedText())
+        now = 8
+        state.handleTick()
+        #expect(state.sessionEngine.phase == .failure)
+        input.insertText("好", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.sessionEngine.text == "好")
+        #expect(input.string == "好")
+    }
+
     @Test
     func startingASessionClearsTheWipeAftermath() {
         var now = 0.0

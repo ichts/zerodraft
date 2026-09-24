@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 NSTextView 输入事件与 SessionEngine 活动回调
+ * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
  * [POS]: AppKit editor core，负责 append-only、IME 安全与受控 wipe 清空；TextKit 位置一律使用 UTF-16 偏移
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
@@ -9,6 +9,7 @@ import AppKit
 import CoreText
 
 final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDelegate {
+    var onPrepareInput: (() -> Bool)?
     var onCommittedText: ((String) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
@@ -21,6 +22,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
+    private var isUpdatingMarkedText = false
     /// Guards replaceCharacters during a programmatic restore of an existing engine
     /// draft (loadRestoredText). The append-only user-input guards behave identically
     /// whenever this flag is false; it only allows the controlled restore path to write
@@ -62,11 +64,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        let hadMarkedText = hasMarkedText()
+        guard onPrepareInput?() ?? true else { return }
         if plainString(from: string).isEmpty == false {
             onMarkedTextActivity?()
         }
 
-        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: replacementRange)
+        let range = hadMarkedText && !hasMarkedText() ? NSRange(location: NSNotFound, length: 0) : replacementRange
+        isUpdatingMarkedText = true
+        defer { isUpdatingMarkedText = false }
+        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: range)
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
@@ -80,7 +87,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             return
         }
 
-        if isMarkedCommit {
+        if !isUpdatingMarkedText && !isRestoringProgrammatically {
+            guard onPrepareInput?() ?? true else { return }
+        }
+        if isMarkedCommit && hasMarkedText() {
             isPerformingInsertion = true
             defer { isPerformingInsertion = false }
             super.insertText(string, replacementRange: replacementRange)
@@ -91,7 +101,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             super.insertText(string, replacementRange: end)
         }
 
-        guard inserted.isEmpty == false else { return }
+        guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
         pendingCompositionRefresh = true
         applyFocusTypographyToExistingText()
         onCommittedText?(inserted)
@@ -101,6 +111,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     func clearWipedText() {
         isRestoringProgrammatically = true
         defer { isRestoringProgrammatically = false }
+        if hasMarkedText() { unmarkText() }
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
     }

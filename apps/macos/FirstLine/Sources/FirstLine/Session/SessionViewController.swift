@@ -167,6 +167,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         // 2. 编辑器（纸内）：照搬 EditorViewRepresentable.makeNSView 配置
         textView = AppendOnlyTextView()
         textView.delegate = self
+        textView.onPrepareInput = { [weak self] in
+            guard let self else { return false }
+            let sessionID = self.engine.sessionID
+            let allowed = self.appState.prepareSessionInput()
+            if self.engine.sessionID != sessionID || self.engine.phase == .failure {
+                self.textView.clearWipedText()
+            }
+            return allowed
+        }
         textView.onCommittedText = { [weak self] inserted in
             self?.engine.registerCommittedText(inserted)
         }
@@ -500,7 +509,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let isDanger = phase == .danger
 
         textView.isEditable = phase == .writing || phase == .danger || phase == .failure
-        if phase == .failure && !textView.string.isEmpty && !textView.hasMarkedText() {
+        if phase == .failure && !textView.string.isEmpty {
             textView.clearWipedText()
         }
         if let unused = engine.unusedSeconds, phase == .failure {

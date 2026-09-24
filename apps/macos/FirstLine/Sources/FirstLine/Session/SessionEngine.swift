@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 单调时间源与编辑器提交、IME 活动
  * [OUTPUT]: SessionEngine / SessionPhase、词数、截止时间与失败时 unusedSeconds
- * [POS]: 首次输入启动时钟，绝对截止时间裁决与原房间重启；草稿只在内存
+ * [POS]: 首次输入启动时钟与绝对截止时间裁决；重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
 import Foundation
@@ -92,7 +92,6 @@ final class SessionEngine {
 
     func registerCommittedText(_ inserted: String) {
         guard !inserted.isEmpty else { return }
-        if phase == .failure { start(duration: duration) }
         guard phase == .writing || phase == .danger, !adjudicateDeadlines() else { return }
         let current = now()
         if startedAt == nil { startedAt = current }
@@ -104,7 +103,6 @@ final class SessionEngine {
     }
 
     func registerMarkedTextActivity() {
-        if phase == .failure { start(duration: duration) }
         guard phase == .writing || phase == .danger, !adjudicateDeadlines() else { return }
         let current = now()
         if startedAt == nil { startedAt = current }

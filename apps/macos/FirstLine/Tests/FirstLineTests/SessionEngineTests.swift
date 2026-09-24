@@ -338,6 +338,7 @@ struct SessionEngineTests {
         time = 100
         engine.tick()
         #expect(engine.unusedSeconds == 52)
+        engine.start(duration: 60)
         engine.registerCommittedText("new")
         #expect(engine.unusedSeconds == nil)
         #expect(engine.remaining == 60)
@@ -368,6 +369,7 @@ struct SessionEngineTests {
         let oldID = engine.sessionID
         time = 8
         engine.tick()
+        engine.start(duration: 180)
         engine.registerCommittedText("again")
         #expect(engine.phase == .writing)
         #expect(engine.text == "again")

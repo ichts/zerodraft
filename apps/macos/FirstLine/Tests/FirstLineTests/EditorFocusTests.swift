@@ -326,7 +326,19 @@ struct EditorFocusTests {
         let controller = SessionViewController(appState: AppState(sessionEngine: engine))
         let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         editor.loadRestoredText("hello world")
-        for selector in ["moveLeft:", "moveUp:", "moveToBeginningOfDocument:", "pageUp:", "moveWordLeft:"] {
+        for selector in ["moveLeft:", "moveRight:", "moveUp:", "moveDown:",
+                         "moveToBeginningOfDocument:", "moveToEndOfDocument:",
+                         "moveToBeginningOfLine:", "moveToEndOfLine:",
+                         "moveToBeginningOfParagraph:", "moveToEndOfParagraph:",
+                         "moveToLeftEndOfLine:", "moveToRightEndOfLine:",
+                         "pageUp:", "pageDown:", "moveWordLeft:", "moveWordRight:",
+                         "moveWordForward:", "moveWordBackward:",
+                         "moveLeftAndModifySelection:", "moveRightAndModifySelection:",
+                         "moveUpAndModifySelection:", "moveDownAndModifySelection:",
+                         "moveWordLeftAndModifySelection:", "moveWordRightAndModifySelection:",
+                         "moveToBeginningOfDocumentAndModifySelection:",
+                         "moveToEndOfDocumentAndModifySelection:",
+                         "pageUpAndModifySelection:", "pageDownAndModifySelection:"] {
             #expect(controller.textView(editor, doCommandBy: Selector((selector))))
             #expect(editor.selectedRange() == NSRange(location: 11, length: 0))
             #expect(engine.lastDenyAt != nil)

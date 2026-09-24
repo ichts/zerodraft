@@ -1,5 +1,7 @@
 # Zero Draft for macOS
 
+> This app is being rebuilt as the writeitdown macOS app. The plan is `docs/WRITEITDOWN_PLAN.md`; until those batches land, the text below describes the current Zero Draft build.
+
 Zero Draft is a forced-output writing tool. You write forward and cannot edit. Stay silent and the page deletes your draft.
 
 This is the native macOS app, built with Swift and AppKit.

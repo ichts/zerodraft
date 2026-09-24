@@ -4,6 +4,7 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: Swift Package 入口，支持 macOS 14+，先保证 `swift build` 与 `swift test` 通过。
+docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史发布规划参考；其中 Mole-style 网站方向已被根目录 `AGENTS.md` 与 `design/DESIGN.md` 的 Flood 视觉规则取代。
 docs/LICENSE_PAYMENT_SPEC.md: Dodo-first 支付、license entitlement、Mac 激活与支持页面规格。

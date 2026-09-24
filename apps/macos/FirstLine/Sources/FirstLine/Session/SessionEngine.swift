@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
  * [OUTPUT]: SessionEngine / SessionPhase、词数、截止时间与失败时 unusedSeconds
- * [POS]: 首次输入启动时钟与绝对截止时间裁决；重启由 AppState 授权，草稿只在内存
+ * [POS]: 首次输入启动时钟与绝对截止时间裁决；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
 import Foundation
@@ -32,7 +32,8 @@ final class SessionEngine {
 
     private let now: () -> TimeInterval
     var phase: SessionPhase = .idle
-    var text = ""
+    private(set) var text = ""
+    private(set) var wordCount = 0
     var duration: TimeInterval = defaultDurationSeconds
     var elapsed: TimeInterval = 0
     var remaining: TimeInterval = defaultDurationSeconds
@@ -51,7 +52,7 @@ final class SessionEngine {
 
     var secondsUntilDeletion: Int { max(0, Int(ceil(Self.wipeAfterSeconds - idleSeconds))) }
 
-    var wordCount: Int {
+    private static func countWords(in text: String) -> Int {
         let source = text as NSString
         let separated = Self.hanPattern.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: source.length), withTemplate: " $1 ")
         let tokenizer = NLTokenizer(unit: .word)
@@ -78,6 +79,7 @@ final class SessionEngine {
         unusedSeconds = nil
         lastDenyAt = nil
         text = ""
+        wordCount = 0
         startedAt = nil
         lastActivityAt = nil
         phase = .writing
@@ -101,6 +103,7 @@ final class SessionEngine {
         let current = now()
         if startedAt == nil { startedAt = current }
         text += inserted
+        wordCount = Self.countWords(in: text)
         lastActivityAt = current
         idleSeconds = 0
         phase = .writing
@@ -131,6 +134,7 @@ final class SessionEngine {
             unusedSeconds = max(0, Int(ceil(finish - wipe)))
             wipedText = text
             text = ""
+            wordCount = 0
             phase = .failure
         } else {
             elapsed = duration
@@ -151,6 +155,7 @@ final class SessionEngine {
         unusedSeconds = nil
         lastDenyAt = nil
         text = ""
+        wordCount = 0
         startedAt = nil
         lastActivityAt = nil
         emitStateChange()

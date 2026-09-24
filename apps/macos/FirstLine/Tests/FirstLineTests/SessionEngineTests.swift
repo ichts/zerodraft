@@ -412,6 +412,31 @@ struct SessionEngineTests {
         }
     }
 
+    @Test func wordCountTracksDraftAcrossActivityAndResets() {
+        var time = 0.0
+        let engine = SessionEngine(now: { time })
+        engine.start(duration: 60)
+        #expect(engine.wordCount == 0)
+        engine.registerCommittedText("hello")
+        #expect(engine.wordCount == 1)
+        time = 4
+        engine.registerMarkedTextActivity()
+        engine.tick()
+        #expect(engine.wordCount == 1)
+        engine.registerCommittedText(" 中文")
+        #expect(engine.wordCount == 3)
+        time = 12
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.wordCount == 0)
+        engine.start(duration: 60)
+        #expect(engine.wordCount == 0)
+        engine.registerCommittedText("new draft")
+        #expect(engine.wordCount == 2)
+        engine.abandon()
+        #expect(engine.wordCount == 0)
+    }
+
     @Test func fiveAndEightSecondRulesHoldForSixtyMinuteSession() {
         var time = 0.0
         let engine = SessionEngine(now: { time })

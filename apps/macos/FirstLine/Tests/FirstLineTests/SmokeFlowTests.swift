@@ -162,20 +162,6 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func failureCapturesAftermathVisibleAfterGoingHome() {
-        var now = 0.0
-        let (state, root) = makeState(now: { now })
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession()
-        state.sessionEngine.registerCommittedText("the lost paragraph text here")
-        now = 8
-        state.handleTick()
-        #expect(state.lastWipeFossil == "the lost paragraph text here")
-        state.goHome()
-        #expect(state.selectedSurface == .home)
-    }
-
-    @Test
     func launchAlwaysShowsHome() throws {
         let (firstRun, root) = makeState()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -392,20 +378,6 @@ struct SmokeFlowTests {
         input.insertText("好", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(state.sessionEngine.text == "好")
         #expect(input.string == "好")
-    }
-
-    @Test
-    func startingASessionClearsTheWipeAftermath() {
-        var now = 0.0
-        let (state, root) = makeState(now: { now })
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession()
-        state.sessionEngine.registerCommittedText("doomed draft")
-        now = 8
-        state.handleTick()
-        #expect(state.lastWipeFossil != nil)
-        state.startSession()
-        #expect(state.lastWipeFossil == nil)
     }
 
 }

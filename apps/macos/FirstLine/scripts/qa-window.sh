@@ -5,8 +5,8 @@
 set -euo pipefail
 
 batch=${1:-}
-if [[ "$batch" != 1 && "$batch" != 2 && "$batch" != 3 ]]; then
-  echo 'Only batches 1 through 3 have scripted window flows.' >&2
+if [[ "$batch" != 1 && "$batch" != 2 && "$batch" != 3 && "$batch" != 4 ]]; then
+  echo 'Only batches 1 through 4 have scripted window flows.' >&2
   exit 2
 fi
 cd "$(dirname "$0")/.."
@@ -63,6 +63,39 @@ print(color.redComponent > 0.5 ? "Light" : "Dark")' "$probe" 2>/dev/null) == "$t
   echo "Timed out waiting for rendered $theme appearance" >&2
   return 1
 }
+if [[ "$batch" == 4 ]]; then
+  osascript -e 'tell application "System Events" to keystroke "," using command down'
+  wait_for_button 'Done'
+  osascript -e 'tell application "System Events" to click menu item "Light" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
+  osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
+  wait_for_button 'Give it sixty seconds.'
+  osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
+  sleep 1; shot rest-light
+  type 'A'; sleep 0.2
+  osascript -e 'tell application "System Events" to key code 51'
+  shot deny-light
+  type ' writing room stays alive'; shot typing-light
+  sleep 5.5; shot warn-light
+  type ' keep'; shot recovered-light
+  sleep 8.3; shot wiped-light
+  type 'fresh'; shot restarted-light
+  for _ in $(seq 1 16); do
+    sleep 4
+    if [[ $(osascript -e 'tell application "System Events" to exists button "COPY TEXT" of window 1 of process "WriteItDown"') == true ]]; then break; fi
+    type ' more'
+  done
+  wait_for_button 'COPY TEXT'; shot kept-light
+  osascript -e 'tell application "System Events" to click button "COPY TEXT" of window 1 of process "WriteItDown"'
+  shot copied-light
+  pbpaste > "$output/copied.txt"
+  osascript -e 'tell application "System Events" to click button "RUN IT AGAIN" of window 1 of process "WriteItDown"'
+  shot again-light
+  osascript -e 'tell application "System Events" to key code 53'
+  wait_for_button 'Give it sixty seconds.'; shot exit-light
+  # The independent graphical session additionally captures dark rest/warn/kept and reduced motion.
+  printf 'Captured %s; inspect states, clipboard, dark appearance and reduced motion independently.\n' "$output"
+  exit 0
+fi
 if [[ "$batch" == 3 ]]; then
   osascript -e 'tell application "System Events" to keystroke "," using command down'
   wait_for_button 'Done'

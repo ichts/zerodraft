@@ -13,10 +13,10 @@ docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；当
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
 Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口（NSApplication + FirstLineAppDelegate）；持有 AppState、构建主菜单、创建并显示 RootWindowController、激活应用；含菜单动作（openWriting/goHome/openSettings）与 validateMenuItem 启用规则。
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（App 菜单：Settings Cmd+, / Quit；Navigate 菜单：Writing Cmd+1 / Home Cmd+0）。
-Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、sessionEngine.phase（success 路由，failure 留在原房间）、settings.theme（窗口 appearance）。
+Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；所有会话相位留在同一个房间。
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
-Sources/FirstLine/App/AppState.swift: 顶层导航状态、全部会话启动与输入前 trial gate、license 激活/校验入口（@Observable，来自 Observation，非 SwiftUI）；成功正文不落盘。
-Sources/FirstLine/App/HomeViewController.swift: Home 启动界面（小号等宽 WRITE_IT_DOWN、大号 Newsreader 标题、规则、trial 状态与固定 60 秒按钮）；仍暂存最近一次 wipe 的红线与 margin fossil，待第 4 批删除。
+Sources/FirstLine/App/AppState.swift: 顶层导航状态、全部会话启动与输入前 trial gate、license 激活/校验入口（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
+Sources/FirstLine/App/HomeViewController.swift: Home 启动界面（小号等宽 WRITE_IT_DOWN、大号 Newsreader 标题、规则、trial 状态与固定 60 秒按钮）；不展示丢失稿。
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
@@ -27,19 +27,18 @@ Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivati
 Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖 activate / validate / deactivate 三个公开 endpoint。
 Sources/FirstLine/Licensing/MockLicenseClient.swift: LicenseClient actor 替身，不触达真实 Dodo 网络。
 Sources/FirstLine/Session/SessionEngine.swift: danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
-Sources/FirstLine/Session/SessionViewController.swift: Session 主界面（AppKit）；托管 AppendOnlyTextView、稳健 first-responder 获取、100ms tick、原房间 wipe 报告与重启、暂存 Flood 环境；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。第 4 批清理旧视觉。
-Sources/FirstLine/Session/FailureViewController.swift: Failure 界面（Draft deleted 文案 + Try Again / Back to Home + joined fossil）。
-Sources/FirstLine/Session/SuccessViewController.swift: 过渡期 Success 界面，提供词数 + 草稿预览 + Copy full text / Discard；Copy 主按钮显示 “Copied.” 回显。
+Sources/FirstLine/Session/RoomPresentation.swift: 与网站一致的时钟、擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
+Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；托管 AppendOnlyTextView、首响应者、100ms tick、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的 upgrade 界面，含 license key 输入、激活全部状态、禁用的 Buy 占位与 Back to Home。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 Appearance（theme / reduced motion）、Session（固定 60 秒）、Trial & License、About 与 Done 返回 Home。
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
 Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/FossilLayerView.swift: Flood 静态 fossil 纹理层（flipped NSView draw）；bone canvas 左右 margin（paper 列以外）seeded 放置犹豫草稿 fossil，danger 时仅变红，几何变化重算。
 Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong，全部来自 package resources。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转测试。
+Tests/FirstLineTests/RoomTests.swift: 房间文案、时钟、wash、deny、复制与退出测试。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功与失败不落盘、菜单无 Library、导航、trial 计数与解锁。
@@ -51,6 +50,6 @@ Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径�
 对外暴露
 可执行目标 `WriteItDown`
 
-法则: 草稿只在内存中，许可与设置仍可持久化；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；所有启动都进入同一个极简 Home，不提供单独 intro / warm-up onboarding；无侧边栏，单一写作界面，导航通过 AppState.selectedSurface 路由；success 阶段仅允许复制或丢弃，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复；不扩大到 AI / 同步 / WebView；license 激活只走 Dodo 公开 endpoint，Mac app 永不嵌入 developer API key；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：沉默 5 秒触发红色 veil 与倒计时，8 秒清空草稿、留下持久文案 "Draft deleted. it joined the pile." 与一条丢失草稿的 fossil，警告色使用 `writeitdown/site.css` 的 alarm token
+法则: 草稿只在内存中，许可与设置仍可持久化；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；所有启动都进入同一个极简 Home，不提供单独 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 Dodo 公开 endpoint，Mac app 永不嵌入 developer API key；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：沉默 5 秒出现 wash 与倒计时，8 秒清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。

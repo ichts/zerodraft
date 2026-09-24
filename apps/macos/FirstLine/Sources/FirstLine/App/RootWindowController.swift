@@ -5,11 +5,9 @@
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
- * 路由：本控制器观察两个信号：
- *   1) selectedSurface -> 换 contentViewController；
- *   2) sessionEngine.phase -> 成功切 kept surface；失败留在 room 以便下一键重启，接管退役
- *      SwiftUI RootView.onChange(of: phase) 的确切职责（AppState.handleEngineStateChange
- *      只记录 aftermath(failure)/idle->Home，不设 failure/success 的 surface）。
+ * 路由：本控制器观察 selectedSurface 和 theme：
+ *   1) selectedSurface -> 换常驻容器内的子控制器；
+ *   2) theme -> 更新窗口外观；
  * Observation 的 withObservationTracking 只触发一次回调，因此在回调里重新 arm 观察实现持续跟踪。
  */
 
@@ -45,7 +43,6 @@ final class RootWindowController: NSWindowController {
         applyTheme()
         container.show(appState.selectedSurface)
         armSurfaceObservation()
-        armPhaseObservation()
         armThemeObservation()
     }
 
@@ -68,28 +65,6 @@ final class RootWindowController: NSWindowController {
                 guard let self else { return }
                 self.swapToSurface(self.appState.selectedSurface)
                 self.armSurfaceObservation()
-            }
-        }
-    }
-
-    // engine.phase -> selectedSurface：仅在成功时离开写作间；失败保留编辑器供下一键重启。
-    private func armPhaseObservation() {
-        withObservationTracking { [weak self] in
-            _ = self?.appState.sessionEngine.phase
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                switch self.appState.sessionEngine.phase {
-                case .failure:
-                    break
-                case .success:
-                    if self.appState.selectedSurface != .success {
-                        self.appState.selectedSurface = .success
-                    }
-                default:
-                    break
-                }
-                self.armPhaseObservation()
             }
         }
     }
@@ -125,8 +100,6 @@ enum SurfaceFactory {
         switch surface {
         case .home:     return HomeViewController(appState: appState)
         case .session:  return SessionViewController(appState: appState)
-        case .failure:  return FailureViewController(appState: appState)
-        case .success:  return SuccessViewController(appState: appState)
         case .settings: return SettingsViewController(appState: appState)
         case .upgrade:  return UpgradeViewController(appState: appState)
         }

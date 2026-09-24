@@ -8,7 +8,7 @@
  * `@main enum FirstLineMain` 提供：main() 在主线程构造 NSApplication、AppDelegate 与
  * AppState，applicationDidFinishLaunching 里构建主菜单、显示主窗口并激活 app。
  * 完整 AppKit 应用由 RootWindowController 托管常驻 RootContainerViewController；Home、Writing、
- * Failure、Success、Settings 与 Upgrade 都是容器内切换的真实原生 AppKit surface。
+ * Session 在单一房间承载 rest/typing/warn/wipe/kept；Settings 与 Upgrade 是容器内切换的原生 AppKit surface。
  */
 
 import AppKit

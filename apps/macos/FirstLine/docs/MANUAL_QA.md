@@ -65,6 +65,12 @@ Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current accept
 
 ## Manual QA Record
 
+### 2026-09-24 - writeitdown batch 4, room parity
+
+- `swift build` exit 0; `swift test` exit 0 (113 tests, 8 suites). All nine Batch 4 named filters and all twelve Batch 2 named filters separately exit 0. The inherited storage-symbol, brand/color and early-Finish negated `rg` gates exit 0; `bash -n scripts/qa-window.sh` exits 0. Command exit codes and logs: `/tmp/wid-b4-accept/results.txt` and adjacent logs (ephemeral build evidence).
+- **Window QA pending independent Computer Use acceptance.** This background session cannot capture the macOS screen and did not grant screen permissions or run System Events/screencapture. `scripts/qa-window.sh 4` describes the light rest, typing, deny, warn, recovery, wipe, restart, real minute, copy, run again, and Escape flow. A separate graphical session must capture and inspect these states, check `pbpaste` against the exact draft, plus dark rest/warn/kept and reduced motion. Physical IME candidate selection and exact 280 ms frames remain unverified.
+- Live website was opened at `https://writeitdown.app/#trial` at 1440x900 with chrome-devtools-axi; its accessible room showed `1:00`, `0 WORDS`, and after idle `DRAFT WIPED - 0:52 UNUSED. TYPE TO RESTART.` The browser tool reported screenshots for rest/warn/wipe, but those paths were not available to this worker for inspection. The kept capture timed out. Fresh comparable web references and visual comparison remain pending independent acceptance; no visual pass is claimed here.
+
 ### 2026-09-24 - writeitdown batch 3, brand and tokens
 
 - `swift build` exit 0; `swift test` exit 0 (105 Swift Testing tests, 7 suites). Five batch-3 named filters and all 12 batch-2 named filters individually exit 0. The inherited storage-reference `! rg`, early-Finish `! rg`, and batch-3 brand/color `! rg` each exit 0 with no matches. `bash -n scripts/qa-window.sh` exits 0.

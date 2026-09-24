@@ -46,22 +46,31 @@ wait_for_button() {
   echo "Timed out waiting for $title" >&2
   return 1
 }
-wait_for_theme() {
+wait_for_appearance() {
   local theme=$1
+  local probe="$output/.appearance.png"
   for _ in {1..40}; do
-    if [[ $(osascript -e 'tell application "System Events" to get value of pop up button 1 of window 1 of process "WriteItDown"' 2>/dev/null) == "$theme" ]]; then return 0; fi
+    if screencapture -x -l "$wid" "$probe" && [[ $(swift -e 'import AppKit; import Foundation
+let bitmap = NSBitmapImageRep(data: try! Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))!
+let color = bitmap.colorAt(x: 80, y: 200)!.usingColorSpace(.deviceRGB)!
+print(color.redComponent > 0.5 ? "Light" : "Dark")' "$probe" 2>/dev/null) == "$theme" ]]; then
+      rm -f "$probe"
+      return 0
+    fi
     sleep 0.25
   done
-  echo "Timed out waiting for $theme theme" >&2
+  rm -f "$probe"
+  echo "Timed out waiting for rendered $theme appearance" >&2
   return 1
 }
 if [[ "$batch" == 3 ]]; then
   osascript -e 'tell application "System Events" to keystroke "," using command down'
   wait_for_button 'Done'
   osascript -e 'tell application "System Events" to click menu item "Light" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
-  wait_for_theme 'Light'
+  wait_for_appearance 'Light'
   osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
   wait_for_button 'Give it sixty seconds.'
+  wait_for_appearance 'Light'
   shot start-light
 else
   shot start
@@ -70,20 +79,24 @@ fi
 osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
 if [[ "$batch" == 3 ]]; then
   wait_for_button 'Abandon - the text is lost'
+  wait_for_appearance 'Light'
   shot room-light
   osascript -e 'tell application "System Events" to click button "Abandon - the text is lost" of window 1 of process "WriteItDown"'
   wait_for_button 'Give it sixty seconds.'
   osascript -e 'tell application "System Events" to keystroke "," using command down'
   wait_for_button 'Done'
+  wait_for_appearance 'Light'
   shot settings-light
   osascript -e 'tell application "System Events" to click menu item "Dark" of menu 1 of pop up button 1 of window 1 of process "WriteItDown"'
-  wait_for_theme 'Dark'
+  wait_for_appearance 'Dark'
   shot settings-dark
   osascript -e 'tell application "System Events" to click button "Done" of window 1 of process "WriteItDown"'
   wait_for_button 'Give it sixty seconds.'
+  wait_for_appearance 'Dark'
   shot start-dark
   osascript -e 'tell application "System Events" to click button "Give it sixty seconds." of window 1 of process "WriteItDown"'
   wait_for_button 'Abandon - the text is lost'
+  wait_for_appearance 'Dark'
   shot room-dark
   printf 'Captured %s; inspect every image in independent Computer Use acceptance.\n' "$output"
   exit 0

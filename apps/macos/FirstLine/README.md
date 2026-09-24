@@ -2,7 +2,7 @@
 
 A native AppKit writing room. Write forward: deletion, paste, cut, undo and selection replacement are blocked. The clock starts on the first input. After five seconds of silence a warning appears; after eight seconds your draft is deleted. Reach the deadline first to keep and copy your text. Writing is not saved to disk or uploaded.
 
-The brand-and-token transition is batch 3 of `docs/WRITEITDOWN_PLAN.md`. The room visuals, duration picker, paid license integration and signed DMG are separate later batches; do not mistake the SwiftPM executable for a distributable app.
+The native room now keeps the writing, warning, wipe report and finished draft in one view. Session length is still fixed at one minute; the duration picker, paid license integration and signed DMG are later batches in `docs/WRITEITDOWN_PLAN.md`. The SwiftPM executable is not a distributable app.
 
 ## Build and test
 

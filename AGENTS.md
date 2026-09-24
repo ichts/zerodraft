@@ -159,7 +159,7 @@ swift build
 swift test
 ```
 
-UI, editor, or motion changes on the macOS app require the batch-specific real-window QA in `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` alongside `swift test`, with evidence recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`. The current room keeps rest, typing, warn, wipe and kept states in one view, without Failure screen, aftermath or fossils. Background sessions without screen access must mark window QA pending independent Computer Use acceptance.
+UI, editor, or motion changes on the macOS app require the batch-specific real-window QA in `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` alongside `swift test`, with evidence recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`. Background sessions without screen access must mark window QA pending independent Computer Use acceptance.
 
 ## Delivery contract
 

@@ -317,11 +317,11 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - Update `README.md`, `apps/macos/AGENTS.md`, `apps/macos/FirstLine/AGENTS.md`, and the macOS lines of the root `AGENTS.md` to name writeitdown. This also removes the stale `build/darwin/` entries, which point at a directory that does not exist.
 - Named tests:
   - `BrandTests/infoPlistNamesWriteItDown`.
-  - `BrandTests/noFirstLineOrZeroDraftUserFacingStrings`, which scans the source string literals shown to users.
-  - `DesignTokenTests/lightTokensMatchSiteCSS`, which parses `writeitdown/site.css` from the repository and compares the hex values.
-  - `DesignTokenTests/darkTokensMatchSiteCSS`.
-  - `DesignTokenTests/alarmIsOnlyNonNeutralColor`.
-- Checks: `rg -n '"First Line|"Zero Draft|c8392f' Sources` prints nothing.
+  - `BrandTests/startScreenAndMenusShowWriteItDown`, which checks the rendered start-screen identity, window title, and app menu label.
+  - `DesignTokenTests/lightTokensResolveToSiteColors`, which resolves the app's dynamic colors in light appearance and compares their displayed color values to the site palette.
+  - `DesignTokenTests/darkTokensResolveToSiteColors`, which repeats the comparison in dark appearance.
+  - `DesignTokenTests/alarmResolvesToSiteColorInBothAppearances`.
+- Supplementary check: `rg -n '"First Line|"Zero Draft|c8392f' Sources` prints nothing.
 - Window QA: the start screen, the room, and Settings in light, then again in dark.
 - Done when the common set is green, the checks print nothing, and the QA record includes both appearances. `BrandTests/infoPlistNamesWriteItDown` checks the source plist only: Finder name, About bundle identifier, and icon require the packaged app in batch 7.
 
@@ -386,10 +386,10 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
   - `LicenseFlowTests/exhaustedTrialRoutesToUpgrade`.
   - `LicenseFlowTests/checkoutURLComesFromInfoPlist`.
   - `LicenseFlowTests/displayPriceComesFromInfoPlist`: the Upgrade copy contains the value of `WIDDisplayPrice` (currently `$4.99`), and the test reads the expected value from `Info.plist` rather than repeating it.
-  - `LicenseFlowTests/noPriceLiteralInSources`: no Swift source or test contains a price literal.
   - `DodoLicenseClientTests/activateBuildsPublicRequestWithoutAuthHeader`, using a stub `URLProtocol` so no real network is used.
   - `DodoLicenseClientTests/errorCodesMapToLicenseActivationError`.
   - The existing license tests are kept.
+- Supplementary check: `! rg -n '\$4\.99' Sources Tests --glob '*.swift'` exits 0; the rendered Upgrade price is covered by `displayPriceComesFromInfoPlist`.
 - Window QA: use three trial sessions, confirm the fourth start routes to Upgrade, confirm Buy opens the configured URL in the browser, activate a Dodo test-mode key if the captain has provided one (otherwise mark it not verified), and confirm Settings shows `License active.`.
 - Done when the common set is green, no request leaves the machine during tests, and the QA record covers the listed states.
 

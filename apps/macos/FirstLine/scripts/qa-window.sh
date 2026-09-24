@@ -45,9 +45,16 @@ type 'batch one draft'
 shot typed
 osascript -e 'tell application "System Events" to keystroke "2" using command down'
 shot command-two
-# Keep the draft alive until the sixty-second deadline, then capture the kept surface.
-for _ in $(seq 1 10); do sleep 5; type ' keep'; done
-sleep 11
+# Keep typing until the sixty-second deadline produces the kept surface.
+for _ in $(seq 1 16); do
+  sleep 4
+  if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "FirstLine"') == true ]]; then break; fi
+  type ' keep'
+done
+if [[ $(osascript -e 'tell application "System Events" to exists button "Copy full text" of window 1 of process "FirstLine"') != true ]]; then
+  echo 'Kept surface did not appear' >&2
+  exit 1
+fi
 shot kept
 # Discard, then open Settings through the standard menu shortcut.
 osascript -e 'tell application "System Events" to click button "Discard" of window 1 of process "FirstLine"'

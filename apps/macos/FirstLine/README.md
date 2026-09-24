@@ -12,7 +12,7 @@ This is the native macOS app, built with Swift and AppKit.
 - Five seconds of silence turns the page red and starts a countdown.
 - Eight seconds of silence deletes the whole draft.
 - A session lasts sixty seconds. Finish it and you keep the draft.
-- Keep the draft three ways: copy full text, copy for AI, or download a Markdown file.
+- On success, copy the full text or discard the draft.
 
 It is not a distraction-free editor. It is a hired threat. This is the draft before the draft.
 

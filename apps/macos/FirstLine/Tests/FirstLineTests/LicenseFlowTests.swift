@@ -514,6 +514,41 @@ struct LicenseFlowTests {
     }
 
     @Test
+    func validCachedLicenseOutranksEarlierActivationErrorInSettings() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 licenseKey: "KEY", licenseStatus: .active,
+                                 licenseActivatedAt: now, licenseLastValidatedAt: now,
+                                 licenseProductID: "prod_mock")
+        let (state, _, _, fm, root) = try makeAppState(activationBehavior: .invalidKey,
+                                                       initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        let settings = SettingsViewController(appState: state)
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
+        }
+        let view = settings.view
+        let status = try #require(fields(view).first { $0.stringValue == "Checking license..." })
+        let input = try #require(fields(view).first { $0.placeholderString == "Paste license key" })
+        input.stringValue = "unfinished key"
+        await state.activateLicense(key: "BAD")
+        for _ in 0..<50 {
+            if status.stringValue == LicenseActivationError.invalidKey.errorDescription { break }
+            await Task.yield()
+        }
+        #expect(status.stringValue == LicenseActivationError.invalidKey.errorDescription)
+        await state.validateLicenseIfNeeded()
+        for _ in 0..<50 {
+            if status.stringValue == "License active." { break }
+            await Task.yield()
+        }
+        #expect(state.hasFullAccess)
+        #expect(status.stringValue == "License active.")
+        #expect(input.stringValue == "unfinished key")
+        #expect(input.superview?.isHidden == true)
+    }
+
+    @Test
     func validationRefreshDoesNotInterruptWriting() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,

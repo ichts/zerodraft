@@ -119,7 +119,8 @@ final class SettingsViewController: NSViewController {
     }
 
     private func refreshLicense() {
-        licenseStatusLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.trialStatusText
+        licenseStatusLabel.stringValue = appState.hasFullAccess ? appState.trialStatusText :
+            (appState.licenseActivationError?.errorDescription ?? appState.trialStatusText)
         let values = [
             appState.settings.licenseActivatedAt.map { "Activated \(formatted($0))" },
             appState.settings.licenseInstanceID.map { "Instance: \($0)" },

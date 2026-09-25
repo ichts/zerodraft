@@ -21,7 +21,6 @@ final class RootContainerViewController: NSViewController {
     private var current: NSViewController?
 
     func copyKeptText() { (current as? SessionViewController)?.copyKeptText() }
-    func toggleStatusChrome() { (current as? SessionViewController)?.toggleStatusChrome() }
 
     init(appState: AppState) {
         self.appState = appState

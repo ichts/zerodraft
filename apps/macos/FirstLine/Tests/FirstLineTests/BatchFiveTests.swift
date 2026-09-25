@@ -117,8 +117,29 @@ struct SettingsTests {
         #expect(clock.alphaValue == 0 && count.alphaValue == 0)
         #expect(clock.accessibilityLabel() == "Time remaining 1:00")
         #expect(count.accessibilityLabel() == "0 WORDS written")
-        room.toggleStatusChrome()
+        window.contentView?.layoutSubtreeIfNeeded()
+        func move(to point: NSPoint) {
+            let event = NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0,
+                                           windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                           clickCount: 0, pressure: 0)!
+            room.mouseMoved(with: event)
+        }
+        move(to: clock.convert(NSPoint(x: clock.bounds.midX, y: clock.bounds.midY), to: nil))
         #expect(clock.alphaValue == 1 && count.alphaValue == 1)
+        move(to: NSPoint(x: window.contentView!.bounds.midX, y: window.contentView!.bounds.midY))
+        #expect(clock.alphaValue == 0 && count.alphaValue == 0)
+        move(to: count.convert(NSPoint(x: count.bounds.midX, y: count.bounds.midY), to: nil))
+        #expect(clock.alphaValue == 1 && count.alphaValue == 1)
+        let exit = NSEvent.mouseEvent(with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 0,
+                                      windowNumber: window.windowNumber, context: nil, eventNumber: 0,
+                                      clickCount: 0, pressure: 0)!
+        room.mouseExited(with: exit)
+        #expect(clock.alphaValue == 0 && count.alphaValue == 0)
+
+        state.updateFocusMode(false)
+        room.tick()
+        #expect(clock.alphaValue == 1 && count.alphaValue == 1)
+        #expect(clock.accessibilityLabel() == "Time remaining 1:00")
     }
 
     @Test func alignmentAndFontSizeDefaultsAndChoices() {
@@ -131,6 +152,16 @@ struct SettingsTests {
         #expect(state.settings.writingAlignment == .left)
         #expect(state.settings.writingFontSize.points == 34)
         #expect(WritingFontSize.allCases == [.small, .medium, .large])
+    }
+
+    @Test func focusWindowDeliversMouseMovementAndHasNoPinnedCommand() {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let controller = RootWindowController(appState: state)
+        #expect(controller.window?.acceptsMouseMovedEvents == true)
+        let delegate = FirstLineAppDelegate(appState: state)
+        let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
+        #expect(menu.items.last?.submenu?.items.contains { $0.keyEquivalent == "i" } == false)
     }
 
     @Test func appearanceDefaultsToSystem() {

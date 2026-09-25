@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；路由新篇、成稿复制、状态揭示、Settings、关闭窗口
+ * [POS]: 建立 NSApplication、菜单与主窗口；路由新篇、成稿复制、Settings、关闭窗口
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -55,7 +55,6 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func newPiece(_ sender: Any?) { appState.newPiece() }
     @objc func copyKept(_ sender: Any?) { rootWindowController?.copyKeptText() }
-    @objc func toggleStatus(_ sender: Any?) { rootWindowController?.toggleStatusChrome() }
     @objc func closeWindow(_ sender: Any?) { rootWindowController?.window?.performClose(sender) }
     @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }
     @objc func goHome(_ sender: Any?) { appState.goHome() }
@@ -71,8 +70,6 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 extension FirstLineAppDelegate: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(toggleStatus):
-            return appState.selectedSurface == .session
         case #selector(copyKept):
             return appState.sessionEngine.phase == .success && appState.selectedSurface == .session
         case #selector(openSettings), #selector(newPiece), #selector(closeWindow):

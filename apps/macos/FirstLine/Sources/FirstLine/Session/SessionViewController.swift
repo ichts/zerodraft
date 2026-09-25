@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Editor focus, hover/keyboard status chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Editor focus, hover-only status chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
 import AppKit
@@ -62,7 +62,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyWork: DispatchWorkItem?
     private var paperWidth: NSLayoutConstraint!
     private var chromeHover = false
-    private var chromePinned = false
 
     init(appState: AppState) {
         self.appState = appState
@@ -86,7 +85,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             Task { @MainActor [weak self] in self?.tick() }
         }
         if let ticker { RunLoop.main.add(ticker, forMode: .common) }
-        view.addTrackingArea(NSTrackingArea(rect: view.bounds, options: [.mouseMoved, .activeInKeyWindow, .inVisibleRect], owner: self))
+        view.addTrackingArea(NSTrackingArea(rect: view.bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
         applyVisualSettings()
         prepareViewport()
         NSApp.activate(ignoringOtherApps: true)
@@ -421,19 +420,19 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                                                     size: settings.writingFontSize.points)
             ?? NSFont.systemFont(ofSize: settings.writingFontSize.points)
         keptText.alignment = settings.writingAlignment == .centered ? .center : .left
-        let showChrome = !settings.focusMode || chromeHover || chromePinned
+        let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0
-    }
-
-    func toggleStatusChrome() {
-        chromePinned.toggle()
-        applyVisualSettings()
     }
 
     override func mouseMoved(with event: NSEvent) {
         let position = paper.convert(event.locationInWindow, from: nil)
         chromeHover = position.y > paper.bounds.height - 90 || position.y < 90
+        applyVisualSettings()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        chromeHover = false
         applyVisualSettings()
     }
 

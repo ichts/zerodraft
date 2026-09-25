@@ -72,10 +72,6 @@ enum MainMenuBuilder {
         let copyItem = NSMenuItem(title: "Copy Kept Text", action: #selector(FirstLineAppDelegate.copyKept(_:)), keyEquivalent: "c")
         copyItem.target = validationOwner
         navigateMenu.addItem(copyItem)
-        let statusItem = NSMenuItem(title: "Show Clock and Words", action: #selector(FirstLineAppDelegate.toggleStatus(_:)), keyEquivalent: "i")
-        statusItem.target = validationOwner
-        navigateMenu.addItem(statusItem)
-
         let writingItem = NSMenuItem(
             title: "Writing",
             action: #selector(FirstLineAppDelegate.openWriting(_:)),

@@ -36,13 +36,6 @@ struct SessionEngineTests {
     }
 
     @Test
-    func namedThresholdConstantsDrivePhaseMachine() {
-        #expect(SessionEngine.dangerAfterSeconds == 5)
-        #expect(SessionEngine.wipeAfterSeconds == 8)
-        #expect(SessionEngine.defaultDurationSeconds == 60)
-    }
-
-    @Test
     func idleSecondsAndSecondsUntilDeletionTrackSilence() {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })

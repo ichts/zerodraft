@@ -14,8 +14,6 @@ enum SessionPhase: Equatable {
 @Observable
 @MainActor
 final class SessionEngine {
-    nonisolated static let dangerAfterSeconds: TimeInterval = 5
-    nonisolated static let wipeAfterSeconds: TimeInterval = 8
     nonisolated static let defaultDurationSeconds: TimeInterval = 60
     nonisolated static let durationChoices: [TimeInterval] = [60, 300, 600, 1200, 1800]
 

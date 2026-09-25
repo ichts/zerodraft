@@ -23,7 +23,7 @@ enum RoomPresentation {
         "0:00 - \(wordLabel(words)) KEPT."
     }
 
-    static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit = .standard) -> CGFloat {
+    static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {
         let warnAt = Double(limit.rawValue - 3)
         guard idle >= warnAt else { return 0 }
         if reducesMotion { return 1 }

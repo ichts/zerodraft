@@ -96,11 +96,14 @@ struct RoomTests {
         #expect(labels(room.view).contains("RUN IT AGAIN"))
     }
 
-    @Test func warnWashOpacityRampsFromFiveToEightSeconds() {
-        #expect(RoomPresentation.washOpacity(idle: 4.9, reducesMotion: false) == 0)
-        #expect(RoomPresentation.washOpacity(idle: 5, reducesMotion: false) == 0)
-        #expect(RoomPresentation.washOpacity(idle: 6.5, reducesMotion: false) == 0.5)
-        #expect(RoomPresentation.washOpacity(idle: 8, reducesMotion: false) == 1)
-        #expect(RoomPresentation.washOpacity(idle: 5, reducesMotion: true) == 1)
+    @Test func warnWashTracksSelectedSilenceLimit() {
+        for limit in SilenceLimit.allCases {
+            let warnAt = Double(limit.rawValue - 3)
+            #expect(RoomPresentation.washOpacity(idle: warnAt - 0.1, reducesMotion: false, limit: limit) == 0)
+            #expect(RoomPresentation.washOpacity(idle: warnAt, reducesMotion: false, limit: limit) == 0)
+            #expect(RoomPresentation.washOpacity(idle: warnAt + 1.5, reducesMotion: false, limit: limit) == 0.5)
+            #expect(RoomPresentation.washOpacity(idle: Double(limit.rawValue), reducesMotion: false, limit: limit) == 1)
+            #expect(RoomPresentation.washOpacity(idle: warnAt, reducesMotion: true, limit: limit) == 1)
+        }
     }
 }

@@ -31,6 +31,7 @@ private final class RoomWashView: NSView {
 @MainActor
 final class SessionViewController: NSViewController, NSTextViewDelegate {
     private let appState: AppState
+    private let pasteboard: NSPasteboard
     private var engine: SessionEngine { appState.sessionEngine }
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
@@ -63,8 +64,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var paperWidth: NSLayoutConstraint!
     private var chromeHover = false
 
-    init(appState: AppState) {
+    init(appState: AppState, pasteboard: NSPasteboard = .general) {
         self.appState = appState
+        self.pasteboard = pasteboard
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -498,7 +500,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     @objc private func copyText() {
-        copyButton.title = RoomPresentation.copy(engine.text, to: .general) ? "COPIED" : "TRY COPY AGAIN"
+        copyButton.title = RoomPresentation.copy(engine.text, to: pasteboard) ? "COPIED" : "TRY COPY AGAIN"
         focusForPhase()
     }
 

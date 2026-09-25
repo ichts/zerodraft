@@ -287,11 +287,10 @@ struct KeyboardFlowTests {
         time = 60
         engine.tick()
         #expect(engine.phase == .success)
-        let room = SessionViewController(appState: state)
+        let board = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
+        defer { board.releaseGlobally() }
+        let room = SessionViewController(appState: state, pasteboard: board)
         _ = room.view
-        let board = NSPasteboard.general
-        let previous = board.string(forType: .string)
-        defer { board.clearContents(); if let previous { board.setString(previous, forType: .string) } }
         room.copyKeptText()
         #expect(board.string(forType: .string) == "the entire draft")
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: FirstLineAppDelegate())

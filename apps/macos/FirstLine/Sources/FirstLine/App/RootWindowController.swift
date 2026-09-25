@@ -35,6 +35,8 @@ final class RootWindowController: NSWindowController {
         window.contentMinSize = NSSize(width: 980, height: 680)
 
         super.init(window: window)
+        NotificationCenter.default.addObserver(self, selector: #selector(didExitFullScreen(_:)),
+                                               name: NSWindow.didExitFullScreenNotification, object: window)
         // 常驻容器是窗口的 contentViewController（只设一次、只 size 一次）；各 surface 作为它的子 VC
         // 原地切换。之前每次换 contentViewController 会让 AppKit 按 success/failure 的 0-fitting-size
         // 根视图把窗口缩成 0x0（显示旧 session 残留快照），而在回调里 setFrame 补救又触发递归 layout
@@ -107,6 +109,11 @@ final class RootWindowController: NSWindowController {
         let shouldFillScreen = appState.settings.focusMode && appState.selectedSurface == .session
         guard window.styleMask.contains(.fullScreen) != shouldFillScreen else { return }
         window.toggleFullScreen(nil)
+    }
+
+    @objc private func didExitFullScreen(_ notification: Notification) {
+        guard appState.selectedSurface == .session, appState.settings.focusMode else { return }
+        appState.updateFocusMode(false)
     }
 
     private func applyTheme() {

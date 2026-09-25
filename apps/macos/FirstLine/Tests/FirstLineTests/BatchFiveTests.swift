@@ -191,6 +191,36 @@ struct SettingsTests {
         #expect(menu.items.last?.submenu?.items.contains { $0.keyEquivalent == "i" } == false)
     }
 
+    @Test func nativeFullScreenExitRestoresChromeWithoutDiscardingDraft() {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        state.sessionEngine.registerCommittedText("draft stays")
+        state.updateFocusMode(true)
+        let sessionID = state.sessionEngine.sessionID
+        let controller = RootWindowController(appState: state)
+        NotificationCenter.default.post(name: NSWindow.didExitFullScreenNotification, object: controller.window)
+        #expect(!state.settings.focusMode)
+        #expect(state.sessionEngine.text == "draft stays")
+        #expect(state.sessionEngine.sessionID == sessionID)
+        #expect(state.selectedSurface == .session)
+    }
+
+    @Test func leavingFullScreenForSettingsKeepsFocusPreference() {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        state.sessionEngine.registerCommittedText("draft stays")
+        state.updateFocusMode(true)
+        let controller = RootWindowController(appState: state)
+        state.openSettings()
+        NotificationCenter.default.post(name: NSWindow.didExitFullScreenNotification, object: controller.window)
+        #expect(state.settings.focusMode)
+        state.closeSettings()
+        #expect(state.selectedSurface == .session)
+        #expect(state.sessionEngine.text == "draft stays")
+    }
+
     @Test func appearanceDefaultsToSystem() {
         #expect(AppSettings.defaultValue.theme == .system)
         #expect(AppSettings.defaultValue.focusMode == false)

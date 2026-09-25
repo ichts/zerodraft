@@ -37,10 +37,10 @@ wid=$(window_id)
 if [[ ! "$wid" =~ ^[0-9]+$ ]]; then echo 'No app window found' >&2; exit 1; fi
 shot() { screencapture -x -l "$wid" "$output/$1.png"; }
 type() { osascript -e 'tell application "System Events" to repeat with characterToType in characters of '"\"$1\"" -e 'keystroke characterToType' -e 'end repeat'; }
-wait_for_button() {
+wait_for_radio_button() {
   local title=$1
   for _ in {1..40}; do
-    if [[ $(osascript -e "tell application \"System Events\" to exists button \"$title\" of window 1 of process \"WriteItDown\"" 2>/dev/null) == true ]]; then return 0; fi
+    if [[ $(osascript -e "tell application \"System Events\" to exists radio button \"$title\" of window 1 of process \"WriteItDown\"" 2>/dev/null) == true ]]; then return 0; fi
     sleep 0.25
   done
   echo "Timed out waiting for $title" >&2
@@ -53,15 +53,15 @@ type 'standard draft'; sleep 5.2; shot warn-standard
 type ' again'; shot recovered-standard
 sleep 8.2; shot wiped-standard
 osascript -e 'tell application "System Events" to key code 53'
-wait_for_button 'Strict - 5s'
-osascript -e 'tell application "System Events" to click button "Strict - 5s" of window 1 of process "WriteItDown"'
+wait_for_radio_button 'Strict - 5s'
+osascript -e 'tell application "System Events" to click radio button "Strict - 5s" of window 1 of process "WriteItDown"'
 osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
 type 'strict draft'; sleep 2.2; shot warn-strict
 type ' again'; shot recovered-strict
 sleep 5.2; shot wiped-strict
 osascript -e 'tell application "System Events" to key code 53'
-wait_for_button 'Relaxed - 12s'
-osascript -e 'tell application "System Events" to click button "Relaxed - 12s" of window 1 of process "WriteItDown"'
+wait_for_radio_button 'Relaxed - 12s'
+osascript -e 'tell application "System Events" to click radio button "Relaxed - 12s" of window 1 of process "WriteItDown"'
 osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
 type 'relaxed draft'; sleep 9.2; shot warn-relaxed
 type ' again'; shot recovered-relaxed

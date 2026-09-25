@@ -1,13 +1,13 @@
 # writeitdown for macOS - Build Plan
 
-Status: batches 0-3 accepted; batch 4 implemented, pending independent real-window acceptance. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
+Status: batch 5 implemented; independent real-window acceptance remains pending. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 
 ## 1. Goal
 
-- The app is a native AppKit writing room that behaves like the live site at https://writeitdown.app: forward-only writing, a warning after five seconds of silence, the draft wiped after eight seconds of silence, and a kept draft that the writer can copy out when the clock runs out.
-- Before writing, the writer chooses a session length and a fixed silence limit. The last chosen length is the default; the standard eight-second limit is the default.
+- The app is a native AppKit writing room that follows the live site's forward-only writing and keeps the draft for copying when the clock runs out. Native silence timing follows the pre-writing choice in section 4, not the site's fixed five/eight-second timing.
+- Before writing, the writer chooses a session length and a silence limit. The last chosen length is the default; the standard eight-second limit is the default.
 - The desktop app is a small tool, not a landing page: opening it puts the cursor in the writing flow, then the writer copies the text when done and closes it. No screen needs a promotional slogan.
 - The app does only the writeitdown thing. First Line and Zero Draft leftovers that do not serve that job (the draft Library, saved Markdown files, Copy for AI, fossils, the separate Failure screen) are removed.
 - The paid license flow stays. It is rebranded to writeitdown and reuses the design in `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md`.
@@ -251,15 +251,15 @@ flowchart LR
     B6 --> B7[7 Signed DMG release]
 ```
 
-Every batch uses this common acceptance set, run from `apps/macos/FirstLine/`:
+The current batch 5 acceptance commands, run from `apps/macos/FirstLine/`, are:
 
 ```bash
 swift build            # must exit 0
 swift test             # must exit 0; the record states the test count
-scripts/qa-window.sh <batch> # real-window QA; screenshots under /tmp/wid-qa/<batch>/
+scripts/qa-window.sh 5 # current real-window QA only; screenshots under /tmp/wid-qa/5/
 ```
 
-Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it, drives it with `osascript` (System Events key codes, one key at a time, because long `keystroke` strings drop spaces), captures the app window only with `screencapture -l <window id>`, and quits the app. Each batch extends the script with its own states. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`. The current script supports only batch 5; historical batch 1-4 flows are unavailable. It builds the debug binary, launches it, drives it with `osascript`, captures the app window with `screencapture -l <window id>`, and quits the app. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 
@@ -417,7 +417,7 @@ After a batch merges, a fresh session with no memory of the build session accept
 1. The accepting session reads this document, the batch's section, and the merged pull request's description. It does not read the build session's conversation.
 2. It checks out the merge commit in a clean worktree.
 3. From `apps/macos/FirstLine/`, it runs `swift build`, `swift test`, each named test with `swift test --filter <Suite>/<function>`, and every `rg` check listed for the batch, and it records the exit codes.
-4. It runs `scripts/qa-window.sh <batch>` itself and inspects every screenshot against the batch's done conditions. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
+4. For batch 5 it runs `scripts/qa-window.sh 5` itself and inspects every screenshot against the done conditions. Historical batches 1-4 have no runnable scripted window flow. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
 5. It appends a record under `Independent acceptance - Batch N` to `docs/MANUAL_QA.md` with the commit, the date, each done condition marked pass or fail with its evidence, and anything not verified.
 6. Any failure opens a fix batch before the next batch starts. The accepting session reports the failure and does not fix it silently.
 

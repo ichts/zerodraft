@@ -414,12 +414,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func applyVisualSettings() {
         let settings = appState.settings
-        paperWidth.constant = settings.writingAlignment == .centered ? 720 : 920
+        let width: CGFloat = settings.writingAlignment == .centered ? 720 : 920
+        if paperWidth.constant != width { paperWidth.constant = width }
         textView.configureSessionTypography(size: settings.writingFontSize.points, alignment: settings.writingAlignment)
-        keptText.font = BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderUprightPostScript,
-                                                    size: settings.writingFontSize.points)
-            ?? NSFont.systemFont(ofSize: settings.writingFontSize.points)
-        keptText.alignment = settings.writingAlignment == .centered ? .center : .left
+        if keptText.font?.pointSize != settings.writingFontSize.points {
+            keptText.font = BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderUprightPostScript,
+                                                        size: settings.writingFontSize.points)
+                ?? NSFont.systemFont(ofSize: settings.writingFontSize.points)
+        }
+        let alignment: NSTextAlignment = settings.writingAlignment == .centered ? .center : .left
+        if keptText.alignment != alignment { keptText.alignment = alignment }
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0

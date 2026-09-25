@@ -118,6 +118,7 @@ struct SettingsTests {
         #expect(clock.accessibilityLabel() == "Time remaining 1:00")
         #expect(count.accessibilityLabel() == "0 WORDS written")
         window.contentView?.layoutSubtreeIfNeeded()
+        #expect(room.view.trackingAreas.contains { $0.options.contains([.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow]) })
         func move(to point: NSPoint) {
             let event = NSEvent.mouseEvent(with: .mouseMoved, location: point, modifierFlags: [], timestamp: 0,
                                            windowNumber: window.windowNumber, context: nil, eventNumber: 0,
@@ -140,6 +141,32 @@ struct SettingsTests {
         room.tick()
         #expect(clock.alphaValue == 1 && count.alphaValue == 1)
         #expect(clock.accessibilityLabel() == "Time remaining 1:00")
+    }
+
+    @Test func roomTypographyUpdatesOnlyWhenPreferencesChange() throws {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        room.viewDidAppear()
+        defer { room.viewWillDisappear() }
+        func textViews(_ view: NSView) -> [NSTextView] {
+            ((view as? NSTextView).map { [$0] } ?? []) + view.subviews.flatMap(textViews)
+        }
+        let kept = try #require(textViews(room.view).first { !$0.isEditable })
+        #expect(kept.font?.pointSize == WritingFontSize.medium.points)
+        #expect(kept.alignment == .center)
+        state.updateFontSize(.large)
+        state.updateAlignment(.left)
+        room.tick()
+        #expect(kept.font?.pointSize == WritingFontSize.large.points)
+        #expect(kept.alignment == .left)
+        room.tick()
+        #expect(kept.font?.pointSize == WritingFontSize.large.points)
+        #expect(kept.alignment == .left)
     }
 
     @Test func alignmentAndFontSizeDefaultsAndChoices() {

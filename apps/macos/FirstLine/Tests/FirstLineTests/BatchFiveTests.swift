@@ -155,6 +155,53 @@ struct SettingsTests {
 
 @MainActor
 struct KeyboardFlowTests {
+    @Test func homeMenuAbandonsActiveDraftBeforeShowingChoices() throws {
+        for fromSettings in [false, true] {
+            var now = 0.0
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let state = AppState(sessionEngine: SessionEngine(now: { now }),
+                                 settingsStore: SettingsStore(configDirectory: root),
+                                 installIDStore: InstallIDStore(configDirectory: root))
+            let delegate = FirstLineAppDelegate(appState: state)
+            let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
+            let home = try #require(menu.items.last?.submenu?.items.first { $0.keyEquivalent == "0" })
+            #expect(home.target === delegate)
+            #expect(delegate.validateMenuItem(home))
+
+            state.startSession()
+            state.sessionEngine.registerCommittedText("private draft")
+            if fromSettings {
+                now = 5
+                state.handleTick()
+                #expect(state.sessionEngine.phase == .danger)
+                state.openSettings()
+                state.closeSettings()
+                #expect(state.selectedSurface == .session)
+                #expect(state.sessionEngine.text == "private draft")
+                state.openSettings()
+            }
+            #expect(NSApplication.shared.sendAction(home.action!, to: home.target, from: home))
+            #expect(state.selectedSurface == .home)
+            #expect(state.sessionEngine.phase == .idle)
+            #expect(state.sessionEngine.text.isEmpty)
+
+            state.updateDefaultDuration(300)
+            state.updateSilenceLimit(.strict)
+            state.startSession()
+            #expect(state.selectedSurface == .session)
+            #expect(state.sessionEngine.duration == 300)
+            #expect(state.sessionEngine.silenceLimit == .strict)
+            #expect(state.settings.trialSessionsUsed == 2)
+
+            state.newPiece()
+            #expect(state.settings.trialSessionsUsed == 3)
+            state.newPiece()
+            #expect(state.selectedSurface == .upgrade)
+            #expect(state.sessionEngine.phase == .idle)
+        }
+    }
+
     @Test func commandNStartsNewPieceThroughTrialGate() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

@@ -26,8 +26,13 @@ enum FirstLineMain {
 
 @MainActor
 final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
-    let appState = AppState()
+    let appState: AppState
     private var rootWindowController: RootWindowController?
+
+    init(appState: AppState = AppState()) {
+        self.appState = appState
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)

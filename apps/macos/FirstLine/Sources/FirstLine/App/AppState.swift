@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
  * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate 与可验证的 license 持久化
- * [POS]: 导航及 trial gate；锁定运行中的时长/静默阈值，写作偏好持久化，Settings 返回原 surface
+ * [POS]: 导航及 trial gate；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -90,7 +90,11 @@ final class AppState {
 
     func goHome() {
         guard sessionEngine.phase != .success else { return }
-        selectedSurface = .home
+        if sessionIsRunning {
+            abandonSession()
+        } else {
+            selectedSurface = .home
+        }
     }
 
     func openWritingMode() {

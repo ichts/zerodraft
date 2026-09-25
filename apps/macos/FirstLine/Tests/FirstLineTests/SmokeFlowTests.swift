@@ -91,14 +91,14 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func startingMacTrialSessionConsumesOneUse() throws {
+    func startingMacTrialSessionDoesNotConsumeUntilInput() throws {
         let (state, root) = makeState()
         defer { try? FileManager.default.removeItem(at: root) }
         state.startSession()
-        #expect(state.settings.trialSessionsUsed == 1)
-        #expect(state.trialSessionsRemaining == 2)
+        #expect(state.settings.trialSessionsUsed == 0)
+        #expect(state.trialSessionsRemaining == 3)
         #expect(state.selectedSurface == .session)
-        #expect(try state.settingsStore.load().trialSessionsUsed == 1)
+        #expect(try state.settingsStore.load().trialSessionsUsed == 0)
     }
 
     @Test
@@ -287,10 +287,9 @@ struct SmokeFlowTests {
             defer { try? FileManager.default.removeItem(at: root) }
             state.settings.trialSessionsUsed = AppState.trialSessionLimit - 1
             state.startSession()
-            state.sessionEngine.registerCommittedText("old draft")
             let controller = SessionViewController(appState: state)
             let input = try #require(editor(in: controller.view))
-            input.loadRestoredText("old draft")
+            input.insertText("old draft", replacementRange: NSRange(location: NSNotFound, length: 0))
             now = 9
             if marked {
                 input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))

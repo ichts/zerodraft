@@ -5,8 +5,8 @@
 set -euo pipefail
 
 batch=${1:-}
-if [[ "$batch" != 5 ]]; then
-  echo 'Only Batch 5 has a current scripted window flow; historical batches 1-4 are unavailable.' >&2
+if [[ "$batch" != 5 && "$batch" != 6 ]]; then
+  echo 'Only Batches 5 and 6 have scripted window flows; historical batches 1-4 are unavailable.' >&2
   exit 2
 fi
 cd "$(dirname "$0")/.."
@@ -46,6 +46,23 @@ wait_for_radio_button() {
   echo "Timed out waiting for $title" >&2
   return 1
 }
+if [[ "$batch" == 6 ]]; then
+  shot start-light
+  for trial in 1 2 3; do
+    wait_for_radio_button 'Standard - 8s'
+    osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
+    type "trial $trial"
+    shot "trial-$trial-typing"
+    sleep 8.3
+    shot "trial-$trial-wiped"
+    osascript -e 'tell application "System Events" to key code 53'
+  done
+  wait_for_radio_button 'Standard - 8s'
+  osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
+  shot upgrade-after-three-trials
+  echo 'Inspect Upgrade, configured Buy URL and active-license state with independent Computer Use. Without a Dodo test key, activation is NOT VERIFIED.'
+  exit 0
+fi
 shot start-light
 osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
 sleep 1; shot rest-standard

@@ -1,16 +1,16 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state and DesignSystem tokens
- * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and license activation flow
- * [POS]: First Line AppKit Upgrade surface; consumes existing AppState license APIs without owning business logic
+ * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and live license activation feedback
+ * [POS]: writeitdown AppKit license gate; uses configured price and checkout via AppState
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit
+import Observation
 
 @MainActor
 final class UpgradeViewController: NSViewController {
     private let appState: AppState
-    private static let displayPrice = "$4.99"
     private var licenseField: NSTextField!
     private var activateButton: NSButton!
     private var feedbackLabel: NSTextField!
@@ -28,18 +28,20 @@ final class UpgradeViewController: NSViewController {
         appState.clearLicenseActivationError()
         appState.dismissLicenseSuccessFeedback()
         buildInterface()
+        refreshLicense()
+        armLicenseObservation()
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        view.window?.makeFirstResponder(licenseField)
+        view.window?.makeFirstResponder(appState.hasFullAccess ? activateButton : licenseField)
     }
 
     private func buildInterface() {
         let title = label("Trial complete", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
-        let subtitle = label("You used the three free Mac writing sessions.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
+        let subtitle = label("Three writing sessions used.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
         let licenseName = label("writeitdown license", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
-        let pricing = label("One-time \(Self.displayPrice). 2 Macs. No subscription. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
+        let pricing = label("One payment. 2 Macs. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
@@ -52,11 +54,13 @@ final class UpgradeViewController: NSViewController {
         feedbackLabel = label("", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
         feedbackLabel.isHidden = true
 
-        let buyButton = FirstLineButtons.secondary(title: "Buy a license - Checkout coming soon", target: nil, action: #selector(noop))
-        buyButton.isEnabled = false
+        let buyButton = FirstLineButtons.secondary(title: "Buy a license - \(AppState.displayPrice), one time", target: self, action: #selector(buyTapped))
+        buyButton.isEnabled = AppState.checkoutURL != nil
+        let checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
+        checkoutStatus.isHidden = buyButton.isEnabled
         let backButton = FirstLineButtons.secondary(title: "Back to Home", target: self, action: #selector(backTapped))
 
-        let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, backButton])
+        let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, checkoutStatus, backButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -76,6 +80,36 @@ final class UpgradeViewController: NSViewController {
             stack.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 48),
             stack.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -48),
         ])
+    }
+
+    private func refreshLicense() {
+        let active = appState.hasFullAccess
+        activateButton.title = active ? "Start writing" : "Activate"
+        activateButton.action = active ? #selector(startWritingTapped) : #selector(activateTapped)
+        activateButton.isEnabled = !appState.licenseActivationInFlight
+        if active {
+            feedbackLabel.stringValue = "License active on this Mac."
+        } else {
+            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.trialStatusText
+        }
+        feedbackLabel.isHidden = !active && appState.licenseActivationError == nil &&
+            appState.settings.licenseStatus == .trial
+    }
+
+    private func armLicenseObservation() {
+        withObservationTracking { [weak self] in
+            guard let self else { return }
+            _ = self.appState.licenseValidationInFlight
+            _ = self.appState.licenseActivationInFlight
+            _ = self.appState.licenseActivationError
+            _ = self.appState.settings
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.refreshLicense()
+                self.armLicenseObservation()
+            }
+        }
     }
 
     private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
@@ -99,19 +133,7 @@ final class UpgradeViewController: NSViewController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: key)
-            activateButton.isEnabled = true
-            activateButton.title = "Activate"
-            if appState.licenseActivationJustSucceeded {
-                feedbackLabel.stringValue = "License active on this Mac."
-                feedbackLabel.textColor = FirstLineColors.inkNSColor
-                feedbackLabel.isHidden = false
-                activateButton.title = "Start writing"
-                activateButton.action = #selector(startWritingTapped)
-            } else if let error = appState.licenseActivationError {
-                feedbackLabel.stringValue = error.errorDescription ?? "Activation failed."
-                feedbackLabel.textColor = FirstLineColors.inkNSColor
-                feedbackLabel.isHidden = false
-            }
+            refreshLicense()
         }
     }
 
@@ -121,5 +143,5 @@ final class UpgradeViewController: NSViewController {
     }
 
     @objc private func backTapped() { appState.goHome() }
-    @objc private func noop() {}
+    @objc private func buyTapped() { appState.openCheckout() }
 }

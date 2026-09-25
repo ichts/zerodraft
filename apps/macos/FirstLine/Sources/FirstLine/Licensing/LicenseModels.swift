@@ -68,6 +68,9 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     case unexpected(statusCode: Int)
     /// 激活在 Dodo 侧成功，但无法把 license 状态写盘（磁盘权限/空间等）。
     case storageFailure
+    case productNotConfigured
+    case wrongProduct
+    case cleanupFailure
 
     var errorDescription: String? {
         switch self {
@@ -83,6 +86,12 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
             return "Activation failed (HTTP \(statusCode))."
         case .storageFailure:
             return "Could not save the license on this Mac. Check disk permissions and try again."
+        case .productNotConfigured:
+            return "License activation is unavailable until the writeitdown product is configured."
+        case .wrongProduct:
+            return "This license is not for writeitdown."
+        case .cleanupFailure:
+            return "Activation could not be undone. Contact support with your receipt to free the device slot."
         }
     }
 }

@@ -1,11 +1,12 @@
 /**
  * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, license
+ * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, live license feedback
  * [POS]: AppKit Settings surface; live visual preferences do not reset engine, Done restores prior surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit
+import Observation
 
 @MainActor
 final class SettingsViewController: NSViewController {
@@ -16,6 +17,8 @@ final class SettingsViewController: NSViewController {
     private var licenseEntryView: NSView?
     private var licenseExplanationLabel: NSTextField?
     private var buyPageButton: NSButton?
+    private var checkoutStatusLabel: NSTextField?
+    private var licenseDetails: [NSTextField] = []
 
     init(appState: AppState) {
         self.appState = appState
@@ -28,6 +31,8 @@ final class SettingsViewController: NSViewController {
     override func loadView() {
         self.view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
         buildInterface()
+        refreshLicense()
+        armLicenseObservation()
     }
 
     private func buildInterface() {
@@ -81,14 +86,10 @@ final class SettingsViewController: NSViewController {
         licenseStatusLabel = muted(appState.trialStatusText)
         var rows: [NSView] = [licenseStatusLabel]
 
-        if appState.settings.licenseStatus == .active {
-            if let date = appState.settings.licenseActivatedAt { rows.append(muted("Activated \(formatted(date))")) }
-            if let id = appState.settings.licenseInstanceID { rows.append(muted("Instance: \(id)")) }
-            if let date = appState.settings.licenseLastValidatedAt { rows.append(muted("Last validated \(formatted(date))")) }
-            return rows
-        }
+        licenseDetails = (0..<3).map { _ in muted("") }
+        rows.append(contentsOf: licenseDetails)
 
-        let explanation = muted("The Mac trial includes three writing sessions. Activate a license key to keep writing.")
+        let explanation = muted("Three writing sessions included. Activate a license key to keep writing.")
         licenseExplanationLabel = explanation
 
         let field = NSTextField(string: "")
@@ -105,10 +106,50 @@ final class SettingsViewController: NSViewController {
         entry.spacing = 12
         licenseEntryView = entry
 
-        let buy = link("Open Buy page", #selector(openBuyTapped))
+        let buy = link("Buy a license - \(AppState.displayPrice), one time", #selector(openBuyTapped))
+        buy.isEnabled = AppState.checkoutURL != nil
         buyPageButton = buy
         rows.append(contentsOf: [explanation, entry, buy])
+        if !buy.isEnabled {
+            let unavailable = muted("Checkout is not available yet.")
+            checkoutStatusLabel = unavailable
+            rows.append(unavailable)
+        }
         return rows
+    }
+
+    private func refreshLicense() {
+        licenseStatusLabel.stringValue = appState.hasFullAccess ? appState.trialStatusText :
+            (appState.licenseActivationError?.errorDescription ?? appState.trialStatusText)
+        let values = [
+            appState.settings.licenseActivatedAt.map { "Activated \(formatted($0))" },
+            appState.settings.licenseInstanceID.map { "Instance: \($0)" },
+            appState.settings.licenseLastValidatedAt.map { "Last validated \(formatted($0))" },
+        ]
+        for (label, value) in zip(licenseDetails, values) {
+            label.stringValue = value ?? ""
+            label.isHidden = !appState.hasFullAccess || value == nil
+        }
+        let showEntry = !appState.hasFullAccess
+        licenseEntryView?.isHidden = !showEntry
+        licenseExplanationLabel?.isHidden = !showEntry
+        buyPageButton?.isHidden = !showEntry
+        checkoutStatusLabel?.isHidden = !showEntry || AppState.checkoutURL != nil
+    }
+
+    private func armLicenseObservation() {
+        withObservationTracking { [weak self] in
+            guard let self else { return }
+            _ = self.appState.licenseValidationInFlight
+            _ = self.appState.settings
+            _ = self.appState.licenseActivationError
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.refreshLicense()
+                self.armLicenseObservation()
+            }
+        }
     }
 
     private func themePopup() -> NSPopUpButton {
@@ -252,18 +293,11 @@ final class SettingsViewController: NSViewController {
             guard let self else { return }
             await appState.activateLicense(key: licenseField.stringValue)
             activateButton.isEnabled = true
-            if let error = appState.licenseActivationError {
-                licenseStatusLabel.stringValue = error.errorDescription ?? "Activation failed."
-            } else {
-                licenseStatusLabel.stringValue = appState.trialStatusText
-                licenseField.stringValue = ""
-                licenseEntryView?.isHidden = true
-                licenseExplanationLabel?.isHidden = true
-                buyPageButton?.isHidden = true
-            }
+            if appState.licenseActivationJustSucceeded { licenseField.stringValue = "" }
+            refreshLicense()
         }
     }
 
-    @objc private func openBuyTapped() { appState.openLaunchWebsite() }
+    @objc private func openBuyTapped() { appState.openCheckout() }
     @objc private func doneTapped() { appState.closeSettings() }
 }

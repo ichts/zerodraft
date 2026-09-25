@@ -472,6 +472,65 @@ struct LicenseFlowTests {
         #expect(state.selectedSurface == .session)
     }
 
+    @Test(arguments: [true, false])
+    func visibleLicenseSurfacesRefreshAfterValidation(valid: Bool) async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: now,
+                                 licenseLastValidatedAt: now, licenseProductID: "prod_mock")
+        let (state, _, _, fm, root) = try makeAppState(validationResult: valid, initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        let settings = SettingsViewController(appState: state)
+        let upgrade = UpgradeViewController(appState: state)
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
+        }
+        func buttons(_ view: NSView) -> [NSButton] {
+            ((view as? NSButton).map { [$0] } ?? []) + view.subviews.flatMap(buttons)
+        }
+        let settingsView = settings.view
+        let upgradeView = upgrade.view
+        let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Paste license key" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Paste license key from Dodo email" })
+        settingsKey.stringValue = "unfinished key"
+        upgradeKey.stringValue = "unfinished key"
+        #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })
+        #expect(fields(upgradeView).contains { $0.stringValue == "Checking license..." })
+
+        await state.validateLicenseIfNeeded()
+        let status = valid ? "License active." : "License revoked. Reactivate in Settings."
+        for _ in 0..<50 {
+            if fields(settingsView).contains(where: { $0.stringValue == status }) &&
+                fields(upgradeView).contains(where: { $0.stringValue == (valid ? "License active on this Mac." : status) }) { break }
+            await Task.yield()
+        }
+        #expect(fields(settingsView).contains { $0.stringValue == status })
+        #expect(fields(upgradeView).contains { $0.stringValue == (valid ? "License active on this Mac." : status) })
+        #expect(settingsKey.stringValue == "unfinished key")
+        #expect(upgradeKey.stringValue == "unfinished key")
+        #expect(buttons(upgradeView).contains { $0.title == (valid ? "Start writing" : "Activate") })
+        #expect(settingsKey.isHidden == valid || settingsKey.superview?.isHidden == valid)
+    }
+
+    @Test
+    func validationRefreshDoesNotInterruptWriting() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 licenseKey: "KEY", licenseStatus: .active,
+                                 licenseActivatedAt: now, licenseLastValidatedAt: now,
+                                 licenseProductID: "prod_mock")
+        let (state, _, _, fm, root) = try makeAppState(initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        state.startSession()
+        state.openSettings()
+        let settings = SettingsViewController(appState: state)
+        _ = settings.view
+        await state.validateLicenseIfNeeded()
+        #expect(state.sessionEngine.phase == .writing)
+        #expect(state.selectedSurface == .settings)
+    }
+
     @Test
     func activeLicenseBypassesTrialLimit() throws {
         let exhausted = AppSettings(

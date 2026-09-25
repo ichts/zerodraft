@@ -30,8 +30,8 @@ Sources/FirstLine/Licensing/DodoLicenseClient.swift: URLSession 实现 Dodo 公�
 Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
 Sources/FirstLine/Session/RoomPresentation.swift: 与网站一致的时钟、擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
 Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID 时清空旧视图、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
-Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的许可入口，价格来自 WIDDisplayPrice；仅配置有效 WIDCheckoutURL 时允许外部浏览器结账。
-Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 appearance、motion、focus、alignment、font size、Trial & License；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
+Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的许可入口，价格来自 WIDDisplayPrice；仅配置有效 WIDCheckoutURL 时允许外部浏览器结账；观察异步许可变化并原位更新反馈。
+Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 appearance、motion、focus、alignment、font size、Trial & License；观察异步许可变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
 Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。

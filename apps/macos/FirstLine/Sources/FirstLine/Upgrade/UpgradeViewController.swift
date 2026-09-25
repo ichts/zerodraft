@@ -1,11 +1,12 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state and DesignSystem tokens
- * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and license activation flow
+ * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and live license activation feedback
  * [POS]: writeitdown AppKit license gate; uses configured price and checkout via AppState
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
 import AppKit
+import Observation
 
 @MainActor
 final class UpgradeViewController: NSViewController {
@@ -27,11 +28,13 @@ final class UpgradeViewController: NSViewController {
         appState.clearLicenseActivationError()
         appState.dismissLicenseSuccessFeedback()
         buildInterface()
+        refreshLicense()
+        armLicenseObservation()
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        view.window?.makeFirstResponder(licenseField)
+        view.window?.makeFirstResponder(appState.hasFullAccess ? activateButton : licenseField)
     }
 
     private func buildInterface() {
@@ -79,6 +82,36 @@ final class UpgradeViewController: NSViewController {
         ])
     }
 
+    private func refreshLicense() {
+        let active = appState.hasFullAccess
+        activateButton.title = active ? "Start writing" : "Activate"
+        activateButton.action = active ? #selector(startWritingTapped) : #selector(activateTapped)
+        activateButton.isEnabled = !appState.licenseActivationInFlight
+        if active {
+            feedbackLabel.stringValue = "License active on this Mac."
+        } else {
+            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.trialStatusText
+        }
+        feedbackLabel.isHidden = !active && appState.licenseActivationError == nil &&
+            appState.settings.licenseStatus == .trial
+    }
+
+    private func armLicenseObservation() {
+        withObservationTracking { [weak self] in
+            guard let self else { return }
+            _ = self.appState.licenseValidationInFlight
+            _ = self.appState.licenseActivationInFlight
+            _ = self.appState.licenseActivationError
+            _ = self.appState.settings
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.refreshLicense()
+                self.armLicenseObservation()
+            }
+        }
+    }
+
     private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.font = font
@@ -100,19 +133,7 @@ final class UpgradeViewController: NSViewController {
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: key)
-            activateButton.isEnabled = true
-            activateButton.title = "Activate"
-            if appState.licenseActivationJustSucceeded {
-                feedbackLabel.stringValue = "License active on this Mac."
-                feedbackLabel.textColor = FirstLineColors.inkNSColor
-                feedbackLabel.isHidden = false
-                activateButton.title = "Start writing"
-                activateButton.action = #selector(startWritingTapped)
-            } else if let error = appState.licenseActivationError {
-                feedbackLabel.stringValue = error.errorDescription ?? "Activation failed."
-                feedbackLabel.textColor = FirstLineColors.inkNSColor
-                feedbackLabel.isHidden = false
-            }
+            refreshLicense()
         }
     }
 

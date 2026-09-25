@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Editor focus and session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Window-relative writing anchor, editor focus and session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
 import AppKit
@@ -63,6 +63,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var washIsCut = false
     private var denyWork: DispatchWorkItem?
     private var paperWidth: NSLayoutConstraint!
+    private var placeholderAnchor: NSLayoutConstraint!
     private var chromeHover = false
 
     init(appState: AppState, pasteboard: NSPasteboard = .general) {
@@ -252,6 +253,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let safe = view.safeAreaLayoutGuide
         paperWidth = paper.widthAnchor.constraint(equalToConstant: appState.settings.writingAlignment == .centered ? 720 : 920)
         paperWidth.priority = .defaultHigh
+        placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
         NSLayoutConstraint.activate([
             wallWash.leadingAnchor.constraint(equalTo: view.leadingAnchor), wallWash.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             wallWash.topAnchor.constraint(equalTo: view.topAnchor), wallWash.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -272,7 +274,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             countLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -24), countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
             exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -20), exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 28),
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -80),
-            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), placeholderLabel.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
+            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), placeholderAnchor,
             numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), numeralLabel.centerYAnchor.constraint(equalTo: paper.bottomAnchor, constant: -170),
             warningLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), warningLabel.topAnchor.constraint(equalTo: numeralLabel.bottomAnchor, constant: 8),
         ])
@@ -300,7 +302,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func prepareViewport() {
         let size = scrollView.contentSize
-        guard size.width > 0, size.height > 0 else { return }
+        guard size.width > 0, size.height > 0, view.bounds.height > 0 else { return }
+        let scrollTop = view.bounds.height - view.convert(scrollView.bounds, from: scrollView).maxY
+        let anchor = round(view.bounds.height * 0.39 - scrollTop)
+        textView.setCompositionAnchor(anchor)
+        placeholderAnchor.constant = anchor
         textView.minSize = NSSize(width: 0, height: size.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {

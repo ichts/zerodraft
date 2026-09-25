@@ -93,6 +93,16 @@ struct LicenseFlowTests {
         let config = try #require(NSDictionary(contentsOf: AppState.configurationURL) as? [String: Any])
         let expected = config["WIDCheckoutURL"] as? String
         #expect(AppState.checkoutURL == expected.flatMap(URL.init(string:)))
+        let (state, _, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        let upgrade = UpgradeViewController(appState: state)
+        func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
+        let all = views(upgrade.view)
+        let buy = try #require(all.compactMap { $0 as? NSButton }.first { $0.title.contains("Buy a license") })
+        #expect(buy.isEnabled == (AppState.checkoutURL != nil))
+        if AppState.checkoutURL == nil {
+            #expect(all.compactMap { $0 as? NSTextField }.contains { $0.stringValue == "Checkout is not available yet." && !$0.isHidden })
+        }
         let configured = URL(string: "https://checkout.dodopayments.com/example")!
         #expect(AppState.checkoutURL(in: ["WIDCheckoutURL": configured.absoluteString]) == configured)
         #expect(AppState.checkoutURL(in: ["WIDCheckoutURL": "http://example.com"]) == nil)

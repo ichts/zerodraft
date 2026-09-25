@@ -16,6 +16,7 @@ final class SettingsViewController: NSViewController {
     private var licenseEntryView: NSView?
     private var licenseExplanationLabel: NSTextField?
     private var buyPageButton: NSButton?
+    private var checkoutStatusLabel: NSTextField?
 
     init(appState: AppState) {
         self.appState = appState
@@ -109,6 +110,11 @@ final class SettingsViewController: NSViewController {
         buy.isEnabled = AppState.checkoutURL != nil
         buyPageButton = buy
         rows.append(contentsOf: [explanation, entry, buy])
+        if !buy.isEnabled {
+            let unavailable = muted("Checkout is not available yet.")
+            checkoutStatusLabel = unavailable
+            rows.append(unavailable)
+        }
         return rows
     }
 
@@ -261,6 +267,7 @@ final class SettingsViewController: NSViewController {
                 licenseEntryView?.isHidden = true
                 licenseExplanationLabel?.isHidden = true
                 buyPageButton?.isHidden = true
+                checkoutStatusLabel?.isHidden = true
             }
         }
     }

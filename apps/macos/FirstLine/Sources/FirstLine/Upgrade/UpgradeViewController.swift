@@ -53,9 +53,11 @@ final class UpgradeViewController: NSViewController {
 
         let buyButton = FirstLineButtons.secondary(title: "Buy a license - \(AppState.displayPrice), one time", target: self, action: #selector(buyTapped))
         buyButton.isEnabled = AppState.checkoutURL != nil
+        let checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
+        checkoutStatus.isHidden = buyButton.isEnabled
         let backButton = FirstLineButtons.secondary(title: "Back to Home", target: self, action: #selector(backTapped))
 
-        let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, backButton])
+        let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, checkoutStatus, backButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX

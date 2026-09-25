@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；路由新篇、成稿复制、Settings、关闭窗口
+ * [POS]: 建立 NSApplication、菜单与主窗口；新篇命令同步清理当前房间、路由成稿复制、Settings、关闭窗口
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -29,8 +29,9 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
     let appState: AppState
     private var rootWindowController: RootWindowController?
 
-    init(appState: AppState = AppState()) {
+    init(appState: AppState = AppState(), windowController: RootWindowController? = nil) {
         self.appState = appState
+        self.rootWindowController = windowController
         super.init()
     }
 
@@ -53,7 +54,10 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu actions (target-action bridge to AppState)
 
-    @objc func newPiece(_ sender: Any?) { appState.newPiece() }
+    @objc func newPiece(_ sender: Any?) {
+        appState.newPiece()
+        rootWindowController?.refreshRoom()
+    }
     @objc func copyKept(_ sender: Any?) { rootWindowController?.copyKeptText() }
     @objc func closeWindow(_ sender: Any?) { rootWindowController?.window?.performClose(sender) }
     @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }

@@ -338,6 +338,55 @@ struct KeyboardFlowTests {
         #expect(state.sessionEngine.text.isEmpty)
     }
 
+    @Test(arguments: [false, true])
+    func commandNResetsVisibleEditorAndChrome(fromKept: Bool) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        var now = 0.0
+        let engine = SessionEngine(now: { now })
+        let state = AppState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        state.settings.licenseStatus = .active
+        state.updateDefaultDuration(300)
+        state.startSession()
+        let windowController = RootWindowController(appState: state)
+        let container = try #require(windowController.window?.contentViewController as? RootContainerViewController)
+        let room = try #require(container.children.first as? SessionViewController)
+        func editor(_ view: NSView) -> AppendOnlyTextView? {
+            if let text = view as? AppendOnlyTextView { return text }
+            return view.subviews.lazy.compactMap(editor).first
+        }
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
+        }
+        let input = try #require(editor(room.view))
+        input.insertText("private old draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.string == "private old draft")
+        if fromKept {
+            for second in stride(from: 4.0, to: 300, by: 4.0) {
+                now = second
+                engine.registerMarkedTextActivity()
+            }
+            now = 300
+            room.tick()
+            #expect(engine.phase == .success)
+        }
+        let delegate = FirstLineAppDelegate(appState: state, windowController: windowController)
+        let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
+        let command = try #require(menu.items.last?.submenu?.items.first { $0.keyEquivalent == "n" })
+        #expect(NSApplication.shared.sendAction(command.action!, to: command.target, from: command))
+        #expect(engine.text.isEmpty)
+        #expect(engine.wordCount == 0)
+        #expect(engine.remaining == 300)
+        #expect(input.string.isEmpty)
+        #expect(input.accessibilityValue() as? String == "")
+        #expect(fields(room.view).contains { $0.stringValue == "5:00" })
+        #expect(fields(room.view).contains { $0.stringValue == "0 WORDS" })
+        input.insertText("fresh", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(input.string == "fresh")
+        #expect(engine.text == "fresh")
+    }
+
     @Test func commandCCopiesEntireKeptDraft() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Editor focus, hover-only status chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Editor focus and session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
 import AppKit
@@ -58,6 +58,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var lastDenyAt: TimeInterval?
     private var deny = DenyFeedbackState()
     private var lastPhase: SessionPhase = .idle
+    private var renderedSessionID: UUID?
     private var cutWork: DispatchWorkItem?
     private var washIsCut = false
     private var denyWork: DispatchWorkItem?
@@ -355,6 +356,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
+    func refreshRoom() { applyPhase() }
+
     func tick() {
         appState.handleTick()
         applyVisualSettings()
@@ -367,6 +370,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func applyPhase() {
         let phase = engine.phase
+        let sessionChanged = renderedSessionID != nil && renderedSessionID != engine.sessionID
+        renderedSessionID = engine.sessionID
+        if sessionChanged {
+            textView.clearWipedText()
+            keptText.string = ""
+        }
         if phase == .failure, lastPhase != .failure { showCut() }
         if phase == .success, lastPhase != .success {
             keptText.string = engine.text
@@ -392,6 +401,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         keptView.isHidden = !isKept
         scrollView.isHidden = isKept
         textView.isEditable = !isKept
+        if sessionChanged, phase == .writing {
+            DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
+        }
         if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
         reportLabel.isHidden = phase != .failure
         placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty

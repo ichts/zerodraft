@@ -51,6 +51,7 @@ final class AppState {
     let productID: String
     var settings: AppSettings
     private(set) var licenseValidationInFlight = false
+    private var activationRevision = 0
 
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active else { return false }
@@ -78,7 +79,7 @@ final class AppState {
         self.clock = clock
         self.productID = productID
         self.settings = (try? settingsStore.load()) ?? .defaultValue
-        self.licenseValidationInFlight = settings.licenseStatus == .active && settings.licenseKey != nil
+        self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) && settings.licenseKey != nil
         self.selectedDuration = settings.defaultDuration
 
         launchInitialSurface()
@@ -93,7 +94,6 @@ final class AppState {
 
     func startSession(duration: TimeInterval? = nil) {
         guard sessionEngine.phase != .success && !sessionIsRunning else { return }
-        guard !licenseValidationInFlight else { return }
         guard canStartTrialSession else {
             selectedSurface = .upgrade
             return
@@ -250,6 +250,8 @@ final class AppState {
             settings.licenseLastValidatedAt = clock()
             do {
                 try persistSettingsThrowing()
+                activationRevision += 1
+                licenseValidationInFlight = false
                 licenseActivationJustSucceeded = true
             } catch {
                 settings = preActivation
@@ -271,23 +273,29 @@ final class AppState {
     }
 
     func validateLicenseIfNeeded() async {
-        guard settings.licenseStatus == .active,
+        guard settings.licenseStatus == .active || settings.licenseStatus == .unknown,
               let key = settings.licenseKey else { return }
         licenseValidationInFlight = true
-        defer { licenseValidationInFlight = false }
+        let revision = activationRevision
+        defer {
+            if activationRevision == revision { licenseValidationInFlight = false }
+        }
         guard !productID.isEmpty, settings.licenseProductID == productID else { return }
 
         do {
             let valid = try await licenseClient.validate(licenseKey: key)
-            guard settings.licenseKey == key, settings.licenseProductID == productID else { return }
+            guard activationRevision == revision, settings.licenseKey == key,
+                  settings.licenseProductID == productID else { return }
             if valid {
+                settings.licenseStatus = .active
                 settings.licenseLastValidatedAt = clock()
                 persistSettings()
             } else {
                 applyRevokedState()
             }
         } catch {
-            guard settings.licenseKey == key, settings.licenseProductID == productID else { return }
+            guard activationRevision == revision, settings.licenseKey == key,
+                  settings.licenseProductID == productID else { return }
             applyOfflineGraceDecision()
         }
     }

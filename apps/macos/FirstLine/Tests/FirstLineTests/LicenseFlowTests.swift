@@ -3,6 +3,36 @@ import AppKit
 import Testing
 @testable import WriteItDown
 
+private actor SuspendedValidationClient: LicenseClient {
+    private var validation: CheckedContinuation<Bool, Error>?
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation {
+        LicenseActivation(instanceID: UUID().uuidString, licenseKeyID: "lic_test", name: instanceName,
+                          businessID: "biz_test", createdAt: "2024-01-01T00:00:00Z", productID: "prod_mock")
+    }
+
+    func validate(licenseKey: String) async throws -> Bool {
+        try await withCheckedThrowingContinuation { continuation in
+            validation = continuation
+            waiter?.resume()
+            waiter = nil
+        }
+    }
+
+    func waitForValidation() async {
+        if validation != nil { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func completeValidation(_ result: Result<Bool, LicenseValidationError>) {
+        validation?.resume(with: result.mapError { $0 as Error })
+        validation = nil
+    }
+
+    func deactivate(licenseKey: String, instanceID: String) async throws {}
+}
+
 @MainActor
 struct LicenseFlowTests {
     private func makeAppState(
@@ -248,6 +278,92 @@ struct LicenseFlowTests {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         #expect(fields(SettingsViewController(appState: wrong).view).contains { $0.placeholderString == "Paste license key" })
+    }
+
+    @Test
+    func pendingLicenseCheckAllowsRemainingTrialAndChargesFirstInput() throws {
+        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: 1, licenseKey: "KEY", licenseStatus: .active,
+                                 licenseProductID: "prod_mock")
+        let (state, _, store, fm, root) = try makeAppState(initialSettings: active)
+        defer { try? fm.removeItem(at: root) }
+        #expect(state.licenseValidationInFlight)
+        state.startSession()
+        #expect(state.selectedSurface == .session)
+        #expect(state.prepareSessionInput())
+        state.sessionEngine.registerCommittedText("trial")
+        state.consumeTrialOnFirstInput()
+        #expect(state.settings.trialSessionsUsed == 2)
+        #expect(try store.load().trialSessionsUsed == 2)
+    }
+
+    @Test
+    func expiredOfflineLicenseRecoversAfterOnlineValidation() async throws {
+        let then = Date(timeIntervalSince1970: 1_700_000_000)
+        let now = then.addingTimeInterval(8 * 86_400)
+        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: then,
+                                 licenseLastValidatedAt: then, licenseProductID: "prod_mock")
+        let (offline, _, store, fm, root) = try makeAppState(validationError: .networkFailure,
+                                                               initialSettings: active, clockNow: now)
+        defer { try? fm.removeItem(at: root) }
+        await offline.validateLicenseIfNeeded()
+        #expect(offline.settings.licenseStatus == .unknown)
+        offline.startSession()
+        #expect(offline.selectedSurface == .upgrade)
+
+        let wrongClient = MockLicenseClient()
+        let wrongProduct = AppState(settingsStore: store, licenseClient: wrongClient,
+                                    installIDStore: InstallIDStore(configDirectory: root.appendingPathComponent("Config")),
+                                    productID: "other")
+        await wrongProduct.validateLicenseIfNeeded()
+        #expect(await wrongClient.lastValidatedKey == nil)
+        wrongProduct.startSession()
+        #expect(wrongProduct.selectedSurface == .upgrade)
+
+        let recovered = AppState(settingsStore: store, licenseClient: MockLicenseClient(),
+                                 installIDStore: InstallIDStore(configDirectory: root.appendingPathComponent("Config")),
+                                 clock: { now }, productID: "prod_mock")
+        #expect(recovered.licenseValidationInFlight)
+        recovered.startSession()
+        #expect(recovered.selectedSurface == .upgrade)
+        await recovered.validateLicenseIfNeeded()
+        #expect(recovered.settings.licenseStatus == .active)
+        #expect(try store.load().licenseStatus == .active)
+        recovered.startSession()
+        #expect(recovered.selectedSurface == .session)
+    }
+
+    @Test(arguments: [0, 1, 2])
+    func staleValidationCannotOverwriteSameKeyReactivation(outcome: Int) async throws {
+        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseProductID: "prod_mock")
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try store.save(active)
+        let client = SuspendedValidationClient()
+        let state = AppState(settingsStore: store, licenseClient: client,
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock")
+        let check = Task { await state.validateLicenseIfNeeded() }
+        await client.waitForValidation()
+        await state.activateLicense(key: "KEY")
+        #expect(state.licenseActivationJustSucceeded)
+        switch outcome {
+        case 0: await client.completeValidation(.success(true))
+        case 1: await client.completeValidation(.success(false))
+        default: await client.completeValidation(.failure(.networkFailure))
+        }
+        await check.value
+        #expect(state.settings.licenseStatus == .active)
+        let savedInstanceID = try store.load().licenseInstanceID
+        #expect(state.settings.licenseInstanceID == savedInstanceID)
+        #expect(!state.licenseValidationInFlight)
+        state.startSession()
+        #expect(state.selectedSurface == .session)
     }
 
     @Test

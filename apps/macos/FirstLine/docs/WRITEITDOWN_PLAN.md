@@ -8,6 +8,7 @@ This plan turns the existing native app in `apps/macos/FirstLine/` into the writ
 
 - The app is a native AppKit writing room that behaves like the live site at https://writeitdown.app: forward-only writing, a warning after five seconds of silence, the draft wiped after eight seconds of silence, and a kept draft that the writer can copy out when the clock runs out.
 - The one new capability is a duration picker before writing starts, modeled on The Most Dangerous Writing App. The default stays at one minute, the same as the web.
+- The desktop app is a small tool, not a landing page: open it and write, copy the text when done, then close it. No screen needs a promotional slogan.
 - The app does only the writeitdown thing. First Line and Zero Draft leftovers that do not serve that job (the draft Library, saved Markdown files, Copy for AI, fossils, the separate Failure screen) are removed.
 - The paid license flow stays. It is rebranded to writeitdown and reuses the design in `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md`.
 - Writing never leaves the machine and is never written to disk.
@@ -69,7 +70,7 @@ The web column cites the file that owns each rule today. The native column recor
 | 5 | After 8 s of silence the draft is wiped. The room stays open with `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.` and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 captures unused time and provides a minimal in-room wipe/restart route. Batch 4 removes the obsolete Failure screen and polishes the report. |
 | 6 | The earlier deadline wins, and a tie goes to the wipe. | `writeitdown/session.mjs` | `SessionEngine.swift` (`adjudicateDeadlines`) | Keep. |
 | 7 | A whitespace-only draft at the deadline is wiped, not kept. | `writeitdown/session.mjs` (`!state.text.trim()`) | `SessionEngine.swift` ends an empty draft as idle and keeps a whitespace-only draft. | Batch 2 adopts the web rule. |
-| 8 | When the clock runs out, the draft is kept: `You wrote it down.`, the full text, `0:00 - N WORDS KEPT.`, `COPY TEXT` (then `COPIED`), and `RUN IT AGAIN`. Focus goes to COPY TEXT. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. Batch 4 matches the web copy and layout. |
+| 8 | When the clock runs out, the native kept view shows the full text, `0:00 - N WORDS KEPT.`, `COPY TEXT` (then `COPIED`), and `RUN IT AGAIN`. Focus goes to COPY TEXT. It needs no promotional heading. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. Batch 4 shipped the web copy and layout; batch 5 removes the native kept heading. |
 | 9 | The count is Unicode words, and each Han character counts as one. Punctuation and emoji do not count. | `writeitdown/session.mjs` (`wordCount`) | `SessionEngine.swift` (`wordCount`) splits on whitespace only. | Batch 2 ports the web rule. |
 | 10 | ESC and the `ESC - EXIT` control leave the room right away. Nothing is saved. | `writeitdown/room.js` (`exit`) | `SessionViewController.swift` has the `Abandon - the text is lost` button. `Cmd+0` goes Home. | Batch 4 adds `ESC - EXIT` at the bottom left and handles Escape outside IME composition. |
 | 11 | There is no early finish. A session ends only at the deadline or by exiting. | `writeitdown/room.js` | `SessionViewController.swift` has a `Finish` button and Cmd+Return. `SessionEngine.swift` has `finish()`. | Batch 2 removes the engine method, button, Cmd+Return paths, and tests together. |
@@ -78,6 +79,8 @@ The web column cites the file that owns each rule today. The native column recor
 | 14 | No draft is stored. Only the appearance preference persists. | `writeitdown/theme.js` (`writeitdown-theme` is the only key) | Before batch 1, `Sources/Infrastructure/PersistenceService.swift` wrote kept drafts as Markdown and `Sources/Library/LibraryViewController.swift` browsed them. | Batch 1 deleted both. Settings keep only preferences and the license cache (section 7). |
 | 15 | The writing view shows the active line in a centered band with two fading lines above it and no scrollbar. | `writeitdown/site.css` (`#editor` mask), `writeitdown/room.js` (`fitEditor`) | `AppendOnlyTextView.swift` (zen typography, caret anchored at 35% of the height). | Batch 4 recenters the band to match the site. The zen typography stays. |
 | 16 | The session length is chosen before writing. | Fixed at 60 s on the web | Fixed at 60 s. `AppState.selectedDuration` and `AppSettings.defaultDuration` already exist but are pinned to 60. | Batch 5 adds the picker. |
+
+The native start screen needs only the duration choice and a clear start action. The native kept view needs only the writing, receipt, and copy or restart actions. The site headline, deck, and `Give it sixty seconds.` style slogans belong to the site, not the app.
 
 The session flow after batch 5, using the web's phase names:
 
@@ -113,9 +116,9 @@ stateDiagram-v2
 
 ### 4.2 Placement and interaction
 
-- The start screen keeps the web landing's hierarchy: the `WRITE_IT_DOWN` logotype, the headline `We force you to write it down.`, the deck line, and one primary button.
+- The start screen keeps the `WRITE_IT_DOWN` identity, the duration picker, and one clearly labeled start button. It has no site headline, deck, or promotional slogan.
 - The picker sits directly above the primary button as one row labeled `SESSION` in the mono chrome style, followed by the choices `1 3 5 10 15 20 30 60` and the unit `MIN`. The selected choice is drawn in ink with a 1 px underline. The others use the muted color.
-- The primary button names the chosen length the way the web names sixty seconds: `Give it sixty seconds.` for 1, `Give it three minutes.` for 3, and so on up to `Give it sixty minutes.` for 60.
+- The primary button says `Start Writing` for every duration. The adjacent picker and the room clock show the chosen length.
 - The control is an `NSSegmentedControl` in single-selection mode, drawn with the site tokens. HIG recommends a segmented control for a small set of mutually exclusive choices, and it brings VoiceOver support for free. Each segment's accessibility label is the full phrase, such as "3 minutes".
 - The picker exists only on the start screen. It cannot be changed during a session. The room's clock shows the chosen length before the first keystroke, for example `5:00`.
 - After a wipe, typing restarts with the same length. After a kept session, `RUN IT AGAIN` uses the same length. The writer returns to the start screen with Esc to change it.
@@ -140,6 +143,8 @@ Recommendation: keep 5 s to warn and 8 s to wipe for every duration. Do not scal
 ### 4.5 Governance note
 
 `VISION.md` says "一场会话六十秒" and treats the numbers as a contract. The captain's request for a duration picker changes that for the writeitdown app. Batch 5 updates the matching line in `VISION.md` to say that the writer picks a length before the first keystroke, the default is sixty seconds, and 5 s and 8 s stay fixed. The pull request cites the captain's request as the authority. If the reviewer or no-mistakes asks, it is escalated as an ask-user finding and not decided by the worker.
+
+The captain is still deciding the ranges for small settings, including duration choices, focus mode, centering, and similar controls. Do not design or build those settings or change the proposed duration range until those decisions arrive; confirm the range before implementing batch 5.
 
 ## 5. Inventory
 
@@ -179,7 +184,7 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/Editor/AppendOnlyTextView.swift` | It holds the IME-safe append-only editor, UTF-16 caret handling, and zen typography. | Site typography and the centered band (batch 4). |
 | `Sources/FirstLine/Session/SessionViewController.swift` | It is the room. | It hosts the rest, typing, warn, wipe, and kept states in one view (batch 4). |
 | `Sources/FirstLine/Session/SuccessViewController.swift` | It is the kept surface. | It becomes the kept view inside the room, or is folded into `SessionViewController` if that is simpler (batch 4). |
-| `Sources/FirstLine/App/HomeViewController.swift` | It is the start screen. | Brand copy (batch 3). Picker (batch 5). |
+| `Sources/FirstLine/App/HomeViewController.swift` | It is the start screen. | Brand copy (batch 3). Picker and removal of site marketing copy (batch 5). |
 | `Sources/FirstLine/App/AppState.swift` | It owns navigation and the trial gate. | Removals (batch 1). Trial consumed on the first keystroke (batch 6). |
 | `Sources/FirstLine/App/FirstLineMain.swift`, `RootWindowController.swift`, `RootContainerViewController.swift`, `MainMenuBuilder.swift` | They are the AppKit shell. | Names, title, and menus (batches 3 and 5). |
 | `Sources/FirstLine/Licensing/LicenseClient.swift`, `LicenseModels.swift`, `MockLicenseClient.swift` | The paid license flow stays. | Add a live Dodo client (batch 6). |
@@ -351,22 +356,26 @@ Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it,
 
 ### Batch 5: Duration picker
 
-- Scope: build section 4. This includes the start-screen picker, the button copy per length, the `Session` menu with Cmd+1 through Cmd+8, the remembered choice, the room clock showing the chosen length before typing, and the `VISION.md` line change from section 4.5.
+- Scope: build section 4. This includes the start-screen picker, the functional `Start Writing` button, the `Session` menu with Cmd+1 through Cmd+8, the remembered choice, the room clock showing the chosen length before typing, and the `VISION.md` line change from section 4.5.
+- Remove the site headline, deck, and `Give it sixty seconds.` slogan shipped on the start screen in batch 3. Remove the promotional kept heading shipped in batch 4. Keep the clock, counts, wipe report, kept receipt, `COPY TEXT`, and `RUN IT AGAIN`.
 - Named tests:
   - `DurationPickerTests/defaultIsOneMinuteOnFirstLaunch`.
   - `DurationPickerTests/offersExactlyTheEightLengths`.
   - `DurationPickerTests/choiceIsRememberedAcrossLaunches`.
-  - `DurationPickerTests/buttonTitleNamesTheLength`.
+  - `DurationPickerTests/startButtonUsesFunctionalTitleForEveryLength`.
+  - `RoomTests/keptViewHasReceiptAndActionsWithoutPromotionalHeading`.
+  - `BrandTests/startScreenHasNoSiteHeadlineDeckOrSlogan`.
   - `DurationPickerTests/pickerAndMenuAreDisabledDuringSession`.
   - `DurationPickerTests/commandDigitSelectsLength`.
   - `DurationPickerTests/segmentsHaveAccessibilityLabels`.
   - `SessionEngineTests/chosenDurationDrivesCompletionDeadline`.
 - Window QA:
   - Enable Full Keyboard Access, pick 3 with arrow keys, and start with Return. Confirm the room shows `3:00` and holds it until the first key. Repeat the length selection through the Session menu without Full Keyboard Access.
+  - Inspect the start screen in light and dark: only the brand, picker, and `Start Writing` control remain, with no site headline, deck, or slogan.
   - Relaunch and confirm 3 is still selected.
   - Pick 60 from the Session menu and confirm `60:00`.
   - Confirm the menu's lengths are disabled in the room.
-  - Run one full kept session at 3 minutes in real time.
+  - Run one full kept session at 3 minutes in real time. Inspect the kept text, receipt, `COPY TEXT`, and `RUN IT AGAIN` in light and dark, with no promotional heading.
   - In a test or QA harness, seed a large draft by programmatic appends through the existing append-only input path and measure typing speed. Do not add an app surface or input bypass.
 - Done when the common set is green and the QA record covers the listed states, including physical focus with Full Keyboard Access and the picker with VoiceOver on (a screenshot plus the spoken label noted).
 

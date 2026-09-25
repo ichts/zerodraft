@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import Testing
 @testable import WriteItDown
 
@@ -36,13 +37,19 @@ struct EditorFocusTests {
         #expect(abs(placeholderY - emptyY) < 3)
         #expect(!placeholder.isHidden)
 
-        editor.insertText("One\nTwo\nThree\nFour", replacementRange: NSRange(location: NSNotFound, length: 0))
-        room.view.layoutSubtreeIfNeeded()
+        editor.insertText("One", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
-        let grownY = try activeLineY(in: editor, room: room)
-        #expect(abs(grownY - emptyY) < 3)
+        let firstY = try inkCenterY(in: editor, room: room)
+        #expect((0.38...0.40).contains(firstY / room.view.bounds.height))
+        #expect(abs(firstY - placeholderY) < 2)
         #expect(placeholder.isHidden)
+
+        editor.insertText("\nTwo\nThree\nFour", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        let grownY = try inkCenterY(in: editor, room: room)
+        #expect((0.38...0.40).contains(grownY / room.view.bounds.height))
+        #expect(abs(grownY - placeholderY) < 2)
     }
 
     private func descendants<T: NSView>(of view: NSView, as type: T.Type) -> [T] {
@@ -63,6 +70,27 @@ struct EditorFocusTests {
             ? layout.extraLineFragmentRect
             : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1), effectiveRange: nil)
         return windowTop(of: textView.textContainerOrigin.y + line.midY, in: textView, room: room)
+    }
+
+    private func inkCenterY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        let glyph = layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1)
+        let line = layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+        var lineGlyphs = NSRange()
+        layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: &lineGlyphs)
+        let first = layout.characterIndexForGlyph(at: lineGlyphs.location)
+        let font = try #require(textView.textStorage?.attribute(.font, at: first, effectiveRange: nil) as? NSFont)
+        let character = (textView.string as NSString).character(at: first)
+        let coreFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
+        var codeUnit = character
+        var measuredGlyph = CGGlyph()
+        #expect(CTFontGetGlyphsForCharacters(coreFont, &codeUnit, &measuredGlyph, 1))
+        var bounds = CGRect.zero
+        CTFontGetBoundingRectsForGlyphs(coreFont, .horizontal, &measuredGlyph, &bounds, 1)
+        return windowTop(of: textView.textContainerOrigin.y + line.minY
+            + layout.location(forGlyphAt: glyph).y - bounds.midY, in: textView, room: room)
     }
 
     @Test

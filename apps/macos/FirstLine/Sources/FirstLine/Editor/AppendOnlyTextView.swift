@@ -436,7 +436,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
-        let targetY = max(-scrollView.contentInsets.top, round(textContainerOrigin.y + line.midY - compositionAnchorY))
+        let targetY = max(-scrollView.contentInsets.top, round(textContainerOrigin.y + compositionLineCenter(in: line) - compositionAnchorY))
         guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -450,6 +450,20 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
         let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
+    }
+
+    private func compositionLineCenter(in line: NSRect) -> CGFloat {
+        guard !string.isEmpty, string.last != "\n", let layoutManager else { return line.midY }
+        let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
+        var glyphs = NSRange()
+        layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: &glyphs)
+        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+        let lineText = (string as NSString).substring(with: characters)
+        guard let scalar = lineText.unicodeScalars.first(where: { !CharacterSet.whitespacesAndNewlines.contains($0) }),
+              let font = font(for: scalar), let ink = glyphMetrics(for: scalar, font: font)?.bounds else {
+            return line.midY
+        }
+        return line.minY + layoutManager.location(forGlyphAt: glyph).y - ink.midY
     }
 
     func clearPendingCompositionRefresh() {

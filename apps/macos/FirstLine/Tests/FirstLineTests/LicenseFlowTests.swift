@@ -40,7 +40,9 @@ struct LicenseFlowTests {
         validationResult: Bool = true,
         validationError: LicenseValidationError? = nil,
         initialSettings: AppSettings? = nil,
-        clockNow: Date = Date(timeIntervalSince1970: 1_700_000_000)
+        clockNow: Date = Date(timeIntervalSince1970: 1_700_000_000),
+        responseProductID: String? = "prod_mock",
+        deactivateFails: Bool = false
     ) throws -> (AppState, MockLicenseClient, SettingsStore, FileManager, URL) {
         let fm = FileManager.default
         let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
@@ -52,7 +54,9 @@ struct LicenseFlowTests {
         let mock = MockLicenseClient(
             activationBehavior: activationBehavior,
             validationResult: validationResult,
-            validationError: validationError
+            validationError: validationError,
+            productID: responseProductID,
+            deactivateFails: deactivateFails
         )
         let installStore = InstallIDStore(
             fileManager: fm,
@@ -366,6 +370,108 @@ struct LicenseFlowTests {
         #expect(state.selectedSurface == .session)
     }
 
+    @Test(arguments: [false, true])
+    func rejectedProductCleansOnlyNewInstanceAndReportsFailure(cleanupFails: Bool) async throws {
+        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                              licenseKey: "OLD", licenseStatus: .active,
+                              licenseActivatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                              licenseInstanceID: "lki_existing", licenseProductID: "prod_mock")
+        let (state, mock, store, fm, root) = try makeAppState(initialSettings: old,
+            responseProductID: "other", deactivateFails: cleanupFails)
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: "NEW")
+        let cleanup = await mock.lastDeactivateArguments
+        #expect(cleanup?.licenseKey == "NEW")
+        #expect(cleanup?.instanceID != "lki_existing")
+        #expect(cleanup?.instanceID.hasPrefix("lki_mock_") == true)
+        #expect(state.licenseActivationError == (cleanupFails ? .cleanupFailure : .wrongProduct))
+        #expect(state.settings.licenseInstanceID == "lki_existing")
+        #expect(try store.load().licenseKey == "OLD")
+    }
+
+    @Test
+    func rejectedActivationNeverDeactivatesPreviouslyAcceptedInstance() async throws {
+        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                              licenseKey: "KEY", licenseStatus: .active,
+                              licenseInstanceID: "lki_existing", licenseProductID: "prod_mock")
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try store.save(old)
+        let mock = MockLicenseClient(productID: "other", activationInstanceID: "lki_existing")
+        let state = AppState(settingsStore: store, licenseClient: mock,
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock")
+        await state.activateLicense(key: "KEY")
+        #expect(state.licenseActivationError == .wrongProduct)
+        #expect(await mock.lastDeactivateArguments == nil)
+        #expect(try store.load().licenseInstanceID == "lki_existing")
+    }
+
+    @Test
+    func cleanupFailureOnUnsavedActivationLeavesTrialGateClosed() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let blocked = root.appendingPathComponent("blocked")
+        try "file".write(to: blocked, atomically: true, encoding: .utf8)
+        let mock = MockLicenseClient(deactivateFails: true)
+        let state = AppState(settingsStore: SettingsStore(configDirectory: blocked.appendingPathComponent("Config")),
+                             licenseClient: mock, installIDStore: InstallIDStore(configDirectory: root),
+                             productID: "prod_mock")
+        state.settings.trialSessionsUsed = AppState.trialSessionLimit
+        await state.activateLicense(key: "KEY")
+        #expect(state.licenseActivationError == .cleanupFailure)
+        #expect((state.licenseActivationError?.errorDescription ?? "").contains("Contact support"))
+        #expect(await mock.lastDeactivateArguments?.licenseKey == "KEY")
+        state.startSession()
+        #expect(state.selectedSurface == .upgrade)
+    }
+
+    @Test
+    func offlineGraceExpiresWhileAppRemainsOpenAndOnlineValidationRestoresAccess() async throws {
+        let last = Date(timeIntervalSince1970: 1_700_000_000)
+        var now = last.addingTimeInterval(86_400)
+        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: last,
+                                 licenseLastValidatedAt: last, licenseProductID: "prod_mock")
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try store.save(active)
+        let state = AppState(settingsStore: store, licenseClient: MockLicenseClient(validationError: .networkFailure),
+                             installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock")
+        await state.validateLicenseIfNeeded()
+        #expect(state.hasFullAccess)
+        now = last.addingTimeInterval(AppState.licenseOfflineGraceInterval + 1)
+        #expect(!state.hasFullAccess)
+        state.startSession()
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.trialStatusText.contains("online validation"))
+
+        let online = AppState(settingsStore: store, licenseClient: MockLicenseClient(),
+                              installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock")
+        await online.validateLicenseIfNeeded()
+        #expect(online.hasFullAccess)
+        online.startSession()
+        #expect(online.selectedSurface == .session)
+    }
+
+    @Test
+    func legacyUnlockIsNotBoundToOfflineGrace() throws {
+        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                              trialSessionsUsed: AppState.trialSessionLimit, licenseStatus: .active)
+        let (state, _, _, fm, root) = try makeAppState(initialSettings: old,
+            clockNow: Date(timeIntervalSince1970: 2_000_000_000))
+        defer { try? fm.removeItem(at: root) }
+        #expect(state.hasFullAccess)
+        state.startSession()
+        #expect(state.selectedSurface == .session)
+    }
+
     @Test
     func activeLicenseBypassesTrialLimit() throws {
         let exhausted = AppSettings(
@@ -538,5 +644,8 @@ struct LicenseFlowTests {
         #expect(appState.licenseActivationError == .storageFailure)
         // A failed persist must not leave the app granting access for this run.
         #expect(appState.settings.licenseStatus != .active)
+        let cleanup = await mock.lastDeactivateArguments
+        #expect(cleanup?.licenseKey == "PRO-GOOD-KEY")
+        #expect(cleanup?.instanceID.hasPrefix("lki_mock_") == true)
     }
 }

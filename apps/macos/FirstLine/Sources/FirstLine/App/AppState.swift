@@ -56,7 +56,8 @@ final class AppState {
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active else { return false }
         if settings.licenseKey == nil { return true }
-        return !licenseValidationInFlight && !productID.isEmpty && settings.licenseProductID == productID
+        return !licenseValidationInFlight && !productID.isEmpty &&
+            settings.licenseProductID == productID && licenseWithinGrace
     }
 
     /// UpgradeView / SettingsView 读取这些字段渲染激活状态。
@@ -236,7 +237,7 @@ final class AppState {
         do {
             let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: instanceName)
             guard activation.productID == productID else {
-                licenseActivationError = .wrongProduct
+                await rejectActivation(activation, key: trimmed, reason: .wrongProduct)
                 return
             }
             // Snapshot the pre-activation state so a failed persist cannot leave the
@@ -255,12 +256,25 @@ final class AppState {
                 licenseActivationJustSucceeded = true
             } catch {
                 settings = preActivation
-                licenseActivationError = .storageFailure
+                await rejectActivation(activation, key: trimmed, reason: .storageFailure)
             }
         } catch let activationError as LicenseActivationError {
             licenseActivationError = activationError
         } catch {
             licenseActivationError = .unexpected(statusCode: -1)
+        }
+    }
+
+    private func rejectActivation(_ activation: LicenseActivation, key: String, reason: LicenseActivationError) async {
+        guard activation.instanceID != settings.licenseInstanceID else {
+            licenseActivationError = reason
+            return
+        }
+        do {
+            try await licenseClient.deactivate(licenseKey: key, instanceID: activation.instanceID)
+            licenseActivationError = reason
+        } catch {
+            licenseActivationError = .cleanupFailure
         }
     }
 
@@ -305,14 +319,13 @@ final class AppState {
         persistSettings()
     }
 
+    private var licenseWithinGrace: Bool {
+        guard let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt else { return false }
+        return clock().timeIntervalSince(last) <= Self.licenseOfflineGraceInterval
+    }
+
     private func applyOfflineGraceDecision() {
-        let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt
-        guard let last else {
-            settings.licenseStatus = .unknown
-            persistSettings()
-            return
-        }
-        if clock().timeIntervalSince(last) > Self.licenseOfflineGraceInterval {
+        if !licenseWithinGrace {
             settings.licenseStatus = .unknown
             persistSettings()
         }
@@ -367,6 +380,10 @@ final class AppState {
     var trialStatusText: String {
         if licenseValidationInFlight { return "Checking license..." }
         if settings.licenseStatus == .active && !hasFullAccess {
+            if settings.licenseKey != nil && !productID.isEmpty &&
+                settings.licenseProductID == productID && !licenseWithinGrace {
+                return "License needs online validation. Reopen the app when connected."
+            }
             return "License does not match the configured writeitdown product."
         }
         switch settings.licenseStatus {

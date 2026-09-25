@@ -63,7 +63,20 @@ struct DodoLicenseClientTests {
     @MainActor
     @Test(arguments: ["prod", "other", ""])
     func productIdentityControlsEntitlement(responseProductID: String) async throws {
-        StubLicenseProtocol.response.set { _ in
+        StubLicenseProtocol.response.set { request in
+            if request.url?.path == "/licenses/deactivate" {
+                #expect(responseProductID != "prod")
+                #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+                let stream = try #require(request.httpBodyStream)
+                stream.open()
+                defer { stream.close() }
+                var bytes = [UInt8](repeating: 0, count: 4096)
+                let length = stream.read(&bytes, maxLength: bytes.count)
+                let json = try #require(JSONSerialization.jsonObject(with: Data(bytes.prefix(length))) as? [String: String])
+                #expect(json == ["license_key": "KEY", "license_key_instance_id": "lki_1"])
+                return (200, Data())
+            }
+            #expect(request.url?.path == "/licenses/activate")
             let product = responseProductID.isEmpty ? "null" : #"{"product_id":"\#(responseProductID)","name":"Test"}"#
             return (200, Data(#"{"id":"lki_1","license_key_id":"lic_1","name":"Mac","business_id":"biz","created_at":"2024-01-01T00:00:00Z","product":\#(product)}"#.utf8))
         }

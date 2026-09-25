@@ -70,6 +70,7 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     case storageFailure
     case productNotConfigured
     case wrongProduct
+    case cleanupFailure
 
     var errorDescription: String? {
         switch self {
@@ -89,6 +90,8 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
             return "License activation is unavailable until the writeitdown product is configured."
         case .wrongProduct:
             return "This license is not for writeitdown."
+        case .cleanupFailure:
+            return "Activation could not be undone. Contact support with your receipt to free the device slot."
         }
     }
 }

@@ -206,6 +206,42 @@ struct SettingsTests {
         #expect(state.selectedSurface == .session)
     }
 
+    @Test func settingsDoneBeforeProgrammaticExitCompletesKeepsFocusPreference() {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        state.startSession()
+        state.sessionEngine.registerCommittedText("draft stays")
+        state.updateFocusMode(true)
+        let sessionID = state.sessionEngine.sessionID
+        let controller = RootWindowController(appState: state)
+        controller.programmaticFullScreenExitPending = true
+        state.openSettings()
+        state.closeSettings()
+        NotificationCenter.default.post(name: NSWindow.didExitFullScreenNotification, object: controller.window)
+        #expect(!controller.programmaticFullScreenExitPending)
+        #expect(state.settings.focusMode)
+        #expect(state.sessionEngine.text == "draft stays")
+        #expect(state.sessionEngine.sessionID == sessionID)
+        #expect(state.selectedSurface == .session)
+    }
+
+    @Test func settingsHasOnlyEditablePreferencesAndLicense() {
+        let (state, root) = state()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let settings = SettingsViewController(appState: state)
+        func labels(_ view: NSView) -> [String] {
+            ((view as? NSTextField).map { [$0.stringValue] } ?? []) + view.subviews.flatMap(labels)
+        }
+        let copy = labels(settings.view)
+        #expect(copy.contains("Focus Mode"))
+        #expect(copy.contains("Alignment"))
+        #expect(copy.contains("Font Size"))
+        #expect(copy.contains("Theme"))
+        #expect(!copy.contains("Session"))
+        #expect(!copy.contains("Duration"))
+        #expect(!copy.contains("Delete after silence"))
+    }
+
     @Test func leavingFullScreenForSettingsKeepsFocusPreference() {
         let (state, root) = state()
         defer { try? FileManager.default.removeItem(at: root) }

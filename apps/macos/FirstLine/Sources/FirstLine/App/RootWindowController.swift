@@ -18,6 +18,7 @@ import Observation
 final class RootWindowController: NSWindowController {
     let appState: AppState
     private let container: RootContainerViewController
+    var programmaticFullScreenExitPending = false
     func copyKeptText() { container.copyKeptText() }
 
     init(appState: AppState) {
@@ -108,10 +109,16 @@ final class RootWindowController: NSWindowController {
         guard let window else { return }
         let shouldFillScreen = appState.settings.focusMode && appState.selectedSurface == .session
         guard window.styleMask.contains(.fullScreen) != shouldFillScreen else { return }
+        if !shouldFillScreen { programmaticFullScreenExitPending = true }
         window.toggleFullScreen(nil)
     }
 
     @objc private func didExitFullScreen(_ notification: Notification) {
+        if programmaticFullScreenExitPending {
+            programmaticFullScreenExitPending = false
+            if appState.selectedSurface == .session && appState.settings.focusMode { applyFocusMode() }
+            return
+        }
         guard appState.selectedSurface == .session, appState.settings.focusMode else { return }
         appState.updateFocusMode(false)
     }

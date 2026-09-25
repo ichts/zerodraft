@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, locked session choices, license
+ * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, license
  * [POS]: AppKit Settings surface; live visual preferences do not reset engine, Done restores prior surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -45,10 +45,6 @@ final class SettingsViewController: NSViewController {
             settingRow("Focus Mode", control: focusSwitch()),
             settingRow("Alignment", control: alignmentPopup()),
             settingRow("Font Size", control: sizePopup()),
-        ]))
-        content.addArrangedSubview(section("Session", rows: [
-            settingRow("Duration", detail: "\(Int(appState.selectedDuration / 60)) minutes. Choose before writing."),
-            settingRow("Delete after silence", detail: "\(appState.settings.silenceLimit.label). Choose before writing."),
         ]))
         content.addArrangedSubview(section("Trial & License", rows: licenseRows()))
         content.addArrangedSubview(section("About", rows: [

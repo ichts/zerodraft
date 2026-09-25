@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
- * [OUTPUT]: SessionEngine / SessionPhase、词数、截止时间与失败时 unusedSeconds
+ * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds
  * [POS]: 首次输入启动时钟与绝对截止时间裁决；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
@@ -14,9 +14,8 @@ enum SessionPhase: Equatable {
 @Observable
 @MainActor
 final class SessionEngine {
-    nonisolated static let dangerAfterSeconds: TimeInterval = 5
-    nonisolated static let wipeAfterSeconds: TimeInterval = 8
     nonisolated static let defaultDurationSeconds: TimeInterval = 60
+    nonisolated static let durationChoices: [TimeInterval] = [60, 300, 600, 1200, 1800]
 
     nonisolated private static let clockReference = ContinuousClock().now
     nonisolated static func continuousNowSeconds() -> TimeInterval {
@@ -25,7 +24,7 @@ final class SessionEngine {
     }
 
     nonisolated static func validDuration(_ value: TimeInterval) -> TimeInterval {
-        [60.0, 180, 300, 600, 900, 1200, 1800, 3600].contains(value) ? value : defaultDurationSeconds
+        durationChoices.contains(value) ? value : defaultDurationSeconds
     }
 
     private static let hanPattern = try! NSRegularExpression(pattern: "(\\p{Script=Han}\\p{Mark}*)")
@@ -35,6 +34,7 @@ final class SessionEngine {
     private(set) var text = ""
     private(set) var wordCount = 0
     var duration: TimeInterval = defaultDurationSeconds
+    private(set) var silenceLimit: SilenceLimit = .standard
     var elapsed: TimeInterval = 0
     var remaining: TimeInterval = defaultDurationSeconds
     private(set) var idleSeconds: TimeInterval = 0
@@ -50,7 +50,7 @@ final class SessionEngine {
         self.now = now
     }
 
-    var secondsUntilDeletion: Int { max(0, Int(ceil(Self.wipeAfterSeconds - idleSeconds))) }
+    var secondsUntilDeletion: Int { max(0, Int(ceil(Double(silenceLimit.rawValue) - idleSeconds))) }
 
     private static func countWords(in text: String) -> Int {
         let source = text as NSString
@@ -69,7 +69,8 @@ final class SessionEngine {
 
     var hasMultipleLines: Bool { text.contains("\n") }
 
-    func start(duration: TimeInterval) {
+    func start(duration: TimeInterval, silenceLimit: SilenceLimit = .standard) {
+        self.silenceLimit = silenceLimit
         self.duration = Self.validDuration(duration)
         sessionID = UUID()
         elapsed = 0
@@ -93,7 +94,7 @@ final class SessionEngine {
         elapsed = min(max(current - startedAt, 0), duration)
         remaining = max(duration - elapsed, 0)
         idleSeconds = max(current - lastActivityAt, 0)
-        phase = idleSeconds >= Self.dangerAfterSeconds ? .danger : .writing
+        phase = idleSeconds >= Double(silenceLimit.rawValue - 3) ? .danger : .writing
         emitStateChange()
     }
 
@@ -125,7 +126,7 @@ final class SessionEngine {
         guard let startedAt, let lastActivityAt, phase == .writing || phase == .danger else { return false }
         let current = now()
         let finish = startedAt + duration
-        let wipe = lastActivityAt + Self.wipeAfterSeconds
+        let wipe = lastActivityAt + Double(silenceLimit.rawValue)
         let wipePassed = current >= wipe
         let finishPassed = current >= finish
         guard wipePassed || finishPassed else { return false }

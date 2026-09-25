@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 安全、居中写作带与受控 wipe 清空；TextKit 位置一律使用 UTF-16 偏移
+ * [POS]: AppKit editor core，负责 append-only、IME 安全、字号及居中/左对齐写作带与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -29,7 +29,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// the already-existing engine text back into the view when re-entering a live
     /// session surface (Home -> Writing). User input is never weakened.
     private var isRestoringProgrammatically = false
-    private let sessionFontSize: CGFloat = 28
+    private var sessionFontSize: CGFloat = 28
+    private var writingAlignment: WritingAlignment = .centered
+    private var typographyConfigured = false
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
     private let writingFont: WritingFontCandidate = .pitchLight
@@ -65,8 +67,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let hadMarkedText = hasMarkedText()
-        guard onPrepareInput?() ?? true else { return }
-        if plainString(from: string).isEmpty == false {
+        guard isRestoringProgrammatically || (onPrepareInput?() ?? true) else { return }
+        if !isRestoringProgrammatically && plainString(from: string).isEmpty == false {
             onMarkedTextActivity?()
         }
 
@@ -356,7 +358,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         NSRange(location: NSNotFound, length: 0)
     }
 
-    func configureSessionTypography() {
+    func configureSessionTypography(size: CGFloat = 28, alignment: WritingAlignment = .centered) {
+        guard !typographyConfigured || size != sessionFontSize || alignment != writingAlignment else { return }
+        typographyConfigured = true
+        sessionFontSize = size
+        writingAlignment = alignment
         let paragraph = sessionParagraphStyle()
         let attributes = activeTextAttributes(paragraph: paragraph)
 
@@ -365,10 +371,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        alignment = .center
+        self.alignment = alignment == .centered ? .center : .left
         layoutManager?.delegate = self
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
+        applyFocusTypographyToExistingText()
     }
 
     func applySessionTypographyToExistingText() {
@@ -642,7 +649,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
+        paragraph.alignment = writingAlignment == .centered ? .center : .left
         paragraph.lineHeightMultiple = 1.45
         paragraph.lineSpacing = 0
         return paragraph

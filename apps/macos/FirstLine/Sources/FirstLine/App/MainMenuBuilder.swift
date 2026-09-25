@@ -1,9 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState
- * [OUTPUT]: MainMenuBuilder.buildMenu - 构建纯 AppKit 主菜单（App 菜单 + Navigate 菜单）
- * [POS]: writeitdown AppKit 菜单构造器；以 target-action 桥接 AppDelegate 上的 @objc 方法，
- *        validateMenuItem(_:) 负责启用/禁用（Settings 在会话中禁用，Writing/Home 在 success 禁用）。
- *        Cmd+, 打开站内 Settings surface。
+ * [OUTPUT]: AppKit 菜单，包含 Cmd+N 新篇、Cmd+C 成稿复制、Cmd+W 关窗和 Cmd+, Settings。
+ * [POS]: 菜单 target-action 桥接 AppDelegate，动态命令由 validateMenuItem 验证。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -40,6 +38,9 @@ enum MainMenuBuilder {
         appMenu.addItem(settingsItem)
 
         appMenu.addItem(.separator())
+        let closeItem = NSMenuItem(title: "Close Window", action: #selector(FirstLineAppDelegate.closeWindow(_:)), keyEquivalent: "w")
+        closeItem.target = validationOwner
+        appMenu.addItem(closeItem)
 
         let hideItem = NSMenuItem(title: "Hide Write It Down", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         appMenu.addItem(hideItem)
@@ -65,6 +66,12 @@ enum MainMenuBuilder {
         let navigateMenu = NSMenu(title: "Navigate")
         navigateMenuItem.submenu = navigateMenu
 
+        let newItem = NSMenuItem(title: "New Piece", action: #selector(FirstLineAppDelegate.newPiece(_:)), keyEquivalent: "n")
+        newItem.target = validationOwner
+        navigateMenu.addItem(newItem)
+        let copyItem = NSMenuItem(title: "Copy Kept Text", action: #selector(FirstLineAppDelegate.copyKept(_:)), keyEquivalent: "c")
+        copyItem.target = validationOwner
+        navigateMenu.addItem(copyItem)
         let writingItem = NSMenuItem(
             title: "Writing",
             action: #selector(FirstLineAppDelegate.openWriting(_:)),

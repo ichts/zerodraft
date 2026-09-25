@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Site room copy and deadline/idle values from SessionEngine.
- * [OUTPUT]: Room clock, report, receipt, wash strength, copy, and deny state.
+ * [OUTPUT]: Room clock, report, receipt, chosen-limit wash strength, copy, and deny state.
  * [POS]: Stateless presentation rules shared by the AppKit room and its tests.
  * [PROTOCOL]: Keep strings and wash timing aligned with writeitdown/room.js.
  */
@@ -23,10 +23,11 @@ enum RoomPresentation {
         "0:00 - \(wordLabel(words)) KEPT."
     }
 
-    static func washOpacity(idle: TimeInterval, reducesMotion: Bool) -> CGFloat {
-        guard idle >= SessionEngine.dangerAfterSeconds else { return 0 }
+    static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {
+        let warnAt = Double(limit.rawValue - 3)
+        guard idle >= warnAt else { return 0 }
         if reducesMotion { return 1 }
-        return CGFloat(min(max((idle - 5) / 3, 0), 1))
+        return CGFloat(min(max((idle - warnAt) / 3, 0), 1))
     }
 
     static func shouldExitOnEscape(isComposing: Bool) -> Bool { !isComposing }

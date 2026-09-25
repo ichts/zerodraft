@@ -36,13 +36,6 @@ struct SessionEngineTests {
     }
 
     @Test
-    func namedThresholdConstantsDrivePhaseMachine() {
-        #expect(SessionEngine.dangerAfterSeconds == 5)
-        #expect(SessionEngine.wipeAfterSeconds == 8)
-        #expect(SessionEngine.defaultDurationSeconds == 60)
-    }
-
-    @Test
     func idleSecondsAndSecondsUntilDeletionTrackSilence() {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })
@@ -371,26 +364,26 @@ struct SessionEngineTests {
         engine.tick()
         #expect(engine.phase == .failure)
         #expect(engine.unusedSeconds == 0)
-        engine.start(duration: 180)
+        engine.start(duration: 300)
         engine.registerCommittedText("long")
         time = 168
         engine.tick()
-        #expect(engine.unusedSeconds == 172)
+        #expect(engine.unusedSeconds == 292)
     }
 
     @Test func keystrokeAfterWipeStartsFreshSessionWithSameDuration() {
         var time = 0.0
         let engine = SessionEngine(now: { time })
-        engine.start(duration: 180)
+        engine.start(duration: 300)
         engine.registerCommittedText("lost")
         let oldID = engine.sessionID
         time = 8
         engine.tick()
-        engine.start(duration: 180)
+        engine.start(duration: 300)
         engine.registerCommittedText("again")
         #expect(engine.phase == .writing)
         #expect(engine.text == "again")
-        #expect(engine.duration == 180)
+        #expect(engine.duration == 300)
         #expect(engine.sessionID != oldID)
         #expect(engine.unusedSeconds == nil)
     }
@@ -440,7 +433,7 @@ struct SessionEngineTests {
     @Test func fiveAndEightSecondRulesHoldForSixtyMinuteSession() {
         var time = 0.0
         let engine = SessionEngine(now: { time })
-        engine.start(duration: 3600)
+        engine.start(duration: 1800)
         engine.registerCommittedText("go")
         time = 5
         engine.tick()
@@ -448,7 +441,24 @@ struct SessionEngineTests {
         time = 8
         engine.tick()
         #expect(engine.phase == .failure)
-        #expect(engine.unusedSeconds == 3592)
+        #expect(engine.unusedSeconds == 1792)
+    }
+
+    @Test func chosenDurationDrivesCompletionDeadline() {
+        for duration in SessionEngine.durationChoices {
+            var now = 0.0
+            let engine = SessionEngine(now: { now })
+            engine.start(duration: duration)
+            engine.registerCommittedText("draft")
+            for second in stride(from: 4.0, to: duration, by: 4.0) {
+                now = second
+                engine.registerMarkedTextActivity()
+            }
+            now = duration
+            engine.tick()
+            #expect(engine.phase == .success)
+            #expect(engine.remaining == 0)
+        }
     }
 
     // MARK: - Suspend-inclusive default clock (Fix M-B1)

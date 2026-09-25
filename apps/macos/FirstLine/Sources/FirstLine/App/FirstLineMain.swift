@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
- * [OUTPUT]: 提供 FirstLine 的纯 AppKit 入口（@main），替代原 SwiftUI WindowGroup 入口
- * [POS]: FirstLine 重写 Phase 1 应用骨架根入口；建立 NSApplication、主菜单、主窗口与路由，不再使用 SwiftUI 生命周期
+ * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
+ * [POS]: 建立 NSApplication、菜单与主窗口；新篇命令同步清理当前房间、路由成稿复制、Settings、关闭窗口
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -26,8 +26,14 @@ enum FirstLineMain {
 
 @MainActor
 final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
-    let appState = AppState()
+    let appState: AppState
     private var rootWindowController: RootWindowController?
+
+    init(appState: AppState = AppState(), windowController: RootWindowController? = nil) {
+        self.appState = appState
+        self.rootWindowController = windowController
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -48,6 +54,12 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu actions (target-action bridge to AppState)
 
+    @objc func newPiece(_ sender: Any?) {
+        appState.newPiece()
+        rootWindowController?.refreshRoom()
+    }
+    @objc func copyKept(_ sender: Any?) { rootWindowController?.copyKeptText() }
+    @objc func closeWindow(_ sender: Any?) { rootWindowController?.window?.performClose(sender) }
     @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }
     @objc func goHome(_ sender: Any?) { appState.goHome() }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
@@ -62,8 +74,10 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 extension FirstLineAppDelegate: NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
-        case #selector(openSettings):
-            return appState.canNavigateToSupportSurface
+        case #selector(copyKept):
+            return appState.sessionEngine.phase == .success && appState.selectedSurface == .session
+        case #selector(openSettings), #selector(newPiece), #selector(closeWindow):
+            return true
         case #selector(openWriting), #selector(goHome):
             // success 阶段锁定导航（复刻原 SwiftUI .disabled 语义）。
             return appState.sessionEngine.phase != .success

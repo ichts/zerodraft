@@ -77,17 +77,33 @@ struct RoomTests {
         window.contentViewController = home
         home.viewDidAppear()
         let button = try #require(window.firstResponder as? NSButton)
-        #expect(button.title == "Give it sixty seconds.")
-        #expect(button.accessibilityRole() == .button)
+        #expect(button.title == "1")
+        #expect(button.accessibilityLabel() == "Start 1 minute session")
         #expect(state.selectedSurface == .home)
         #expect(state.sessionEngine.phase == .idle)
     }
 
-    @Test func warnWashOpacityRampsFromFiveToEightSeconds() {
-        #expect(RoomPresentation.washOpacity(idle: 4.9, reducesMotion: false) == 0)
-        #expect(RoomPresentation.washOpacity(idle: 5, reducesMotion: false) == 0)
-        #expect(RoomPresentation.washOpacity(idle: 6.5, reducesMotion: false) == 0.5)
-        #expect(RoomPresentation.washOpacity(idle: 8, reducesMotion: false) == 1)
-        #expect(RoomPresentation.washOpacity(idle: 5, reducesMotion: true) == 1)
+    @Test func keptViewHasReceiptAndActionsWithoutPromotionalHeading() {
+        let state = AppState()
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        func labels(_ view: NSView) -> [String] {
+            let current = (view as? NSButton).map { [$0.title] } ?? (view as? NSTextField).map { [$0.stringValue] } ?? []
+            return current + view.subviews.flatMap(labels)
+        }
+        #expect(!labels(room.view).contains("You wrote it down."))
+        #expect(labels(room.view).contains("COPY TEXT"))
+        #expect(labels(room.view).contains("RUN IT AGAIN"))
+    }
+
+    @Test func warnWashTracksSelectedSilenceLimit() {
+        for limit in SilenceLimit.allCases {
+            let warnAt = Double(limit.rawValue - 3)
+            #expect(RoomPresentation.washOpacity(idle: warnAt - 0.1, reducesMotion: false, limit: limit) == 0)
+            #expect(RoomPresentation.washOpacity(idle: warnAt, reducesMotion: false, limit: limit) == 0)
+            #expect(RoomPresentation.washOpacity(idle: warnAt + 1.5, reducesMotion: false, limit: limit) == 0.5)
+            #expect(RoomPresentation.washOpacity(idle: Double(limit.rawValue), reducesMotion: false, limit: limit) == 1)
+            #expect(RoomPresentation.washOpacity(idle: warnAt, reducesMotion: true, limit: limit) == 1)
+        }
     }
 }

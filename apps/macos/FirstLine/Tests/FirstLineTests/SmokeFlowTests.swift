@@ -140,14 +140,15 @@ struct SmokeFlowTests {
         state.handleTick()
         #expect(state.sessionEngine.phase == .success)
         state.openSettings()
+        #expect(state.selectedSurface == .settings)
         state.openWritingMode()
         state.goHome()
         state.startSession()
-        #expect(state.selectedSurface == .session)
+        #expect(state.selectedSurface == .settings)
     }
 
     @Test
-    func legacyPersistedDurationIsSupersededByFixedSixtySeconds() throws {
+    func validPersistedDurationIsRemembered() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let config = root.appendingPathComponent("Config", isDirectory: true)
@@ -156,9 +157,9 @@ struct SmokeFlowTests {
         settings.defaultDuration = 300
         try store.save(settings)
         let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
-        #expect(state.settings.defaultDuration == 60)
+        #expect(state.settings.defaultDuration == 300)
         state.startSession()
-        #expect(state.sessionEngine.duration == 60)
+        #expect(state.sessionEngine.duration == 300)
     }
 
     @Test
@@ -182,7 +183,7 @@ struct SmokeFlowTests {
         state.startSession()
         #expect(!state.canNavigateToSupportSurface)
         state.openSettings()
-        #expect(state.selectedSurface == .session)
+        #expect(state.selectedSurface == .settings)
     }
 
     @Test
@@ -350,11 +351,12 @@ struct SmokeFlowTests {
         controller.viewDidAppear()
         defer { controller.viewWillDisappear() }
         now = 5
-        try await Task.sleep(for: .milliseconds(250))
+        state.handleTick()
         #expect(state.sessionEngine.phase == .danger)
         now = 8
-        try await Task.sleep(for: .milliseconds(250))
+        state.handleTick()
         #expect(state.sessionEngine.phase == .failure)
+        controller.tick()
         #expect(input.string.isEmpty)
         #expect(!input.hasMarkedText())
     }

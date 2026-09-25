@@ -1,7 +1,7 @@
 /*
- * [INPUT]: AppState, SessionEngine, AppendOnlyTextView, RoomPresentation and site design tokens.
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Owns editor focus, room chrome, deadline visuals, Escape and deny feedback; no draft persistence.
+ * [POS]: Editor focus and session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
 import AppKit
@@ -31,6 +31,7 @@ private final class RoomWashView: NSView {
 @MainActor
 final class SessionViewController: NSViewController, NSTextViewDelegate {
     private let appState: AppState
+    private let pasteboard: NSPasteboard
     private var engine: SessionEngine { appState.sessionEngine }
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
@@ -57,12 +58,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var lastDenyAt: TimeInterval?
     private var deny = DenyFeedbackState()
     private var lastPhase: SessionPhase = .idle
+    private var renderedSessionID: UUID?
     private var cutWork: DispatchWorkItem?
     private var washIsCut = false
     private var denyWork: DispatchWorkItem?
+    private var paperWidth: NSLayoutConstraint!
+    private var chromeHover = false
 
-    init(appState: AppState) {
+    init(appState: AppState, pasteboard: NSPasteboard = .general) {
         self.appState = appState
+        self.pasteboard = pasteboard
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -83,6 +88,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             Task { @MainActor [weak self] in self?.tick() }
         }
         if let ticker { RunLoop.main.add(ticker, forMode: .common) }
+        view.addTrackingArea(NSTrackingArea(rect: view.bounds, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
+        applyVisualSettings()
         prepareViewport()
         NSApp.activate(ignoringOtherApps: true)
         view.window?.makeKeyAndOrderFront(nil)
@@ -145,7 +152,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         textView.textContainerInset = NSSize(width: 24, height: 0)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
-        textView.configureSessionTypography()
+        textView.configureSessionTypography(size: appState.settings.writingFontSize.points, alignment: appState.settings.writingAlignment)
+        textView.setAccessibilityHelp("Clock and word count remain accessible in Focus Mode.")
         scrollView = NSScrollView()
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
@@ -167,8 +175,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         timerLabel = label()
         timerLabel.alignment = .right
+        timerLabel.setAccessibilityRole(.staticText)
+        timerLabel.setAccessibilityElement(true)
+        timerLabel.setAccessibilityHidden(false)
         countLabel = label()
         countLabel.alignment = .right
+        countLabel.setAccessibilityRole(.staticText)
+        countLabel.setAccessibilityElement(true)
+        countLabel.setAccessibilityHidden(false)
         reportLabel = label()
         reportLabel.isHidden = true
         placeholderLabel = label("Start typing.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.dimNSColor)
@@ -190,7 +204,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func buildKeptView() {
-        let title = label("You wrote it down.", font: FirstLineTypography.titleNSFont)
         keptText = NSTextView()
         keptText.isEditable = false
         keptText.isSelectable = true
@@ -216,7 +229,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let actions = NSStackView(views: [copyButton, restart])
         actions.orientation = .horizontal
         actions.spacing = 24
-        let stack = NSStackView(views: [title, preview, receiptLabel, actions])
+        let stack = NSStackView(views: [preview, receiptLabel, actions])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 20
@@ -237,7 +250,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func installConstraints() {
         let safe = view.safeAreaLayoutGuide
-        let paperWidth = paper.widthAnchor.constraint(equalToConstant: 720)
+        paperWidth = paper.widthAnchor.constraint(equalToConstant: appState.settings.writingAlignment == .centered ? 720 : 920)
         paperWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
             wallWash.leadingAnchor.constraint(equalTo: view.leadingAnchor), wallWash.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -274,8 +287,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             if self.engine.sessionID != sessionID || self.engine.phase == .failure { self.textView.clearWipedText() }
             return allowed
         }
-        textView.onCommittedText = { [weak self] in self?.engine.registerCommittedText($0) }
-        textView.onMarkedTextActivity = { [weak self] in self?.engine.registerMarkedTextActivity() }
+        textView.onCommittedText = { [weak self] text in
+            self?.engine.registerCommittedText(text)
+            self?.applyPhase()
+        }
+        textView.onMarkedTextActivity = { [weak self] in
+            self?.engine.registerMarkedTextActivity()
+            self?.applyPhase()
+        }
         textView.onDeny = { [weak self] in self?.engine.registerDeny() }
     }
 
@@ -337,8 +356,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    private func tick() {
+    func refreshRoom() { applyPhase() }
+
+    func tick() {
         appState.handleTick()
+        applyVisualSettings()
         applyPhase()
         if let deniedAt = engine.lastDenyAt, deniedAt != lastDenyAt {
             lastDenyAt = deniedAt
@@ -348,6 +370,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func applyPhase() {
         let phase = engine.phase
+        let sessionChanged = renderedSessionID != nil && renderedSessionID != engine.sessionID
+        renderedSessionID = engine.sessionID
+        if sessionChanged {
+            textView.clearWipedText()
+            keptText.string = ""
+        }
         if phase == .failure, lastPhase != .failure { showCut() }
         if phase == .success, lastPhase != .success {
             keptText.string = engine.text
@@ -366,13 +394,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             announce(RoomPresentation.wipeReport(unused: unused))
         }
         if phase == .success, lastPhase != .success {
-            announce("You wrote it down. Copy your text before leaving.")
+            announce("Draft kept. Copy your text before closing.")
         }
         lastPhase = phase
         let isKept = phase == .success
         keptView.isHidden = !isKept
         scrollView.isHidden = isKept
         textView.isEditable = !isKept
+        if sessionChanged, phase == .writing {
+            DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
+        }
         if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
         reportLabel.isHidden = phase != .failure
         placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
@@ -382,15 +413,45 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let seconds = max(0, Int(ceil(engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
+        timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
+        countLabel.setAccessibilityLabel("\(countLabel.stringValue) written")
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
         warningLabel.isHidden = !warning
         if warning { numeralLabel.stringValue = "\(engine.secondsUntilDeletion)" }
-        let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion) : 0
+        let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion, limit: engine.silenceLimit) : 0
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
         if !textView.hasMarkedText() { prepareViewport() }
+    }
+
+    private func applyVisualSettings() {
+        let settings = appState.settings
+        let width: CGFloat = settings.writingAlignment == .centered ? 720 : 920
+        if paperWidth.constant != width { paperWidth.constant = width }
+        textView.configureSessionTypography(size: settings.writingFontSize.points, alignment: settings.writingAlignment)
+        if keptText.font?.pointSize != settings.writingFontSize.points {
+            keptText.font = BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderUprightPostScript,
+                                                        size: settings.writingFontSize.points)
+                ?? NSFont.systemFont(ofSize: settings.writingFontSize.points)
+        }
+        let alignment: NSTextAlignment = settings.writingAlignment == .centered ? .center : .left
+        if keptText.alignment != alignment { keptText.alignment = alignment }
+        let showChrome = !settings.focusMode || chromeHover
+        timerLabel.alphaValue = showChrome ? 1 : 0
+        countLabel.alphaValue = showChrome ? 1 : 0
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        let position = paper.convert(event.locationInWindow, from: nil)
+        chromeHover = position.y > paper.bounds.height - 90 || position.y < 90
+        applyVisualSettings()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        chromeHover = false
+        applyVisualSettings()
     }
 
     private func setWash(_ opacity: CGFloat, cut: Bool) {
@@ -445,8 +506,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         appState.abandonSession()
         appState.startSession(duration: engine.duration)
     }
+    func copyKeptText() {
+        guard engine.phase == .success else { return }
+        copyText()
+    }
+
     @objc private func copyText() {
-        copyButton.title = RoomPresentation.copy(engine.text, to: .general) ? "COPIED" : "TRY COPY AGAIN"
+        copyButton.title = RoomPresentation.copy(engine.text, to: pasteboard) ? "COPIED" : "TRY COPY AGAIN"
         focusForPhase()
     }
 

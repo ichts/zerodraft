@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController 的 SurfaceFactory、DesignSystem/Colors
- * [OUTPUT]: RootContainerViewController - 常驻窗口内容控制器，用子 VC 承载各 surface 并原地切换
+ * [OUTPUT]: 常驻窗口内容容器，原地切换 surface 子 VC 并转发当前房间菜单动作与新篇同步刷新
  * [POS]: FirstLine AppKit 壳的 surface 宿主；窗口只设一次尺寸，切 surface 只换子视图，避免每次
  *        换 contentViewController 触发的窗口 resize / 0x0 fitting-size / 递归 layout
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -19,6 +19,9 @@ import AppKit
 final class RootContainerViewController: NSViewController {
     private let appState: AppState
     private var current: NSViewController?
+
+    func copyKeptText() { (current as? SessionViewController)?.copyKeptText() }
+    func refreshRoom() { (current as? SessionViewController)?.refreshRoom() }
 
     init(appState: AppState) {
         self.appState = appState

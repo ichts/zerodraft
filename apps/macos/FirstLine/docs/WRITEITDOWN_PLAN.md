@@ -1,13 +1,13 @@
 # writeitdown for macOS - Build Plan
 
-Status: batches 0-3 accepted; batch 4 implemented, pending independent real-window acceptance. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
+Status: batch 5 implemented; independent real-window acceptance remains pending. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 
 ## 1. Goal
 
-- The app is a native AppKit writing room that behaves like the live site at https://writeitdown.app: forward-only writing, a warning after five seconds of silence, the draft wiped after eight seconds of silence, and a kept draft that the writer can copy out when the clock runs out.
-- Before writing, the writer chooses a session length and a fixed silence limit. The last chosen length is the default; the standard eight-second limit is the default.
+- The app is a native AppKit writing room that follows the live site's forward-only writing and keeps the draft for copying when the clock runs out. Native silence timing follows the pre-writing choice in section 4, not the site's fixed five/eight-second timing.
+- Before writing, the writer chooses a session length and a silence limit. The last chosen length is the default; the standard eight-second limit is the default.
 - The desktop app is a small tool, not a landing page: opening it puts the cursor in the writing flow, then the writer copies the text when done and closes it. No screen needs a promotional slogan.
 - The app does only the writeitdown thing. First Line and Zero Draft leftovers that do not serve that job (the draft Library, saved Markdown files, Copy for AI, fossils, the separate Failure screen) are removed.
 - The paid license flow stays. It is rebranded to writeitdown and reuses the design in `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md`.
@@ -118,22 +118,22 @@ stateDiagram-v2
 ### 4.2 Start screen
 
 - The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows one row of five duration buttons and the three silence choices; activating a duration starts writing immediately with the cursor ready.
-- On opening the tool, keyboard focus is ready for writing, with the remembered duration selected. A keyboard-only writer can begin with that duration without a mouse; the choices remain available until the first input. No duration or silence choice may change once writing begins.
+- On opening the tool, the remembered duration button has keyboard focus. A keyboard-only writer can activate it without a mouse. Duration and silence choices are available on the start screen, not in Settings or the writing room; the clock starts on the first input after entering the room.
 - The three silence choices are available before writing, with Standard selected by default. Keep them compact and visibly labeled; do not add a second promotional start action.
 - Before the first keystroke, the room clock shows the chosen duration. The clock starts with the first committed or marked text. After a kept session, `RUN IT AGAIN` uses the current choices; Escape returns to the pre-writing choices.
-- The old MDWA-style picker, eight-choice duration menu, and Cmd+1 through Cmd+8 length shortcuts are superseded. The `Session` menu still exposes the relevant start, exit, and setting commands without a resident menu-bar utility.
+- The old MDWA-style picker, eight-choice duration menu, and Cmd+1 through Cmd+8 length shortcuts are superseded. The Navigate menu offers New Piece, Writing, and Home; Settings remains in the app menu. There is no resident menu-bar utility.
 
 ### 4.3 Settings and keyboard
 
 - Settings (`Cmd+,`) offers Focus Mode, alignment, font size, and appearance alongside the existing license and motion controls. Focus Mode is off by default; when on, the room fills the screen and hides the clock and word count until the pointer hovers over their chrome. Deadline announcements remain accessible without hover.
 - Alignment defaults to a centered narrow column and can switch to a left-aligned wide column. Font size offers Small, Medium, and Large, with Medium as the default. Appearance follows the system by default, with the existing Light and Dark choices.
-- Settings preferences may persist without storing draft text. Settings may be viewed while writing, but duration and silence limits are locked until the next session; changing focus, alignment, font size, or appearance must not reset the session clock or draft.
+- Settings preferences may persist without storing draft text. Settings may be viewed while writing and Done returns to the surface from which Settings opened. Duration and silence limits are selected only on the start screen and cannot change while writing; changing focus, alignment, font size, or appearance must not reset the session clock or draft. Native fullscreen exit turns focus mode off during writing; a programmatic exit for Settings navigation preserves the preference, including a quick Settings/Done round trip.
 - `Cmd+N` starts a new piece through the existing session and trial gate, dropping any current unkept draft without saving it. On the kept view, `Cmd+C` copies the entire draft rather than a partial selection; `Cmd+W` closes the window. The full flow must work without a mouse.
 - Word-count goals and a resident menu-bar app are out of scope.
 
 ### 4.4 Governance note
 
-`VISION.md` still fixes a sixty-second session. Batch 5 updates the matching line for the five duration choices and configurable silence limit while preserving forward-only writing, deadline precedence, and no draft persistence. The captain's current choices replace the previous reference-based options and fixed-threshold recommendation; historical batch 1-4 requirements below record what shipped, not the final native settings.
+`VISION.md` distinguishes the web's fixed sixty seconds from the native duration and silence choices. The captain's current choices replace the previous reference-based options and fixed-threshold recommendation; historical batch 1-4 requirements below record what shipped, not the final native settings.
 
 ## 5. Inventory
 
@@ -179,7 +179,7 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/Licensing/LicenseClient.swift`, `LicenseModels.swift`, `MockLicenseClient.swift` | The paid license flow stays. | Add a live Dodo client (batch 6). |
 | `Sources/FirstLine/Infrastructure/InstallIDStore.swift` | It provides the Dodo activation instance name without hardware IDs. | Rename the root folder (batch 3). |
 | `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the trial-exhausted purchase screen. | Brand copy and a real checkout link (batch 6). |
-| `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls; show duration and silence limits as locked during writing (batch 5). |
+| `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls (batch 5). Duration and silence choices belong only on the start screen. |
 | `Sources/FirstLine/DesignSystem/Colors.swift`, `Typography.swift`, `Spacing.swift`, `FirstLineButtons.swift`, `FloodCanvasView.swift`, `WritingFontCandidate.swift` | They are the design token layer and bundled fonts. | Site tokens (batch 3). |
 | `Sources/FirstLine/Resources/` | It holds Newsreader, IBM Plex Mono, and Zhuque Fangsong, with their OFL texts. | Keep all three. The site uses the first two, and Zhuque covers CJK. |
 | `Tests/FirstLineTests/SessionEngineTests.swift`, `EditorFocusTests.swift`, `SettingsStoreTests.swift`, `LicenseFlowTests.swift`, `SmokeFlowTests.swift` | They cover the rules that stay. | Update per batch. |
@@ -251,15 +251,15 @@ flowchart LR
     B6 --> B7[7 Signed DMG release]
 ```
 
-Every batch uses this common acceptance set, run from `apps/macos/FirstLine/`:
+The current batch 5 acceptance commands, run from `apps/macos/FirstLine/`, are:
 
 ```bash
 swift build            # must exit 0
 swift test             # must exit 0; the record states the test count
-scripts/qa-window.sh <batch> # real-window QA; screenshots under /tmp/wid-qa/<batch>/
+scripts/qa-window.sh 5 # current real-window QA only; screenshots under /tmp/wid-qa/5/
 ```
 
-Batch 1 creates `scripts/qa-window.sh`. It builds the debug binary, launches it, drives it with `osascript` (System Events key codes, one key at a time, because long `keystroke` strings drop spaces), captures the app window only with `screencapture -l <window id>`, and quits the app. Each batch extends the script with its own states. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`. The current script supports only batch 5; historical batch 1-4 flows are unavailable. It builds the debug binary, launches it, drives it with `osascript`, captures the app window with `screencapture -l <window id>`, and quits the app. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 
@@ -417,7 +417,7 @@ After a batch merges, a fresh session with no memory of the build session accept
 1. The accepting session reads this document, the batch's section, and the merged pull request's description. It does not read the build session's conversation.
 2. It checks out the merge commit in a clean worktree.
 3. From `apps/macos/FirstLine/`, it runs `swift build`, `swift test`, each named test with `swift test --filter <Suite>/<function>`, and every `rg` check listed for the batch, and it records the exit codes.
-4. It runs `scripts/qa-window.sh <batch>` itself and inspects every screenshot against the batch's done conditions. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
+4. For batch 5 it runs `scripts/qa-window.sh 5` itself and inspects every screenshot against the done conditions. Historical batches 1-4 have no runnable scripted window flow. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
 5. It appends a record under `Independent acceptance - Batch N` to `docs/MANUAL_QA.md` with the commit, the date, each done condition marked pass or fail with its evidence, and anything not verified.
 6. Any failure opens a fix batch before the next batch starts. The accepting session reports the failure and does not fix it silently.
 
@@ -431,7 +431,6 @@ All ten findings are incorporated into the affected batch or acceptance sections
 
 ## 12. Risks
 
-- Governance: `VISION.md` still fixes sixty seconds; batch 5 updates it for the five durations and three silence limits. Batch 4 must update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them.
 - The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.

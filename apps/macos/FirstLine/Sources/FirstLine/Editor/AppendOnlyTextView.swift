@@ -14,10 +14,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
 
-    private let compositionTopRatio: CGFloat = 0.37
-    private let compositionBottomRatio: CGFloat = 0.63
+    private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
-    private var lastAppliedViewportHeight: CGFloat = 0
     private(set) var pendingCompositionRefresh = true
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
@@ -427,45 +425,31 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         textStorage.endEditing()
     }
 
+    func setCompositionAnchor(_ y: CGFloat) {
+        guard abs(compositionAnchorY - y) > insetEpsilon else { return }
+        compositionAnchorY = y
+        updateViewportInsetsIfNeeded()
+        pendingCompositionRefresh = true
+    }
+
     func scrollCaretToCompositionAnchor() {
         guard let scrollView = enclosingScrollView,
-              let layoutManager,
-              let textContainer else { return }
+              let line = compositionLineRect() else { return }
 
-        if string.isEmpty {
-            scrollView.contentView.scroll(to: NSPoint(x: 0, y: -scrollView.contentInsets.top))
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-            return
-        }
-
-        layoutManager.ensureLayout(for: textContainer)
-
-        let insertionLocation = selectedRange().location
-        let lineRect: NSRect
-
-        if insertionLocation == utf16Length,
-           string.last == "\n",
-           layoutManager.extraLineFragmentRect.isEmpty == false {
-            lineRect = layoutManager.extraLineFragmentRect
-        } else {
-            let characterIndex = max(insertionLocation - 1, 0)
-            let glyphIndex = layoutManager.glyphIndexForCharacter(at: characterIndex)
-            lineRect = layoutManager.lineFragmentUsedRect(
-                forGlyphAt: glyphIndex,
-                effectiveRange: nil,
-                withoutAdditionalLayout: true
-            )
-        }
-
-        let viewportHeight = scrollView.contentView.bounds.height
-        let anchorY = round(viewportHeight * compositionTopRatio)
-        let targetY = max(-scrollView.contentInsets.top, round(lineRect.minY - anchorY))
-        let currentY = scrollView.contentView.bounds.origin.y
-
-        guard abs(currentY - targetY) > insetEpsilon else { return }
-
+        let targetY = max(-scrollView.contentInsets.top, round(textContainerOrigin.y + line.midY - compositionAnchorY))
+        guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    private func compositionLineRect() -> NSRect? {
+        guard let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        if string.isEmpty || (selectedRange().location == utf16Length && string.last == "\n") {
+            return layoutManager.extraLineFragmentRect
+        }
+        let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
+        return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
     }
 
     func clearPendingCompositionRefresh() {
@@ -476,13 +460,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView else { return }
 
         let viewportHeight = round(scrollView.contentView.bounds.height)
-        guard viewportHeight > 0 else { return }
-        guard abs(viewportHeight - lastAppliedViewportHeight) > insetEpsilon else { return }
+        guard viewportHeight > 0, compositionAnchorY > 0,
+              let line = compositionLineRect() else { return }
 
-        lastAppliedViewportHeight = viewportHeight
-
-        let topInset = round(viewportHeight * compositionTopRatio)
-        let bottomInset = round(viewportHeight * compositionBottomRatio)
+        let topInset = max(0, round(compositionAnchorY - textContainerOrigin.y - line.height / 2))
+        let bottomInset = max(0, viewportHeight - topInset)
         let currentInsets = scrollView.contentInsets
 
         guard abs(currentInsets.top - topInset) > insetEpsilon ||

@@ -28,7 +28,7 @@ Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖
 Sources/FirstLine/Licensing/MockLicenseClient.swift: LicenseClient actor 替身，不触达真实 Dodo 网络。
 Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
 Sources/FirstLine/Session/RoomPresentation.swift: 与网站一致的时钟、擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
-Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID 时清空旧视图、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
+Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；按窗口内容高度定位书写行及空态文案，托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID 时清空旧视图、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: Mac trial 用尽后的 upgrade 界面，含 license key 输入、激活全部状态、禁用的 Buy 占位与 Back to Home。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 appearance、motion、focus、alignment、font size、Trial & License；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。

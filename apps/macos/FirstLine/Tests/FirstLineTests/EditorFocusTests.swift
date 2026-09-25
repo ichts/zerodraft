@@ -4,33 +4,65 @@ import Testing
 
 @MainActor
 struct EditorFocusTests {
-    @Test(arguments: [WritingAlignment.centered, .left])
-    func writingLineStaysAboveCenterAsDraftGrows(alignment: WritingAlignment) throws {
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 700))
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 700))
-        scrollView.documentView = textView
-        scrollView.hasVerticalScroller = false
-        textView.configureSessionTypography(alignment: alignment)
-        scrollView.layoutSubtreeIfNeeded()
-
-        let emptyY = try activeLineY(in: textView, scrollView: scrollView)
-        #expect(abs(emptyY / scrollView.contentView.bounds.height - 0.37) < 0.03)
-
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "One\nTwo\nThree\nFour"))
-        textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
-        textView.scrollCaretToCompositionAnchor()
-        let grownY = try activeLineY(in: textView, scrollView: scrollView)
-        #expect(abs(grownY - emptyY) < 24)
+    @Test(arguments: [WritingAlignment.centered, .left], [false, true])
+    func writingLineMatchesWindowAndPlaceholder(alignment: WritingAlignment, focus: Bool) throws {
+        for size in [NSSize(width: 1040, height: 720), NSSize(width: 1440, height: 900)] {
+            try checkWritingLine(alignment: alignment, focus: focus, size: size)
+        }
     }
 
-    private func activeLineY(in textView: AppendOnlyTextView, scrollView: NSScrollView) throws -> CGFloat {
+    private func checkWritingLine(alignment: WritingAlignment, focus: Bool, size: NSSize) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root))
+        state.settings.writingAlignment = alignment
+        state.settings.focusMode = focus
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(size)
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let placeholder = try #require(descendants(of: room.view, as: NSTextField.self)
+            .first(where: { $0.stringValue == "Start typing." }))
+        let emptyY = try activeLineY(in: editor, room: room)
+        let placeholderY = windowTop(of: placeholder.bounds.midY, in: placeholder, room: room)
+        #expect(abs(emptyY / room.view.bounds.height - 0.39) < 0.01)
+        #expect(abs(placeholderY - emptyY) < 3)
+        #expect(!placeholder.isHidden)
+
+        editor.insertText("One\nTwo\nThree\nFour", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.refreshRoom()
+        let grownY = try activeLineY(in: editor, room: room)
+        #expect(abs(grownY - emptyY) < 3)
+        #expect(placeholder.isHidden)
+    }
+
+    private func descendants<T: NSView>(of view: NSView, as type: T.Type) -> [T] {
+        view.subviews.flatMap { child in
+            ((child as? T).map { [$0] } ?? []) + descendants(of: child, as: type)
+        }
+    }
+
+    private func windowTop(of y: CGFloat, in view: NSView, room: SessionViewController) -> CGFloat {
+        room.view.bounds.height - room.view.convert(NSPoint(x: 0, y: y), from: view).y
+    }
+
+    private func activeLineY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
         layout.ensureLayout(for: container)
         let line = textView.string.isEmpty
             ? layout.extraLineFragmentRect
-            : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: textView.string.utf16.count - 1), effectiveRange: nil)
-        return textView.textContainerOrigin.y + line.midY - scrollView.contentView.bounds.origin.y
+            : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1), effectiveRange: nil)
+        return windowTop(of: textView.textContainerOrigin.y + line.midY, in: textView, room: room)
     }
 
     @Test

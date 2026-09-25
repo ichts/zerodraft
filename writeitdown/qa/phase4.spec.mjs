@@ -31,6 +31,7 @@ async function assertZen(page) {
       apertureTop: rect.top,
       chromeBottom: e.closest('.room-paper').querySelector('.chrome-row').getBoundingClientRect().bottom,
       visibleTextLines: [0, 1, 2, 3].filter(previous => activeCenter - previous * line > rect.top).length,
+      roomGut: parseFloat(getComputedStyle(e.closest('.room')).paddingTop),
       pageHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
       pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
     };
@@ -38,7 +39,8 @@ async function assertZen(page) {
   expect(Math.abs(geometry.height - geometry.line * 5)).toBeLessThan(1);
   expect(geometry.visibleTextLines).toBe(3);
   expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
-  expect(Math.abs(geometry.activeCenter - geometry.viewportHeight * 0.39)).toBeLessThan(2);
+  expect(Math.abs(geometry.activeCenter - Math.max(geometry.viewportHeight * 0.39,
+    geometry.roomGut + 64 + 2.5 * geometry.line))).toBeLessThan(2);
   expect(Math.abs(geometry.writingAreaCenter - geometry.activeCenter)).toBeLessThan(1);
   expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.bottomGap).toBeLessThan(2);
@@ -150,6 +152,16 @@ test('demo and trial active-line placement', async ({ page }, info) => {
   }
   await info.attach('placement', { body: JSON.stringify({ demo, states }), contentType: 'application/json' });
   console.log(info.project.name, JSON.stringify({ demo, states }));
+});
+
+test('short rooms keep the writing aperture below the clock', async ({ page }, info) => {
+  await page.setViewportSize({ width: info.project.use.viewport.width, height: 350 });
+  await enter(page);
+  const empty = await assertZen(page);
+  expect(empty.activeCenter).toBeGreaterThan(350 * 0.39);
+  await page.keyboard.insertText('One\nTwo\nThree\nFour');
+  const grown = await assertZen(page);
+  expect(Math.abs(grown.activeCenter - empty.activeCenter)).toBeLessThan(1);
 });
 
 test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ page }, info) => {

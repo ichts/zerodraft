@@ -1,8 +1,8 @@
 # Write It Down for macOS
 
-A native AppKit writing room. Write forward: deletion, paste, cut, undo and selection replacement are blocked. The clock starts on the first input. After five seconds of silence a warning appears; after eight seconds your draft is deleted. Reach the deadline first to keep and copy your text. Writing is not saved to disk or uploaded.
+A native AppKit writing room. Choose 1, 5, 10, 20, or 30 minutes to start; the last choice is remembered, and the first-run default is one minute. Choose a 5-second (Strict), 8-second (Standard), or 12-second (Relaxed) silence limit before writing. Standard is the default. The warning begins three seconds before the selected limit; at the limit, the draft is deleted. Write forward: deletion, paste, cut, undo, and selection replacement are blocked. The clock starts on the first input. Reach the deadline first to keep and copy your text. Writing is not saved to disk or uploaded.
 
-The native room now keeps the writing, warning, wipe report and finished draft in one view. Session length is still fixed at one minute; the duration picker, paid license integration and signed DMG are later batches in `docs/WRITEITDOWN_PLAN.md`. The SwiftPM executable is not a distributable app.
+Settings offers focus mode, alignment, font size, and appearance; duration and silence choices stay on the start screen. Settings returns to the screen you left; the session and silence deadlines keep running, so a deadline can still complete or wipe the draft. Focus mode fills the screen during writing and hides the clock and word count until pointer hover; leaving fullscreen with the native window control turns focus mode off. The SwiftPM executable is not a distributable app. Paid license integration and a signed DMG remain later batches in `docs/WRITEITDOWN_PLAN.md`.
 
 ## Build and test
 

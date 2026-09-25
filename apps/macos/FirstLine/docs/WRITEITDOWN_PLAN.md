@@ -118,22 +118,22 @@ stateDiagram-v2
 ### 4.2 Start screen
 
 - The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows one row of five duration buttons and the three silence choices; activating a duration starts writing immediately with the cursor ready.
-- On opening the tool, keyboard focus is ready for writing, with the remembered duration selected. A keyboard-only writer can begin with that duration without a mouse; the choices remain available until the first input. No duration or silence choice may change once writing begins.
+- On opening the tool, the remembered duration button has keyboard focus. A keyboard-only writer can activate it without a mouse. Duration and silence choices are available on the start screen, not in Settings or the writing room; the clock starts on the first input after entering the room.
 - The three silence choices are available before writing, with Standard selected by default. Keep them compact and visibly labeled; do not add a second promotional start action.
 - Before the first keystroke, the room clock shows the chosen duration. The clock starts with the first committed or marked text. After a kept session, `RUN IT AGAIN` uses the current choices; Escape returns to the pre-writing choices.
-- The old MDWA-style picker, eight-choice duration menu, and Cmd+1 through Cmd+8 length shortcuts are superseded. The `Session` menu still exposes the relevant start, exit, and setting commands without a resident menu-bar utility.
+- The old MDWA-style picker, eight-choice duration menu, and Cmd+1 through Cmd+8 length shortcuts are superseded. The Navigate menu offers New Piece, Writing, and Home; Settings remains in the app menu. There is no resident menu-bar utility.
 
 ### 4.3 Settings and keyboard
 
 - Settings (`Cmd+,`) offers Focus Mode, alignment, font size, and appearance alongside the existing license and motion controls. Focus Mode is off by default; when on, the room fills the screen and hides the clock and word count until the pointer hovers over their chrome. Deadline announcements remain accessible without hover.
 - Alignment defaults to a centered narrow column and can switch to a left-aligned wide column. Font size offers Small, Medium, and Large, with Medium as the default. Appearance follows the system by default, with the existing Light and Dark choices.
-- Settings preferences may persist without storing draft text. Settings may be viewed while writing, but duration and silence limits are locked until the next session; changing focus, alignment, font size, or appearance must not reset the session clock or draft.
+- Settings preferences may persist without storing draft text. Settings may be viewed while writing and Done returns to the surface from which Settings opened. Duration and silence limits are selected only on the start screen and cannot change while writing; changing focus, alignment, font size, or appearance must not reset the session clock or draft. Native fullscreen exit turns focus mode off during writing; a programmatic exit for Settings navigation preserves the preference, including a quick Settings/Done round trip.
 - `Cmd+N` starts a new piece through the existing session and trial gate, dropping any current unkept draft without saving it. On the kept view, `Cmd+C` copies the entire draft rather than a partial selection; `Cmd+W` closes the window. The full flow must work without a mouse.
 - Word-count goals and a resident menu-bar app are out of scope.
 
 ### 4.4 Governance note
 
-`VISION.md` still fixes a sixty-second session. Batch 5 updates the matching line for the five duration choices and configurable silence limit while preserving forward-only writing, deadline precedence, and no draft persistence. The captain's current choices replace the previous reference-based options and fixed-threshold recommendation; historical batch 1-4 requirements below record what shipped, not the final native settings.
+`VISION.md` distinguishes the web's fixed sixty seconds from the native duration and silence choices. The captain's current choices replace the previous reference-based options and fixed-threshold recommendation; historical batch 1-4 requirements below record what shipped, not the final native settings.
 
 ## 5. Inventory
 
@@ -179,7 +179,7 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/Licensing/LicenseClient.swift`, `LicenseModels.swift`, `MockLicenseClient.swift` | The paid license flow stays. | Add a live Dodo client (batch 6). |
 | `Sources/FirstLine/Infrastructure/InstallIDStore.swift` | It provides the Dodo activation instance name without hardware IDs. | Rename the root folder (batch 3). |
 | `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the trial-exhausted purchase screen. | Brand copy and a real checkout link (batch 6). |
-| `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls; show duration and silence limits as locked during writing (batch 5). |
+| `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls (batch 5). Duration and silence choices belong only on the start screen. |
 | `Sources/FirstLine/DesignSystem/Colors.swift`, `Typography.swift`, `Spacing.swift`, `FirstLineButtons.swift`, `FloodCanvasView.swift`, `WritingFontCandidate.swift` | They are the design token layer and bundled fonts. | Site tokens (batch 3). |
 | `Sources/FirstLine/Resources/` | It holds Newsreader, IBM Plex Mono, and Zhuque Fangsong, with their OFL texts. | Keep all three. The site uses the first two, and Zhuque covers CJK. |
 | `Tests/FirstLineTests/SessionEngineTests.swift`, `EditorFocusTests.swift`, `SettingsStoreTests.swift`, `LicenseFlowTests.swift`, `SmokeFlowTests.swift` | They cover the rules that stay. | Update per batch. |
@@ -431,7 +431,6 @@ All ten findings are incorporated into the affected batch or acceptance sections
 
 ## 12. Risks
 
-- Governance: `VISION.md` still fixes sixty seconds; batch 5 updates it for the five durations and three silence limits. Batch 4 must update the L1/L2/L3 descriptions of Failure, aftermath, and fossils when it removes them.
 - The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.

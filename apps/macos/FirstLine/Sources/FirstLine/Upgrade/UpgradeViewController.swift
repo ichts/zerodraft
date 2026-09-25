@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state and DesignSystem tokens
  * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and license activation flow
- * [POS]: First Line AppKit Upgrade surface; consumes existing AppState license APIs without owning business logic
+ * [POS]: writeitdown AppKit license gate; uses configured price and checkout via AppState
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -10,7 +10,6 @@ import AppKit
 @MainActor
 final class UpgradeViewController: NSViewController {
     private let appState: AppState
-    private static let displayPrice = "$4.99"
     private var licenseField: NSTextField!
     private var activateButton: NSButton!
     private var feedbackLabel: NSTextField!
@@ -37,9 +36,9 @@ final class UpgradeViewController: NSViewController {
 
     private func buildInterface() {
         let title = label("Trial complete", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
-        let subtitle = label("You used the three free Mac writing sessions.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
+        let subtitle = label("Three writing sessions used.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
         let licenseName = label("writeitdown license", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
-        let pricing = label("One-time \(Self.displayPrice). 2 Macs. No subscription. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
+        let pricing = label("One payment. 2 Macs. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
@@ -52,8 +51,8 @@ final class UpgradeViewController: NSViewController {
         feedbackLabel = label("", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
         feedbackLabel.isHidden = true
 
-        let buyButton = FirstLineButtons.secondary(title: "Buy a license - Checkout coming soon", target: nil, action: #selector(noop))
-        buyButton.isEnabled = false
+        let buyButton = FirstLineButtons.secondary(title: "Buy a license - \(AppState.displayPrice), one time", target: self, action: #selector(buyTapped))
+        buyButton.isEnabled = AppState.checkoutURL != nil
         let backButton = FirstLineButtons.secondary(title: "Back to Home", target: self, action: #selector(backTapped))
 
         let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, backButton])
@@ -121,5 +120,5 @@ final class UpgradeViewController: NSViewController {
     }
 
     @objc private func backTapped() { appState.goHome() }
-    @objc private func noop() {}
+    @objc private func buyTapped() { appState.openCheckout() }
 }

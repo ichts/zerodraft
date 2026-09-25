@@ -88,7 +88,7 @@ final class SettingsViewController: NSViewController {
             return rows
         }
 
-        let explanation = muted("The Mac trial includes three writing sessions. Activate a license key to keep writing.")
+        let explanation = muted("Three writing sessions included. Activate a license key to keep writing.")
         licenseExplanationLabel = explanation
 
         let field = NSTextField(string: "")
@@ -105,7 +105,8 @@ final class SettingsViewController: NSViewController {
         entry.spacing = 12
         licenseEntryView = entry
 
-        let buy = link("Open Buy page", #selector(openBuyTapped))
+        let buy = link("Buy a license - \(AppState.displayPrice), one time", #selector(openBuyTapped))
+        buy.isEnabled = AppState.checkoutURL != nil
         buyPageButton = buy
         rows.append(contentsOf: [explanation, entry, buy])
         return rows
@@ -264,6 +265,6 @@ final class SettingsViewController: NSViewController {
         }
     }
 
-    @objc private func openBuyTapped() { appState.openLaunchWebsite() }
+    @objc private func openBuyTapped() { appState.openCheckout() }
     @objc private func doneTapped() { appState.closeSettings() }
 }

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate 与可验证的 license 持久化
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 license 持久化
  * [POS]: 导航及 trial gate；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -23,6 +23,19 @@ enum Surface: String, CaseIterable, Hashable, Identifiable {
 @Observable
 final class AppState {
     static let trialSessionLimit = 3
+    static let configurationURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        .deletingLastPathComponent().appendingPathComponent("Info.plist")
+    private static var configuration: [String: Any] {
+        if Bundle.main.bundleURL.pathExtension == "app" { return Bundle.main.infoDictionary ?? [:] }
+        return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
+    }
+    static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
+    static var checkoutURL: URL? { checkoutURL(in: configuration) }
+    static func checkoutURL(in values: [String: Any]) -> URL? {
+        guard let value = values["WIDCheckoutURL"] as? String,
+              let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
+        return url
+    }
     /// Dodo validate 不可达时，仍把 license 视作 active 的最长宽限期。
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
 
@@ -73,11 +86,18 @@ final class AppState {
             return
         }
 
-        consumeTrialSessionIfNeeded()
         let resolvedDuration = SessionEngine.validDuration(duration ?? selectedDuration)
         sessionEngine.start(duration: resolvedDuration, silenceLimit: settings.silenceLimit)
         selectedSurface = .session
     }
+
+    func consumeTrialOnFirstInput() {
+        guard sessionEngine.hasStarted, chargedSessionID != sessionEngine.sessionID else { return }
+        chargedSessionID = sessionEngine.sessionID
+        consumeTrialSessionIfNeeded()
+    }
+
+    private var chargedSessionID: UUID?
 
     func prepareSessionInput() -> Bool {
         sessionEngine.tick()
@@ -174,13 +194,14 @@ final class AppState {
         persistSettings()
     }
 
-    func openLaunchWebsite() {
-        guard let url = URL(string: "https://zerodraft.ai-builders.space/") else { return }
+    func openCheckout() {
+        guard let url = Self.checkoutURL else { return }
         NSWorkspace.shared.open(url)
     }
 
     func openLicenseHelp() {
-        openLaunchWebsite()
+        guard let url = URL(string: "https://writeitdown.app/support.html") else { return }
+        NSWorkspace.shared.open(url)
     }
 
     func activateLicense(key: String) async {

@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import Testing
 @testable import WriteItDown
 
@@ -35,6 +36,80 @@ struct LicenseFlowTests {
             clock: { clockNow }
         )
         return (appState, mock, store, fm, tempRoot)
+    }
+
+    private func editor(in view: NSView) -> AppendOnlyTextView? {
+        if let input = view as? AppendOnlyTextView { return input }
+        return view.subviews.lazy.compactMap { editor(in: $0) }.first
+    }
+
+    @Test func trialIsConsumedOnFirstKeystrokeNotOnEntry() throws {
+        let (state, _, store, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        state.startSession()
+        let input = try #require(editor(in: SessionViewController(appState: state).view))
+        #expect(state.settings.trialSessionsUsed == 0)
+        input.insertText("first", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 1)
+        input.insertText(" second", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 1)
+        #expect(try store.load().trialSessionsUsed == 1)
+    }
+
+    @Test func markedTextConsumesTrialOnlyOnce() throws {
+        let (state, _, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        state.startSession()
+        let input = try #require(editor(in: SessionViewController(appState: state).view))
+        input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 1)
+        input.insertText("你", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 1)
+    }
+
+    @Test func untouchedRoomDoesNotConsumeTrial() throws {
+        let (state, _, store, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        state.startSession()
+        state.abandonSession()
+        #expect(state.settings.trialSessionsUsed == 0)
+        #expect(try store.load().trialSessionsUsed == 0)
+    }
+
+    @Test func exhaustedTrialRoutesToUpgrade() throws {
+        let (state, _, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        state.settings.trialSessionsUsed = 2
+        state.startSession()
+        let input = try #require(editor(in: SessionViewController(appState: state).view))
+        input.insertText("third", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 3)
+        state.newPiece()
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.sessionEngine.phase == .idle)
+    }
+
+    @Test func checkoutURLComesFromInfoPlist() throws {
+        let config = try #require(NSDictionary(contentsOf: AppState.configurationURL) as? [String: Any])
+        let expected = config["WIDCheckoutURL"] as? String
+        #expect(AppState.checkoutURL == expected.flatMap(URL.init(string:)))
+        let configured = URL(string: "https://checkout.dodopayments.com/example")!
+        #expect(AppState.checkoutURL(in: ["WIDCheckoutURL": configured.absoluteString]) == configured)
+        #expect(AppState.checkoutURL(in: ["WIDCheckoutURL": "http://example.com"]) == nil)
+    }
+
+    @Test func displayPriceComesFromInfoPlist() throws {
+        let config = try #require(NSDictionary(contentsOf: AppState.configurationURL) as? [String: Any])
+        let price = try #require(config["WIDDisplayPrice"] as? String)
+        let (state, _, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        let upgrade = UpgradeViewController(appState: state)
+        func labels(_ view: NSView) -> [String] {
+            let fields = (view as? NSTextField).map { [$0.stringValue] } ?? []
+            let buttons = (view as? NSButton).map { [$0.title] } ?? []
+            return fields + buttons + view.subviews.flatMap(labels)
+        }
+        #expect(labels(upgrade.view).contains { $0.contains(price) })
     }
 
     @Test

@@ -15,18 +15,18 @@ Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppS
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cmd+,、新篇 Cmd+N、成稿复制 Cmd+C、关窗 Cmd+W）。
 Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；启用鼠标移动事件供专注模式悬停显示计时/字数，原生退出全屏时同步关闭写作中的专注偏好，导航导致的退出则保留偏好；所有会话相位留在同一个房间。
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
-Sources/FirstLine/App/AppState.swift: 顶层导航状态、会话启动与首输入 trial 计数、Info.plist 价格/HTTPS checkout 配置、license 激活/校验入口（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
+Sources/FirstLine/App/AppState.swift: 顶层导航状态、会话启动与首输入 trial 计数、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及产品 ID 门槛（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
 Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前选择面；五个时长按钮直接进入房间、三个静默时限单选；默认时长按钮获焦点。
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、五档时长/三档静默时限及专注/对齐/字号持久化、旧许可键只读迁移（v0.1 hasUnlockedFullAccess → v0.2 licenseStatus），不再写旧许可键与沉浸模式。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、五档时长/三档静默时限及专注/对齐/字号持久化、旧许可键只读迁移（v0.1 hasUnlockedFullAccess → v0.2 licenseStatus）、已接受激活的产品 ID 缓存，不再写旧许可键与沉浸模式。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，作为 Dodo activate 的 instance name。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约。
 Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖 activate / validate / deactivate 三个公开 endpoint。
 Sources/FirstLine/Licensing/MockLicenseClient.swift: LicenseClient actor 测试替身，不触达真实 Dodo 网络。
-Sources/FirstLine/Licensing/DodoLicenseClient.swift: URLSession 实现 Dodo 公开许可端点；Debug 默认 test mode，Release 默认 live mode，无 developer API key。测试以 URLProtocol 隔离请求。
+Sources/FirstLine/Licensing/DodoLicenseClient.swift: URLSession 实现 Dodo 公开许可端点；Debug 默认 test mode，Release 默认 live mode，无 developer API key；validate 仅返回有效性，不返回产品身份。测试以 URLProtocol 隔离请求。
 Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
 Sources/FirstLine/Session/RoomPresentation.swift: 与网站一致的时钟、擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
 Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID 时清空旧视图、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。

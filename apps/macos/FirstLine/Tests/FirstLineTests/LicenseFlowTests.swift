@@ -33,7 +33,8 @@ struct LicenseFlowTests {
             settingsStore: store,
             licenseClient: mock,
             installIDStore: installStore,
-            clock: { clockNow }
+            clock: { clockNow },
+            productID: "prod_mock"
         )
         return (appState, mock, store, fm, tempRoot)
     }
@@ -142,6 +143,7 @@ struct LicenseFlowTests {
         let reloaded = try store.load()
         #expect(reloaded.licenseStatus == .active)
         #expect(reloaded.licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(reloaded.licenseProductID == "prod_mock")
     }
 
     @Test
@@ -205,6 +207,50 @@ struct LicenseFlowTests {
     }
 
     @Test
+    func emptyProductConfigurationRejectsActivation() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let mock = MockLicenseClient()
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root), licenseClient: mock,
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "")
+        await state.activateLicense(key: "KEY")
+        #expect(state.licenseActivationError == .productNotConfigured)
+        #expect(await mock.lastActivateArguments == nil)
+    }
+
+    @Test
+    func cachedKeyIsBlockedUntilValidationAndRequiresMatchingProduct() async throws {
+        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+                                 licenseProductID: "prod_mock")
+        let (state, mock, _, fm, root) = try makeAppState(initialSettings: active)
+        defer { try? fm.removeItem(at: root) }
+        state.startSession()
+        #expect(state.sessionEngine.phase == .idle)
+        await state.validateLicenseIfNeeded()
+        #expect(await mock.lastValidatedKey == "KEY")
+        state.startSession()
+        #expect(state.sessionEngine.phase == .writing)
+
+        let wrongRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: wrongRoot) }
+        let wrongStore = SettingsStore(configDirectory: wrongRoot)
+        try wrongStore.save(active)
+        let wrong = AppState(settingsStore: wrongStore, licenseClient: MockLicenseClient(),
+                             installIDStore: InstallIDStore(configDirectory: wrongRoot), productID: "other")
+        await wrong.validateLicenseIfNeeded()
+        wrong.startSession()
+        #expect(wrong.selectedSurface == .upgrade)
+        #expect(wrong.trialStatusText.contains("does not match"))
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
+        }
+        #expect(fields(SettingsViewController(appState: wrong).view).contains { $0.placeholderString == "Paste license key" })
+    }
+
+    @Test
     func activeLicenseBypassesTrialLimit() throws {
         let exhausted = AppSettings(
             theme: .system,
@@ -250,7 +296,8 @@ struct LicenseFlowTests {
             licenseKey: "PRO-VALID",
             licenseStatus: .active,
             licenseActivatedAt: Date(timeIntervalSince1970: 1_699_000_000),
-            licenseLastValidatedAt: Date(timeIntervalSince1970: 1_699_000_000)
+            licenseLastValidatedAt: Date(timeIntervalSince1970: 1_699_000_000),
+            licenseProductID: "prod_mock"
         )
         let later = Date(timeIntervalSince1970: 1_700_000_000)
         let (appState, _, store, fm, tempRoot) = try makeAppState(
@@ -264,6 +311,7 @@ struct LicenseFlowTests {
 
         #expect(appState.settings.licenseStatus == .active)
         #expect(appState.settings.licenseLastValidatedAt == later)
+        #expect(!appState.licenseValidationInFlight)
         #expect(try store.load().licenseLastValidatedAt == later)
     }
 
@@ -276,7 +324,8 @@ struct LicenseFlowTests {
             licenseKey: "PRO-REFUNDED",
             licenseStatus: .active,
             licenseActivatedAt: Date(timeIntervalSince1970: 1_699_000_000),
-            licenseLastValidatedAt: Date(timeIntervalSince1970: 1_699_000_000)
+            licenseLastValidatedAt: Date(timeIntervalSince1970: 1_699_000_000),
+            licenseProductID: "prod_mock"
         )
         let (appState, _, _, fm, tempRoot) = try makeAppState(
             validationResult: false,
@@ -300,7 +349,8 @@ struct LicenseFlowTests {
             licenseKey: "PRO-OFFLINE",
             licenseStatus: .active,
             licenseActivatedAt: recentlyValidated,
-            licenseLastValidatedAt: recentlyValidated
+            licenseLastValidatedAt: recentlyValidated,
+            licenseProductID: "prod_mock"
         )
         let (appState, _, _, fm, tempRoot) = try makeAppState(
             validationError: .networkFailure,
@@ -325,7 +375,8 @@ struct LicenseFlowTests {
             licenseKey: "PRO-EXPIRED",
             licenseStatus: .active,
             licenseActivatedAt: lastValidated,
-            licenseLastValidatedAt: lastValidated
+            licenseLastValidatedAt: lastValidated,
+            licenseProductID: "prod_mock"
         )
         let (appState, _, _, fm, tempRoot) = try makeAppState(
             validationError: .networkFailure,
@@ -361,7 +412,8 @@ struct LicenseFlowTests {
             settingsStore: store,
             licenseClient: mock,
             installIDStore: installStore,
-            clock: { Date(timeIntervalSince1970: 1_700_000_000) }
+            clock: { Date(timeIntervalSince1970: 1_700_000_000) },
+            productID: "prod_mock"
         )
 
         await appState.activateLicense(key: "PRO-GOOD-KEY")

@@ -49,6 +49,7 @@ wait_for_radio_button() {
 if [[ "$batch" == 6 ]]; then
   shot start-light
   for trial in 1 2 3; do
+    wait_for_radio_button 'Standard - 8s'
     osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
     type "trial $trial"
     shot "trial-$trial-typing"
@@ -56,6 +57,7 @@ if [[ "$batch" == 6 ]]; then
     shot "trial-$trial-wiped"
     osascript -e 'tell application "System Events" to key code 53'
   done
+  wait_for_radio_button 'Standard - 8s'
   osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
   shot upgrade-after-three-trials
   echo 'Inspect Upgrade, configured Buy URL and active-license state with independent Computer Use. Without a Dodo test key, activation is NOT VERIFIED.'

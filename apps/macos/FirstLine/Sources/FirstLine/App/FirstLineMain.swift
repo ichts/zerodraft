@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Dodo client；新篇命令同步清理房间、路由复制与设置
+ * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Dodo client 并启动缓存许可校验；新篇命令同步清理房间、路由复制与设置
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -46,6 +46,7 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
         controller.showWindow(nil)
 
         NSApp.activate(ignoringOtherApps: true)
+        Task { await appState.validateLicenseIfNeeded() }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

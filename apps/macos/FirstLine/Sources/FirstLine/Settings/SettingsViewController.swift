@@ -82,7 +82,7 @@ final class SettingsViewController: NSViewController {
         licenseStatusLabel = muted(appState.trialStatusText)
         var rows: [NSView] = [licenseStatusLabel]
 
-        if appState.settings.licenseStatus == .active {
+        if appState.hasFullAccess {
             if let date = appState.settings.licenseActivatedAt { rows.append(muted("Activated \(formatted(date))")) }
             if let id = appState.settings.licenseInstanceID { rows.append(muted("Instance: \(id)")) }
             if let date = appState.settings.licenseLastValidatedAt { rows.append(muted("Last validated \(formatted(date))")) }

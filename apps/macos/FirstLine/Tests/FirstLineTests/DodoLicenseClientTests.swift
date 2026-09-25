@@ -57,6 +57,33 @@ struct DodoLicenseClientTests {
         let result = try await client().activate(licenseKey: "KEY", instanceName: "writeitdown Mac abcd1234")
         #expect(result.instanceID == "lki_123")
         #expect(result.productName == "Write It Down")
+        #expect(result.productID == "prod")
+    }
+
+    @MainActor
+    @Test(arguments: ["prod", "other", ""])
+    func productIdentityControlsEntitlement(responseProductID: String) async throws {
+        StubLicenseProtocol.response.set { _ in
+            let product = responseProductID.isEmpty ? "null" : #"{"product_id":"\#(responseProductID)","name":"Test"}"#
+            return (200, Data(#"{"id":"lki_1","license_key_id":"lic_1","name":"Mac","business_id":"biz","created_at":"2024-01-01T00:00:00Z","product":\#(product)}"#.utf8))
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        let state = AppState(settingsStore: store, licenseClient: client(),
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "prod")
+        state.settings.trialSessionsUsed = AppState.trialSessionLimit
+        await state.activateLicense(key: "KEY")
+        state.startSession()
+        if responseProductID == "prod" {
+            #expect(state.settings.licenseProductID == "prod")
+            #expect(state.selectedSurface == .session)
+            #expect(try store.load().licenseProductID == "prod")
+        } else {
+            #expect(state.licenseActivationError == .wrongProduct)
+            #expect(state.selectedSurface == .upgrade)
+            #expect(state.settings.licenseProductID == nil)
+        }
     }
 
     @Test(arguments: [("LICENSE_KEY_LIMIT_REACHED", LicenseActivationError.activationLimitReached), ("LICENSE_KEY_NOT_FOUND", .invalidKey), ("INACTIVE_LICENSE_KEY", .invalidKey)])

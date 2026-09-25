@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可缓存
+ * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可产品身份缓存
  * [POS]: 配置层；合法时长校验、旧字段迁移、写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -75,6 +75,7 @@ struct AppSettings: Codable, Equatable {
     var licenseActivatedAt: Date?
     var licenseLastValidatedAt: Date?
     var licenseInstanceID: String?
+    var licenseProductID: String?
 
     init(
         theme: AppTheme,
@@ -90,7 +91,8 @@ struct AppSettings: Codable, Equatable {
         licenseStatus: LicenseStatus = .trial,
         licenseActivatedAt: Date? = nil,
         licenseLastValidatedAt: Date? = nil,
-        licenseInstanceID: String? = nil
+        licenseInstanceID: String? = nil,
+        licenseProductID: String? = nil
     ) {
         self.theme = theme
         self.defaultDuration = SessionEngine.validDuration(defaultDuration)
@@ -104,6 +106,7 @@ struct AppSettings: Codable, Equatable {
         self.licenseActivatedAt = licenseActivatedAt
         self.licenseLastValidatedAt = licenseLastValidatedAt
         self.licenseInstanceID = licenseInstanceID
+        self.licenseProductID = licenseProductID
 
         // 向后兼容：v0.1 的 hasUnlockedFullAccess=true 映射到 v0.2 的 licenseStatus=.active。
         // 显式传入 licenseStatus 时尊重调用方意图。
@@ -126,6 +129,7 @@ struct AppSettings: Codable, Equatable {
         case licenseActivatedAt
         case licenseLastValidatedAt
         case licenseInstanceID
+        case licenseProductID
     }
 
     init(from decoder: Decoder) throws {
@@ -143,6 +147,7 @@ struct AppSettings: Codable, Equatable {
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
         licenseInstanceID = try container.decodeIfPresent(String.self, forKey: .licenseInstanceID)
+        licenseProductID = try container.decodeIfPresent(String.self, forKey: .licenseProductID)
 
         let decodedStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
         if legacyUnlocked && decodedStatus == .trial {
@@ -167,6 +172,7 @@ struct AppSettings: Codable, Equatable {
         try container.encodeIfPresent(licenseActivatedAt, forKey: .licenseActivatedAt)
         try container.encodeIfPresent(licenseLastValidatedAt, forKey: .licenseLastValidatedAt)
         try container.encodeIfPresent(licenseInstanceID, forKey: .licenseInstanceID)
+        try container.encodeIfPresent(licenseProductID, forKey: .licenseProductID)
     }
 
     static let defaultValue = AppSettings(

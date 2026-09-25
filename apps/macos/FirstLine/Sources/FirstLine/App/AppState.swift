@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 license 持久化
- * [POS]: 导航及 trial gate；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与产品限定的 license 持久化
+ * [POS]: 导航及 trial gate；启动校验前限制缓存许可；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -30,6 +30,7 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
+    static var dodoProductID: String { configuration["WIDDodoProductID"] as? String ?? "" }
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
@@ -47,7 +48,15 @@ final class AppState {
     let licenseClient: LicenseClient
     let installIDStore: InstallIDStore
     let clock: () -> Date
+    let productID: String
     var settings: AppSettings
+    private(set) var licenseValidationInFlight = false
+
+    var hasFullAccess: Bool {
+        guard settings.licenseStatus == .active else { return false }
+        if settings.licenseKey == nil { return true }
+        return !licenseValidationInFlight && !productID.isEmpty && settings.licenseProductID == productID
+    }
 
     /// UpgradeView / SettingsView 读取这些字段渲染激活状态。
     var licenseActivationInFlight = false
@@ -59,14 +68,17 @@ final class AppState {
         settingsStore: SettingsStore = SettingsStore(),
         licenseClient: LicenseClient = MockLicenseClient(),
         installIDStore: InstallIDStore = InstallIDStore(),
-        clock: @escaping () -> Date = Date.init
+        clock: @escaping () -> Date = Date.init,
+        productID: String = AppState.dodoProductID
     ) {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
         self.licenseClient = licenseClient
         self.installIDStore = installIDStore
         self.clock = clock
+        self.productID = productID
         self.settings = (try? settingsStore.load()) ?? .defaultValue
+        self.licenseValidationInFlight = settings.licenseStatus == .active && settings.licenseKey != nil
         self.selectedDuration = settings.defaultDuration
 
         launchInitialSurface()
@@ -81,6 +93,7 @@ final class AppState {
 
     func startSession(duration: TimeInterval? = nil) {
         guard sessionEngine.phase != .success && !sessionIsRunning else { return }
+        guard !licenseValidationInFlight else { return }
         guard canStartTrialSession else {
             selectedSurface = .upgrade
             return
@@ -215,15 +228,24 @@ final class AppState {
         licenseActivationJustSucceeded = false
         defer { licenseActivationInFlight = false }
 
+        guard !productID.isEmpty else {
+            licenseActivationError = .productNotConfigured
+            return
+        }
         let instanceName = installIDStore.loadOrCreate().shortName
         do {
             let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: instanceName)
+            guard activation.productID == productID else {
+                licenseActivationError = .wrongProduct
+                return
+            }
             // Snapshot the pre-activation state so a failed persist cannot leave the
             // app granting access that is not durable on disk.
             let preActivation = settings
             settings.licenseKey = trimmed
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
+            settings.licenseProductID = productID
             settings.licenseActivatedAt = clock()
             settings.licenseLastValidatedAt = clock()
             do {
@@ -251,9 +273,13 @@ final class AppState {
     func validateLicenseIfNeeded() async {
         guard settings.licenseStatus == .active,
               let key = settings.licenseKey else { return }
+        licenseValidationInFlight = true
+        defer { licenseValidationInFlight = false }
+        guard !productID.isEmpty, settings.licenseProductID == productID else { return }
 
         do {
             let valid = try await licenseClient.validate(licenseKey: key)
+            guard settings.licenseKey == key, settings.licenseProductID == productID else { return }
             if valid {
                 settings.licenseLastValidatedAt = clock()
                 persistSettings()
@@ -261,6 +287,7 @@ final class AppState {
                 applyRevokedState()
             }
         } catch {
+            guard settings.licenseKey == key, settings.licenseProductID == productID else { return }
             applyOfflineGraceDecision()
         }
     }
@@ -325,11 +352,15 @@ final class AppState {
     }
 
     var trialSessionsRemaining: Int {
-        guard settings.licenseStatus != .active else { return Self.trialSessionLimit }
+        guard !hasFullAccess else { return Self.trialSessionLimit }
         return max(0, Self.trialSessionLimit - settings.trialSessionsUsed)
     }
 
     var trialStatusText: String {
+        if licenseValidationInFlight { return "Checking license..." }
+        if settings.licenseStatus == .active && !hasFullAccess {
+            return "License does not match the configured writeitdown product."
+        }
         switch settings.licenseStatus {
         case .active:
             return "License active."
@@ -346,15 +377,15 @@ final class AppState {
     }
 
     var isTrialExhausted: Bool {
-        settings.licenseStatus != .active && trialSessionsRemaining == 0
+        !hasFullAccess && trialSessionsRemaining == 0
     }
 
     private var canStartTrialSession: Bool {
-        settings.licenseStatus == .active || settings.trialSessionsUsed < Self.trialSessionLimit
+        hasFullAccess || settings.trialSessionsUsed < Self.trialSessionLimit
     }
 
     private func consumeTrialSessionIfNeeded() {
-        guard settings.licenseStatus != .active else { return }
+        guard !hasFullAccess else { return }
         settings.trialSessionsUsed += 1
         persistSettings()
     }

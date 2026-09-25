@@ -4,6 +4,35 @@ import Testing
 
 @MainActor
 struct EditorFocusTests {
+    @Test(arguments: [WritingAlignment.centered, .left])
+    func writingLineStaysAboveCenterAsDraftGrows(alignment: WritingAlignment) throws {
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 800, height: 700))
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 700))
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = false
+        textView.configureSessionTypography(alignment: alignment)
+        scrollView.layoutSubtreeIfNeeded()
+
+        let emptyY = try activeLineY(in: textView, scrollView: scrollView)
+        #expect(abs(emptyY / scrollView.contentView.bounds.height - 0.37) < 0.03)
+
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "One\nTwo\nThree\nFour"))
+        textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
+        textView.scrollCaretToCompositionAnchor()
+        let grownY = try activeLineY(in: textView, scrollView: scrollView)
+        #expect(abs(grownY - emptyY) < 24)
+    }
+
+    private func activeLineY(in textView: AppendOnlyTextView, scrollView: NSScrollView) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        let line = textView.string.isEmpty
+            ? layout.extraLineFragmentRect
+            : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: textView.string.utf16.count - 1), effectiveRange: nil)
+        return textView.textContainerOrigin.y + line.midY - scrollView.contentView.bounds.origin.y
+    }
+
     @Test
     func focusTypographyBlursPreviousParagraphAndKeepsCurrentClear() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))

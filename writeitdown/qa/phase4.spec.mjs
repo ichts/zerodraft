@@ -38,9 +38,8 @@ async function assertZen(page) {
   expect(Math.abs(geometry.height - geometry.line * 5)).toBeLessThan(1);
   expect(geometry.visibleTextLines).toBe(3);
   expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
-  expect(Math.abs(geometry.activeCenter - geometry.paperCenter)).toBeLessThan(1);
-  expect(Math.abs(geometry.writingAreaCenter - geometry.paperCenter)).toBeLessThan(1);
-  expect(Math.abs(geometry.ratio - 0.5)).toBeLessThan(0.01);
+  expect(Math.abs(geometry.activeCenter - geometry.viewportHeight * 0.39)).toBeLessThan(2);
+  expect(Math.abs(geometry.writingAreaCenter - geometry.activeCenter)).toBeLessThan(1);
   expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.bottomGap).toBeLessThan(2);
   expect(geometry.overflow).toBe('hidden');
@@ -157,6 +156,19 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   await capture(page, info, 'landing');
   await enter(page);
   await capture(page, info, 'empty-focused');
+  const emptyLine = await assertZen(page);
+  await page.keyboard.insertText('First line');
+  await assertZen(page);
+  await capture(page, info, 'one-line');
+  for (let line = 2; line <= 4; line++) {
+    await page.keyboard.press('Enter');
+    await page.keyboard.insertText(`Line ${line}`);
+  }
+  const grownLine = await assertZen(page);
+  expect(Math.abs(grownLine.activeCenter - emptyLine.activeCenter)).toBeLessThan(1);
+  await capture(page, info, 'four-lines');
+  await page.locator('#exit').click();
+  await enter(page);
   for (const file of ['input-regression.js', 'zen-regression.js']) {
     const source = await readFile(new URL(file, import.meta.url), 'utf8');
     const results = await page.evaluate(`(${source})()`);

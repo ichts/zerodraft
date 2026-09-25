@@ -436,7 +436,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
-        let targetY = max(-scrollView.contentInsets.top, round(textContainerOrigin.y + compositionLineCenter(in: line) - compositionAnchorY))
+        let targetY = max(
+            -scrollView.contentInsets.top,
+            round(textContainerOrigin.y + compositionLineCenter(in: line) - compositionAnchorY)
+        )
         guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
         scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -460,7 +463,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
         let lineText = (string as NSString).substring(with: characters)
         guard let scalar = lineText.unicodeScalars.first(where: { !CharacterSet.whitespacesAndNewlines.contains($0) }),
-              let font = font(for: scalar), let ink = glyphMetrics(for: scalar, font: font)?.bounds else {
+              let font = font(for: scalar),
+              let ink = glyphMetrics(for: scalar, font: font)?.bounds else {
             return line.midY
         }
         return line.minY + layoutManager.location(forGlyphAt: glyph).y - ink.midY

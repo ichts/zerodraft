@@ -24,19 +24,22 @@ struct BrandTests {
         home.loadViewIfNeeded()
         let labels = allLabels(in: home.view)
         #expect(labels.contains("WRITE_IT_DOWN"))
-        #expect(labels.contains("We force you to write it down."))
-        #expect(labels.contains("Give it sixty seconds."))
-        let headline = try #require(allTextFields(in: home.view).first { $0.stringValue == "We force you to write it down." })
-        let logotype = try #require(allTextFields(in: home.view).first { $0.stringValue == "WRITE_IT_DOWN" })
-        let deck = try #require(allTextFields(in: home.view).first { $0.stringValue.hasPrefix("With a clock:") })
-        let button = try #require(allButtons(in: home.view).first { $0.title == "Give it sixty seconds." })
-        #expect(headline.font!.pointSize > max(logotype.font!.pointSize, deck.font!.pointSize, button.font!.pointSize))
-        #expect(logotype.font!.familyName == "IBM Plex Mono")
-        #expect(logotype.attributedStringValue.attribute(.kern, at: 0, effectiveRange: nil) as? Double == 1.82)
+        #expect(labels.contains("MINUTES"))
+        #expect(labels.contains("DELETE AFTER SILENCE"))
+        #expect(allButtons(in: home.view).contains { $0.title == "1" })
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: FirstLineAppDelegate())
         #expect(menu.items.first?.title == "Write It Down")
         #expect(menu.items.first?.submenu?.items.first?.title == "About Write It Down")
         #expect(RootWindowController(appState: state).window?.title == "Write It Down")
+    }
+
+    @Test func startScreenHasNoSiteHeadlineDeckOrSlogan() {
+        let state = AppState()
+        let home = HomeViewController(appState: state)
+        let labels = allLabels(in: home.view).joined(separator: " ")
+        #expect(!labels.contains("We force you"))
+        #expect(!labels.contains("With a clock"))
+        #expect(!labels.contains("Give it sixty seconds"))
     }
 
     @Test func upgradeShowsOneTimePrice() {

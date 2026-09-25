@@ -1,16 +1,16 @@
-/**
- * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem tokens 与 FirstLineButtons
- * [OUTPUT]: HomeViewController - 固定 60 秒启动入口与 trial 状态
- * [POS]: writeitdown start screen and keyboard focus return target
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
+/*
+ * [INPUT]: AppState choices and AppKit button focus.
+ * [OUTPUT]: Cursor-ready, direct-start duration row and fixed silence choices.
+ * [POS]: Pre-writing surface; selection persists before a session begins, no marketing copy.
+ * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
  */
-
 import AppKit
 
 @MainActor
 final class HomeViewController: NSViewController {
     private let appState: AppState
-    private var startButton: NSButton!
+    private var durationButtons: [NSButton] = []
+    private var silenceButtons: [NSButton] = []
 
     init(appState: AppState) {
         self.appState = appState
@@ -21,106 +21,75 @@ final class HomeViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        let canvas = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
-        self.view = canvas
+        view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
         buildInterface()
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        view.window?.makeFirstResponder(startButton)
+        let index = SessionEngine.durationChoices.firstIndex(of: appState.selectedDuration) ?? 0
+        view.window?.makeFirstResponder(durationButtons[index])
+        view.window?.defaultButtonCell = durationButtons[index].cell as? NSButtonCell
     }
 
     private func buildInterface() {
-        let logotypeFont = FirstLineTypography.logotypeNSFont ?? NSFont.monospacedSystemFont(ofSize: 13, weight: .medium)
-        let logotype = label("WRITE_IT_DOWN", font: logotypeFont, color: FirstLineColors.inkNSColor)
-        logotype.attributedStringValue = NSAttributedString(
-            string: "WRITE_IT_DOWN",
-            attributes: [
-                .font: logotypeFont,
-                .foregroundColor: FirstLineColors.inkNSColor,
-                .kern: 1.82,
-            ]
-        )
-        let identityGroup = verticalGroup(
-            views: [
-                logotype,
-                label(
-                    "We force you to write it down.",
-                    font: FirstLineTypography.titleNSFont,
-                    color: FirstLineColors.inkNSColor
-                ),
-            ],
-            spacing: CGFloat(FirstLineSpacing.sm)
-        )
-
-        let ruleGroup = verticalGroup(
-            views: [
-                label(
-                    "With a clock: stop for eight seconds and your draft is deleted.",
-                    font: FirstLineTypography.bodyNSFont,
-                    color: FirstLineColors.inkNSColor
-                ),
-                label(
-                    "No delete. No paste. No undo.",
-                    font: FirstLineTypography.microcopyNSFont,
-                    color: FirstLineColors.uiNSColor
-                ),
-            ],
-            spacing: CGFloat(FirstLineSpacing.xs)
-        )
-
-        let trialStatus = label(
-            appState.trialStatusText,
-            font: FirstLineTypography.microcopyNSFont,
-            color: appState.isTrialExhausted ? FirstLineColors.inkNSColor : FirstLineColors.uiNSColor
-        )
-
-        startButton = FirstLineButtons.primary(
-            title: "Give it sixty seconds.",
-            target: self,
-            action: #selector(startSession)
-        )
-        startButton.setAccessibilityRole(.button)
-        startButton.setAccessibilityLabel(startButton.title)
-        let primaryViews: [NSView] = [identityGroup, ruleGroup, trialStatus, startButton]
-
-        let content = verticalGroup(
-            views: primaryViews,
-            spacing: CGFloat(FirstLineSpacing.md)
-        )
-        content.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(content)
-
+        let title = NSTextField(labelWithString: "WRITE_IT_DOWN")
+        title.font = FirstLineTypography.logotypeNSFont
+        title.textColor = FirstLineColors.inkNSColor
+        let durationTitle = caption("MINUTES")
+        let durationRow = row(SessionEngine.durationChoices.map { duration in
+            let button = FirstLineButtons.primary(title: "\(Int(duration / 60))", target: self, action: #selector(start(_:)))
+            button.tag = Int(duration)
+            button.setAccessibilityLabel("Start \(Int(duration / 60)) minute session")
+            durationButtons.append(button)
+            return button
+        })
+        let silenceTitle = caption("DELETE AFTER SILENCE")
+        let silenceRow = row(SilenceLimit.allCases.map { limit in
+            let button = NSButton(radioButtonWithTitle: limit.label, target: self, action: #selector(selectSilence(_:)))
+            button.tag = limit.rawValue
+            button.state = appState.settings.silenceLimit == limit ? .on : .off
+            silenceButtons.append(button)
+            return button
+        })
+        let status = caption(appState.trialStatusText)
+        let stack = NSStackView(views: [title, durationTitle, durationRow, silenceTitle, silenceRow, status])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 16
+        stack.setCustomSpacing(32, after: title)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
         NSLayoutConstraint.activate([
-            content.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
-            content.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            content.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: CGFloat(FirstLineSpacing.xl)),
-            content.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -CGFloat(FirstLineSpacing.xl)),
+            stack.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32),
         ])
-
     }
 
-    private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
+    private func caption(_ text: String) -> NSTextField {
         let field = NSTextField(labelWithString: text)
-        field.font = font
-        field.textColor = color
-        field.alignment = .center
-        field.maximumNumberOfLines = 0
-        field.lineBreakMode = .byWordWrapping
+        field.font = FirstLineTypography.microcopyNSFont
+        field.textColor = FirstLineColors.uiNSColor
         return field
     }
 
-    private func verticalGroup(views: [NSView], spacing: CGFloat) -> NSStackView {
-        let stack = NSStackView(views: views)
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.distribution = .gravityAreas
-        stack.spacing = spacing
+    private func row(_ buttons: [NSButton]) -> NSStackView {
+        let stack = NSStackView(views: buttons)
+        stack.orientation = .horizontal
+        stack.spacing = 12
         return stack
     }
 
-    @objc private func startSession() {
-        appState.startSession(duration: 60)
+    @objc private func selectSilence(_ sender: NSButton) {
+        guard let limit = SilenceLimit(rawValue: sender.tag) else { return }
+        appState.updateSilenceLimit(limit)
+        for button in silenceButtons { button.state = button === sender ? .on : .off }
+    }
+
+    @objc private func start(_ sender: NSButton) {
+        appState.updateDefaultDuration(TimeInterval(sender.tag))
+        appState.startSession(duration: TimeInterval(sender.tag))
     }
 }

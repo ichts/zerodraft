@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, session, license and about settings
- * [POS]: First Line AppKit Settings surface; consumes existing AppState settings and license APIs
+ * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, locked session choices, license
+ * [POS]: AppKit Settings surface; live visual preferences do not reset engine, Done restores prior surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -42,9 +42,13 @@ final class SettingsViewController: NSViewController {
         content.addArrangedSubview(section("Appearance", rows: [
             settingRow("Theme", control: themePopup()),
             settingRow("Reduced Motion", control: motionPopup()),
+            settingRow("Focus Mode", control: focusSwitch()),
+            settingRow("Alignment", control: alignmentPopup()),
+            settingRow("Font Size", control: sizePopup()),
         ]))
         content.addArrangedSubview(section("Session", rows: [
-            settingRow("Duration", detail: "60 seconds. Fixed."),
+            settingRow("Duration", detail: "\(Int(appState.selectedDuration / 60)) minutes. Choose before writing."),
+            settingRow("Delete after silence", detail: "\(appState.settings.silenceLimit.label). Choose before writing."),
         ]))
         content.addArrangedSubview(section("Trial & License", rows: licenseRows()))
         content.addArrangedSubview(section("About", rows: [
@@ -131,6 +135,30 @@ final class SettingsViewController: NSViewController {
         return popup
     }
 
+    private func focusSwitch() -> NSButton {
+        let button = NSButton(checkboxWithTitle: "Fullscreen focus", target: self, action: #selector(focusChanged(_:)))
+        button.state = appState.settings.focusMode ? .on : .off
+        return button
+    }
+
+    private func alignmentPopup() -> NSPopUpButton {
+        let popup = NSPopUpButton()
+        popup.addItems(withTitles: WritingAlignment.allCases.map(\.label))
+        popup.selectItem(at: WritingAlignment.allCases.firstIndex(of: appState.settings.writingAlignment) ?? 0)
+        popup.target = self
+        popup.action = #selector(alignmentChanged(_:))
+        return popup
+    }
+
+    private func sizePopup() -> NSPopUpButton {
+        let popup = NSPopUpButton()
+        popup.addItems(withTitles: WritingFontSize.allCases.map(\.label))
+        popup.selectItem(at: WritingFontSize.allCases.firstIndex(of: appState.settings.writingFontSize) ?? 1)
+        popup.target = self
+        popup.action = #selector(sizeChanged(_:))
+        return popup
+    }
+
     private func section(_ title: String, rows: [NSView]) -> NSView {
         let label = NSTextField(labelWithString: title.uppercased())
         label.font = FirstLineTypography.sessionStatusNSFont
@@ -206,6 +234,20 @@ final class SettingsViewController: NSViewController {
         appState.updateReducedMotion(ReducedMotionOverride.allCases[sender.indexOfSelectedItem])
     }
 
+    @objc private func focusChanged(_ sender: NSButton) {
+        appState.updateFocusMode(sender.state == .on)
+    }
+
+    @objc private func alignmentChanged(_ sender: NSPopUpButton) {
+        guard WritingAlignment.allCases.indices.contains(sender.indexOfSelectedItem) else { return }
+        appState.updateAlignment(WritingAlignment.allCases[sender.indexOfSelectedItem])
+    }
+
+    @objc private func sizeChanged(_ sender: NSPopUpButton) {
+        guard WritingFontSize.allCases.indices.contains(sender.indexOfSelectedItem) else { return }
+        appState.updateFontSize(WritingFontSize.allCases[sender.indexOfSelectedItem])
+    }
+
     @objc private func activateTapped() {
         guard let licenseField, let activateButton else { return }
         activateButton.isEnabled = false
@@ -227,5 +269,5 @@ final class SettingsViewController: NSViewController {
     }
 
     @objc private func openBuyTapped() { appState.openLaunchWebsite() }
-    @objc private func doneTapped() { appState.goHome() }
+    @objc private func doneTapped() { appState.closeSettings() }
 }

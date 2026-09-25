@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
  * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate 与可验证的 license 持久化
- * [POS]: FirstLine 顶层导航真相源，负责全部 session 启动（含删稿后输入）、消耗 trial 与支持面跳转
+ * [POS]: 导航及 trial gate；锁定运行中的时长/静默阈值，写作偏好持久化，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -27,6 +27,7 @@ final class AppState {
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
 
     var selectedSurface: Surface = .home
+    private var surfaceBeforeSettings: Surface = .home
     var selectedDuration: TimeInterval = SessionEngine.defaultDurationSeconds
     let sessionEngine: SessionEngine
     let settingsStore: SettingsStore
@@ -53,11 +54,7 @@ final class AppState {
         self.installIDStore = installIDStore
         self.clock = clock
         self.settings = (try? settingsStore.load()) ?? .defaultValue
-        // Fixed 60s contract: legacy persisted durations are superseded by the engine constant.
-        self.selectedDuration = SessionEngine.defaultDurationSeconds
-        if settings.defaultDuration != SessionEngine.defaultDurationSeconds {
-            settings.defaultDuration = SessionEngine.defaultDurationSeconds
-        }
+        self.selectedDuration = settings.defaultDuration
 
         launchInitialSurface()
 
@@ -70,15 +67,15 @@ final class AppState {
     }
 
     func startSession(duration: TimeInterval? = nil) {
-        guard sessionEngine.phase != .success else { return }
+        guard sessionEngine.phase != .success && !sessionIsRunning else { return }
         guard canStartTrialSession else {
             selectedSurface = .upgrade
             return
         }
 
         consumeTrialSessionIfNeeded()
-        let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
-        sessionEngine.start(duration: resolvedDuration)
+        let resolvedDuration = SessionEngine.validDuration(duration ?? selectedDuration)
+        sessionEngine.start(duration: resolvedDuration, silenceLimit: settings.silenceLimit)
         selectedSurface = .session
     }
 
@@ -106,8 +103,14 @@ final class AppState {
     }
 
     func openSettings() {
-        guard canNavigateToSupportSurface else { return }
+        guard selectedSurface != .settings else { return }
+        surfaceBeforeSettings = selectedSurface
         selectedSurface = .settings
+    }
+
+    func closeSettings() {
+        sessionEngine.tick()
+        selectedSurface = surfaceBeforeSettings
     }
 
     func abandonSession() {
@@ -125,10 +128,41 @@ final class AppState {
         persistSettings()
     }
 
+    var sessionIsRunning: Bool {
+        sessionEngine.phase == .writing || sessionEngine.phase == .danger
+    }
+
     func updateDefaultDuration(_ duration: TimeInterval) {
-        settings.defaultDuration = duration
-        selectedDuration = duration
+        guard !sessionIsRunning else { return }
+        settings.defaultDuration = SessionEngine.validDuration(duration)
+        selectedDuration = settings.defaultDuration
         persistSettings()
+    }
+
+    func updateSilenceLimit(_ limit: SilenceLimit) {
+        guard !sessionIsRunning else { return }
+        settings.silenceLimit = limit
+        persistSettings()
+    }
+
+    func updateFocusMode(_ enabled: Bool) {
+        settings.focusMode = enabled
+        persistSettings()
+    }
+
+    func updateAlignment(_ alignment: WritingAlignment) {
+        settings.writingAlignment = alignment
+        persistSettings()
+    }
+
+    func updateFontSize(_ size: WritingFontSize) {
+        settings.writingFontSize = size
+        persistSettings()
+    }
+
+    func newPiece() {
+        sessionEngine.abandon()
+        startSession(duration: selectedDuration)
     }
 
     func updateReducedMotion(_ option: ReducedMotionOverride) {

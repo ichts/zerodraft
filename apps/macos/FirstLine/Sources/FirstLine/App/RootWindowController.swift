@@ -1,13 +1,13 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
- * [OUTPUT]: RootWindowController - 主窗口 + surface 路由（selectedSurface -> 常驻容器内的子 VC）
+ * [OUTPUT]: 主窗口、surface 路由、theme/focus 响应及房间菜单动作桥接
  * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 路由：本控制器观察 selectedSurface 和 theme：
  *   1) selectedSurface -> 换常驻容器内的子控制器；
- *   2) theme -> 更新窗口外观；
+ *   2) theme -> 更新窗口外观；focusMode -> 全屏切换；
  * Observation 的 withObservationTracking 只触发一次回调，因此在回调里重新 arm 观察实现持续跟踪。
  */
 
@@ -18,6 +18,8 @@ import Observation
 final class RootWindowController: NSWindowController {
     let appState: AppState
     private let container: RootContainerViewController
+    func copyKeptText() { container.copyKeptText() }
+    func toggleStatusChrome() { container.toggleStatusChrome() }
 
     init(appState: AppState) {
         self.appState = appState
@@ -44,16 +46,23 @@ final class RootWindowController: NSWindowController {
         container.show(appState.selectedSurface)
         armSurfaceObservation()
         armThemeObservation()
+        armFocusObservation()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func showWindow(_ sender: Any?) {
+        super.showWindow(sender)
+        applyFocusMode()
+    }
 
     // MARK: - Routing
 
     private func swapToSurface(_ surface: Surface) {
         // 只在常驻容器内切换子 VC；不碰窗口尺寸、不换 contentViewController，故无 resize / 0x0 / 递归 layout。
         container.show(surface)
+        applyFocusMode()
     }
 
     private func armSurfaceObservation() {
@@ -79,6 +88,25 @@ final class RootWindowController: NSWindowController {
                 self.armThemeObservation()
             }
         }
+    }
+
+    private func armFocusObservation() {
+        withObservationTracking { [weak self] in
+            _ = self?.appState.settings.focusMode
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.applyFocusMode()
+                self.armFocusObservation()
+            }
+        }
+    }
+
+    private func applyFocusMode() {
+        guard let window else { return }
+        let shouldFillScreen = appState.settings.focusMode && appState.selectedSurface == .session
+        guard window.styleMask.contains(.fullScreen) != shouldFillScreen else { return }
+        window.toggleFullScreen(nil)
     }
 
     private func applyTheme() {

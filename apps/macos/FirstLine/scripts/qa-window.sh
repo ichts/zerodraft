@@ -5,8 +5,8 @@
 set -euo pipefail
 
 batch=${1:-}
-if [[ "$batch" != 1 && "$batch" != 2 && "$batch" != 3 && "$batch" != 4 ]]; then
-  echo 'Only batches 1 through 4 have scripted window flows.' >&2
+if [[ "$batch" != 1 && "$batch" != 2 && "$batch" != 3 && "$batch" != 4 && "$batch" != 5 ]]; then
+  echo 'Only batches 1 through 5 have scripted window flows.' >&2
   exit 2
 fi
 cd "$(dirname "$0")/.."
@@ -63,6 +63,31 @@ print(color.redComponent > 0.5 ? "Light" : "Dark")' "$probe" 2>/dev/null) == "$t
   echo "Timed out waiting for rendered $theme appearance" >&2
   return 1
 }
+if [[ "$batch" == 5 ]]; then
+  shot start-light
+  # The main duration button, not Return, is the explicit mouse start path.
+  osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
+  sleep 1; shot rest-standard
+  type 'standard draft'; sleep 5.2; shot warn-standard
+  type ' again'; shot recovered-standard
+  sleep 8.2; shot wiped-standard
+  osascript -e 'tell application "System Events" to key code 53'
+  wait_for_button 'Strict - 5s'
+  osascript -e 'tell application "System Events" to click button "Strict - 5s" of window 1 of process "WriteItDown"'
+  osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
+  type 'strict draft'; sleep 2.2; shot warn-strict
+  type ' again'; shot recovered-strict
+  sleep 5.2; shot wiped-strict
+  osascript -e 'tell application "System Events" to key code 53'
+  wait_for_button 'Relaxed - 12s'
+  osascript -e 'tell application "System Events" to click button "Relaxed - 12s" of window 1 of process "WriteItDown"'
+  osascript -e 'tell application "System Events" to click button "1" of window 1 of process "WriteItDown"'
+  type 'relaxed draft'; sleep 9.2; shot warn-relaxed
+  type ' again'; shot recovered-relaxed
+  sleep 12.2; shot wiped-relaxed
+  printf 'Captured %s; independent Computer Use must additionally verify real-window focus, keyboard-only kept flow, visual settings, appearance, persistence and clipboard.\n' "$output"
+  exit 0
+fi
 if [[ "$batch" == 4 ]]; then
   osascript -e 'tell application "System Events" to keystroke "," using command down'
   wait_for_button 'Done'

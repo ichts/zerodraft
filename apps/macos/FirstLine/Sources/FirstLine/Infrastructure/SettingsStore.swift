@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: 提供 AppSettings、AppTheme、ReducedMotionOverride、SettingsStore，包含原生 trial 计数
- * [POS]: Infrastructure 设置层，负责时长统一校验、默认值与 settings.json 持久化
+ * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可缓存
+ * [POS]: 配置层；合法时长校验、旧字段迁移、写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -31,10 +31,42 @@ enum ReducedMotionOverride: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum SilenceLimit: Int, Codable, CaseIterable {
+    case strict = 5, standard = 8, relaxed = 12
+    var label: String {
+        switch self {
+        case .strict: "Strict - 5s"
+        case .standard: "Standard - 8s"
+        case .relaxed: "Relaxed - 12s"
+        }
+    }
+}
+
+enum WritingAlignment: String, Codable, CaseIterable {
+    case centered, left
+    var label: String { self == .centered ? "Centered narrow" : "Left wide" }
+}
+
+enum WritingFontSize: String, Codable, CaseIterable {
+    case small, medium, large
+    var label: String { rawValue.capitalized }
+    var points: CGFloat {
+        switch self {
+        case .small: 23
+        case .medium: 28
+        case .large: 34
+        }
+    }
+}
+
 struct AppSettings: Codable, Equatable {
     var theme: AppTheme
     var defaultDuration: TimeInterval
     var reducedMotion: ReducedMotionOverride
+    var silenceLimit: SilenceLimit
+    var focusMode: Bool
+    var writingAlignment: WritingAlignment
+    var writingFontSize: WritingFontSize
     var trialSessionsUsed: Int
 
     /// v0.2 新增：结构化 license 状态。来自 Dodo activate / validate 调用。
@@ -49,6 +81,10 @@ struct AppSettings: Codable, Equatable {
         defaultDuration: TimeInterval,
         reducedMotion: ReducedMotionOverride,
         trialSessionsUsed: Int = 0,
+        silenceLimit: SilenceLimit = .standard,
+        focusMode: Bool = false,
+        writingAlignment: WritingAlignment = .centered,
+        writingFontSize: WritingFontSize = .medium,
         hasUnlockedFullAccess: Bool = false,
         licenseKey: String? = nil,
         licenseStatus: LicenseStatus = .trial,
@@ -59,6 +95,10 @@ struct AppSettings: Codable, Equatable {
         self.theme = theme
         self.defaultDuration = SessionEngine.validDuration(defaultDuration)
         self.reducedMotion = reducedMotion
+        self.silenceLimit = silenceLimit
+        self.focusMode = focusMode
+        self.writingAlignment = writingAlignment
+        self.writingFontSize = writingFontSize
         self.trialSessionsUsed = trialSessionsUsed
         self.licenseKey = licenseKey
         self.licenseActivatedAt = licenseActivatedAt
@@ -78,6 +118,7 @@ struct AppSettings: Codable, Equatable {
         case theme
         case defaultDuration
         case reducedMotion
+        case silenceLimit, focusMode, writingAlignment, writingFontSize
         case trialSessionsUsed
         case hasUnlockedFullAccess
         case licenseKey
@@ -92,6 +133,10 @@ struct AppSettings: Codable, Equatable {
         theme = try container.decode(AppTheme.self, forKey: .theme)
         defaultDuration = SessionEngine.validDuration((try? container.decode(TimeInterval.self, forKey: .defaultDuration)) ?? SessionEngine.defaultDurationSeconds)
         reducedMotion = try container.decode(ReducedMotionOverride.self, forKey: .reducedMotion)
+        silenceLimit = (try? container.decode(SilenceLimit.self, forKey: .silenceLimit)) ?? .standard
+        focusMode = (try? container.decode(Bool.self, forKey: .focusMode)) ?? false
+        writingAlignment = (try? container.decode(WritingAlignment.self, forKey: .writingAlignment)) ?? .centered
+        writingFontSize = (try? container.decode(WritingFontSize.self, forKey: .writingFontSize)) ?? .medium
         trialSessionsUsed = try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0
         let legacyUnlocked = try container.decodeIfPresent(Bool.self, forKey: .hasUnlockedFullAccess) ?? false
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
@@ -112,6 +157,10 @@ struct AppSettings: Codable, Equatable {
         try container.encode(theme, forKey: .theme)
         try container.encode(SessionEngine.validDuration(defaultDuration), forKey: .defaultDuration)
         try container.encode(reducedMotion, forKey: .reducedMotion)
+        try container.encode(silenceLimit, forKey: .silenceLimit)
+        try container.encode(focusMode, forKey: .focusMode)
+        try container.encode(writingAlignment, forKey: .writingAlignment)
+        try container.encode(writingFontSize, forKey: .writingFontSize)
         try container.encode(trialSessionsUsed, forKey: .trialSessionsUsed)
         try container.encodeIfPresent(licenseKey, forKey: .licenseKey)
         try container.encode(licenseStatus, forKey: .licenseStatus)

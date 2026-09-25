@@ -1,6 +1,6 @@
 # writeitdown for macOS - Build Plan
 
-Status: batches 0 and 1 accepted; batch 2 follows. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
+Status: batches 0-3 accepted; batch 4 implemented, pending independent real-window acceptance. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 

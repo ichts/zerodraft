@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate、内存中的 wipe aftermath 与可验证的 license 持久化
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，包含原生 3-session trial gate 与可验证的 license 持久化
  * [POS]: FirstLine 顶层导航真相源，负责全部 session 启动（含删稿后输入）、消耗 trial 与支持面跳转
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -11,14 +11,12 @@ import AppKit
 enum Surface: String, CaseIterable, Hashable, Identifiable {
     case home = "Home"
     case session = "Session"
-    case failure = "Failure"
-    case success = "Success"
     case settings = "Settings"
     case upgrade = "Upgrade"
 
     var id: String { rawValue }
 
-    static let navigationCases: [Surface] = [.home, .session, .failure, .success, .settings]
+    static let navigationCases: [Surface] = [.home, .session, .settings]
 }
 
 @MainActor
@@ -41,10 +39,6 @@ final class AppState {
     var licenseActivationInFlight = false
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
-
-    /// In-memory aftermath of the most recent wipe: the first ~64 chars (whitespace
-    /// collapsed) of the lost draft, shown on Home until the next session starts.
-    var lastWipeFossil: String?
 
     init(
         sessionEngine: SessionEngine = SessionEngine(),
@@ -83,8 +77,6 @@ final class AppState {
         }
 
         consumeTrialSessionIfNeeded()
-        // Starting fresh clears the in-memory wipe aftermath from Home.
-        lastWipeFossil = nil
         let resolvedDuration = duration ?? SessionEngine.defaultDurationSeconds
         sessionEngine.start(duration: resolvedDuration)
         selectedSurface = .session
@@ -242,11 +234,9 @@ final class AppState {
         try settingsStore.save(settings)
     }
 
-    /// Central engine state observer: routes idle and captures in-memory wipe aftermath.
+    /// Central engine state observer: routes an expired empty session home.
     private func handleEngineStateChange(_ phase: SessionPhase) {
         switch phase {
-        case .failure:
-            captureWipeAftermath()
         case .idle:
             // engine 的 live->idle 转换（空草稿触达完成截止 / 迟到首输入在截止后被裁决为
             // idle）必须在状态回调里集中路由 Home，否则用户会卡在死掉的 Session 界面。
@@ -257,13 +247,6 @@ final class AppState {
             break
         }
         previousEnginePhase = phase
-    }
-
-    private func captureWipeAftermath() {
-        let collapsed = sessionEngine.wipedText
-            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-            .joined(separator: " ")
-        lastWipeFossil = collapsed.isEmpty ? nil : String(collapsed.prefix(64))
     }
 
     /// 跟踪 engine 上一次的 phase，用于在状态回调里识别 live->idle 转换并集中路由 Home。

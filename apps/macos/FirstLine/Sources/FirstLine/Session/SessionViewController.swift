@@ -1,61 +1,65 @@
-/**
- * [INPUT]: 依赖 AppKit、App/AppState、Session/SessionEngine、Editor/AppendOnlyTextView、DesignSystem
- * [OUTPUT]: SessionViewController - AppKit 主写作界面
- * [POS]: FirstLine 重写核心 surface，负责 append-only 编辑器、稳焦点（beep 根治）、
- *        danger/failure/success 循环驱动、Flood 白纸列与 chrome（FossilLayer 静态化石、danger veil
- *        与倒计时、narrator strip、deny 抖动 + 红色 hairline、failure wiped-text fossil）、
- *        原房间 wipe 报告及下一键重启、session 草稿恢复。成功仅由计时截止产生。
- * [PROTOCOL]: 变更时更新此头部，然后检查最近 AGENTS.md
- *
- * 焦点修复（beep 根治）：SwiftUI 版的 EditorViewRepresentable 在 updateNSView 里用
- * 「phase==.writing 且 window!=nil 且未激活」一次性 DispatchQueue.main.async 抓 first responder，
- * 成功前置 hasActivatedForSession=true → 一枪打空（window 还不是 key）就永不重试 → 敲键 NSBeep。
- * 本控制器在 viewDidAppear 稳健重试，校验 firstResponder===textView 才停，并监听 didBecomeKey 兜底。
- *
- * 草稿恢复：RootContainerViewController 每次切 surface 新建本 VC；活动 session 从 Home 返回 Writing
- * 时经 AppendOnlyTextView.loadRestoredText 受控写回 engine.text（isRestoringProgrammatically 豁免
- * replaceCharacters 的 append-only 守卫），用户输入守卫语义不变。
+/*
+ * [INPUT]: AppState, SessionEngine, AppendOnlyTextView, RoomPresentation and site design tokens.
+ * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
+ * [POS]: Owns editor focus, room chrome, deadline visuals, Escape and deny feedback; no draft persistence.
+ * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
-
 import AppKit
+
+private final class RoomWashView: NSView {
+    var fillColor: NSColor { didSet { needsDisplay = true } }
+    init(fillColor: NSColor) {
+        self.fillColor = fillColor
+        super.init(frame: .zero)
+        wantsLayer = true
+    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override var wantsUpdateLayer: Bool { true }
+    override func updateLayer() {
+        super.updateLayer()
+        layer?.backgroundColor = fillColor.cgColor
+        layer?.borderColor = FirstLineColors.dangerNSColor.cgColor
+    }
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
 
 @MainActor
 final class SessionViewController: NSViewController, NSTextViewDelegate {
-
     private let appState: AppState
     private var engine: SessionEngine { appState.sessionEngine }
-
-    // 焦点重试
-    private var focusRetryCount = 0
-    private let focusRetryLimit = 12
-    private var didBecomeKeyObserver: NSObjectProtocol?
-    private var denyFlashActive = false
-    private var denyResetWorkItem: DispatchWorkItem?
-    private var lastObservedDenyAt: TimeInterval?
-    private var tickTimer: Timer?
-    private var denyShakeOffset: CGFloat = 0
-    private var denyShakeWorkItem: DispatchWorkItem?
-    private var denyHairlineActive = false
-    private var denyHairlineWorkItem: DispatchWorkItem?
-
-    // 子视图
-    private var scrollView: NSScrollView!
     private var textView: AppendOnlyTextView!
-    private var progressTrack: NSView!
-    private var progressFill: NSView!
-    private var wipeReportLabel: NSTextField!
+    private var scrollView: NSScrollView!
+    private var paper: FloodCanvasView!
+    private var wallWash: RoomWashView!
+    private var paperWash: RoomWashView!
+    private var outline: RoomWashView!
     private var timerLabel: NSTextField!
-    private var topChrome: NSView!
-    private var paperContainer: NSView!
-    private var veilView: NSView!
-    private var fossilLayer: FossilLayerView!
-    private var denyHairlineView: NSView!
-    private var failureFossilLabel: NSTextField!
-    private var countdownLabel: NSTextField!
-    private var countdownHint: NSTextField!
-    private var narratorLabel: NSTextField!
-    private var abandonButton: NSButton!
-    private var wordCountLabel: NSTextField!
+    private var countLabel: NSTextField!
+    private var reportLabel: NSTextField!
+    private var placeholderLabel: NSTextField!
+    private var numeralLabel: NSTextField!
+    private var warningLabel: NSTextField!
+    private var exitButton: NSButton!
+    private var keptView: NSView!
+    private var keptText: NSTextView!
+    private var keptScrollView: NSScrollView!
+    private var receiptLabel: NSTextField!
+    private var copyButton: NSButton!
+    private var keyMonitor: Any?
+    private var keyObserver: NSObjectProtocol?
+    private var ticker: Timer?
+    private var focusAttempts = 0
+    private var lastDenyAt: TimeInterval?
+    private var deny = DenyFeedbackState()
+    private var lastPhase: SessionPhase = .idle
+    private var cutWork: DispatchWorkItem?
+    private var washIsCut = false
+    private var denyWork: DispatchWorkItem?
 
     init(appState: AppState) {
         self.appState = appState
@@ -65,126 +69,68 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    // MARK: - Lifecycle
-
     override func loadView() {
-        let root = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
-        root.translatesAutoresizingMaskIntoConstraints = false
-        self.view = root
-        buildInterface()
-    }
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
+        view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
+        buildRoom()
         configureEditor()
-        applyPhaseUI()
-        applyNarrator()
+        applyPhase()
     }
 
     override func viewDidAppear() {
         super.viewDidAppear()
-        applyReducedMotionToFossils()
-        startTicker()
-        installDidBecomeKeyObserver()
-        prepareEditorViewport()
-        grabFocus()
+        installInputMonitor()
+        ticker = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.tick() }
+        }
+        if let ticker { RunLoop.main.add(ticker, forMode: .common) }
+        prepareViewport()
+        NSApp.activate(ignoringOtherApps: true)
+        view.window?.makeKeyAndOrderFront(nil)
+        focusForPhase()
     }
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        prepareEditorViewport()
-    }
-
-    private func prepareEditorViewport() {
-        let viewportSize = scrollView.contentSize
-        guard viewportSize.width > 0, viewportSize.height > 0 else { return }
-
-        textView.minSize = NSSize(width: 0, height: viewportSize.height)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
-
-        var frame = textView.frame
-        let targetWidth = viewportSize.width
-        let targetHeight = max(frame.height, viewportSize.height)
-        if abs(frame.width - targetWidth) > 0.5 || abs(frame.height - targetHeight) > 0.5 {
-            frame.size = NSSize(width: targetWidth, height: targetHeight)
-            textView.frame = frame
-        }
-
-        refreshCompositionAnchorIfNeeded()
-    }
-
-    private func refreshCompositionAnchorIfNeeded() {
-        guard textView.hasMarkedText() == false, textView.pendingCompositionRefresh else { return }
-        textView.scrollCaretToCompositionAnchor()
-        textView.clearPendingCompositionRefresh()
-    }
-
-    private func applyReducedMotionToFossils() {
-        let reduces: Bool
-        switch appState.settings.reducedMotion {
-        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        case .always: reduces = true
-        case .never: reduces = false
-        }
-        fossilLayer.setDanger(engine.phase == .danger, reducesMotion: reduces)
+        prepareViewport()
+        sizeKeptDocument()
     }
 
     override func viewWillDisappear() {
         super.viewWillDisappear()
-        stopTicker()
-        if let obs = didBecomeKeyObserver {
-            NotificationCenter.default.removeObserver(obs)
-            didBecomeKeyObserver = nil
-        }
-        denyResetWorkItem?.cancel()
+        ticker?.invalidate()
+        ticker = nil
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
+        if let keyObserver { NotificationCenter.default.removeObserver(keyObserver); self.keyObserver = nil }
+        cutWork?.cancel()
+        denyWork?.cancel()
     }
 
-    deinit {
-        // viewWillDisappear 已停 timer 与 observer；deinit 非 isolated 不能访问非 Sendable Timer，
-        // 仅做无 observer-self 风险的清理。
-        NotificationCenter.default.removeObserver(self)
+    private func label(_ text: String = "", font: NSFont? = FirstLineTypography.sessionStatusNSFont,
+                       color: NSColor = FirstLineColors.inkNSColor) -> NSTextField {
+        let field = NSTextField(labelWithString: text)
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.font = font
+        field.textColor = color
+        field.alignment = .center
+        return field
     }
 
-    // MARK: - Interface
+    private func buildRoom() {
+        wallWash = RoomWashView(fillColor: FirstLineColors.washWallNSColor)
+        wallWash.translatesAutoresizingMaskIntoConstraints = false
+        wallWash.alphaValue = 0
+        view.addSubview(wallWash)
 
-    private func buildInterface() {
-        // 1. 白纸列容器
-        paperContainer = FloodCanvasView(
-            fillColor: FirstLineColors.paperNSColor,
-            borderColor: FirstLineColors.faintNSColor.withAlphaComponent(0.5),
-            borderWidth: 1
-        )
-        paperContainer.translatesAutoresizingMaskIntoConstraints = false
-        paperContainer.wantsLayer = true
-        paperContainer.layer?.cornerRadius = 6
-        paperContainer.shadow = NSShadow()
-        paperContainer.layer?.shadowOpacity = 0.06
-        paperContainer.layer?.shadowRadius = 24
-        paperContainer.layer?.shadowOffset = NSSize(width: 0, height: 12)
-        paperContainer.layer?.masksToBounds = false
-        view.addSubview(paperContainer)
+        paper = FloodCanvasView(fillColor: FirstLineColors.paperNSColor)
+        paper.translatesAutoresizingMaskIntoConstraints = false
+        paper.shadow = NSShadow()
+        paper.layer?.shadowOpacity = 0.08
+        paper.layer?.shadowRadius = 24
+        paper.layer?.shadowOffset = NSSize(width: 0, height: 12)
+        view.addSubview(paper)
 
-        // 2. 编辑器（纸内）：照搬 EditorViewRepresentable.makeNSView 配置
         textView = AppendOnlyTextView()
         textView.delegate = self
-        textView.onPrepareInput = { [weak self] in
-            guard let self else { return false }
-            let sessionID = self.engine.sessionID
-            let allowed = self.appState.prepareSessionInput()
-            if self.engine.sessionID != sessionID || self.engine.phase == .failure {
-                self.textView.clearWipedText()
-            }
-            return allowed
-        }
-        textView.onCommittedText = { [weak self] inserted in
-            self?.engine.registerCommittedText(inserted)
-        }
-        textView.onMarkedTextActivity = { [weak self] in
-            self?.engine.registerMarkedTextActivity()
-        }
-        textView.onDeny = { [weak self] in
-            self?.engine.registerDeny()
-        }
         textView.drawsBackground = false
         textView.isRichText = false
         textView.isAutomaticQuoteSubstitutionEnabled = false
@@ -197,493 +143,327 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         textView.isVerticallyResizable = true
         textView.autoresizingMask = [.width]
         textView.textContainerInset = NSSize(width: 24, height: 0)
-        textView.selectedTextAttributes = [:]
-        textView.insertionPointColor = FirstLineColors.inkNSColor
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: textView.bounds.width, height: .greatestFiniteMagnitude)
         textView.configureSessionTypography()
-
         scrollView = NSScrollView()
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
-        scrollView.borderType = .noBorder
         scrollView.drawsBackground = false
-        scrollView.automaticallyAdjustsContentInsets = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        paperContainer.addSubview(scrollView)
+        paper.addSubview(scrollView)
 
-        // 3. topChrome
-        topChrome = NSView()
-        topChrome.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(topChrome)
+        paperWash = RoomWashView(fillColor: FirstLineColors.washPaperNSColor)
+        paperWash.translatesAutoresizingMaskIntoConstraints = false
+        paperWash.alphaValue = 0
+        paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
-        progressTrack = FloodCanvasView(fillColor: FirstLineColors.uiLightNSColor.withAlphaComponent(0.4))
-        progressTrack.translatesAutoresizingMaskIntoConstraints = false
-        progressTrack.wantsLayer = true
-        topChrome.addSubview(progressTrack)
+        outline = RoomWashView(fillColor: .clear)
+        outline.translatesAutoresizingMaskIntoConstraints = false
+        outline.wantsLayer = true
+        outline.layer?.borderWidth = 1
+        outline.alphaValue = 0
+        paper.addSubview(outline)
 
-        progressFill = FloodCanvasView(fillColor: FirstLineColors.uiNSColor)
-        progressFill.translatesAutoresizingMaskIntoConstraints = false
-        progressFill.wantsLayer = true
-        topChrome.addSubview(progressFill)
-
-        wipeReportLabel = NSTextField(labelWithString: "")
-        wipeReportLabel.translatesAutoresizingMaskIntoConstraints = false
-        wipeReportLabel.font = FirstLineTypography.sessionStatusNSFont
-        wipeReportLabel.textColor = FirstLineColors.dangerNSColor
-        wipeReportLabel.alignment = .center
-        wipeReportLabel.isHidden = true
-        paperContainer.addSubview(wipeReportLabel)
-
-        timerLabel = NSTextField(labelWithString: "")
-        timerLabel.translatesAutoresizingMaskIntoConstraints = false
-        timerLabel.font = FirstLineTypography.sessionStatusNSFont
-        timerLabel.textColor = FirstLineColors.uiNSColor
-        topChrome.addSubview(timerLabel)
-
-        // 4. danger veil + countdown
-        veilView = FloodCanvasView(fillColor: FirstLineColors.dangerNSColor.withAlphaComponent(0.07))
-        veilView.translatesAutoresizingMaskIntoConstraints = false
-        veilView.isHidden = true
-        view.addSubview(veilView)
-
-        // Fossil soul layer：铺满 bone，只在 gutter，不接事件。
-        fossilLayer = FossilLayerView(paperColumnWidth: 720)
-        fossilLayer.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(fossilLayer, positioned: .below, relativeTo: paperContainer)
-
-        countdownLabel = NSTextField(labelWithString: "")
-        countdownLabel.translatesAutoresizingMaskIntoConstraints = false
-        countdownLabel.font = NSFont.monospacedSystemFont(ofSize: 104, weight: .regular)
-        countdownLabel.textColor = FirstLineColors.dangerNSColor
-        countdownLabel.alignment = .center
-        countdownLabel.isHidden = true
-        view.addSubview(countdownLabel)
-
-        countdownHint = NSTextField(labelWithString: "KEEP TYPING OR THE DRAFT IS DELETED")
-        countdownHint.translatesAutoresizingMaskIntoConstraints = false
-        countdownHint.font = FirstLineTypography.sessionStatusNSFont
-        countdownHint.textColor = FirstLineColors.uiNSColor
-        countdownHint.alignment = .center
-        countdownHint.isHidden = true
-        view.addSubview(countdownHint)
-
-        // failure wiped-text fossil（被删除草稿的前 64 字作为 margin fossil）
-        failureFossilLabel = NSTextField(labelWithString: "")
-        failureFossilLabel.translatesAutoresizingMaskIntoConstraints = false
-        failureFossilLabel.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-        failureFossilLabel.textColor = FirstLineColors.inkNSColor.withAlphaComponent(0.14)
-        failureFossilLabel.alignment = .center
-        failureFossilLabel.isHidden = true
-        view.addSubview(failureFossilLabel)
-
-        // deny hairline：闪现的红纸边（90ms），独立 overlay 在纸容器上。
-        denyHairlineView = NSView()
-        denyHairlineView.translatesAutoresizingMaskIntoConstraints = false
-        denyHairlineView.wantsLayer = true
-        denyHairlineView.layer?.cornerRadius = 6
-        denyHairlineView.layer?.borderWidth = 1
-        denyHairlineView.layer?.borderColor = FirstLineColors.dangerNSColor.cgColor
-        denyHairlineView.layer?.opacity = 0
-        paperContainer.addSubview(denyHairlineView)
-
-        // 5. narrator strip
-        narratorLabel = NSTextField(labelWithString: "")
-        narratorLabel.translatesAutoresizingMaskIntoConstraints = false
-        narratorLabel.font = FirstLineTypography.sessionStatusNSFont
-        narratorLabel.textColor = FirstLineColors.uiNSColor
-        view.addSubview(narratorLabel)
-
-        abandonButton = NSButton(title: "Abandon - the text is lost", target: self, action: #selector(abandonTapped))
-        abandonButton.translatesAutoresizingMaskIntoConstraints = false
-        abandonButton.isBordered = false
-        abandonButton.font = FirstLineTypography.sessionStatusNSFont
-        view.addSubview(abandonButton)
-        abandonButton.attributedTitle = attributedAbandonTitle()
-
-        wordCountLabel = NSTextField(labelWithString: "")
-        wordCountLabel.translatesAutoresizingMaskIntoConstraints = false
-        wordCountLabel.font = FirstLineTypography.sessionStatusNSFont
-        wordCountLabel.textColor = FirstLineColors.uiNSColor
-        view.addSubview(wordCountLabel)
-
+        timerLabel = label()
+        timerLabel.alignment = .right
+        countLabel = label()
+        countLabel.alignment = .right
+        reportLabel = label()
+        reportLabel.isHidden = true
+        placeholderLabel = label("Start typing.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.dimNSColor)
+        paper.addSubview(placeholderLabel)
+        numeralLabel = label(font: NSFont.monospacedSystemFont(ofSize: 104, weight: .semibold),
+                             color: FirstLineColors.dangerNSColor)
+        warningLabel = label("KEEP TYPING OR THE DRAFT IS DELETED.")
+        numeralLabel.isHidden = true
+        warningLabel.isHidden = true
+        exitButton = NSButton(title: "ESC - EXIT", target: self, action: #selector(exitRoom))
+        exitButton.isBordered = false
+        exitButton.font = FirstLineTypography.sessionStatusNSFont
+        exitButton.translatesAutoresizingMaskIntoConstraints = false
+        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningLabel!, exitButton!] {
+            paper.addSubview(element)
+        }
+        buildKeptView()
         installConstraints()
     }
 
-    private func attributedAbandonTitle() -> NSAttributedString {
-        NSAttributedString(
-            string: "Abandon - the text is lost",
-            attributes: [
-                .font: FirstLineTypography.sessionStatusNSFont as Any,
-                .foregroundColor: FirstLineColors.dangerNSColor,
-            ]
-        )
+    private func buildKeptView() {
+        let title = label("You wrote it down.", font: FirstLineTypography.titleNSFont)
+        keptText = NSTextView()
+        keptText.isEditable = false
+        keptText.isSelectable = true
+        keptText.drawsBackground = false
+        keptText.font = FirstLineTypography.bodyNSFont
+        keptText.textColor = FirstLineColors.inkNSColor
+        keptText.textContainerInset = .zero
+        keptText.textContainer?.lineFragmentPadding = 0
+        keptText.textContainer?.widthTracksTextView = true
+        keptText.textContainer?.heightTracksTextView = false
+        keptText.isHorizontallyResizable = false
+        keptText.isVerticallyResizable = true
+        keptText.autoresizingMask = [.width]
+        let preview = NSScrollView()
+        keptScrollView = preview
+        preview.documentView = keptText
+        preview.hasVerticalScroller = true
+        preview.drawsBackground = false
+        preview.translatesAutoresizingMaskIntoConstraints = false
+        receiptLabel = label()
+        copyButton = FirstLineButtons.primary(title: "COPY TEXT", target: self, action: #selector(copyText))
+        let restart = FirstLineButtons.link(title: "RUN IT AGAIN", target: self, action: #selector(restart))
+        let actions = NSStackView(views: [copyButton, restart])
+        actions.orientation = .horizontal
+        actions.spacing = 24
+        let stack = NSStackView(views: [title, preview, receiptLabel, actions])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 20
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        keptView = stack
+        keptView.isHidden = true
+        paper.addSubview(keptView)
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
+            stack.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -80),
+            stack.widthAnchor.constraint(equalTo: paper.widthAnchor, constant: -96),
+            stack.heightAnchor.constraint(lessThanOrEqualTo: paper.heightAnchor, constant: -140),
+            preview.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 100),
+        ])
     }
 
     private func installConstraints() {
-        let g = view.safeAreaLayoutGuide
-
-        // countdown 比例定位：centerY = view 顶 + view 高*0.62
-        let countdownY = NSLayoutConstraint(
-            item: countdownLabel!, attribute: .centerY,
-            relatedBy: .equal,
-            toItem: view, attribute: .bottom,
-            multiplier: 0.62, constant: 0
-        )
-
-        let paperPreferredWidth = paperContainer.widthAnchor.constraint(equalToConstant: 720)
-        paperPreferredWidth.priority = .defaultHigh
-
+        let safe = view.safeAreaLayoutGuide
+        let paperWidth = paper.widthAnchor.constraint(equalToConstant: 720)
+        paperWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
-            // 白纸
-            paperContainer.centerXAnchor.constraint(equalTo: g.centerXAnchor),
-            paperContainer.leadingAnchor.constraint(greaterThanOrEqualTo: g.leadingAnchor, constant: 48),
-            paperContainer.trailingAnchor.constraint(lessThanOrEqualTo: g.trailingAnchor, constant: -48),
-            paperContainer.widthAnchor.constraint(lessThanOrEqualToConstant: 720),
-            paperPreferredWidth,
-            paperContainer.topAnchor.constraint(equalTo: g.topAnchor, constant: 48),
-            paperContainer.bottomAnchor.constraint(lessThanOrEqualTo: g.bottomAnchor, constant: -120),
-            paperContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 520),
-
-            // 编辑器填满纸
-            scrollView.topAnchor.constraint(equalTo: paperContainer.topAnchor),
-            scrollView.leadingAnchor.constraint(equalTo: paperContainer.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: paperContainer.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: paperContainer.bottomAnchor),
-
-            // deny hairline 贴纸边
-            denyHairlineView.topAnchor.constraint(equalTo: paperContainer.topAnchor),
-            denyHairlineView.leadingAnchor.constraint(equalTo: paperContainer.leadingAnchor),
-            denyHairlineView.trailingAnchor.constraint(equalTo: paperContainer.trailingAnchor),
-            denyHairlineView.bottomAnchor.constraint(equalTo: paperContainer.bottomAnchor),
-
-            // topChrome
-            topChrome.topAnchor.constraint(equalTo: g.topAnchor),
-            topChrome.leadingAnchor.constraint(equalTo: g.leadingAnchor),
-            topChrome.trailingAnchor.constraint(equalTo: g.trailingAnchor),
-            topChrome.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
-
-            progressTrack.topAnchor.constraint(equalTo: topChrome.topAnchor),
-            progressTrack.leadingAnchor.constraint(equalTo: topChrome.leadingAnchor),
-            progressTrack.trailingAnchor.constraint(equalTo: topChrome.trailingAnchor),
-            progressTrack.heightAnchor.constraint(equalToConstant: 2),
-
-            progressFill.leadingAnchor.constraint(equalTo: progressTrack.leadingAnchor),
-            progressFill.topAnchor.constraint(equalTo: progressTrack.topAnchor),
-            progressFill.heightAnchor.constraint(equalToConstant: 2),
-
-            timerLabel.topAnchor.constraint(equalTo: topChrome.topAnchor, constant: CGFloat(FirstLineSpacing.sm)),
-            timerLabel.trailingAnchor.constraint(equalTo: topChrome.trailingAnchor, constant: -24),
-            wipeReportLabel.centerXAnchor.constraint(equalTo: paperContainer.centerXAnchor),
-            wipeReportLabel.centerYAnchor.constraint(equalTo: paperContainer.centerYAnchor),
-            wipeReportLabel.widthAnchor.constraint(lessThanOrEqualTo: paperContainer.widthAnchor, constant: -24),
-
-            // veil 铺满
-            veilView.topAnchor.constraint(equalTo: view.topAnchor),
-            veilView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            veilView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            veilView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            // fossil 铺满（在 veil 之下、paper 之下）
-            fossilLayer.topAnchor.constraint(equalTo: view.topAnchor),
-            fossilLayer.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            fossilLayer.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            fossilLayer.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
-            // failure wiped-text fossil：右侧 margin，纵向居中偏下
-            failureFossilLabel.widthAnchor.constraint(equalToConstant: 220),
-            failureFossilLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -150),
-            failureFossilLabel.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-
-            // countdown
-            countdownLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            countdownY,
-            countdownHint.topAnchor.constraint(equalTo: countdownLabel.bottomAnchor, constant: CGFloat(FirstLineSpacing.xs)),
-            countdownHint.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-
-            // narrator strip
-            narratorLabel.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 24),
-            narratorLabel.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -CGFloat(FirstLineSpacing.xs)),
-
-            abandonButton.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -CGFloat(FirstLineSpacing.xs)),
-            abandonButton.trailingAnchor.constraint(equalTo: wordCountLabel.leadingAnchor, constant: -CGFloat(FirstLineSpacing.sm)),
-
-            wordCountLabel.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -24),
-            wordCountLabel.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -CGFloat(FirstLineSpacing.xs)),
+            wallWash.leadingAnchor.constraint(equalTo: view.leadingAnchor), wallWash.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            wallWash.topAnchor.constraint(equalTo: view.topAnchor), wallWash.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            paper.centerXAnchor.constraint(equalTo: safe.centerXAnchor), paperWidth,
+            paper.leadingAnchor.constraint(greaterThanOrEqualTo: safe.leadingAnchor, constant: 32),
+            paper.trailingAnchor.constraint(lessThanOrEqualTo: safe.trailingAnchor, constant: -32),
+            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 20),
+            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -20),
+            scrollView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
+            scrollView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
+            scrollView.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
+            scrollView.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -76),
+            paperWash.leadingAnchor.constraint(equalTo: paper.leadingAnchor), paperWash.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            paperWash.topAnchor.constraint(equalTo: paper.topAnchor), paperWash.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
+            outline.leadingAnchor.constraint(equalTo: paper.leadingAnchor), outline.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            outline.topAnchor.constraint(equalTo: paper.topAnchor), outline.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
+            timerLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 24), timerLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
+            countLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -24), countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
+            exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -20), exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 28),
+            reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -80),
+            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), placeholderLabel.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
+            numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), numeralLabel.centerYAnchor.constraint(equalTo: paper.bottomAnchor, constant: -170),
+            warningLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), warningLabel.topAnchor.constraint(equalTo: numeralLabel.bottomAnchor, constant: 8),
         ])
     }
 
     private func configureEditor() {
-        if engine.text.isEmpty == false && textView.string.isEmpty {
-            textView.loadRestoredText(engine.text)
+        if !engine.text.isEmpty { textView.loadRestoredText(engine.text) }
+        textView.onPrepareInput = { [weak self] in
+            guard let self else { return false }
+            let sessionID = self.engine.sessionID
+            let allowed = self.appState.prepareSessionInput()
+            if self.engine.sessionID != sessionID || self.engine.phase == .failure { self.textView.clearWipedText() }
+            return allowed
         }
-        let end = NSRange(location: (textView.string as NSString).length, length: 0)
-        if textView.selectedRange() != end { textView.setSelectedRange(end) }
+        textView.onCommittedText = { [weak self] in self?.engine.registerCommittedText($0) }
+        textView.onMarkedTextActivity = { [weak self] in self?.engine.registerMarkedTextActivity() }
+        textView.onDeny = { [weak self] in self?.engine.registerDeny() }
     }
 
-    // MARK: - Focus (beep fix)
-
-    private func installDidBecomeKeyObserver() {
-        guard didBecomeKeyObserver == nil else { return }
-        didBecomeKeyObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didBecomeKeyNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                if self.engine.phase == .writing || self.engine.phase == .danger,
-                   let window = self.view.window,
-                   window.firstResponder !== self.textView {
-                    self.grabFocus()
-                }
-            }
+    private func prepareViewport() {
+        let size = scrollView.contentSize
+        guard size.width > 0, size.height > 0 else { return }
+        textView.minSize = NSSize(width: 0, height: size.height)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {
+            textView.frame.size = NSSize(width: size.width, height: max(size.height, textView.frame.height))
         }
-    }
-
-    private func grabFocus() {
-        guard let window = view.window else {
-            scheduleFocusRetry()
-            return
-        }
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(textView)
-        if window.firstResponder === textView {
-            focusRetryCount = 0
-            return
-        }
-        scheduleFocusRetry()
-    }
-
-    private func scheduleFocusRetry() {
-        guard focusRetryCount < focusRetryLimit else { return }
-        focusRetryCount += 1
-        DispatchQueue.main.async { [weak self] in
-            Task { @MainActor [weak self] in self?.grabFocus() }
+        if !textView.hasMarkedText(), textView.pendingCompositionRefresh {
+            textView.scrollCaretToCompositionAnchor()
+            textView.clearPendingCompositionRefresh()
         }
     }
 
-    // MARK: - Session loop
-
-    private func startTicker() {
-        guard tickTimer == nil else { return }
-        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.tick() }
+    private func sizeKeptDocument() {
+        guard let container = keptText.textContainer, let layout = keptText.layoutManager else { return }
+        let size = keptScrollView.contentSize
+        guard size.width > 0, size.height > 0 else { return }
+        keptText.minSize = NSSize(width: 0, height: size.height)
+        keptText.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        container.containerSize = NSSize(width: size.width, height: CGFloat.greatestFiniteMagnitude)
+        let height = max(size.height, layout.usedRect(for: container).height)
+        if abs(keptText.frame.width - size.width) > 0.5 || abs(keptText.frame.height - height) > 0.5 {
+            keptText.frame.size = NSSize(width: size.width, height: height)
         }
-        RunLoop.main.add(timer, forMode: .common)
-        tickTimer = timer
     }
 
-    private func stopTicker() {
-        tickTimer?.invalidate()
-        tickTimer = nil
+    private func installInputMonitor() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, event.window === self.view.window, event.keyCode == 53,
+                  RoomPresentation.shouldExitOnEscape(isComposing: self.textView.hasMarkedText()) else { return event }
+            self.exitRoom()
+            return nil
+        }
+        keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
+                                                               object: view.window, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.focusForPhase() }
+        }
+    }
+
+    private func focusForPhase() {
+        guard let window = view.window else { return }
+        let target: NSResponder = engine.phase == .success ? copyButton : textView
+        guard window.firstResponder !== target else { focusAttempts = 0; return }
+        window.makeFirstResponder(target)
+        guard window.firstResponder !== target, focusAttempts < 12 else { return }
+        focusAttempts += 1
+        DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
+    }
+
+    private var reducesMotion: Bool {
+        switch appState.settings.reducedMotion {
+        case .system: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case .always: true
+        case .never: false
+        }
     }
 
     private func tick() {
         appState.handleTick()
-        applyPhaseUI()
-        if engine.lastDenyAt != nil && engine.lastDenyAt != lastObservedDenyAt {
-            lastObservedDenyAt = engine.lastDenyAt
-            denyFlashActive = true
-            denyResetWorkItem?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    self.denyFlashActive = false
-                    self.applyNarrator()
-                }
-            }
-            denyResetWorkItem = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
-            triggerDenyFeedback()
+        applyPhase()
+        if let deniedAt = engine.lastDenyAt, deniedAt != lastDenyAt {
+            lastDenyAt = deniedAt
+            showDeny()
         }
-        applyNarrator()
     }
 
-    // MARK: - UI application
-
-    private func applyPhaseUI() {
+    private func applyPhase() {
         let phase = engine.phase
-        let isDanger = phase == .danger
-
-        textView.isEditable = phase == .writing || phase == .danger || phase == .failure
-        if phase == .failure && !textView.string.isEmpty {
-            textView.clearWipedText()
+        if phase == .failure, lastPhase != .failure { showCut() }
+        if phase == .success, lastPhase != .success {
+            keptText.string = engine.text
+            receiptLabel.stringValue = RoomPresentation.keptReceipt(words: engine.wordCount)
+            copyButton.title = "COPY TEXT"
+            DispatchQueue.main.async { [weak self] in
+                self?.sizeKeptDocument()
+                self?.focusForPhase()
+            }
         }
+        if phase == .danger, lastPhase != .danger {
+            announce("Keep typing or the draft is deleted. Three seconds left.")
+        }
+        if phase == .failure, lastPhase != .failure,
+           let unused = engine.unusedSeconds {
+            announce(RoomPresentation.wipeReport(unused: unused))
+        }
+        if phase == .success, lastPhase != .success {
+            announce("You wrote it down. Copy your text before leaving.")
+        }
+        lastPhase = phase
+        let isKept = phase == .success
+        keptView.isHidden = !isKept
+        scrollView.isHidden = isKept
+        textView.isEditable = !isKept
+        if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
+        reportLabel.isHidden = phase != .failure
+        placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
         if let unused = engine.unusedSeconds, phase == .failure {
-            wipeReportLabel.stringValue = String(format: "DRAFT WIPED - %d:%02d UNUSED. TYPE TO RESTART.", unused / 60, unused % 60)
-            wipeReportLabel.isHidden = false
-        } else {
-            wipeReportLabel.isHidden = true
+            reportLabel.stringValue = RoomPresentation.wipeReport(unused: unused)
         }
+        let seconds = max(0, Int(ceil(engine.remaining)))
+        timerLabel.stringValue = RoomPresentation.clock(seconds)
+        countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
+        let warning = phase == .danger
+        numeralLabel.isHidden = !warning
+        warningLabel.isHidden = !warning
+        if warning { numeralLabel.stringValue = "\(engine.secondsUntilDeletion)" }
+        let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion) : 0
+        if cutWork == nil { setWash(strength, cut: false) }
+        if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
+        placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
+        if !textView.hasMarkedText() { prepareViewport() }
+    }
 
-        let totalSeconds = max(Int(ceil(engine.remaining)), 0)
-        timerLabel.stringValue = String(format: "%02d:%02d", totalSeconds / 60, totalSeconds % 60)
-        timerLabel.textColor = timerColor
+    private func setWash(_ opacity: CGFloat, cut: Bool) {
+        if washIsCut != cut {
+            washIsCut = cut
+            wallWash.fillColor = cut ? FirstLineColors.deepWallNSColor : FirstLineColors.washWallNSColor
+            paperWash.fillColor = cut ? FirstLineColors.deepPaperNSColor : FirstLineColors.washPaperNSColor
+        }
+        if wallWash.alphaValue != opacity { wallWash.alphaValue = opacity }
+        if paperWash.alphaValue != opacity { paperWash.alphaValue = opacity }
+    }
 
-        let prog = engine.duration > 0 ? min(max(engine.elapsed / engine.duration, 0), 1) : 0
-        DispatchQueue.main.async { [weak self] in
+    private func showCut() {
+        setWash(1, cut: true)
+        let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            let w = self.progressTrack.bounds.width * prog
-            var f = self.progressFill.frame
-            f.size.width = max(0, w)
-            f.origin = .zero
-            self.progressFill.frame = f
+            self.cutWork = nil
+            self.setWash(0, cut: false)
         }
-
-        let topOpacity: CGFloat = isDanger ? 0.92 : 0.42
-        topChrome.alphaValue = topOpacity
-
-        veilView.isHidden = !isDanger
-        countdownLabel.isHidden = !isDanger
-        countdownHint.isHidden = !isDanger
-        if isDanger {
-            countdownLabel.stringValue = "\(engine.secondsUntilDeletion)"
-        }
-
-        let live = phase == .writing || phase == .danger
-        abandonButton.isHidden = !live
-
-        wordCountLabel.stringValue = "\(engine.wordCount) words"
-
-        if textView.hasMarkedText() == false && engine.text.isEmpty == false && textView.string.isEmpty {
-            textView.loadRestoredText(engine.text)
-            let end = NSRange(location: (textView.string as NSString).length, length: 0)
-            if textView.selectedRange() != end { textView.setSelectedRange(end) }
-        }
-        if textView.hasMarkedText() == false {
-            let end = NSRange(location: (textView.string as NSString).length, length: 0)
-            if textView.selectedRange() != end { textView.setSelectedRange(end) }
-            refreshCompositionAnchorIfNeeded()
-        }
-
-        if (phase == .writing || phase == .danger || phase == .failure),
-           let window = view.window,
-           window.firstResponder !== textView {
-            grabFocus()
-        }
-
-        // fossil danger 色
-        let reduces: Bool
-        switch appState.settings.reducedMotion {
-        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        case .always: reduces = true
-        case .never: reduces = false
-        }
-        fossilLayer.setDanger(isDanger, reducesMotion: reduces)
-
-        // failure wiped-text fossil
-        if phase == .failure {
-            let collapsed = engine.wipedText
-                .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
-                .joined(separator: " ")
-            failureFossilLabel.stringValue = String(collapsed.prefix(64))
-            failureFossilLabel.isHidden = collapsed.isEmpty
-        } else {
-            failureFossilLabel.isHidden = true
-        }
+        cutWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
-    private func applyNarrator() {
-        narratorLabel.stringValue = narratorText.uppercased()
-        narratorLabel.textColor = narratorColor
+    private func announce(_ text: String) {
+        NSAccessibility.post(element: textView as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
-    private var narratorText: String {
-        if denyFlashActive { return "no going back." }
-        switch engine.phase {
-        case .failure: return "draft deleted. it joined the pile."
-        case .danger: return "keep typing or the draft is deleted"
-        default: return "forward only. don't stop."
+    private func showDeny() {
+        guard deny.begin(reducesMotion: reducesMotion) else { return }
+        outline.alphaValue = 1
+        announce("Blocked. Forward only.")
+        if deny.shakeOffset != 0 {
+            paper.layer?.setAffineTransform(CGAffineTransform(translationX: deny.shakeOffset, y: 0))
         }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
+            guard let self, self.deny.outlineVisible, self.deny.shakeOffset != 0 else { return }
+            self.paper.layer?.setAffineTransform(CGAffineTransform(translationX: -self.deny.shakeOffset, y: 0))
+        }
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.deny.end()
+            self.outline.alphaValue = 0
+            self.paper.layer?.setAffineTransform(.identity)
+        }
+        denyWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: work)
     }
 
-    private var narratorColor: NSColor {
-        if denyFlashActive || engine.phase == .failure { return FirstLineColors.dangerNSColor }
-        return FirstLineColors.uiNSColor
+    @objc private func exitRoom() { appState.abandonSession() }
+    @objc private func restart() {
+        appState.abandonSession()
+        appState.startSession(duration: engine.duration)
+    }
+    @objc private func copyText() {
+        copyButton.title = RoomPresentation.copy(engine.text, to: .general) ? "COPIED" : "TRY COPY AGAIN"
+        focusForPhase()
     }
 
-    private var timerColor: NSColor {
-        switch engine.phase {
-        case .danger: return FirstLineColors.dangerNSColor
-        case .success: return FirstLineColors.successNSColor
-        default: return FirstLineColors.uiNSColor
-        }
+    func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        let denied = AppendOnlyInputPolicy.shouldDenyCommand(selector, hasMarkedText: textView.hasMarkedText())
+        if denied { engine.registerDeny() }
+        return denied
     }
 
-    // MARK: - Actions
-
-    @objc private func abandonTapped() { appState.abandonSession() }
-
-    // MARK: - Deny feedback (shake + hairline)
-
-    private func triggerDenyFeedback() {
-        // 红 hairline 闪 90ms（色/透明度变化，reduce-motion 下仍允许）。
-        denyHairlineActive = true
-        denyHairlineView.layer?.opacity = 1
-        denyHairlineWorkItem?.cancel()
-        let hairline = DispatchWorkItem { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.denyHairlineActive = false
-                self.denyHairlineView.layer?.opacity = 0
-            }
-        }
-        denyHairlineWorkItem = hairline
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.09, execute: hairline)
-
-        let reduces: Bool
-        switch appState.settings.reducedMotion {
-        case .system: reduces = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        case .always: reduces = true
-        case .never: reduces = false
-        }
-        guard reduces == false else { return }
-        // 2px 水平摇 ~160ms：-2 -> +2 -> 0
-        denyShakeWorkItem?.cancel()
-        denyShakeOffset = -2
-        paperContainer.layer?.setAffineTransform(CGAffineTransform(translationX: -2, y: 0))
-        let half = 0.08
-        DispatchQueue.main.asyncAfter(deadline: .now() + half) { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.paperContainer.layer?.setAffineTransform(CGAffineTransform(translationX: 2, y: 0))
-            }
-        }
-        let reset = DispatchWorkItem { [weak self] in
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.denyShakeOffset = 0
-                self.paperContainer.layer?.setAffineTransform(.identity)
-            }
-        }
-        denyShakeWorkItem = reset
-        DispatchQueue.main.asyncAfter(deadline: .now() + half * 2, execute: reset)
-    }
-
-    // MARK: - NSTextViewDelegate（append-only 守卫，逻辑来源 AppendOnlyInputPolicy）
-
-    func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-        let deny = AppendOnlyInputPolicy.shouldDenyCommand(commandSelector, hasMarkedText: textView.hasMarkedText())
-        if deny {
-            engine.registerDeny()
-        }
-        return deny
-    }
-
-    func textView(_ textView: NSTextView,
-                  willChangeSelectionFromCharacterRange oldSelectedCharRange: NSRange,
-                  toCharacterRange newSelectedCharRange: NSRange) -> NSRange {
-        if let end = AppendOnlyInputPolicy.redirectedSelection(
-            proposed: newSelectedCharRange,
+    func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange,
+                  toCharacterRange proposed: NSRange) -> NSRange {
+        if let end = AppendOnlyInputPolicy.redirectedSelection(proposed: proposed,
             fullLength: (textView.string as NSString).length,
-            markedRange: textView.hasMarkedText() ? textView.markedRange() : nil
-        ) {
+            markedRange: textView.hasMarkedText() ? textView.markedRange() : nil) {
             engine.registerDeny()
             return end
         }
-        return newSelectedCharRange
+        return proposed
     }
 }

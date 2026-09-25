@@ -52,7 +52,7 @@ Before adding a new pattern, check how this codebase already handles the same cl
 
 - Web UI state: the only truth is the `_session.*` signals on `<body>`; write them only through the `fl*` custom-event bridge (see "Web architecture boundary"). Never introduce a second state system or a `root`/`mergePaths` write path.
 - Web visuals: reuse the `design/DESIGN.md` tokens (CSS custom properties) and danger choreography (wash, snap, step numeral) before inventing a variant.
-- macOS: follow the existing deadline adjudication, navigation routing, persistence, deny-feedback, and reduced-motion patterns; extend the existing types instead of adding a parallel one. New top-level modals must join the existing pending-modal routing, not each go their own way.
+- macOS: follow the existing deadline adjudication, navigation routing, settings/license persistence, room-only wipe and kept states, deny-feedback, and reduced-motion patterns; extend the existing types instead of adding a parallel one. Draft text stays in memory. New top-level modals must join the existing pending-modal routing, not each go their own way.
 
 The goal is that code from ten contributors reads as one design language.
 

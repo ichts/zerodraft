@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、DesignSystem tokens 与 FirstLineButtons
- * [OUTPUT]: HomeViewController - 固定 60 秒启动入口、trial 状态与 durable wipe aftermath
- * [POS]: writeitdown start screen；临时 wipe aftermath 待第 4 批删除
+ * [OUTPUT]: HomeViewController - 固定 60 秒启动入口与 trial 状态
+ * [POS]: writeitdown start screen and keyboard focus return target
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -10,6 +10,7 @@ import AppKit
 @MainActor
 final class HomeViewController: NSViewController {
     private let appState: AppState
+    private var startButton: NSButton!
 
     init(appState: AppState) {
         self.appState = appState
@@ -23,6 +24,11 @@ final class HomeViewController: NSViewController {
         let canvas = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
         self.view = canvas
         buildInterface()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        view.window?.makeFirstResponder(startButton)
     }
 
     private func buildInterface() {
@@ -70,21 +76,14 @@ final class HomeViewController: NSViewController {
             color: appState.isTrialExhausted ? FirstLineColors.inkNSColor : FirstLineColors.uiNSColor
         )
 
-        var primaryViews: [NSView] = [identityGroup, ruleGroup, trialStatus]
-        if appState.lastWipeFossil != nil {
-            primaryViews.append(label(
-                "Draft deleted. it joined the pile.",
-                font: FirstLineTypography.sessionStatusNSFont,
-                color: FirstLineColors.dangerNSColor
-            ))
-        }
-
-        let startButton = FirstLineButtons.primary(
+        startButton = FirstLineButtons.primary(
             title: "Give it sixty seconds.",
             target: self,
             action: #selector(startSession)
         )
-        primaryViews.append(startButton)
+        startButton.setAccessibilityRole(.button)
+        startButton.setAccessibilityLabel(startButton.title)
+        let primaryViews: [NSView] = [identityGroup, ruleGroup, trialStatus, startButton]
 
         let content = verticalGroup(
             views: primaryViews,
@@ -100,9 +99,6 @@ final class HomeViewController: NSViewController {
             content.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -CGFloat(FirstLineSpacing.xl)),
         ])
 
-        if let fossil = appState.lastWipeFossil {
-            addAftermathFossil(fossil)
-        }
     }
 
     private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
@@ -124,67 +120,7 @@ final class HomeViewController: NSViewController {
         return stack
     }
 
-    private func addAftermathFossil(_ text: String) {
-        let fossil = HomeAftermathFossilView(text: text)
-        fossil.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(fossil)
-
-        NSLayoutConstraint.activate([
-            fossil.widthAnchor.constraint(equalToConstant: 200),
-            fossil.heightAnchor.constraint(equalToConstant: 72),
-            fossil.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -28),
-            fossil.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -40),
-        ])
-    }
-
     @objc private func startSession() {
         appState.startSession(duration: 60)
-    }
-}
-
-/// Dead margin fragment from the most recent wipe. It draws directly with a dynamic NSColor so
-/// appearance changes remain correct and the fixed rotation cannot be lost during Auto Layout.
-private final class HomeAftermathFossilView: NSView {
-    private let text: String
-
-    init(text: String) {
-        self.text = text
-        super.init(frame: .zero)
-        setAccessibilityElement(false)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override var isFlipped: Bool { true }
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard let context = NSGraphicsContext.current else { return }
-        context.saveGraphicsState()
-
-        let rotation = NSAffineTransform()
-        rotation.translateX(by: bounds.midX, yBy: bounds.midY)
-        rotation.rotate(byDegrees: -3)
-        rotation.translateX(by: -bounds.midX, yBy: -bounds.midY)
-        rotation.concat()
-
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byWordWrapping
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.12),
-            .paragraphStyle: paragraph,
-        ]
-        NSAttributedString(string: text, attributes: attributes)
-            .draw(with: bounds.insetBy(dx: 4, dy: 4), options: [.usesLineFragmentOrigin, .usesFontLeading])
-
-        context.restoreGraphicsState()
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        needsDisplay = true
     }
 }

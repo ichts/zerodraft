@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 安全与受控 wipe 清空；TextKit 位置一律使用 UTF-16 偏移
+ * [POS]: AppKit editor core，负责 append-only、IME 安全、居中写作带与受控 wipe 清空；TextKit 位置一律使用 UTF-16 偏移
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -14,8 +14,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
 
-    private let compositionTopRatio: CGFloat = 0.35
-    private let compositionBottomRatio: CGFloat = 0.65
+    private let compositionTopRatio: CGFloat = 0.5
+    private let compositionBottomRatio: CGFloat = 0.5
     private let insetEpsilon: CGFloat = 0.5
     private var lastAppliedViewportHeight: CGFloat = 0
     private(set) var pendingCompositionRefresh = true

@@ -1,6 +1,6 @@
 # writeitdown for macOS - Build Plan
 
-Status: batch 5 implemented; independent real-window acceptance remains pending. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
+Status: batch 6 implementation is in progress; independent real-window acceptance remains pending. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 
@@ -201,8 +201,8 @@ The following code inside kept files is also deleted:
 ## 7. Privacy
 
 - Writing stays in memory. It is never written to disk, never logged, and never sent anywhere. Batch 1 isolates both the configuration root and the former draft root in temporary directories for kept and wiped sessions, and observes that no draft text or draft file appears in either. Tests also check that these flows do not write to the real user root. Configuration and install ID persistence remain legitimate and are tested separately; an empty directory is not the criterion.
-- `settings.json` holds only appearance, the reduced-motion override, chosen duration and silence limit, focus mode, alignment, font size, the trial count, and the license cache (key, status, dates, and instance ID), as the license spec allows. `install-id.json` holds a random install UUID.
-- The only network traffic is the license flow: Dodo's public `activate` and `validate` license endpoints, called with the license key and install name only, plus opening the checkout page in the default browser. No analytics, no crash reporting, and no update checks are added.
+- `settings.json` holds only appearance, the reduced-motion override, chosen duration and silence limit, focus mode, alignment, font size, the trial count, and the license cache described in `docs/LICENSE_PAYMENT_SPEC.md`. `install-id.json` holds a random install UUID.
+- The only network traffic is the license flow described in `docs/LICENSE_PAYMENT_SPEC.md`, plus opening the checkout page in the default browser. No analytics, no crash reporting, and no update checks are added.
 - The fonts are bundled, so the app makes no font requests, unlike the site.
 - The in-app About text and the site's privacy page state this in one sentence each. The site change ships with batch 7 as part of a normal writeitdown bundle install.
 
@@ -251,15 +251,15 @@ flowchart LR
     B6 --> B7[7 Signed DMG release]
 ```
 
-The current batch 5 acceptance commands, run from `apps/macos/FirstLine/`, are:
+The batch 6 acceptance commands, run from `apps/macos/FirstLine/`, are:
 
 ```bash
 swift build            # must exit 0
 swift test             # must exit 0; the record states the test count
-scripts/qa-window.sh 5 # current real-window QA only; screenshots under /tmp/wid-qa/5/
+scripts/qa-window.sh 6 # scripted batch 6 window flow; screenshots under /tmp/wid-qa/6/
 ```
 
-Batch 1 created `scripts/qa-window.sh`. The current script supports only batch 5; historical batch 1-4 flows are unavailable. It builds the debug binary, launches it, drives it with `osascript`, captures the app window with `screencapture -l <window id>`, and quits the app. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`. The script supports batches 5 and 6; historical batch 1-4 flows are unavailable. It builds the debug binary, launches it, drives it with `osascript`, captures the app window with `screencapture -l <window id>`, and quits the app. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 
@@ -435,6 +435,6 @@ All ten findings are incorporated into the affected batch or acceptance sections
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
 - The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
-- Notarization, the Dodo product, and the checkout URL depend on the owner-account steps. Without them, batch 7 stops at an unsigned local package, and batch 6 ships with test mode only.
+- Notarization, the Dodo product, and the checkout URL depend on the owner-account steps. Without them, batch 7 stops at an unsigned local package; batch 6's debug client defaults to test mode, while an empty product ID prevents paid activation.
 - Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. The app does not delete user folders on its own; migration guidance belongs in the release instructions at batch 7.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

@@ -189,6 +189,10 @@ Reviewer 复审 pure-AppKit 重写后接受 1 个 BLOCKER + 4 个 FIX-NOW。Debu
 - HARNESS DEVIATION: `scripts/qa-window.sh 4` was not run: it relies on System Events and `screencapture`, both prohibited for this Mini acceptance. Computer Use drove real app windows and captured evidence instead. No App crash was observed; trial gate after three isolated session starts is expected at this stage.
 - MERGE AUTHORIZATION: Captain approved merging Batch 4 on these screenshots despite the NOT VERIFIED evidence above; those lines remain unresolved, not reclassified as pass.
 
+### Trial writing-line position (2026-09-25)
+
+- PENDING real-window Computer Use on the Mini: compare empty and four-line rooms against the web at 1440x900 and 390x844, in centered narrow and left wide alignment and fullscreen Focus Mode. No Mac window screenshot was captured in this background session. The AppKit viewport test covers both alignments; `swift build` and `swift test` pass (145 tests).
+
 ### Batch 5 implementation window QA (2026-09-25)
 
 - PENDING independent Computer Use acceptance. This background session has no display access and did not run `scripts/qa-window.sh 5`, System Events, or `screencapture`; no real-window screenshot is claimed. A fresh graphical session must capture all three warning/recovery/wipe tiers, light/dark start and kept screens, keyboard-only and clipboard flow, duration persistence, fullscreen focus hover and keyboard/VoiceOver status access, alignment and three font sizes, and system appearance. Physical IME, transient frames, and audible VoiceOver remain NOT VERIFIED until separately observed.

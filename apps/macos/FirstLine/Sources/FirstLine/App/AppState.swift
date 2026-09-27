@@ -52,11 +52,12 @@ final class AppState {
     var settings: AppSettings
     private(set) var licenseValidationInFlight = false
     private var activationRevision = 0
+    private var validationRevision = 0
 
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active else { return false }
         if settings.licenseKey == nil { return true }
-        return !licenseValidationInFlight && !productID.isEmpty &&
+        return settings.licenseInstanceID != nil && !licenseValidationInFlight && !productID.isEmpty &&
             settings.licenseProductID == productID && licenseWithinGrace
     }
 
@@ -80,7 +81,8 @@ final class AppState {
         self.clock = clock
         self.productID = productID
         self.settings = (try? settingsStore.load()) ?? .defaultValue
-        self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) && settings.licenseKey != nil
+        self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
+            settings.licenseKey != nil && settings.licenseInstanceID != nil
         self.selectedDuration = settings.defaultDuration
 
         launchInitialSurface()
@@ -294,17 +296,22 @@ final class AppState {
     func validateLicenseIfNeeded(allowRevoked: Bool = false) async {
         guard settings.licenseStatus == .active || settings.licenseStatus == .unknown ||
               (allowRevoked && settings.licenseStatus == .revoked),
-              let key = settings.licenseKey else { return }
+              let key = settings.licenseKey, let instanceID = settings.licenseInstanceID else { return }
         licenseValidationInFlight = true
+        validationRevision += 1
+        let requestRevision = validationRevision
         let revision = activationRevision
         defer {
-            if activationRevision == revision { licenseValidationInFlight = false }
+            if activationRevision == revision && validationRevision == requestRevision {
+                licenseValidationInFlight = false
+            }
         }
         guard !productID.isEmpty, settings.licenseProductID == productID else { return }
 
         do {
-            let valid = try await licenseClient.validate(licenseKey: key, instanceID: settings.licenseInstanceID)
-            guard activationRevision == revision, settings.licenseKey == key,
+            let valid = try await licenseClient.validate(licenseKey: key, instanceID: instanceID)
+            guard activationRevision == revision, validationRevision == requestRevision,
+                  settings.licenseKey == key, settings.licenseInstanceID == instanceID,
                   settings.licenseProductID == productID else { return }
             if valid {
                 settings.licenseStatus = .active
@@ -314,7 +321,8 @@ final class AppState {
                 applyRevokedState()
             }
         } catch {
-            guard activationRevision == revision, settings.licenseKey == key,
+            guard activationRevision == revision, validationRevision == requestRevision,
+                  settings.licenseKey == key, settings.licenseInstanceID == instanceID,
                   settings.licenseProductID == productID else { return }
             applyOfflineGraceDecision()
         }
@@ -386,6 +394,9 @@ final class AppState {
 
     var trialStatusText: String {
         if licenseValidationInFlight { return "Checking license..." }
+        if settings.licenseKey != nil && settings.licenseInstanceID == nil {
+            return "License not activated on this Mac. Enter your key in Settings."
+        }
         if settings.licenseStatus == .active && !hasFullAccess {
             if settings.licenseKey != nil && !productID.isEmpty &&
                 settings.licenseProductID == productID && !licenseWithinGrace {

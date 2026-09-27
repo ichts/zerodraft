@@ -79,7 +79,7 @@ actor MockLicenseClient: LicenseClient {
         }
     }
 
-    func validate(licenseKey: String, instanceID: String?) async throws -> Bool {
+    func validate(licenseKey: String, instanceID: String) async throws -> Bool {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
         lastValidatedKey = licenseKey
         lastValidatedInstanceID = instanceID

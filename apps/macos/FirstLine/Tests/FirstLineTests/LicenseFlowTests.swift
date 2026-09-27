@@ -214,6 +214,42 @@ struct LicenseFlowTests {
     }
 
     @Test
+    func inactiveSameKeyInstanceActivatesAgain() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .revoked, licenseActivatedAt: now,
+                                 licenseLastValidatedAt: now, licenseInstanceID: "lki_inactive",
+                                 licenseProductID: "prod_mock")
+        let (state, mock, store, fm, root) = try makeAppState(validationResult: false, initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: "KEY")
+        #expect(await mock.lastValidatedInstanceID == "lki_inactive")
+        #expect(await mock.lastActivateArguments?.licenseKey == "KEY")
+        #expect(state.settings.licenseInstanceID != "lki_inactive")
+        #expect(try store.load().licenseInstanceID == state.settings.licenseInstanceID)
+        #expect(state.hasFullAccess)
+    }
+
+    @Test
+    func sameKeyValidationNetworkFailureDoesNotActivate() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 licenseKey: "KEY", licenseStatus: .revoked,
+                                 licenseActivatedAt: now, licenseLastValidatedAt: now,
+                                 licenseInstanceID: "lki_existing", licenseProductID: "prod_mock")
+        let (state, mock, store, fm, root) = try makeAppState(validationError: .networkFailure,
+            initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: "KEY")
+        #expect(await mock.lastValidatedInstanceID == "lki_existing")
+        #expect(await mock.lastActivateArguments == nil)
+        #expect(state.licenseActivationError == .networkFailure)
+        #expect(state.settings.licenseInstanceID == "lki_existing")
+        #expect(try store.load().licenseInstanceID == "lki_existing")
+    }
+
+    @Test
     func activateLicenseInvalidKeyKeepsTrialState() async throws {
         let (appState, _, store, fm, tempRoot) = try makeAppState(activationBehavior: .invalidKey)
         defer { try? fm.removeItem(at: tempRoot) }
@@ -415,11 +451,13 @@ struct LicenseFlowTests {
         #expect(!state.licenseValidationInFlight)
         await client.completeValidation(at: 0, .success(!newerValid))
         await check.value
-        #expect(state.settings.licenseStatus == (newerValid ? .active : .revoked))
-        #expect(try store.load().licenseStatus == state.settings.licenseStatus)
-        #expect(state.settings.licenseInstanceID == "lki_existing")
+        #expect(state.settings.licenseStatus == .active)
+        #expect(try store.load().licenseStatus == .active)
+        #expect(newerValid ? state.settings.licenseInstanceID == "lki_existing" :
+                state.settings.licenseInstanceID != "lki_existing")
+        #expect(try store.load().licenseInstanceID == state.settings.licenseInstanceID)
         state.startSession()
-        #expect(state.selectedSurface == (newerValid ? .session : .upgrade))
+        #expect(state.selectedSurface == .session)
     }
 
     @Test(arguments: [false, true])

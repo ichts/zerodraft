@@ -237,8 +237,15 @@ final class AppState {
         }
         if trimmed == settings.licenseKey, settings.licenseInstanceID != nil,
            settings.licenseProductID == productID {
-            await validateLicenseIfNeeded(allowRevoked: true)
-            return
+            switch await validateLicenseIfNeeded(allowRevoked: true) {
+            case true: return
+            case nil:
+                licenseActivationError = .networkFailure
+                return
+            case false:
+                settings.licenseInstanceID = nil
+                persistSettings()
+            }
         }
         let instanceName = installIDStore.loadOrCreate().shortName
         do {
@@ -293,10 +300,11 @@ final class AppState {
         licenseActivationJustSucceeded = false
     }
 
-    func validateLicenseIfNeeded(allowRevoked: Bool = false) async {
+    @discardableResult
+    func validateLicenseIfNeeded(allowRevoked: Bool = false) async -> Bool? {
         guard settings.licenseStatus == .active || settings.licenseStatus == .unknown ||
               (allowRevoked && settings.licenseStatus == .revoked),
-              let key = settings.licenseKey, let instanceID = settings.licenseInstanceID else { return }
+              let key = settings.licenseKey, let instanceID = settings.licenseInstanceID else { return nil }
         licenseValidationInFlight = true
         validationRevision += 1
         let requestRevision = validationRevision
@@ -306,13 +314,13 @@ final class AppState {
                 licenseValidationInFlight = false
             }
         }
-        guard !productID.isEmpty, settings.licenseProductID == productID else { return }
+        guard !productID.isEmpty, settings.licenseProductID == productID else { return nil }
 
         do {
             let valid = try await licenseClient.validate(licenseKey: key, instanceID: instanceID)
             guard activationRevision == revision, validationRevision == requestRevision,
                   settings.licenseKey == key, settings.licenseInstanceID == instanceID,
-                  settings.licenseProductID == productID else { return }
+                  settings.licenseProductID == productID else { return nil }
             if valid {
                 settings.licenseStatus = .active
                 settings.licenseLastValidatedAt = clock()
@@ -320,11 +328,13 @@ final class AppState {
             } else {
                 applyRevokedState()
             }
+            return valid
         } catch {
             guard activationRevision == revision, validationRevision == requestRevision,
                   settings.licenseKey == key, settings.licenseInstanceID == instanceID,
-                  settings.licenseProductID == productID else { return }
+                  settings.licenseProductID == productID else { return nil }
             applyOfflineGraceDecision()
+            return nil
         }
     }
 

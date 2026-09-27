@@ -29,6 +29,7 @@ actor MockLicenseClient: LicenseClient {
     /// 测试可读取，确认 UI 传给 client 的 key 与 instance name 符合预期。
     private(set) var lastActivateArguments: (licenseKey: String, instanceName: String)?
     private(set) var lastValidatedKey: String?
+    private(set) var lastValidatedInstanceID: String?
     private(set) var lastDeactivateArguments: (licenseKey: String, instanceID: String)?
 
     init(
@@ -78,9 +79,10 @@ actor MockLicenseClient: LicenseClient {
         }
     }
 
-    func validate(licenseKey: String) async throws -> Bool {
+    func validate(licenseKey: String, instanceID: String?) async throws -> Bool {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
         lastValidatedKey = licenseKey
+        lastValidatedInstanceID = instanceID
         if let validationError { throw validationError }
         return validationResult
     }

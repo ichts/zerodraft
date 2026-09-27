@@ -60,6 +60,59 @@ struct DodoLicenseClientTests {
         #expect(result.productID == "prod")
     }
 
+    @Test func activationAcceptsNullProductName() async throws {
+        StubLicenseProtocol.response.set { _ in
+            (201, Data(#"{"id":"lki_1","license_key_id":"lic_1","name":"Mac","business_id":"biz","created_at":"2024-01-01T00:00:00Z","product":{"product_id":"prod","name":null}}"#.utf8))
+        }
+        let result = try await client().activate(licenseKey: "KEY", instanceName: "Mac")
+        #expect(result.instanceID == "lki_1")
+        #expect(result.productID == "prod")
+        #expect(result.productName == nil)
+    }
+
+    @Test func validationIncludesCachedInstanceAndRevokesInactiveInstance() async throws {
+        StubLicenseProtocol.response.set { request in
+            #expect(request.url?.path == "/licenses/validate")
+            let stream = try #require(request.httpBodyStream)
+            stream.open()
+            defer { stream.close() }
+            var bytes = [UInt8](repeating: 0, count: 4096)
+            let length = stream.read(&bytes, maxLength: bytes.count)
+            let json = try #require(JSONSerialization.jsonObject(with: Data(bytes.prefix(length))) as? [String: String])
+            #expect(json == ["license_key": "KEY", "license_key_instance_id": "lki_1"])
+            return (200, Data(#"{"valid":false}"#.utf8))
+        }
+        #expect(try await client().validate(licenseKey: "KEY", instanceID: "lki_1") == false)
+    }
+
+    @MainActor
+    @Test func inactiveCachedInstanceRevokesAccess() async throws {
+        StubLicenseProtocol.response.set { request in
+            #expect(request.url?.path == "/licenses/validate")
+            let stream = try #require(request.httpBodyStream)
+            stream.open()
+            defer { stream.close() }
+            var bytes = [UInt8](repeating: 0, count: 4096)
+            let length = stream.read(&bytes, maxLength: bytes.count)
+            let json = try #require(JSONSerialization.jsonObject(with: Data(bytes.prefix(length))) as? [String: String])
+            #expect(json["license_key_instance_id"] == "lki_inactive")
+            return (404, Data(#"{"code":"LICENSE_KEY_NOT_FOUND"}"#.utf8))
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 licenseKey: "KEY", licenseStatus: .active,
+                                 licenseInstanceID: "lki_inactive", licenseProductID: "prod")
+        try store.save(cached)
+        let state = AppState(settingsStore: store, licenseClient: client(),
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "prod")
+        await state.validateLicenseIfNeeded()
+        #expect(state.settings.licenseStatus == .revoked)
+        #expect(!state.hasFullAccess)
+        #expect(try store.load().licenseStatus == .revoked)
+    }
+
     @MainActor
     @Test(arguments: ["prod", "other", ""])
     func productIdentityControlsEntitlement(responseProductID: String) async throws {

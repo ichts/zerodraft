@@ -12,7 +12,7 @@ private actor SuspendedValidationClient: LicenseClient {
                           businessID: "biz_test", createdAt: "2024-01-01T00:00:00Z", productID: "prod_mock")
     }
 
-    func validate(licenseKey: String) async throws -> Bool {
+    func validate(licenseKey: String, instanceID: String?) async throws -> Bool {
         try await withCheckedThrowingContinuation { continuation in
             validation = continuation
             waiter?.resume()
@@ -190,6 +190,24 @@ struct LicenseFlowTests {
         let args = await mock.lastActivateArguments
         #expect(args?.licenseKey == "PRO-TRIM-ME")
         #expect(appState.settings.licenseKey == "PRO-TRIM-ME")
+    }
+
+    @Test(arguments: [LicenseStatus.unknown, .revoked])
+    func cachedSameKeyRevalidatesWithoutConsumingAnotherSlot(status: LicenseStatus) async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 licenseKey: "KEY", licenseStatus: status,
+                                 licenseActivatedAt: now, licenseLastValidatedAt: now,
+                                 licenseInstanceID: "lki_existing", licenseProductID: "prod_mock")
+        let (state, mock, store, fm, root) = try makeAppState(initialSettings: cached)
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: " KEY ")
+        #expect(await mock.lastActivateArguments == nil)
+        #expect(await mock.lastValidatedKey == "KEY")
+        #expect(await mock.lastValidatedInstanceID == "lki_existing")
+        #expect(state.settings.licenseInstanceID == "lki_existing")
+        #expect(try store.load().licenseInstanceID == "lki_existing")
+        #expect(state.hasFullAccess)
     }
 
     @Test
@@ -402,7 +420,7 @@ struct LicenseFlowTests {
         let mock = MockLicenseClient(productID: "other", activationInstanceID: "lki_existing")
         let state = AppState(settingsStore: store, licenseClient: mock,
                              installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock")
-        await state.activateLicense(key: "KEY")
+        await state.activateLicense(key: "NEW")
         #expect(state.licenseActivationError == .wrongProduct)
         #expect(await mock.lastDeactivateArguments == nil)
         #expect(try store.load().licenseInstanceID == "lki_existing")
@@ -458,6 +476,48 @@ struct LicenseFlowTests {
         #expect(online.hasFullAccess)
         online.startSession()
         #expect(online.selectedSurface == .session)
+    }
+
+    @Test(arguments: [-2 * 86_400, -86_400, 86_400, 7 * 86_400])
+    func offlineGraceRejectsFutureTimestampBeyondOneDayButAllowsNormalGrace(age: Int) async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let last = now.addingTimeInterval(TimeInterval(-age))
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: last,
+                                 licenseLastValidatedAt: last, licenseInstanceID: "lki_existing",
+                                 licenseProductID: "prod_mock")
+        let (state, _, _, fm, root) = try makeAppState(validationError: .networkFailure,
+            initialSettings: cached, clockNow: now)
+        defer { try? fm.removeItem(at: root) }
+        await state.validateLicenseIfNeeded()
+        let allowed = age >= -86_400
+        #expect(state.hasFullAccess == allowed)
+        #expect(state.settings.licenseStatus == (allowed ? .active : .unknown))
+    }
+
+    @Test
+    func clockRollbackBeyondToleranceRevokesOfflineGraceWhileAppOpen() async throws {
+        let last = Date(timeIntervalSince1970: 1_700_000_000)
+        var now = last.addingTimeInterval(86_400)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                 licenseStatus: .active, licenseActivatedAt: last,
+                                 licenseLastValidatedAt: last, licenseInstanceID: "lki_existing",
+                                 licenseProductID: "prod_mock")
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try store.save(cached)
+        let state = AppState(settingsStore: store, licenseClient: MockLicenseClient(validationError: .networkFailure),
+                             installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock")
+        await state.validateLicenseIfNeeded()
+        #expect(state.hasFullAccess)
+        now = last.addingTimeInterval(-2 * 86_400)
+        #expect(!state.hasFullAccess)
+        state.startSession()
+        #expect(state.selectedSurface == .upgrade)
     }
 
     @Test

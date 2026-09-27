@@ -41,9 +41,11 @@ struct DodoLicenseClient: LicenseClient {
                                  productName: response.product?.name)
     }
 
-    func validate(licenseKey: String) async throws -> Bool {
+    func validate(licenseKey: String, instanceID: String?) async throws -> Bool {
         do {
-            let data = try await post("validate", body: ["license_key": licenseKey])
+            var body = ["license_key": licenseKey]
+            if let instanceID { body["license_key_instance_id"] = instanceID }
+            let data = try await post("validate", body: body)
             return try JSONDecoder().decode(ValidationResponse.self, from: data).valid
         } catch let error as HTTPFailure {
             if error.code == "LICENSE_KEY_NOT_FOUND" || error.code == "INACTIVE_LICENSE_KEY" { return false }
@@ -84,7 +86,7 @@ private struct ActivationResponse: Decodable {
     let businessID: String
     let createdAt: String
     let product: Product?
-    struct Product: Decodable { let productID: String; let name: String }
+    struct Product: Decodable { let productID: String; let name: String? }
     enum CodingKeys: String, CodingKey {
         case id, name, product
         case licenseKeyID = "license_key_id"

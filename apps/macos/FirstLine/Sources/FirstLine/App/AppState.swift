@@ -233,6 +233,11 @@ final class AppState {
             licenseActivationError = .productNotConfigured
             return
         }
+        if trimmed == settings.licenseKey, settings.licenseInstanceID != nil,
+           settings.licenseProductID == productID {
+            await validateLicenseIfNeeded(allowRevoked: true)
+            return
+        }
         let instanceName = installIDStore.loadOrCreate().shortName
         do {
             let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: instanceName)
@@ -286,8 +291,9 @@ final class AppState {
         licenseActivationJustSucceeded = false
     }
 
-    func validateLicenseIfNeeded() async {
-        guard settings.licenseStatus == .active || settings.licenseStatus == .unknown,
+    func validateLicenseIfNeeded(allowRevoked: Bool = false) async {
+        guard settings.licenseStatus == .active || settings.licenseStatus == .unknown ||
+              (allowRevoked && settings.licenseStatus == .revoked),
               let key = settings.licenseKey else { return }
         licenseValidationInFlight = true
         let revision = activationRevision
@@ -297,7 +303,7 @@ final class AppState {
         guard !productID.isEmpty, settings.licenseProductID == productID else { return }
 
         do {
-            let valid = try await licenseClient.validate(licenseKey: key)
+            let valid = try await licenseClient.validate(licenseKey: key, instanceID: settings.licenseInstanceID)
             guard activationRevision == revision, settings.licenseKey == key,
                   settings.licenseProductID == productID else { return }
             if valid {
@@ -321,7 +327,8 @@ final class AppState {
 
     private var licenseWithinGrace: Bool {
         guard let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt else { return false }
-        return clock().timeIntervalSince(last) <= Self.licenseOfflineGraceInterval
+        let age = clock().timeIntervalSince(last)
+        return age >= -86_400 && age <= Self.licenseOfflineGraceInterval
     }
 
     private func applyOfflineGraceDecision() {

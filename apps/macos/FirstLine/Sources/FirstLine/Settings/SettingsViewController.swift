@@ -14,6 +14,7 @@ final class SettingsViewController: NSViewController {
     private var licenseField: NSTextField?
     private var activateButton: NSButton?
     private var licenseStatusLabel: NSTextField!
+    private var licenseCleanupWarningLabel: NSTextField!
     private var licenseEntryView: NSView?
     private var licenseExplanationLabel: NSTextField?
     private var buyPageButton: NSButton?
@@ -84,7 +85,9 @@ final class SettingsViewController: NSViewController {
 
     private func licenseRows() -> [NSView] {
         licenseStatusLabel = muted(appState.trialStatusText)
-        var rows: [NSView] = [licenseStatusLabel]
+        licenseCleanupWarningLabel = muted("")
+        licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 640).isActive = true
+        var rows: [NSView] = [licenseStatusLabel, licenseCleanupWarningLabel]
 
         licenseDetails = (0..<3).map { _ in muted("") }
         rows.append(contentsOf: licenseDetails)
@@ -119,8 +122,11 @@ final class SettingsViewController: NSViewController {
     }
 
     private func refreshLicense() {
-        licenseStatusLabel.stringValue = appState.hasFullAccess ? appState.trialStatusText :
+        let active = appState.hasFullAccess
+        licenseStatusLabel.stringValue = active ? appState.trialStatusText :
             (appState.licenseActivationError?.errorDescription ?? appState.trialStatusText)
+        licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
+        licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
         let values = [
             appState.settings.licenseActivatedAt.map { "Activated \(formatted($0))" },
             appState.settings.licenseInstanceID.map { "Instance: \($0)" },
@@ -128,9 +134,9 @@ final class SettingsViewController: NSViewController {
         ]
         for (label, value) in zip(licenseDetails, values) {
             label.stringValue = value ?? ""
-            label.isHidden = !appState.hasFullAccess || value == nil
+            label.isHidden = !active || value == nil
         }
-        let showEntry = !appState.hasFullAccess
+        let showEntry = !active
         licenseEntryView?.isHidden = !showEntry
         licenseExplanationLabel?.isHidden = !showEntry
         buyPageButton?.isHidden = !showEntry

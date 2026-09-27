@@ -549,6 +549,50 @@ struct LicenseFlowTests {
     }
 
     @Test
+    func cleanupFailureRemainsVisibleAlongsideRecoveredCachedLicense() async throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                 trialSessionsUsed: AppState.trialSessionLimit,
+                                 licenseKey: "OLD", licenseStatus: .active,
+                                 licenseActivatedAt: now, licenseLastValidatedAt: now,
+                                 licenseInstanceID: "lki_existing", licenseProductID: "prod_mock")
+        let (state, mock, store, fm, root) = try makeAppState(initialSettings: cached,
+            responseProductID: "other", deactivateFails: true)
+        defer { try? fm.removeItem(at: root) }
+        let settingsController = SettingsViewController(appState: state)
+        let upgradeController = UpgradeViewController(appState: state)
+        let settingsView = settingsController.view
+        let upgradeView = upgradeController.view
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
+        }
+        let settingsLabels = fields(settingsView)
+        let upgradeLabels = fields(upgradeView)
+        let warning = try #require(LicenseActivationError.cleanupFailure.errorDescription)
+
+        await state.activateLicense(key: "NEW")
+        #expect(state.licenseActivationError == .cleanupFailure)
+        #expect(!state.hasFullAccess)
+        #expect(state.settings.licenseKey == "OLD")
+        #expect(await mock.lastDeactivateArguments?.licenseKey == "NEW")
+        await state.validateLicenseIfNeeded()
+        for _ in 0..<50 {
+            if settingsLabels.contains(where: { $0.stringValue == "License active." }) &&
+                settingsLabels.contains(where: { $0.stringValue == warning && !$0.isHidden }) &&
+                upgradeLabels.contains(where: { $0.stringValue.contains(warning) }) { break }
+            await Task.yield()
+        }
+        #expect(state.hasFullAccess)
+        #expect(try store.load().licenseKey == "OLD")
+        #expect(settingsLabels.contains { $0.stringValue == "License active." && !$0.isHidden })
+        #expect(settingsLabels.contains { $0.stringValue == warning && !$0.isHidden })
+        #expect(upgradeLabels.contains { $0.stringValue.contains("License active on this Mac.") &&
+            $0.stringValue.contains(warning) && !$0.isHidden })
+        let reopened = UpgradeViewController(appState: state).view
+        #expect(fields(reopened).contains { $0.stringValue.contains(warning) && !$0.isHidden })
+    }
+
+    @Test
     func validationRefreshDoesNotInterruptWriting() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,

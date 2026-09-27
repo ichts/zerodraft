@@ -25,7 +25,9 @@ final class UpgradeViewController: NSViewController {
 
     override func loadView() {
         self.view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
-        appState.clearLicenseActivationError()
+        if appState.licenseActivationError != .cleanupFailure {
+            appState.clearLicenseActivationError()
+        }
         appState.dismissLicenseSuccessFeedback()
         buildInterface()
         refreshLicense()
@@ -89,6 +91,9 @@ final class UpgradeViewController: NSViewController {
         activateButton.isEnabled = !appState.licenseActivationInFlight
         if active {
             feedbackLabel.stringValue = "License active on this Mac."
+            if appState.licenseActivationError == .cleanupFailure {
+                feedbackLabel.stringValue += "\n\(LicenseActivationError.cleanupFailure.errorDescription ?? "")"
+            }
         } else {
             feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.trialStatusText
         }

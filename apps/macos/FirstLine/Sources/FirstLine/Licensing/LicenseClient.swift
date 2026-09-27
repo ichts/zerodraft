@@ -23,10 +23,12 @@ protocol LicenseClient: Sendable {
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation
 
     /// 对应 `POST /licenses/validate`。
-    /// - Parameter licenseKey: 已持久化的 key。
-    /// - Returns: true 表示仍然有效；false 表示已退款/撤销/失效。
+    /// - Parameters:
+    ///   - licenseKey: 已持久化的 key。
+    ///   - instanceID: 已缓存的激活实例 ID；没有实例 ID 的记录不得校验。
+    /// - Returns: true 表示该实例仍然有效；false 表示已退款/撤销/失效。
     /// - Throws: 网络或非预期 HTTP 状态码时抛 `LicenseValidationError`。
-    func validate(licenseKey: String) async throws -> Bool
+    func validate(licenseKey: String, instanceID: String) async throws -> Bool
 
     /// 对应 `POST /licenses/deactivate`。
     /// v1 UI 不暴露此操作，但 API 契约留位，便于将来加 self-serve device management。

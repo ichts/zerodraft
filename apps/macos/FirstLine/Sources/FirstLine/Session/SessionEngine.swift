@@ -43,6 +43,7 @@ final class SessionEngine {
     private(set) var lastDenyAt: TimeInterval?
     private(set) var sessionID = UUID()
     var onStateChange: ((SessionPhase) -> Void)?
+    var hasStarted: Bool { startedAt != nil }
     private var startedAt: TimeInterval?
     private var lastActivityAt: TimeInterval?
 

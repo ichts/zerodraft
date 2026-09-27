@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Window-relative writing anchor, editor focus and session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Window-relative writing anchor, editor focus, first committed/marked input trial accounting, session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
  */
 import AppKit
@@ -291,10 +291,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         textView.onCommittedText = { [weak self] text in
             self?.engine.registerCommittedText(text)
+            self?.appState.consumeTrialOnFirstInput()
             self?.applyPhase()
         }
         textView.onMarkedTextActivity = { [weak self] in
             self?.engine.registerMarkedTextActivity()
+            self?.appState.consumeTrialOnFirstInput()
             self?.applyPhase()
         }
         textView.onDeny = { [weak self] in self?.engine.registerDeny() }

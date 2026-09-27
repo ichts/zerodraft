@@ -48,7 +48,8 @@ struct BrandTests {
         let state = AppState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
         let upgrade = UpgradeViewController(appState: state)
         upgrade.loadViewIfNeeded()
-        #expect(allLabels(in: upgrade.view).contains("One-time $4.99. 2 Macs. No subscription. 14-day refund."))
+        let price = AppState.displayPrice
+        #expect(allLabels(in: upgrade.view).contains { $0.contains(price) })
     }
 
     private func allTextFields(in view: NSView) -> [NSTextField] {

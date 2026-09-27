@@ -295,6 +295,7 @@ struct KeyboardFlowTests {
 
             state.startSession()
             state.sessionEngine.registerCommittedText("private draft")
+            state.consumeTrialOnFirstInput()
             if fromSettings {
                 now = 5
                 state.handleTick()
@@ -316,10 +317,14 @@ struct KeyboardFlowTests {
             #expect(state.selectedSurface == .session)
             #expect(state.sessionEngine.duration == 300)
             #expect(state.sessionEngine.silenceLimit == .strict)
-            #expect(state.settings.trialSessionsUsed == 2)
+            #expect(state.settings.trialSessionsUsed == 1)
 
+            state.sessionEngine.registerCommittedText("second draft")
+            state.consumeTrialOnFirstInput()
             state.newPiece()
-            #expect(state.settings.trialSessionsUsed == 3)
+            #expect(state.settings.trialSessionsUsed == 2)
+            state.sessionEngine.registerCommittedText("third draft")
+            state.consumeTrialOnFirstInput()
             state.newPiece()
             #expect(state.selectedSurface == .upgrade)
             #expect(state.sessionEngine.phase == .idle)

@@ -22,6 +22,9 @@ actor MockLicenseClient: LicenseClient {
     private let validationResult: Bool
     private let validationError: LicenseValidationError?
     private let artificialDelay: Duration?
+    private let productID: String?
+    private let deactivateFails: Bool
+    private let activationInstanceID: String?
 
     /// 测试可读取，确认 UI 传给 client 的 key 与 instance name 符合预期。
     private(set) var lastActivateArguments: (licenseKey: String, instanceName: String)?
@@ -32,12 +35,18 @@ actor MockLicenseClient: LicenseClient {
         activationBehavior: ActivationBehavior = .success,
         validationResult: Bool = true,
         validationError: LicenseValidationError? = nil,
-        artificialDelay: Duration? = nil
+        artificialDelay: Duration? = nil,
+        productID: String? = "prod_mock",
+        deactivateFails: Bool = false,
+        activationInstanceID: String? = nil
     ) {
         self.activationBehavior = activationBehavior
         self.validationResult = validationResult
         self.validationError = validationError
         self.artificialDelay = artificialDelay
+        self.productID = productID
+        self.deactivateFails = deactivateFails
+        self.activationInstanceID = activationInstanceID
     }
 
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation {
@@ -52,12 +61,12 @@ actor MockLicenseClient: LicenseClient {
         switch activationBehavior {
         case .success:
             return LicenseActivation(
-                instanceID: "lki_mock_\(UUID().uuidString.prefix(8))",
+                instanceID: activationInstanceID ?? "lki_mock_\(UUID().uuidString.prefix(8))",
                 licenseKeyID: "lic_mock_\(UUID().uuidString.prefix(8))",
                 name: instanceName,
                 businessID: "biz_mock",
                 createdAt: ISO8601DateFormatter().string(from: Date()),
-                productID: "prod_mock",
+                productID: productID,
                 productName: "writeitdown license"
             )
         case .invalidKey:
@@ -79,5 +88,6 @@ actor MockLicenseClient: LicenseClient {
     func deactivate(licenseKey: String, instanceID: String) async throws {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
         lastDeactivateArguments = (licenseKey, instanceID)
+        if deactivateFails { throw LicenseValidationError.networkFailure }
     }
 }

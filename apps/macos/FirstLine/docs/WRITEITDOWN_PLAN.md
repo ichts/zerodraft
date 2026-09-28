@@ -220,13 +220,13 @@ The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收�
 
 These are the captain's account actions. They are needed at batch 7 and do not block batches 1 to 6.
 
-- [ ] Enroll or confirm the Apple Developer Program membership.
-- [ ] Create a Developer ID Application certificate and install it with its private key in the release Mac's keychain.
-- [ ] Create notarization credentials: an app-specific password or an App Store Connect API key, stored with `xcrun notarytool store-credentials` under a profile name the release script reads.
+- [x] Confirm the Apple Developer Program membership (App Store Connect API access and validated notary credentials on the release Mac).
+- [ ] Create a Developer ID Application certificate and install it with its private key in the release Mac's keychain. App Store Connect certificates API returned `403 FORBIDDEN_ERROR: This operation can only be performed by the Account Holder.` The Account Holder must create the certificate; the release script fails before packaging until a valid identity is installed.
+- [x] Store notarization credentials using the existing App Store Connect API key in the login keychain under profile `writeitdown-notary`; validation succeeded. No app-specific password is needed.
 - [ ] Create the Dodo one-time product for writeitdown with license keys enabled, an activation limit of 2, and a one-time price of USD $4.99.
 - [ ] Provide the Dodo checkout URL and the live-mode product ID.
-- [ ] Confirm the support email and the copyright holder name (both open in the license spec).
-- [ ] Approve the final app icon.
+- [ ] Confirm a working support email and legal copyright holder. Proposed `support@writeitdown.app` only if the mailbox exists; current Info.plist says `writeitdown`, while `LICENSE` still has a `Your Company` placeholder. Do not publish an unverified address or change legal attribution without confirmation.
+- [ ] Approve the final app icon. The current 1024 px asset was copied to `~/Desktop/writeitdown-icon.png` for review.
 - [ ] Approve the site copy for the Mac section in `writeitdown/support.html` and install the updated site bundle.
 
 ## 9. Batches

@@ -4,6 +4,8 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
+scripts/package-app.sh: 从 SwiftPM release 构建组装 `.app`，编译图标，把资源 bundle 装入 `Contents/Resources`；本地 QA 可 ad-hoc 签名。
+scripts/release-dmg.sh: 只在 Developer ID identity、Dodo live 配置存在时用 hardened runtime 签名，公证/装订/验证 DMG 并生成 checksum；不上传或部署。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
@@ -36,7 +38,7 @@ Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 to
 Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong，全部来自 package resources。
+Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。

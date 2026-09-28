@@ -24,13 +24,14 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 - [ ] Confirm config path and absence of draft files on a clean machine
 
 ## Signing
-- [ ] Install Apple Developer ID Application certificate
-- [ ] Build release app bundle with stable bundle identifier
-- [ ] Codesign app with hardened runtime enabled
-- [ ] Verify codesign recursively
+- [ ] Account Holder installs a valid Developer ID Application identity with private key in the login keychain. The certificates API rejected creation for the current API key with a 403 Account Holder-only error.
+- [x] Assemble the local release app with `scripts/package-app.sh --adhoc`; the packaged resource bundle is under `Contents/Resources/` and the icon is compiled to `.icns`.
+- [ ] Set the live checkout URL and product ID in `Sources/FirstLine/Info.plist` after Dodo setup; keep both empty until then. `scripts/release-dmg.sh` refuses to ship without them.
+- [ ] Run `scripts/release-dmg.sh` to sign the app with hardened runtime and timestamp, verify recursively, build the DMG, notarize, staple, validate, and write the SHA-256 checksum.
 
 ## Notarization
 - [ ] Create DMG containing the app bundle
+- [x] Save validated App Store Connect API credentials in the login keychain as `writeitdown-notary` (no app-specific password)
 - [ ] Submit DMG for notarization using notarytool
 - [ ] Wait for Accepted status
 - [ ] Staple notarization ticket to DMG
@@ -38,11 +39,14 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 
 ## Release packaging
 - [ ] Name release artifact consistently
-- [ ] Include short installation instructions
+- [ ] Include short installation instructions: open the DMG, drag Write It Down to Applications, then eject the disk image
 - [ ] Include known limitations if any remain
 - [ ] Publish checksum alongside DMG
 
 ## Final ship gate
 - [ ] No known blocker remains for English keyboard input
 - [ ] No known blocker remains for Chinese IME
+- [ ] Test-mode license activates through the real app client; a different product key is refused
 - [ ] No known blocker remains for license activation or purchase
+- [ ] Confirm support mailbox and copyright holder before publishing; `support@writeitdown.app` is proposed, not verified. Review the current `writeitdown` plist attribution against the `LICENSE` placeholder.
+- [ ] Upload the DMG and install the tested site bundle separately; neither release script deploys.

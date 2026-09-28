@@ -46,7 +46,7 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 ## Final ship gate
 - [ ] No known blocker remains for English keyboard input
 - [ ] No known blocker remains for Chinese IME
-- [ ] Test-mode license activates through the real app client; a different product key is refused
+- [x] Test-mode license activates through the real AppState + DodoLicenseClient (`WID_DODO_E2E=1 swift test --filter LiveDodoAcceptanceTests`); configuring a different product rejects the same key. Keep the key outside git in a mode-600 file.
 - [ ] No known blocker remains for license activation or purchase
 - [ ] Confirm support mailbox and copyright holder before publishing; `support@writeitdown.app` is proposed, not verified. Review the current `writeitdown` plist attribution against the `LICENSE` placeholder.
 - [ ] Upload the DMG and install the tested site bundle separately; neither release script deploys.

@@ -49,6 +49,7 @@ Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 le
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功与失败不落盘、菜单无 Library、导航、trial 计数与解锁。
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入 trial gate 交互。
 Tests/FirstLineTests/DodoLicenseClientTests.swift: stub URLProtocol 验证公开 API 请求和错误映射，不触达外网。
+Tests/FirstLineTests/LiveDodoAcceptanceTests.swift: 仅 `WID_DODO_E2E=1` 时从 `~/.config/writeitdown/dodo.env` 读取测试密钥，调用真实 Dodo test endpoint 验证成功激活和异产品拒绝；CI 默认不触网、不输出密钥。
 
 验证命令
 从本目录运行 `swift build` 和 `swift test`。界面、编辑器、键盘、IME 或发布流程变更还必须执行相关的 `docs/MANUAL_QA.md` 项目，并记录无法执行的检查。

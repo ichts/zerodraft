@@ -3,7 +3,7 @@ set -eu
 
 TARGET=/var/www/writeitdown.app
 SOURCE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-FILES='site.css theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js privacy.html terms.html support.html index.html og.png robots.txt sitemap.xml BingSiteAuth.xml google7787e5a0693832e8.html'
+FILES='site.css theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js privacy.html terms.html support.html index.html og.png robots.txt sitemap.xml BingSiteAuth.xml google7787e5a0693832e8.html 1bcb6b66144003eb070fe87774217f86.txt'
 
 [ "$(id -u)" -eq 0 ] || { echo 'Run this installer as root.' >&2; exit 1; }
 [ -d /var/www ] || { echo '/var/www must already exist.' >&2; exit 1; }

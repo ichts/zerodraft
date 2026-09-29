@@ -10,3 +10,9 @@ Polar is the only payment and license provider for the Mac release. Do not ship 
 6. Run the signed/notarized DMG and window QA gates in `RELEASE_CHECKLIST.md`. The website bundle install and DMG upload are separate approved release steps, never done by the packaging script.
 
 Public API contract: [activate](https://polar.sh/docs/api-reference/customer-portal/license-keys/activate), [validate](https://polar.sh/docs/api-reference/customer-portal/license-keys/validate), [deactivate](https://polar.sh/docs/api-reference/customer-portal/license-keys/deactivate). Sandbox base URL: `https://sandbox-api.polar.sh/v1`; production: `https://api.polar.sh/v1`. No Authorization header is used by these customer-portal endpoints.
+
+## Sandbox status (2026-09-29)
+
+Built in the sandbox organization `write-it-down-mac`: product **Write It Down for Mac** USD 4.99 one-time, license-key benefit (prefix `WID`, 2 activations, customer deactivation on, visible), checkout link with success URL `https://writeitdown.app/support.html#mac`. IDs and test keys live only in `~/.config/writeitdown/polar-sandbox.env` (0600). Real-client proof: `WID_POLAR_E2E=1 swift test --filter LivePolarAcceptanceTests` covers activation, wrong-benefit refusal, third-device refusal and offline grace; a revoked key is refused on validation (`WID_POLAR_PHASE=activate-revoke-key`, revoke in the dashboard, then `WID_POLAR_PHASE=verify-revoked`).
+
+Operational notes: Polar rate-limits the public license endpoints (HTTP 429 with `Retry-After`; the app reports this as a network failure and retries later), and appends `customer_session_token` to the success URL, so the support page must not log or forward its query string.

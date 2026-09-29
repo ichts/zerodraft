@@ -47,7 +47,7 @@ final class UpgradeViewController: NSViewController {
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = "Paste license key from Dodo email"
+        licenseField.placeholderString = "Paste license key from Polar email"
         licenseField.font = FirstLineTypography.bodyNSFont
         licenseField.target = self
         licenseField.action = #selector(activateTapped)

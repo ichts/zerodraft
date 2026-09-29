@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与产品限定的 license 持久化
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 Polar benefit 限定的 license 持久化
  * [POS]: 导航及 trial gate；启动校验前限制缓存许可；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -30,14 +30,15 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
-    static var dodoProductID: String { configuration["WIDDodoProductID"] as? String ?? "" }
+    static var polarOrganizationID: String { configuration["WIDPolarOrganizationID"] as? String ?? "" }
+    static var polarBenefitID: String { configuration["WIDPolarBenefitID"] as? String ?? "" }
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
               let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
         return url
     }
-    /// Dodo validate 不可达时，仍把 license 视作 active 的最长宽限期。
+    /// Polar validate 不可达时，仍把 license 视作 active 的最长宽限期。
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
 
     var selectedSurface: Surface = .home
@@ -49,6 +50,7 @@ final class AppState {
     let installIDStore: InstallIDStore
     let clock: () -> Date
     let productID: String
+    let organizationID: String
     var settings: AppSettings
     private(set) var licenseValidationInFlight = false
     private var activationRevision = 0
@@ -58,6 +60,7 @@ final class AppState {
         guard settings.licenseStatus == .active else { return false }
         if settings.licenseKey == nil { return true }
         return settings.licenseInstanceID != nil && !licenseValidationInFlight && !productID.isEmpty &&
+            (!organizationID.isEmpty || !(licenseClient is PolarLicenseClient)) &&
             settings.licenseProductID == productID && licenseWithinGrace
     }
 
@@ -72,7 +75,8 @@ final class AppState {
         licenseClient: LicenseClient = MockLicenseClient(),
         installIDStore: InstallIDStore = InstallIDStore(),
         clock: @escaping () -> Date = Date.init,
-        productID: String = AppState.dodoProductID
+        productID: String = AppState.polarBenefitID,
+        organizationID: String = AppState.polarOrganizationID
     ) {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
@@ -80,6 +84,7 @@ final class AppState {
         self.installIDStore = installIDStore
         self.clock = clock
         self.productID = productID
+        self.organizationID = organizationID
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
             settings.licenseKey != nil && settings.licenseInstanceID != nil
@@ -231,7 +236,7 @@ final class AppState {
         licenseActivationJustSucceeded = false
         defer { licenseActivationInFlight = false }
 
-        guard !productID.isEmpty else {
+        guard !productID.isEmpty, !organizationID.isEmpty || !(licenseClient is PolarLicenseClient) else {
             licenseActivationError = .productNotConfigured
             return
         }
@@ -314,7 +319,8 @@ final class AppState {
                 licenseValidationInFlight = false
             }
         }
-        guard !productID.isEmpty, settings.licenseProductID == productID else { return nil }
+        guard !productID.isEmpty, (!organizationID.isEmpty || !(licenseClient is PolarLicenseClient)),
+              settings.licenseProductID == productID else { return nil }
 
         do {
             let valid = try await licenseClient.validate(licenseKey: key, instanceID: instanceID)

@@ -624,7 +624,7 @@ struct LicenseFlowTests {
         let settingsView = settings.view
         let upgradeView = upgrade.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Paste license key" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Paste license key from Dodo email" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Paste license key from Polar email" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })

@@ -1,13 +1,13 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 与 FileManager
  * [OUTPUT]: InstallIDStore + InstallID，生成并持久化稳定的本机 install UUID
- * [POS]: Infrastructure 身份层；给 Dodo `/licenses/activate` 提供非侵入式的 instance 标识
+ * [POS]: Infrastructure 身份层；给 Polar customer-portal activate 提供非侵入式的设备标签
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  *
  * 设计取舍：
  * - 不使用硬件序列号 / IOPlatformUUID 等侵入式设备指纹。
  * - 仅在 Application Support 内保存一个随机 UUID；用户清掉目录就视为新设备。
- * - 这对 Dodo 的 2-Mac 限制足够，且不收集可识别个人信息。
+ * - 这对 Polar 的 2-Mac 限制足够，且不收集可识别个人信息。
  */
 
 import Foundation
@@ -18,7 +18,7 @@ struct InstallID: Codable, Equatable, Sendable {
     /// 首次生成时间，仅记录用途。
     let createdAt: Date
 
-    /// 返回 "writeitdown Mac abcd1234" 形式的短名，用作 Dodo activate 的 `name` 字段。
+    /// 返回 "writeitdown Mac abcd1234" 形式的短名，用作 Polar activate 的 `label` 字段。
     var shortName: String {
         let short = String(uuid.uuidString.prefix(8))
         return "writeitdown Mac \(short)"

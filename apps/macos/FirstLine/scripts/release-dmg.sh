@@ -2,6 +2,12 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+if [[ "${1:-}" != "" && "${1:-}" != "--staging" ]] || (( $# > 1 )); then
+  echo 'Usage: scripts/release-dmg.sh [--staging]' >&2
+  exit 2
+fi
+staging=false
+if [[ "${1:-}" == "--staging" ]]; then staging=true; fi
 identity="${WID_SIGNING_IDENTITY:-}"
 if [[ -z "$identity" ]]; then
   identity="$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -n 1)"
@@ -13,9 +19,14 @@ fi
 
 plist=Sources/FirstLine/Info.plist
 checkout="$(/usr/libexec/PlistBuddy -c 'Print :WIDCheckoutURL' "$plist")"
-product="$(/usr/libexec/PlistBuddy -c 'Print :WIDDodoProductID' "$plist")"
-if [[ ! "$checkout" =~ ^https://[^[:space:]]+$ || -z "$product" ]]; then
-  echo 'Release blocked: configure the live Dodo WIDCheckoutURL and WIDDodoProductID in Info.plist first.' >&2
+organization="$(/usr/libexec/PlistBuddy -c 'Print :WIDPolarOrganizationID' "$plist")"
+benefit="$(/usr/libexec/PlistBuddy -c 'Print :WIDPolarBenefitID' "$plist")"
+if [[ "$staging" == false && ( ! "$checkout" =~ ^https://[^[:space:]]+$ || -z "$organization" || -z "$benefit" ) ]]; then
+  echo 'Release blocked: configure the live Polar WIDCheckoutURL, WIDPolarOrganizationID, and WIDPolarBenefitID in Info.plist first.' >&2
+  exit 1
+fi
+if [[ "$staging" == true && ( -n "$checkout" || -n "$organization" || -n "$benefit" ) ]]; then
+  echo 'Staging requires an empty checkout URL and product ID, so this DMG cannot be sold.' >&2
   exit 1
 fi
 
@@ -25,7 +36,9 @@ codesign --force --deep --options runtime --timestamp --sign "$identity" "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
-dmg="$PWD/dist/Write-It-Down-$version.dmg"
+suffix=''
+if [[ "$staging" == true ]]; then suffix='-staging'; fi
+dmg="$PWD/dist/Write-It-Down-$version$suffix.dmg"
 rm -f "$dmg" "$dmg.sha256"
 hdiutil create -volname 'Write It Down' -srcfolder "$app" -format UDZO -ov "$dmg"
 xcrun notarytool submit "$dmg" --keychain-profile writeitdown-notary --keychain "$HOME/Library/Keychains/login.keychain-db" --wait

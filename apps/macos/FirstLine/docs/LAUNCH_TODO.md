@@ -1,4 +1,6 @@
-# Zero Draft - Launch TODO
+# Zero Draft - Launch TODO (historical, retired)
+
+This Dodo-era checklist is retained only for history. The current payment provider is Polar; follow `POLAR_PRODUCT_CHECKLIST.md`, `POLAR_OWNER_STEPS.md`, and `RELEASE_CHECKLIST.md`. Do not execute the Dodo instructions below.
 
 > Superseded for the writeitdown macOS app: see `WRITEITDOWN_PLAN.md`. The Zero Draft price and naming below are historical.
 

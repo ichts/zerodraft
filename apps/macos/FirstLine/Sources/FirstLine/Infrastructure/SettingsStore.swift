@@ -69,7 +69,7 @@ struct AppSettings: Codable, Equatable {
     var writingFontSize: WritingFontSize
     var trialSessionsUsed: Int
 
-    /// v0.2 新增：结构化 license 状态。来自 Dodo activate / validate 调用。
+    /// v0.2 新增：结构化 license 状态。当前由 Polar activate / validate 更新。
     var licenseKey: String?
     var licenseStatus: LicenseStatus
     var licenseActivatedAt: Date?

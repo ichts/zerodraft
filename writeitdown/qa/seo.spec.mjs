@@ -31,3 +31,12 @@ test('verification files are served without HTML fallback', async ({ request }) 
     expect(await response.text()).toBe(readFileSync(file, 'utf8'));
   }
 });
+
+test('IndexNow key file is served, exact, and shipped by the installer', async ({ request }) => {
+  const key = '1bcb6b66144003eb070fe87774217f86';
+  const response = await request.get(`/writeitdown/${key}.txt`);
+  expect(response.ok()).toBe(true);
+  expect((await response.text()).trim()).toBe(key);
+  expect(readFileSync(`${key}.txt`, 'utf8').trim()).toBe(key);
+  expect(readFileSync('install.sh', 'utf8')).toContain(` ${key}.txt'`);
+});

@@ -101,6 +101,8 @@ test.beforeEach(async ({ page }) => {
   });
   page.on('requestfailed', request => evidence.failedRequests.push(request.url()));
   await page.route('**/favicon.ico', route => route.fulfill({ status: 204 }));
+  // Hermetic: the only allowed third-party script is the Cloudflare beacon; stub it so no network call leaves the test.
+  await page.route('https://static.cloudflareinsights.com/beacon.min.js', route => route.fulfill({ contentType: 'text/javascript', body: '' }));
   page.on('request', request => evidence.requests.push({ method: request.method(), url: request.url() }));
   page.on('response', response => {
     if (response.status() >= 400 && !response.url().endsWith('/favicon.ico')) evidence.failedAssets.push(response.url());

@@ -40,3 +40,13 @@ test('IndexNow key file is served, exact, and shipped by the installer', async (
   expect(readFileSync(`${key}.txt`, 'utf8').trim()).toBe(key);
   expect(readFileSync('install.sh', 'utf8')).toContain(` ${key}.txt'`);
 });
+
+test('Cloudflare beacon appears exactly once on each shipped page', async ({ request }) => {
+  for (const path of pages) {
+    const response = await request.get('/writeitdown' + (path === '/' ? '/index.html' : path));
+    const html = await response.text();
+    expect(html.match(/beacon\.min\.js/g)).toHaveLength(1);
+    expect(html.match(/df0c43279d154d5eb9ee4ef8a7d92fec/g)).toHaveLength(1);
+    expect(html.indexOf('static.cloudflareinsights.com')).toBeLessThan(html.indexOf('</body>'));
+  }
+});

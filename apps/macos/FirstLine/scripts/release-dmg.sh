@@ -41,6 +41,7 @@ if [[ "$staging" == true ]]; then suffix='-staging'; fi
 dmg="$PWD/dist/Write-It-Down-$version$suffix.dmg"
 rm -f "$dmg" "$dmg.sha256"
 hdiutil create -volname 'Write It Down' -srcfolder "$app" -format UDZO -ov "$dmg"
+codesign --force --timestamp --sign "$identity" "$dmg"
 xcrun notarytool submit "$dmg" --keychain-profile writeitdown-notary --keychain "$HOME/Library/Keychains/login.keychain-db" --wait
 xcrun stapler staple "$dmg"
 xcrun stapler validate "$dmg"

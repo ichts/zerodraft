@@ -14,7 +14,9 @@
     <string>$4.99</string>
     <key>WIDCheckoutURL</key>
     <string></string>
-    <key>WIDDodoProductID</key>
+    <key>WIDPolarOrganizationID</key>
+    <string></string>
+    <key>WIDPolarBenefitID</key>
     <string></string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>

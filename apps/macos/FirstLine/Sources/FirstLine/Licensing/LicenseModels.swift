@@ -1,13 +1,13 @@
 /**
  * [INPUT]: 依赖 Foundation
- * [OUTPUT]: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Dodo 公开 license API 契约
+ * [OUTPUT]: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Polar 公开 customer-portal license API 契约
  * [POS]: Licensing 模块的契约层，定义 Mac app 与 LicenseClient 之间共享的数据形状；含本地持久化失败的 storageFailure 错误
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation
 
-/// Mac app 内部使用的 license 状态。比 Dodo 公开 endpoints 返回的 `valid: Bool` 更细粒度：
+/// Mac app 内部使用的 license 状态。比 Polar 的 granted / invalid 状态更细粒度：
 /// `.trial` / `.active` / `.invalid` / `.revoked` / `.unknown` 分别对应不同 UI 行为与 trial gate 判定。
 enum LicenseStatus: String, Codable, Sendable {
     case trial
@@ -17,20 +17,19 @@ enum LicenseStatus: String, Codable, Sendable {
     case unknown
 }
 
-/// `/licenses/activate` 成功后保留的关键字段。
-/// 对照 https://docs.dodopayments.com/api-reference/licenses/activate-license 的 response shape。
+/// Polar customer-portal activate 成功后保留的关键字段。历史字段名兼容本地状态模型。
 struct LicenseActivation: Codable, Equatable, Sendable {
-    /// `lki_...` - Dodo 返回的 license key instance ID。后续 `/licenses/deactivate` 必填。
+    /// Polar activation UUID。后续 deactivate 必填。
     let instanceID: String
-    /// `lic_...` - 关联的 license key ID。
+    /// Polar license key UUID。
     let licenseKeyID: String
     /// 此激活实例的人类可读名，例如 "writeitdown Mac abcd1234"。
     let name: String
-    /// `business_id`。仅作记录，不参与本地决策。
+    /// Polar organization UUID。
     let businessID: String
-    /// ISO8601 创建时间字符串。Dodo 返回的是 string，本地保留原值。
+    /// ISO8601 创建时间字符串。
     let createdAt: String
-    /// 关联产品 ID（如有）。
+    /// Polar license-key benefit UUID；历史属性名保留以避免改变本地状态模型。
     let productID: String?
     /// 关联产品名（如有）。
     let productName: String?
@@ -54,9 +53,9 @@ struct LicenseActivation: Codable, Equatable, Sendable {
     }
 }
 
-/// `/licenses/activate` 失败原因。映射 Dodo 错误响应到 UI 文案。
+/// Polar customer-portal activate 失败原因。
 enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
-    /// Key 不存在 / 已退款 / 已撤销。Dodo 通常返回 4xx。
+    /// Key 不存在 / 已退款 / 已撤销。Polar 通常返回 403 或 404。
     case invalidKey
     /// 已达 2-Mac 激活上限。
     case activationLimitReached
@@ -64,9 +63,9 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     case networkFailure
     /// 输入为空或全空白。
     case emptyKey
-    /// Dodo 返回了无法识别的错误。保留原始状态码以便诊断。
+    /// Polar 返回了无法识别的错误。保留原始状态码以便诊断。
     case unexpected(statusCode: Int)
-    /// 激活在 Dodo 侧成功，但无法把 license 状态写盘（磁盘权限/空间等）。
+    /// 激活在 Polar 侧成功，但无法把 license 状态写盘（磁盘权限/空间等）。
     case storageFailure
     case productNotConfigured
     case wrongProduct
@@ -79,15 +78,15 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
         case .activationLimitReached:
             return "This license has reached its 2-Mac activation limit."
         case .networkFailure:
-            return "Could not reach Dodo Payments. Check your connection and try again."
+            return "Could not reach Polar. Check your connection and try again."
         case .emptyKey:
-            return "Enter the license key from your Dodo receipt email."
+            return "Enter the license key from your Polar purchase email."
         case .unexpected(let statusCode):
             return "Activation failed (HTTP \(statusCode))."
         case .storageFailure:
             return "Could not save the license on this Mac. Check disk permissions and try again."
         case .productNotConfigured:
-            return "License activation is unavailable until the writeitdown product is configured."
+            return "License activation is unavailable until the writeitdown Polar organization and benefit are configured."
         case .wrongProduct:
             return "This license is not for writeitdown."
         case .cleanupFailure:

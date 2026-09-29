@@ -13,6 +13,7 @@ pi-session-*.html
 
 # Build artifacts
 .build/
+apps/macos/FirstLine/dist/
 apps/macos/FirstLine/build/
 
 # Debug bundles

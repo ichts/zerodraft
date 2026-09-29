@@ -1,39 +1,20 @@
 /**
- * [INPUT]: 依赖 LicenseModels
- * [OUTPUT]: LicenseClient protocol，覆盖 activate / validate / deactivate 三个 Dodo 公开 license endpoint
- * [POS]: Licensing 抽象层，让 Mac app 在没有真实 Dodo 网络调用时也能测试与运行
- * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
+ * [INPUT]: LicenseModels
+ * [OUTPUT]: LicenseClient protocol for Polar public activate / validate / deactivate
+ * [POS]: Licensing boundary shared by the real network client and test substitute
+ * [PROTOCOL]: Update this header and FirstLine/AGENTS.md when the API boundary changes
  */
 
 import Foundation
 
-/// Mac app 与 Dodo 公开 license API 之间的契约。
-/// 所有方法都是 async，便于 mock 与真实 HTTP 实现共享同一签名。
-///
-/// 实现注意：
-/// - activate / validate / deactivate 都不需要 developer API key（Dodo 文档明确为公开端点）
-/// - 实现层不得在请求体里夹带任何开发者密钥；license_key 自身就是认证因子
-/// - 不得在日志中输出 license_key 全文
+/// Public customer-portal endpoints need no merchant access token. Never log the key or request body.
 protocol LicenseClient: Sendable {
-    /// 对应 `POST /licenses/activate`。
-    /// - Parameters:
-    ///   - licenseKey: 用户粘贴的 key，已 trim。
-    ///   - instanceName: 传给 Dodo 的 `name` 字段。推荐 "writeitdown Mac <short-install-id>"。
-    /// - Returns: 激活后的实例信息（含 `instanceID`，需要持久化以便将来 deactivate）。
+    /// Activate this install and return the allocation ID for later validation or deactivation.
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation
 
-    /// 对应 `POST /licenses/validate`。
-    /// - Parameters:
-    ///   - licenseKey: 已持久化的 key。
-    ///   - instanceID: 已缓存的激活实例 ID；没有实例 ID 的记录不得校验。
-    /// - Returns: true 表示该实例仍然有效；false 表示已退款/撤销/失效。
-    /// - Throws: 网络或非预期 HTTP 状态码时抛 `LicenseValidationError`。
+    /// Validate the cached activation, not merely the key. False means the entitlement was revoked.
     func validate(licenseKey: String, instanceID: String) async throws -> Bool
 
-    /// 对应 `POST /licenses/deactivate`。
-    /// v1 UI 不暴露此操作，但 API 契约留位，便于将来加 self-serve device management。
-    /// - Parameters:
-    ///   - licenseKey: 同上。
-    ///   - instanceID: 来自 activate 返回的 `LicenseActivation.instanceID`。
+    /// Undo a rejected activation so a device slot is not consumed.
     func deactivate(licenseKey: String, instanceID: String) async throws
 }

@@ -310,6 +310,33 @@ struct LicenseFlowTests {
         #expect(await mock.lastActivateArguments == nil)
     }
 
+    @Test
+    func missingPolarOrganizationBlocksActivationAndCachedEntitlement() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                   trialSessionsUsed: AppState.trialSessionLimit, licenseKey: "KEY",
+                                   licenseStatus: .active, licenseActivatedAt: now,
+                                   licenseLastValidatedAt: now, licenseInstanceID: "instance",
+                                   licenseProductID: "benefit"))
+        let client = PolarLicenseClient(organizationID: "", benefitID: "benefit",
+                                        baseURL: URL(string: "http://127.0.0.1:1")!)
+        let state = AppState(settingsStore: store, licenseClient: client,
+                             installIDStore: InstallIDStore(configDirectory: root),
+                             clock: { now }, productID: "benefit", organizationID: "")
+        #expect(!state.hasFullAccess)
+        #expect(await state.validateLicenseIfNeeded() == nil)
+        state.startSession()
+        #expect(state.selectedSurface == .upgrade)
+        await state.activateLicense(key: "KEY")
+        #expect(state.licenseActivationError == .productNotConfigured)
+        #expect(!state.hasFullAccess)
+        #expect(try store.load().licenseInstanceID == "instance")
+    }
+
     @Test(arguments: [LicenseStatus.active, .unknown, .revoked])
     func cachedKeyWithoutInstanceCannotValidateOrUnlockButCanActivateSameKey(status: LicenseStatus) async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -624,7 +651,7 @@ struct LicenseFlowTests {
         let settingsView = settings.view
         let upgradeView = upgrade.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Paste license key" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Paste license key from Dodo email" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Paste license key from Polar email" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })

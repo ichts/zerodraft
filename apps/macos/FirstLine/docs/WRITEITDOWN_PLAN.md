@@ -211,22 +211,22 @@ The following code inside kept files is also deleted:
 The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收费的", and then set the price: "4.99".
 
 - Distribution is a Developer ID signed, hardened-runtime, notarized, stapled DMG downloaded from writeitdown.app. There is no Mac App Store build. This matches the existing `docs/RELEASE_CHECKLIST.md`.
-- The app is paid with a one-time purchase through Dodo Payments. It reuses `docs/LICENSE_PAYMENT_SPEC.md`: a hosted checkout, a license key by email, 2 Macs per license, a 14-day refund, a 3-session Mac trial, and a 7-day offline grace period, all rebranded to writeitdown.
+- The app is paid with a one-time purchase through Polar. The original batch 6 Dodo implementation was replaced before the direct-sale release; historical batch records below describe what shipped then, not the current provider. It reuses `docs/LICENSE_PAYMENT_SPEC.md`: a hosted checkout, a license key by email, 2 Macs per license, a 14-day refund, a 3-session Mac trial, and a 7-day offline grace period, all rebranded to writeitdown.
 - The price is USD $4.99, paid once. Every piece of copy that names a price reads `$4.99`.
-- In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the Dodo product. Once checkout is live, price changes must update the Dodo product, app configuration, and the site's Mac copy together.
+- In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the Polar product. Once checkout is live, price changes must update the Polar product, app configuration, and the site's Mac copy together.
 - One trial session is counted when its first keystroke lands, not when the room opens. That matches the web's start rule and means an untouched room never costs a trial.
 
 ### 8.1 Owner-account steps (needed at the release batch)
 
 These are the captain's account actions. They are needed at batch 7 and do not block batches 1 to 6.
 
-- [ ] Enroll or confirm the Apple Developer Program membership.
-- [ ] Create a Developer ID Application certificate and install it with its private key in the release Mac's keychain.
-- [ ] Create notarization credentials: an app-specific password or an App Store Connect API key, stored with `xcrun notarytool store-credentials` under a profile name the release script reads.
-- [ ] Create the Dodo one-time product for writeitdown with license keys enabled, an activation limit of 2, and a one-time price of USD $4.99.
-- [ ] Provide the Dodo checkout URL and the live-mode product ID.
-- [ ] Confirm the support email and the copyright holder name (both open in the license spec).
-- [ ] Approve the final app icon.
+- [x] Confirm the Apple Developer Program membership (App Store Connect API access and validated notary credentials on the release Mac).
+- [x] Account Holder installed `Developer ID Application: Ziying WANG (4BNUMV44F8)` in the release Mac's login keychain. The earlier certificates API returned `403 FORBIDDEN_ERROR: This operation can only be performed by the Account Holder.` Signing still hangs waiting on private-key access despite the identity appearing valid; DMG notarization remains pending.
+- [x] Store notarization credentials using the existing App Store Connect API key in the login keychain under profile `writeitdown-notary`; validation succeeded. No app-specific password is needed.
+- [ ] Create a Polar sandbox one-time product and license-key benefit, USD $4.99, two activations; prove the real sandbox key with `WID_POLAR_E2E=1 swift test --filter LivePolarAcceptanceTests` (never in CI). Sandbox login and key are owner-account inputs; see `POLAR_PRODUCT_CHECKLIST.md`.
+- [ ] After the owner's Polar KYC and payout setup, create the live product and provide the organization UUID, license benefit UUID, and hosted checkout URL. No live checkout is configured before approval.
+- [ ] Confirm a working support email and legal copyright holder. Proposed `support@writeitdown.app` only if the mailbox exists; current Info.plist says `writeitdown`, while `LICENSE` still has a `Your Company` placeholder. Do not publish an unverified address or change legal attribution without confirmation.
+- [ ] Approve the final app icon. The current 1024 px asset was copied to `~/Desktop/writeitdown-icon.png` for review.
 - [ ] Approve the site copy for the Mac section in `writeitdown/support.html` and install the updated site bundle.
 
 ## 9. Batches
@@ -435,6 +435,6 @@ All ten findings are incorporated into the affected batch or acceptance sections
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
 - The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
-- Notarization, the Dodo product, and the checkout URL depend on the owner-account steps. Without them, batch 7 stops at an unsigned local package; batch 6's debug client defaults to test mode, while an empty product ID prevents paid activation.
+- Notarization, the Polar product, and the checkout URL depend on the owner-account steps. `release-dmg.sh --staging` can notarize a non-sellable build while checkout and benefit IDs remain empty; production release refuses empty Polar configuration. Debug uses Polar sandbox, release uses production.
 - Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. The app does not delete user folders on its own; migration guidance belongs in the release instructions at batch 7.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

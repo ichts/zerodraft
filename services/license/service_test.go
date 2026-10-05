@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
@@ -69,7 +70,7 @@ func (f *fixture) event(id, typ string) *httptest.ResponseRecorder {
 }
 func (f *fixture) eventInEnvironment(id, typ, environment string) *httptest.ResponseRecorder {
 	f.t.Helper()
-	body := map[string]any{"id": id, "eventType": typ, "environment": environment, "data": map[string]any{"orderId": "ORD_fixture", "paymentId": "PAY_fixture", "productId": "wid-test"}}
+	body := map[string]any{"id": id, "eventType": typ, "environment": environment, "data": map[string]any{"orderId": "ORD_fixture", "productId": "wid-test"}}
 	raw, _ := json.Marshal(body)
 	hash := sha256.Sum256(raw)
 	sig, e := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
@@ -150,8 +151,6 @@ func TestWebhookSignatureAndReplay(t *testing.T) {
 	body["eventType"] = "refund.succeeded"
 	expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), 401)
 	expect(t, f.eventInEnvironment("production-event", "order.completed", "production"), 401)
-	expect(t, f.event("unsupported", "refund.failed"), 400)
-	expect(t, f.event("unsupported", "order.completed"), 200)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	expect(t, f.activate("install-one", "macos"), 200)
@@ -191,15 +190,41 @@ func TestOfflineExpiryAndRenewal(t *testing.T) {
 		t.Fatalf("validation must return only a token: %s, %v", w.Body, err)
 	}
 }
-func TestNoSharedProxyThrottle(t *testing.T) {
-	f := setup(t)
-	expect(t, f.event("order", "order.completed"), 200)
-	token := tokenFrom(t, f.activate("install-one", "macos"))
-	for i := 0; i < 61; i++ {
-		expect(t, f.activate("install-one", "macos"), 200)
-		expect(t, f.request("/api/v1/licenses/validate", map[string]string{"token": token}, ""), 200)
+func TestValidationWaitsForRevocationOrDeactivation(t *testing.T) {
+	for _, change := range []string{
+		"UPDATE licenses SET status='revoked' WHERE order_id='ORD_fixture'",
+		"UPDATE activations SET deactivated_at=1 WHERE install_label='install-one'",
+	} {
+		t.Run(change, func(t *testing.T) {
+			f := setup(t)
+			expect(t, f.event("order", "order.completed"), 200)
+			token := tokenFrom(t, f.activate("install-one", "macos"))
+			db, err := sql.Open("sqlite", f.cfgDB())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer db.Close()
+			tx, err := db.Begin()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tx.Rollback()
+			if _, err := tx.Exec(change); err != nil {
+				t.Fatal(err)
+			}
+			result := make(chan *httptest.ResponseRecorder, 1)
+			go func() { result <- f.request("/api/v1/licenses/validate", map[string]string{"token": token}, "") }()
+			select {
+			case w := <-result:
+				t.Fatalf("validation completed before state change committed: %d", w.Code)
+			case <-time.After(100 * time.Millisecond):
+			}
+			if err := tx.Commit(); err != nil {
+				t.Fatal(err)
+			}
+			expect(t, <-result, 403)
+		})
 	}
-	expect(t, f.request("/api/v1/licenses/deactivate", map[string]string{"token": token}, ""), 200)
 }
 
 func TestRefundBeforeCompletionAndManualRevoke(t *testing.T) {

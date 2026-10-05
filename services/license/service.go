@@ -41,7 +41,6 @@ type event struct {
 	Environment string `json:"environment"`
 	Data        struct {
 		OrderID   string `json:"orderId"`
-		PaymentID string `json:"paymentId"`
 		ProductID string `json:"productId"`
 	} `json:"data"`
 }
@@ -67,8 +66,8 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 	}
 	db.SetMaxOpenConns(1)
 	schema := `PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL;
- CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE, payment_id TEXT, status TEXT NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER);
- CREATE TABLE IF NOT EXISTS activations (id TEXT PRIMARY KEY, license_id TEXT NOT NULL REFERENCES licenses(id), install_label TEXT NOT NULL, platform TEXT NOT NULL, created_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, deactivated_at INTEGER);
+ CREATE TABLE IF NOT EXISTS licenses (id TEXT PRIMARY KEY, order_id TEXT NOT NULL UNIQUE, status TEXT NOT NULL, created_at INTEGER NOT NULL, revoked_at INTEGER);
+ CREATE TABLE IF NOT EXISTS activations (id TEXT PRIMARY KEY, license_id TEXT NOT NULL REFERENCES licenses(id), install_label TEXT NOT NULL, platform TEXT NOT NULL, created_at INTEGER NOT NULL, deactivated_at INTEGER);
  CREATE UNIQUE INDEX IF NOT EXISTS active_install ON activations(license_id, install_label) WHERE deactivated_at IS NULL;
  CREATE TABLE IF NOT EXISTS webhook_events (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, received_at INTEGER NOT NULL);`
 	if _, err = db.Exec(schema); err != nil {
@@ -168,10 +167,10 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 	switch e.EventType {
 	case "order.completed":
 		// Revocation is terminal; a reordered completion can never restore a refunded license.
-		_, err = tx.Exec(`INSERT INTO licenses(id,order_id,payment_id,status,created_at) VALUES(?,?,?,?,?) ON CONFLICT(order_id) DO NOTHING`, randomID(), e.Data.OrderID, e.Data.PaymentID, "active", s.now().Unix())
+		_, err = tx.Exec(`INSERT INTO licenses(id,order_id,status,created_at) VALUES(?,?,?,?) ON CONFLICT(order_id) DO NOTHING`, randomID(), e.Data.OrderID, "active", s.now().Unix())
 	case "refund.succeeded":
 		// Store a tombstone even if the refund arrives before order.completed.
-		_, err = tx.Exec(`INSERT INTO licenses(id,order_id,payment_id,status,created_at,revoked_at) VALUES(?,?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET status='revoked',revoked_at=excluded.revoked_at`, randomID(), e.Data.OrderID, e.Data.PaymentID, "revoked", s.now().Unix(), s.now().Unix())
+		_, err = tx.Exec(`INSERT INTO licenses(id,order_id,status,created_at,revoked_at) VALUES(?,?,?,?,?) ON CONFLICT(order_id) DO UPDATE SET status='revoked',revoked_at=excluded.revoked_at`, randomID(), e.Data.OrderID, "revoked", s.now().Unix(), s.now().Unix())
 	}
 	if err == nil {
 		err = tx.Commit()
@@ -236,20 +235,32 @@ func (s *Server) activate(w http.ResponseWriter, r *http.Request) {
 		}
 		id = randomID()
 		created = s.now().Unix()
-		_, err = tx.Exec("INSERT INTO activations(id,license_id,install_label,platform,created_at,last_seen_at) VALUES(?,?,?,?,?,?)", id, license, req.InstallLabel, req.Platform, created, created)
+		_, err = tx.Exec("INSERT INTO activations(id,license_id,install_label,platform,created_at) VALUES(?,?,?,?,?)", id, license, req.InstallLabel, req.Platform, created)
 	} else if err != nil {
 		http.Error(w, "storage error", 500)
 		return
-	}
-	if err == nil {
-		err = tx.Commit()
 	}
 	if err != nil {
 		http.Error(w, "storage error", 500)
 		return
 	}
+	result, err := tx.Exec("UPDATE licenses SET status=status WHERE id=? AND status='active'", license)
+	if err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	n, err := result.RowsAffected()
+	if err != nil || n != 1 {
+		http.Error(w, "storage error", 500)
+		return
+	}
 	issued := s.now().Unix()
-	respond(w, 200, map[string]string{"token": s.sign(claim{license, id, req.InstallLabel, s.cfg.ProductID, issued, issued + int64(grace.Seconds())})})
+	token := s.sign(claim{license, id, req.InstallLabel, s.cfg.ProductID, issued, issued + int64(grace.Seconds())})
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	respond(w, 200, map[string]string{"token": token})
 }
 func (s *Server) sign(c claim) string {
 	b, _ := json.Marshal(c)
@@ -292,20 +303,36 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var status, label string
-	err := s.db.QueryRow(`SELECT l.status,a.install_label FROM activations a JOIN licenses l ON l.id=a.license_id WHERE a.id=? AND a.license_id=? AND a.deactivated_at IS NULL`, c.ActivationID, c.LicenseID).Scan(&status, &label)
-	if err != nil || status != "active" || label != c.InstallLabel {
-		http.Error(w, "license unavailable", 403)
-		return
-	}
-	_, err = s.db.Exec("UPDATE activations SET last_seen_at=? WHERE id=?", s.now().Unix(), c.ActivationID)
+	tx, err := s.db.Begin()
 	if err != nil {
 		http.Error(w, "storage error", 500)
 		return
 	}
+	defer tx.Rollback()
+	result, err := tx.Exec(`UPDATE activations SET deactivated_at=deactivated_at
+		WHERE id=? AND license_id=? AND install_label=? AND deactivated_at IS NULL
+		AND EXISTS (SELECT 1 FROM licenses WHERE id=? AND status='active')`, c.ActivationID, c.LicenseID, c.InstallLabel, c.LicenseID)
+	if err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	n, err := result.RowsAffected()
+	if err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	if n == 0 {
+		http.Error(w, "license unavailable", 403)
+		return
+	}
 	c.IssuedAt = s.now().Unix()
 	c.ExpiresAt = c.IssuedAt + int64(grace.Seconds())
-	respond(w, 200, map[string]string{"token": s.sign(c)})
+	token := s.sign(c)
+	if err := tx.Commit(); err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	respond(w, 200, map[string]string{"token": token})
 }
 func (s *Server) deactivate(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.checked(w, r)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # [INPUT] Optional screenshot/output directory (default /tmp/wid-qa/cua-<timestamp>);
-#         app under test resolved from WID_APP_OUTPUT or dist/Write It Down.app.
+#         app under test packaged at WID_APP_OUTPUT or dist/Write It Down.app.
 # [OUTPUT] Per-stage window screenshots, the matching AX snapshots, and app.log in
 #          the output directory; exit 0 only when every assertion below holds.
 # [POS] apps/macos/FirstLine/scripts/qa-window.sh — real-window acceptance driven
@@ -18,19 +18,15 @@ output="${1:-/tmp/wid-qa/cua-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$output"
 output="$(cd "$output" && pwd -P)"   # screenshot_out_file refuses symlinked ancestors
 
-app="${WID_APP_OUTPUT:-$PWD/dist/Write It Down.app}"
-bin="$app/Contents/MacOS/WriteItDown"
-if [[ ! -x "$bin" ]]; then
-  echo "No packaged app at $app; run scripts/package-app.sh --adhoc first." >&2
-  exit 1
-fi
-
 perms="$(cua-driver permissions status --json 2>/dev/null || true)"
 if ! jq -e '.accessibility == true and .screen_recording == true' >/dev/null 2>&1 <<<"$perms"; then
   echo 'cua-driver daemon lacks accessibility/screen-recording permission; run: cua-driver permissions grant' >&2
   exit 1
 fi
 
+scripts/package-app.sh --adhoc
+app="${WID_APP_OUTPUT:-$PWD/dist/Write It Down.app}"
+bin="$app/Contents/MacOS/WriteItDown"
 qa_home="$(mktemp -d "${TMPDIR:-/tmp}/wid-qa-home.XXXXXX")"
 qa_home="$(cd "$qa_home" && pwd -P)"
 pid=''
@@ -63,11 +59,7 @@ fail() {
 }
 
 
-# tree_markdown. Normalize to the window's own subtree (drop the shared menubar
-# noise) plus the token-bearing elements.
-# The daemon reports only actionable elements in `elements`; static texts live in
-# tree_markdown. Normalize to the window's own subtree (drop the shared menubar
-# noise) plus the token-bearing elements.
+# The daemon reports actionable elements separately from static AX tree text.
 normalize() {
   jq '{
     elements: (.structuredContent.elements // .elements),
@@ -102,12 +94,6 @@ poll() { # poll <name> <query>
   json="$(cua get_window_state "{\"pid\":$pid,\"window_id\":$window_id,\"include_screenshot\":false,\"query\":\"$query\"}" | normalize)"
   printf '%s\n' "$json" | tee "$file.json" >"$output/last-poll.json"
   ta_token="$(jq -r '[.elements[] | select(.role == "AXTextArea")][0].element_token // empty' "$output/last-poll.json")"
-}
-
-# Screenshot-only capture of a transient state (fast, keeps the snapshot cache).
-shot() { # shot <name>
-  local file="$output/$(printf '%02d' "$snap_n")-$1.png"
-  cua get_window_state "{\"pid\":$pid,\"window_id\":$window_id,\"include_accessibility_tree\":false,\"screenshot_out_file\":\"$file\"}" >/dev/null
 }
 
 assert_text() { # assert_text <snapshot-file> <substring>
@@ -162,10 +148,44 @@ for b in 1 5 10 20 30; do
   [[ -n "$(token_of "$output/home.json" button "$b")" ]] || fail "home is missing duration button '$b'"
 done
 
+enter_room() { # enter_room <home-snapshot>
+  local token
+  token="$(token_of "$1" button '1')"
+  [[ -n "$token" ]] || fail 'no element token for the 1-minute button'
+  cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+}
+
+select_tier() { # select_tier <home-snapshot> <label> <tier>
+  local token
+  token="$(token_of "$1" radio "$2")"
+  [[ -n "$token" ]] || fail "no radio button for '$2'"
+  cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+  snap "selected-$3" >"$output/selected-$3.json"
+  assert_text "$output/selected-$3.json" "$2"
+}
+
+check_warn_recovery_wipe() { # tier <max-polls> <draft-before-recovery>
+  local tier="$1" max="$2" before="$3" warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json"
+  wait_text "$tier-warn" 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
+  snap "$tier-warn-full" >"$warn"
+  assert_text "$warn" 'KEEP TYPING OR THE DRAFT IS DELETED.'
+  jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
+    || fail "$tier warn state has no 3-2-1 numeral in AX"
+  press k
+  snap "$tier-recovered-state" >"$recovered"
+  absent_text "$recovered" 'KEEP TYPING OR THE DRAFT IS DELETED.'
+  [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
+  wait_text "$tier-wiped" 'DRAFT WIPED' 'DRAFT WIPED - ' "$max"
+  snap "$tier-wiped-full" >"$wiped"
+  jq -e '.window_markdown | test("DRAFT WIPED - [0-9]+:[0-5][0-9] UNUSED\\. TYPE TO RESTART\\.")' >/dev/null "$wiped" \
+    || fail "$tier wipe report is not the literal receipt"
+  assert_text "$wiped" '0 WORDS'
+  press escape
+  snap "$tier-exit" >"$output/$tier-exit.json"
+}
+
 ### 2. Enter the room via the 1-minute button
-token="$(token_of "$output/home.json" button '1')"
-[[ -n "$token" ]] || fail 'no element token for the 1-minute button'
-cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+enter_room "$output/home.json"
 snap room >"$output/room.json"
 assert_text "$output/room.json" 'Start typing.'
 assert_text "$output/room.json" '1:00'
@@ -183,35 +203,43 @@ press delete
 snap deny >"$output/deny.json"
 [[ "$(draft_value "$output/deny.json")" == 'hello world' ]] || fail 'Backspace mutated the draft; forward-only contract broken'
 
-### 4. Standard 8s tier: warn during seconds 5-8, single-key recovery
-press x   # resets the silence clock; draft becomes 'hello worldx'
-wait_text warn 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' 24
-shot warn-state
-snap warn-full >"$output/warn.json"
-assert_text "$output/warn.json" 'KEEP TYPING OR THE DRAFT IS DELETED.'
-jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$output/warn.json" \
-  || fail 'warn state has no 3-2-1 numeral in AX'
-press k   # one key inside the 3s warn window; draft becomes 'hello worldxk'
-snap recovered >"$output/recovered.json"
-absent_text "$output/recovered.json" 'KEEP TYPING OR THE DRAFT IS DELETED.'
-[[ "$(draft_value "$output/recovered.json")" == 'hello worldxk' ]] || fail "recovered draft is '$(draft_value "$output/recovered.json")'"
-assert_text "$output/recovered.json" '2 WORDS'
+### 4. Standard: warn, recovery, wipe, exit
+press x
+check_warn_recovery_wipe standard 32 'hello worldx'
+assert_text "$output/standard-exit.json" 'Standard - 8s'
+assert_text "$output/standard-exit.json" 'Mac trial: 1 of 3 sessions used.'
 
-### 5. Wipe after 8s of silence; literal report; next input restarts
-wait_text wiped 'DRAFT WIPED' 'DRAFT WIPED - ' 24
-shot wiped-state
-snap wiped-full >"$output/wiped.json"
-assert_text "$output/wiped.json" 'UNUSED. TYPE TO RESTART.'
-assert_text "$output/wiped.json" '0 WORDS'
-press z   # the editor stays armed; a fresh keystroke starts a fresh session
-snap restart >"$output/restart.json"
-[[ "$(draft_value "$output/restart.json")" == 'z' ]] || fail "post-wipe draft is '$(draft_value "$output/restart.json")', expected fresh 'z'"
+### 5. Strict and Relaxed: each selection, warn, recovery, wipe, exit
+for tier in strict relaxed; do
+  home="$output/$tier-home.json"
+  snap "$tier-home" >"$home"
+  if [[ "$tier" == strict ]]; then
+    label='Strict - 5s'
+    budget=2
+    max_polls=25
+  else
+    label='Relaxed - 12s'
+    budget=3
+    max_polls=48
+  fi
+  select_tier "$home" "$label" "$tier"
+  enter_room "$output/selected-$tier.json"
+  snap "$tier-room" >"$output/$tier-room.json"
+  assert_text "$output/$tier-room.json" 'Start typing.'
+  press a
+  snap "$tier-typed" >"$output/$tier-typed.json"
+  [[ "$(draft_value "$output/$tier-typed.json")" == 'a' ]] || fail "$tier first input missing"
+  check_warn_recovery_wipe "$tier" "$max_polls" 'a'
+  assert_text "$output/$tier-exit.json" "$label"
+  assert_text "$output/$tier-exit.json" "Mac trial: $budget of 3 sessions used."
+done
 
-### 6. Escape leaves the room; both sessions were first-input billed
-press escape
-snap exit >"$output/exit.json"
-assert_text "$output/exit.json" 'Standard - 8s'
-assert_text "$output/exit.json" 'Mac trial: 2 of 3 sessions used.'
+### 6. Fourth start routes to Upgrade without billing another trial
+enter_room "$output/relaxed-exit.json"
+snap upgrade >"$output/upgrade.json"
+assert_text "$output/upgrade.json" 'Trial complete'
+assert_text "$output/upgrade.json" 'Three writing sessions used.'
+absent_text "$output/upgrade.json" 'Start typing.'
 
 ### 7. Billing truth in the isolated home
 kill "$pid" 2>/dev/null || true
@@ -220,6 +248,6 @@ pid=''
 settings="$qa_home/Library/Application Support/WriteItDown/Config/settings.json"
 [[ -f "$settings" ]] || fail 'settings.json missing in the isolated home'
 used="$(jq -r '.trialSessionsUsed // 0' "$settings")"
-[[ "$used" == '2' ]] || fail "trialSessionsUsed is $used, expected 2"
+[[ "$used" == '3' ]] || fail "trialSessionsUsed is $used, expected 3"
 
 printf 'QA PASS: %s stages captured in %s\n' "$snap_n" "$output"

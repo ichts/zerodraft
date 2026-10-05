@@ -24,13 +24,13 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 - [ ] Confirm config path and absence of draft files on a clean machine
 
 ## Signing
-- [x] Account Holder installed a valid Developer ID Application identity in the login keychain. Codesign private-key authorization is still blocked; no signed DMG yet.
+- [x] Account Holder installed a valid Developer ID Application identity in the login keychain. Staging signing and notarization were verified; see `MANUAL_QA.md`. A production DMG is still pending.
 - [x] Assemble the local release app with `scripts/package-app.sh --adhoc`; the packaged resource bundle is under `Contents/Resources/` and the icon is compiled to `.icns`.
 - [ ] Set the live checkout URL, organization UUID and benefit UUID in `Sources/FirstLine/Info.plist` after Polar setup; keep them empty until then. `scripts/release-dmg.sh` refuses to ship without them; `--staging` notarizes a non-sellable build only.
 - [ ] Run `scripts/release-dmg.sh` to sign the app with hardened runtime and timestamp, verify recursively, build the DMG, notarize, staple, validate, and write the SHA-256 checksum.
 
 ## Notarization
-- [ ] Create DMG containing the app bundle
+- [ ] Create production DMG containing the app bundle and an Applications symlink
 - [x] Save validated App Store Connect API credentials in the login keychain as `writeitdown-notary` (no app-specific password)
 - [ ] Submit DMG for notarization using notarytool
 - [ ] Wait for Accepted status

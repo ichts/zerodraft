@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # [INPUT] Optional screenshot/output directory (default /tmp/wid-qa/cua-<timestamp>);
 #         app under test packaged at WID_APP_OUTPUT or dist/Write It Down.app.
-# [OUTPUT] Per-stage window screenshots, the matching AX snapshots, and app.log in
-#          the output directory; exit 0 only when every assertion below holds.
+# [OUTPUT] Per-stage screenshots, AX snapshots, app.log, and timing.txt in the
+#          output directory; exit 0 only when every assertion below holds.
 # [POS] apps/macos/FirstLine/scripts/qa-window.sh — real-window acceptance driven
 #       through the cua-driver daemon (roadmap report section 6.9).
 # [PROTOCOL] Accessibility/screen-recording permission belongs to the running
@@ -190,8 +190,8 @@ check_warn_recovery_wipe() {
   assert_text "$warn" 'KEEP TYPING OR THE DRAFT IS DELETED.'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
-  press k
   wipe_start="$(clock_now)"
+  press k
   snap "$tier-recovered-state" >"$recovered"
   absent_text "$recovered" 'KEEP TYPING OR THE DRAFT IS DELETED.'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
@@ -226,8 +226,8 @@ snap deny >"$output/deny.json"
 [[ "$(draft_value "$output/deny.json")" == 'hello world' ]] || fail 'Backspace mutated the draft; forward-only contract broken'
 
 ### 4. Standard: warn, recovery, wipe, exit
-press x
 warn_start="$(clock_now)"
+press x
 check_warn_recovery_wipe standard 32 'hello worldx' 8 "$warn_start"
 assert_text "$output/standard-exit.json" 'Standard - 8s'
 assert_text "$output/standard-exit.json" 'Mac trial: 1 of 3 sessions used.'
@@ -251,8 +251,12 @@ for tier in strict relaxed; do
   enter_room "$output/selected-$tier.json"
   snap "$tier-room" >"$output/$tier-room.json"
   assert_text "$output/$tier-room.json" 'Start typing.'
+  # The daemon confirms a key only after delivery; that round trip can exceed a
+  # second. Bracket the input: Strict's 2s warn needs the early clock, while
+  # Relaxed's 9s warn needs the late clock to avoid counting delivery latency.
+  if [[ "$tier" == strict ]]; then warn_start="$(clock_now)"; fi
   press a
-  warn_start="$(clock_now)"
+  if [[ "$tier" == relaxed ]]; then warn_start="$(clock_now)"; fi
   snap "$tier-typed" >"$output/$tier-typed.json"
   [[ "$(draft_value "$output/$tier-typed.json")" == 'a' ]] || fail "$tier first input missing"
   check_warn_recovery_wipe "$tier" "$max_polls" 'a' "$silence_limit" "$warn_start"
@@ -276,5 +280,5 @@ settings="$qa_home/Library/Application Support/WriteItDown/Config/settings.json"
 used="$(jq -r '.trialSessionsUsed // 0' "$settings")"
 [[ "$used" == '3' ]] || fail "trialSessionsUsed is $used, expected 3"
 
-timing_summary="$(awk '{printf "%s%s %s", NR > 1 ? ", " : "", $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
+timing_summary="$(awk '{printf "%s%s %s", (NR > 1 ? ", " : ""), $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
 printf 'QA PASS: %s stages captured in %s; %s\n' "$snap_n" "$output" "$timing_summary"

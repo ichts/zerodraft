@@ -221,7 +221,7 @@ The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收�
 These are the captain's account actions. They are needed at batch 7 and do not block batches 1 to 6.
 
 - [x] Confirm the Apple Developer Program membership (App Store Connect API access and validated notary credentials on the release Mac).
-- [x] Account Holder installed `Developer ID Application: Ziying WANG (4BNUMV44F8)` in the release Mac's login keychain. The earlier certificates API returned `403 FORBIDDEN_ERROR: This operation can only be performed by the Account Holder.` Signing still hangs waiting on private-key access despite the identity appearing valid; DMG notarization remains pending.
+- [x] Account Holder installed `Developer ID Application: Ziying WANG (4BNUMV44F8)` in the release Mac's login keychain. The earlier certificates API returned `403 FORBIDDEN_ERROR: This operation can only be performed by the Account Holder.` The staging signing and notarization run later succeeded on 2026-09-29; see the correction in `docs/MANUAL_QA.md`. A production DMG remains pending.
 - [x] Store notarization credentials using the existing App Store Connect API key in the login keychain under profile `writeitdown-notary`; validation succeeded. No app-specific password is needed.
 - [ ] Create a Polar sandbox one-time product and license-key benefit, USD $4.99, two activations; prove the real sandbox key with `WID_POLAR_E2E=1 swift test --filter LivePolarAcceptanceTests` (never in CI). Sandbox login and key are owner-account inputs; see `POLAR_PRODUCT_CHECKLIST.md`.
 - [ ] After the owner's Polar KYC and payout setup, create the live product and provide the organization UUID, license benefit UUID, and hosted checkout URL. No live checkout is configured before approval.
@@ -370,7 +370,7 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
   - Inspect start and kept screens in light and dark without slogans; copy the full kept text with `Cmd+C` and compare the pasteboard, start again with `Cmd+N`, and close with `Cmd+W`.
   - Open Settings with `Cmd+,`; verify fullscreen Focus Mode hides clock and count until hover, and test keyboard and VoiceOver access to both. Check centered narrow and left wide alignment, all three font sizes, and system-following appearance without losing text or shifting the deadline.
   - Seed a large draft by programmatic appends through the existing append-only input path in a test or QA harness and measure typing speed; add no app surface or input bypass.
-- Done when `swift build`, `swift test`, each named test, and independent Computer Use real-window acceptance from a separate session pass. Record screenshots of warning and wipe for all three limits and the keyboard-only, focus, settings, light, and dark checks in `docs/MANUAL_QA.md`; mark physical IME or VoiceOver steps not verified if they cannot be performed.
+- Done when `swift build`, `swift test`, each named test, and independent real-window acceptance from a separate session pass. Record screenshots of warning and wipe for all three limits and the keyboard-only, focus, settings, light, and dark checks in `docs/MANUAL_QA.md`; mark physical IME or VoiceOver steps not verified if they cannot be performed.
 
 ### Batch 6: License rebrand and live Dodo client
 
@@ -431,7 +431,7 @@ All ten findings are incorporated into the affected batch or acceptance sections
 
 ## 12. Risks
 
-- The Swift package builds an executable, not an `.app` bundle. Window QA before batch 7 runs the bare binary, so bundle-only behavior (the icon, the bundle identifier in the About panel, Gatekeeper) is only proven in batch 7.
+- The Swift package builds an executable, not an `.app` bundle. `scripts/qa-window.sh` packages and tests an ad-hoc universal app, but that does not prove Developer ID signature, notarization, or Gatekeeper acceptance; the signed release still needs batch 7's checks.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
 - The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.

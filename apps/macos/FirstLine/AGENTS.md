@@ -4,9 +4,9 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
-scripts/package-app.sh: 从 SwiftPM release 构建组装 universal `.app`（`--arch arm64 --arch x86_64`，bin 路径随 arch flags 解析），编译图标，把资源 bundle 装入 `Contents/Resources`；`--adhoc` 由内到外签名（嵌套代码先签，再签外层）并 `codesign --verify --deep --strict`。
-scripts/release-dmg.sh: release/`--staging` 均要求 Developer ID identity、Polar live/空配置匹配，以 hardened runtime 由内到外签名；临时目录放 app + `ln -s /Applications` 再 `hdiutil create`，公证/装订/验证 DMG 并生成 checksum；不上传或部署。
-scripts/qa-window.sh: cua-driver 守护进程路线的真实窗口验收（roadmap report 6.9）：自行 ad-hoc 打包 app，隔离 `CFFIXED_USER_HOME`；AX 验证三档警告/恢复/擦除、三次试用耗尽后升级及计费，每阶段截图；权限在 daemon（`cua-driver permissions status`），后台会话无需自身 TCC 授权。
+scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
+scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；验收流程及未覆盖项见 `docs/WRITEITDOWN_PLAN.md`。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。

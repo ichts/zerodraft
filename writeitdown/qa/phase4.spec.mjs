@@ -316,7 +316,7 @@ test('historical demo sample without subtitles, centered report', async ({ page 
   await expect(page.locator('#paper')).toHaveClass('paper cut');
   await capture(page, info, 'demo-cut');
   await seek(CUT + 300);
-  await expect(page.locator('#report')).toContainText(`DRAFT WIPED - 0:${60 - Math.round(CUT / 1000)} UNUSED`);
+  await expect(page.locator('#report')).toContainText(`DRAFT DELETED AT 0:${60 - Math.round(CUT / 1000)}. TYPE TO START AGAIN`);
   const centers = await page.evaluate(() => {
     const p = document.querySelector('#paper').getBoundingClientRect();
     const range = document.createRange();

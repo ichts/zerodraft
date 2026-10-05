@@ -30,7 +30,7 @@ function render(now = performance.now()) {
   const count = wordCount(state.text);
   const words = `${count} ${count === 1 ? 'WORD' : 'WORDS'}`;
   $('room-count').textContent = words;
-  $('room-report').textContent = state.phase === 'wipe' ? `DRAFT WIPED - ${clock(state.unused)} UNUSED. TYPE TO RESTART.` : '';
+  $('room-report').textContent = state.phase === 'wipe' ? `DRAFT DELETED AT ${clock(state.unused)}. TYPE TO START AGAIN.` : '';
   editor.hidden = kept;
   $('kept').hidden = !kept;
   if (previous === state.phase) return;
@@ -47,7 +47,7 @@ function render(now = performance.now()) {
     compositionBase = null;
     $('kept-text').textContent = state.text;
     $('receipt').textContent = `0:00 - ${words} KEPT.`;
-    announce('You wrote it down. Copy your text before leaving.');
+    announce('You wrote it down. Copy your text before you leave. Nothing is saved.');
     $('copy').focus({ preventScroll: true });
   }
 }
@@ -62,7 +62,7 @@ function tick() {
 function deny(event) {
   event.preventDefault();
   denyFeedback(room.querySelector('.room-paper'));
-  announce('BLOCKED. FORWARD ONLY.');
+  announce('Blocked. Forward only.');
   render();
 }
 

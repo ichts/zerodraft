@@ -64,6 +64,7 @@ Design authority: the web surface answers to `design/DESIGN.md` (constitution v2
 - `writeitdown/` is the separate writeitdown.app static deployment. Its approved LAMPLIGHT/DAYLIGHT and vanilla-browser contracts are scoped in `writeitdown/AGENTS.md`; they do not change the root landing's Datastar or bone-only rules.
 - writeitdown.app releases stay bundle installs, never a deploy from this repository: the source lives here, but a release still means transferring a tested bundle to the Hetzner host and running `sh writeitdown/install.sh` there (it copies exactly the twelve production files into `/var/www/writeitdown.app`). Nothing in this repository - no workflow, hook, or credential - deploys anything.
 - `apps/macos/FirstLine/` is the native AppKit writeitdown implementation (historical source path). Its batch plan is `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`; it does not share a browser runtime with either web surface.
+- `services/license/` is the independent Go + SQLite Waffo license-service skeleton. Its HTTP, security, and operational contract is in `services/license/README.md`; its module map is `services/license/AGENTS.md`. It is not deployed or connected to live money.
 - The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.
 

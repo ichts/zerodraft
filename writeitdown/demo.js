@@ -97,7 +97,7 @@ import { clock, wordCount } from './session.mjs';
       setPhase("report");
       setWash(null);
       put(numeralEl, "num", "");
-      put(reportEl, "rep", "DRAFT WIPED - " + clock(60 - Math.round(CUT_END / 1000)) + " UNUSED. TYPE TO RESTART.");
+      put(reportEl, "rep", "DRAFT DELETED AT " + clock(60 - Math.round(CUT_END / 1000)) + ". TYPE TO START AGAIN.");
       renderDraft({ done: [], cur: "" });
       put(clockEl, "clock", "1:00");
     }

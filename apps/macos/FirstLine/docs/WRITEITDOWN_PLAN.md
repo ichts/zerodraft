@@ -256,10 +256,10 @@ The batch 6 acceptance commands, run from `apps/macos/FirstLine/`, are:
 ```bash
 swift build            # must exit 0
 swift test             # must exit 0; the record states the test count
-scripts/qa-window.sh 6 # scripted batch 6 window flow; screenshots under /tmp/wid-qa/6/
+scripts/qa-window.sh   # cua-driver real-window flow; screenshots under /tmp/wid-qa/cua-*/
 ```
 
-Batch 1 created `scripts/qa-window.sh`. The script supports batches 5 and 6; historical batch 1-4 flows are unavailable. It builds the debug binary, launches it, drives it with `osascript`, captures the app window with `screencapture -l <window id>`, and quits the app. A person or agent then inspects every screenshot and appends a dated record to `docs/MANUAL_QA.md` listing each state, its screenshot path, and pass or fail. States that synthetic events cannot prove, such as physical IME candidate windows and the exact 280 ms feedback frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver daemon route (roadmap report section 6.9), which replaced the earlier batched `osascript`/`screencapture` flows. The script runs the packaged app (`WID_APP_OUTPUT` or `dist/Write It Down.app`) with a fresh `CFFIXED_USER_HOME`, asserts the AX tree at every stage - home budget text and duration buttons, room entry, typed draft and word count, blocked Backspace, warn numeral, recovery, the literal wipe report, fresh restart input, Escape to Home, and `trialSessionsUsed` billing truth - and saves per-stage screenshots. Permissions belong to the cua-driver daemon (`cua-driver permissions status`), so background agents need no TCC grants of their own and no Computer Use approval. States that synthetic events cannot prove at CLI latency, such as physical IME candidate windows and the exact 280 ms deny frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 
@@ -417,7 +417,7 @@ After a batch merges, a fresh session with no memory of the build session accept
 1. The accepting session reads this document, the batch's section, and the merged pull request's description. It does not read the build session's conversation.
 2. It checks out the merge commit in a clean worktree.
 3. From `apps/macos/FirstLine/`, it runs `swift build`, `swift test`, each named test with `swift test --filter <Suite>/<function>`, and every `rg` check listed for the batch, and it records the exit codes.
-4. For batch 5 it runs `scripts/qa-window.sh 5` itself and inspects every screenshot against the done conditions. Historical batches 1-4 have no runnable scripted window flow. For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
+4. For the window flow it runs `scripts/qa-window.sh` itself and inspects every screenshot against the done conditions; the cua-driver route works from a background session (permissions ride the daemon). For visual batches it recaptures comparable web states at 1440x900 light appearance from the live URL in section 2.2; machine-private screenshots are optional context, not acceptance dependencies.
 5. It appends a record under `Independent acceptance - Batch N` to `docs/MANUAL_QA.md` with the commit, the date, each done condition marked pass or fail with its evidence, and anything not verified.
 6. Any failure opens a fix batch before the next batch starts. The accepting session reports the failure and does not fix it silently.
 

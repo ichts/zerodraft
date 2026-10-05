@@ -55,16 +55,14 @@ func run(args []string) error {
 	if !ok {
 		return errors.New("Ed25519 private key required")
 	}
-	var testKey, productionKey []byte
-	if os.Getenv("LICENSE_ENVIRONMENT") == "production" {
-		productionKey, err = readKey(os.Getenv("WAFFO_PRODUCTION_PUBLIC_KEY_FILE"))
-	} else {
-		testKey, err = readKey(os.Getenv("WAFFO_TEST_PUBLIC_KEY_FILE"))
+	if os.Getenv("LICENSE_ENVIRONMENT") != "test" {
+		return errors.New("LICENSE_ENVIRONMENT must be test")
 	}
+	testKey, err := readKey(os.Getenv("WAFFO_TEST_PUBLIC_KEY_FILE"))
 	if err != nil {
 		return err
 	}
-	s, err := Open(Config{Database: dbPath, ProductID: os.Getenv("LICENSE_PRODUCT_ID"), Environment: os.Getenv("LICENSE_ENVIRONMENT"), TestPublicKey: testKey, ProductionPublicKey: productionKey, TokenKey: key}, time.Now)
+	s, err := Open(Config{Database: dbPath, ProductID: os.Getenv("LICENSE_PRODUCT_ID"), Environment: "test", TestPublicKey: testKey, TokenKey: key}, time.Now)
 	if err != nil {
 		return err
 	}

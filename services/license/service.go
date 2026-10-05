@@ -14,10 +14,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
-	"net"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -26,21 +24,15 @@ import (
 const grace = 7 * 24 * time.Hour
 
 type Config struct {
-	Database, ProductID, Environment   string
-	TestPublicKey, ProductionPublicKey []byte
-	TokenKey                           ed25519.PrivateKey
+	Database, ProductID, Environment string
+	TestPublicKey                    []byte
+	TokenKey                         ed25519.PrivateKey
 }
 type Server struct {
 	db        *sql.DB
 	cfg       Config
 	now       func() time.Time
 	publicKey ed25519.PublicKey
-	limitMu   sync.Mutex
-	limits    map[string]limit
-}
-type limit struct {
-	start time.Time
-	count int
 }
 
 type event struct {
@@ -63,7 +55,7 @@ type claim struct {
 }
 
 func Open(cfg Config, now func() time.Time) (*Server, error) {
-	if cfg.Database == "" || cfg.ProductID == "" || (cfg.Environment != "test" && cfg.Environment != "production") || len(cfg.TokenKey) != ed25519.PrivateKeySize {
+	if cfg.Database == "" || cfg.ProductID == "" || cfg.Environment != "test" || len(cfg.TokenKey) != ed25519.PrivateKeySize {
 		return nil, errors.New("incomplete license configuration")
 	}
 	if _, err := webhookKey(cfg); err != nil {
@@ -83,15 +75,11 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey), limits: make(map[string]limit)}, nil
+	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey)}, nil
 }
 func (s *Server) Close() error { return s.db.Close() }
 func webhookKey(c Config) (*rsa.PublicKey, error) {
-	pemBytes := c.TestPublicKey
-	if c.Environment == "production" {
-		pemBytes = c.ProductionPublicKey
-	}
-	block, _ := pem.Decode(pemBytes)
+	block, _ := pem.Decode(c.TestPublicKey)
 	if block == nil {
 		return nil, errors.New("missing webhook public key")
 	}
@@ -157,7 +145,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid environment or event", 401)
 		return
 	}
-	if e.ID == "" || e.Data.OrderID == "" || e.Data.ProductID != s.cfg.ProductID || (e.EventType != "order.completed" && e.EventType != "refund.succeeded" && e.EventType != "refund.failed") {
+	if e.ID == "" || e.Data.OrderID == "" || e.Data.ProductID != s.cfg.ProductID || (e.EventType != "order.completed" && e.EventType != "refund.succeeded") {
 		http.Error(w, "unsupported event", 400)
 		return
 	}
@@ -201,38 +189,6 @@ func randomID() string {
 	}
 	return hex.EncodeToString(b[:])
 }
-func (s *Server) allowed(r *http.Request, license string) bool {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	// Never use X-Forwarded-For here: the reverse proxy must set RemoteAddr if per-client limits are needed.
-	s.limitMu.Lock()
-	defer s.limitMu.Unlock()
-	if len(s.limits) >= 4096 {
-		for key, entry := range s.limits {
-			if s.now().Sub(entry.start) >= time.Minute {
-				delete(s.limits, key)
-			}
-		}
-	}
-	for _, key := range []string{"ip:" + host, "license:" + hex.EncodeToString(sha256sum(license))} {
-		entry, exists := s.limits[key]
-		if !exists && len(s.limits) >= 4096 {
-			return false
-		}
-		if s.now().Sub(entry.start) >= time.Minute {
-			entry = limit{start: s.now()}
-		}
-		entry.count++
-		s.limits[key] = entry
-		if entry.count > 60 {
-			return false
-		}
-	}
-	return true
-}
-func sha256sum(v string) []byte { sum := sha256.Sum256([]byte(v)); return sum[:] }
 func (s *Server) activate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		OrderID      string `json:"orderId"`
@@ -244,10 +200,6 @@ func (s *Server) activate(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(req.OrderID) < 8 || len(req.OrderID) > 100 || len(req.InstallLabel) < 4 || len(req.InstallLabel) > 128 || (req.Platform != "macos" && req.Platform != "windows") {
 		http.Error(w, "invalid activation", 400)
-		return
-	}
-	if !s.allowed(r, req.OrderID) {
-		http.Error(w, "rate limited", 429)
 		return
 	}
 	tx, err := s.db.Begin()
@@ -333,10 +285,6 @@ func (s *Server) checked(w http.ResponseWriter, r *http.Request) (claim, bool) {
 		http.Error(w, "invalid token", 403)
 		return claim{}, false
 	}
-	if !s.allowed(r, c.LicenseID) {
-		http.Error(w, "rate limited", 429)
-		return claim{}, false
-	}
 	return c, true
 }
 func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
@@ -345,8 +293,7 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var status, label string
-	var created int64
-	err := s.db.QueryRow(`SELECT l.status,a.install_label,l.created_at FROM activations a JOIN licenses l ON l.id=a.license_id WHERE a.id=? AND a.license_id=? AND a.deactivated_at IS NULL`, c.ActivationID, c.LicenseID).Scan(&status, &label, &created)
+	err := s.db.QueryRow(`SELECT l.status,a.install_label FROM activations a JOIN licenses l ON l.id=a.license_id WHERE a.id=? AND a.license_id=? AND a.deactivated_at IS NULL`, c.ActivationID, c.LicenseID).Scan(&status, &label)
 	if err != nil || status != "active" || label != c.InstallLabel {
 		http.Error(w, "license unavailable", 403)
 		return
@@ -358,7 +305,7 @@ func (s *Server) validate(w http.ResponseWriter, r *http.Request) {
 	}
 	c.IssuedAt = s.now().Unix()
 	c.ExpiresAt = c.IssuedAt + int64(grace.Seconds())
-	respond(w, 200, map[string]any{"token": s.sign(c), "refundEligible": s.now().Unix()-created < 14*24*3600})
+	respond(w, 200, map[string]string{"token": s.sign(c)})
 }
 func (s *Server) deactivate(w http.ResponseWriter, r *http.Request) {
 	c, ok := s.checked(w, r)

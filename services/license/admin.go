@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"time"
 )
 
@@ -12,16 +11,8 @@ func revoke(path, orderID string) error {
 		return err
 	}
 	defer db.Close()
-	result, err := db.Exec("UPDATE licenses SET status='revoked',revoked_at=? WHERE order_id=?", time.Now().Unix(), orderID)
-	if err != nil {
-		return err
-	}
-	n, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n != 1 {
-		return errors.New("order not found")
-	}
-	return nil
+	now := time.Now().Unix()
+	_, err = db.Exec(`INSERT INTO licenses(id,order_id,status,created_at,revoked_at) VALUES(?,?,?,?,?)
+		ON CONFLICT(order_id) DO UPDATE SET status='revoked',revoked_at=excluded.revoked_at`, randomID(), orderID, "revoked", now, now)
+	return err
 }

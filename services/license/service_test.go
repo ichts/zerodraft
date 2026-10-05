@@ -65,8 +65,11 @@ func (f *fixture) request(path string, payload any, signature string) *httptest.
 	return w
 }
 func (f *fixture) event(id, typ string) *httptest.ResponseRecorder {
+	return f.eventInEnvironment(id, typ, "test")
+}
+func (f *fixture) eventInEnvironment(id, typ, environment string) *httptest.ResponseRecorder {
 	f.t.Helper()
-	body := map[string]any{"id": id, "eventType": typ, "environment": "test", "data": map[string]any{"orderId": "ORD_fixture", "paymentId": "PAY_fixture", "productId": "wid-test"}}
+	body := map[string]any{"id": id, "eventType": typ, "environment": environment, "data": map[string]any{"orderId": "ORD_fixture", "paymentId": "PAY_fixture", "productId": "wid-test"}}
 	raw, _ := json.Marshal(body)
 	hash := sha256.Sum256(raw)
 	sig, e := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
@@ -146,13 +149,14 @@ func TestWebhookSignatureAndReplay(t *testing.T) {
 	sig, _ := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
 	body["eventType"] = "refund.succeeded"
 	expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), 401)
-	body["environment"] = "production"
-	expect(t, f.request("/api/v1/webhooks/waffo", body, ""), 401)
+	expect(t, f.eventInEnvironment("production-event", "order.completed", "production"), 401)
+	expect(t, f.event("unsupported", "refund.failed"), 400)
+	expect(t, f.event("unsupported", "order.completed"), 200)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	expect(t, f.activate("install-one", "macos"), 200)
 }
-func TestOfflineExpiryAndRefundWindow(t *testing.T) {
+func TestOfflineExpiryAndRenewal(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	token := tokenFrom(t, f.activate("install-one", "macos"))
@@ -167,8 +171,9 @@ func TestOfflineExpiryAndRefundWindow(t *testing.T) {
 	}
 	w := f.request("/api/v1/licenses/validate", map[string]string{"token": token}, "")
 	expect(t, w, 200)
-	if !bytes.Contains(w.Body.Bytes(), []byte(`"refundEligible":true`)) {
-		t.Fatal(w.Body)
+	var response map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || len(response) != 1 || response["token"] == "" {
+		t.Fatalf("validation must return only a token: %s, %v", w.Body, err)
 	}
 	token = tokenFrom(t, w)
 	f.s.now = func() time.Time { return f.now.Add(6 * 24 * time.Hour) }
@@ -182,17 +187,19 @@ func TestOfflineExpiryAndRefundWindow(t *testing.T) {
 	f.s.now = func() time.Time { return f.now.Add(14 * 24 * time.Hour) }
 	w = f.request("/api/v1/licenses/validate", map[string]string{"token": token}, "")
 	expect(t, w, 200)
-	if !bytes.Contains(w.Body.Bytes(), []byte(`"refundEligible":false`)) {
-		t.Fatal(w.Body)
+	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || len(response) != 1 || response["token"] == "" {
+		t.Fatalf("validation must return only a token: %s, %v", w.Body, err)
 	}
 }
-func TestRateLimit(t *testing.T) {
+func TestNoSharedProxyThrottle(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("order", "order.completed"), 200)
-	for i := 0; i < 60; i++ {
+	token := tokenFrom(t, f.activate("install-one", "macos"))
+	for i := 0; i < 61; i++ {
 		expect(t, f.activate("install-one", "macos"), 200)
+		expect(t, f.request("/api/v1/licenses/validate", map[string]string{"token": token}, ""), 200)
 	}
-	expect(t, f.activate("install-one", "macos"), 429)
+	expect(t, f.request("/api/v1/licenses/deactivate", map[string]string{"token": token}, ""), 200)
 }
 
 func TestRefundBeforeCompletionAndManualRevoke(t *testing.T) {
@@ -201,14 +208,32 @@ func TestRefundBeforeCompletionAndManualRevoke(t *testing.T) {
 	expect(t, f.event("order-later", "order.completed"), 200)
 	expect(t, f.activate("install-one", "macos"), 403)
 	f2 := setup(t)
-	expect(t, f2.event("order", "order.completed"), 200)
-	token := tokenFrom(t, f2.activate("install-one", "macos"))
 	if err := revoke(f2.cfgDB(), "ORD_fixture"); err != nil {
 		t.Fatal(err)
 	}
-	expect(t, f2.request("/api/v1/licenses/validate", map[string]string{"token": token}, ""), 403)
+	expect(t, f2.event("order-later", "order.completed"), 200)
+	expect(t, f2.activate("install-one", "macos"), 403)
+	f3 := setup(t)
+	expect(t, f3.event("order", "order.completed"), 200)
+	token := tokenFrom(t, f3.activate("install-one", "macos"))
+	if err := revoke(f3.cfgDB(), "ORD_fixture"); err != nil {
+		t.Fatal(err)
+	}
+	expect(t, f3.request("/api/v1/licenses/validate", map[string]string{"token": token}, ""), 403)
+	expect(t, f3.event("order-again", "order.completed"), 200)
+	expect(t, f3.activate("install-two", "macos"), 403)
 }
 func (f *fixture) cfgDB() string { return f.s.cfg.Database }
+
+func TestProductionConfigurationRejected(t *testing.T) {
+	f := setup(t)
+	cfg := f.s.cfg
+	cfg.Environment = "production"
+	if s, err := Open(cfg, func() time.Time { return f.now }); err == nil {
+		s.Close()
+		t.Fatal("production mode must not open")
+	}
+}
 
 func TestWrongProductAndEnvironment(t *testing.T) {
 	f := setup(t)

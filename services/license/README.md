@@ -14,7 +14,7 @@ An authenticated operator can revoke a disputed order offline: stop or coordinat
 
 All routes use `POST`, JSON and `/api/v1/`:
 
-- `/webhooks/waffo`: signed raw-body RSA-SHA256 `X-Waffo-Signature` (base64), matched against the configured environment public key. Accepts `order.completed` and `refund.succeeded`; enforces product ID and event ID; processes repeats once. Its expected event envelope is `{ "id": "...", "eventType": "order.completed", "environment": "test", "data": { "orderId": "...", "productId": "..." } }`. Verify the exact envelope and signature encoding with a real **test-mode** callback before shipping.
+- `/webhooks/waffo`: signed raw-body RSA-SHA256 `X-Waffo-Signature` (base64), verified with the pinned test-mode public key. Accepts `order.completed` and `refund.succeeded`; enforces product ID and event ID; processes repeats once. Its expected event envelope is `{ "id": "...", "eventType": "order.completed", "environment": "test", "data": { "orderId": "...", "productId": "..." } }`. Verify the exact envelope and signature encoding with a real **test-mode** callback before shipping.
 - `/licenses/activate`: `{ "orderId": "...", "installLabel": "random stable install UUID", "platform": "macos|windows" }`. Order ID is a bearer credential. At most two active installations; a repeat installation reuses its slot. Returns `{ "token": "..." }`.
 - `/licenses/validate`: `{ "token": "..." }`. Checks active license and installation; returns a renewed token. Waffo owns refund eligibility and processing; any valid `refund.succeeded` revokes the license.
 - `/licenses/deactivate`: `{ "token": "..." }`. Frees the installation's slot.

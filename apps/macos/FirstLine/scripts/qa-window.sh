@@ -144,10 +144,12 @@ wait_text() { # wait_text <stage> <ax-query> <expected-substring> <max-polls>
 clock_now() { python3 -c 'import time; print(time.monotonic())'; }
 
 assert_timing() {
-  local tier="$1" phase="$2" start="$3" end="$4" lower="$5" upper="$6"
-  awk -v start="$start" -v end="$end" -v lower="$lower" -v upper="$upper" \
-    'BEGIN { elapsed = end - start; exit !(elapsed >= lower && elapsed <= upper) }' \
-    || fail "$tier $phase occurred outside ${lower}-${upper}s after input"
+  local tier="$1" phase="$2" start="$3" end="$4" lower="$5" upper="$6" elapsed
+  elapsed="$(awk -v start="$start" -v end="$end" 'BEGIN { printf "%.3f", end - start }')"
+  printf '%s %s %ss\n' "$tier" "$phase" "$elapsed" >>"$output/timing.txt"
+  awk -v elapsed="$elapsed" -v lower="$lower" -v upper="$upper" \
+    'BEGIN { exit !(elapsed >= lower && elapsed <= upper) }' \
+    || fail "$tier $phase observed at ${elapsed}s, outside ${lower}-${upper}s"
 }
 
 ### 1. Home: duration buttons, silence radio, trial budget line
@@ -181,8 +183,7 @@ check_warn_recovery_wipe() {
   local warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json" wipe_start warn_min warn_max
   warn_min="$(awk -v t="$limit" 'BEGIN { print 0.6 * t - 0.5 }')"
   warn_max="$(awk -v t="$limit" 'BEGIN { print 0.625 * t + 2 }')"
-  if [[ "$tier" == strict ]]; then warn_max=4.9; fi
-  if [[ "$tier" == relaxed ]]; then warn_min=7.1; fi
+  if [[ "$tier" == strict ]]; then warn_min=1.8; warn_max=4.5; fi
   wait_text "$tier-warn" 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
   assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
@@ -275,4 +276,5 @@ settings="$qa_home/Library/Application Support/WriteItDown/Config/settings.json"
 used="$(jq -r '.trialSessionsUsed // 0' "$settings")"
 [[ "$used" == '3' ]] || fail "trialSessionsUsed is $used, expected 3"
 
-printf 'QA PASS: %s stages captured in %s\n' "$snap_n" "$output"
+timing_summary="$(awk '{printf "%s%s %s", NR > 1 ? ", " : "", $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
+printf 'QA PASS: %s stages captured in %s; %s\n' "$snap_n" "$output" "$timing_summary"

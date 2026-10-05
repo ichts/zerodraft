@@ -132,12 +132,22 @@ wait_text() { # wait_text <stage> <ax-query> <expected-substring> <max-polls>
   for ((i = 1; i <= max; i++)); do
     poll "$stage-wait" "$query"
     if jq -e --arg t "$text" '.window_markdown | contains($t)' >/dev/null 2>&1 "$output/last-poll.json"; then
+      matched_at="$(python3 -c 'import time; print(time.monotonic())')"
       cp "$output/last-poll.json" "$output/last-match.json"
       return 0
     fi
     sleep 0.4
   done
   fail "timed out waiting for AX text '$text'"
+}
+
+clock_now() { python3 -c 'import time; print(time.monotonic())'; }
+
+assert_timing() {
+  local tier="$1" phase="$2" start="$3" end="$4" lower="$5" upper="$6"
+  awk -v start="$start" -v end="$end" -v lower="$lower" -v upper="$upper" \
+    'BEGIN { elapsed = end - start; exit !(elapsed >= lower && elapsed <= upper) }' \
+    || fail "$tier $phase occurred outside ${lower}-${upper}s after input"
 }
 
 ### 1. Home: duration buttons, silence radio, trial budget line
@@ -162,20 +172,30 @@ select_tier() { # select_tier <home-snapshot> <label> <tier>
   cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
   snap "selected-$3" >"$output/selected-$3.json"
   assert_text "$output/selected-$3.json" "$2"
+  jq -e --arg label "$2" '[.elements[] | select(.role == "AXRadioButton" and .label == $label and (.value | tostring) == "1")] | length == 1' \
+    >/dev/null "$output/selected-$3.json" || fail "'$2' radio is not selected"
 }
 
-check_warn_recovery_wipe() { # tier <max-polls> <draft-before-recovery>
-  local tier="$1" max="$2" before="$3" warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json"
+check_warn_recovery_wipe() {
+  local tier="$1" max="$2" before="$3" limit="$4" warn_start="$5"
+  local warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json" wipe_start warn_min warn_max
+  warn_min="$(awk -v t="$limit" 'BEGIN { print 0.6 * t - 0.5 }')"
+  warn_max="$(awk -v t="$limit" 'BEGIN { print 0.625 * t + 2 }')"
+  if [[ "$tier" == strict ]]; then warn_max=4.9; fi
+  if [[ "$tier" == relaxed ]]; then warn_min=7.1; fi
   wait_text "$tier-warn" 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
+  assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
   assert_text "$warn" 'KEEP TYPING OR THE DRAFT IS DELETED.'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
   press k
+  wipe_start="$(clock_now)"
   snap "$tier-recovered-state" >"$recovered"
   absent_text "$recovered" 'KEEP TYPING OR THE DRAFT IS DELETED.'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
   wait_text "$tier-wiped" 'DRAFT WIPED' 'DRAFT WIPED - ' "$max"
+  assert_timing "$tier" wipe "$wipe_start" "$matched_at" "$(awk -v t="$limit" 'BEGIN { print t - 0.5 }')" "$((limit + 3))"
   snap "$tier-wiped-full" >"$wiped"
   jq -e '.window_markdown | test("DRAFT WIPED - [0-9]+:[0-5][0-9] UNUSED\\. TYPE TO RESTART\\.")' >/dev/null "$wiped" \
     || fail "$tier wipe report is not the literal receipt"
@@ -185,7 +205,8 @@ check_warn_recovery_wipe() { # tier <max-polls> <draft-before-recovery>
 }
 
 ### 2. Enter the room via the 1-minute button
-enter_room "$output/home.json"
+select_tier "$output/home.json" 'Standard - 8s' standard
+enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
 assert_text "$output/room.json" 'Start typing.'
 assert_text "$output/room.json" '1:00'
@@ -205,7 +226,8 @@ snap deny >"$output/deny.json"
 
 ### 4. Standard: warn, recovery, wipe, exit
 press x
-check_warn_recovery_wipe standard 32 'hello worldx'
+warn_start="$(clock_now)"
+check_warn_recovery_wipe standard 32 'hello worldx' 8 "$warn_start"
 assert_text "$output/standard-exit.json" 'Standard - 8s'
 assert_text "$output/standard-exit.json" 'Mac trial: 1 of 3 sessions used.'
 
@@ -217,19 +239,22 @@ for tier in strict relaxed; do
     label='Strict - 5s'
     budget=2
     max_polls=25
+    silence_limit=5
   else
     label='Relaxed - 12s'
     budget=3
     max_polls=48
+    silence_limit=12
   fi
   select_tier "$home" "$label" "$tier"
   enter_room "$output/selected-$tier.json"
   snap "$tier-room" >"$output/$tier-room.json"
   assert_text "$output/$tier-room.json" 'Start typing.'
   press a
+  warn_start="$(clock_now)"
   snap "$tier-typed" >"$output/$tier-typed.json"
   [[ "$(draft_value "$output/$tier-typed.json")" == 'a' ]] || fail "$tier first input missing"
-  check_warn_recovery_wipe "$tier" "$max_polls" 'a'
+  check_warn_recovery_wipe "$tier" "$max_polls" 'a' "$silence_limit" "$warn_start"
   assert_text "$output/$tier-exit.json" "$label"
   assert_text "$output/$tier-exit.json" "Mac trial: $budget of 3 sessions used."
 done

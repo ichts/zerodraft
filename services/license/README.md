@@ -8,14 +8,16 @@ The existing callback envelope and signature format below are local skeleton ass
 
 Trefoil Studio is the outward seller brand; Write It Down remains the product. The reported dedicated store is `STO_1p1XpirhbkmZIfDkXzGCok` and product is `PROD_4YM4NKcWOOqsBOIuKbBDcy`, named "Write It Down for Mac", one-time USD 4.99, two Macs and a 14-day refund offer. These are configuration facts, not proof of a purchase or refund. Only this dedicated store is in scope. The previous shared-store fallback is withdrawn. Do not borrow or rotate any translation-site credentials. Waffo keys are merchant-scoped, so a dedicated store does not remove the need for exact product-ID filtering on every callback, including refunds. Missing or mismatched product IDs must fail closed.
 
-The reported TEST callback target is `https://licenses.writeitdown.app/waffo/webhook`; LIVE is unset. This code and its Caddy template instead expose `/api/v1/webhooks/waffo`. No receiver deployment has been verified. Merchant notes describe RSA-SHA256 over `${t}.${rawBody}`, whereas this skeleton verifies raw body alone. It is not a compatible provider adapter. Do not silently add a route alias or change signing assumptions without the full verified contract.
+The canonical callback target is `https://licenses.writeitdown.app/api/v1/webhooks/waffo`, matching this code and its Caddy template. The merchant operator has been asked to update TEST from the earlier `/waffo/webhook` path; the remote change and receiver deployment remain unverified. LIVE is unset.
+
+The reported provider scheme is RSA-SHA256 over `${t}.${rawBody}`, with `X-Waffo-Signature: t=<milliseconds>,v1=<base64>`, a 45-minute timestamp tolerance and event-ID deduplication. This is a prose description, not an observed contract. The skeleton instead base64-decodes the whole signature header and verifies raw body alone, so it is incompatible with that description. Do not change the verifier from prose or manufacture fixtures as proof. First capture genuine TEST callback headers and exact raw bytes through a restricted channel, compare them with the implementation, and only then implement and test the observed format.
 
 Before enabling TEST checkout, obtain through the approved safe channel:
 
 - The exact timestamp/signature headers, signature encoding and RSA padding, signed-byte construction, replay-time policy and mode-specific callback public-key provenance. No private-key values belong in evidence reports.
 - Authentic TEST completion and refund callbacks with exact event names and product/order identifiers. Confirm what the merchant's configured event set sends; do not infer fields from fixtures. Keep raw credential-bearing captures restricted, not in source or chat.
 - A genuine dedicated-product TEST checkout and buyer-visible receipt credential, followed by signed callback processing, activation, third-install denial and genuine TEST refund revocation. This requires a separately authorized, verified receiver first; a configured URL alone is not a deployment.
-- Approved receiver routing that reconciles the configured callback path with the implementation, plus deployment and key-handling verification.
+- Proof that TEST now targets the canonical `/api/v1/webhooks/waffo` route, plus separately approved receiver deployment and key-handling verification.
 
 No LIVE requests, real charges or deployment are authorized by the free-trial release. TEST and LIVE keys being provisioned does not itself authorize their use.
 

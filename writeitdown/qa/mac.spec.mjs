@@ -1,39 +1,40 @@
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { CHECKOUT, DOWNLOAD, blockers, readInputs } from '../release-check.mjs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const shipped = ['index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html'];
-const appPrice = readInputs().plist.match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
+const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
+const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
 
-test('Mac page states the offer and never shows a dead or fake purchase/download CTA', async ({ page }, info) => {
+test('Mac page sells a paid app, points to the free web trial, and has no dead or fake CTA', async ({ page }, info) => {
   await page.goto('mac.html');
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
-  await expect(main).toContainText('first three writing sessions are free');
-  await expect(main).not.toContainText('Polar');
+  await expect(main).toContainText('The Mac app is paid.');
+  await expect(main).not.toContainText(/free (writing )?sessions|three/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
 
-  for (const [slot, pattern] of [['checkout', CHECKOUT], ['download', DOWNLOAD]]) {
+  for (const slot of ['checkout', 'download', 'license']) {
     const live = page.locator(`[data-launch="${slot}"]`);
     const pending = page.locator(`[data-launch-pending="${slot}"]`);
-    const liveCount = await live.count();
-    expect(liveCount + await pending.count(), `${slot} must be exactly one link or one pending notice`).toBe(1);
-    if (liveCount) {
-      expect(await live.evaluate(e => e.tagName)).toBe('A');
-      expect(await live.getAttribute('href')).toMatch(pattern);
-      await expect(live).toBeVisible();
-    } else {
+    expect(await live.count() + await pending.count(), `${slot}: exactly one live element or one pending notice`).toBe(1);
+    if (await pending.count()) {
       await expect(pending).toBeVisible();
       expect(await pending.evaluate(e => e.tagName)).not.toBe('A');
-      await expect(pending).toContainText('NOT');
     }
   }
-  // Every door-styled control is a real link to a launch destination.
+  // Every door-styled control is a real, working link.
   for (const door of await page.locator('.door').all()) {
     expect(await door.evaluate(e => e.tagName)).toBe('A');
-    expect(await door.getAttribute('data-launch')).toMatch(/^(checkout|download)$/);
+    expect(await door.getAttribute('href')).toMatch(/^(index\.html#trial|https:\/\/\S+)$/);
   }
+  await page.locator('.door', { hasText: 'TRY IT IN YOUR BROWSER' }).click();
+  await expect(page.locator('#editor')).toBeFocused();
+
+  await page.goto('mac.html');
   const width = await page.evaluate(() => [document.documentElement.scrollWidth, innerWidth]);
   expect(width[0]).toBeLessThanOrEqual(width[1]);
   await page.screenshot({ path: info.outputPath('mac.png'), fullPage: true });
@@ -60,34 +61,64 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
   }
 });
 
-test('landing and help pages route to the Mac page', async ({ page }) => {
-  await page.goto('index.html');
-  await page.locator('.nav-actions a', { hasText: 'MAC APP' }).click();
-  await expect(page).toHaveURL(/\/mac\.html$/);
+test('help pages route to the Mac page', async ({ page }) => {
   for (const file of ['support.html', 'privacy.html', 'terms.html']) {
     await page.goto(file);
-    await expect(page.locator('.foot-links a[href="mac.html"]')).toHaveText('MAC APP');
+    await page.locator('.foot-links a', { hasText: 'MAC APP' }).click();
+    await expect(page).toHaveURL(/\/mac\.html$/);
   }
-  expect(readFileSync('install.sh', 'utf8')).toMatch(/ mac\.html[ ']/);
 });
 
-test('release gate blocks until every launch input is real', () => {
-  const inputs = readInputs();
-  const url = 'https://checkout.example.com/wid';
-  const live = inputs.mac
-    .replace(/<p[^>]*data-launch-pending="download"[^>]*>.*?<\/p>/, '<a class="door" data-launch="download" href="https://example.com/wid-qa.dmg">DOWNLOAD FOR MAC</a>')
-    .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${url}">BUY</a>`)
-    .replace(/<p[^>]*data-launch-pending="license"[^>]*>.*?<\/p>/, '<p data-launch="license">Steps.</p>')
-    .replace(/<p[^>]*data-launch-pending="sha256"[^>]*>.*?<\/p>/, `<p class="report">SHA-256 <code data-launch="sha256">${'0'.repeat(64)}</code></p>`);
-  const support = inputs.support.replace('<h2 id="contact">Contact</h2>', '<h2 id="contact">Contact</h2><p><a href="mailto:help@example.com">help@example.com</a></p>');
-  const plist = inputs.plist.replace(/(<key>WIDCheckoutURL<\/key>\s*<string>)[^<]*/, `$1${url}`);
+// Runs the real release gate CLI against a site copy and returns [exit code, output].
+function releaseCheck({ mac, support, checkout = '' }, ...args) {
+  const root = mkdtempSync(join(tmpdir(), 'wid-release-'));
+  const site = join(root, 'writeitdown');
+  const plistDir = join(root, 'apps/macos/FirstLine/Sources/FirstLine');
+  mkdirSync(site); mkdirSync(plistDir, { recursive: true });
+  writeFileSync(join(site, 'mac.html'), mac);
+  writeFileSync(join(site, 'support.html'), support);
+  writeFileSync(join(plistDir, 'Info.plist'), readFileSync(plistPath, 'utf8')
+    .replace(/(<key>WIDCheckoutURL<\/key>\s*<string>)[^<]*/, `$1${checkout}`));
+  try {
+    return [0, execFileSync('node', ['release-check.mjs', '--root', site, ...args], { encoding: 'utf8', stdio: 'pipe' })];
+  } catch (error) {
+    return [error.status, error.stderr];
+  }
+}
 
-  expect(blockers(inputs).length).toBeGreaterThan(0);
-  expect(blockers({ mac: live, support, plist })).toEqual([]);
-  expect(blockers({ mac: live, support, plist: inputs.plist })).toContain('Checkout URL: Info.plist WIDCheckoutURL differs from mac.html');
-  expect(blockers({ mac: live.replace(url, 'http://example.com/pay'), support, plist })).toContain('Checkout URL: malformed in mac.html');
-  expect(blockers({ mac: live.replace('wid-qa.dmg', 'wid-qa.zip'), support, plist })).toContain('Signed, notarized DMG URL: malformed in mac.html');
-  expect(blockers({ mac: live.replace('<p data-launch="license">Steps.</p>', ''), support, plist })).toContain('License delivery and activation steps: not confirmed in mac.html');
-  expect(blockers({ mac: live, support: inputs.support, plist })).toContain('Support address: not listed in support.html#contact');
-  expect(blockers({ mac: live.replace(`${appPrice} ONCE.`, '$9 ONCE.'), support, plist }).some(line => line.startsWith('Price:'))).toBe(true);
+test('release gate stays blocked on missing, fake, or placeholder launch inputs', () => {
+  const mac = readFileSync('mac.html', 'utf8');
+  const support = readFileSync('support.html', 'utf8');
+  const checkout = 'https://pay.writeitdown.app/wid-mac';
+  const fill = ({ buy = checkout, dmg = 'https://downloads.writeitdown.app/Write-It-Down-1.0.dmg',
+    steps = 'Open the purchase email, copy the license key, and paste it into Settings.' } = {}) => mac
+    .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${buy}">BUY</a>`)
+    .replace(/<p[^>]*data-launch-pending="download"[^>]*>.*?<\/p>/, `<a class="door" data-launch="download" href="${dmg}">DOWNLOAD</a>`)
+    .replace(/<p[^>]*data-launch-pending="license"[^>]*>.*?<\/p>/, `<p data-launch="license">${steps}</p>`);
+  const contact = support.replace('<h2 id="contact">Contact</h2>', '<h2 id="contact">Contact</h2><p><a href="mailto:help@writeitdown.app">help@writeitdown.app</a></p>');
+
+  const [current, currentOut] = releaseCheck({ mac, support }, '--live');
+  expect(current).toBe(1);
+  for (const line of ['Checkout URL: not confirmed', 'DMG URL: not confirmed', 'activation steps: not confirmed', 'Support address'])
+    expect(currentOut).toContain(line);
+
+  const [ready, readyOut] = releaseCheck({ mac: fill(), support: contact, checkout });
+  expect(ready).toBe(0);
+  expect(readyOut).toContain('Not verified live');
+  expect(readyOut).toContain('real test order');
+
+  const cases = [
+    [{ mac: fill({ buy: 'https://example.com/pay' }), checkout: 'https://example.com/pay' }, 'Checkout URL: not a real https destination'],
+    [{ mac: fill({ dmg: 'https://downloads.writeitdown.app/app.zip' }) }, 'DMG URL: not a real https .dmg destination'],
+    [{ mac: fill({ dmg: 'https://x.test/Write-It-Down.dmg' }) }, 'DMG URL: not a real https .dmg destination'],
+    [{ mac: fill({ steps: 'Steps.' }) }, 'activation steps: placeholder copy'],
+    [{ mac: fill(), checkout: '' }, 'WIDCheckoutURL differs'],
+    [{ mac: fill().replace(`${appPrice} ONCE.`, '$9 ONCE.') }, 'Price:'],
+    [{ mac: fill(), support }, 'Support address'],
+  ];
+  for (const [input, message] of cases) {
+    const [code, out] = releaseCheck({ support: contact, checkout, ...input });
+    expect(code, message).toBe(1);
+    expect(out).toContain(message);
+  }
 });

@@ -25,6 +25,6 @@ Transfer and extract the tested deployment bundle on the target host, then run `
 
 The legal pages disclose Google Fonts requests and possible hosting access logs. A public support/privacy contact is deliberately marked as not configured, not replaced with an invented address.
 
-Before installing a bundle that sells the Mac app, `npm run release-check` must pass: it lists every missing launch input on `mac.html`.
+Before installing a bundle that sells the Mac app, `npm run release-check -- --live` must pass: it lists every missing or placeholder launch input on `mac.html` and fetches the checkout and DMG URLs. A pass does not replace a real test order.
 
 See `QA.md` for validation evidence and limits.

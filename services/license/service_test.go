@@ -260,6 +260,31 @@ func TestProductionConfigurationRejected(t *testing.T) {
 	}
 }
 
+func TestSharedStoreRejectsForeignAndUnscopedEvents(t *testing.T) {
+	f := setup(t)
+	expect(t, f.event("own-order", "order.completed"), http.StatusOK)
+	for _, typ := range []string{"order.completed", "refund.succeeded"} {
+		for _, product := range []string{"", "other-product"} {
+			body := map[string]any{"id": typ + product, "eventType": typ, "environment": "test", "data": map[string]string{"orderId": "ORD_fixture", "productId": product}}
+			raw, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hash := sha256.Sum256(raw)
+			sig, err := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), http.StatusBadRequest)
+			var count int
+			if err := f.s.db.QueryRow("SELECT count(*) FROM webhook_events").Scan(&count); err != nil || count != 1 {
+				t.Fatal("foreign or unscoped event reached the event ledger", err)
+			}
+			expect(t, f.activate("install-one", "macos"), http.StatusOK)
+		}
+	}
+}
+
 func TestWrongProductAndEnvironment(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("evt1", "order.completed"), 200)

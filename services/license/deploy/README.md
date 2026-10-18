@@ -6,7 +6,8 @@ These are review templates, not a deployed service or an installer. No host, DNS
 
 - Confirm the approved Hetzner host, SSH identity, test DNS name and Caddy ownership. Do not replace an existing Caddy configuration wholesale.
 - Obtain the verified Waffo test checkout and callback contract from the reference product. The current callback fixture is not provider evidence, and checkout always returns 503.
-- Confirm a dedicated Write It Down one-time $4.99 product, 14-day refund policy, the seller matching the existing Developer ID identity, and the correct test account. Do not borrow the other product's IDs or infer the GB account configuration.
+- Confirm a dedicated Write It Down one-time $4.99 product and 14-day refund policy in the correct test account. The outward seller brand is Trefoil Studio; Write It Down remains the product. GB is preparing a dedicated Trefoil Studio Waffo store. Verify legal merchant identity separately rather than deriving it from the brand.
+- If the dedicated store is delayed, the existing shared store is an authorized fallback only with exact Write It Down product-ID filtering on every callback, including refunds. An event without the verified product ID must not grant or revoke a license. The local handler already rejects missing or mismatched product IDs, but the real provider envelope still needs verification. Do not borrow another product's credentials or change the translation site's API/webhook keys. Obtain verified current merchant configuration through the approved safe channel; keep checkout unavailable until then.
 - Obtain the pinned Waffo test callback public key by a trusted channel. Provision the Ed25519 signing private key outside git. Send only its public key to the Mac worker.
 - Run the repository acceptance command and build a Linux binary matching the approved VPS architecture. Keep the build artifact and checksum outside git.
 

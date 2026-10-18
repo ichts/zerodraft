@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createServer } from 'node:net';
 
 const shipped = ['index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html'];
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
@@ -13,7 +14,7 @@ test('Mac page sells a paid app, points to the free web trial, and has no dead o
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
-  await expect(main).toContainText('The Mac app is paid.');
+  await expect(main).toContainText('The Mac app will be paid when sales open.');
   await expect(main).not.toContainText(/free (writing )?sessions|three/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
 
@@ -146,8 +147,6 @@ test('installer refuses to publish the signup form before the collector answers'
   expect(execFileSync('python3', ['qa/test-install.py'], { encoding: 'utf8' })).toContain('refused while the waitlist collector is down');
 });
 
-// Waitlist form, adapted from the prepared free-trial-launch patch. The collector is mocked;
-// its contract lives in services/waitlist/README.md (JSON for fetch, 303 fragment without JS).
 const respond = (status, outcome) => route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ status: outcome }) });
 async function fillWaitlist(page) {
   await page.locator('#waitlist-email').fill('reader@example.com');
@@ -208,6 +207,56 @@ test('keyboard reaches email, consent, and submit in order', async ({ page }) =>
   await expect(page.locator('#waitlist-form button')).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('#waitlist-status')).toContainText('YOU ARE ON THE LIST');
+});
+
+test('actual Mac form registers through the Go collector with JS and without JS', async ({ page, browser }) => {
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'one real collector run is enough');
+  const root = mkdtempSync(join(tmpdir(), 'wid-collector-'));
+  const binary = join(root, 'collector');
+  const build = spawnSync('go', ['build', '-o', binary, '.'], { cwd: '../services/waitlist', encoding: 'utf8' });
+  expect(build.status, build.stderr).toBe(0);
+  const listener = createServer();
+  await new Promise(resolve => listener.listen(0, '127.0.0.1', resolve));
+  const port = listener.address().port;
+  await new Promise(resolve => listener.close(resolve));
+  const file = join(root, 'subscribers.tsv');
+  const collector = spawn(binary, [], {
+    env: { ...process.env, WAITLIST_ADDR: `127.0.0.1:${port}`, WAITLIST_FILE: file,
+      WAITLIST_ORIGIN: 'http://127.0.0.1:8015', WAITLIST_RETURN_URL: 'http://127.0.0.1:8015/writeitdown/mac.html' },
+    stdio: 'ignore',
+  });
+  const forward = async route => {
+    const response = await route.fetch({ url: `http://127.0.0.1:${port}/api/waitlist`, maxRedirects: 0 });
+    await route.fulfill({ response });
+  };
+  let noJS;
+  try {
+    await expect.poll(async () => {
+      try { return (await fetch(`http://127.0.0.1:${port}/api/waitlist/health`)).status; }
+      catch { return 0; }
+    }, { timeout: 15000 }).toBe(200);
+    await page.route('**/api/waitlist', forward);
+    await page.goto('mac.html');
+    await fillWaitlist(page);
+    await page.locator('#waitlist-form button').click();
+    await expect(page.locator('#waitlist-status')).toContainText('YOU ARE ON THE LIST');
+    expect(readFileSync(file, 'utf8')).toMatch(/\treader@example\.com\n$/);
+
+    noJS = await browser.newContext({ baseURL: 'http://127.0.0.1:8015/writeitdown/', javaScriptEnabled: false });
+    await noJS.route('**/api/waitlist', forward);
+    const plain = await noJS.newPage();
+    await plain.goto('mac.html');
+    await plain.locator('#waitlist-email').fill('second@example.com');
+    await plain.locator('input[name="consent"]').check();
+    await plain.locator('#waitlist-form button').click();
+    await expect(plain).toHaveURL(/mac\.html#waitlist-joined$/);
+    await expect(plain.locator('#waitlist-joined')).toBeVisible();
+    expect(readFileSync(file, 'utf8').split('\n').filter(Boolean)).toHaveLength(2);
+  } finally {
+    await noJS?.close();
+    collector.kill();
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test.describe('without JavaScript', () => {

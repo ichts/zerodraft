@@ -1,11 +1,39 @@
-# Mac waitlist collector
+# writeitdown.app Mac waitlist collector
 
-Python 3 standard library service for the Write It Down Mac signup. No email is sent by this service. `POST /api/waitlist` accepts URL-encoded `email`, `consent=yes`, and an empty `website` honeypot. It inserts a normalized address with its first signup time into SQLite, once per address. JSON clients (`Accept: application/json`) get `{ "status": "joined" | "invalid" | "limited" | "error" }` with HTTP 200/400/429/500. Regular form posts get HTTP 303 to `/mac.html#waitlist-<status>`. Invalid submissions are not stored. Five valid submission attempts per client IP per rolling ten minutes are allowed. `GET /api/waitlist/health` returns `ok` only while SQLite can accept a write transaction. Request logging is disabled; client IPs are held only in process memory for rate limiting.
+A stdlib-only Go service behind the writeitdown.app reverse proxy. It collects addresses from the waitlist form on the writeitdown.app Mac page for one email when Write It Down for Mac can be bought. It is not deployed from this repository.
 
-Run `python3 -m unittest discover -s services/waitlist -p 'test_*.py'` from the repository root to exercise real HTTP requests and persistence. This does not prove live routing.
+## HTTP contract
 
-## Deployment handoff (not performed by this repository)
+`POST /api/waitlist`, `application/x-www-form-urlencoded`, body at most 4 KB:
 
-Create a private persistent SQLite directory writable by the service account, and start `python3 services/waitlist/server.py --db /private/path/waitlist.sqlite --listen 127.0.0.1:8090` under a supervised unprivileged account. Bind only to loopback. Configure the writeitdown.app HTTPS reverse proxy to forward `/api/waitlist` and `/api/waitlist/health` unchanged to that listener, and replace incoming `X-Forwarded-For` with the verified client IP rather than trusting arbitrary client headers. Keep the database outside the public document root, back it up securely, and restrict access to the account handling unsubscribe requests. Do not expose its addresses in logs or artifacts. The service does not configure the proxy, manage an email sender, or deploy itself.
+| Field | Rule |
+| --- | --- |
+| `email` | one bare address, at most 254 characters, dotted domain |
+| `consent` | must be `yes` (the form's required checkbox) |
+| `website` | honeypot; must be empty. A filled value answers `joined` and stores nothing |
 
-Before installing the site, verify the public health endpoint and submit a consented test address through the actual page, confirm its stored row through an authorized local database query, then remove it. `writeitdown/install.sh` blocks when the public health check fails, but health alone does not prove the public POST route, reverse-proxy forwarding, or email delivery. For development, point `WAITLIST_HEALTH_URL` at a local listener when running the installer sandbox test; never treat that as live signup proof. Handle removal requests to contact@trefoilstudio.com by deleting the address from the SQLite database. Sales remain closed until the separate real checkout, delivery, activation, and refund cycle is verified and approved.
+Outcomes: `joined`, `invalid`, `limited` (rate limit), `error` (file write failed). A request with `Accept: application/json` gets `{"status":"<outcome>"}` with 200/400/429/500. Any other request gets `303` to `WAITLIST_RETURN_URL#waitlist-<outcome>`, which the page shows without JavaScript. A duplicate address (case-insensitive) answers `joined` and is not stored twice. A request whose `Origin` header is present and differs from `WAITLIST_ORIGIN` gets 403. `GET /api/waitlist/health` answers `ok`.
+
+Rate limits: 5 submissions per client address and 120 overall per 10-minute window. The client address is the last `X-Forwarded-For` hop, which is sound only because the service refuses to bind anything but loopback. It is kept in memory for the window and never written.
+
+## Storage
+
+One line per new address appended to `WAITLIST_FILE` (mode 0600, fsync per write): `<UTC RFC3339 time>\t<email>`. Nothing else is stored. To remove an address on request, stop the service, delete its line, and start it again (the duplicate set is loaded at start).
+
+## Environment
+
+| Variable | Default |
+| --- | --- |
+| `WAITLIST_ADDR` | `127.0.0.1:8091` (loopback only) |
+| `WAITLIST_FILE` | `/var/lib/writeitdown-waitlist/waitlist.tsv` |
+| `WAITLIST_RETURN_URL` | `https://writeitdown.app/mac.html` |
+| `WAITLIST_ORIGIN` | `https://writeitdown.app` |
+
+## Deploy (operator, by hand)
+
+1. `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o writeitdown-waitlist .` (use the host's architecture), copy it to `/usr/local/bin/` (root, 0755).
+2. Install `deploy/writeitdown-waitlist.service` to `/etc/systemd/system/`, then `systemctl daemon-reload && systemctl enable --now writeitdown-waitlist`.
+3. Add `deploy/Caddyfile.snippet` (or `deploy/nginx.snippet`) to the writeitdown.app site and reload the proxy.
+4. Check `curl -fsS https://writeitdown.app/api/waitlist/health`, submit one real test address from the page, confirm its line in the file, then remove it.
+
+Back up `/var/lib/writeitdown-waitlist/` with the host's other state. Validate code changes with `go vet ./... && go test -race ./...`.

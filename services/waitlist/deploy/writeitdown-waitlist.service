@@ -1,0 +1,31 @@
+# systemd unit for the writeitdown.app Mac waitlist collector. Template only; see ../README.md.
+[Unit]
+Description=writeitdown.app Mac waitlist collector
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/writeitdown-waitlist
+Environment=WAITLIST_ADDR=127.0.0.1:8091
+Environment=WAITLIST_FILE=/var/lib/writeitdown-waitlist/waitlist.tsv
+Environment=WAITLIST_RETURN_URL=https://writeitdown.app/mac.html
+Environment=WAITLIST_ORIGIN=https://writeitdown.app
+DynamicUser=yes
+StateDirectory=writeitdown-waitlist
+StateDirectoryMode=0700
+UMask=0077
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+SystemCallFilter=@system-service
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target

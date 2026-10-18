@@ -1,13 +1,14 @@
 # Test deployment preparation
 
-These are review templates, not a deployed service or an installer. No host, DNS name, product ID or Waffo credential is selected here. Do not run them against a VPS until firstmate supplies the approved host and configuration through a safe channel. Production mode is not implemented.
+These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Deployment is not authorized for the first public free three-use trial, which has no checkout or activation. Do not run these templates against a VPS without separate approval and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment
 
 - Confirm the approved Hetzner host, SSH identity, test DNS name and Caddy ownership. Do not replace an existing Caddy configuration wholesale.
 - Obtain the verified Waffo test checkout and callback contract from the reference product. The current callback fixture is not provider evidence, and checkout always returns 503.
-- Confirm a dedicated Write It Down one-time $4.99 product and 14-day refund policy in the correct test account. The outward seller brand is Trefoil Studio; Write It Down remains the product. GB is preparing a dedicated Trefoil Studio Waffo store. Verify legal merchant identity separately rather than deriving it from the brand.
-- If the dedicated store is delayed, the existing shared store is an authorized fallback only with exact Write It Down product-ID filtering on every callback, including refunds. An event without the verified product ID must not grant or revoke a license. The local handler already rejects missing or mismatched product IDs, but the real provider envelope still needs verification. Do not borrow another product's credentials or change the translation site's API/webhook keys. Obtain verified current merchant configuration through the approved safe channel; keep checkout unavailable until then.
+- Verify the reported dedicated Trefoil Studio store and Write It Down product against an actual TEST purchase: one-time USD 4.99, two Macs, 14-day refund. Verify legal merchant identity separately rather than deriving it from the outward brand. The dedicated-store configuration is the only approved direction; no shared TranslateImage store or key fallback remains.
+- Keep exact product-ID filtering on every callback, including refunds, because merchant keys are not store-scoped. An event without the verified product ID must not grant or revoke a license. The local handler rejects missing or mismatched product IDs, but its envelope and raw-body signature scheme do not implement the reported provider contract. Do not borrow another product's credentials or change the translation site's API/webhook keys.
+- Reconcile the configured TEST `/waffo/webhook` target with the current `/api/v1/webhooks/waffo` route and Caddy template. Verify timestamp-prefixed signature construction, headers, encoding, key provenance and genuine completion/refund payloads before adapting the receiver. Keep checkout unavailable meanwhile.
 - Obtain the pinned Waffo test callback public key by a trusted channel. Provision the Ed25519 signing private key outside git. Send only its public key to the Mac worker.
 - Run the repository acceptance command and build a Linux binary matching the approved VPS architecture. Keep the build artifact and checksum outside git.
 
@@ -27,7 +28,7 @@ The service trusts `X-Real-IP` only when `LICENSE_TRUST_LOOPBACK_PROXY=true` and
 
 The daily timer runs SQLite's online backup, checks integrity, and retains about 14 days of dated local snapshots. It does not copy a live database file. Each backup contains bearer order IDs. Provision encrypted off-host copies with restricted access separately; the template does not claim off-host protection. Back up the token signing key separately, encrypted, through the approved secret channel. Loss of that key invalidates existing offline tokens.
 
-Before launch, restore a snapshot into a separate restricted directory and run SQLite integrity and license-count checks there. Do not print order IDs. Prove the restored test database can activate and reject a revoked order. Replacing the running database requires an authorized maintenance stop and a consistent restore; stale WAL/SHM files must not be mixed with another snapshot. A snapshot taken before a refund can resurrect its license. Reconcile all refunds since the backup before serving a restored database. Do not roll back across an unknown schema migration without a restore plan.
+Before a paid launch, restore a snapshot into a separate restricted directory and run SQLite integrity and license-count checks there. Do not print order IDs. Prove the restored test database can activate and reject a revoked order. Replacing the running database requires an authorized maintenance stop and a consistent restore; stale WAL/SHM files must not be mixed with another snapshot. A snapshot taken before a refund can resurrect its license. Reconcile all refunds since the backup before serving a restored database. Do not roll back across an unknown schema migration without a restore plan.
 
 ## Required test-order record
 
@@ -41,4 +42,4 @@ After the provider adapter is verified and implemented, the operator must record
 6. A genuine test refund followed by callback revocation and failed online validation/activation. Note that an already-issued offline token remains valid for at most seven days.
 7. Backup execution, off-host copy and isolated restore result.
 
-Until that record exists, the real payment path is blocked. Local HTTP tests prove only the local contract. Enabling live payments requires a separate explicit release decision; these templates and this binary do not enable production mode.
+Until that record exists, the real payment path is blocked, not the free trial release. Local HTTP tests prove only the local contract. Enabling live payments requires a separate explicit release decision; these templates and this binary do not enable production mode.

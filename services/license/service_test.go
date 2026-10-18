@@ -260,7 +260,7 @@ func TestProductionConfigurationRejected(t *testing.T) {
 	}
 }
 
-func TestSharedStoreRejectsForeignAndUnscopedEvents(t *testing.T) {
+func TestWebhookRejectsForeignAndUnscopedEvents(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("own-order", "order.completed"), http.StatusOK)
 	for _, typ := range []string{"order.completed", "refund.succeeded"} {

@@ -1,8 +1,23 @@
 # Write It Down license service
 
-This is a test-mode-only service, not a verified Waffo integration. It has no working checkout adapter and has not processed a real Waffo test order, callback or receipt. `POST /api/v1/checkout` fails closed with HTTP 503. No request from this service contacts Waffo. Do not connect production money or claim the purchase path works.
+This is a test-mode-only service, not a verified Waffo integration. It has no working checkout adapter and has not processed a real Waffo test order, callback or receipt. `POST /api/v1/checkout` fails closed with HTTP 503. No request from this service contacts Waffo. Do not connect production money or claim the purchase path works. The first public Mac package is a free three-use trial without checkout or activation. Payment work and deployment are separate from that release; this service is not a trial release dependency.
 
-The existing callback envelope and signature format below are local skeleton assumptions, not verified provider facts. Do not infer product IDs, key IDs, signature encoding, checkout response shape or receipt order-number visibility from fixtures. A buyer cannot activate until a signed completion creates the license; there is no GraphQL fallback or receipt lookup. The $4.99 price, 14-day refund offer and dedicated product must be confirmed in the actual account before implementing checkout. Trefoil Studio is the outward seller brand; Write It Down remains the product. The preferred merchant setup is a dedicated Trefoil Studio store. A delayed store permits the existing shared-store fallback only with exact product-ID filtering on every callback, including refunds. Missing or mismatched product IDs must fail closed. Do not borrow another product's credentials or rotate the translation site's API/webhook keys. Current merchant keys and the event shape still require verification through the approved safe channel.
+The existing callback envelope and signature format below are local skeleton assumptions, not verified provider facts. Do not infer signature encoding, checkout response shape or receipt order-number visibility from fixtures. A buyer cannot activate until a signed completion creates the license; there is no GraphQL fallback or receipt lookup.
+
+## Merchant configuration and pending evidence
+
+Trefoil Studio is the outward seller brand; Write It Down remains the product. The reported dedicated store is `STO_1p1XpirhbkmZIfDkXzGCok` and product is `PROD_4YM4NKcWOOqsBOIuKbBDcy`, named "Write It Down for Mac", one-time USD 4.99, two Macs and a 14-day refund offer. These are configuration facts, not proof of a purchase or refund. Only this dedicated store is in scope. The previous shared-store fallback is withdrawn. Do not borrow or rotate any translation-site credentials. Waffo keys are merchant-scoped, so a dedicated store does not remove the need for exact product-ID filtering on every callback, including refunds. Missing or mismatched product IDs must fail closed.
+
+The reported TEST callback target is `https://licenses.writeitdown.app/waffo/webhook`; LIVE is unset. This code and its Caddy template instead expose `/api/v1/webhooks/waffo`. No receiver deployment has been verified. Merchant notes describe RSA-SHA256 over `${t}.${rawBody}`, whereas this skeleton verifies raw body alone. It is not a compatible provider adapter. Do not silently add a route alias or change signing assumptions without the full verified contract.
+
+Before enabling TEST checkout, obtain through the approved safe channel:
+
+- The exact timestamp/signature headers, signature encoding and RSA padding, signed-byte construction, replay-time policy and mode-specific callback public-key provenance. No private-key values belong in evidence reports.
+- Authentic TEST completion and refund callbacks with exact event names and product/order identifiers. Confirm what the merchant's configured event set sends; do not infer fields from fixtures. Keep raw credential-bearing captures restricted, not in source or chat.
+- A genuine dedicated-product TEST checkout and buyer-visible receipt credential, followed by signed callback processing, activation, third-install denial and genuine TEST refund revocation. This requires a separately authorized, verified receiver first; a configured URL alone is not a deployment.
+- Approved receiver routing that reconciles the configured callback path with the implementation, plus deployment and key-handling verification.
+
+No LIVE requests, real charges or deployment are authorized by the free-trial release. TEST and LIVE keys being provisioned does not itself authorize their use.
 
 ## Run and validate
 
@@ -57,4 +72,4 @@ An authorized operator can revoke a disputed order offline. Set `LICENSE_DB` and
 
 Run one server against the database. Back up with SQLite's online backup API or `sqlite3 .backup`, not by copying a live database file. Keep encrypted off-host copies and test restoration. Database backups contain order credentials. A restore must reconcile refunds received since the snapshot before serving buyers.
 
-`deploy/README.md` owns the unexecuted Hetzner/Caddy/systemd test deployment plan, key permissions, backup templates and genuine test-order evidence checklist. No host is selected or changed by this repository. The release remains blocked on verified provider/account facts, safe test configuration, a genuine test order and refund proof. Live payments require a separate explicit release decision.
+`deploy/README.md` owns the unexecuted Hetzner/Caddy/systemd test deployment plan, key permissions, backup templates and genuine test-order evidence checklist. No host is selected or changed by this repository. Payment enablement remains blocked on the evidence listed above, safe test configuration, a genuine test order and refund proof. That does not block the free three-use trial release. Live payments require a separate explicit release decision.

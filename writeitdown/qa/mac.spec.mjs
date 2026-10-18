@@ -96,7 +96,8 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const checkout = 'https://pay.writeitdown.app/wid-mac';
-  const fill = ({ buy = checkout, dmg = 'https://downloads.writeitdown.app/Write-It-Down-1.0.dmg',
+  const downloadURL = 'https://downloads.writeitdown.app/Write-It-Down-1.0.dmg';
+  const fill = ({ buy = checkout, dmg = downloadURL,
     steps = 'Open the purchase email, copy the license key, and paste it into Settings.' } = {}) => mac
     .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${buy}">BUY</a>`)
     .replace(/<p[^>]*data-launch-pending="download"[^>]*>.*?<\/p>/, `<a class="door" data-launch="download" href="${dmg}">DOWNLOAD</a>`)
@@ -115,6 +116,12 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   expect(readyOut).toContain('real test order');
 
   const cases = [
+    [{ mac: fill().replace(`<a class="door" data-launch="checkout" href="${checkout}">BUY</a>`,
+      `<p data-launch="checkout" href="${checkout}">BUY</p>`) }, 'Checkout URL: not a clickable link'],
+    [{ mac: fill().replace(`<a class="door" data-launch="download" href="${downloadURL}">DOWNLOAD</a>`,
+      `<p data-launch="download" href="${downloadURL}">DOWNLOAD</p>`) }, 'DMG URL: not a clickable link'],
+    [{ mac: fill().replace(`data-launch="checkout" href="${checkout}"`, 'data-launch="checkout"') }, 'Checkout URL: not a real https destination'],
+    [{ mac: fill().replace(`data-launch="download" href="${downloadURL}"`, 'data-launch="download"') }, 'DMG URL: not a real https .dmg destination'],
     [{ mac: fill({ buy: 'https://example.com/pay' }), checkout: 'https://example.com/pay' }, 'Checkout URL: not a real https destination'],
     [{ mac: fill({ dmg: 'https://downloads.writeitdown.app/app.zip' }) }, 'DMG URL: not a real https .dmg destination'],
     [{ mac: fill({ dmg: 'https://x.test/Write-It-Down.dmg' }) }, 'DMG URL: not a real https .dmg destination'],

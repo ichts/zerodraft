@@ -44,9 +44,11 @@ export function blockers({ mac, support, plist }) {
   const found = [];
   const checkout = slot(mac, 'checkout');
   if (!checkout) found.push('Checkout URL: not confirmed in mac.html');
+  else if (!/^<a\s/i.test(checkout.tag)) found.push('Checkout URL: not a clickable link');
   else if (!realURL(attr(checkout.tag, 'href'))) found.push('Checkout URL: not a real https destination');
   const download = slot(mac, 'download');
   if (!download) found.push('Signed, notarized DMG URL: not confirmed in mac.html');
+  else if (!/^<a\s/i.test(download.tag)) found.push('Signed, notarized DMG URL: not a clickable link');
   else if (!realURL(attr(download.tag, 'href'), { dmg: true })) found.push('Signed, notarized DMG URL: not a real https .dmg destination');
   const license = slot(mac, 'license');
   if (!license) found.push('License delivery and activation steps: not confirmed in mac.html');

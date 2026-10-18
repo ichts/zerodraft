@@ -26,7 +26,7 @@ Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源�
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；忽略旧 hasUnlockedFullAccess，无非空白 key 的 active 降为 trial；许可门槛见 docs/LICENSE_PAYMENT_SPEC.md。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，作为 Polar activate 的 label。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Polar 公开 license API 契约。
 Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖 activate / validate / deactivate 三个公开 endpoint。
@@ -64,10 +64,3 @@ Tests/FirstLineTests/LivePolarAcceptanceTests.swift: 仅 `WID_POLAR_E2E=1` 时�
 法则: 草稿只在内存中，许可与设置仍可持久化；许可 trial 在首输入计数，未输入的房间免费；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；所有启动都进入同一个极简 Home，不提供单独 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 Polar 公开 customer-portal endpoint，Mac app 永不嵌入 developer API key；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。
-
-## Maintaining this file
-
-Keep this file for knowledge useful to almost every future agent session in this project.
-Do not repeat what the codebase already shows; point to the authoritative file or command instead.
-Prefer rewriting or pruning existing entries over appending new ones.
-When updating this file, preserve this bar for all agents and keep entries concise.

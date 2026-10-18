@@ -21,8 +21,10 @@ The writing viewport shows the active line at full opacity in the center of a fi
 
 ## Deploy
 
-Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the twelve production files under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
+Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the production files listed in `install.sh` under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
 
 The legal pages disclose Google Fonts requests and possible hosting access logs. A public support/privacy contact is deliberately marked as not configured, not replaced with an invented address.
+
+Before installing a bundle that sells the Mac app, `npm run release-check` must pass: it lists every missing launch input on `mac.html`.
 
 See `QA.md` for validation evidence and limits.

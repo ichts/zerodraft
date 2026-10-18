@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 
-const pages = ['/', '/support.html', '/privacy.html', '/terms.html'];
+const pages = ['/', '/mac.html', '/support.html', '/privacy.html', '/terms.html'];
 const origin = 'https://writeitdown.app';
 
 test('public URLs have a single apex canonical and a discoverable sitemap', async ({ request }) => {

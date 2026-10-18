@@ -13,12 +13,15 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `session.mjs`: pure deadline adjudication and Unicode writing-unit count. Earlier deadline wins; ties wipe. See `README.md` for counting semantics.
 - `room.js`: transient session owner, native textarea/IME enforcement, upper-third three-visible-line zen viewport, routing, clipboard. Writing never exposes a scrollbar; kept text remains readable. No draft persistence or network transport.
 - `privacy.html`, `terms.html`, `support.html`: honest static help/legal pages with the shared theme.
+- `mac.html`: the Mac app's sale and download page. Each launch input (checkout, DMG, SHA-256, license delivery steps) is either a real link/element (`data-launch`) or a visible pending notice (`data-launch-pending`), never a placeholder link. Name no payment provider and no license-delivery mechanism until a real test order confirms it.
+- `release-check.mjs`: `npm run release-check`, the pre-publish gate. It fails until every launch input and a support address are present and the page matches the app's `Info.plist` price and checkout URL. Not shipped.
 - `session.test.mjs`: deterministic timing and multilingual-count regressions.
 - `qa/input-regression.js`: browser event-path checks, including synthetic IME composition; not an OS input-method test.
 - `qa/zen-regression.js`: long multilingual text, fixed zen geometry, scroll containment, and deny-feedback regressions.
+- `qa/mac.spec.mjs`: sale-page CTA honesty, site-wide link and fragment resolution, and the release gate's rules.
 - `qa/phase4.spec.mjs`, `playwright.config.mjs`: executable eight-project browser acceptance, accelerated clocks, screenshots, and console/network checks. Playwright is test-only; the deployed site has no package runtime.
 - `og.png`: 1200×630 light-theme social share card referenced by landing metadata.
-- `robots.txt`, `sitemap.xml`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Keep the four canonical page URLs aligned with the sitemap.
+- `robots.txt`, `sitemap.xml`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Keep the canonical page URLs aligned with the sitemap.
 - `install.sh`: fixed-target, backed-up deployment inside `/var/www/writeitdown.app/` only.
 - `QA.md`: browser acceptance and remaining limits.
 

@@ -116,6 +116,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .legal h1{font-weight:500;font-size:48px;line-height:1.1}
 .legal h2{font-weight:500;font-size:28px;margin-top:32px}
 .legal a{text-decoration:underline;text-underline-offset:3px}
+.legal .actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:24px 0}
+.legal .actions .door{margin:0;text-decoration:none}
+.legal .actions .report{margin:0}
 @media(max-width:767px){
   .nav{gap:12px}.foot-links{gap:20px}.foot-links a{min-height:44px;display:flex;align-items:center}
   .room{--room-gut:12px}.writing-area{inset:64px 20px}

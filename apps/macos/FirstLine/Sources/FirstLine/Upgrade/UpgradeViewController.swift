@@ -47,7 +47,7 @@ final class UpgradeViewController: NSViewController {
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = "Paste license key from Polar email"
+        licenseField.placeholderString = "Paste Waffo order number"
         licenseField.font = FirstLineTypography.bodyNSFont
         licenseField.target = self
         licenseField.action = #selector(activateTapped)
@@ -128,7 +128,7 @@ final class UpgradeViewController: NSViewController {
     @objc private func activateTapped() {
         let key = licenseField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !key.isEmpty, !appState.licenseActivationInFlight else {
-            feedbackLabel.stringValue = "Paste a license key first."
+            feedbackLabel.stringValue = "Enter your Waffo order number first."
             feedbackLabel.isHidden = false
             return
         }

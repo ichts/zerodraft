@@ -54,7 +54,7 @@ struct LicenseEntitlementTests {
             #expect(!state.hasFullAccess)
             #expect(!state.licenseValidationInFlight)
             await state.validateLicenseIfNeeded()
-            #expect(await mock.lastValidatedKey == nil)
+            #expect(await mock.lastValidatedToken == nil)
             let home = HomeViewController(appState: state)
             #expect(descendants(home.view, of: NSTextField.self).contains {
                 $0.stringValue == "Mac trial: 3 of 3 sessions used."
@@ -83,7 +83,7 @@ struct LicenseEntitlementTests {
         #expect(!state.hasFullAccess)
         #expect(!state.licenseValidationInFlight)
         await state.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedKey == nil)
+        #expect(await mock.lastValidatedToken == nil)
         try startFromHome(state)
         #expect(state.selectedSurface == .upgrade)
         #expect(try store.load().licenseStatus == .trial)
@@ -93,7 +93,7 @@ struct LicenseEntitlementTests {
         state.settings.licenseStatus = .active
         #expect(!state.hasFullAccess)
         await state.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedKey == nil)
+        #expect(await mock.lastValidatedToken == nil)
         state.newPiece()
         #expect(state.selectedSurface == .upgrade)
         #expect(state.sessionEngine.phase == .idle)
@@ -142,7 +142,7 @@ struct LicenseEntitlementTests {
         try startFromHome(restarted)
         #expect(restarted.selectedSurface == .upgrade)
         await restarted.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedKey == "TEST-KEY")
+        #expect(await mock.lastValidatedToken == "mock-token")
         #expect(restarted.hasFullAccess)
         try startFromHome(restarted)
         #expect(restarted.selectedSurface == .session)

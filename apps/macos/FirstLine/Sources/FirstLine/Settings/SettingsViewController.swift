@@ -92,11 +92,11 @@ final class SettingsViewController: NSViewController {
         licenseDetails = (0..<3).map { _ in muted("") }
         rows.append(contentsOf: licenseDetails)
 
-        let explanation = muted("Three writing sessions included. Activate a license key to keep writing.")
+        let explanation = muted("Three writing sessions included. Enter your Waffo order number to keep writing.")
         licenseExplanationLabel = explanation
 
         let field = NSTextField(string: "")
-        field.placeholderString = "Paste license key"
+        field.placeholderString = "Paste Waffo order number"
         field.font = FirstLineTypography.microcopyNSFont
         field.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
         licenseField = field

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # [INPUT] Optional screenshot/output directory (default /tmp/wid-qa/cua-<timestamp>);
 #         app under test packaged at WID_APP_OUTPUT or dist/Write It Down.app.
+#         WID_QA_LICENSE_FIXTURE=1 adds signed-token activation/offline/refund QA
+#         using a disposable loopback fixture, never a Waffo purchase.
+#         WID_QA_LICENSE_ONLY=1 enables that fixture and seeds three used trials,
+#         skipping timing-sensitive motion checks to isolate license-window QA.
 # [OUTPUT] Per-stage screenshots, AX snapshots, app.log, and timing.txt in the
 #          output directory; exit 0 only when every assertion below holds.
 # [POS] apps/macos/FirstLine/scripts/qa-window.sh — real-window acceptance driven
@@ -30,28 +34,61 @@ bin="$app/Contents/MacOS/WriteItDown"
 qa_home="$(mktemp -d "${TMPDIR:-/tmp}/wid-qa-home.XXXXXX")"
 qa_home="$(cd "$qa_home" && pwd -P)"
 pid=''
+fixture_pid=''
+license_only="${WID_QA_LICENSE_ONLY:-0}"
+license_fixture="${WID_QA_LICENSE_FIXTURE:-$license_only}"
 cleanup() {
   if [[ -n "$pid" ]]; then kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi
+  if [[ -n "$fixture_pid" ]]; then kill "$fixture_pid" 2>/dev/null || true; wait "$fixture_pid" 2>/dev/null || true; fi
   rm -rf "$qa_home"
 }
 trap cleanup EXIT
 
-CFFIXED_USER_HOME="$qa_home" "$bin" >"$output/app.log" 2>&1 &
-pid=$!
+if [[ "$license_fixture" == 1 ]]; then
+  go build -o "$output/license-fixture" scripts/qa-license-fixture.go
+  printf 'active\n' >"$output/fixture-mode"
+  "$output/license-fixture" "$qa_home/fixture.json" "$output/fixture-mode" >"$output/fixture.log" 2>&1 &
+  fixture_pid=$!
+  for _ in {1..40}; do [[ -s "$qa_home/fixture.json" ]] && break; sleep 0.1; done
+  qa_app="$qa_home/Write It Down QA.app"
+  cp -R "$app" "$qa_app"
+  python3 - "$qa_app/Contents/Info.plist" "$qa_home/fixture.json" <<'PY'
+import json, plistlib, sys
+with open(sys.argv[1], 'rb') as f:
+    config = plistlib.load(f)
+with open(sys.argv[2]) as f:
+    config.update(json.load(f))
+config['WIDCheckoutURL'] = ''
+with open(sys.argv[1], 'wb') as f:
+    plistlib.dump(config, f)
+PY
+  codesign --force --sign - "$qa_app"
+  bin="$qa_app/Contents/MacOS/WriteItDown"
+fi
 
 cua() { cua-driver call "$1" "$2"; }
 
-window_id=''
-for _ in {1..40}; do
-  window_id="$(cua list_windows "{\"pid\":$pid,\"on_screen_only\":false}" 2>/dev/null \
-    | jq -r '[.windows[] | select(.layer == 0 and .title == "Write It Down")][0].window_id // empty' || true)"
-  [[ -n "$window_id" ]] && break
-  sleep 0.5
-done
-if [[ -z "$window_id" ]]; then
-  echo 'No Write It Down window appeared within 20s' >&2
-  exit 1
+launch_app() {
+  CFFIXED_USER_HOME="$qa_home" "$bin" >>"$output/app.log" 2>&1 &
+  pid=$!
+  window_id=''
+  for _ in {1..40}; do
+    window_id="$(cua list_windows "{\"pid\":$pid,\"on_screen_only\":false}" 2>/dev/null \
+      | jq -r '[.windows[] | select(.layer == 0 and .title == "Write It Down")][0].window_id // empty' || true)"
+    [[ -n "$window_id" ]] && break
+    sleep 0.5
+  done
+  if [[ -z "$window_id" ]]; then
+    echo 'No Write It Down window appeared within 20s' >&2
+    exit 1
+  fi
+}
+if [[ "$license_only" == 1 ]]; then
+  config="$qa_home/Library/Application Support/WriteItDown/Config"
+  mkdir -p "$config"
+  printf '%s\n' '{"theme":"system","defaultDuration":60,"reducedMotion":"always","trialSessionsUsed":3,"licenseStatus":"trial"}' >"$config/settings.json"
 fi
+launch_app
 
 fail() {
   echo "FAIL: $1" >&2
@@ -152,14 +189,6 @@ assert_timing() {
     || fail "$tier $phase observed at ${elapsed}s, outside ${lower}-${upper}s"
 }
 
-### 1. Home: duration buttons, silence radio, trial budget line
-snap home >"$output/home.json"
-assert_text "$output/home.json" 'Standard - 8s'
-assert_text "$output/home.json" 'Mac trial: 0 of 3 sessions used.'
-for b in 1 5 10 20 30; do
-  [[ -n "$(token_of "$output/home.json" button "$b")" ]] || fail "home is missing duration button '$b'"
-done
-
 enter_room() { # enter_room <home-snapshot>
   local token
   token="$(token_of "$1" button '1')"
@@ -181,9 +210,8 @@ select_tier() { # select_tier <home-snapshot> <label> <tier>
 check_warn_recovery_wipe() {
   local tier="$1" max="$2" before="$3" limit="$4" warn_start="$5"
   local warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json" wipe_start warn_min warn_max
-  warn_min="$(awk -v t="$limit" 'BEGIN { print 0.6 * t - 0.5 }')"
-  warn_max="$(awk -v t="$limit" 'BEGIN { print 0.625 * t + 2 }')"
-  if [[ "$tier" == strict ]]; then warn_min=1.8; warn_max=4.5; fi
+  warn_min="$(awk -v t="$limit" 'BEGIN { print t - 3 - 0.5 }')"
+  warn_max="$(awk -v t="$limit" 'BEGIN { print t - 3 + 2.5 }')"
   wait_text "$tier-warn" 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
   assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
@@ -204,6 +232,18 @@ check_warn_recovery_wipe() {
   press escape
   snap "$tier-exit" >"$output/$tier-exit.json"
 }
+
+if [[ "$license_only" == 1 ]]; then
+  snap seeded-trial-exhausted >"$output/relaxed-exit.json"
+  assert_text "$output/relaxed-exit.json" 'Mac trial: 3 of 3 sessions used.'
+else
+### 1. Home: duration buttons, silence radio, trial budget line
+snap home >"$output/home.json"
+assert_text "$output/home.json" 'Standard - 8s'
+assert_text "$output/home.json" 'Mac trial: 0 of 3 sessions used.'
+for b in 1 5 10 20 30; do
+  [[ -n "$(token_of "$output/home.json" button "$b")" ]] || fail "home is missing duration button '$b'"
+done
 
 ### 2. Enter the room via the 1-minute button
 select_tier "$output/home.json" 'Standard - 8s' standard
@@ -264,6 +304,8 @@ for tier in strict relaxed; do
   assert_text "$output/$tier-exit.json" "Mac trial: $budget of 3 sessions used."
 done
 
+fi
+
 ### 6. Fourth start routes to Upgrade without billing another trial
 enter_room "$output/relaxed-exit.json"
 snap upgrade >"$output/upgrade.json"
@@ -271,7 +313,46 @@ assert_text "$output/upgrade.json" 'Trial complete'
 assert_text "$output/upgrade.json" 'Three writing sessions used.'
 absent_text "$output/upgrade.json" 'Start typing.'
 
-### 7. Billing truth in the isolated home
+### 7. Optional real-window activation against an explicitly synthetic service.
+if [[ "$license_fixture" == 1 ]]; then
+  field="$(jq -r '[.elements[] | select(.role == "AXTextField")][0].element_token // empty' "$output/upgrade.json")"
+  [[ -n "$field" ]] || fail 'order-number field missing'
+  cua type_text "{\"pid\":$pid,\"element_token\":\"$field\",\"text\":\"window-qa-order\"}" >/dev/null
+  snap order-entered >"$output/order-entered.json"
+  activate="$(token_of "$output/order-entered.json" button 'Activate')"
+  cua click "{\"pid\":$pid,\"element_token\":\"$activate\"}" >/dev/null
+  wait_text activated 'License active' 'License active on this Mac.' 30
+  snap activated >"$output/activated.json"
+  start="$(token_of "$output/activated.json" button 'Start writing')"
+  cua click "{\"pid\":$pid,\"element_token\":\"$start\"}" >/dev/null
+  snap activated-home >"$output/activated-home.json"
+  enter_room "$output/activated-home.json"
+  snap activated-room >"$output/activated-room.json"
+  press a
+  snap paid-input >"$output/paid-input.json"
+  [[ "$(draft_value "$output/paid-input.json")" == a ]] || fail 'activated input was blocked'
+  press escape
+
+  # Restart against an unavailable service, then an explicit refund response.
+  for mode in offline refunded; do
+    kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
+    printf '%s\n' "$mode" >"$output/fixture-mode"
+    launch_app
+    if [[ "$mode" == offline ]]; then expected='License active.'; else expected='License revoked.'; fi
+    wait_text "$mode-license" 'License' "$expected" 30
+    snap "$mode-home" >"$output/$mode-home.json"
+    enter_room "$output/$mode-home.json"
+    snap "$mode-entry" >"$output/$mode-entry.json"
+    if [[ "$mode" == offline ]]; then
+      assert_text "$output/$mode-entry.json" 'Start typing.'
+    else
+      assert_text "$output/$mode-entry.json" 'Trial complete'
+      absent_text "$output/$mode-entry.json" 'Start typing.'
+    fi
+  done
+fi
+
+### 8. Billing truth in the isolated home
 kill "$pid" 2>/dev/null || true
 wait "$pid" 2>/dev/null || true
 pid=''
@@ -280,5 +361,8 @@ settings="$qa_home/Library/Application Support/WriteItDown/Config/settings.json"
 used="$(jq -r '.trialSessionsUsed // 0' "$settings")"
 [[ "$used" == '3' ]] || fail "trialSessionsUsed is $used, expected 3"
 
-timing_summary="$(awk '{printf "%s%s %s", (NR > 1 ? ", " : ""), $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
+timing_summary='license-only fixture; trial usage seeded at 3; motion timing not exercised'
+if [[ "$license_only" != 1 ]]; then
+  timing_summary="$(awk '{printf "%s%s %s", (NR > 1 ? ", " : ""), $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
+fi
 printf 'QA PASS: %s stages captured in %s; %s\n' "$snap_n" "$output" "$timing_summary"

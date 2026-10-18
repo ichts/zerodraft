@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 Polar benefit 限定的 license 持久化
- * [POS]: 导航及 trial gate；active 必须有非空白 key 且满足产品/实例/校验与宽限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 Waffo 签名 token 持久化
+ * [POS]: 导航及 trial gate；active 必须有订单号及合法签名 token，满足产品/设备/实例/时限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -30,15 +30,19 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
-    static var polarOrganizationID: String { configuration["WIDPolarOrganizationID"] as? String ?? "" }
-    static var polarBenefitID: String { configuration["WIDPolarBenefitID"] as? String ?? "" }
+    static var licenseProductID: String { configuration["WIDLicenseProductID"] as? String ?? "" }
+    static var configuredLicenseClient: WaffoLicenseClient {
+        WaffoLicenseClient(baseURL: (configuration["WIDLicenseServiceURL"] as? String).flatMap(URL.init(string:)),
+                           productID: licenseProductID,
+                           publicKey: Data(base64Encoded: configuration["WIDLicensePublicKey"] as? String ?? "") ?? Data())
+    }
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
               let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
         return url
     }
-    /// Polar validate 不可达时，仍把 license 视作 active 的最长宽限期。
+    /// 网络故障不延长签名 token 的七天有效期。
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
 
     var selectedSurface: Surface = .home
@@ -50,7 +54,7 @@ final class AppState {
     let installIDStore: InstallIDStore
     let clock: () -> Date
     let productID: String
-    let organizationID: String
+    let installLabel: String
     var settings: AppSettings
     private(set) var licenseValidationInFlight = false
     private var activationRevision = 0
@@ -59,8 +63,7 @@ final class AppState {
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active, settings.hasLicenseKey else { return false }
         return settings.licenseInstanceID != nil && !licenseValidationInFlight && !productID.isEmpty &&
-            (!organizationID.isEmpty || !(licenseClient is PolarLicenseClient)) &&
-            settings.licenseProductID == productID && licenseWithinGrace
+            licenseClient.isConfigured && settings.licenseProductID == productID && licenseWithinGrace
     }
 
     /// UpgradeView / SettingsView 读取这些字段渲染激活状态。
@@ -71,11 +74,10 @@ final class AppState {
     init(
         sessionEngine: SessionEngine = SessionEngine(),
         settingsStore: SettingsStore = SettingsStore(),
-        licenseClient: LicenseClient = MockLicenseClient(),
+        licenseClient: LicenseClient = AppState.configuredLicenseClient,
         installIDStore: InstallIDStore = InstallIDStore(),
         clock: @escaping () -> Date = Date.init,
-        productID: String = AppState.polarBenefitID,
-        organizationID: String = AppState.polarOrganizationID
+        productID: String = AppState.licenseProductID
     ) {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
@@ -83,7 +85,7 @@ final class AppState {
         self.installIDStore = installIDStore
         self.clock = clock
         self.productID = productID
-        self.organizationID = organizationID
+        self.installLabel = installIDStore.loadOrCreate().uuid.uuidString
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
             settings.hasLicenseKey && settings.licenseInstanceID != nil
@@ -121,6 +123,11 @@ final class AppState {
 
     func prepareSessionInput() -> Bool {
         sessionEngine.tick()
+        if !sessionEngine.hasStarted && !canStartTrialSession {
+            sessionEngine.abandon()
+            selectedSurface = .upgrade
+            return false
+        }
         if sessionEngine.phase == .failure {
             startSession(duration: sessionEngine.duration)
         }
@@ -225,6 +232,7 @@ final class AppState {
     }
 
     func activateLicense(key: String) async {
+        guard !licenseActivationInFlight else { return }
         let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             licenseActivationError = .emptyKey
@@ -235,13 +243,13 @@ final class AppState {
         licenseActivationJustSucceeded = false
         defer { licenseActivationInFlight = false }
 
-        guard !productID.isEmpty, !organizationID.isEmpty || !(licenseClient is PolarLicenseClient) else {
+        guard !productID.isEmpty, licenseClient.isConfigured else {
             licenseActivationError = .productNotConfigured
             return
         }
         if trimmed == settings.licenseKey, settings.licenseInstanceID != nil,
-           settings.licenseProductID == productID {
-            switch await validateLicenseIfNeeded(allowRevoked: true) {
+           settings.licenseToken != nil, settings.licenseProductID == productID {
+            switch await validateLicenseIfNeeded(allowInactive: true) {
             case true: return
             case nil:
                 licenseActivationError = .networkFailure
@@ -251,11 +259,15 @@ final class AppState {
                 persistSettings()
             }
         }
-        let instanceName = installIDStore.loadOrCreate().shortName
         do {
-            let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: instanceName)
+            let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: installLabel)
             guard activation.productID == productID else {
-                await rejectActivation(activation, key: trimmed, reason: .wrongProduct)
+                await rejectActivation(activation, reason: .wrongProduct)
+                return
+            }
+            guard licenseClient.permitsAccess(token: activation.token, instanceID: activation.instanceID,
+                                               installLabel: installLabel, now: clock()) else {
+                licenseActivationError = .invalidToken
                 return
             }
             // Snapshot the pre-activation state so a failed persist cannot leave the
@@ -265,6 +277,7 @@ final class AppState {
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
             settings.licenseProductID = productID
+            settings.licenseToken = activation.token
             settings.licenseActivatedAt = clock()
             settings.licenseLastValidatedAt = clock()
             do {
@@ -274,7 +287,7 @@ final class AppState {
                 licenseActivationJustSucceeded = true
             } catch {
                 settings = preActivation
-                await rejectActivation(activation, key: trimmed, reason: .storageFailure)
+                await rejectActivation(activation, reason: .storageFailure)
             }
         } catch let activationError as LicenseActivationError {
             licenseActivationError = activationError
@@ -283,13 +296,13 @@ final class AppState {
         }
     }
 
-    private func rejectActivation(_ activation: LicenseActivation, key: String, reason: LicenseActivationError) async {
+    private func rejectActivation(_ activation: LicenseActivation, reason: LicenseActivationError) async {
         guard activation.instanceID != settings.licenseInstanceID else {
             licenseActivationError = reason
             return
         }
         do {
-            try await licenseClient.deactivate(licenseKey: key, instanceID: activation.instanceID)
+            try await licenseClient.deactivate(token: activation.token)
             licenseActivationError = reason
         } catch {
             licenseActivationError = .cleanupFailure
@@ -305,9 +318,9 @@ final class AppState {
     }
 
     @discardableResult
-    func validateLicenseIfNeeded(allowRevoked: Bool = false) async -> Bool? {
+    func validateLicenseIfNeeded(allowInactive: Bool = false) async -> Bool? {
         guard settings.licenseStatus == .active || settings.licenseStatus == .unknown ||
-              (allowRevoked && settings.licenseStatus == .revoked),
+              (allowInactive && (settings.licenseStatus == .revoked || settings.licenseStatus == .invalid)),
               settings.hasLicenseKey,
               let key = settings.licenseKey, let instanceID = settings.licenseInstanceID else { return nil }
         licenseValidationInFlight = true
@@ -319,27 +332,45 @@ final class AppState {
                 licenseValidationInFlight = false
             }
         }
-        guard !productID.isEmpty, (!organizationID.isEmpty || !(licenseClient is PolarLicenseClient)),
-              settings.licenseProductID == productID else { return nil }
+        guard !productID.isEmpty, licenseClient.isConfigured,
+              settings.licenseProductID == productID, let token = settings.licenseToken else { return nil }
 
         do {
-            let valid = try await licenseClient.validate(licenseKey: key, instanceID: instanceID)
+            let renewedToken = try await licenseClient.validate(token: token)
             guard activationRevision == revision, validationRevision == requestRevision,
                   settings.licenseKey == key, settings.licenseInstanceID == instanceID,
                   settings.licenseProductID == productID else { return nil }
-            if valid {
-                settings.licenseStatus = .active
-                settings.licenseLastValidatedAt = clock()
-                persistSettings()
-            } else {
+            guard let renewedToken else {
                 applyRevokedState()
+                return false
             }
-            return valid
+            guard licenseClient.permitsAccess(token: renewedToken, instanceID: instanceID,
+                                               installLabel: installLabel, now: clock()) else {
+                settings.licenseStatus = .invalid
+                persistSettings()
+                return false
+            }
+            let previous = settings
+            settings.licenseStatus = .active
+            settings.licenseToken = renewedToken
+            settings.licenseLastValidatedAt = clock()
+            do { try persistSettingsThrowing() }
+            catch {
+                settings = previous
+                licenseActivationError = .storageFailure
+                return nil
+            }
+            return true
         } catch {
             guard activationRevision == revision, validationRevision == requestRevision,
                   settings.licenseKey == key, settings.licenseInstanceID == instanceID,
                   settings.licenseProductID == productID else { return nil }
-            applyOfflineGraceDecision()
+            if (error as? LicenseValidationError) == .networkFailure {
+                applyOfflineGraceDecision()
+            } else {
+                settings.licenseStatus = .invalid
+                persistSettings()
+            }
             return nil
         }
     }
@@ -350,9 +381,11 @@ final class AppState {
     }
 
     private var licenseWithinGrace: Bool {
-        guard let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt else { return false }
+        guard let token = settings.licenseToken, let instanceID = settings.licenseInstanceID,
+              let last = settings.licenseLastValidatedAt ?? settings.licenseActivatedAt else { return false }
         let age = clock().timeIntervalSince(last)
-        return age >= -86_400 && age <= Self.licenseOfflineGraceInterval
+        return age >= -60 && age < Self.licenseOfflineGraceInterval &&
+            licenseClient.permitsAccess(token: token, instanceID: instanceID, installLabel: installLabel, now: clock())
     }
 
     private func applyOfflineGraceDecision() {
@@ -366,8 +399,7 @@ final class AppState {
         try? settingsStore.save(settings)
     }
 
-    /// License activation is the one path that must not silently claim success
-    /// when the on-disk write failed.
+    /// Activation and renewal must not claim durable success after a failed write.
     private func persistSettingsThrowing() throws {
         try settingsStore.save(settings)
     }
@@ -411,7 +443,7 @@ final class AppState {
     var trialStatusText: String {
         if licenseValidationInFlight { return "Checking license..." }
         if settings.licenseKey != nil && settings.licenseInstanceID == nil {
-            return "License not activated on this Mac. Enter your key in Settings."
+            return "License not activated on this Mac. Enter your order number in Settings."
         }
         if settings.licenseStatus == .active && !hasFullAccess {
             if settings.licenseKey != nil && !productID.isEmpty &&

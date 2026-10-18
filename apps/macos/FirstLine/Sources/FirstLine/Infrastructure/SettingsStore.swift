@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可产品身份缓存
+ * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial、许可产品身份和签名 token 缓存
  * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 trial；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -69,13 +69,14 @@ struct AppSettings: Codable, Equatable {
     var writingFontSize: WritingFontSize
     var trialSessionsUsed: Int
 
-    /// v0.2 新增：结构化 license 状态。当前由 Polar activate / validate 更新。
+    /// licenseKey 保留历史字段名，当前保存 Waffo 订单号；无 token 的旧缓存不授予访问。
     var licenseKey: String?
     var licenseStatus: LicenseStatus
     var licenseActivatedAt: Date?
     var licenseLastValidatedAt: Date?
     var licenseInstanceID: String?
     var licenseProductID: String?
+    var licenseToken: String?
 
     var hasLicenseKey: Bool {
         licenseKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -95,7 +96,8 @@ struct AppSettings: Codable, Equatable {
         licenseActivatedAt: Date? = nil,
         licenseLastValidatedAt: Date? = nil,
         licenseInstanceID: String? = nil,
-        licenseProductID: String? = nil
+        licenseProductID: String? = nil,
+        licenseToken: String? = nil
     ) {
         self.theme = theme
         self.defaultDuration = SessionEngine.validDuration(defaultDuration)
@@ -110,6 +112,7 @@ struct AppSettings: Codable, Equatable {
         self.licenseLastValidatedAt = licenseLastValidatedAt
         self.licenseInstanceID = licenseInstanceID
         self.licenseProductID = licenseProductID
+        self.licenseToken = licenseToken
 
         self.licenseStatus = licenseStatus
         if licenseStatus == .active && !hasLicenseKey {
@@ -128,7 +131,7 @@ struct AppSettings: Codable, Equatable {
         case licenseActivatedAt
         case licenseLastValidatedAt
         case licenseInstanceID
-        case licenseProductID
+        case licenseProductID, licenseToken
     }
 
     init(from decoder: Decoder) throws {
@@ -146,6 +149,7 @@ struct AppSettings: Codable, Equatable {
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
         licenseInstanceID = try container.decodeIfPresent(String.self, forKey: .licenseInstanceID)
         licenseProductID = try container.decodeIfPresent(String.self, forKey: .licenseProductID)
+        licenseToken = try container.decodeIfPresent(String.self, forKey: .licenseToken)
 
         licenseStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
         if licenseStatus == .active && !hasLicenseKey {
@@ -169,6 +173,7 @@ struct AppSettings: Codable, Equatable {
         try container.encodeIfPresent(licenseLastValidatedAt, forKey: .licenseLastValidatedAt)
         try container.encodeIfPresent(licenseInstanceID, forKey: .licenseInstanceID)
         try container.encodeIfPresent(licenseProductID, forKey: .licenseProductID)
+        try container.encodeIfPresent(licenseToken, forKey: .licenseToken)
     }
 
     static let defaultValue = AppSettings(

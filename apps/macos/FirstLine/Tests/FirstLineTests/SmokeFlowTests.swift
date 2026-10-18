@@ -11,6 +11,7 @@ struct SmokeFlowTests {
         let state = AppState(
             sessionEngine: SessionEngine(now: now),
             settingsStore: SettingsStore(configDirectory: config),
+            licenseClient: MockLicenseClient(),
             installIDStore: InstallIDStore(configDirectory: config),
             productID: "prod_mock"
         )

@@ -1,4 +1,6 @@
-# Polar owner-only steps
+# Historical Polar owner-only steps
+
+Retired. Do not perform these steps for the Waffo release. See `LICENSE_PAYMENT_SPEC.md` and `RELEASE_CHECKLIST.md` for the current release gates.
 
 These account actions require the owner's identity and payout details. Do not send documents or bank details to an agent or commit them.
 

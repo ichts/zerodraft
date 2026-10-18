@@ -23,8 +23,14 @@ The writing viewport shows the active line at full opacity in the center of a fi
 
 Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the production files listed in `install.sh` under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
 
-The legal pages disclose Google Fonts requests and possible hosting access logs. A public support/privacy contact is deliberately marked as not configured, not replaced with an invented address.
+The legal pages disclose Google Fonts requests, possible hosting access logs, and the Mac waitlist. The public contact is contact@trefoilstudio.com (Trefoil Studio).
 
-Before installing a bundle that sells the Mac app, `npm run release-check -- --live` must pass: it lists every missing or placeholder launch input on `mac.html` and fetches the checkout and DMG URLs. A pass does not replace a real test order.
+### Mac page release order
+
+`mac.html` sells a paid app whose purchase is not open yet: the free web room is its working CTA, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
+
+1. Deploy the waitlist collector behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. Submit one real test address from the page, confirm its line, then remove it.
+2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.
+3. To open sales, replace each `data-launch-pending` notice on `mac.html` with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real test order through checkout, license email, activation and refund, and an explicit go.
 
 See `QA.md` for validation evidence and limits.

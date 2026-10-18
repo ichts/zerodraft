@@ -26,8 +26,9 @@ test('Mac page sells a paid app, points to the free web trial, and has no dead o
       expect(await pending.evaluate(e => e.tagName)).not.toBe('A');
     }
   }
-  // Every door-styled control is a real, working link.
-  for (const door of await page.locator('.door').all()) {
+  // Every door-styled control is a real, working link, except the waitlist form's own submit.
+  await expect(page.locator('#waitlist-form button.door[type="submit"]')).toHaveText('NOTIFY ME');
+  for (const door of await page.locator('.door:not(#waitlist-form .door)').all()) {
     expect(await door.evaluate(e => e.tagName)).toBe('A');
     expect(await door.getAttribute('href')).toMatch(/^(index\.html#trial|https:\/\/\S+)$/);
   }
@@ -48,6 +49,10 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
     for (const href of hrefs) {
       expect(href, `${file}: empty or placeholder link`).not.toMatch(/^(#?|javascript:.*)$/);
       const url = new URL(href, new URL(file, base));
+      if (url.protocol === 'mailto:') {
+        expect(href, `${file}: mailto must be the confirmed contact`).toBe('mailto:contact@trefoilstudio.com');
+        continue;
+      }
       if (url.origin !== base.origin) {
         expect(url.protocol, `${file}: ${href}`).toBe('https:');
         continue;
@@ -95,11 +100,12 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
     .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${buy}">BUY</a>`)
     .replace(/<p[^>]*data-launch-pending="download"[^>]*>.*?<\/p>/, `<a class="door" data-launch="download" href="${dmg}">DOWNLOAD</a>`)
     .replace(/<p[^>]*data-launch-pending="license"[^>]*>.*?<\/p>/, `<p data-launch="license">${steps}</p>`);
-  const contact = support.replace('<h2 id="contact">Contact</h2>', '<h2 id="contact">Contact</h2><p><a href="mailto:help@writeitdown.app">help@writeitdown.app</a></p>');
+  const contact = support;
+  const noContact = support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD');
 
   const [current, currentOut] = releaseCheck({ mac, support }, '--live');
   expect(current).toBe(1);
-  for (const line of ['Checkout URL: not confirmed', 'DMG URL: not confirmed', 'activation steps: not confirmed', 'Support address'])
+  for (const line of ['Checkout URL: not confirmed', 'DMG URL: not confirmed', 'activation steps: not confirmed'])
     expect(currentOut).toContain(line);
 
   const [ready, readyOut] = releaseCheck({ mac: fill(), support: contact, checkout });
@@ -114,11 +120,110 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
     [{ mac: fill({ steps: 'Steps.' }) }, 'activation steps: placeholder copy'],
     [{ mac: fill(), checkout: '' }, 'WIDCheckoutURL differs'],
     [{ mac: fill().replace(`${appPrice} ONCE.`, '$9 ONCE.') }, 'Price:'],
-    [{ mac: fill(), support }, 'Support address'],
+    [{ mac: fill(), support: noContact }, 'Support address'],
   ];
   for (const [input, message] of cases) {
     const [code, out] = releaseCheck({ support: contact, checkout, ...input });
     expect(code, message).toBe(1);
     expect(out).toContain(message);
   }
+});
+
+test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }) => {
+  await page.goto('index.html');
+  const hero = page.locator('header.hero');
+  await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');
+  const secondary = hero.locator('a.hero-secondary');
+  await expect(secondary).toHaveText(/MAC APP, \$4\.99 - COMING SOON/);
+  await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
+  await secondary.click();
+  await expect(page).toHaveURL(/\/mac\.html#waitlist$/);
+  await expect(page.locator('#waitlist-form')).toBeVisible();
+});
+
+test('installer refuses to publish the signup form before the collector answers', () => {
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'filesystem check, one project is enough');
+  expect(execFileSync('python3', ['qa/test-install.py'], { encoding: 'utf8' })).toContain('refused while the waitlist collector is down');
+});
+
+// Waitlist form, adapted from the prepared free-trial-launch patch. The collector is mocked;
+// its contract lives in services/waitlist/README.md (JSON for fetch, 303 fragment without JS).
+const respond = (status, outcome) => route => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify({ status: outcome }) });
+async function fillWaitlist(page) {
+  await page.locator('#waitlist-email').fill('reader@example.com');
+  await page.locator('input[name="consent"]').check();
+}
+
+test('waitlist states its consent and reports each JavaScript outcome', async ({ page }, info) => {
+  await page.goto('mac.html');
+  await expect(page.locator('h2#waitlist')).toHaveText('Purchase opens soon');
+  await expect(page.locator('.waitlist-consent')).toContainText('That is the only email.');
+  await expect(page.locator('.waitlist-zh')).toContainText('仅此一封');
+  let body = '';
+  for (const [status, outcome, text] of [[200, 'joined', 'YOU ARE ON THE LIST'], [400, 'invalid', 'ENTER A VALID EMAIL'],
+    [429, 'limited', 'TOO MANY TRIES'], [500, 'error', 'NOT SAVED']]) {
+    await page.route('**/api/waitlist', route => { body = route.request().postData(); return respond(status, outcome)(route); });
+    await fillWaitlist(page);
+    await page.locator('#waitlist-form button').click();
+    await expect(page.locator('#waitlist-status')).toContainText(text);
+    await expect(page).toHaveURL(/mac\.html$/);
+    await page.locator('#waitlist-form').screenshot({ path: info.outputPath(`waitlist-js-${outcome}.png`) });
+    await page.unroute('**/api/waitlist');
+  }
+  const sent = new URLSearchParams(body);
+  expect([sent.get('email'), sent.get('consent'), sent.get('website')]).toEqual(['reader@example.com', 'yes', '']);
+
+  // A collector that is down or not deployed never reads as success.
+  await page.route('**/api/waitlist', route => route.abort());
+  await page.locator('#waitlist-form button').click();
+  await expect(page.locator('#waitlist-status')).toContainText('NOT SAVED');
+  await page.unroute('**/api/waitlist');
+  await page.route('**/api/waitlist', route => route.fulfill({ status: 404, contentType: 'text/html', body: 'Not found' }));
+  await page.locator('#waitlist-form button').click();
+  await expect(page.locator('#waitlist-status')).toContainText('NOT SAVED');
+});
+
+test('browser validation blocks an empty address or missing consent before any request', async ({ page }) => {
+  let requests = 0;
+  await page.route('**/api/waitlist', route => { requests++; return respond(200, 'joined')(route); });
+  await page.goto('mac.html');
+  await page.locator('#waitlist-form button').click();
+  await expect(page.locator('#waitlist-email')).toBeFocused();
+  await page.locator('#waitlist-email').fill('reader@example.com');
+  await page.locator('#waitlist-form button').click();
+  await expect(page.locator('input[name="consent"]')).toBeFocused();
+  expect(requests).toBe(0);
+});
+
+test('keyboard reaches email, consent, and submit in order', async ({ page }) => {
+  await page.route('**/api/waitlist', respond(200, 'joined'));
+  await page.goto('mac.html');
+  await page.locator('#waitlist-email').focus();
+  await page.keyboard.type('reader@example.com');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('input[name="consent"]')).toBeFocused();
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Tab');
+  if (await page.evaluate(() => !!document.activeElement.closest('a'))) await page.keyboard.press('Tab');
+  await expect(page.locator('#waitlist-form button')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#waitlist-status')).toContainText('YOU ARE ON THE LIST');
+});
+
+test.describe('without JavaScript', () => {
+  test.use({ javaScriptEnabled: false });
+  test('the form posts and the returned fragment shows exactly one outcome', async ({ page }, info) => {
+    for (const outcome of ['joined', 'invalid', 'limited', 'error']) {
+      await page.route('**/api/waitlist', route => route.fulfill({ status: 303, headers: { Location: `/writeitdown/mac.html#waitlist-${outcome}` } }));
+      await page.goto('mac.html');
+      await expect(page.locator('.waitlist-note:visible')).toHaveCount(0);
+      await fillWaitlist(page);
+      await page.locator('#waitlist-form button').click();
+      await expect(page).toHaveURL(new RegExp(`#waitlist-${outcome}$`));
+      await expect(page.locator(`#waitlist-${outcome}`)).toBeVisible();
+      await expect(page.locator('.waitlist-note:visible')).toHaveCount(1);
+      await page.locator('#waitlist-form').screenshot({ path: info.outputPath(`waitlist-nojs-${outcome}.png`) });
+      await page.unroute('**/api/waitlist');
+    }
+  });
 });

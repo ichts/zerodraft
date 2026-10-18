@@ -27,10 +27,28 @@
      <a class="door" data-launch="checkout" href="https://(verified checkout URL)">BUY - $4.99</a>
      <a class="door" data-launch="download" href="https://(signed, notarized DMG URL).dmg">DOWNLOAD FOR MAC</a>
      Run `npm run release-check -- --live` before installing the site. -->
-<p class="report" data-launch-pending="checkout">BUY: COMING SOON.</p>
+<p class="report" data-launch-pending="checkout">BUY - $4.99: COMING SOON. <a class="mini-link" href="#waitlist">GET ONE EMAIL WHEN IT OPENS</a></p>
 </div>
 <p class="report" data-launch-pending="download">DOWNLOAD: AVAILABLE WHEN SALES OPEN.</p>
 <p>Requires macOS 14 Sonoma or later, on Apple silicon or Intel. The download is a disk image signed with a Developer ID and notarized by Apple.</p>
+<h2 id="waitlist">Purchase opens soon</h2>
+<p>Leave your email to be notified.</p>
+<form class="waitlist" id="waitlist-form" method="post" action="/api/waitlist">
+  <label class="mini-link" for="waitlist-email">EMAIL</label>
+  <input id="waitlist-email" name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off">
+  <div class="waitlist-trap" aria-hidden="true"><label>Leave empty <input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+  <label class="waitlist-consent"><input name="consent" type="checkbox" value="yes" required>
+    <span>Send me one email when Write It Down for Mac can be bought. That is the only email. Unsubscribe anytime by writing to <a href="mailto:contact@trefoilstudio.com">contact@trefoilstudio.com</a>. Trefoil Studio stores only this address and the time you sent it, and never shares it with third parties.</span>
+  </label>
+  <p class="waitlist-zh" lang="zh-Hans">勾选即同意：Write It Down Mac 版开放购买时，我们只给你发一封通知邮件，仅此一封。随时可写信到 contact@trefoilstudio.com 退订。Trefoil Studio 只保存这个邮箱和提交时间，不与任何第三方共享。</p>
+  <button class="door" type="submit">NOTIFY ME</button>
+  <p class="report waitlist-status" id="waitlist-status" role="status" aria-live="polite"></p>
+  <p class="report waitlist-note" id="waitlist-joined">YOU ARE ON THE LIST. ONE EMAIL WHEN PURCHASE OPENS.</p>
+  <p class="report waitlist-note" id="waitlist-invalid">ENTER A VALID EMAIL AND TICK THE BOX.</p>
+  <p class="report waitlist-note" id="waitlist-limited">TOO MANY TRIES. WAIT TEN MINUTES.</p>
+  <p class="report waitlist-note" id="waitlist-error">NOT SAVED. TRY AGAIN LATER.</p>
+</form>
+<p>See the <a href="privacy.html#waitlist">privacy policy</a> for how the address is handled.</p>
 <h2 id="install">Install</h2>
 <p>Open the disk image, drag Write It Down to Applications, then eject the disk image.</p>
 <h2 id="activate">Activate</h2>
@@ -43,6 +61,7 @@
 </main>
 <footer class="row foot"><a class="mini-link" href="index.html">BACK TO THE ROOM</a><div class="foot-links"><a class="mini-link" href="mac.html">MAC APP</a><a class="mini-link" href="support.html">SUPPORT</a><a class="mini-link" href="privacy.html">PRIVACY</a><a class="mini-link" href="terms.html">TERMS</a></div></footer>
 </div>
+<script src="waitlist.js"></script>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "df0c43279d154d5eb9ee4ef8a7d92fec"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

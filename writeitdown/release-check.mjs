@@ -100,5 +100,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(args.includes('--live')
     ? 'LIVE CHECK PASSED: inputs present and reachable.'
     : 'STATIC CHECK PASSED: inputs present. Not verified live; run with --live.');
-  console.log('Still required before opening sales: a real test order through checkout, license email, activation and refund, and an explicit go.');
+  console.log('Still required before opening sales: a real test order through checkout, license email, activation and refund, a delivered test email to the support address, and an explicit go.');
 }

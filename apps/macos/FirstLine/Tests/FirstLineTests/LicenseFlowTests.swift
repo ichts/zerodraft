@@ -620,15 +620,15 @@ struct LicenseFlowTests {
     }
 
     @Test
-    func legacyUnlockIsNotBoundToOfflineGrace() throws {
+    func activeFlagWithoutKeyCannotSkipOfflineGrace() throws {
         let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
                               trialSessionsUsed: AppState.trialSessionLimit, licenseStatus: .active)
         let (state, _, _, fm, root) = try makeAppState(initialSettings: old,
             clockNow: Date(timeIntervalSince1970: 2_000_000_000))
         defer { try? fm.removeItem(at: root) }
-        #expect(state.hasFullAccess)
+        #expect(!state.hasFullAccess)
         state.startSession()
-        #expect(state.selectedSurface == .session)
+        #expect(state.selectedSurface == .upgrade)
     }
 
     @Test(arguments: [true, false])
@@ -770,17 +770,18 @@ struct LicenseFlowTests {
     }
 
     @Test
-    func activeLicenseBypassesTrialLimit() throws {
+    func activeLicenseBypassesTrialLimit() async throws {
         let exhausted = AppSettings(
             theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
-            trialSessionsUsed: AppState.trialSessionLimit,
-            licenseStatus: .active
+            trialSessionsUsed: AppState.trialSessionLimit
         )
         let (appState, _, _, fm, tempRoot) = try makeAppState(initialSettings: exhausted)
         defer { try? fm.removeItem(at: tempRoot) }
 
+        await appState.activateLicense(key: "TEST-KEY")
+        #expect(appState.hasFullAccess)
         appState.startSession()
 
         #expect(appState.sessionEngine.phase == .writing)

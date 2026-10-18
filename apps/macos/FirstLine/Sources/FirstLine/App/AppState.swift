@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
  * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 Polar benefit 限定的 license 持久化
- * [POS]: 导航及 trial gate；启动校验前限制缓存许可；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
+ * [POS]: 导航及 trial gate；active 必须有非空白 key 且满足产品/实例/校验与宽限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -57,8 +57,7 @@ final class AppState {
     private var validationRevision = 0
 
     var hasFullAccess: Bool {
-        guard settings.licenseStatus == .active else { return false }
-        if settings.licenseKey == nil { return true }
+        guard settings.licenseStatus == .active, settings.hasLicenseKey else { return false }
         return settings.licenseInstanceID != nil && !licenseValidationInFlight && !productID.isEmpty &&
             (!organizationID.isEmpty || !(licenseClient is PolarLicenseClient)) &&
             settings.licenseProductID == productID && licenseWithinGrace
@@ -87,7 +86,7 @@ final class AppState {
         self.organizationID = organizationID
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
-            settings.licenseKey != nil && settings.licenseInstanceID != nil
+            settings.hasLicenseKey && settings.licenseInstanceID != nil
         self.selectedDuration = settings.defaultDuration
 
         launchInitialSurface()
@@ -309,6 +308,7 @@ final class AppState {
     func validateLicenseIfNeeded(allowRevoked: Bool = false) async -> Bool? {
         guard settings.licenseStatus == .active || settings.licenseStatus == .unknown ||
               (allowRevoked && settings.licenseStatus == .revoked),
+              settings.hasLicenseKey,
               let key = settings.licenseKey, let instanceID = settings.licenseInstanceID else { return nil }
         licenseValidationInFlight = true
         validationRevision += 1

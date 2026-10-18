@@ -351,7 +351,6 @@ struct KeyboardFlowTests {
         let engine = SessionEngine(now: { now })
         let state = AppState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root),
                              installIDStore: InstallIDStore(configDirectory: root))
-        state.settings.licenseStatus = .active
         state.updateDefaultDuration(300)
         state.startSession()
         let windowController = RootWindowController(appState: state)

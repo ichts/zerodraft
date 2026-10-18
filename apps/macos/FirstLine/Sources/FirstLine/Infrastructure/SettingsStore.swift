@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
  * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可产品身份缓存
- * [POS]: 配置层；合法时长校验、旧字段迁移、写作偏好和 license 数据落盘，正文绝不落盘
+ * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 trial；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -77,6 +77,10 @@ struct AppSettings: Codable, Equatable {
     var licenseInstanceID: String?
     var licenseProductID: String?
 
+    var hasLicenseKey: Bool {
+        licenseKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+    }
+
     init(
         theme: AppTheme,
         defaultDuration: TimeInterval,
@@ -86,7 +90,6 @@ struct AppSettings: Codable, Equatable {
         focusMode: Bool = false,
         writingAlignment: WritingAlignment = .centered,
         writingFontSize: WritingFontSize = .medium,
-        hasUnlockedFullAccess: Bool = false,
         licenseKey: String? = nil,
         licenseStatus: LicenseStatus = .trial,
         licenseActivatedAt: Date? = nil,
@@ -108,12 +111,9 @@ struct AppSettings: Codable, Equatable {
         self.licenseInstanceID = licenseInstanceID
         self.licenseProductID = licenseProductID
 
-        // 向后兼容：v0.1 的 hasUnlockedFullAccess=true 映射到 v0.2 的 licenseStatus=.active。
-        // 显式传入 licenseStatus 时尊重调用方意图。
-        if hasUnlockedFullAccess && licenseStatus == .trial {
-            self.licenseStatus = .active
-        } else {
-            self.licenseStatus = licenseStatus
+        self.licenseStatus = licenseStatus
+        if licenseStatus == .active && !hasLicenseKey {
+            self.licenseStatus = .trial
         }
     }
 
@@ -123,7 +123,6 @@ struct AppSettings: Codable, Equatable {
         case reducedMotion
         case silenceLimit, focusMode, writingAlignment, writingFontSize
         case trialSessionsUsed
-        case hasUnlockedFullAccess
         case licenseKey
         case licenseStatus
         case licenseActivatedAt
@@ -142,18 +141,15 @@ struct AppSettings: Codable, Equatable {
         writingAlignment = (try? container.decode(WritingAlignment.self, forKey: .writingAlignment)) ?? .centered
         writingFontSize = (try? container.decode(WritingFontSize.self, forKey: .writingFontSize)) ?? .medium
         trialSessionsUsed = try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0
-        let legacyUnlocked = try container.decodeIfPresent(Bool.self, forKey: .hasUnlockedFullAccess) ?? false
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
         licenseInstanceID = try container.decodeIfPresent(String.self, forKey: .licenseInstanceID)
         licenseProductID = try container.decodeIfPresent(String.self, forKey: .licenseProductID)
 
-        let decodedStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
-        if legacyUnlocked && decodedStatus == .trial {
-            licenseStatus = .active
-        } else {
-            licenseStatus = decodedStatus
+        licenseStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
+        if licenseStatus == .active && !hasLicenseKey {
+            licenseStatus = .trial
         }
     }
 

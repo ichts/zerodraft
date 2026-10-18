@@ -134,7 +134,7 @@ test('landing keeps Try web primary and offers the Mac app as a secondary coming
   const hero = page.locator('header.hero');
   await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');
   const secondary = hero.locator('a.hero-secondary');
-  await expect(secondary).toHaveText(/MAC APP, \$4\.99 - COMING SOON/);
+  await expect(secondary).toHaveText(/BUY MAC USD 4\.99 - COMING SOON/);
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await secondary.click();
   await expect(page).toHaveURL(/\/mac\.html#waitlist$/);

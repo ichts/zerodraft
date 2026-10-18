@@ -1,0 +1,16 @@
+# Replace only after the host and DNS name are explicitly approved.
+license-test.example.invalid {
+	request_body {
+		max_size 64KB
+	}
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8060 {
+			# Overwrite, never forward a caller-supplied address for rate limiting.
+			header_up X-Real-IP {http.request.remote.host}
+		}
+	}
+	handle {
+		respond 404
+	}
+	# Do not enable request body, query string, token or order-ID logging.
+}

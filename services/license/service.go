@@ -1,3 +1,7 @@
+// [INPUT] Test-only configuration, pinned callback key, SQLite and local HTTP requests.
+// [OUTPUT] Transactional licenses/activations and signed offline tokens.
+// [POS] License domain and provisional callback contract; no provider network calls.
+// [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
 
 import (
@@ -14,6 +18,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"strings"
 	"time"
@@ -27,12 +32,15 @@ type Config struct {
 	Database, ProductID, Environment string
 	TestPublicKey                    []byte
 	TokenKey                         ed25519.PrivateKey
+	TrustLoopbackProxy               bool
 }
 type Server struct {
-	db        *sql.DB
-	cfg       Config
-	now       func() time.Time
-	publicKey ed25519.PublicKey
+	db                          *sql.DB
+	cfg                         Config
+	now                         func() time.Time
+	publicKey                   ed25519.PublicKey
+	webhookKey                  *rsa.PublicKey
+	clientLimits, webhookLimits *requestLimits
 }
 
 type event struct {
@@ -57,7 +65,8 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 	if cfg.Database == "" || cfg.ProductID == "" || cfg.Environment != "test" || len(cfg.TokenKey) != ed25519.PrivateKeySize {
 		return nil, errors.New("incomplete license configuration")
 	}
-	if _, err := webhookKey(cfg); err != nil {
+	key, err := webhookKey(cfg)
+	if err != nil {
 		return nil, err
 	}
 	db, err := sql.Open("sqlite", cfg.Database)
@@ -74,7 +83,11 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey)}, nil
+	if err := migrateEventHash(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey), webhookKey: key, clientLimits: newRequestLimits(), webhookLimits: newRequestLimits()}, nil
 }
 func (s *Server) Close() error { return s.db.Close() }
 func webhookKey(c Config) (*rsa.PublicKey, error) {
@@ -87,21 +100,23 @@ func webhookKey(c Config) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 	rsaKey, ok := key.(*rsa.PublicKey)
-	if !ok {
-		return nil, errors.New("webhook key must be RSA")
+	if !ok || rsaKey.N.BitLen() < 2048 {
+		return nil, errors.New("webhook key must be RSA with at least 2048 bits")
 	}
 	return rsaKey, nil
 }
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/checkout", s.checkout)
 	mux.HandleFunc("POST /api/v1/webhooks/waffo", s.webhook)
 	mux.HandleFunc("POST /api/v1/licenses/activate", s.activate)
 	mux.HandleFunc("POST /api/v1/licenses/validate", s.validate)
 	mux.HandleFunc("POST /api/v1/licenses/deactivate", s.deactivate)
-	return mux
+	return s.protect(mux)
 }
 func jsonInput(w http.ResponseWriter, r *http.Request, v any) bool {
-	if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
 		http.Error(w, "JSON required", 415)
 		return false
 	}
@@ -133,9 +148,8 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid signature", 401)
 		return
 	}
-	key, _ := webhookKey(s.cfg)
 	hash := sha256.Sum256(body)
-	if rsa.VerifyPKCS1v15(key, crypto.SHA256, hash[:], signature) != nil {
+	if rsa.VerifyPKCS1v15(s.webhookKey, crypto.SHA256, hash[:], signature) != nil {
 		http.Error(w, "invalid signature", 401)
 		return
 	}
@@ -144,7 +158,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid environment or event", 401)
 		return
 	}
-	if e.ID == "" || e.Data.OrderID == "" || e.Data.ProductID != s.cfg.ProductID || (e.EventType != "order.completed" && e.EventType != "refund.succeeded") {
+	if len(e.ID) == 0 || len(e.ID) > 256 || len(e.Data.OrderID) < 8 || len(e.Data.OrderID) > 100 || e.Data.ProductID != s.cfg.ProductID || (e.EventType != "order.completed" && e.EventType != "refund.succeeded") {
 		http.Error(w, "unsupported event", 400)
 		return
 	}
@@ -154,13 +168,23 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	result, err := tx.Exec("INSERT OR IGNORE INTO webhook_events VALUES (?,?,?)", e.ID, e.EventType, s.now().Unix())
+	payloadHash := hex.EncodeToString(hash[:])
+	result, err := tx.Exec("INSERT OR IGNORE INTO webhook_events(event_id,event_type,received_at,payload_hash) VALUES (?,?,?,?)", e.ID, e.EventType, s.now().Unix(), payloadHash)
 	if err != nil {
 		http.Error(w, "storage error", 500)
 		return
 	}
 	n, _ := result.RowsAffected()
 	if n == 0 {
+		var previous string
+		if err := tx.QueryRow("SELECT payload_hash FROM webhook_events WHERE event_id=?", e.ID).Scan(&previous); err != nil {
+			http.Error(w, "storage error", 500)
+			return
+		}
+		if previous != payloadHash {
+			http.Error(w, "event ID conflict", http.StatusConflict)
+			return
+		}
 		respond(w, 200, map[string]string{"status": "duplicate"})
 		return
 	}
@@ -271,7 +295,7 @@ func (s *Server) sign(c claim) string {
 func VerifyToken(public ed25519.PublicKey, token string, now time.Time) (claim, error) {
 	var c claim
 	parts := strings.Split(token, ".")
-	if len(parts) != 2 {
+	if len(public) != ed25519.PublicKeySize || len(token) > 4096 || len(parts) != 2 {
 		return c, errors.New("invalid token")
 	}
 	sig, err := base64.RawURLEncoding.DecodeString(parts[1])
@@ -281,6 +305,9 @@ func VerifyToken(public ed25519.PublicKey, token string, now time.Time) (claim, 
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil || json.Unmarshal(payload, &c) != nil || c.ExpiresAt <= now.Unix() || c.IssuedAt > now.Unix()+60 || c.ExpiresAt-c.IssuedAt != int64(grace.Seconds()) {
 		return c, errors.New("expired or invalid token")
+	}
+	if c.LicenseID == "" || c.ActivationID == "" || c.InstallLabel == "" || c.Product == "" {
+		return c, errors.New("incomplete token")
 	}
 	return c, nil
 }

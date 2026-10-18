@@ -44,6 +44,7 @@ type Config struct {
 	Global    int           // submissions allowed across all clients per window
 	Window    time.Duration // rate-limit window
 	Now       func() time.Time
+	Schedule  func(time.Duration, func()) func()
 }
 
 // Waitlist owns the file and the in-memory rate limiter and duplicate set.
@@ -53,17 +54,25 @@ type Waitlist struct {
 	seen    map[string]bool
 	clients map[string]*bucket
 	global  bucket
+	closed  bool
 }
 
 type bucket struct {
 	start time.Time
 	count int
+	stop  func()
 }
 
 // Open loads existing addresses so a repeated signup is acknowledged without a second line.
 func Open(cfg Config) (*Waitlist, error) {
 	if cfg.Now == nil {
 		cfg.Now = time.Now
+	}
+	if cfg.Schedule == nil {
+		cfg.Schedule = func(d time.Duration, f func()) func() {
+			timer := time.AfterFunc(d, f)
+			return func() { timer.Stop() }
+		}
 	}
 	w := &Waitlist{cfg: cfg, seen: map[string]bool{}, clients: map[string]*bucket{}}
 	f, err := os.Open(cfg.File)
@@ -140,9 +149,13 @@ func (w *Waitlist) respond(rw http.ResponseWriter, r *http.Request, outcome Outc
 func (w *Waitlist) allow(client string) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+	if w.closed {
+		return false
+	}
 	now := w.cfg.Now()
 	for key, b := range w.clients {
 		if now.Sub(b.start) >= w.cfg.Window {
+			b.stop()
 			delete(w.clients, key)
 		}
 	}
@@ -150,6 +163,7 @@ func (w *Waitlist) allow(client string) bool {
 	if b == nil {
 		b = &bucket{start: now}
 		w.clients[client] = b
+		b.stop = w.cfg.Schedule(w.cfg.Window, func() { w.expire(client, b) })
 	}
 	if now.Sub(w.global.start) >= w.cfg.Window {
 		w.global = bucket{start: now}
@@ -160,6 +174,24 @@ func (w *Waitlist) allow(client string) bool {
 	b.count++
 	w.global.count++
 	return true
+}
+
+func (w *Waitlist) expire(client string, b *bucket) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.clients[client] == b {
+		delete(w.clients, client)
+	}
+}
+
+func (w *Waitlist) Close() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.closed = true
+	for key, b := range w.clients {
+		b.stop()
+		delete(w.clients, key)
+	}
 }
 
 func (w *Waitlist) append(email string) error {

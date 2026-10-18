@@ -14,7 +14,7 @@ A stdlib-only Go service behind the writeitdown.app reverse proxy. It collects a
 
 Outcomes: `joined`, `invalid`, `limited` (rate limit), `error` (file write failed). A request with `Accept: application/json` gets `{"status":"<outcome>"}` with 200/400/429/500. Any other request gets `303` to `WAITLIST_RETURN_URL#waitlist-<outcome>`, which the page shows without JavaScript. A duplicate address (case-insensitive) answers `joined` and is not stored twice. A request whose `Origin` header is present and differs from `WAITLIST_ORIGIN` gets 403. `GET /api/waitlist/health` answers `ok`.
 
-Rate limits: 5 submissions per client address and 120 overall per 10-minute window. The client address is the last `X-Forwarded-For` hop, which is sound only because the service refuses to bind anything but loopback. It is kept in memory for the window and never written.
+Rate limits: 5 submissions per client address and 120 overall per 10-minute window. The client address is the last `X-Forwarded-For` hop, which is sound only because the service refuses to bind anything but loopback. It is kept in memory only for its 10-minute window, even if no further requests arrive, and never written.
 
 ## Storage
 

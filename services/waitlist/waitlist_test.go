@@ -19,6 +19,7 @@ func newTestWaitlist(t *testing.T, now *time.Time) (*Waitlist, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(w.Close)
 	return w, file
 }
 
@@ -98,6 +99,7 @@ func TestDuplicateIsAcknowledgedOnceAcrossRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(reopened.Close)
 	rec := post(reopened, signup("reader@example.com"), map[string]string{"X-Forwarded-For": "203.0.113.2"})
 	if !strings.HasSuffix(rec.Header().Get("Location"), "#waitlist-joined") {
 		t.Fatalf("duplicate outcome %q", rec.Header().Get("Location"))
@@ -128,6 +130,52 @@ func TestPerClientAndGlobalRateLimits(t *testing.T) {
 	now = now.Add(10 * time.Minute)
 	if rec := post(w, signup("c@example.com"), json); rec.Code != 200 {
 		t.Fatalf("window reset: %d", rec.Code)
+	}
+}
+
+func TestIdleClientExpiresAndTimersStop(t *testing.T) {
+	now := time.Unix(1_800_000_000, 0)
+	type task struct {
+		run     func()
+		stopped bool
+	}
+	var tasks []*task
+	w, err := Open(Config{File: filepath.Join(t.TempDir(), "waitlist.tsv"), ReturnURL: "https://writeitdown.app/mac.html",
+		PerClient: 2, Global: 3, Window: 10 * time.Minute, Now: func() time.Time { return now },
+		Schedule: func(d time.Duration, run func()) func() {
+			if d != 10*time.Minute {
+				t.Fatalf("scheduled for %v", d)
+			}
+			job := &task{run: run}
+			tasks = append(tasks, job)
+			return func() { job.stopped = true }
+		}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(w.Close)
+	headers := map[string]string{"X-Forwarded-For": "203.0.113.9"}
+	if rec := post(w, signup("reader@example.com"), headers); rec.Code != http.StatusSeeOther {
+		t.Fatalf("first submission: %d", rec.Code)
+	}
+	if len(w.clients) != 1 || len(tasks) != 1 {
+		t.Fatalf("client not scheduled: %d clients, %d timers", len(w.clients), len(tasks))
+	}
+	now = now.Add(10 * time.Minute)
+	tasks[0].run()
+	if len(w.clients) != 0 {
+		t.Fatalf("idle client retained: %v", w.clients)
+	}
+	if rec := post(w, signup("reader@example.com"), headers); rec.Code != http.StatusSeeOther {
+		t.Fatalf("new window: %d", rec.Code)
+	}
+	tasks[0].run()
+	if len(w.clients) != 1 || len(tasks) != 2 {
+		t.Fatalf("stale timer deleted new window: %d clients, %d timers", len(w.clients), len(tasks))
+	}
+	w.Close()
+	if len(w.clients) != 0 || !tasks[1].stopped {
+		t.Fatal("shutdown retained client or timer")
 	}
 }
 
@@ -164,6 +212,7 @@ func TestUnwritableFileReportsError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(w.Close)
 	if rec := post(w, signup("a@example.com"), map[string]string{"Accept": "application/json"}); rec.Code != 500 {
 		t.Fatalf("got %d", rec.Code)
 	}

@@ -39,7 +39,9 @@ func main() {
 	server := &http.Server{Addr: addr, Handler: waitlist, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second}
 	log.Printf("waitlist listening on %s", addr)
-	log.Fatal(server.ListenAndServe())
+	err = server.ListenAndServe()
+	waitlist.Close()
+	log.Fatal(err)
 }
 
 // requireLoopback keeps the X-Forwarded-For trust in clientAddress sound: only the local proxy can reach us.

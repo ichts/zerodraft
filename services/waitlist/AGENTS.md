@@ -1,3 +1,3 @@
 # Waitlist service module
 
-`README.md` is the HTTP, privacy, and deployment contract. `waitlist.go` owns validation, rate limiting, the append-only file, and responses; `main.go` owns environment configuration and the loopback-only bind; `waitlist_test.go` covers storage, outcomes, duplicates, limits, origin, and validation; `deploy/` holds the systemd unit and reverse-proxy snippets (templates, never executed from here). Store nothing but the email and UTC time; the consent copy next to the form and in `writeitdown/privacy.html` must promise exactly that. Run `go vet ./... && go test -race ./...` here after changes.
+`README.md` owns the HTTP, privacy, deployment, and validation contract. `waitlist.go` owns form validation, timed in-memory rate limiting, storage, and responses; `main.go` owns environment configuration and the loopback-only server lifecycle; `waitlist_test.go` covers the handler and timer lifecycle; `deploy/` holds operator templates.

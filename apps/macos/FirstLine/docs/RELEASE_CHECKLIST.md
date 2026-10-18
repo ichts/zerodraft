@@ -46,7 +46,7 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 ## Final ship gate
 - [ ] No known blocker remains for English keyboard input
 - [ ] No known blocker remains for Chinese IME
-- [ ] `WID_QA_LICENSE_ONLY=1 scripts/qa-window.sh` passes real-window fourth-use denial from a seeded exhausted trial, signed-token activation, offline restart and refund denial. This is synthetic evidence only; trial consumption and animation timing still require their focused Swift tests.
+- [ ] `WID_QA_LICENSE_ONLY=1 scripts/qa-window.sh` passes real-window fresh activation-only launch, signed-token activation, offline restart and refund denial, with no persisted trial counter. This is synthetic evidence only; menu/legacy-state denial and animation timing are covered by their focused Swift tests.
 - [ ] A genuine Waffo test order activates in the real app through AppState + WaffoLicenseClient; refund then refuses access. Record redacted evidence in `MANUAL_QA.md`, never the order number or token. Wrong-product/device/signature and seven-day boundaries must also pass `swift test`.
 - [ ] No known blocker remains for license activation or purchase
 - [ ] Confirm support mailbox and copyright holder before publishing; `support@writeitdown.app` is proposed, not verified. Review the current `writeitdown` plist attribution against the `LICENSE` placeholder.

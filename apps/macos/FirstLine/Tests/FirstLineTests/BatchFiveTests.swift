@@ -10,14 +10,14 @@ struct DurationPickerTests {
     }
 
     @Test func offersExactlyFiveDirectStartLengths() {
-        let home = HomeViewController(appState: AppState())
+        let home = HomeViewController(appState: licensedTestState())
         #expect(buttons(home.view).filter { $0.tag >= 60 }.map(\.tag) == [60, 300, 600, 1200, 1800])
     }
 
     @Test func selectionStartsWritingWithFocusedEditor() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
         let home = HomeViewController(appState: state)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -39,9 +39,9 @@ struct DurationPickerTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
-        let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
         state.updateDefaultDuration(1200)
-        let next = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
+        let next = licensedTestState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
         #expect(next.selectedDuration == 1200)
         next.startSession()
         #expect(next.sessionEngine.duration == 1200)
@@ -57,7 +57,7 @@ struct DurationPickerTests {
         var json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
         json["defaultDuration"] = 180
         try JSONSerialization.data(withJSONObject: json).write(to: file)
-        let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: root))
         #expect(state.selectedDuration == 60)
         #expect(SessionEngine.validDuration(180) == 60)
     }
@@ -67,7 +67,7 @@ struct DurationPickerTests {
 struct SettingsTests {
     private func state() -> (AppState, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root),
                              installIDStore: InstallIDStore(configDirectory: root))
         return (state, root)
     }
@@ -284,7 +284,7 @@ struct KeyboardFlowTests {
             var now = 0.0
             let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
             defer { try? FileManager.default.removeItem(at: root) }
-            let state = AppState(sessionEngine: SessionEngine(now: { now }),
+            let state = licensedTestState(sessionEngine: SessionEngine(now: { now }),
                                  settingsStore: SettingsStore(configDirectory: root),
                                  installIDStore: InstallIDStore(configDirectory: root))
             let delegate = FirstLineAppDelegate(appState: state)
@@ -295,7 +295,6 @@ struct KeyboardFlowTests {
 
             state.startSession()
             state.sessionEngine.registerCommittedText("private draft")
-            state.consumeTrialOnFirstInput()
             if fromSettings {
                 now = 5
                 state.handleTick()
@@ -317,27 +316,23 @@ struct KeyboardFlowTests {
             #expect(state.selectedSurface == .session)
             #expect(state.sessionEngine.duration == 300)
             #expect(state.sessionEngine.silenceLimit == .strict)
-            #expect(state.settings.trialSessionsUsed == 1)
 
             state.sessionEngine.registerCommittedText("second draft")
-            state.consumeTrialOnFirstInput()
             state.newPiece()
-            #expect(state.settings.trialSessionsUsed == 2)
             state.sessionEngine.registerCommittedText("third draft")
-            state.consumeTrialOnFirstInput()
             state.newPiece()
-            #expect(state.selectedSurface == .upgrade)
-            #expect(state.sessionEngine.phase == .idle)
+            #expect(state.selectedSurface == .session)
+            #expect(state.sessionEngine.phase == .writing)
         }
     }
 
-    @Test func commandNStartsNewPieceThroughTrialGate() {
+    @Test func commandNCannotRestartAfterRevocation() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
         state.startSession()
         state.sessionEngine.registerCommittedText("lost")
-        state.settings.trialSessionsUsed = AppState.trialSessionLimit
+        state.settings.licenseStatus = .revoked
         state.newPiece()
         #expect(state.selectedSurface == .upgrade)
         #expect(state.sessionEngine.text.isEmpty)
@@ -349,7 +344,7 @@ struct KeyboardFlowTests {
         defer { try? FileManager.default.removeItem(at: root) }
         var now = 0.0
         let engine = SessionEngine(now: { now })
-        let state = AppState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root),
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root),
                              installIDStore: InstallIDStore(configDirectory: root))
         state.updateDefaultDuration(300)
         state.startSession()
@@ -396,7 +391,7 @@ struct KeyboardFlowTests {
         defer { try? FileManager.default.removeItem(at: root) }
         var time = 0.0
         let engine = SessionEngine(now: { time })
-        let state = AppState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
         state.startSession()
         engine.registerCommittedText("the entire draft")
         for second in stride(from: 4.0, to: 60, by: 4.0) {
@@ -420,7 +415,7 @@ struct KeyboardFlowTests {
     @Test func largeDraftAppendsThroughGuardedInputPath() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
         state.startSession(duration: 1800)
         let room = SessionViewController(appState: state)
         func editor(_ view: NSView) -> AppendOnlyTextView? {
@@ -437,7 +432,7 @@ struct KeyboardFlowTests {
     }
 
     @Test func commandWClosesWindow() {
-        let state = AppState()
+        let state = licensedTestState()
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: FirstLineAppDelegate())
         let close = menu.items.first?.submenu?.items.first { $0.keyEquivalent == "w" }
         #expect(close?.action == #selector(FirstLineAppDelegate.closeWindow(_:)))

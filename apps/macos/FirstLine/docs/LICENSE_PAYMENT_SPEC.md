@@ -1,6 +1,6 @@
 # Write It Down for Mac: license and payment
 
-The Mac app uses the Waffo-backed service in `services/license/`, not Polar. Price: USD $4.99 once, two installations per license, three free Mac writing sessions charged on first input. Waffo owns the charged amount; `WIDDisplayPrice` owns the app's displayed price.
+The Mac app uses the Waffo-backed service in `services/license/`, not Polar. Price: USD $4.99 once, two installations per license. Mac requires activation before the first session; the full web trial remains at https://writeitdown.app/. Waffo owns the charged amount; `WIDDisplayPrice` owns the app's displayed price.
 
 **Public sale is blocked.** The local service contract is implemented, but its Waffo webhook envelope and the buyer-visible receipt order number have not been verified with a genuine Waffo test purchase. HTTP stubs and the window fixture are not purchase evidence. Do not publish checkout until that order, callback, real app activation and refund rejection pass. See `services/license/README.md` for service readiness.
 
@@ -17,16 +17,16 @@ No merchant credential belongs in the app. Missing or invalid configuration fail
 
 ## Entitlement and persisted state
 
-`AppState` still owns activation, validation, revision guards and persistence rollback. `SettingsStore` retains the historical `licenseKey` field name for the order number and adds `licenseToken`. The token, order number, activation ID, product, status and validation timestamps may persist; writing never does. The full random install UUID in `install-id.json` supplies the device binding, not a shortened label or hardware identifier.
+`AppState` still owns activation, validation, revision guards and persistence rollback. `SettingsStore` retains the historical `licenseKey` field name for the order number and adds `licenseToken`. The token, order number, activation ID, product, status and validation timestamps may persist; writing never does. There is no persisted native trial counter. Old `trialSessionsUsed` and `hasUnlockedFullAccess` fields are ignored and omitted when settings are saved. The full random install UUID in `install-id.json` supplies the device binding, not a shortened label or hardware identifier.
 
 Full access requires all of the following:
 
-- Active status and a nonblank order number. The old `hasUnlockedFullAccess` flag is ignored; active records without an order number are demoted to trial without changing trial usage or writing preferences.
+- Active status and a nonblank order number. The old `hasUnlockedFullAccess` flag is ignored; active records without an order number are demoted to inactive without changing writing preferences.
 - A configured service, matching product and activation ID, and a token signed by the pinned Ed25519 public key for this installation.
 - Nonempty license and activation IDs, issuance no more than 60 seconds ahead of the clock, a seven-day signed lifetime and an expiration strictly later than now. The local validation timestamp cannot extend the signed expiration.
 - Completion of the launch validation attempt. Only transport errors, HTTP 429 and 5xx preserve valid offline access. Explicit HTTP 403 revokes it; malformed tokens, invalid signatures and unexpected responses fail closed.
 
-Legacy Polar/Dodo caches without a signed token do not unlock the app. Remaining free sessions still work, including during a pending validation. The start gate and the first-input gate both enforce entitlement; revocation before the first keystroke cannot turn an already-opened empty room into a fourth free session. A draft already being written is not erased by a license check.
+Fresh installs and legacy Polar/Dodo caches without a signed token open the activation screen. No free native sessions are available, including while validation is pending. Unactivated Home, Settings and writing menu actions cannot bypass the gate; the screen offers order/code entry, configured checkout and the full web-trial link. Valid launch validation or signed offline grace opens Home. The start and first-input gates both enforce entitlement, so revocation before the first keystroke closes an already-opened empty room. A draft already being written is not erased by a license check.
 
 Successful renewal replaces the persisted token only after checking signature, product, installation and activation ID. Older validation responses cannot overwrite a newer validation or activation. An activation persistence failure restores the previous settings and attempts to release only the new allocation; it never deactivates the previously accepted instance. Concurrent activation submissions are ignored while one is in flight.
 
@@ -56,6 +56,8 @@ swift test
 WID_QA_LICENSE_ONLY=1 scripts/qa-window.sh "$PWD/dist/qa-license"
 ```
 
-The window command requires Go, Python 3, jq and a permitted cua-driver daemon. The license-only mode seeds three used trial sessions, proves the fourth start is blocked, then activates a copied app against a disposable loopback fixture, writes in the real editor, restarts offline and restarts with a refund response. It does not exercise the three prior trial sessions or motion timing in the window; deterministic Swift tests cover those behaviors. Without license-only mode the existing full-window motion checks remain available. The fixture uses a fresh in-memory Ed25519 key; no Waffo request is made and the distributable app's configuration stays unchanged. `WaffoLicenseClientTests` verifies HTTP payloads, signature failures, persisted legacy denial, renewal, refund rejection and exact offline deadlines. `LicenseFlowTests` retains concurrency and rollback coverage.
+The window command requires Go, Python 3, jq and a permitted cua-driver daemon. The license-only mode starts with an empty home, verifies the activation-only screen and full web-trial link, activates a copied app against a disposable loopback fixture, writes in the real editor, restarts offline and restarts with a refund response. It verifies no trial counter is saved. Without license-only mode the full-window motion checks run after fixture activation; deterministic Swift tests cover their timing separately. The fixture uses a fresh in-memory Ed25519 key; no Waffo request is made and the distributable app's configuration stays unchanged. `WaffoLicenseClientTests` verifies HTTP payloads, signature failures, persisted legacy denial, renewal, refund rejection and exact offline deadlines. `LicenseFlowTests` retains concurrency and rollback coverage.
+
+The service's local contract accepts an opaque 8-100-byte credential in the existing `orderId` field. Except for rejecting empty/all-whitespace input, the app preserves the entered UTF-8 bytes: no trimming, case folding, Unicode aliasing or code translation. A buyer-visible activation-code format or receipt identifier still needs real-order verification; the client does not invent issuance or another endpoint.
 
 For genuine acceptance, configure a test build with the verified service public configuration, buy a Waffo **test-mode** order, confirm the signed callback reached the service, then enter the buyer-visible order number in the real app. Record only a redacted pass/fail result and screenshots without buyer credentials in `MANUAL_QA.md`. Never log or commit order numbers, tokens, private keys or request bodies from real purchases. Production purchase and deployment require separate authorization.

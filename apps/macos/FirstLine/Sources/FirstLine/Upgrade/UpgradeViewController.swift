@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state and DesignSystem tokens
- * [OUTPUT]: UpgradeViewController - exhausted-trial upsell and live license activation feedback
+ * [OUTPUT]: UpgradeViewController - activation-first access screen and live license activation feedback
  * [POS]: writeitdown AppKit license gate; uses configured price and checkout via AppState
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -40,17 +40,17 @@ final class UpgradeViewController: NSViewController {
     }
 
     private func buildInterface() {
-        let title = label("Trial complete", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
-        let subtitle = label("Three writing sessions used.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
-        let licenseName = label("writeitdown license", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.inkNSColor)
+        let title = label("Activate Write It Down", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
+        let subtitle = label("A license is required to write on this Mac.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
         let pricing = label("One payment. 2 Macs. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = "Paste Waffo order number"
+        licenseField.placeholderString = "Order number or activation code"
         licenseField.font = FirstLineTypography.bodyNSFont
         licenseField.target = self
         licenseField.action = #selector(activateTapped)
+        licenseField.cell?.sendsActionOnEndEditing = false
 
         activateButton = FirstLineButtons.primary(title: "Activate", target: self, action: #selector(activateTapped))
         feedbackLabel = label("", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
@@ -60,9 +60,9 @@ final class UpgradeViewController: NSViewController {
         buyButton.isEnabled = AppState.checkoutURL != nil
         let checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.microcopyNSFont, color: FirstLineColors.uiNSColor)
         checkoutStatus.isHidden = buyButton.isEnabled
-        let backButton = FirstLineButtons.secondary(title: "Back to Home", target: self, action: #selector(backTapped))
+        let webTrialButton = FirstLineButtons.link(title: "Try the full web app at writeitdown.app", target: self, action: #selector(webTrialTapped))
 
-        let stack = NSStackView(views: [title, subtitle, licenseName, pricing, licenseField, activateButton, feedbackLabel, buyButton, checkoutStatus, backButton])
+        let stack = NSStackView(views: [title, subtitle, pricing, licenseField, activateButton, feedbackLabel, buyButton, checkoutStatus, webTrialButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -95,10 +95,10 @@ final class UpgradeViewController: NSViewController {
                 feedbackLabel.stringValue += "\n\(LicenseActivationError.cleanupFailure.errorDescription ?? "")"
             }
         } else {
-            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.trialStatusText
+            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.licenseStatusText
         }
         feedbackLabel.isHidden = !active && appState.licenseActivationError == nil &&
-            appState.settings.licenseStatus == .trial
+            appState.settings.licenseStatus == .inactive
     }
 
     private func armLicenseObservation() {
@@ -126,9 +126,9 @@ final class UpgradeViewController: NSViewController {
     }
 
     @objc private func activateTapped() {
-        let key = licenseField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, !appState.licenseActivationInFlight else {
-            feedbackLabel.stringValue = "Enter your Waffo order number first."
+        let key = licenseField.stringValue
+        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !appState.licenseActivationInFlight else {
+            feedbackLabel.stringValue = "Enter your order number or activation code first."
             feedbackLabel.isHidden = false
             return
         }
@@ -147,6 +147,6 @@ final class UpgradeViewController: NSViewController {
         appState.goHome()
     }
 
-    @objc private func backTapped() { appState.goHome() }
+    @objc private func webTrialTapped() { appState.openWebTrial() }
     @objc private func buyTapped() { appState.openCheckout() }
 }

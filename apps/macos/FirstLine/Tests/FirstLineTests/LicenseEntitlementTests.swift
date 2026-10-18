@@ -11,142 +11,162 @@ struct LicenseEntitlementTests {
         ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap { descendants($0, of: type) }
     }
 
-    private func startFromHome(_ state: AppState) throws {
-        let home = HomeViewController(appState: state)
-        let button = try #require(descendants(home.view, of: NSButton.self).first { $0.tag == 60 })
-        button.performClick(nil)
-    }
-
-    private func typeInRoom(_ state: AppState) throws {
-        let room = SessionViewController(appState: state)
-        let input = try #require(descendants(room.view, of: AppendOnlyTextView.self).first)
-        input.insertText("another draft", replacementRange: NSRange(location: NSNotFound, length: 0))
-        #expect(state.sessionEngine.text == "another draft")
-    }
-
-    private func writeFixture(at root: URL, fields: [String: Any]) throws -> SettingsStore {
-        var fixture: [String: Any] = [
-            "theme": "dark", "defaultDuration": 300, "reducedMotion": "always",
-            "trialSessionsUsed": AppState.trialSessionLimit
-        ]
-        fixture.merge(fields) { _, new in new }
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try JSONSerialization.data(withJSONObject: fixture).write(to: root.appendingPathComponent("settings.json"))
-        return SettingsStore(configDirectory: root)
-    }
-
-    private func makeState(at root: URL, client: MockLicenseClient = MockLicenseClient()) -> AppState {
+    private func makeState(at root: URL, client: MockLicenseClient = MockLicenseClient(),
+                           openURL: @escaping (URL) -> Void = { _ in }) -> AppState {
         AppState(settingsStore: SettingsStore(configDirectory: root), licenseClient: client,
-                 installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock")
+                 installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock",
+                 openExternalURL: openURL)
     }
 
-    @Test(arguments: [false, true])
-    func legacyFlagCannotUnlockExhaustedTrialAcrossRestart(unlocked: Bool) async throws {
+    private func assertLocked(_ state: AppState) {
+        #expect(!state.hasFullAccess)
+        #expect(state.selectedSurface == .upgrade)
+        state.startSession()
+        state.openWritingMode()
+        state.newPiece()
+        state.goHome()
+        state.openSettings()
+        state.closeSettings()
+        #expect(!state.prepareSessionInput())
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.sessionEngine.phase == .idle)
+        #expect(state.sessionEngine.text.isEmpty)
+    }
+
+    @Test func freshInstallOnlyOffersActivationAndFullWebTrial() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = try writeFixture(at: root, fields: ["hasUnlockedFullAccess": unlocked])
-        for _ in 0..<2 {
-            let mock = MockLicenseClient()
-            let state = makeState(at: root, client: mock)
-            #expect(state.settings.licenseStatus == .trial)
-            #expect(state.settings.theme == .dark)
-            #expect(state.settings.reducedMotion == .always)
-            #expect(!state.hasFullAccess)
-            #expect(!state.licenseValidationInFlight)
-            await state.validateLicenseIfNeeded()
-            #expect(await mock.lastValidatedToken == nil)
-            let home = HomeViewController(appState: state)
-            #expect(descendants(home.view, of: NSTextField.self).contains {
-                $0.stringValue == "Mac trial: 3 of 3 sessions used."
-            })
-            try startFromHome(state)
-            #expect(state.selectedSurface == .upgrade)
-            #expect(state.sessionEngine.phase == .idle)
-            #expect(state.isTrialExhausted)
-            #expect(try store.load().trialSessionsUsed == AppState.trialSessionLimit)
-            #expect(try store.load().licenseStatus == .trial)
+        var opened: URL?
+        let state = makeState(at: root, openURL: { opened = $0 })
+        assertLocked(state)
+        let screen = UpgradeViewController(appState: state)
+        let fields = descendants(screen.view, of: NSTextField.self)
+        #expect(fields.contains { $0.stringValue == "Activate Write It Down" })
+        #expect(fields.contains { $0.placeholderString == "Order number or activation code" })
+        let buttons = descendants(screen.view, of: NSButton.self)
+        #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Start writing" })
+        let trial = try #require(buttons.first { $0.title == "Try the full web app at writeitdown.app" })
+        trial.performClick(nil)
+        #expect(opened?.absoluteString == "https://writeitdown.app/")
+        assertLocked(state)
+
+        let delegate = FirstLineAppDelegate(appState: state)
+        let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
+        for action in [#selector(FirstLineAppDelegate.newPiece(_:)), #selector(FirstLineAppDelegate.goHome(_:)),
+                       #selector(FirstLineAppDelegate.openWriting(_:)), #selector(FirstLineAppDelegate.openSettings(_:))] {
+            let item = try #require(menu.items.flatMap { $0.submenu?.items ?? [] }.first { $0.action == action })
+            #expect(!delegate.validateMenuItem(item))
+            _ = NSApplication.shared.sendAction(action, to: delegate, from: item)
+            assertLocked(state)
         }
     }
 
-    @Test(arguments: [nil, "", " \t\n"] as [String?])
-    func activeWithoutKeyCannotUnlockEvenWithCachedMetadata(key: String?) async throws {
+    @Test func activationFieldFocusChangesDoNotSubmitEmptyCredentials() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = try writeFixture(at: root, fields: [
-            "licenseStatus": "active", "licenseKey": key as Any? ?? NSNull(),
-            "licenseInstanceID": "lki_existing", "licenseProductID": "prod_mock",
-            "licenseLastValidatedAt": now.timeIntervalSinceReferenceDate
-        ])
-        let mock = MockLicenseClient()
-        let state = makeState(at: root, client: mock)
-        #expect(state.settings.licenseStatus == .trial)
-        #expect(!state.hasFullAccess)
-        #expect(!state.licenseValidationInFlight)
-        await state.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedToken == nil)
-        try startFromHome(state)
-        #expect(state.selectedSurface == .upgrade)
-        #expect(try store.load().licenseStatus == .trial)
-        #expect(!makeState(at: root).hasFullAccess)
-
-        // Mutable in-memory settings must not bypass the entitlement check either.
-        state.settings.licenseStatus = .active
-        #expect(!state.hasFullAccess)
-        await state.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedToken == nil)
-        state.newPiece()
-        #expect(state.selectedSurface == .upgrade)
-        #expect(state.sessionEngine.phase == .idle)
-    }
-
-    @Test
-    func legacyFlagDoesNotHideTrialConsumption() throws {
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: root) }
-        let store = try writeFixture(at: root, fields: ["hasUnlockedFullAccess": true, "trialSessionsUsed": 2])
         let state = makeState(at: root)
-        try startFromHome(state)
-        #expect(state.selectedSurface == .session)
-        #expect(state.settings.trialSessionsUsed == 2)
-        try typeInRoom(state)
-        #expect(state.settings.trialSessionsUsed == 3)
-        #expect(try store.load().trialSessionsUsed == 3)
-        state.newPiece()
-        #expect(state.selectedSurface == .upgrade)
-        let restarted = makeState(at: root)
-        try startFromHome(restarted)
-        #expect(restarted.selectedSurface == .upgrade)
+        let controller = RootWindowController(appState: state)
+        controller.showWindow(nil)
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        let view = try #require(window.contentView)
+        let field = try #require(descendants(view, of: NSTextField.self).first {
+            $0.placeholderString == "Order number or activation code"
+        })
+        window.makeFirstResponder(field)
+        window.makeFirstResponder(nil)
+        window.makeFirstResponder(field)
+        await Task.yield()
+        #expect(!descendants(view, of: NSTextField.self).contains {
+            !$0.isHidden && $0.stringValue == "Enter your order number or activation code first."
+        })
     }
 
     @Test(arguments: [false, true])
-    func keyedActivationAndRestartPreserveAccess(offline: Bool) async throws {
+    func unactivatedStaleEditorRejectsCommittedAndMarkedInput(marked: Bool) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = try writeFixture(at: root, fields: ["hasUnlockedFullAccess": true])
         let state = makeState(at: root)
-        try startFromHome(state)
-        #expect(state.selectedSurface == .upgrade)
-        await state.activateLicense(key: " TEST-KEY ")
-        #expect(state.hasFullAccess)
-        #expect(state.licenseActivationJustSucceeded)
-        try startFromHome(state)
-        #expect(state.selectedSurface == .session)
-        try typeInRoom(state)
-        #expect(try store.load().trialSessionsUsed == 3)
-        #expect(try store.load().licenseKey == "TEST-KEY")
+        state.sessionEngine.start(duration: 60)
+        state.selectedSurface = .session
+        let room = SessionViewController(appState: state)
+        let editor = try #require(descendants(room.view, of: AppendOnlyTextView.self).first)
+        if marked {
+            editor.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                                 replacementRange: NSRange(location: NSNotFound, length: 0))
+        } else {
+            editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        }
+        #expect(editor.string.isEmpty)
+        assertLocked(state)
+    }
 
-        let mock = MockLicenseClient(validationError: offline ? .networkFailure : nil)
-        let restarted = makeState(at: root, client: mock)
-        #expect(!restarted.hasFullAccess)
-        #expect(restarted.licenseValidationInFlight)
-        try startFromHome(restarted)
+    @Test(arguments: [-1, 0, 1, 2, 3, 99])
+    func legacyTrialBudgetAndUnlockFlagCannotGrantAnySession(used: Int) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let fixture: [String: Any] = ["theme": "dark", "defaultDuration": 300, "reducedMotion": "always",
+                                      "trialSessionsUsed": used, "hasUnlockedFullAccess": true, "licenseStatus": "trial"]
+        try JSONSerialization.data(withJSONObject: fixture).write(to: root.appendingPathComponent("settings.json"))
+        for _ in 0..<2 {
+            let state = makeState(at: root)
+            #expect(state.settings.theme == .dark)
+            #expect(state.settings.defaultDuration == 300)
+            #expect(state.settings.reducedMotion == .always)
+            #expect(state.settings.licenseStatus == .inactive)
+            assertLocked(state)
+            try state.settingsStore.save(state.settings)
+        }
+        let persisted = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("settings.json"))) as? [String: Any]
+        #expect(persisted?["trialSessionsUsed"] == nil)
+        #expect(persisted?["hasUnlockedFullAccess"] == nil)
+    }
+
+    @Test(arguments: [nil, "", " \t\n"] as [String?])
+    func activeWithoutCredentialRemainsLockedAcrossRestart(key: String?) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                   licenseKey: key, licenseStatus: .active, licenseLastValidatedAt: now,
+                                   licenseInstanceID: "instance", licenseProductID: "prod_mock", licenseToken: "mock-token"))
+        let client = MockLicenseClient()
+        let state = makeState(at: root, client: client)
+        await state.validateLicenseIfNeeded()
+        #expect(await client.lastValidatedToken == nil)
+        assertLocked(state)
+        state.settings.licenseStatus = .active
+        assertLocked(state)
+        assertLocked(makeState(at: root))
+    }
+
+    @Test(arguments: [false, true])
+    func activatedLicenseUnlocksHomeAndRestartsWithoutTrialBudget(offline: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = makeState(at: root)
+        assertLocked(state)
+        await state.activateLicense(key: " TEST-ORDER ")
+        #expect(state.hasFullAccess)
+        state.goHome()
+        #expect(state.selectedSurface == .home)
+        for _ in 0..<4 {
+            state.startSession()
+            #expect(state.selectedSurface == .session)
+            let room = SessionViewController(appState: state)
+            let editor = try #require(descendants(room.view, of: AppendOnlyTextView.self).first)
+            editor.insertText("paid draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+            #expect(state.sessionEngine.text == "paid draft")
+            state.abandonSession()
+        }
+        let restarted = makeState(at: root, client: MockLicenseClient(validationError: offline ? .networkFailure : nil))
         #expect(restarted.selectedSurface == .upgrade)
+        #expect(!restarted.hasFullAccess)
         await restarted.validateLicenseIfNeeded()
-        #expect(await mock.lastValidatedToken == "mock-token")
         #expect(restarted.hasFullAccess)
-        try startFromHome(restarted)
+        #expect(restarted.selectedSurface == .home)
+        restarted.startSession()
         #expect(restarted.selectedSurface == .session)
-        try typeInRoom(restarted)
-        #expect(try store.load().trialSessionsUsed == 3)
     }
 }

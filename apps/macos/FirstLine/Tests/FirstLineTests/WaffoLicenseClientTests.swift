@@ -147,7 +147,7 @@ struct WaffoLicenseClientTests {
             let body = try Self.body(request)
             switch request.url?.path {
             case "/api/v1/licenses/activate":
-                #expect(body == ["orderId": "test-order-123", "installLabel": f.install, "platform": "macos"])
+                #expect(body == ["orderId": " test-order-123 ", "installLabel": f.install, "platform": "macos"])
                 return try Self.reply(token)
             case "/api/v1/licenses/validate":
                 #expect(body == ["token": token])
@@ -159,7 +159,7 @@ struct WaffoLicenseClientTests {
             }
         }
         let client = f.client()
-        let activated = try await client.activate(licenseKey: "test-order-123", instanceName: f.install)
+        let activated = try await client.activate(licenseKey: " test-order-123 ", instanceName: f.install)
         #expect(activated.instanceID == "activation-test")
         #expect(activated.token == token)
         #expect(try await client.validate(token: token) == token)
@@ -244,20 +244,13 @@ struct WaffoLicenseClientTests {
         }
     }
 
-    @Test func threeFreeSessionsActivationRestartOfflineExpiryAndRefund() async throws {
+    @Test func activationRequiredBeforeFirstSessionAndAfterRefundOrExpiry() async throws {
         let f = SignedLicenseFixture()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         var now = f.now
         let state = makeState(f, root: root, clock: { now })
-        for used in 1...3 {
-            state.startSession()
-            #expect(state.selectedSurface == .session)
-            #expect(state.settings.trialSessionsUsed == used - 1)
-            try input(state)
-            #expect(state.settings.trialSessionsUsed == used)
-            state.abandonSession()
-        }
+        #expect(state.selectedSurface == .upgrade)
         state.startSession()
         #expect(state.selectedSurface == .upgrade)
         acceptActivations(f)
@@ -265,7 +258,6 @@ struct WaffoLicenseClientTests {
         #expect(state.hasFullAccess)
         state.startSession()
         try input(state)
-        #expect(state.settings.trialSessionsUsed == 3)
         state.abandonSession()
 
         LicenseHTTPStub.handler.set { _ in throw URLError(.notConnectedToInternet) }
@@ -296,7 +288,6 @@ struct WaffoLicenseClientTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let state = makeState(f, root: root, clock: { f.now })
-        state.settings.trialSessionsUsed = 3
         acceptActivations(f)
         await state.activateLicense(key: "test-order-123")
         state.startSession()
@@ -306,7 +297,6 @@ struct WaffoLicenseClientTests {
         #expect(!state.prepareSessionInput())
         #expect(state.selectedSurface == .upgrade)
         #expect(state.sessionEngine.text.isEmpty)
-        #expect(state.settings.trialSessionsUsed == 3)
     }
 
     @Test func invalidRenewalCannotUseGraceAndValidRenewalPersists() async throws {
@@ -339,7 +329,7 @@ struct WaffoLicenseClientTests {
         #expect(state.licenseActivationError == nil)
     }
 
-    @Test func legacyFlagsAndTamperedCacheDoNotAuthorizeFourthSession() async throws {
+    @Test func legacyFlagsAndTamperedCacheDoNotAuthorizeWriting() async throws {
         let f = SignedLicenseFixture()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -347,7 +337,6 @@ struct WaffoLicenseClientTests {
         let state = makeState(f, root: root, clock: { f.now })
         acceptActivations(f)
         await state.activateLicense(key: "test-order-123")
-        state.settings.trialSessionsUsed = 3
         let signed = state.settings
         LicenseHTTPStub.handler.set { _ in throw URLError(.notConnectedToInternet) }
         for mutation in 0..<5 {
@@ -365,7 +354,6 @@ struct WaffoLicenseClientTests {
             #expect(!restarted.hasFullAccess)
             restarted.startSession()
             #expect(restarted.selectedSurface == .upgrade)
-            #expect(restarted.settings.trialSessionsUsed == 3)
         }
     }
 }

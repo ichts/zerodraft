@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，首输入 trial gate、配置驱动结账与 Waffo 签名 token 持久化
- * [POS]: 导航及 trial gate；active 必须有订单号及合法签名 token，满足产品/设备/实例/时限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
+ * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，activation-first 入口、配置驱动结账与 Waffo 签名 token 持久化
+ * [POS]: 导航及付费许可门槛；active 必须有订单号及合法签名 token，满足产品/设备/实例/时限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -22,7 +22,6 @@ enum Surface: String, CaseIterable, Hashable, Identifiable {
 @MainActor
 @Observable
 final class AppState {
-    static let trialSessionLimit = 3
     static let configurationURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent("Info.plist")
     private static var configuration: [String: Any] {
@@ -36,6 +35,7 @@ final class AppState {
                            productID: licenseProductID,
                            publicKey: Data(base64Encoded: configuration["WIDLicensePublicKey"] as? String ?? "") ?? Data())
     }
+    static let webTrialURL = URL(string: "https://writeitdown.app/")!
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
@@ -55,6 +55,7 @@ final class AppState {
     let clock: () -> Date
     let productID: String
     let installLabel: String
+    private let openExternalURL: (URL) -> Void
     var settings: AppSettings
     private(set) var licenseValidationInFlight = false
     private var activationRevision = 0
@@ -77,7 +78,8 @@ final class AppState {
         licenseClient: LicenseClient = AppState.configuredLicenseClient,
         installIDStore: InstallIDStore = InstallIDStore(),
         clock: @escaping () -> Date = Date.init,
-        productID: String = AppState.licenseProductID
+        productID: String = AppState.licenseProductID,
+        openExternalURL: @escaping (URL) -> Void = { NSWorkspace.shared.open($0) }
     ) {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
@@ -85,6 +87,7 @@ final class AppState {
         self.installIDStore = installIDStore
         self.clock = clock
         self.productID = productID
+        self.openExternalURL = openExternalURL
         self.installLabel = installIDStore.loadOrCreate().uuid.uuidString
         self.settings = (try? settingsStore.load()) ?? .defaultValue
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
@@ -103,7 +106,7 @@ final class AppState {
 
     func startSession(duration: TimeInterval? = nil) {
         guard sessionEngine.phase != .success && !sessionIsRunning else { return }
-        guard canStartTrialSession else {
+        guard hasFullAccess else {
             selectedSurface = .upgrade
             return
         }
@@ -113,17 +116,9 @@ final class AppState {
         selectedSurface = .session
     }
 
-    func consumeTrialOnFirstInput() {
-        guard sessionEngine.hasStarted, chargedSessionID != sessionEngine.sessionID else { return }
-        chargedSessionID = sessionEngine.sessionID
-        consumeTrialSessionIfNeeded()
-    }
-
-    private var chargedSessionID: UUID?
-
     func prepareSessionInput() -> Bool {
         sessionEngine.tick()
-        if !sessionEngine.hasStarted && !canStartTrialSession {
+        if !sessionEngine.hasStarted && !hasFullAccess {
             sessionEngine.abandon()
             selectedSurface = .upgrade
             return false
@@ -140,7 +135,7 @@ final class AppState {
         if sessionIsRunning {
             abandonSession()
         } else {
-            selectedSurface = .home
+            selectedSurface = hasFullAccess ? .home : .upgrade
         }
     }
 
@@ -154,6 +149,10 @@ final class AppState {
     }
 
     func openSettings() {
+        guard hasFullAccess else {
+            if !sessionEngine.hasStarted { selectedSurface = .upgrade }
+            return
+        }
         guard selectedSurface != .settings else { return }
         surfaceBeforeSettings = selectedSurface
         selectedSurface = .settings
@@ -161,12 +160,12 @@ final class AppState {
 
     func closeSettings() {
         sessionEngine.tick()
-        selectedSurface = surfaceBeforeSettings
+        selectedSurface = hasFullAccess ? surfaceBeforeSettings : .upgrade
     }
 
     func abandonSession() {
         sessionEngine.abandon()
-        selectedSurface = .home
+        selectedSurface = hasFullAccess ? .home : .upgrade
     }
 
     func handleTick() {
@@ -223,18 +222,21 @@ final class AppState {
 
     func openCheckout() {
         guard let url = Self.checkoutURL else { return }
-        NSWorkspace.shared.open(url)
+        openExternalURL(url)
+    }
+
+    func openWebTrial() {
+        openExternalURL(Self.webTrialURL)
     }
 
     func openLicenseHelp() {
         guard let url = URL(string: "https://writeitdown.app/support.html") else { return }
-        NSWorkspace.shared.open(url)
+        openExternalURL(url)
     }
 
     func activateLicense(key: String) async {
         guard !licenseActivationInFlight else { return }
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             licenseActivationError = .emptyKey
             return
         }
@@ -247,7 +249,7 @@ final class AppState {
             licenseActivationError = .productNotConfigured
             return
         }
-        if trimmed == settings.licenseKey, settings.licenseInstanceID != nil,
+        if settings.licenseKey?.utf8.elementsEqual(key.utf8) == true, settings.licenseInstanceID != nil,
            settings.licenseToken != nil, settings.licenseProductID == productID {
             switch await validateLicenseIfNeeded(allowInactive: true) {
             case true: return
@@ -260,7 +262,7 @@ final class AppState {
             }
         }
         do {
-            let activation = try await licenseClient.activate(licenseKey: trimmed, instanceName: installLabel)
+            let activation = try await licenseClient.activate(licenseKey: key, instanceName: installLabel)
             guard activation.productID == productID else {
                 await rejectActivation(activation, reason: .wrongProduct)
                 return
@@ -273,7 +275,7 @@ final class AppState {
             // Snapshot the pre-activation state so a failed persist cannot leave the
             // app granting access that is not durable on disk.
             let preActivation = settings
-            settings.licenseKey = trimmed
+            settings.licenseKey = key
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
             settings.licenseProductID = productID
@@ -330,6 +332,14 @@ final class AppState {
         defer {
             if activationRevision == revision && validationRevision == requestRevision {
                 licenseValidationInFlight = false
+                if !licenseActivationInFlight {
+                    if hasFullAccess && selectedSurface == .upgrade {
+                        selectedSurface = .home
+                    } else if !hasFullAccess && !sessionEngine.hasStarted {
+                        sessionEngine.abandon()
+                        selectedSurface = .upgrade
+                    }
+                }
             }
         }
         guard !productID.isEmpty, licenseClient.isConfigured,
@@ -423,27 +433,23 @@ final class AppState {
     private var previousEnginePhase: SessionPhase = .idle
 
     private func launchInitialSurface() {
-        selectedSurface = .home
+        selectedSurface = hasFullAccess ? .home : .upgrade
     }
 
     var canNavigateToSupportSurface: Bool {
+        guard hasFullAccess else { return false }
         switch sessionEngine.phase {
         case .idle, .failure:
-            true
+            return true
         case .writing, .danger, .success:
-            false
+            return false
         }
     }
 
-    var trialSessionsRemaining: Int {
-        guard !hasFullAccess else { return Self.trialSessionLimit }
-        return max(0, Self.trialSessionLimit - settings.trialSessionsUsed)
-    }
-
-    var trialStatusText: String {
+    var licenseStatusText: String {
         if licenseValidationInFlight { return "Checking license..." }
         if settings.licenseKey != nil && settings.licenseInstanceID == nil {
-            return "License not activated on this Mac. Enter your order number in Settings."
+            return "License not activated on this Mac. Enter your order number or activation code."
         }
         if settings.licenseStatus == .active && !hasFullAccess {
             if settings.licenseKey != nil && !productID.isEmpty &&
@@ -456,29 +462,14 @@ final class AppState {
         case .active:
             return "License active."
         case .revoked:
-            return "License revoked. Reactivate in Settings."
+            return "License revoked. Enter a valid order number or activation code."
         case .invalid:
-            return "License invalid. Reactivate in Settings."
+            return "License invalid. Activate this Mac again."
         case .unknown:
             return "License status unknown. Reconnect to validate."
-        case .trial:
-            let used = min(Self.trialSessionLimit, settings.trialSessionsUsed)
-            return "Mac trial: \(used) of \(Self.trialSessionLimit) sessions used."
+        case .inactive:
+            return "Activate this Mac to start writing."
         }
-    }
-
-    var isTrialExhausted: Bool {
-        !hasFullAccess && trialSessionsRemaining == 0
-    }
-
-    private var canStartTrialSession: Bool {
-        hasFullAccess || settings.trialSessionsUsed < Self.trialSessionLimit
-    }
-
-    private func consumeTrialSessionIfNeeded() {
-        guard !hasFullAccess else { return }
-        settings.trialSessionsUsed += 1
-        persistSettings()
     }
 
 }

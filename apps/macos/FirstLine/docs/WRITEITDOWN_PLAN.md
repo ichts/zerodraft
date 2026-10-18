@@ -128,7 +128,7 @@ stateDiagram-v2
 - Settings (`Cmd+,`) offers Focus Mode, alignment, font size, and appearance alongside the existing license and motion controls. Focus Mode is off by default; when on, the room fills the screen and hides the clock and word count until the pointer hovers over their chrome. Deadline announcements remain accessible without hover.
 - Alignment defaults to a centered narrow column and can switch to a left-aligned wide column. Font size offers Small, Medium, and Large, with Medium as the default. Appearance follows the system by default, with the existing Light and Dark choices.
 - Settings preferences may persist without storing draft text. Settings may be viewed while writing and Done returns to the surface from which Settings opened. Duration and silence limits are selected only on the start screen and cannot change while writing; changing focus, alignment, font size, or appearance must not reset the session clock or draft. Native fullscreen exit turns focus mode off during writing; a programmatic exit for Settings navigation preserves the preference, including a quick Settings/Done round trip.
-- `Cmd+N` starts a new piece through the existing session and trial gate, dropping any current unkept draft without saving it. On the kept view, `Cmd+C` copies the entire draft rather than a partial selection; `Cmd+W` closes the window. The full flow must work without a mouse.
+- `Cmd+N` starts a new piece through the existing session and paid-license gate, dropping any current unkept draft without saving it. On the kept view, `Cmd+C` copies the entire draft rather than a partial selection; `Cmd+W` closes the window. The full flow must work without a mouse.
 - Word-count goals and a resident menu-bar app are out of scope.
 
 ### 4.4 Governance note
@@ -174,11 +174,11 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/Session/SessionViewController.swift` | It is the room. | It hosts the rest, typing, warn, wipe, and kept states in one view (batch 4). |
 | `Sources/FirstLine/Session/SuccessViewController.swift` | It is the kept surface. | It becomes the kept view inside the room, or is folded into `SessionViewController` if that is simpler (batch 4). |
 | `Sources/FirstLine/App/HomeViewController.swift` | It is the start screen. | Brand copy (batch 3). Picker and removal of site marketing copy (batch 5). |
-| `Sources/FirstLine/App/AppState.swift` | It owns navigation and the trial gate. | Removals (batch 1). Trial consumed on the first keystroke (batch 6). |
+| `Sources/FirstLine/App/AppState.swift` | It owns activation-first navigation and paid access. | No native trial counter. Start and first input require a valid license. |
 | `Sources/FirstLine/App/FirstLineMain.swift`, `RootWindowController.swift`, `RootContainerViewController.swift`, `MainMenuBuilder.swift` | They are the AppKit shell. | Names, title, and menus (batches 3 and 5). |
 | `Sources/FirstLine/Licensing/LicenseClient.swift`, `LicenseModels.swift`, `MockLicenseClient.swift` | The paid license flow stays. | Add a live Dodo client (batch 6). |
 | `Sources/FirstLine/Infrastructure/InstallIDStore.swift` | It provides the Dodo activation instance name without hardware IDs. | Rename the root folder (batch 3). |
-| `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the trial-exhausted purchase screen. | Brand copy and a real checkout link (batch 6). |
+| `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the first-launch activation screen. | Order/code entry, configured checkout and the full writeitdown.app web-trial link. |
 | `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls (batch 5). Duration and silence choices belong only on the start screen. |
 | `Sources/FirstLine/DesignSystem/Colors.swift`, `Typography.swift`, `Spacing.swift`, `FirstLineButtons.swift`, `FloodCanvasView.swift`, `WritingFontCandidate.swift` | They are the design token layer and bundled fonts. | Site tokens (batch 3). |
 | `Sources/FirstLine/Resources/` | It holds Newsreader, IBM Plex Mono, and Zhuque Fangsong, with their OFL texts. | Keep all three. The site uses the first two, and Zhuque covers CJK. |
@@ -201,7 +201,7 @@ The following code inside kept files is also deleted:
 ## 7. Privacy
 
 - Writing stays in memory. It is never written to disk, never logged, and never sent anywhere. Batch 1 isolates both the configuration root and the former draft root in temporary directories for kept and wiped sessions, and observes that no draft text or draft file appears in either. Tests also check that these flows do not write to the real user root. Configuration and install ID persistence remain legitimate and are tested separately; an empty directory is not the criterion.
-- `settings.json` holds only appearance, the reduced-motion override, chosen duration and silence limit, focus mode, alignment, font size, the trial count, and the license cache described in `docs/LICENSE_PAYMENT_SPEC.md`. `install-id.json` holds a random install UUID.
+- `settings.json` holds only appearance, the reduced-motion override, chosen duration and silence limit, focus mode, alignment, font size and the license cache described in `docs/LICENSE_PAYMENT_SPEC.md`. `install-id.json` holds a random install UUID.
 - The only network traffic is the license flow described in `docs/LICENSE_PAYMENT_SPEC.md`, plus opening the checkout page in the default browser. No analytics, no crash reporting, and no update checks are added.
 - The fonts are bundled, so the app makes no font requests, unlike the site.
 - The in-app About text and the site's privacy page state this in one sentence each. The site change ships with batch 7 as part of a normal writeitdown bundle install.
@@ -211,10 +211,10 @@ The following code inside kept files is also deleted:
 The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收费的", and then set the price: "4.99".
 
 - Distribution is a Developer ID signed, hardened-runtime, notarized, stapled DMG downloaded from writeitdown.app. There is no Mac App Store build. This matches the existing `docs/RELEASE_CHECKLIST.md`.
-- The app uses a Waffo one-time purchase and the Waffo-backed license service. The earlier Dodo and Polar implementations are retired; historical batch records below are not the current provider contract. `docs/LICENSE_PAYMENT_SPEC.md` owns order-number activation, signed seven-day tokens, two installations and three free Mac sessions. A genuine Waffo test purchase, receipt identifier and app activation remain required before public sale.
+- The app uses a Waffo one-time purchase and the Waffo-backed license service. The earlier Dodo and Polar implementations are retired; historical batch records below are not the current provider contract. `docs/LICENSE_PAYMENT_SPEC.md` owns order-number activation, signed seven-day tokens, two installations and paid-only native access. A genuine Waffo test purchase, receipt identifier and app activation remain required before public sale.
 - The price is USD $4.99, paid once. Every piece of copy that names a price reads `$4.99`.
 - In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the Waffo product. Once checkout is live, price changes must update the Waffo product, app configuration, and the site's Mac copy together.
-- One trial session is counted when its first keystroke lands, not when the room opens. That matches the web's start rule and means an untouched room never costs a trial.
+- The captain superseded the native trial on 2026-10-18: Mac is USD $4.99 once, activation before the first session, no native trial counter. Fresh installs and invalid licenses open activation only; the full web trial is available at https://writeitdown.app/. Old trial/unlock settings cannot grant access.
 
 ### 8.1 Owner-account steps (needed at the release batch)
 
@@ -230,6 +230,8 @@ These are the captain's account actions. They are needed at batch 7 and do not b
 - [ ] Approve the site copy for the Mac section in `writeitdown/support.html` and install the updated site bundle.
 
 ## 9. Batches
+
+The completed batch records below are historical. Their three-session-trial requirements and named trial tests were superseded by the activation-first decision in section 8. Current license acceptance is `LICENSE_PAYMENT_SPEC.md`.
 
 Every batch follows the same flow:
 
@@ -259,7 +261,7 @@ swift test             # must exit 0; the record states the test count
 scripts/qa-window.sh   # ad-hoc universal package + cua-driver window flow; screenshots under /tmp/wid-qa/cua-*/
 ```
 
-Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver daemon route (roadmap report section 6.9), which replaced the earlier batched `osascript`/`screencapture` flows. The script builds an ad-hoc universal app (`WID_APP_OUTPUT` or `dist/Write It Down.app`) and runs it with a fresh `CFFIXED_USER_HOME`. It asserts the AX tree at every stage: Home budget and duration buttons; Standard 8s, Strict 5s and Relaxed 12s selected on Home, each with a selected AX radio value, a first input, tier-bound warn and wipe timing, 3-2-1 warn numeral and KEEP TYPING line, recovery, literal DRAFT WIPED report and Escape; blocked Backspace in Standard; the fourth start routing to Upgrade after exactly three billed trials; and `trialSessionsUsed == 3` in settings.json. It saves per-stage screenshots and observed warn/wipe delays in `timing.txt`, also printed in the final summary. Permissions belong to the cua-driver daemon (`cua-driver permissions status`), so background agents need no TCC grants of their own and no Computer Use approval. States that synthetic events cannot prove at CLI latency, such as physical IME candidate windows and the exact 280 ms deny frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver daemon route (roadmap report section 6.9), which replaced the earlier batched `osascript`/`screencapture` flows. The script builds an ad-hoc universal app (`WID_APP_OUTPUT` or `dist/Write It Down.app`), copies it into a fresh `CFFIXED_USER_HOME` and activates that copy against a disposable signed loopback fixture. `WID_QA_LICENSE_ONLY=1` isolates activation/offline/refund behavior from timing-sensitive animation checks. The fixture is not Waffo purchase evidence. It asserts the AX tree at every stage: fresh activation, paid Home duration buttons; Standard 8s, Strict 5s and Relaxed 12s selected on Home, each with a selected AX radio value, a first input, tier-bound warn and wipe timing, 3-2-1 warn numeral and KEEP TYPING line, recovery, literal DRAFT WIPED report and Escape; blocked Backspace in Standard; continued licensed access after four sessions, offline restart and refund denial; no `trialSessionsUsed` field is saved. It saves per-stage screenshots and observed warn/wipe delays in `timing.txt`, also printed in the final summary. Permissions belong to the cua-driver daemon (`cua-driver permissions status`), so background agents need no TCC grants of their own and no Computer Use approval. States that synthetic events cannot prove at CLI latency, such as physical IME candidate windows and the exact 280 ms deny frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 

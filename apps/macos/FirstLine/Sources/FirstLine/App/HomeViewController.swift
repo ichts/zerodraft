@@ -54,7 +54,7 @@ final class HomeViewController: NSViewController {
             silenceButtons.append(button)
             return button
         })
-        let status = caption(appState.trialStatusText)
+        let status = caption(appState.licenseStatusText)
         statusLabel = status
         let stack = NSStackView(views: [title, durationTitle, durationRow, silenceTitle, silenceRow, status])
         stack.orientation = .vertical
@@ -78,7 +78,7 @@ final class HomeViewController: NSViewController {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.statusLabel.stringValue = self.appState.trialStatusText
+                self.statusLabel.stringValue = self.appState.licenseStatusText
                 self.armLicenseObservation()
             }
         }

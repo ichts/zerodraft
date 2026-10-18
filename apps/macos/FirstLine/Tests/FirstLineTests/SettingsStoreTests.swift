@@ -87,7 +87,7 @@ struct SettingsStoreTests {
         """
         try Data(oldJSON.utf8).write(to: root.appendingPathComponent("settings.json"))
         var loaded = try store.load()
-        #expect(loaded.licenseStatus == .trial)
+        #expect(loaded.licenseStatus == .inactive)
         try store.save(loaded)
         let encoded = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("settings.json"))) as? [String: Any]
         #expect(encoded?["hasUnlockedFullAccess"] == nil)
@@ -103,13 +103,13 @@ struct SettingsStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
         let settings = AppSettings(theme: .dark, defaultDuration: 300, reducedMotion: .always,
-                                   trialSessionsUsed: 3, licenseKey: key, licenseStatus: .active)
-        #expect(settings.licenseStatus == (key == "TEST-KEY" ? .active : .trial))
+                                   licenseKey: key, licenseStatus: .active)
+        #expect(settings.licenseStatus == (key == "TEST-KEY" ? .active : .inactive))
         try store.save(settings)
         #expect(try store.load() == settings)
     }
 
-    @Test(arguments: [LicenseStatus.trial, .active, .revoked, .invalid, .unknown])
+    @Test(arguments: [LicenseStatus.inactive, .active, .revoked, .invalid, .unknown])
     func legacyFlagDoesNotOverrideExplicitKeyedStatus(status: LicenseStatus) throws {
         let fixture = """
         {"theme":"dark","defaultDuration":300,"reducedMotion":"always",
@@ -121,7 +121,7 @@ struct SettingsStoreTests {
     }
 
     @Test
-    func settingsDecodeMissingTrialFieldsWithDefaults() throws {
+    func settingsDecodeMissingLicenseFieldsAsInactive() throws {
         let fm = FileManager.default
         let tempRoot = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let configDirectory = tempRoot.appendingPathComponent("Config", isDirectory: true)
@@ -129,7 +129,7 @@ struct SettingsStoreTests {
 
         try fm.createDirectory(at: configDirectory, withIntermediateDirectories: true)
         let settingsFile = configDirectory.appendingPathComponent("settings.json")
-        let settingsWithoutTrial = """
+        let settingsWithoutLicense = """
         {
           "defaultDuration" : 600,
           "immersiveSessionMode" : false,
@@ -137,13 +137,12 @@ struct SettingsStoreTests {
           "theme" : "dark"
         }
         """
-        let data = try #require(settingsWithoutTrial.data(using: .utf8))
+        let data = try #require(settingsWithoutLicense.data(using: .utf8))
         try data.write(to: settingsFile, options: .atomic)
 
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         let loaded = try store.load()
 
-        #expect(loaded.trialSessionsUsed == 0)
-        #expect(loaded.licenseStatus == .trial)
+        #expect(loaded.licenseStatus == .inactive)
     }
 }

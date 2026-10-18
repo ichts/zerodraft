@@ -7,7 +7,12 @@
 import Foundation
 
 enum LicenseStatus: String, Codable, Sendable {
-    case trial, active, invalid, revoked, unknown
+    case inactive, active, invalid, revoked, unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: raw) ?? .inactive
+    }
 }
 
 struct LicenseActivation: Equatable, Sendable {
@@ -37,7 +42,7 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
         case .networkFailure:
             return "Could not reach the license service. Check your connection and try again."
         case .emptyKey:
-            return "Enter your Waffo order number."
+            return "Enter your Waffo order number or activation code."
         case .unexpected(let statusCode):
             return "Activation failed (HTTP \(statusCode))."
         case .storageFailure:

@@ -55,7 +55,7 @@ struct RoomTests {
     @Test func escapeReturnsToStartAndDropsDraft() {
         var now = 0.0
         let engine = SessionEngine(now: { now })
-        let state = AppState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)))
         state.startSession()
         engine.registerCommittedText("private draft")
         #expect(RoomPresentation.shouldExitOnEscape(isComposing: false))
@@ -68,7 +68,7 @@ struct RoomTests {
     @Test func homeRestoresStartButtonFocusWithoutStartingSession() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root))
         state.startSession()
         state.abandonSession()
         let home = HomeViewController(appState: state)
@@ -84,7 +84,7 @@ struct RoomTests {
     }
 
     @Test func keptViewHasReceiptAndActionsWithoutPromotionalHeading() {
-        let state = AppState()
+        let state = licensedTestState()
         state.startSession()
         let room = SessionViewController(appState: state)
         func labels(_ view: NSView) -> [String] {

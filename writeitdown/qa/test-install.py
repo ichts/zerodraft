@@ -2,6 +2,7 @@
 from pathlib import Path
 import shutil
 import subprocess
+import re
 import tempfile
 
 source = Path(__file__).resolve().parents[1]
@@ -11,7 +12,8 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source.parent / 'd
     payload.mkdir()
     target = base / 'www' / 'writeitdown.app'
     target.mkdir(parents=True)
-    files = ['index.html', 'og.png', 'site.css', 'theme.js', 'demo.js', 'demo-timeline.mjs', 'feedback.js', 'session.mjs', 'room.js', 'privacy.html', 'terms.html', 'support.html', 'mac.html']
+    files = re.search(r"^FILES='([^']*)'", (source / 'install.sh').read_text(), re.M).group(1).split()
+    assert 'mac.html' in files and 'index.html' in files
     for name in files:
         shutil.copyfile(source / name, payload / name)
     script = (source / 'install.sh').read_text()
@@ -34,4 +36,4 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source.parent / 'd
     assert rejected.returncode != 0
     assert 'Refusing symlink' in rejected.stderr
     assert victim.read_text() == 'protected'
-print('PASS: exact production files, preserved backup, repeat installation, rejected symlink.')
+print(f'PASS: {len(files)} exact production files, preserved backup, repeat installation, rejected symlink.')

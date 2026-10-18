@@ -1,6 +1,6 @@
 # Test deployment preparation
 
-These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Deployment is not authorized for the first public free three-use trial, which has no checkout or activation. Do not run these templates against a VPS without separate approval and verified configuration through a safe channel. Production mode is not implemented.
+These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. The paid Waffo path is now a Mac release dependency; the separate free Mac trial release is canceled. That priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment
 
@@ -42,4 +42,4 @@ After the provider adapter is verified and implemented, the operator must record
 6. A genuine test refund followed by callback revocation and failed online validation/activation. Note that an already-issued offline token remains valid for at most seven days.
 7. Backup execution, off-host copy and isolated restore result.
 
-Until that record exists, the real payment path is blocked, not the free trial release. Local HTTP tests prove only the local contract. Enabling live payments requires a separate explicit release decision; these templates and this binary do not enable production mode.
+Until that record exists, the real payment path and paid Mac release remain blocked. Local HTTP tests prove only the local contract. Enabling live payments requires a separate explicit release decision; these templates and this binary do not enable production mode.

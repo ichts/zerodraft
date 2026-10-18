@@ -1,6 +1,6 @@
 # Write It Down license service
 
-This is a test-mode-only service, not a verified Waffo integration. It has no working checkout adapter and has not processed a real Waffo test order, callback or receipt. `POST /api/v1/checkout` fails closed with HTTP 503. No request from this service contacts Waffo. Do not connect production money or claim the purchase path works. The first public Mac package is a free three-use trial without checkout or activation. Payment work and deployment are separate from that release; this service is not a trial release dependency.
+This is a test-mode-only service, not a verified Waffo integration. It has no working checkout adapter and has not processed a real Waffo test order, callback or receipt. `POST /api/v1/checkout` fails closed with HTTP 503. No request from this service contacts Waffo. Do not connect production money or claim the purchase path works. The Mac release now requires the paid Waffo path. The separate free Mac trial release is canceled. A genuine TEST checkout, buyer credential delivery, signed completion, Mac activation and refund revocation are release gates; local fixtures alone do not satisfy them.
 
 The existing callback envelope and signature format below are local skeleton assumptions, not verified provider facts. Do not infer signature encoding, checkout response shape or receipt order-number visibility from fixtures. A buyer cannot activate until a signed completion creates the license; there is no GraphQL fallback or receipt lookup.
 
@@ -19,7 +19,7 @@ Before enabling TEST checkout, obtain through the approved safe channel:
 - A genuine dedicated-product TEST checkout and buyer-visible receipt credential, followed by signed callback processing, activation, third-install denial and genuine TEST refund revocation. This requires a separately authorized, verified receiver first; a configured URL alone is not a deployment.
 - Proof that TEST now targets the canonical `/api/v1/webhooks/waffo` route, plus separately approved receiver deployment and key-handling verification.
 
-No LIVE requests, real charges or deployment are authorized by the free-trial release. TEST and LIVE keys being provisioned does not itself authorize their use.
+Paid-release priority does not authorize production deployment, LIVE requests or real charges. TEST receiver deployment still requires a specifically approved host and safe configuration. TEST and LIVE keys being provisioned does not itself authorize their use.
 
 ## Run and validate
 
@@ -68,10 +68,12 @@ An offline client must verify the signature with the embedded public key, produc
 
 An offline token cannot learn about a refund. Revocation takes effect on the next online validation or activation, or when the token expires, at most seven days later. Do not promise immediate offline revocation.
 
+For Mac integration, configure the service origin, exact product ID and base64-encoded raw 32-byte Ed25519 public key. These are distinct from the Waffo RSA callback key. The current credential input is `orderId`; no separately generated purchase-code issuance or delivery mechanism exists. Genuine receipt evidence must establish whether the buyer can obtain that credential. Coordinate any credential-field change with the Mac client rather than making a fixture stand in for receipt delivery.
+
 ## Operations
 
 An authorized operator can revoke a disputed order offline. Set `LICENSE_DB` and `LICENSE_ORDER_ID` in a protected operator environment and run `go run . revoke`. Coordinate with the service and avoid shell history containing credentials. Revocation remains terminal after late callbacks.
 
 Run one server against the database. Back up with SQLite's online backup API or `sqlite3 .backup`, not by copying a live database file. Keep encrypted off-host copies and test restoration. Database backups contain order credentials. A restore must reconcile refunds received since the snapshot before serving buyers.
 
-`deploy/README.md` owns the unexecuted Hetzner/Caddy/systemd test deployment plan, key permissions, backup templates and genuine test-order evidence checklist. No host is selected or changed by this repository. Payment enablement remains blocked on the evidence listed above, safe test configuration, a genuine test order and refund proof. That does not block the free three-use trial release. Live payments require a separate explicit release decision.
+`deploy/README.md` owns the unexecuted Hetzner/Caddy/systemd test deployment plan, key permissions, backup templates and genuine test-order evidence checklist. No host is selected or changed by this repository. Payment enablement remains blocked on the evidence listed above, safe test configuration, a genuine test order and refund proof. These are blockers for the paid Mac release. Live payments require a separate explicit release decision.

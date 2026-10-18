@@ -68,7 +68,9 @@ An offline client must verify the signature with the embedded public key, produc
 
 An offline token cannot learn about a refund. Revocation takes effect on the next online validation or activation, or when the token expires, at most seven days later. Do not promise immediate offline revocation.
 
-For Mac integration, configure the service origin, exact product ID and base64-encoded raw 32-byte Ed25519 public key. These are distinct from the Waffo RSA callback key. The current credential input is `orderId`; no separately generated purchase-code issuance or delivery mechanism exists. Genuine receipt evidence must establish whether the buyer can obtain that credential. Coordinate any credential-field change with the Mac client rather than making a fixture stand in for receipt delivery.
+For Mac integration, configure the service origin, exact product ID and base64-encoded raw 32-byte Ed25519 public key. These are distinct from the Waffo RSA callback key. The current credential input is `orderId`, an opaque 8-100 byte string matched exactly against the stored callback order ID. The service does not trim, case-fold, translate an order number or look up aliases. `TestActivationRequiresExactOrderCredential` proves that local behavior only. No separately generated purchase-code issuance or delivery mechanism exists.
+
+A buyer-visible order number is usable only if genuine TEST receipt and signed callback evidence establish its exact mapping to the stored credential, and it is suitable as a bearer secret rather than a predictable public reference. The current merchant configuration provides neither proof. A separate code is not inherently required if the receipt already delivers a suitable credential; it may be needed if it does not. Do not decide from field names or synthetic fixtures. Compare the actual buyer receipt, completion and refund fields through the restricted evidence channel first, then coordinate any credential-field change with the Mac client.
 
 ## Operations
 

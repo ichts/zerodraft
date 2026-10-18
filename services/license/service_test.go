@@ -99,6 +99,31 @@ func expect(t *testing.T, w *httptest.ResponseRecorder, code int) {
 	}
 }
 
+// This proves opaque credential handling, not what a real Waffo buyer receives.
+func TestActivationRequiresExactOrderCredential(t *testing.T) {
+	f := setup(t)
+	expect(t, f.event("completion", "order.completed"), http.StatusOK)
+	for _, tc := range []struct {
+		credential string
+		status     int
+	}{
+		{"ORD_fixture ", http.StatusForbidden},
+		{"ord_fixture", http.StatusForbidden},
+		{"buyer-number-123", http.StatusForbidden},
+		{"", http.StatusBadRequest},
+		{"ORD_fixture", http.StatusOK},
+	} {
+		response := f.request("/api/v1/licenses/activate", map[string]string{
+			"orderId": tc.credential, "installLabel": "install-one", "platform": "macos",
+		}, "")
+		expect(t, response, tc.status)
+	}
+	var count int
+	if err := f.s.db.QueryRow("SELECT count(*) FROM activations").Scan(&count); err != nil || count != 1 {
+		t.Fatal("only the exact credential should create an activation", err)
+	}
+}
+
 func TestActivationLimitAndReuse(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("evt1", "order.completed"), 200)

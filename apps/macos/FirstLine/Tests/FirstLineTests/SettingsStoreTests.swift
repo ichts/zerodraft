@@ -87,7 +87,7 @@ struct SettingsStoreTests {
         """
         try Data(oldJSON.utf8).write(to: root.appendingPathComponent("settings.json"))
         var loaded = try store.load()
-        #expect(loaded.licenseStatus == .active)
+        #expect(loaded.licenseStatus == .trial)
         try store.save(loaded)
         let encoded = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("settings.json"))) as? [String: Any]
         #expect(encoded?["hasUnlockedFullAccess"] == nil)
@@ -95,6 +95,29 @@ struct SettingsStoreTests {
         loaded.licenseStatus = .revoked
         try store.save(loaded)
         #expect(try store.load().licenseStatus == .revoked)
+    }
+
+    @Test(arguments: [nil, "", " \t\n", "TEST-KEY"] as [String?])
+    func activeSettingsRequireNonblankKeyOnInitializationAndReload(key: String?) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = SettingsStore(configDirectory: root)
+        let settings = AppSettings(theme: .dark, defaultDuration: 300, reducedMotion: .always,
+                                   trialSessionsUsed: 3, licenseKey: key, licenseStatus: .active)
+        #expect(settings.licenseStatus == (key == "TEST-KEY" ? .active : .trial))
+        try store.save(settings)
+        #expect(try store.load() == settings)
+    }
+
+    @Test(arguments: [LicenseStatus.trial, .active, .revoked, .invalid, .unknown])
+    func legacyFlagDoesNotOverrideExplicitKeyedStatus(status: LicenseStatus) throws {
+        let fixture = """
+        {"theme":"dark","defaultDuration":300,"reducedMotion":"always",
+         "hasUnlockedFullAccess":true,"licenseKey":"TEST-KEY","licenseStatus":"\(status.rawValue)"}
+        """
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(fixture.utf8))
+        #expect(settings.licenseStatus == status)
+        #expect(settings.licenseKey == "TEST-KEY")
     }
 
     @Test

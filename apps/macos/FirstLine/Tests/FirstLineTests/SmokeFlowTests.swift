@@ -11,7 +11,8 @@ struct SmokeFlowTests {
         let state = AppState(
             sessionEngine: SessionEngine(now: now),
             settingsStore: SettingsStore(configDirectory: config),
-            installIDStore: InstallIDStore(configDirectory: config)
+            installIDStore: InstallIDStore(configDirectory: config),
+            productID: "prod_mock"
         )
         return (state, root)
     }
@@ -112,17 +113,18 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func legacyUnlockedMacAppBypassesTrialLimit() throws {
+    func activeFlagWithoutKeyCannotBypassTrialLimit() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let config = root.appendingPathComponent("Config", isDirectory: true)
         let store = SettingsStore(configDirectory: config)
         try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
-                                   trialSessionsUsed: AppState.trialSessionLimit, hasUnlockedFullAccess: true))
+                                   trialSessionsUsed: AppState.trialSessionLimit, licenseStatus: .active))
         let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
         state.startSession()
-        #expect(state.sessionEngine.phase == .writing)
-        #expect(state.settings.licenseStatus == .active)
+        #expect(state.sessionEngine.phase == .idle)
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.settings.licenseStatus == .trial)
     }
 
     @Test
@@ -304,12 +306,13 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func licensedRestartKeepsOnlyNewInputIncludingIMECommit() throws {
+    func licensedRestartKeepsOnlyNewInputIncludingIMECommit() async throws {
         for marked in [false, true] {
             var now = 0.0
             let (state, root) = makeState(now: { now })
             defer { try? FileManager.default.removeItem(at: root) }
-            state.settings.licenseStatus = .active
+            await state.activateLicense(key: "TEST-KEY")
+            #expect(state.hasFullAccess)
             state.startSession()
             state.sessionEngine.registerCommittedText("old draft")
             let oldID = state.sessionEngine.sessionID
@@ -361,11 +364,12 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func wipeDuringCompositionClearsOldDraftBeforeNextCandidate() throws {
+    func wipeDuringCompositionClearsOldDraftBeforeNextCandidate() async throws {
         var now = 0.0
         let (state, root) = makeState(now: { now })
         defer { try? FileManager.default.removeItem(at: root) }
-        state.settings.licenseStatus = .active
+        await state.activateLicense(key: "TEST-KEY")
+        #expect(state.hasFullAccess)
         state.startSession()
         state.sessionEngine.registerCommittedText("old draft")
         let controller = SessionViewController(appState: state)

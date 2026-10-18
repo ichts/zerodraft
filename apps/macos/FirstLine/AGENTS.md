@@ -26,7 +26,7 @@ Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源�
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、zen 排印、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、五档时长/三档静默时限及专注/对齐/字号持久化、旧许可键只读迁移（v0.1 hasUnlockedFullAccess → v0.2 licenseStatus）、已接受激活的产品 ID 缓存，不再写旧许可键与沉浸模式。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，作为 Polar activate 的 label。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation、LicenseActivationError、LicenseValidationError，对照 Polar 公开 license API 契约。
 Sources/FirstLine/Licensing/LicenseClient.swift: LicenseClient protocol，覆盖 activate / validate / deactivate 三个公开 endpoint。
@@ -51,6 +51,7 @@ Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回�
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功与失败不落盘、菜单无 Library、导航、trial 计数与解锁。
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入 trial gate 交互。
+Tests/FirstLineTests/LicenseEntitlementTests.swift: 持久化旧标记、无 key 的 active 与 Home/编辑器入口、trial 计数、合法 keyed 激活及重启回归。
 Tests/FirstLineTests/PolarLicenseClientTests.swift: stub URLProtocol 验证公开 API 请求和错误映射，不触达外网。
 Tests/FirstLineTests/LivePolarAcceptanceTests.swift: 仅 `WID_POLAR_E2E=1` 时从 `~/.config/writeitdown/polar-sandbox.env` 读取测试密钥，调用真实 Polar sandbox endpoint 验证成功激活和异产品拒绝；CI 默认不触网、不输出密钥。
 

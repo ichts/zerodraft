@@ -1,0 +1,5 @@
+# Inside the existing writeitdown.app site block. Caddy replaces untrusted
+# X-Forwarded-For by default, so the service sees the real client address.
+handle /api/waitlist* {
+	reverse_proxy 127.0.0.1:8091
+}

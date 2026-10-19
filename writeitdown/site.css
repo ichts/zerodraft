@@ -49,6 +49,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .deck{margin:0;font-family:var(--serif);font-style:italic;font-weight:400;font-size:var(--deck);line-height:1.45;color:var(--mute);text-align:center;max-width:46ch}
 .door{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;min-height:var(--doorh);padding:0 28px;border:0;border-radius:0;background:var(--ink);color:var(--wall);font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.12em;cursor:pointer;transition:none}
 .door:hover{color:var(--wall)}
+.hero-secondary{display:inline-flex;align-items:center;min-height:44px}
 
 .demo-wrap{padding:20px var(--gut) 0;flex:1;min-height:0;display:flex}
 .paper{position:relative;width:100%;flex:1;min-height:220px;background:var(--paper);box-shadow:var(--lift);border-radius:0;overflow:hidden;--chrome:var(--faint);--timer:var(--mute)}
@@ -116,6 +117,20 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .legal h1{font-weight:500;font-size:48px;line-height:1.1}
 .legal h2{font-weight:500;font-size:28px;margin-top:32px}
 .legal a{text-decoration:underline;text-underline-offset:3px}
+.waitlist{display:flex;flex-direction:column;gap:16px;margin-top:24px}
+.waitlist input[type="email"]{width:100%;min-height:var(--doorh);padding:0 16px;border:1px solid var(--faint);border-radius:0;background:var(--paper);color:var(--ink);font:400 21px/1 var(--serif)}
+.waitlist input[type="email"]:focus-visible{outline:1px solid var(--ink);outline-offset:0;border-color:var(--ink)}
+.waitlist .door{margin:0;align-self:flex-start}
+.waitlist .door:disabled{opacity:.6;cursor:progress}
+.waitlist-consent{display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.5;color:var(--mute)}
+.waitlist-consent input{flex:none;width:20px;height:20px;margin:4px 0 0;accent-color:var(--ink)}
+.waitlist-zh{margin:0;font-size:16px;line-height:1.6;color:var(--mute)}
+.waitlist-trap{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.waitlist-status,.waitlist-note{margin:0;color:var(--ink)}
+.waitlist-status:empty,.waitlist-note:not(:target),.waitlist[data-outcome] .waitlist-note{display:none}
+.legal .actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin:24px 0}
+.legal .actions .door{margin:0;text-decoration:none}
+.legal .actions .report{margin:0}
 @media(max-width:767px){
   .nav{gap:12px}.foot-links{gap:20px}.foot-links a{min-height:44px;display:flex;align-items:center}
   .room{--room-gut:12px}.writing-area{inset:64px 20px}

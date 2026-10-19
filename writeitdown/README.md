@@ -21,8 +21,16 @@ The writing viewport shows the active line at full opacity in the center of a fi
 
 ## Deploy
 
-Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the twelve production files under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
+Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the production files listed in `install.sh` under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
 
-The legal pages disclose Google Fonts requests and possible hosting access logs. A public support/privacy contact is deliberately marked as not configured, not replaced with an invented address.
+The legal pages disclose Google Fonts requests, possible hosting access logs, and the Mac waitlist. The public contact is contact@trefoilstudio.com (Trefoil Studio).
+
+### Mac page release order
+
+`mac.html` describes a planned paid app whose purchase is not open yet: the free web room is its working CTA, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
+
+1. Deploy the Go collector using [`services/waitlist/README.md`](../services/waitlist/README.md) behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. This is only a preflight: submit one real test address from the page, confirm its stored line, then remove it. Neither the collector's presence in this repository nor a local test proves deployment.
+2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.
+3. Keep the sale closed until the separate Mac paid-only build is integrated and independently verified. Then replace each `data-launch-pending` notice on `mac.html` with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real Waffo TEST order through checkout, callback, license email, activation and refund, and explicit approval to open.
 
 See `QA.md` for validation evidence and limits.

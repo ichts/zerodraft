@@ -1,0 +1,8 @@
+# Inside the existing writeitdown.app server block (use instead of Caddy).
+# Overwrite X-Forwarded-For so a client cannot pick its rate-limit address.
+location /api/waitlist {
+    proxy_pass http://127.0.0.1:8091;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header Host $host;
+    client_max_body_size 4k;
+}

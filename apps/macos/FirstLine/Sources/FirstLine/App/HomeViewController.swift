@@ -1,5 +1,5 @@
 /*
- * [INPUT]: AppState choices and AppKit button focus.
+ * [INPUT]: AppState choices, observable license status and AppKit button focus.
  * [OUTPUT]: Cursor-ready, direct-start duration row and fixed silence choices.
  * [POS]: Pre-writing surface; selection persists before a session begins, no marketing copy.
  * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
@@ -11,6 +11,7 @@ final class HomeViewController: NSViewController {
     private let appState: AppState
     private var durationButtons: [NSButton] = []
     private var silenceButtons: [NSButton] = []
+    private var statusLabel: NSTextField!
 
     init(appState: AppState) {
         self.appState = appState
@@ -23,6 +24,7 @@ final class HomeViewController: NSViewController {
     override func loadView() {
         view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
         buildInterface()
+        armLicenseObservation()
     }
 
     override func viewDidAppear() {
@@ -52,7 +54,8 @@ final class HomeViewController: NSViewController {
             silenceButtons.append(button)
             return button
         })
-        let status = caption(appState.trialStatusText)
+        let status = caption(appState.licenseStatusText)
+        statusLabel = status
         let stack = NSStackView(views: [title, durationTitle, durationRow, silenceTitle, silenceRow, status])
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -66,6 +69,19 @@ final class HomeViewController: NSViewController {
             stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 32),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -32),
         ])
+    }
+
+    private func armLicenseObservation() {
+        withObservationTracking {
+            _ = appState.settings
+            _ = appState.licenseValidationInFlight
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.statusLabel.stringValue = self.appState.licenseStatusText
+                self.armLicenseObservation()
+            }
+        }
     }
 
     private func caption(_ text: String) -> NSTextField {

@@ -1,20 +1,17 @@
 /**
  * [INPUT]: LicenseModels
- * [OUTPUT]: LicenseClient protocol for Polar public activate / validate / deactivate
- * [POS]: Licensing boundary shared by the real network client and test substitute
+ * [OUTPUT]: LicenseClient activation, signed renewal, local verification and rollback
+ * [POS]: Waffo-backed service boundary; no merchant credentials or second entitlement store
  * [PROTOCOL]: Update this header and FirstLine/AGENTS.md when the API boundary changes
  */
-
 import Foundation
 
-/// Public customer-portal endpoints need no merchant access token. Never log the key or request body.
 protocol LicenseClient: Sendable {
-    /// Activate this install and return the allocation ID for later validation or deactivation.
+    var isConfigured: Bool { get }
+    /// licenseKey is the opaque orderId credential; preserve its entered UTF-8 bytes.
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation
-
-    /// Validate the cached activation, not merely the key. False means the entitlement was revoked.
-    func validate(licenseKey: String, instanceID: String) async throws -> Bool
-
-    /// Undo a rejected activation so a device slot is not consumed.
-    func deactivate(licenseKey: String, instanceID: String) async throws
+    /// Nil is explicit revocation. Transport failures must throw, not revoke.
+    func validate(token: String) async throws -> String?
+    func deactivate(token: String) async throws
+    func permitsAccess(token: String, instanceID: String, installLabel: String, now: Date) -> Bool
 }

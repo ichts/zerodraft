@@ -1,11 +1,12 @@
 /**
  * [INPUT]: 依赖 LicenseClient、LicenseModels
- * [OUTPUT]: MockLicenseClient，测试期间替换真实 Polar 调用
- * [POS]: Licensing 测试替身；让 UpgradeView / SettingsView / AppState 在 Polar 产品尚未上线前可跑可测
+ * [OUTPUT]: MockLicenseClient，用于状态机测试，不证明签名或真实付款
+ * [POS]: 仅测试目标的许可替身，真实协议另由 HTTP stub 和签名测试验证
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation
+@testable import WriteItDown
 
 /// 测试与本地 QA 用的 LicenseClient 替身。
 /// 通过 `activationBehavior` 控制激活分支；通过 `validationResult` 控制 validate 分支。
@@ -28,9 +29,13 @@ actor MockLicenseClient: LicenseClient {
 
     /// 测试可读取，确认 UI 传给 client 的 key 与 instance name 符合预期。
     private(set) var lastActivateArguments: (licenseKey: String, instanceName: String)?
-    private(set) var lastValidatedKey: String?
-    private(set) var lastValidatedInstanceID: String?
-    private(set) var lastDeactivateArguments: (licenseKey: String, instanceID: String)?
+    private(set) var lastValidatedToken: String?
+    private(set) var lastDeactivatedToken: String?
+    nonisolated let isConfigured = true
+
+    nonisolated func permitsAccess(token: String, instanceID: String, installLabel: String, now: Date) -> Bool {
+        token == "mock-token"
+    }
 
     init(
         activationBehavior: ActivationBehavior = .success,
@@ -63,12 +68,8 @@ actor MockLicenseClient: LicenseClient {
         case .success:
             return LicenseActivation(
                 instanceID: activationInstanceID ?? "lki_mock_\(UUID().uuidString.prefix(8))",
-                licenseKeyID: "lic_mock_\(UUID().uuidString.prefix(8))",
-                name: instanceName,
-                businessID: "biz_mock",
-                createdAt: ISO8601DateFormatter().string(from: Date()),
                 productID: productID,
-                productName: "writeitdown license"
+                token: "mock-token"
             )
         case .invalidKey:
             throw LicenseActivationError.invalidKey
@@ -79,17 +80,16 @@ actor MockLicenseClient: LicenseClient {
         }
     }
 
-    func validate(licenseKey: String, instanceID: String) async throws -> Bool {
+    func validate(token: String) async throws -> String? {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
-        lastValidatedKey = licenseKey
-        lastValidatedInstanceID = instanceID
+        lastValidatedToken = token
         if let validationError { throw validationError }
-        return validationResult
+        return validationResult ? "mock-token" : nil
     }
 
-    func deactivate(licenseKey: String, instanceID: String) async throws {
+    func deactivate(token: String) async throws {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
-        lastDeactivateArguments = (licenseKey, instanceID)
+        lastDeactivatedToken = token
         if deactivateFails { throw LicenseValidationError.networkFailure }
     }
 }

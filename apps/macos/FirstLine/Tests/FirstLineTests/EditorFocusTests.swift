@@ -15,7 +15,7 @@ struct EditorFocusTests {
     private func checkWritingLine(alignment: WritingAlignment, focus: Bool, size: NSSize) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
-        let state = AppState(settingsStore: SettingsStore(configDirectory: root))
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root))
         state.settings.writingAlignment = alignment
         state.settings.focusMode = focus
         state.startSession()
@@ -412,7 +412,7 @@ struct EditorFocusTests {
 
     @Test func movementCommandsDenyAndKeepCaretAtEnd() {
         let engine = SessionEngine()
-        let controller = SessionViewController(appState: AppState(sessionEngine: engine))
+        let controller = SessionViewController(appState: licensedTestState(sessionEngine: engine))
         let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         editor.loadRestoredText("hello world")
         for selector in ["moveLeft:", "moveRight:", "moveUp:", "moveDown:",
@@ -437,7 +437,7 @@ struct EditorFocusTests {
     @Test
     func imeMovementStaysWithinMarkedRange() throws {
         let engine = SessionEngine()
-        let controller = SessionViewController(appState: AppState(sessionEngine: engine))
+        let controller = SessionViewController(appState: licensedTestState(sessionEngine: engine))
         let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         editor.configureSessionTypography()
         editor.loadRestoredText("draft")

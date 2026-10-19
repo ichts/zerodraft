@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [INPUT] Mode: (none) live release or --staging (empty checkout/product IDs).
+# [INPUT] Mode: (none) live release or --staging (empty checkout/license configuration).
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the
 #          universal app and an Applications symlink, plus a .sha256 sidecar.
 # [POS] apps/macos/FirstLine/scripts/release-dmg.sh — release packaging on top of
@@ -28,17 +28,31 @@ if [[ -z "$identity" ]] || ! security find-identity -v -p codesigning | grep -Fq
 fi
 
 plist=Sources/FirstLine/Info.plist
-checkout="$(/usr/libexec/PlistBuddy -c 'Print :WIDCheckoutURL' "$plist")"
-organization="$(/usr/libexec/PlistBuddy -c 'Print :WIDPolarOrganizationID' "$plist")"
-benefit="$(/usr/libexec/PlistBuddy -c 'Print :WIDPolarBenefitID' "$plist")"
-if [[ "$mode" == '' && ( ! "$checkout" =~ ^https://[^[:space:]]+$ || -z "$organization" || -z "$benefit" ) ]]; then
-  echo 'Release blocked: configure the live Polar WIDCheckoutURL, WIDPolarOrganizationID, and WIDPolarBenefitID in Info.plist first.' >&2
-  exit 1
-fi
-if [[ "$mode" == '--staging' && ( -n "$checkout" || -n "$organization" || -n "$benefit" ) ]]; then
-  echo 'Staging requires an empty checkout URL and product ID, so this DMG cannot be sold.' >&2
-  exit 1
-fi
+python3 - "$plist" "$mode" <<'PY'
+import base64, plistlib, sys
+from urllib.parse import urlsplit
+
+with open(sys.argv[1], 'rb') as f:
+    config = plistlib.load(f)
+keys = ('WIDCheckoutURL', 'WIDLicenseServiceURL', 'WIDLicenseProductID', 'WIDLicensePublicKey')
+values = [config.get(key, '') for key in keys]
+if sys.argv[2] == '--staging':
+    if any(values):
+        sys.exit('Staging requires empty checkout and license configuration; this DMG cannot be sold.')
+    sys.exit(0)
+try:
+    checkout, service = map(urlsplit, values[:2])
+    for url in (checkout, service):
+        if (url.scheme != 'https' or not url.hostname or url.username or url.password
+                or url.fragment or url.hostname in ('localhost', '127.0.0.1', '::1')):
+            raise ValueError('HTTPS production URLs required')
+    if service.path not in ('', '/') or service.query:
+        raise ValueError('service URL must be an origin, without an API path')
+    if not values[2].strip() or len(base64.b64decode(values[3], validate=True)) != 32:
+        raise ValueError('product and raw Ed25519 public key required')
+except (ValueError, TypeError) as error:
+    sys.exit(f'Release blocked: configure Waffo checkout and license service in Info.plist: {error}')
+PY
 
 WID_APP_OUTPUT="$app" scripts/package-app.sh --unsigned
 while IFS= read -r -d '' nested; do

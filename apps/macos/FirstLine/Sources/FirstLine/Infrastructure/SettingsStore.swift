@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含 trial 与许可产品身份缓存
- * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 trial；写作偏好和 license 数据落盘，正文绝不落盘
+ * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含许可产品身份和签名 token 缓存，忽略旧试用计数
+ * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；旧 trial 状态与计数不授予访问；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -67,15 +67,15 @@ struct AppSettings: Codable, Equatable {
     var focusMode: Bool
     var writingAlignment: WritingAlignment
     var writingFontSize: WritingFontSize
-    var trialSessionsUsed: Int
 
-    /// v0.2 新增：结构化 license 状态。当前由 Polar activate / validate 更新。
+    /// licenseKey 保留历史字段名，当前保存 Waffo 订单号；无 token 的旧缓存不授予访问。
     var licenseKey: String?
     var licenseStatus: LicenseStatus
     var licenseActivatedAt: Date?
     var licenseLastValidatedAt: Date?
     var licenseInstanceID: String?
     var licenseProductID: String?
+    var licenseToken: String?
 
     var hasLicenseKey: Bool {
         licenseKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
@@ -85,17 +85,17 @@ struct AppSettings: Codable, Equatable {
         theme: AppTheme,
         defaultDuration: TimeInterval,
         reducedMotion: ReducedMotionOverride,
-        trialSessionsUsed: Int = 0,
         silenceLimit: SilenceLimit = .standard,
         focusMode: Bool = false,
         writingAlignment: WritingAlignment = .centered,
         writingFontSize: WritingFontSize = .medium,
         licenseKey: String? = nil,
-        licenseStatus: LicenseStatus = .trial,
+        licenseStatus: LicenseStatus = .inactive,
         licenseActivatedAt: Date? = nil,
         licenseLastValidatedAt: Date? = nil,
         licenseInstanceID: String? = nil,
-        licenseProductID: String? = nil
+        licenseProductID: String? = nil,
+        licenseToken: String? = nil
     ) {
         self.theme = theme
         self.defaultDuration = SessionEngine.validDuration(defaultDuration)
@@ -104,16 +104,16 @@ struct AppSettings: Codable, Equatable {
         self.focusMode = focusMode
         self.writingAlignment = writingAlignment
         self.writingFontSize = writingFontSize
-        self.trialSessionsUsed = trialSessionsUsed
         self.licenseKey = licenseKey
         self.licenseActivatedAt = licenseActivatedAt
         self.licenseLastValidatedAt = licenseLastValidatedAt
         self.licenseInstanceID = licenseInstanceID
         self.licenseProductID = licenseProductID
+        self.licenseToken = licenseToken
 
         self.licenseStatus = licenseStatus
         if licenseStatus == .active && !hasLicenseKey {
-            self.licenseStatus = .trial
+            self.licenseStatus = .inactive
         }
     }
 
@@ -122,13 +122,12 @@ struct AppSettings: Codable, Equatable {
         case defaultDuration
         case reducedMotion
         case silenceLimit, focusMode, writingAlignment, writingFontSize
-        case trialSessionsUsed
         case licenseKey
         case licenseStatus
         case licenseActivatedAt
         case licenseLastValidatedAt
         case licenseInstanceID
-        case licenseProductID
+        case licenseProductID, licenseToken
     }
 
     init(from decoder: Decoder) throws {
@@ -140,16 +139,16 @@ struct AppSettings: Codable, Equatable {
         focusMode = (try? container.decode(Bool.self, forKey: .focusMode)) ?? false
         writingAlignment = (try? container.decode(WritingAlignment.self, forKey: .writingAlignment)) ?? .centered
         writingFontSize = (try? container.decode(WritingFontSize.self, forKey: .writingFontSize)) ?? .medium
-        trialSessionsUsed = try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
         licenseInstanceID = try container.decodeIfPresent(String.self, forKey: .licenseInstanceID)
         licenseProductID = try container.decodeIfPresent(String.self, forKey: .licenseProductID)
+        licenseToken = try container.decodeIfPresent(String.self, forKey: .licenseToken)
 
-        licenseStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .trial
+        licenseStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .inactive
         if licenseStatus == .active && !hasLicenseKey {
-            licenseStatus = .trial
+            licenseStatus = .inactive
         }
     }
 
@@ -162,22 +161,21 @@ struct AppSettings: Codable, Equatable {
         try container.encode(focusMode, forKey: .focusMode)
         try container.encode(writingAlignment, forKey: .writingAlignment)
         try container.encode(writingFontSize, forKey: .writingFontSize)
-        try container.encode(trialSessionsUsed, forKey: .trialSessionsUsed)
         try container.encodeIfPresent(licenseKey, forKey: .licenseKey)
         try container.encode(licenseStatus, forKey: .licenseStatus)
         try container.encodeIfPresent(licenseActivatedAt, forKey: .licenseActivatedAt)
         try container.encodeIfPresent(licenseLastValidatedAt, forKey: .licenseLastValidatedAt)
         try container.encodeIfPresent(licenseInstanceID, forKey: .licenseInstanceID)
         try container.encodeIfPresent(licenseProductID, forKey: .licenseProductID)
+        try container.encodeIfPresent(licenseToken, forKey: .licenseToken)
     }
 
     static let defaultValue = AppSettings(
         theme: .system,
         defaultDuration: SessionEngine.defaultDurationSeconds,
         reducedMotion: .system,
-        trialSessionsUsed: 0,
         licenseKey: nil,
-        licenseStatus: .trial,
+        licenseStatus: .inactive,
         licenseActivatedAt: nil,
         licenseLastValidatedAt: nil,
         licenseInstanceID: nil

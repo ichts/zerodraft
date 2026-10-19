@@ -1,6 +1,8 @@
-# Polar direct-sale setup (writeitdown Mac)
+# Historical Polar direct-sale setup
 
-Polar is the only payment and license provider for the Mac release. Do not ship a Dodo checkout or client. Complete this list in **sandbox first**, then repeat in production. The app stores no Polar access token; it calls only the public customer-portal license endpoints.
+Retired. Current Mac licensing uses the Waffo-backed service described in `LICENSE_PAYMENT_SPEC.md`. The commands and configuration below document the former Polar integration and must not be used for the current release.
+
+Polar was the payment and license provider at the time of this checklist. Complete this list in **sandbox first**, then repeat in production. The app stores no Polar access token; it calls only the public customer-portal license endpoints.
 
 1. In [Polar sandbox](https://sandbox.polar.sh/), create an organization for writeitdown. Record its organization UUID outside git. A separate sandbox account/sign-in may be required.
 2. Create a product named **Write It Down for Mac**, one-time **USD $4.99**, with a license-key benefit. Enable activations, limit **2**, no expiration, and customer self-service deactivation. Record the benefit UUID and hosted checkout URL. Do not use the product UUID as the app's license scope: Polar's public response identifies the *benefit*.

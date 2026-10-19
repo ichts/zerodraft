@@ -52,7 +52,7 @@ final class SettingsViewController: NSViewController {
             settingRow("Alignment", control: alignmentPopup()),
             settingRow("Font Size", control: sizePopup()),
         ]))
-        content.addArrangedSubview(section("Trial & License", rows: licenseRows()))
+        content.addArrangedSubview(section("License", rows: licenseRows()))
         content.addArrangedSubview(section("About", rows: [
             settingRow("Write It Down", detail: "Version 0.1.0"),
         ]))
@@ -84,7 +84,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func licenseRows() -> [NSView] {
-        licenseStatusLabel = muted(appState.trialStatusText)
+        licenseStatusLabel = muted(appState.licenseStatusText)
         licenseCleanupWarningLabel = muted("")
         licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 640).isActive = true
         var rows: [NSView] = [licenseStatusLabel, licenseCleanupWarningLabel]
@@ -92,11 +92,11 @@ final class SettingsViewController: NSViewController {
         licenseDetails = (0..<3).map { _ in muted("") }
         rows.append(contentsOf: licenseDetails)
 
-        let explanation = muted("Three writing sessions included. Activate a license key to keep writing.")
+        let explanation = muted("Enter your Waffo order number or activation code to activate this Mac.")
         licenseExplanationLabel = explanation
 
         let field = NSTextField(string: "")
-        field.placeholderString = "Paste license key"
+        field.placeholderString = "Order number or activation code"
         field.font = FirstLineTypography.microcopyNSFont
         field.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
         licenseField = field
@@ -123,8 +123,8 @@ final class SettingsViewController: NSViewController {
 
     private func refreshLicense() {
         let active = appState.hasFullAccess
-        licenseStatusLabel.stringValue = active ? appState.trialStatusText :
-            (appState.licenseActivationError?.errorDescription ?? appState.trialStatusText)
+        licenseStatusLabel.stringValue = active ? appState.licenseStatusText :
+            (appState.licenseActivationError?.errorDescription ?? appState.licenseStatusText)
         licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
         licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
         let values = [

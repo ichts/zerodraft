@@ -8,11 +8,10 @@ struct SmokeFlowTests {
     private func makeState(now: @escaping () -> TimeInterval = { 0 }) -> (AppState, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let config = root.appendingPathComponent("Config", isDirectory: true)
-        let state = AppState(
+        let state = licensedTestState(
             sessionEngine: SessionEngine(now: now),
             settingsStore: SettingsStore(configDirectory: config),
-            installIDStore: InstallIDStore(configDirectory: config),
-            productID: "prod_mock"
+            installIDStore: InstallIDStore(configDirectory: config)
         )
         return (state, root)
     }
@@ -92,39 +91,18 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func startingMacTrialSessionDoesNotConsumeUntilInput() throws {
-        let (state, root) = makeState()
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.startSession()
-        #expect(state.settings.trialSessionsUsed == 0)
-        #expect(state.trialSessionsRemaining == 3)
-        #expect(state.selectedSurface == .session)
-        #expect(try state.settingsStore.load().trialSessionsUsed == 0)
-    }
-
-    @Test
-    func exhaustedMacTrialShowsUpgradeInsteadOfStartingSession() throws {
-        let (state, root) = makeState()
-        defer { try? FileManager.default.removeItem(at: root) }
-        state.settings.trialSessionsUsed = AppState.trialSessionLimit
-        state.startSession()
-        #expect(state.sessionEngine.phase == .idle)
-        #expect(state.selectedSurface == .upgrade)
-    }
-
-    @Test
-    func activeFlagWithoutKeyCannotBypassTrialLimit() throws {
+    func activeFlagWithoutKeyCannotGrantAccess() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let config = root.appendingPathComponent("Config", isDirectory: true)
         let store = SettingsStore(configDirectory: config)
         try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
-                                   trialSessionsUsed: AppState.trialSessionLimit, licenseStatus: .active))
+                                   licenseStatus: .active))
         let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
         state.startSession()
         #expect(state.sessionEngine.phase == .idle)
         #expect(state.selectedSurface == .upgrade)
-        #expect(state.settings.licenseStatus == .trial)
+        #expect(state.settings.licenseStatus == .inactive)
     }
 
     @Test
@@ -158,24 +136,10 @@ struct SmokeFlowTests {
         var settings = AppSettings.defaultValue
         settings.defaultDuration = 300
         try store.save(settings)
-        let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
+        let state = licensedTestState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
         #expect(state.settings.defaultDuration == 300)
         state.startSession()
         #expect(state.sessionEngine.duration == 300)
-    }
-
-    @Test
-    func launchAlwaysShowsHome() throws {
-        let (firstRun, root) = makeState()
-        defer { try? FileManager.default.removeItem(at: root) }
-        #expect(firstRun.selectedSurface == .home)
-        var settings = AppSettings.defaultValue
-        settings.trialSessionsUsed = 1
-        try firstRun.settingsStore.save(settings)
-        let returning = AppState(settingsStore: firstRun.settingsStore,
-                                 installIDStore: InstallIDStore(configDirectory: root.appendingPathComponent("Config")))
-        #expect(returning.selectedSurface == .home)
-        #expect(returning.sessionEngine.phase == .idle)
     }
 
     @Test
@@ -282,16 +246,16 @@ struct SmokeFlowTests {
     }
 
     @Test
-    func exhaustedTrialBlocksBothLateKeystrokeAndIMEAfterWipe() throws {
+    func revocationBlocksBothLateKeystrokeAndIMEAfterWipe() throws {
         for marked in [false, true] {
             var now = 0.0
             let (state, root) = makeState(now: { now })
             defer { try? FileManager.default.removeItem(at: root) }
-            state.settings.trialSessionsUsed = AppState.trialSessionLimit - 1
             state.startSession()
             let controller = SessionViewController(appState: state)
             let input = try #require(editor(in: controller.view))
             input.insertText("old draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+            state.settings.licenseStatus = .revoked
             now = 9
             if marked {
                 input.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -300,7 +264,6 @@ struct SmokeFlowTests {
             }
             #expect(state.selectedSurface == .upgrade)
             #expect(state.sessionEngine.phase == .failure)
-            #expect(state.settings.trialSessionsUsed == AppState.trialSessionLimit)
             #expect(input.string.isEmpty)
         }
     }
@@ -334,7 +297,6 @@ struct SmokeFlowTests {
             #expect(state.sessionEngine.sessionID != oldID)
             #expect(state.sessionEngine.text == expected)
             #expect(input.string == expected)
-            #expect(state.settings.trialSessionsUsed == 0)
         }
     }
 

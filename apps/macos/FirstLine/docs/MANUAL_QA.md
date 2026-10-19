@@ -2,6 +2,29 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-18 UTC: activation-first, paid-only reversal
+
+This supersedes the native three-session trial in the earlier record below. Price remains USD $4.99 once; signature checks, two installations and seven-day offline grace are unchanged.
+
+- `swift build && swift test`: passed, 183 tests in 15 suites. Trial-consumption tests were replaced by fresh-install, menu, direct-input/IME and persisted-legacy denial tests. Editor and session tests now use an explicit test-only licensed fixture; production still defaults to the real Waffo client.
+- `WID_QA_LICENSE_ONLY=1 WID_QA_THEME=light scripts/qa-window.sh <output>` and the same command with `WID_QA_THEME=dark`: passed, 13 captured stages in light and 14 in dark, against isolated unactivated preferences and a disposable loopback signing service. The license-only flow checks the activation screen, full web-trial link, signed activation, real editor input, offline restart and direct return to activation after a refund. It also verifies the persisted file has no native trial counter. Evidence: ignored `tmp/waffo-mac/qa-paid-final-light/` and `qa-paid-final-dark/`.
+- Initial window captures exposed an empty activation error triggered by focus changes. `activationFieldFocusChangesDoNotSubmitEmptyCredentials` reproduced it before the fix. The credential field now submits on the explicit action/Return, not on end-editing; the test passes.
+- Light and dark activation, focus, activated and refunded states were inspected. Text fits the existing AppKit layout; there is no native trial or Home escape on the unactivated screen. The opaque credential tests verify raw UTF-8 transport/persistence and reject Unicode-equivalent aliases when deciding whether to reuse a cached activation.
+- The full browser-trial target is checked through the actual link button's action with an injected external-URL opener. No browser checkout or real purchase was performed. The loopback order is synthetic and does not prove Waffo receipt/code interoperability.
+- Full timing-sensitive window motion acceptance remains separate. The focused engine/room timing tests pass; no animation timing changes were made in this reversal.
+- Real Waffo TEST checkout, signed callback, order/code-to-app activation, refund trace and verified production inputs remain uncompleted release prerequisites. No production DMG, public sale or deployment was performed.
+
+## 2026-10-18: Waffo-backed Mac client, historical synthetic trial acceptance
+
+- `swift build && swift test`: passed, 188 tests in 15 suites. The new real-client HTTP tests cover order-number requests, token signature/product/device/instance checks, signed renewal, legacy cache denial, first-input revocation, refunds and the exact seven-day expiry. Existing tests retain three-session consumption, IME, concurrency and activation rollback coverage.
+- `WID_QA_LICENSE_ONLY=1 scripts/qa-window.sh <evidence-directory>`: passed with 14 captured stages. This packages a universal ad-hoc app, copies it into an isolated home, installs a fresh fixture public key only into that copy and uses a loopback service. Trial usage is deliberately seeded at three. The real window proved fourth-start denial, entered-order activation, real editor input without another trial charge, offline restart with access, then explicit refund rejection on restart. This is not a genuine Waffo order or payment test.
+- Inspected the exhausted Upgrade, activated Upgrade, paid editor, offline Home and refunded Upgrade screenshots: text is not clipped, the order field and feedback remain aligned, native focus is visible. Local evidence lives under the ignored `tmp/waffo-mac/qa-license-head/` directory. The Settings layout was not independently inspected in a real window; automated view tests cover its changed copy and asynchronous feedback.
+- Window QA exposed Home's stale `Checking license...` caption after asynchronous validation. Both active and revoked cases failed a focused view test before the Observation fix and pass afterward. A separate regression proved an opened empty room could accept input after revocation; first input now rechecks the existing trial/entitlement gate.
+- Full motion-window QA did not pass: its Relaxed warn bounds used an obsolete percentage rather than the final three seconds, then screenshot/input latency let recovery arrive after the 12-second wipe. The bounds now match the fixed-three-second contract. Per the acceptance decision, license-window QA is separate from animation; deterministic `SilenceLimitTests` and `RoomTests` pass, but the full timing-sensitive window choreography remains pending independent acceptance.
+- `go vet scripts/qa-license-fixture.go`, `shellcheck scripts/qa-window.sh scripts/release-dmg.sh`, `bash -n scripts/qa-window.sh scripts/release-dmg.sh`, `plutil -lint Sources/FirstLine/Info.plist` and `git diff --check` passed. Existing append-only selector-construction compiler warnings remain; they also occur in the untouched baseline.
+- Not performed: genuine Waffo test purchase/callback/receipt verification, real-order activation/refund, production configuration, signing/notarization, public sale or deployment. These remain release blockers, not evidence supplied by mocks.
+
+
 ## First launch
 - Delete `~/Library/Application Support/First Line/Config/settings.json`.
 - Launch the app.

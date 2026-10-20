@@ -137,9 +137,13 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   }
 });
 
-test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }) => {
+test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
+  await expect(hero.locator('h1')).toHaveText('Type for 60 seconds. Stop for 8, and your words disappear.');
+  await expect(hero.locator('.deck')).toHaveText('Test the free 60-second web room right in your browser.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+  await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
   await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');
   const secondary = hero.locator('a.hero-secondary');
   await expect(secondary).toHaveText(/BUY MAC USD 4\.99 - COMING SOON/);

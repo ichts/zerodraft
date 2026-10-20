@@ -14,7 +14,7 @@ test('Mac page sells a paid app, points to the free web trial, and has no dead o
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
-  await expect(main).toContainText('The Mac app will be paid when sales open.');
+  await expect(main).toContainText('When the native Mac app launches, a single $4.99 payment covers 2 Macs and comes with a 14-day refund.');
   await expect(main).not.toContainText(/free (writing )?sessions|three/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
 
@@ -137,9 +137,13 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   }
 });
 
-test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }) => {
+test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
+  await expect(hero.locator('h1')).toHaveText('We force you to write it down.');
+  await expect(hero.locator('.deck')).toHaveText('Test the free 60-second web room right in your browser.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+  await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
   await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');
   const secondary = hero.locator('a.hero-secondary');
   await expect(secondary).toHaveText(/BUY MAC USD 4\.99 - COMING SOON/);

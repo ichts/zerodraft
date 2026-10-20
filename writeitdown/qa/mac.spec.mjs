@@ -14,7 +14,7 @@ test('Mac page sells a paid app, points to the free web trial, and has no dead o
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
-  await expect(main).toContainText('The Mac app will be paid when sales open.');
+  await expect(main).toContainText('When the native Mac app launches, a single $4.99 payment covers 2 Macs and comes with a 14-day refund.');
   await expect(main).not.toContainText(/free (writing )?sessions|three/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
 

@@ -4,7 +4,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 
 ## Map
 
-- `index.html`: landing and directly addressable `#trial` room. The home-page H1 copy is locked to `We force you to write it down.` by captain ruling; its two-line treatment (line 1 Archivo Expanded ExtraBold, line 2 Reenie Beanie in the per-theme `--hand` red) lives in `site.css`, with both self-hosted fonts and their OFL licenses alongside it and listed in `install.sh`. `qa/evidence/headline-red/` holds 1440/390 screenshots; `qa/mac.spec.mjs` checks the copy, both fonts, and the red.
+- `index.html`: landing and directly addressable `#trial` room. The home-page H1 copy is locked to `We force you to write it down.` by captain ruling; `site.css` owns its visual treatment. Self-hosted fonts and their OFL licenses ship via `install.sh`; `qa/mac.spec.mjs` checks the headline.
 - `site.css`: shared geometry and semantic tokens. Both themes keep paper brighter than wall, including wash and cut.
 - `theme.js`: appearance preference only. System appearance is the default; `writeitdown-theme` is the only localStorage key.
 - `demo.js`: watch-only private messy-draft preview replaying `demo-timeline.mjs` - human-rhythm typing with a visible self-correction and a centered wipe report. Never owns the actual trial; deny feedback fires only in the trial.

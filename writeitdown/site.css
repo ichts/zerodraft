@@ -1,6 +1,8 @@
 
 /* Reenie Beanie, SIL OFL 1.1 (OFL-ReenieBeanie.txt), self-hosted: the handwritten "write it down." in the H1. */
 @font-face{font-family:'Reenie Beanie';font-style:normal;font-weight:400;font-display:swap;src:url(reenie-beanie.woff2) format('woff2')}
+/* Archivo Expanded ExtraBold (wdth 125, wght 800), SIL OFL 1.1 (OFL-Archivo.txt), self-hosted: the hard, wide "We force you to" in the H1. */
+@font-face{font-family:'Archivo Expanded';font-style:normal;font-weight:800;font-display:swap;src:url(archivo-expanded-800.woff2) format('woff2')}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 html.in-trial,html.in-trial body{height:100%;overflow:hidden}
@@ -13,13 +15,13 @@ a:hover{color:var(--ink)}
 button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 :root{
   color-scheme:dark;
-  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--alarm:#f2a93b;
+  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--alarm:#f2a93b;--hand:#e4604a;
   --wash-wall:#2e1712;--wash-paper:#3a1c15;--deep-wall:#3d1d15;--deep-paper:#4a2318;
   --lift:0 1px 0 rgba(0,0,0,.25),0 24px 48px -32px rgba(0,0,0,.65);
 }
 :root[data-theme="light"]{
   color-scheme:light;
-  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--alarm:#8f4405;
+  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--alarm:#8f4405;--hand:#9a2a1f;
   --wash-wall:#d1c1ac;--wash-paper:#ebdfce;--deep-wall:#c6b095;--deep-paper:#decab3;
   --lift:0 1px 0 rgba(26,24,19,.10),0 24px 48px -32px rgba(26,24,19,.35);
 }
@@ -48,8 +50,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 
 .hero{padding:var(--heroy) var(--gut) 0;display:flex;flex-direction:column;align-items:center;gap:20px}
 .h1{margin:0;font-family:var(--serif);font-weight:500;font-size:var(--h1);line-height:1.04;letter-spacing:-.015em;color:var(--ink);text-wrap:balance;text-align:center;max-width:none;--l1-scale:1.3}
-.h1 .l1{display:block;white-space:nowrap;font-size:min(calc(var(--l1-scale) * 1em),calc((100cqw - 2*var(--gut)) / 6.8))}
-.h1 .hand{display:block;margin-top:.22em;font-family:'Reenie Beanie',var(--serif);font-weight:400;font-size:min(1.9em,calc((100cqw - 2*var(--gut)) / 4.5));line-height:.8;letter-spacing:0;white-space:nowrap;-webkit-text-stroke:.012em currentColor}
+.h1 .l1{display:block;white-space:nowrap;font-family:'Archivo Expanded',var(--serif);font-weight:800;line-height:1;letter-spacing:-.01em;font-size:min(calc(.86 * var(--l1-scale) * 1em),calc((100cqw - 2*var(--gut)) / 9.6))}
+.h1 .hand{display:block;margin-top:.22em;font-family:'Reenie Beanie',var(--serif);font-weight:400;font-size:min(1.9em,calc((100cqw - 2*var(--gut)) / 4.5));line-height:.8;letter-spacing:0;white-space:nowrap;color:var(--hand);-webkit-text-stroke:.012em currentColor}
 .deck{margin:0;font-family:var(--serif);font-style:italic;font-weight:400;font-size:var(--deck);line-height:1.45;color:var(--mute);text-align:center;max-width:46ch}
 .door{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;min-height:var(--doorh);padding:0 28px;border:0;border-radius:0;background:var(--ink);color:var(--wall);font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.12em;cursor:pointer;transition:none}
 .door:hover{color:var(--wall)}

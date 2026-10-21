@@ -143,7 +143,21 @@ test('landing keeps Try web primary and offers the Mac app as a secondary coming
   await expect(hero.locator('h1')).toHaveText('We force you to write it down.');
   await expect(hero.locator('h1 .hand')).toHaveText('write it down.');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
-  expect(await page.evaluate(() => [...document.fonts].some(f => f.family.includes('Reenie') && f.status === 'loaded'))).toBe(true);
+  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /Archivo Expanded/);
+  const loaded = await page.evaluate(() => [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family));
+  expect(loaded.some(f => f.includes('Reenie')), 'handwriting face loaded').toBe(true);
+  expect(loaded.some(f => f.includes('Archivo Expanded')), 'line 1 face loaded').toBe(true);
+  const ink = await hero.evaluate(h => {
+    const css = getComputedStyle(h.querySelector('h1 .hand'));
+    const probe = document.createElement('i');
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--hand');
+    h.append(probe);
+    const hand = getComputedStyle(probe).color;
+    probe.remove();
+    return { hand, actual: css.color, line1: getComputedStyle(h.querySelector('h1 .l1')).color };
+  });
+  expect(ink.actual, 'the handwritten line wears the theme red').toBe(ink.hand);
+  expect(ink.actual, 'the two headline lines differ in color').not.toBe(ink.line1);
   const gap = await hero.evaluate(h => {
     const hand = h.querySelector('h1 .hand');
     return (hand.getBoundingClientRect().top - h.querySelector('h1 .l1').getBoundingClientRect().bottom) / parseFloat(getComputedStyle(hand).fontSize);

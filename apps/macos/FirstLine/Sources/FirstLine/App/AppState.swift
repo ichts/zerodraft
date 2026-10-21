@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
  * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、配置驱动结账与 Waffo 签名 token 持久化
- * [POS]: 试用首个非空输入前持久扣次，当前会话可完成；已有许可记录不可回退试用；完整访问仍须订单号与合法签名 token；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
+ * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；已有许可记录不可回退试用；完整访问仍须订单号与合法签名 token；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -151,9 +151,10 @@ final class AppState {
 
     func prepareSessionInput(isActivity: Bool = false) -> Bool {
         sessionEngine.tick()
-        if sessionEngine.phase == .failure {
+        if sessionEngine.phase == .failure && isActivity {
             startSession(duration: sessionEngine.duration)
         }
+        if sessionEngine.phase == .failure && !isActivity { return selectedSurface == .session }
         guard selectedSurface == .session, sessionIsRunning else { return false }
         if !sessionEngine.hasStarted && !hasFullAccess {
             guard canStartSession else {

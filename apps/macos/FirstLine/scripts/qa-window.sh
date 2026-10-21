@@ -248,10 +248,18 @@ for used in 1 2 3; do
   snap "trial-$used-input" >"$output/trial-input.json"
   [[ "$(draft_value "$output/trial-input.json")" == a ]] || fail 'trial input was blocked'
   # Escape may cancel an active IME composition instead of leaving the room.
-  exit_token="$(token_of "$output/trial-input.json" button 'ESC - EXIT')"
-  cua click "{\"pid\":$pid,\"element_token\":\"$exit_token\"}" >/dev/null
-  snap "trial-$used-exit" >"$output/trial-exit.json"
-  if [[ "$used" != 3 ]]; then
+  if [[ "$used" == 3 ]]; then
+    wait_text last-trial-wiped 'DRAFT DELETED' 'DRAFT DELETED AT ' 16
+    snap last-trial-wiped-full >"$output/last-trial-wiped.json"
+    jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. ACTIVATE TO KEEP WRITING\\.")' >/dev/null "$output/last-trial-wiped.json" \
+      || fail 'last trial wipe must offer activation, not restart'
+    press a
+    snap trial-exhausted-input >"$output/trial-exhausted-input.json"
+    assert_text "$output/trial-exhausted-input.json" 'Activate Write It Down'
+  else
+    exit_token="$(token_of "$output/trial-input.json" button 'ESC - EXIT')"
+    cua click "{\"pid\":$pid,\"element_token\":\"$exit_token\"}" >/dev/null
+    snap "trial-$used-exit" >"$output/trial-exit.json"
     assert_text "$output/trial-exit.json" "Free trial: $((3 - used)) of 3 sessions left."
   fi
 done

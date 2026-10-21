@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
  * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含免费试用会话计数、许可产品身份和签名 token 缓存
- * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；旧 trial 许可状态不授予付费访问，trialSessionsUsed 只提供三次本地会话，不代替许可；写作偏好和 license 数据落盘，正文绝不落盘
+ * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；损坏试用计数单独耗尽而不丢弃许可，旧 trial 许可状态不授予付费访问；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -144,7 +144,10 @@ struct AppSettings: Codable, Equatable {
         focusMode = (try? container.decode(Bool.self, forKey: .focusMode)) ?? false
         writingAlignment = (try? container.decode(WritingAlignment.self, forKey: .writingAlignment)) ?? .centered
         writingFontSize = (try? container.decode(WritingFontSize.self, forKey: .writingFontSize)) ?? .medium
-        trialSessionsUsed = min(Self.trialSessionLimit, max(0, try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0))
+        let trialCount = container.contains(.trialSessionsUsed)
+            ? (try? container.decode(Int.self, forKey: .trialSessionsUsed)) ?? Self.trialSessionLimit
+            : 0
+        trialSessionsUsed = (0...Self.trialSessionLimit).contains(trialCount) ? trialCount : Self.trialSessionLimit
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)

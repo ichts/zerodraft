@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native receipts live in RoomPresentation; check nearest AGENTS.md.
  */
 import AppKit
@@ -396,8 +396,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             announce("Keep typing or the draft is deleted. Three seconds left.")
         }
         if phase == .failure, lastPhase != .failure,
-           let unused = engine.unusedSeconds {
-            announce(RoomPresentation.wipeReport(unused: unused))
+           let elapsed = engine.deletionElapsedSeconds {
+            announce(RoomPresentation.wipeReport(elapsed: elapsed, canRestart: appState.canStartSession))
         }
         if phase == .success, lastPhase != .success {
             announce("Draft kept. Copy your text before closing.")
@@ -412,8 +412,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
         reportLabel.isHidden = phase != .failure
-        if let unused = engine.unusedSeconds, phase == .failure {
-            reportLabel.stringValue = RoomPresentation.wipeReport(unused: unused)
+        if let elapsed = engine.deletionElapsedSeconds, phase == .failure {
+            reportLabel.stringValue = RoomPresentation.wipeReport(elapsed: elapsed, canRestart: appState.canStartSession)
         }
         let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)

@@ -6,7 +6,7 @@ Parent instructions: `../AGENTS.md`
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
-scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
+scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用、末次擦除报告及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
@@ -24,14 +24,14 @@ Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源�
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、非空输入前试用授权、窄/宽纸张固定左起点、短段首行固定及下沿滚动、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；损坏试用计数独立耗尽，不丢弃可解码许可；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，以完整 UUID 作为 service activate 的 installLabel。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation 及激活/校验错误；订单号沿用持久化 licenseKey 字段。
 Sources/FirstLine/Licensing/LicenseClient.swift: activate / token validate / deactivate 及本地 token 校验边界。
 Sources/FirstLine/Licensing/LicenseTokenVerifier.swift: CryptoKit Ed25519 签名及产品/完整设备 UUID/七天有效期校验。
 Sources/FirstLine/Licensing/WaffoLicenseClient.swift: 无状态 URLSession service 客户端，拒绝 redirect；请求及响应见 `docs/LICENSE_PAYMENT_SPEC.md`。
-Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
-Sources/FirstLine/Session/RoomPresentation.swift: 与网站一致的时钟、擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
+Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds 和删除时已过秒数、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
+Sources/FirstLine/Session/RoomPresentation.swift: 时钟、按已过时间与剩余试用/许可分流的擦除报告、保留收据、wash 强度、复制及拒绝反馈状态规则。
 Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）；按窗口内容高度定位书写行及空态文案，托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID 时清空旧视图、原房间 wipe/restart 与 kept/copy；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: 试用耗尽或许可失效后的原生入口；订单号/激活码、结账和完整 writeitdown.app 网页试用链接，价格来自 WIDDisplayPrice；仅配置有效 WIDCheckoutURL 时允许外部浏览器结账；观察异步许可变化并原位更新反馈。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 appearance、motion、focus、alignment、font size、License；观察异步许可变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。

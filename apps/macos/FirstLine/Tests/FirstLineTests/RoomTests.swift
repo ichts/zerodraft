@@ -11,7 +11,8 @@ struct RoomTests {
     }
 
     @Test func wipeReportStatesDeletionAndRestart() {
-        #expect(RoomPresentation.wipeReport(unused: 45) == "DRAFT DELETED AT 0:45. TYPE TO START AGAIN.")
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: true) == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN.")
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: false) == "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
     }
 
     @Test func wipeRearmsClockAndRestoresInputHint() throws {
@@ -29,6 +30,7 @@ struct RoomTests {
         now = 8.1
         room.tick()
         #expect(engine.phase == .failure)
+        #expect(engine.deletionElapsedSeconds == 8)
 
         func fields(_ view: NSView) -> [NSTextField] {
             view.subviews.flatMap { child in
@@ -38,6 +40,7 @@ struct RoomTests {
         let clock = try #require(fields(room.view).first(where: { $0.accessibilityLabel()?.hasPrefix("Time remaining") == true }))
         let hint = try #require(fields(room.view).first(where: { $0.stringValue == "Start typing." }))
         #expect(clock.stringValue == "1:00")
+        #expect(fields(room.view).contains { $0.stringValue == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN." && !$0.isHidden })
         #expect(!hint.isHidden)
     }
 

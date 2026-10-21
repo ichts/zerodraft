@@ -3,6 +3,19 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
+private struct OfflineSignedClient: LicenseClient {
+    let verifier: LicenseTokenVerifier
+    var isConfigured: Bool { true }
+    func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation {
+        throw LicenseActivationError.networkFailure
+    }
+    func validate(token: String) async throws -> String? { throw LicenseValidationError.networkFailure }
+    func deactivate(token: String) async throws { throw LicenseValidationError.networkFailure }
+    func permitsAccess(token: String, instanceID: String, installLabel: String, now: Date) -> Bool {
+        (try? verifier.verify(token, installLabel: installLabel, now: now).activationId) == instanceID
+    }
+}
+
 @MainActor
 struct TrialReleaseTests {
     private func makeState(at root: URL, now: @escaping () -> TimeInterval = { 0 },
@@ -127,6 +140,15 @@ struct TrialReleaseTests {
             #expect(state.sessionEngine.phase == .failure)
             #expect(state.selectedSurface == .session)
             #expect(field.string.isEmpty)
+            field.setMarkedText("", selectedRange: NSRange(location: 0, length: 0),
+                                replacementRange: NSRange(location: NSNotFound, length: 0))
+            field.insertText("", replacementRange: NSRange(location: NSNotFound, length: 0))
+            #expect(state.sessionEngine.phase == .failure)
+            #expect(state.selectedSurface == .session)
+            #expect(state.settings.trialSessionsUsed == used)
+            let expected = used == 3 ? "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING."
+                                     : "DRAFT DELETED AT 0:08. TYPE TO START AGAIN."
+            #expect(descendants(room.view, of: NSTextField.self).contains { $0.stringValue == expected && !$0.isHidden })
         }
         field.insertText("fourth", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(field.string.isEmpty)
@@ -220,16 +242,47 @@ struct TrialReleaseTests {
         #expect(!state.canStartSession)
     }
 
-    @Test(arguments: ["not json", "{\"theme\":\"system\",\"defaultDuration\":60,\"reducedMotion\":\"system\",\"trialSessionsUsed\":\"bad\"}"])
-    func unreadableSettingsDoNotResetTrialBudget(json: String) throws {
+    @Test func unreadableSettingsDoNotResetTrialBudget() throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try Data(json.utf8).write(to: root.appendingPathComponent("settings.json"))
+        try Data("not json".utf8).write(to: root.appendingPathComponent("settings.json"))
         let state = makeState(at: root)
         #expect(state.selectedSurface == .upgrade)
         #expect(state.trialSessionsRemaining == 0)
         #expect(state.accessStatusText.contains("Could not read trial usage"))
+    }
+
+    @Test func corruptTrialCountPreservesOfflineSignedLicense() async throws {
+        let root = tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let fixture = SignedLicenseFixture()
+        let store = SettingsStore(configDirectory: root)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try JSONEncoder().encode(InstallID(uuid: UUID(uuidString: fixture.install)!, createdAt: fixture.now))
+            .write(to: root.appendingPathComponent("install-id.json"))
+        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+                                   licenseKey: "order", licenseStatus: .active, licenseActivatedAt: fixture.now,
+                                   licenseLastValidatedAt: fixture.now, licenseInstanceID: "activation-test",
+                                   licenseProductID: fixture.product, licenseToken: fixture.token()))
+        let file = root.appendingPathComponent("settings.json")
+        var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+        json["trialSessionsUsed"] = "bad"
+        try JSONSerialization.data(withJSONObject: json).write(to: file)
+        let state = AppState(settingsStore: store, licenseClient: OfflineSignedClient(verifier: try fixture.verifier()),
+                             installIDStore: InstallIDStore(configDirectory: root), clock: { fixture.now },
+                             productID: fixture.product)
+        #expect(state.settings.trialSessionsUsed == 3)
+        #expect(state.trialSessionsRemaining == 0)
+        #expect(!state.hasFullAccess)
+        #expect(state.selectedSurface == .upgrade)
+        #expect(await state.validateLicenseIfNeeded() == nil)
+        #expect(state.hasFullAccess)
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let field = try editor(in: room)
+        field.insertText("offline draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.sessionEngine.text == "offline draft")
     }
 
     @Test func activationUnlocksExhaustedTrialWithoutChangingCounterAndRefundNeverRestoresIt() async throws {

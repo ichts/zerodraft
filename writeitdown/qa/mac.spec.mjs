@@ -141,6 +141,9 @@ test('landing keeps Try web primary and offers the Mac app as a secondary coming
   await page.goto('index.html');
   const hero = page.locator('header.hero');
   await expect(hero.locator('h1')).toHaveText('We force you to write it down.');
+  await expect(hero.locator('h1 .hand')).toHaveText('write it down.');
+  await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
+  expect(await page.evaluate(() => [...document.fonts].some(f => f.family.includes('Reenie') && f.status === 'loaded'))).toBe(true);
   await expect(hero.locator('.deck')).toHaveText('Test the free 60-second web room right in your browser.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });

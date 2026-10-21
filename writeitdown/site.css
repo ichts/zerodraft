@@ -1,4 +1,6 @@
 
+/* Reenie Beanie, SIL OFL 1.1 (OFL-ReenieBeanie.txt), self-hosted: the handwritten "write it down." in the H1. */
+@font-face{font-family:'Reenie Beanie';font-style:normal;font-weight:400;font-display:swap;src:url(reenie-beanie.woff2) format('woff2')}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 html.in-trial,html.in-trial body{height:100%;overflow:hidden}
@@ -46,6 +48,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 
 .hero{padding:var(--heroy) var(--gut) 0;display:flex;flex-direction:column;align-items:center;gap:20px}
 .h1{margin:0;font-family:var(--serif);font-weight:500;font-size:var(--h1);line-height:1.04;letter-spacing:-.015em;color:var(--ink);text-wrap:balance;text-align:center;max-width:26ch}
+.h1 .hand{display:block;margin-top:.06em;font-family:'Reenie Beanie',var(--serif);font-weight:400;font-size:min(1.9em,calc((100cqw - 2*var(--gut)) / 4.5));line-height:.8;letter-spacing:0;white-space:nowrap;-webkit-text-stroke:.012em currentColor}
 .deck{margin:0;font-family:var(--serif);font-style:italic;font-weight:400;font-size:var(--deck);line-height:1.45;color:var(--mute);text-align:center;max-width:46ch}
 .door{margin-top:12px;display:inline-flex;align-items:center;justify-content:center;min-height:var(--doorh);padding:0 28px;border:0;border-radius:0;background:var(--ink);color:var(--wall);font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.12em;cursor:pointer;transition:none}
 .door:hover{color:var(--wall)}

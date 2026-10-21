@@ -4,7 +4,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 
 ## Map
 
-- `index.html`: landing and directly addressable `#trial` room. The home-page H1 is locked to `We force you to write it down.` by captain ruling - no copy round may change it; tests assert it verbatim.
+- `index.html`: landing and directly addressable `#trial` room. The home-page H1 is locked to `We force you to write it down.` by captain ruling; its `write it down.` is set in the captain-picked handwriting Reenie Beanie (self-hosted `reenie-beanie.woff2`, SIL OFL in `OFL-ReenieBeanie.txt`, on its own line under 768px) - no copy round may change it; tests assert it verbatim.
 - `site.css`: shared geometry and semantic tokens. Both themes keep paper brighter than wall, including wash and cut.
 - `theme.js`: appearance preference only. System appearance is the default; `writeitdown-theme` is the only localStorage key.
 - `demo.js`: watch-only private messy-draft preview replaying `demo-timeline.mjs` - human-rhythm typing with a visible self-correction and a centered wipe report. Never owns the actual trial; deny feedback fires only in the trial.

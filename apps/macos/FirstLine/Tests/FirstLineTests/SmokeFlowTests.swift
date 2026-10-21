@@ -102,7 +102,7 @@ struct SmokeFlowTests {
         state.startSession()
         #expect(state.sessionEngine.phase == .idle)
         #expect(state.selectedSurface == .upgrade)
-        #expect(state.settings.licenseStatus == .inactive)
+        #expect(state.settings.licenseStatus == .active)
     }
 
     @Test

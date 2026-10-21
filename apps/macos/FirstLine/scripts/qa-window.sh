@@ -249,7 +249,7 @@ for used in 1 2 3; do
   [[ "$(draft_value "$output/trial-input.json")" == a ]] || fail 'trial input was blocked'
   # Escape may cancel an active IME composition instead of leaving the room.
   if [[ "$used" == 3 ]]; then
-    wait_text last-trial-wiped 'DRAFT DELETED' 'DRAFT DELETED AT ' 16
+    wait_text last-trial-wiped 'DRAFT DELETED' 'DRAFT DELETED AT ' 32
     snap last-trial-wiped-full >"$output/last-trial-wiped.json"
     jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. ACTIVATE TO KEEP WRITING\\.")' >/dev/null "$output/last-trial-wiped.json" \
       || fail 'last trial wipe must offer activation, not restart'

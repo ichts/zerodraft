@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
  * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含免费试用会话计数、许可产品身份和签名 token 缓存
- * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；损坏试用计数单独耗尽而不丢弃许可，旧 trial 许可状态不授予付费访问；写作偏好和 license 数据落盘，正文绝不落盘
+ * [POS]: 配置层；合法时长校验、忽略旧解锁标记，保留无 key 的许可状态以阻止回退试用；损坏试用计数单独耗尽而不丢弃许可，旧 trial 许可状态不授予付费访问；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -117,9 +117,6 @@ struct AppSettings: Codable, Equatable {
         self.licenseToken = licenseToken
 
         self.licenseStatus = licenseStatus
-        if licenseStatus == .active && !hasLicenseKey {
-            self.licenseStatus = .inactive
-        }
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -156,9 +153,6 @@ struct AppSettings: Codable, Equatable {
         licenseToken = try container.decodeIfPresent(String.self, forKey: .licenseToken)
 
         licenseStatus = try container.decodeIfPresent(LicenseStatus.self, forKey: .licenseStatus) ?? .inactive
-        if licenseStatus == .active && !hasLicenseKey {
-            licenseStatus = .inactive
-        }
     }
 
     func encode(to encoder: Encoder) throws {

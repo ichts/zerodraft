@@ -24,7 +24,7 @@ Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源�
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、非空输入前试用授权、窄/宽纸张固定左起点、短段首行固定及下沿滚动、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；损坏试用计数独立耗尽，不丢弃可解码许可；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；保留无 key 的许可记录以阻止回退试用，损坏试用计数独立耗尽，不丢弃可解码许可；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，以完整 UUID 作为 service activate 的 installLabel。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation 及激活/校验错误；订单号沿用持久化 licenseKey 字段。
 Sources/FirstLine/Licensing/LicenseClient.swift: activate / token validate / deactivate 及本地 token 校验边界。

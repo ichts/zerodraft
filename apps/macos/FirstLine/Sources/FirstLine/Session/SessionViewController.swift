@@ -284,6 +284,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if !engine.text.isEmpty { textView.loadRestoredText(engine.text) }
         textView.onPrepareInput = { [weak self] isActivity in
             guard let self else { return false }
+            if !isActivity && self.engine.phase == .failure { return true }
             let sessionID = self.engine.sessionID
             let allowed = self.appState.prepareSessionInput(isActivity: isActivity)
             if self.engine.sessionID != sessionID || self.engine.phase == .failure { self.textView.clearWipedText() }

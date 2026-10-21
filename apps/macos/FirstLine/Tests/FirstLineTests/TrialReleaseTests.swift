@@ -140,11 +140,14 @@ struct TrialReleaseTests {
             #expect(state.sessionEngine.phase == .failure)
             #expect(state.selectedSurface == .session)
             #expect(field.string.isEmpty)
+            let wipedSessionID = state.sessionEngine.sessionID
             field.setMarkedText("", selectedRange: NSRange(location: 0, length: 0),
                                 replacementRange: NSRange(location: NSNotFound, length: 0))
             field.insertText("", replacementRange: NSRange(location: NSNotFound, length: 0))
             #expect(state.sessionEngine.phase == .failure)
+            #expect(state.sessionEngine.sessionID == wipedSessionID)
             #expect(state.selectedSurface == .session)
+            #expect(field.string.isEmpty)
             #expect(state.settings.trialSessionsUsed == used)
             let expected = used == 3 ? "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING."
                                      : "DRAFT DELETED AT 0:08. TYPE TO START AGAIN."
@@ -302,6 +305,30 @@ struct TrialReleaseTests {
         state.startSession()
         #expect(state.selectedSurface == .upgrade)
         #expect(makeState(at: root).selectedSurface == .upgrade)
+    }
+
+    @Test func activeFlagWithoutKeyOrTokenNeverRestoresTrialAcrossRestart() throws {
+        let root = tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try Data("""
+            {"theme":"system","defaultDuration":60,"reducedMotion":"system",
+             "trialSessionsUsed":1,"licenseStatus":"active"}
+            """.utf8).write(to: root.appendingPathComponent("settings.json"))
+        for _ in 0..<2 {
+            let state = makeState(at: root)
+            #expect(state.settings.trialSessionsUsed == 1)
+            #expect(state.settings.licenseStatus == .active)
+            #expect(state.trialSessionsRemaining == 0)
+            #expect(!state.hasFullAccess)
+            #expect(state.selectedSurface == .upgrade)
+            state.startSession()
+            state.newPiece()
+            state.openWritingMode()
+            #expect(state.selectedSurface == .upgrade)
+            #expect(state.sessionEngine.phase == .idle)
+            try state.settingsStore.save(state.settings)
+        }
     }
 
     @Test func partialLicenseMetadataDoesNotCreateAFreshTrial() throws {

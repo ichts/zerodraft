@@ -136,7 +136,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .legal .actions .door{margin:0;text-decoration:none}
 .legal .actions .report{margin:0}
 @media(max-width:767px){
-  .h1{--l1-scale:1.1}
+  .h1{--l1-scale:1.2}
   .nav{gap:12px}.foot-links{gap:20px}.foot-links a{min-height:44px;display:flex;align-items:center}
   .room{--room-gut:12px}.writing-area{inset:64px 20px}
   #editor,.kept-text{font-size:21px}

@@ -243,23 +243,34 @@ func (c *callbackCapture) prune(now time.Time) (int, string, error) {
 	if err != nil || info.Mode().Perm() != 0700 {
 		return 0, "", errors.New("capture directory permissions changed")
 	}
-	entries, err := dir.ReadDir(captureCountLimit + 1)
+	entries, err := dir.ReadDir(2*captureCountLimit + 1)
 	if err != nil && err != io.EOF {
 		return 0, "", err
 	}
-	if len(entries) > captureCountLimit {
+	if len(entries) > 2*captureCountLimit {
 		return 0, "", errors.New("capture directory entry limit exceeded")
+	}
+	published := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		_, capture := captureTime(name)
+		pending := strings.HasPrefix(name, ".pending-") && captureID(strings.TrimPrefix(name, ".pending-"))
+		if !entry.IsDir() || (!capture && !pending) {
+			return 0, "", errors.New("unexpected capture directory entry")
+		}
+		if capture {
+			published++
+		}
+	}
+	if published > captureCountLimit {
+		return 0, "", errors.New("capture record limit exceeded")
 	}
 	count, oldest := 0, ""
 	var oldestTime time.Time
 	for _, entry := range entries {
 		name := entry.Name()
 		created, capture := captureTime(name)
-		pending := strings.HasPrefix(name, ".pending-") && captureID(strings.TrimPrefix(name, ".pending-"))
-		if !entry.IsDir() || (!capture && !pending) {
-			return 0, "", errors.New("unexpected capture directory entry")
-		}
-		if pending || !now.Before(created.Add(captureRetention)) {
+		if !capture || !now.Before(created.Add(captureRetention)) {
 			if err := c.root.RemoveAll(name); err != nil {
 				return 0, "", err
 			}

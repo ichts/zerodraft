@@ -244,6 +244,70 @@ func TestCaptureRetentionAndRestart(t *testing.T) {
 	}
 }
 
+func TestCaptureReopensFullArchiveWithOrphanStaging(t *testing.T) {
+	path := captureDirectory(t)
+	var clock atomic.Int64
+	clock.Store(time.Now().UnixNano())
+	now := func() time.Time { return time.Unix(0, clock.Add(1)) }
+	c := startCapture(t, path, now)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/webhooks/waffo", nil)
+	for range captureCountLimit {
+		if err := c.save(r, []byte("published")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	before := capturePaths(t, path)
+	if err := c.close(); err != nil {
+		t.Fatal(err)
+	}
+	unknown := filepath.Join(path, "unrelated")
+	if err := os.Mkdir(unknown, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if reopened, err := openCallbackCapture(path, now); err == nil {
+		reopened.close()
+		t.Fatal("unknown entry accepted at capacity")
+	}
+	if err := os.Remove(unknown); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(path, ".pending-"+strings.Repeat("b", 32))
+	if err := os.Symlink(filepath.Dir(path), link); err != nil {
+		t.Fatal(err)
+	}
+	if reopened, err := openCallbackCapture(path, now); err == nil {
+		reopened.close()
+		t.Fatal("symlink accepted at capacity")
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	orphan := filepath.Join(path, ".pending-"+strings.Repeat("a", 32))
+	if err := os.Mkdir(orphan, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(orphan, "body.bin"), []byte("unfinished"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	c = startCapture(t, path, now)
+	if _, err := os.Lstat(orphan); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("orphan staging survived restart", err)
+	}
+	if len(capturePaths(t, path)) != captureCountLimit {
+		t.Fatal("reopening evicted a published record")
+	}
+	if err := c.save(r, []byte("replacement")); err != nil {
+		t.Fatal(err)
+	}
+	after := capturePaths(t, path)
+	if len(after) != captureCountLimit {
+		t.Fatal("rolling archive exceeded its capacity")
+	}
+	if _, err := os.Stat(before[0]); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("oldest record was not evicted", err)
+	}
+}
+
 func TestCaptureBoundsAndAtomicPublication(t *testing.T) {
 	path := captureDirectory(t)
 	c := startCapture(t, path, time.Now)

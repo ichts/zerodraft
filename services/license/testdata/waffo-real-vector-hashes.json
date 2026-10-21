@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "publicKeyFileSHA256": "a6b522b68490d0ad6c7b9fa173b64c83afd60668ba9b1b83e19761dbe1c986f6",
+  "publicKeySPKISHA256": "e39c3c78806dfc0f56b6debfb1fad650fa341fc671a4fb4900e8e263bbdf914b",
+  "records": [
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "dc0608687044033061b2ad836a6a4437c3768cb400d0a138103a4447d6065076"
+    },
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "3ea1103fd78ed6096664eac034a2d6e613f027b0ff0bb781ee6c574f1c9b18e7"
+    },
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "67499f960fd99f7def84c03eae16e08b96ae51175b64af2895c3b0da17a92993"
+    },
+    {
+      "bodySHA256": "ecbe4613b003c4185a6d6b5dd97a404406137beac1de0b854a7cb771e61a93b8",
+      "metadataSHA256": "c9014f0b275dfccbe86046da4515b4a75a313d0124919d1e90ef85aa18bb3db2"
+    },
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "594d845b7ec4bb2d46724729651bbc9b34bccc87187057b9bac5380fdfac29d8"
+    },
+    {
+      "bodySHA256": "ecbe4613b003c4185a6d6b5dd97a404406137beac1de0b854a7cb771e61a93b8",
+      "metadataSHA256": "137b504520262940b9489ab2ccd1e89ef805e35d60ff953fb1d305d34bba6099"
+    },
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "65049688a16c52ad931422e771416c58de6d4b87f7865489a827d87e761e8890"
+    },
+    {
+      "bodySHA256": "8325a0c7c7c1694fcd734d2b7316fc50e2b4bafebf35d8232d5a820b42f4a1a7",
+      "metadataSHA256": "013e866e36b841a9fe498f16b0e310385005c15e30c1165ffc68a5f3719bc34e"
+    },
+    {
+      "bodySHA256": "ecbe4613b003c4185a6d6b5dd97a404406137beac1de0b854a7cb771e61a93b8",
+      "metadataSHA256": "59a94c65ba0e336e0845eface1d0f50b12fc076a4ec5e35c20ad57665b2ee10d"
+    }
+  ]
+}

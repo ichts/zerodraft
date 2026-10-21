@@ -2,11 +2,9 @@ package main
 
 import (
 	"bytes"
-	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"database/sql"
 	"encoding/base64"
@@ -72,12 +70,7 @@ func (f *fixture) eventInEnvironment(id, typ, environment string) *httptest.Resp
 	f.t.Helper()
 	body := map[string]any{"id": id, "eventType": typ, "environment": environment, "data": map[string]any{"orderId": "ORD_fixture", "productId": "wid-test"}}
 	raw, _ := json.Marshal(body)
-	hash := sha256.Sum256(raw)
-	sig, e := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
-	if e != nil {
-		f.t.Fatal(e)
-	}
-	return f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig))
+	return f.request("/api/v1/webhooks/waffo", body, signedWaffoHeader(f.t, f.signer, raw, f.s.now()))
 }
 func (f *fixture) activate(label, platform string) *httptest.ResponseRecorder {
 	return f.request("/api/v1/licenses/activate", map[string]string{"orderId": "ORD_fixture", "installLabel": label, "platform": platform}, "")
@@ -171,10 +164,9 @@ func TestWebhookSignatureAndReplay(t *testing.T) {
 	expect(t, f.request("/api/v1/webhooks/waffo", body, ""), 401)
 	expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString([]byte("forged"))), 401)
 	raw, _ := json.Marshal(body)
-	hash := sha256.Sum256(raw)
-	sig, _ := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
+	header := signedWaffoHeader(t, f.signer, raw, f.s.now())
 	body["eventType"] = "refund.succeeded"
-	expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), 401)
+	expect(t, f.request("/api/v1/webhooks/waffo", body, header), 401)
 	expect(t, f.eventInEnvironment("production-event", "order.completed", "production"), 401)
 	expect(t, f.event("evt1", "order.completed"), 200)
 	expect(t, f.event("evt1", "order.completed"), 200)
@@ -295,12 +287,7 @@ func TestWebhookRejectsForeignAndUnscopedEvents(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			hash := sha256.Sum256(raw)
-			sig, err := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
-			if err != nil {
-				t.Fatal(err)
-			}
-			expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), http.StatusBadRequest)
+			expect(t, f.request("/api/v1/webhooks/waffo", body, signedWaffoHeader(t, f.signer, raw, f.s.now())), http.StatusBadRequest)
 			var count int
 			if err := f.s.db.QueryRow("SELECT count(*) FROM webhook_events").Scan(&count); err != nil || count != 1 {
 				t.Fatal("foreign or unscoped event reached the event ledger", err)
@@ -315,13 +302,9 @@ func TestWrongProductAndEnvironment(t *testing.T) {
 	expect(t, f.event("evt1", "order.completed"), 200)
 	b := map[string]any{"id": "evt2", "eventType": "order.completed", "environment": "test", "data": map[string]any{"orderId": "ORD_other", "productId": "other"}}
 	raw, _ := json.Marshal(b)
-	h := sha256.Sum256(raw)
-	sig, _ := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, h[:])
-	expect(t, f.request("/api/v1/webhooks/waffo", b, base64.StdEncoding.EncodeToString(sig)), 400)
+	expect(t, f.request("/api/v1/webhooks/waffo", b, signedWaffoHeader(t, f.signer, raw, f.s.now())), 400)
 	b["environment"] = "production"
 	raw, _ = json.Marshal(b)
-	h = sha256.Sum256(raw)
-	sig, _ = rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, h[:])
-	expect(t, f.request("/api/v1/webhooks/waffo", b, base64.StdEncoding.EncodeToString(sig)), 401)
+	expect(t, f.request("/api/v1/webhooks/waffo", b, signedWaffoHeader(t, f.signer, raw, f.s.now())), 401)
 	expect(t, f.activate("install-one", "macos"), 200)
 }

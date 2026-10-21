@@ -244,6 +244,7 @@ test('keyboard reaches email, consent, and submit in order', async ({ page }) =>
 
 test('actual Mac form registers through the Go collector with JS and without JS', async ({ page, browser }) => {
   test.skip(test.info().project.name !== '1440-dark-no-preference', 'one real collector run is enough');
+  test.setTimeout(120000); // A cold Go build shares this budget with both browser submissions.
   const root = mkdtempSync(join(tmpdir(), 'wid-collector-'));
   const binary = join(root, 'collector');
   const build = spawnSync('go', ['build', '-o', binary, '.'], { cwd: '../services/waitlist', encoding: 'utf8' });

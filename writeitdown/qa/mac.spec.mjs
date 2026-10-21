@@ -144,7 +144,12 @@ test('landing keeps Try web primary and offers the Mac app as a secondary coming
   await expect(hero.locator('h1 .hand')).toHaveText('write it down.');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
   expect(await page.evaluate(() => [...document.fonts].some(f => f.family.includes('Reenie') && f.status === 'loaded'))).toBe(true);
-  await expect(hero.locator('.deck')).toHaveText('Test the free 60-second web room right in your browser.');
+  const gap = await hero.evaluate(h => {
+    const hand = h.querySelector('h1 .hand');
+    return (hand.getBoundingClientRect().top - h.querySelector('h1 .l1').getBoundingClientRect().bottom) / parseFloat(getComputedStyle(hand).fontSize);
+  });
+  expect(gap, 'the handwritten line sits clearly apart from line 1').toBeGreaterThanOrEqual(0.2);
+  await expect(hero.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
   await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');

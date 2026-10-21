@@ -178,6 +178,9 @@ func TestCaptureDirectoryConfiguration(t *testing.T) {
 				if err := os.Mkdir(path, 0755); err != nil {
 					t.Fatal(err)
 				}
+				if err := os.Chmod(path, 0755); err != nil {
+					t.Fatal(err)
+				}
 			case "symlink":
 				if err := os.Symlink(t.TempDir(), path); err != nil {
 					t.Fatal(err)

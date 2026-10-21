@@ -2,11 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -14,7 +9,7 @@ import (
 	"testing"
 )
 
-// These events test the local skeleton contract, not the Waffo wire format.
+// Synthetic signed events exercise the provisional license envelope, not provider business mapping.
 func TestHTTPLicenseLifecycle(t *testing.T) {
 	f := setup(t)
 	server := httptest.NewServer(f.s.Handler())
@@ -31,12 +26,7 @@ func TestHTTPLicenseLifecycle(t *testing.T) {
 		}
 		r.Header.Set("Content-Type", "application/json")
 		if signed {
-			hash := sha256.Sum256(raw)
-			sig, err := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
-			if err != nil {
-				t.Fatal(err)
-			}
-			r.Header.Set("X-Waffo-Signature", base64.StdEncoding.EncodeToString(sig))
+			r.Header.Set("X-Waffo-Signature", signedWaffoHeader(t, f.signer, raw, f.s.now()))
 		}
 		response, err := server.Client().Do(r)
 		if err != nil {

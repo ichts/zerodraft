@@ -1,11 +1,10 @@
 // [INPUT] Test-only configuration, pinned callback key, SQLite, optional private capture and HTTP requests.
 // [OUTPUT] Transactional licenses/activations and signed tokens, independent of capture IO.
-// [POS] License domain and provisional callback contract; no provider network calls.
+// [POS] License domain and provisional event mapping; waffo.go authenticates transport.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
 
 import (
-	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
@@ -162,13 +161,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 			log.Print("callback capture failed; verification continues")
 		}
 	}
-	signature, err := base64.StdEncoding.DecodeString(r.Header.Get("X-Waffo-Signature"))
-	if err != nil || len(signature) == 0 {
-		http.Error(w, "invalid signature", 401)
-		return
-	}
-	hash := sha256.Sum256(body)
-	if rsa.VerifyPKCS1v15(s.webhookKey, crypto.SHA256, hash[:], signature) != nil {
+	if !verifyWaffoSignature(s.webhookKey, r.Header.Values("X-Waffo-Signature"), body, s.now()) {
 		http.Error(w, "invalid signature", 401)
 		return
 	}
@@ -187,6 +180,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
+	hash := sha256.Sum256(body)
 	payloadHash := hex.EncodeToString(hash[:])
 	result, err := tx.Exec("INSERT OR IGNORE INTO webhook_events(event_id,event_type,received_at,payload_hash) VALUES (?,?,?,?)", e.ID, e.EventType, s.now().Unix(), payloadHash)
 	if err != nil {

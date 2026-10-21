@@ -31,28 +31,19 @@ func parseWaffoSignature(header string) (waffoSignature, bool) {
 	if len(header) == 0 || len(header) > waffoHeaderLimit || strings.ContainsAny(header, "\r\n") {
 		return result, false
 	}
-	parts := strings.Split(header, ",")
-	if len(parts) != 2 {
+	value, ok := strings.CutPrefix(header, "t=")
+	if !ok {
 		return result, false
 	}
-	params := make(map[string]string, 2)
-	for _, part := range parts {
-		key, value, ok := strings.Cut(part, "=")
-		key, value = strings.Trim(key, " \t"), strings.Trim(value, " \t")
-		if !ok || (key != "t" && key != "v1") || params[key] != "" || value == "" {
-			return result, false
-		}
-		params[key] = value
-	}
-	stamp := params["t"]
-	if len(stamp) == 0 || len(stamp) > 19 || strings.IndexFunc(stamp, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
+	stamp, encoded, ok := strings.Cut(value, ",v1=")
+	if !ok || len(stamp) == 0 || len(stamp) > 19 || stamp[0] == '0' || strings.IndexFunc(stamp, func(r rune) bool { return r < '0' || r > '9' }) >= 0 {
 		return result, false
 	}
 	millis, err := strconv.ParseInt(stamp, 10, 64)
-	if err != nil || millis <= 0 || strings.ContainsAny(params["v1"], " \t") {
+	if err != nil || millis <= 0 {
 		return result, false
 	}
-	signature, err := base64.StdEncoding.Strict().DecodeString(params["v1"])
+	signature, err := base64.StdEncoding.Strict().DecodeString(encoded)
 	if err != nil || len(signature) == 0 {
 		return result, false
 	}

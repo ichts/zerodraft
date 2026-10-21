@@ -251,8 +251,7 @@ for used in 1 2 3; do
   if [[ "$used" == 3 ]]; then
     wait_text last-trial-wiped 'DRAFT DELETED' 'DRAFT DELETED AT ' 32
     snap last-trial-wiped-full >"$output/last-trial-wiped.json"
-    jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. ACTIVATE TO KEEP WRITING\\.")' >/dev/null "$output/last-trial-wiped.json" \
-      || fail 'last trial wipe must offer activation, not restart'
+    assert_text "$output/last-trial-wiped.json" 'DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.'
     press a
     snap trial-exhausted-input >"$output/trial-exhausted-input.json"
     assert_text "$output/trial-exhausted-input.json" 'Activate Write It Down'

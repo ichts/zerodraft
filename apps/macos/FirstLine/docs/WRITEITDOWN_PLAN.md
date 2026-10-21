@@ -178,7 +178,7 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/App/FirstLineMain.swift`, `RootWindowController.swift`, `RootContainerViewController.swift`, `MainMenuBuilder.swift` | They are the AppKit shell. | Names, title, and menus (batches 3 and 5). |
 | `Sources/FirstLine/Licensing/LicenseClient.swift`, `LicenseModels.swift`, `MockLicenseClient.swift` | The paid license flow stays. | Add a live Dodo client (batch 6). |
 | `Sources/FirstLine/Infrastructure/InstallIDStore.swift` | It provides the Dodo activation instance name without hardware IDs. | Rename the root folder (batch 3). |
-| `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the first-launch activation screen. | Order/code entry, configured checkout and the full writeitdown.app web-trial link. |
+| `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the license screen after trial exhaustion or an invalid license record. | Order/code entry, configured checkout and the full writeitdown.app web-trial link; access rules are in `LICENSE_PAYMENT_SPEC.md`. |
 | `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls (batch 5). Duration and silence choices belong only on the start screen. |
 | `Sources/FirstLine/DesignSystem/Colors.swift`, `Typography.swift`, `Spacing.swift`, `FirstLineButtons.swift`, `FloodCanvasView.swift`, `WritingFontCandidate.swift` | They are the design token layer and bundled fonts. | Site tokens (batch 3). |
 | `Sources/FirstLine/Resources/` | It holds Newsreader, IBM Plex Mono, and Zhuque Fangsong, with their OFL texts. | Keep all three. The site uses the first two, and Zhuque covers CJK. |

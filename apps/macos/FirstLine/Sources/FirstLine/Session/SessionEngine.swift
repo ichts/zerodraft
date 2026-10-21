@@ -136,7 +136,9 @@ final class SessionEngine {
         if wipePassed && (!finishPassed || wipe <= finish) ||
             finishPassed && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             unusedSeconds = max(0, Int(ceil(finish - wipe)))
-            deletionElapsedSeconds = max(0, Int(min(duration, (wipePassed ? wipe : finish) - startedAt)))
+            let deletionElapsed = min(duration, (wipePassed ? wipe : finish) - startedAt)
+            // Deadline arithmetic can yield 7.999999999999999 for an exact eight-second wipe.
+            deletionElapsedSeconds = max(0, Int(floor(deletionElapsed + 1e-9)))
             wipedText = text
             text = ""
             wordCount = 0

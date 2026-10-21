@@ -44,6 +44,19 @@ struct RoomTests {
         #expect(!hint.isHidden)
     }
 
+    @Test func wipeReportUsesExactDeadlineDespiteFractionalStart() {
+        var now = 0.7
+        let engine = SessionEngine(now: { now })
+        engine.start(duration: 60)
+        engine.registerCommittedText("a")
+        now = 8.7
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.deletionElapsedSeconds == 8)
+        #expect(RoomPresentation.wipeReport(elapsed: engine.deletionElapsedSeconds ?? -1, canRestart: false) ==
+            "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
+    }
+
     @Test func keptReceiptTextMatchesWeb() {
         #expect(RoomPresentation.keptReceipt(words: 12) == "0:00 - 12 WORDS KEPT.")
         #expect(RoomPresentation.keptReceipt(words: 1) == "0:00 - 1 WORD KEPT.")

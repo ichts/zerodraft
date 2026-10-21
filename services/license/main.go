@@ -1,4 +1,4 @@
-// [INPUT] Environment, restricted key files and process shutdown signals.
+// [INPUT] Environment, restricted key files, optional capture directory and shutdown signals.
 // [OUTPUT] A test-only loopback HTTP server or offline administrative revocation.
 // [POS] Process entry point; deployment configuration stays outside source.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
@@ -86,7 +86,7 @@ func run(args []string) error {
 }
 
 func environmentConfig(dbPath string) (Config, error) {
-	cfg := Config{Database: dbPath, ProductID: os.Getenv("LICENSE_PRODUCT_ID"), Environment: os.Getenv("LICENSE_ENVIRONMENT")}
+	cfg := Config{Database: dbPath, ProductID: os.Getenv("LICENSE_PRODUCT_ID"), Environment: os.Getenv("LICENSE_ENVIRONMENT"), CaptureDirectory: os.Getenv("LICENSE_CALLBACK_CAPTURE_DIR")}
 	if cfg.Environment != "test" {
 		return cfg, errors.New("LICENSE_ENVIRONMENT must be test")
 	}

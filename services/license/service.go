@@ -1,4 +1,4 @@
-// [INPUT] Test-only configuration, pinned callback key, SQLite and local HTTP requests.
+// [INPUT] Test-only configuration, pinned callback key, SQLite, optional private capture and HTTP requests.
 // [OUTPUT] Transactional licenses/activations and signed offline tokens.
 // [POS] License domain and provisional callback contract; no provider network calls.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
@@ -30,6 +30,7 @@ const grace = 7 * 24 * time.Hour
 
 type Config struct {
 	Database, ProductID, Environment string
+	CaptureDirectory                 string
 	TestPublicKey                    []byte
 	TokenKey                         ed25519.PrivateKey
 	TrustLoopbackProxy               bool
@@ -41,6 +42,7 @@ type Server struct {
 	publicKey                   ed25519.PublicKey
 	webhookKey                  *rsa.PublicKey
 	clientLimits, webhookLimits *requestLimits
+	capture                     *callbackCapture
 }
 
 type event struct {
@@ -87,9 +89,20 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 		db.Close()
 		return nil, err
 	}
-	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey), webhookKey: key, clientLimits: newRequestLimits(), webhookLimits: newRequestLimits()}, nil
+	capture, err := openCallbackCapture(cfg.CaptureDirectory, now)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	return &Server{db: db, cfg: cfg, now: now, publicKey: cfg.TokenKey.Public().(ed25519.PublicKey), webhookKey: key, clientLimits: newRequestLimits(), webhookLimits: newRequestLimits(), capture: capture}, nil
 }
-func (s *Server) Close() error { return s.db.Close() }
+func (s *Server) Close() error {
+	var captureErr error
+	if s.capture != nil {
+		captureErr = s.capture.close()
+	}
+	return errors.Join(captureErr, s.db.Close())
+}
 func webhookKey(c Config) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(c.TestPublicKey)
 	if block == nil {
@@ -138,10 +151,16 @@ func respond(w http.ResponseWriter, status int, v any) {
 	json.NewEncoder(w).Encode(v)
 }
 func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, callbackBodyLimit))
 	if err != nil {
 		http.Error(w, "invalid request", 400)
 		return
+	}
+	if s.capture != nil {
+		if err := s.capture.save(r, body); err != nil {
+			http.Error(w, "callback capture unavailable", http.StatusServiceUnavailable)
+			return
+		}
 	}
 	signature, err := base64.StdEncoding.DecodeString(r.Header.Get("X-Waffo-Signature"))
 	if err != nil || len(signature) == 0 {

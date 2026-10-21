@@ -1,0 +1,15 @@
+[Unit]
+Description=Back up Write It Down test license database
+
+[Service]
+Type=oneshot
+User=writeitdown-license
+Group=writeitdown-license
+ExecStart=/bin/sh /opt/writeitdown-license/backup.sh
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadWritePaths=/var/lib/writeitdown-license

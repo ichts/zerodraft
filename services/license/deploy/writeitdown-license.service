@@ -1,0 +1,37 @@
+[Unit]
+Description=Write It Down test-mode license service
+After=network.target
+
+[Service]
+Type=simple
+User=writeitdown-license
+Group=writeitdown-license
+WorkingDirectory=/var/lib/writeitdown-license
+EnvironmentFile=/etc/writeitdown-license/service.env
+ExecStart=/opt/writeitdown-license/license serve
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+UMask=0077
+StateDirectory=writeitdown-license
+StateDirectoryMode=0700
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/writeitdown-license
+MemoryMax=256M
+TasksMax=64
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

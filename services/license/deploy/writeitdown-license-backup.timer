@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Write It Down test license database backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=15m
+Unit=writeitdown-license-backup.service
+
+[Install]
+WantedBy=timers.target

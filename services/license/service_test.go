@@ -99,6 +99,31 @@ func expect(t *testing.T, w *httptest.ResponseRecorder, code int) {
 	}
 }
 
+// This proves opaque credential handling, not what a real Waffo buyer receives.
+func TestActivationRequiresExactOrderCredential(t *testing.T) {
+	f := setup(t)
+	expect(t, f.event("completion", "order.completed"), http.StatusOK)
+	for _, tc := range []struct {
+		credential string
+		status     int
+	}{
+		{"ORD_fixture ", http.StatusForbidden},
+		{"ord_fixture", http.StatusForbidden},
+		{"buyer-number-123", http.StatusForbidden},
+		{"", http.StatusBadRequest},
+		{"ORD_fixture", http.StatusOK},
+	} {
+		response := f.request("/api/v1/licenses/activate", map[string]string{
+			"orderId": tc.credential, "installLabel": "install-one", "platform": "macos",
+		}, "")
+		expect(t, response, tc.status)
+	}
+	var count int
+	if err := f.s.db.QueryRow("SELECT count(*) FROM activations").Scan(&count); err != nil || count != 1 {
+		t.Fatal("only the exact credential should create an activation", err)
+	}
+}
+
 func TestActivationLimitAndReuse(t *testing.T) {
 	f := setup(t)
 	expect(t, f.event("evt1", "order.completed"), 200)
@@ -257,6 +282,31 @@ func TestProductionConfigurationRejected(t *testing.T) {
 	if s, err := Open(cfg, func() time.Time { return f.now }); err == nil {
 		s.Close()
 		t.Fatal("production mode must not open")
+	}
+}
+
+func TestWebhookRejectsForeignAndUnscopedEvents(t *testing.T) {
+	f := setup(t)
+	expect(t, f.event("own-order", "order.completed"), http.StatusOK)
+	for _, typ := range []string{"order.completed", "refund.succeeded"} {
+		for _, product := range []string{"", "other-product"} {
+			body := map[string]any{"id": typ + product, "eventType": typ, "environment": "test", "data": map[string]string{"orderId": "ORD_fixture", "productId": product}}
+			raw, err := json.Marshal(body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			hash := sha256.Sum256(raw)
+			sig, err := rsa.SignPKCS1v15(rand.Reader, f.signer, crypto.SHA256, hash[:])
+			if err != nil {
+				t.Fatal(err)
+			}
+			expect(t, f.request("/api/v1/webhooks/waffo", body, base64.StdEncoding.EncodeToString(sig)), http.StatusBadRequest)
+			var count int
+			if err := f.s.db.QueryRow("SELECT count(*) FROM webhook_events").Scan(&count); err != nil || count != 1 {
+				t.Fatal("foreign or unscoped event reached the event ledger", err)
+			}
+			expect(t, f.activate("install-one", "macos"), http.StatusOK)
+		}
 	}
 }
 

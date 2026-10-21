@@ -6,8 +6,50 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 )
+
+func TestHTTPWaffoSignatureGrammar(t *testing.T) {
+	f := setup(t)
+	server := httptest.NewServer(f.s.Handler())
+	defer server.Close()
+	body := []byte(`{"id":"grammar","eventType":"order.completed","environment":"test","data":{"orderId":"ORD_grammar","productId":"wid-test"}}`)
+	stamp := strconv.FormatInt(f.now.UnixMilli(), 10)
+	canonical := signedWaffoHeaderWithStamp(t, f.signer, body, stamp)
+	signature := strings.TrimPrefix(canonical, "t="+stamp+",v1=")
+	for _, tc := range []struct {
+		name, header string
+		want         int
+	}{
+		{"canonical", canonical, http.StatusOK},
+		{"reversed", "v1=" + signature + ",t=" + stamp, http.StatusUnauthorized},
+		{"whitespace", "t=" + stamp + ", v1=" + signature, http.StatusUnauthorized},
+		{"leading-zero", signedWaffoHeaderWithStamp(t, f.signer, body, "0"+stamp), http.StatusUnauthorized},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, err := http.NewRequest(http.MethodPost, server.URL+"/api/v1/webhooks/waffo", bytes.NewReader(body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("X-Waffo-Signature", tc.header)
+			response, err := server.Client().Do(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			message, err := io.ReadAll(response.Body)
+			if err != nil || response.StatusCode != tc.want {
+				t.Fatalf("callback status = %d, want %d, read error = %v", response.StatusCode, tc.want, err)
+			}
+			if tc.want == http.StatusUnauthorized && strings.TrimSpace(string(message)) != "invalid signature" {
+				t.Fatal("malformed signed header did not fail at signature gate")
+			}
+			t.Logf("POST /api/v1/webhooks/waffo (%s): HTTP %d, response %q", tc.name, response.StatusCode, strings.TrimSpace(string(message)))
+		})
+	}
+}
 
 // Synthetic signed events exercise the provisional license envelope, not provider business mapping.
 func TestHTTPLicenseLifecycle(t *testing.T) {

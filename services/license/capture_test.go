@@ -164,7 +164,7 @@ func TestCaptureDirectoryConfiguration(t *testing.T) {
 	if c, err := openCallbackCapture("", time.Now); err != nil || c != nil {
 		t.Fatal("capture should be disabled by default")
 	}
-	for _, kind := range []string{"relative", "public-parent", "public-directory", "symlink", "file"} {
+	for _, kind := range []string{"relative", "public-parent", "public-directory", "symlink", "parent-symlink", "file"} {
 		t.Run(kind, func(t *testing.T) {
 			path := captureDirectory(t)
 			switch kind {
@@ -182,6 +182,12 @@ func TestCaptureDirectoryConfiguration(t *testing.T) {
 				if err := os.Symlink(t.TempDir(), path); err != nil {
 					t.Fatal(err)
 				}
+			case "parent-symlink":
+				link := filepath.Join(t.TempDir(), "private-link")
+				if err := os.Symlink(filepath.Dir(path), link); err != nil {
+					t.Fatal(err)
+				}
+				path = filepath.Join(link, "captures")
 			case "file":
 				if err := os.WriteFile(path, nil, 0600); err != nil {
 					t.Fatal(err)
@@ -256,6 +262,8 @@ func TestCaptureBoundsAndAtomicPublication(t *testing.T) {
 	body := bytes.Repeat([]byte("x"), callbackBodyLimit)
 	stop := make(chan struct{})
 	observed := make(chan error, 1)
+	firstObserved := make(chan struct{})
+	var observeOnce sync.Once
 	go func() {
 		for {
 			select {
@@ -279,12 +287,13 @@ func TestCaptureBoundsAndAtomicPublication(t *testing.T) {
 					observed <- errors.New("partially published capture observed")
 					return
 				}
+				observeOnce.Do(func() { close(firstObserved) })
 			}
 		}
 	}()
 	var successes atomic.Int64
 	var wg sync.WaitGroup
-	for range captureCountLimit + 8 {
+	for range captureCountLimit {
 		wg.Go(func() {
 			if err := c.save(r, body); err == nil {
 				successes.Add(1)
@@ -292,6 +301,16 @@ func TestCaptureBoundsAndAtomicPublication(t *testing.T) {
 		})
 	}
 	wg.Wait()
+	select {
+	case <-firstObserved:
+	case err := <-observed:
+		close(stop)
+		t.Fatal("capture observer stopped before observing a record", err)
+	case <-time.After(5 * time.Second):
+		close(stop)
+		<-observed
+		t.Fatal("capture observer did not observe a published record")
+	}
 	close(stop)
 	if err := <-observed; err != nil {
 		t.Fatal(err)
@@ -299,8 +318,13 @@ func TestCaptureBoundsAndAtomicPublication(t *testing.T) {
 	if successes.Load() != captureCountLimit || len(capturePaths(t, path)) != captureCountLimit {
 		t.Fatal("concurrent writes violated capture count bound")
 	}
-	if err := c.save(r, body); err == nil {
-		t.Fatal("full archive accepted another capture")
+	for range 8 {
+		if err := c.save(r, body); err != nil {
+			t.Fatal("full archive rejected a new capture", err)
+		}
+	}
+	if len(capturePaths(t, path)) != captureCountLimit {
+		t.Fatal("rolling archive exceeded its capacity")
 	}
 }
 
@@ -311,7 +335,7 @@ func (failingCallbackBody) Read(p []byte) (int, error) {
 	return len("partial"), io.ErrUnexpectedEOF
 }
 
-func TestCaptureHTTPFailuresDoNotAuthorize(t *testing.T) {
+func TestCaptureHTTPFailuresKeepVerificationIndependent(t *testing.T) {
 	f := setup(t)
 	path := captureDirectory(t)
 	var err error
@@ -330,8 +354,8 @@ func TestCaptureHTTPFailuresDoNotAuthorize(t *testing.T) {
 	if err := os.Chmod(path, 0755); err != nil {
 		t.Fatal(err)
 	}
-	expect(t, f.event("capture-storage-failure", "order.completed"), 503)
-	expect(t, f.activate("first-install", "macos"), 403)
+	expect(t, f.event("capture-storage-failure", "order.completed"), 200)
+	expect(t, f.activate("first-install", "macos"), 200)
 	if len(capturePaths(t, path)) != 0 {
 		t.Fatal("unsafe directory received sensitive data")
 	}

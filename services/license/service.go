@@ -1,5 +1,5 @@
 // [INPUT] Test-only configuration, pinned callback key, SQLite, optional private capture and HTTP requests.
-// [OUTPUT] Transactional licenses/activations and signed offline tokens.
+// [OUTPUT] Transactional licenses/activations and signed tokens, independent of capture IO.
 // [POS] License domain and provisional callback contract; no provider network calls.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
@@ -18,6 +18,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"io"
+	"log"
 	"mime"
 	"net/http"
 	"strings"
@@ -158,8 +159,7 @@ func (s *Server) webhook(w http.ResponseWriter, r *http.Request) {
 	}
 	if s.capture != nil {
 		if err := s.capture.save(r, body); err != nil {
-			http.Error(w, "callback capture unavailable", http.StatusServiceUnavailable)
-			return
+			log.Print("callback capture failed; verification continues")
 		}
 	}
 	signature, err := base64.StdEncoding.DecodeString(r.Header.Get("X-Waffo-Signature"))

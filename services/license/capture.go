@@ -1,5 +1,5 @@
 // [INPUT] Opt-in private directory, bounded callback bytes and parsed HTTP headers.
-// [OUTPUT] Atomic private capture directories and expiry cleanup, never authorization.
+// [OUTPUT] Bounded rolling private captures and expiry cleanup, never authorization.
 // [POS] TEST evidence collection before the unchanged provisional webhook verifier.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
@@ -72,7 +72,7 @@ func openCallbackCapture(path string, now func() time.Time) (*callbackCapture, e
 		return nil, errors.New("cannot open capture directory")
 	}
 	c := &callbackCapture{root: root, now: now, stop: make(chan struct{}), done: make(chan struct{})}
-	if _, err := c.prune(now()); err != nil {
+	if _, _, err := c.prune(now()); err != nil {
 		root.Close()
 		return nil, errors.New("cannot initialize capture directory")
 	}
@@ -118,7 +118,7 @@ func (c *callbackCapture) cleanupLoop() {
 func (c *callbackCapture) cleanup() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	_, err := c.prune(c.now())
+	_, _, err := c.prune(c.now())
 	return err
 }
 
@@ -153,12 +153,14 @@ func (c *callbackCapture) save(r *http.Request, body []byte) error {
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	count, err := c.prune(now)
+	count, oldest, err := c.prune(now)
 	if err != nil {
 		return err
 	}
 	if count >= captureCountLimit {
-		return errors.New("capture capacity reached")
+		if err := c.root.RemoveAll(oldest); err != nil {
+			return err
+		}
 	}
 	return c.publish(now, body, metadata)
 }
@@ -231,38 +233,42 @@ func captureTime(name string) (time.Time, bool) {
 
 // The dedicated directory contains only this process's captures. Refuse unknown
 // entries instead of deleting unrelated files or scanning an unbounded directory.
-func (c *callbackCapture) prune(now time.Time) (int, error) {
+func (c *callbackCapture) prune(now time.Time) (int, string, error) {
 	dir, err := c.root.Open(".")
 	if err != nil {
-		return 0, err
+		return 0, "", err
 	}
 	defer dir.Close()
 	info, err := dir.Stat()
 	if err != nil || info.Mode().Perm() != 0700 {
-		return 0, errors.New("capture directory permissions changed")
+		return 0, "", errors.New("capture directory permissions changed")
 	}
 	entries, err := dir.ReadDir(captureCountLimit + 1)
 	if err != nil && err != io.EOF {
-		return 0, err
+		return 0, "", err
 	}
 	if len(entries) > captureCountLimit {
-		return 0, errors.New("capture directory entry limit exceeded")
+		return 0, "", errors.New("capture directory entry limit exceeded")
 	}
-	count := 0
+	count, oldest := 0, ""
+	var oldestTime time.Time
 	for _, entry := range entries {
 		name := entry.Name()
 		created, capture := captureTime(name)
 		pending := strings.HasPrefix(name, ".pending-") && captureID(strings.TrimPrefix(name, ".pending-"))
 		if !entry.IsDir() || (!capture && !pending) {
-			return 0, errors.New("unexpected capture directory entry")
+			return 0, "", errors.New("unexpected capture directory entry")
 		}
 		if pending || !now.Before(created.Add(captureRetention)) {
 			if err := c.root.RemoveAll(name); err != nil {
-				return 0, err
+				return 0, "", err
 			}
 		} else {
 			count++
+			if oldest == "" || created.Before(oldestTime) || created.Equal(oldestTime) && name < oldest {
+				oldest, oldestTime = name, created
+			}
 		}
 	}
-	return count, nil
+	return count, oldest, nil
 }

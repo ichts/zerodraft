@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # [INPUT] Optional screenshot/output directory (default /tmp/wid-qa/cua-<timestamp>);
 #         app under test packaged at WID_APP_OUTPUT or dist/Write It Down.app.
-#         Always activates a copied app through a disposable loopback fixture,
+#         Spends three native trial sessions, then activates a copied app through a disposable loopback fixture,
 #         never a Waffo purchase. WID_QA_LICENSE_ONLY=1 skips motion timing checks.
 #         WID_QA_THEME=light|dark presets appearance only, never entitlement.
 # [OUTPUT] Per-stage screenshots, AX snapshots, app.log, and timing.txt in the
@@ -220,20 +220,46 @@ check_warn_recovery_wipe() {
   snap "$tier-recovered-state" >"$recovered"
   absent_text "$recovered" 'KEEP TYPING OR THE DRAFT IS DELETED.'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
-  wait_text "$tier-wiped" 'DRAFT WIPED' 'DRAFT WIPED - ' "$max"
+  wait_text "$tier-wiped" 'DRAFT DELETED' 'DRAFT DELETED AT ' "$max"
   assert_timing "$tier" wipe "$wipe_start" "$matched_at" "$(awk -v t="$limit" 'BEGIN { print t - 0.5 }')" "$((limit + 3))"
   snap "$tier-wiped-full" >"$wiped"
-  jq -e '.window_markdown | test("DRAFT WIPED - [0-9]+:[0-5][0-9] UNUSED\\. TYPE TO RESTART\\.")' >/dev/null "$wiped" \
+  jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. TYPE TO START AGAIN\\.")' >/dev/null "$wiped" \
     || fail "$tier wipe report is not the literal receipt"
   assert_text "$wiped" '0 WORDS'
+  assert_text "$wiped" '1:00'
+  assert_text "$wiped" 'Start typing.'
   press escape
   snap "$tier-exit" >"$output/$tier-exit.json"
 }
 
-### 1. A fresh install is activation-only, with no native free session.
-snap unactivated >"$output/upgrade.json"
+### 1. Empty rooms cost nothing; each first input spends one of three sessions.
+snap fresh-trial >"$output/fresh-trial.json"
+assert_text "$output/fresh-trial.json" 'Free trial: 3 of 3 sessions left.'
+enter_room "$output/fresh-trial.json"
+snap empty-trial >"$output/empty-trial.json"
+press escape
+snap unspent-trial >"$output/unspent-trial.json"
+assert_text "$output/unspent-trial.json" 'Free trial: 3 of 3 sessions left.'
+for used in 1 2 3; do
+  snap "trial-$used-home" >"$output/trial-home.json"
+  enter_room "$output/trial-home.json"
+  snap "trial-$used-room" >"$output/trial-room.json"
+  press a
+  snap "trial-$used-input" >"$output/trial-input.json"
+  [[ "$(draft_value "$output/trial-input.json")" == a ]] || fail 'trial input was blocked'
+  # Escape may cancel an active IME composition instead of leaving the room.
+  exit_token="$(token_of "$output/trial-input.json" button 'ESC - EXIT')"
+  cua click "{\"pid\":$pid,\"element_token\":\"$exit_token\"}" >/dev/null
+  snap "trial-$used-exit" >"$output/trial-exit.json"
+  if [[ "$used" != 3 ]]; then
+    assert_text "$output/trial-exit.json" "Free trial: $((3 - used)) of 3 sessions left."
+  fi
+done
+kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
+launch_app
+snap trial-exhausted-restart >"$output/upgrade.json"
 assert_text "$output/upgrade.json" 'Activate Write It Down'
-assert_text "$output/upgrade.json" 'A license is required to write on this Mac.'
+assert_text "$output/upgrade.json" 'After 3 free sessions, a license is required to keep writing.'
 assert_text "$output/upgrade.json" 'Try the full web app at writeitdown.app'
 absent_text "$output/upgrade.json" 'Back to Home'
 absent_text "$output/upgrade.json" 'Start typing.'
@@ -349,10 +375,10 @@ wait "$pid" 2>/dev/null || true
 pid=''
 settings="$qa_home/Library/Application Support/WriteItDown/Config/settings.json"
 [[ -f "$settings" ]] || fail 'settings.json missing in the isolated home'
-jq -e '.licenseStatus == "revoked" and (has("trialSessionsUsed") | not)' "$settings" >/dev/null \
-  || fail 'refunded settings must be revoked with no trial counter'
+jq -e '.licenseStatus == "revoked" and .trialSessionsUsed == 3' "$settings" >/dev/null \
+  || fail 'refunded settings must remain revoked with the exhausted trial counter'
 
-timing_summary='activation-first synthetic fixture; no native trial; motion timing not exercised'
+timing_summary='three-session trial, signed activation, offline and refund fixture; motion timing not exercised'
 if [[ "$license_only" != 1 ]]; then
   timing_summary="$(awk '{printf "%s%s %s", (NR > 1 ? ", " : ""), $1, $2 "=" $3} END {print ""}' "$output/timing.txt")"
 fi

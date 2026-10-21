@@ -10,8 +10,35 @@ struct RoomTests {
         #expect(RoomPresentation.clock(0) == "0:00")
     }
 
-    @Test func wipeReportTextMatchesWeb() {
-        #expect(RoomPresentation.wipeReport(unused: 45) == "DRAFT WIPED - 0:45 UNUSED. TYPE TO RESTART.")
+    @Test func wipeReportStatesDeletionAndRestart() {
+        #expect(RoomPresentation.wipeReport(unused: 45) == "DRAFT DELETED AT 0:45. TYPE TO START AGAIN.")
+    }
+
+    @Test func wipeRearmsClockAndRestoresInputHint() throws {
+        var now = 0.0
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine(now: { now })
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root))
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        _ = room.view
+        engine.registerCommittedText("one sentence")
+        now = 7
+        room.tick()
+        now = 8.1
+        room.tick()
+        #expect(engine.phase == .failure)
+
+        func fields(_ view: NSView) -> [NSTextField] {
+            view.subviews.flatMap { child in
+                ((child as? NSTextField).map { [$0] } ?? []) + fields(child)
+            }
+        }
+        let clock = try #require(fields(room.view).first(where: { $0.accessibilityLabel()?.hasPrefix("Time remaining") == true }))
+        let hint = try #require(fields(room.view).first(where: { $0.stringValue == "Start typing." }))
+        #expect(clock.stringValue == "1:00")
+        #expect(!hint.isHidden)
     }
 
     @Test func keptReceiptTextMatchesWeb() {

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置
+ * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -78,12 +78,12 @@ extension FirstLineAppDelegate: NSMenuItemValidation {
         case #selector(copyKept):
             return appState.sessionEngine.phase == .success && appState.selectedSurface == .session
         case #selector(openSettings), #selector(newPiece):
-            return appState.hasFullAccess
+            return appState.canUseApp
         case #selector(closeWindow):
             return true
         case #selector(openWriting), #selector(goHome):
             // success 阶段锁定导航（复刻原 SwiftUI .disabled 语义）。
-            return appState.hasFullAccess && appState.sessionEngine.phase != .success
+            return appState.canUseApp && appState.sessionEngine.phase != .success
         default:
             return true
         }

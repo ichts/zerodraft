@@ -12,7 +12,7 @@ enum RoomPresentation {
     }
 
     static func wipeReport(unused: Int) -> String {
-        "DRAFT WIPED - \(clock(unused)) UNUSED. TYPE TO RESTART."
+        "DRAFT DELETED AT \(clock(unused)). TYPE TO START AGAIN."
     }
 
     static func wordLabel(_ count: Int) -> String {

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, live license feedback
+ * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, live trial count and license feedback
  * [POS]: AppKit Settings surface; live visual preferences do not reset engine, Done restores prior surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -84,7 +84,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func licenseRows() -> [NSView] {
-        licenseStatusLabel = muted(appState.licenseStatusText)
+        licenseStatusLabel = muted(appState.accessStatusText)
         licenseCleanupWarningLabel = muted("")
         licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 640).isActive = true
         var rows: [NSView] = [licenseStatusLabel, licenseCleanupWarningLabel]
@@ -124,7 +124,7 @@ final class SettingsViewController: NSViewController {
     private func refreshLicense() {
         let active = appState.hasFullAccess
         licenseStatusLabel.stringValue = active ? appState.licenseStatusText :
-            (appState.licenseActivationError?.errorDescription ?? appState.licenseStatusText)
+            (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText)
         licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
         licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
         let values = [

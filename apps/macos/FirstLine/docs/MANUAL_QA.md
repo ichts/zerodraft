@@ -2,7 +2,24 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
-## 2026-10-18 UTC: activation-first, paid-only reversal
+## 2026-10-21: Mac-only three-session trial before signed activation
+
+This supersedes the paid-only policy below. The site is unchanged. Only Mac trial behavior and the typing-origin/wipe-reset fix were ported from the free-trial branch; no release-mode switch, trial-ended controller, icon, DMG or website redesign was carried.
+
+- Smallest safe design: `AppState` shares one trial-or-license gate across navigation, menus and first input. `SettingsStore` saves one of three usages before accepting the first nonempty committed text or IME activity, once per session. Empty rooms and blocked actions do not spend a session. Failed persistence rejects input with a visible error. Existing license records cannot fall back to a trial. `hasFullAccess`, the Waffo client, signed-token verification, activation rollback and refund handling are unchanged. The existing activation controller follows exhaustion; no second payment path was introduced.
+- `swift build && swift test`: passed, 195 tests in 16 suites. Added real AppKit editor coverage for trial consumption, composition, exhaustion/restart, last-session danger recovery and completion, Settings round trips across the final wipe/completion, persistence failure, corrupt usage, activation and refund denial. Imported geometry tests first failed against the baseline's moving/centered writing origin, then passed with the fixed left origin and bottom-edge scrolling. The wipe clock and input hint now rearm in the same room.
+- `WID_QA_LICENSE_ONLY=1 WID_QA_THEME=light scripts/qa-window.sh <output>`: passed, 28 captured stages. The same command with `WID_QA_THEME=dark`: passed, 28 stages. Both package an ad-hoc app, use an isolated home and a disposable loopback signing fixture, and prove an empty room costs nothing, three real-input sessions spend the budget, exhaustion survives restart, fixture activation opens the editor, offline validation retains access and an explicit refund blocks access without restoring the budget. They do not prove a genuine Waffo purchase. Evidence is local and ignored under `dist/mac-trial-pr/final-license-light/` and `dist/mac-trial-pr/final-license-dark/`.
+- All captured light/dark screenshots were inspected. Trial counts, exhausted activation, licensed Home/editor, offline and refunded states fit the existing native layout; focus remains visible. On the first light run, Escape cancelled active composition rather than exiting, so the scripted trial uses the explicit EXIT button. This is not a Japanese IME acceptance result.
+- `shellcheck scripts/qa-window.sh`, `bash -n scripts/qa-window.sh`, `go vet scripts/qa-license-fixture.go`, `plutil -lint Sources/FirstLine/Info.plist` and `git diff --check`: passed. Existing selector-construction warnings also occur in the untouched baseline; no new compiler error or test failure remains.
+- User-visible changes are present: Home and Settings show trial sessions remaining, trial exhaustion opens the existing activation page with post-trial copy, paper width labels read Narrow/Wide paper, and the writing origin/wipe reset are corrected. This is not a no-UI-change merge candidate.
+- Unverified release prerequisites: real Waffo test purchase, signed callback, buyer-visible credential activation and refund trace. Checkout URL, service URL, product ID and public key remain empty. No DMG build, upload, deployment or merge was performed. Full timing-sensitive real-window warn/recovery/wipe/kept-copy and Settings inspection were not run in this license-only pass; deterministic engine and AppKit view tests cover those paths but are not independent real-window acceptance.
+
+Bounded follow-ups, not claimed fixed here:
+
+- [ ] Reproduce and classify the prior RC report's 5/1077 per-key frame-match misses using an independent native capture run. This port does not remeasure or claim to eliminate those misses.
+- [ ] Run real Japanese IME candidate selection, commit, cancellation, first-input trial charge, warning recovery and wipe/restart in a signed app. Direct `setMarkedText` tests and synthetic key delivery do not prove this.
+
+## 2026-10-18 UTC: activation-first, paid-only reversal (historical)
 
 This supersedes the native three-session trial in the earlier record below. Price remains USD $4.99 once; signature checks, two installations and seven-day offline grace are unchanged.
 

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含许可产品身份和签名 token 缓存，忽略旧试用计数
- * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；旧 trial 状态与计数不授予访问；写作偏好和 license 数据落盘，正文绝不落盘
+ * [OUTPUT]: AppSettings、时长/静默限额及外观/专注/排印选择、SettingsStore；含免费试用会话计数、许可产品身份和签名 token 缓存
+ * [POS]: 配置层；合法时长校验、忽略旧解锁标记，无非空白 key 的 active 降为 inactive；旧 trial 许可状态不授予付费访问，trialSessionsUsed 只提供三次本地会话，不代替许可；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -44,7 +44,7 @@ enum SilenceLimit: Int, Codable, CaseIterable {
 
 enum WritingAlignment: String, Codable, CaseIterable {
     case centered, left
-    var label: String { self == .centered ? "Centered narrow" : "Left wide" }
+    var label: String { self == .centered ? "Narrow paper" : "Wide paper" }
 }
 
 enum WritingFontSize: String, Codable, CaseIterable {
@@ -60,6 +60,7 @@ enum WritingFontSize: String, Codable, CaseIterable {
 }
 
 struct AppSettings: Codable, Equatable {
+    static let trialSessionLimit = 3
     var theme: AppTheme
     var defaultDuration: TimeInterval
     var reducedMotion: ReducedMotionOverride
@@ -67,6 +68,8 @@ struct AppSettings: Codable, Equatable {
     var focusMode: Bool
     var writingAlignment: WritingAlignment
     var writingFontSize: WritingFontSize
+    /// First nonempty input spends a session; licensed sessions leave this unchanged.
+    var trialSessionsUsed: Int
 
     /// licenseKey 保留历史字段名，当前保存 Waffo 订单号；无 token 的旧缓存不授予访问。
     var licenseKey: String?
@@ -89,6 +92,7 @@ struct AppSettings: Codable, Equatable {
         focusMode: Bool = false,
         writingAlignment: WritingAlignment = .centered,
         writingFontSize: WritingFontSize = .medium,
+        trialSessionsUsed: Int = 0,
         licenseKey: String? = nil,
         licenseStatus: LicenseStatus = .inactive,
         licenseActivatedAt: Date? = nil,
@@ -104,6 +108,7 @@ struct AppSettings: Codable, Equatable {
         self.focusMode = focusMode
         self.writingAlignment = writingAlignment
         self.writingFontSize = writingFontSize
+        self.trialSessionsUsed = min(Self.trialSessionLimit, max(0, trialSessionsUsed))
         self.licenseKey = licenseKey
         self.licenseActivatedAt = licenseActivatedAt
         self.licenseLastValidatedAt = licenseLastValidatedAt
@@ -121,7 +126,7 @@ struct AppSettings: Codable, Equatable {
         case theme
         case defaultDuration
         case reducedMotion
-        case silenceLimit, focusMode, writingAlignment, writingFontSize
+        case silenceLimit, focusMode, writingAlignment, writingFontSize, trialSessionsUsed
         case licenseKey
         case licenseStatus
         case licenseActivatedAt
@@ -139,6 +144,7 @@ struct AppSettings: Codable, Equatable {
         focusMode = (try? container.decode(Bool.self, forKey: .focusMode)) ?? false
         writingAlignment = (try? container.decode(WritingAlignment.self, forKey: .writingAlignment)) ?? .centered
         writingFontSize = (try? container.decode(WritingFontSize.self, forKey: .writingFontSize)) ?? .medium
+        trialSessionsUsed = min(Self.trialSessionLimit, max(0, try container.decodeIfPresent(Int.self, forKey: .trialSessionsUsed) ?? 0))
         licenseKey = try container.decodeIfPresent(String.self, forKey: .licenseKey)
         licenseActivatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseActivatedAt)
         licenseLastValidatedAt = try container.decodeIfPresent(Date.self, forKey: .licenseLastValidatedAt)
@@ -161,6 +167,7 @@ struct AppSettings: Codable, Equatable {
         try container.encode(focusMode, forKey: .focusMode)
         try container.encode(writingAlignment, forKey: .writingAlignment)
         try container.encode(writingFontSize, forKey: .writingFontSize)
+        try container.encode(trialSessionsUsed, forKey: .trialSessionsUsed)
         try container.encodeIfPresent(licenseKey, forKey: .licenseKey)
         try container.encode(licenseStatus, forKey: .licenseStatus)
         try container.encodeIfPresent(licenseActivatedAt, forKey: .licenseActivatedAt)

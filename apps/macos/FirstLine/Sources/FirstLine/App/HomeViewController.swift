@@ -1,5 +1,5 @@
 /*
- * [INPUT]: AppState choices, observable license status and AppKit button focus.
+ * [INPUT]: AppState choices, observable access status (free-trial count or license) and AppKit button focus.
  * [OUTPUT]: Cursor-ready, direct-start duration row and fixed silence choices.
  * [POS]: Pre-writing surface; selection persists before a session begins, no marketing copy.
  * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
@@ -54,7 +54,7 @@ final class HomeViewController: NSViewController {
             silenceButtons.append(button)
             return button
         })
-        let status = caption(appState.licenseStatusText)
+        let status = caption(appState.accessStatusText)
         statusLabel = status
         let stack = NSStackView(views: [title, durationTitle, durationRow, silenceTitle, silenceRow, status])
         stack.orientation = .vertical
@@ -78,7 +78,7 @@ final class HomeViewController: NSViewController {
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.statusLabel.stringValue = self.appState.licenseStatusText
+                self.statusLabel.stringValue = self.appState.accessStatusText
                 self.armLicenseObservation()
             }
         }

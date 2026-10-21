@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state and DesignSystem tokens
- * [OUTPUT]: UpgradeViewController - activation-first access screen and live license activation feedback
+ * [OUTPUT]: UpgradeViewController - post-trial access screen and live license activation feedback
  * [POS]: writeitdown AppKit license gate; uses configured price and checkout via AppState
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -41,7 +41,7 @@ final class UpgradeViewController: NSViewController {
 
     private func buildInterface() {
         let title = label("Activate Write It Down", font: FirstLineTypography.titleNSFont, color: FirstLineColors.inkNSColor)
-        let subtitle = label("A license is required to write on this Mac.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
+        let subtitle = label("After 3 free sessions, a license is required to keep writing.", font: FirstLineTypography.taglineNSFont, color: FirstLineColors.uiNSColor)
         let pricing = label("One payment. 2 Macs. 14-day refund.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.uiNSColor)
 
         licenseField = NSTextField(string: "")
@@ -95,10 +95,10 @@ final class UpgradeViewController: NSViewController {
                 feedbackLabel.stringValue += "\n\(LicenseActivationError.cleanupFailure.errorDescription ?? "")"
             }
         } else {
-            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.licenseStatusText
+            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
         }
         feedbackLabel.isHidden = !active && appState.licenseActivationError == nil &&
-            appState.settings.licenseStatus == .inactive
+            appState.settings.licenseStatus == .inactive && appState.trialAccessError == nil
     }
 
     private func armLicenseObservation() {
@@ -108,6 +108,7 @@ final class UpgradeViewController: NSViewController {
             _ = self.appState.licenseActivationInFlight
             _ = self.appState.licenseActivationError
             _ = self.appState.settings
+            _ = self.appState.trialAccessError
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }

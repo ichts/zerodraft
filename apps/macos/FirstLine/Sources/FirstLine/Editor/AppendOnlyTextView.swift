@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 安全、字号及偏上位置的居中/左对齐写作带与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 安全、字号及窄/宽纸张的固定左起点、短段固定首行/临近下沿才滚动与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -9,7 +9,8 @@ import AppKit
 import CoreText
 
 final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDelegate {
-    var onPrepareInput: (() -> Bool)?
+    /// The flag marks nonempty committed text or composition activity for trial reservation.
+    var onPrepareInput: ((Bool) -> Bool)?
     var onCommittedText: ((String) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
@@ -65,8 +66,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let hadMarkedText = hasMarkedText()
-        guard isRestoringProgrammatically || (onPrepareInput?() ?? true) else { return }
-        if !isRestoringProgrammatically && plainString(from: string).isEmpty == false {
+        let isActivity = !plainString(from: string).isEmpty
+        guard isRestoringProgrammatically || (onPrepareInput?(isActivity) ?? true) else { return }
+        if !isRestoringProgrammatically && isActivity {
             onMarkedTextActivity?()
         }
 
@@ -88,7 +90,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
 
         if !isUpdatingMarkedText && !isRestoringProgrammatically {
-            guard onPrepareInput?() ?? true else { return }
+            guard onPrepareInput?(!inserted.isEmpty) ?? true else { return }
         }
         let end = NSRange(location: utf16Length, length: 0)
         if isMarkedCommit && hasMarkedText() {
@@ -369,7 +371,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        self.alignment = alignment == .centered ? .center : .left
+        self.alignment = .left
         layoutManager?.delegate = self
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
@@ -436,9 +438,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
+        let initialY = round(textContainerOrigin.y + firstLineInkCenter() - compositionAnchorY)
         let targetY = max(
-            -scrollView.contentInsets.top,
-            round(textContainerOrigin.y + compositionLineCenter(in: line) - compositionAnchorY)
+            -scrollView.contentInsets.top, initialY,
+            ceil(textContainerOrigin.y + line.maxY - scrollView.contentView.bounds.height + 40)
         )
         guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
@@ -455,19 +458,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
     }
 
-    private func compositionLineCenter(in line: NSRect) -> CGFloat {
-        guard !string.isEmpty, string.last != "\n", let layoutManager else { return line.midY }
-        let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
-        var glyphs = NSRange()
-        layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: &glyphs)
-        let characters = layoutManager.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
-        let lineText = (string as NSString).substring(with: characters)
-        guard let scalar = lineText.unicodeScalars.first(where: { !CharacterSet.whitespacesAndNewlines.contains($0) }),
-              let font = font(for: scalar),
-              let ink = glyphMetrics(for: scalar, font: font)?.bounds else {
-            return line.midY
+    private func firstLineInkCenter() -> CGFloat {
+        guard !string.isEmpty, let layoutManager, let textContainer else {
+            return layoutManager?.extraLineFragmentRect.midY ?? 0
         }
-        return line.minY + layoutManager.location(forGlyphAt: glyph).y - ink.midY
+        layoutManager.ensureLayout(for: textContainer)
+        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
+        guard let scalar = string.unicodeScalars.first,
+              let font = font(for: scalar),
+              let ink = glyphMetrics(for: scalar, font: font)?.bounds else { return line.midY }
+        return line.minY + layoutManager.location(forGlyphAt: 0).y - ink.midY
     }
 
     func clearPendingCompositionRefresh() {
@@ -649,7 +649,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = writingAlignment == .centered ? .center : .left
+        paragraph.alignment = .left
         paragraph.lineHeightMultiple = 1.45
         paragraph.lineSpacing = 0
         return paragraph

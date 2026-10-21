@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
- * [OUTPUT]: 提供 Surface 枚举与 AppState 状态容器，activation-first 入口、配置驱动结账与 Waffo 签名 token 持久化
- * [POS]: 导航及付费许可门槛；active 必须有订单号及合法签名 token，满足产品/设备/实例/时限门槛；Home/Exit 清空运行中草稿，锁定运行中的时长/静默阈值，Settings 返回原 surface
+ * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、配置驱动结账与 Waffo 签名 token 持久化
+ * [POS]: 试用首个非空输入前持久扣次，当前会话可完成；已有许可记录不可回退试用；完整访问仍须订单号与合法签名 token；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -22,6 +22,7 @@ enum Surface: String, CaseIterable, Hashable, Identifiable {
 @MainActor
 @Observable
 final class AppState {
+    static let trialSessionLimit = AppSettings.trialSessionLimit
     static let configurationURL = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         .deletingLastPathComponent().appendingPathComponent("Info.plist")
     private static var configuration: [String: Any] {
@@ -60,6 +61,32 @@ final class AppState {
     private(set) var licenseValidationInFlight = false
     private var activationRevision = 0
     private var validationRevision = 0
+    private var chargedTrialSessionID: UUID?
+    private(set) var trialAccessError: String?
+
+    /// A local trial budget is not a license. Cached or revoked licenses never fall back to it.
+    var trialSessionsRemaining: Int {
+        guard trialAccessError == nil, licenseActivationError != .cleanupFailure,
+              settings.licenseStatus == .inactive,
+              !settings.hasLicenseKey, settings.licenseToken == nil,
+              settings.licenseInstanceID == nil, settings.licenseProductID == nil,
+              settings.licenseActivatedAt == nil, settings.licenseLastValidatedAt == nil else { return 0 }
+        return max(0, Self.trialSessionLimit - settings.trialSessionsUsed)
+    }
+
+    var canStartSession: Bool { hasFullAccess || trialSessionsRemaining > 0 }
+    var canUseApp: Bool {
+        canStartSession || (chargedTrialSessionID == sessionEngine.sessionID && sessionEngine.hasStarted)
+    }
+
+    var accessStatusText: String {
+        if hasFullAccess { return licenseStatusText }
+        if let trialAccessError { return trialAccessError }
+        if trialSessionsRemaining > 0 {
+            return "Free trial: \(trialSessionsRemaining) of \(Self.trialSessionLimit) sessions left."
+        }
+        return licenseStatusText
+    }
 
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active, settings.hasLicenseKey else { return false }
@@ -89,7 +116,13 @@ final class AppState {
         self.productID = productID
         self.openExternalURL = openExternalURL
         self.installLabel = installIDStore.loadOrCreate().uuid.uuidString
-        self.settings = (try? settingsStore.load()) ?? .defaultValue
+        do {
+            self.settings = try settingsStore.load()
+        } catch {
+            self.settings = .defaultValue
+            self.settings.trialSessionsUsed = Self.trialSessionLimit
+            self.trialAccessError = "Could not read trial usage. Check access to the app's settings and reopen the app."
+        }
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
             settings.hasLicenseKey && settings.licenseInstanceID != nil
         self.selectedDuration = settings.defaultDuration
@@ -106,7 +139,7 @@ final class AppState {
 
     func startSession(duration: TimeInterval? = nil) {
         guard sessionEngine.phase != .success && !sessionIsRunning else { return }
-        guard hasFullAccess else {
+        guard canStartSession else {
             selectedSurface = .upgrade
             return
         }
@@ -116,26 +149,47 @@ final class AppState {
         selectedSurface = .session
     }
 
-    func prepareSessionInput() -> Bool {
+    func prepareSessionInput(isActivity: Bool = false) -> Bool {
         sessionEngine.tick()
+        if sessionEngine.phase == .failure {
+            startSession(duration: sessionEngine.duration)
+        }
+        guard selectedSurface == .session, sessionIsRunning else { return false }
         if !sessionEngine.hasStarted && !hasFullAccess {
+            guard canStartSession else {
+                sessionEngine.abandon()
+                selectedSurface = .upgrade
+                return false
+            }
+            if isActivity && !chargeTrialSession() { return false }
+        }
+        return true
+    }
+
+    /// Reserve once before TextKit accepts the first committed or marked text.
+    private func chargeTrialSession() -> Bool {
+        guard chargedTrialSessionID != sessionEngine.sessionID else { return true }
+        let previous = settings
+        settings.trialSessionsUsed += 1
+        do {
+            try persistSettingsThrowing()
+            chargedTrialSessionID = sessionEngine.sessionID
+            return true
+        } catch {
+            settings = previous
+            trialAccessError = "Could not save trial usage. Check access to the app's settings and reopen the app."
             sessionEngine.abandon()
             selectedSurface = .upgrade
             return false
         }
-        if sessionEngine.phase == .failure {
-            startSession(duration: sessionEngine.duration)
-        }
-        return selectedSurface == .session &&
-            (sessionEngine.phase == .writing || sessionEngine.phase == .danger)
     }
 
     func goHome() {
         guard sessionEngine.phase != .success else { return }
-        if sessionIsRunning {
+        if sessionIsRunning || sessionEngine.phase == .failure {
             abandonSession()
         } else {
-            selectedSurface = hasFullAccess ? .home : .upgrade
+            selectedSurface = canUseApp ? .home : .upgrade
         }
     }
 
@@ -149,7 +203,7 @@ final class AppState {
     }
 
     func openSettings() {
-        guard hasFullAccess else {
+        guard canUseApp else {
             if !sessionEngine.hasStarted { selectedSurface = .upgrade }
             return
         }
@@ -160,12 +214,12 @@ final class AppState {
 
     func closeSettings() {
         sessionEngine.tick()
-        selectedSurface = hasFullAccess ? surfaceBeforeSettings : .upgrade
+        selectedSurface = canUseApp ? surfaceBeforeSettings : .upgrade
     }
 
     func abandonSession() {
         sessionEngine.abandon()
-        selectedSurface = hasFullAccess ? .home : .upgrade
+        selectedSurface = canUseApp ? .home : .upgrade
     }
 
     func handleTick() {
@@ -433,11 +487,11 @@ final class AppState {
     private var previousEnginePhase: SessionPhase = .idle
 
     private func launchInitialSurface() {
-        selectedSurface = hasFullAccess ? .home : .upgrade
+        selectedSurface = canUseApp ? .home : .upgrade
     }
 
     var canNavigateToSupportSurface: Bool {
-        guard hasFullAccess else { return false }
+        guard canUseApp else { return false }
         switch sessionEngine.phase {
         case .idle, .failure:
             return true

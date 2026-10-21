@@ -1,6 +1,6 @@
 # Test deployment preparation
 
-These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. The client is a free download with three trial sessions; its paid unlock depends on the verified Waffo path. That priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
+These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment
 

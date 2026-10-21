@@ -256,7 +256,8 @@ struct TrialReleaseTests {
         #expect(state.accessStatusText.contains("Could not read trial usage"))
     }
 
-    @Test func corruptTrialCountPreservesOfflineSignedLicense() async throws {
+    @Test(arguments: [false, true])
+    func corruptTrialCountPreservesOfflineSignedLicense(negativeCounter: Bool) async throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let fixture = SignedLicenseFixture()
@@ -271,6 +272,7 @@ struct TrialReleaseTests {
         let file = root.appendingPathComponent("settings.json")
         var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
         json["trialSessionsUsed"] = "bad"
+        if negativeCounter { json["trialSessionsUsed"] = -1 }
         try JSONSerialization.data(withJSONObject: json).write(to: file)
         let state = AppState(settingsStore: store, licenseClient: OfflineSignedClient(verifier: try fixture.verifier()),
                              installIDStore: InstallIDStore(configDirectory: root), clock: { fixture.now },

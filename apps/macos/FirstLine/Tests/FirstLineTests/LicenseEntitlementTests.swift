@@ -109,6 +109,8 @@ struct LicenseEntitlementTests {
 
     @Test(arguments: [-1, 0, 1, 2, 3, 99])
     func legacyTrialBudgetIsRetainedButUnlockFlagCannotGrantALicense(used: Int) throws {
+        let limit = AppState.trialSessionLimit
+        let expectedUsed = (0...limit).contains(used) ? used : limit
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -122,12 +124,12 @@ struct LicenseEntitlementTests {
             #expect(state.settings.reducedMotion == .always)
             #expect(state.settings.licenseStatus == .inactive)
             #expect(!state.hasFullAccess)
-            #expect(state.trialSessionsRemaining == max(0, 3 - max(0, used)))
-            if used >= 3 { assertLocked(state) }
+            #expect(state.trialSessionsRemaining == limit - expectedUsed)
+            if expectedUsed == limit { assertLocked(state) }
             try state.settingsStore.save(state.settings)
         }
         let persisted = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("settings.json"))) as? [String: Any]
-        #expect(persisted?["trialSessionsUsed"] as? Int == min(3, max(0, used)))
+        #expect(persisted?["trialSessionsUsed"] as? Int == expectedUsed)
         #expect(persisted?["hasUnlockedFullAccess"] == nil)
     }
 

@@ -6,7 +6,7 @@ Parent instructions: `../AGENTS.md`
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
-scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；逐次核对完整句子，第 2 次静默删除，第 3 次完整分钟成稿与精确剪贴板复制，再重开至激活页。本次录像必须成功完成并非空，人工 clean-user 证据须含录像及说明，缺失退出 2。执行与证据契约见 `../../../writeitdown/README.md`；禁止在 Mini 屏幕运行 GUI journey。
+scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
 scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用、末次擦除报告及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。

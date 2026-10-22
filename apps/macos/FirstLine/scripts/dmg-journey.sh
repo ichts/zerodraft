@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Assertion chains also fail when their success action fails, not only their condition.
+# shellcheck disable=SC2015
 # [INPUT] Optional DMG path (default: download https://writeitdown.app/download/Write-It-Down-1.0.dmg)
 #         and output dir (default /tmp/wid-dmg-journey/<timestamp>). Env:
 #         WID_DMG_URL, WID_DMG_CLEAN_USER_EVIDENCE=<directory> (see MANUAL below).
@@ -32,6 +34,8 @@ log() { printf '%s\n' "$*" | tee -a "$out/journey.log"; }
 pass() { log "PASS $1"; }
 bad() { log "FAIL $1"; failures=$((failures + 1)); }
 step() { local name="$1"; shift; if "$@" >>"$out/journey.log" 2>&1; then pass "$name"; else bad "$name"; return 1; fi; }
+# Invoked indirectly by the EXIT trap below.
+# shellcheck disable=SC2329
 cleanup() {
   local status=$? recorder_status=0 i
   trap - EXIT

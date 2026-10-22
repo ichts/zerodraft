@@ -40,14 +40,14 @@
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "step": "nav DOWNLOAD entry goes to /download/",
    "msg": "locator.click: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "nav DOWNLOAD entry goes to /download/",
-   "msg": "locator.click: Timeout 5000ms exceeded."
+   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
+   "msg": "page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')"
   },
   {
    "tag": "phone",
@@ -78,6 +78,12 @@
    "status": "FAIL",
    "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
    "msg": "content-type text/html; charset=utf-8"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": "page.waitForURL: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
@@ -154,14 +160,14 @@
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "step": "nav DOWNLOAD entry goes to /download/",
    "msg": "locator.click: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "nav DOWNLOAD entry goes to /download/",
-   "msg": "locator.click: Timeout 5000ms exceeded."
+   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
+   "msg": "page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')"
   },
   {
    "tag": "desktop",
@@ -192,6 +198,12 @@
    "status": "FAIL",
    "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
    "msg": "content-type text/html; charset=utf-8"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": "page.waitForURL: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",

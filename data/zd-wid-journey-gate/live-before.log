@@ -5,13 +5,14 @@ FAIL [phone] understand: handwritten second line - second line text
 FAIL [phone] understand: deck below the demo - deck is not below the demo
 FAIL [phone] try: demo takes >=60% of first viewport height - demo paper covers 34% of the viewport
 FAIL [phone] no price/buy/checkout offered on landing (checkout does not exist yet) - found ["BUY MAC USD 4.99 - COMING SOON →"]
-FAIL [phone] try: "Give it 60 seconds" starts the real room and typing works - locator.click: Timeout 5000ms exceeded.
 FAIL [phone] nav DOWNLOAD entry goes to /download/ - locator.click: Timeout 5000ms exceeded.
+FAIL [phone] download page: terms, button, DMG link and SHA-256 line on screen - page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')
 FAIL [phone] download page shows trial terms - locator.innerText: Timeout 5000ms exceeded.
 FAIL [phone] download page offers no buy/checkout (checkout does not exist yet) - found ["BUY MAC USD 4.99 - COMING SOON →"]
 FAIL [phone] download page DMG link is the canonical URL - locator.getAttribute: Timeout 5000ms exceeded.
 FAIL [phone] published SHA-256 present on the page - locator.innerText: Timeout 2000ms exceeded.
 FAIL [phone] DMG answers 200, diskimage type, plausible size, sha matches published - content-type text/html; charset=utf-8
+FAIL [phone] back to landing, then try: "Give it 60 seconds" starts the real room and typing works - page.waitForURL: Timeout 5000ms exceeded.
 PASS [phone] support reachable
 PASS [phone] privacy reachable
 PASS [phone] terms reachable
@@ -25,13 +26,14 @@ FAIL [desktop] understand: handwritten second line - second line text
 FAIL [desktop] understand: deck below the demo - deck is not below the demo
 FAIL [desktop] try: demo takes >=60% of first viewport height - demo paper covers 25% of the viewport
 FAIL [desktop] no price/buy/checkout offered on landing (checkout does not exist yet) - found ["BUY MAC USD 4.99 - COMING SOON →"]
-FAIL [desktop] try: "Give it 60 seconds" starts the real room and typing works - locator.click: Timeout 5000ms exceeded.
 FAIL [desktop] nav DOWNLOAD entry goes to /download/ - locator.click: Timeout 5000ms exceeded.
+FAIL [desktop] download page: terms, button, DMG link and SHA-256 line on screen - page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')
 FAIL [desktop] download page shows trial terms - locator.innerText: Timeout 5000ms exceeded.
 FAIL [desktop] download page offers no buy/checkout (checkout does not exist yet) - found ["BUY MAC USD 4.99 - COMING SOON →"]
 FAIL [desktop] download page DMG link is the canonical URL - locator.getAttribute: Timeout 5000ms exceeded.
 FAIL [desktop] published SHA-256 present on the page - locator.innerText: Timeout 2000ms exceeded.
 FAIL [desktop] DMG answers 200, diskimage type, plausible size, sha matches published - content-type text/html; charset=utf-8
+FAIL [desktop] back to landing, then try: "Give it 60 seconds" starts the real room and typing works - page.waitForURL: Timeout 5000ms exceeded.
 PASS [desktop] support reachable
 PASS [desktop] privacy reachable
 PASS [desktop] terms reachable
@@ -40,4 +42,4 @@ SKIP [desktop] sign-in / checkout / test payment / output after payment - not bu
 PASS [desktop] no console errors across the journey
 video [desktop]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/live-before/desktop/journey-desktop.webm
 
-SUMMARY base=https://writeitdown.app: 12 pass, 24 fail, 2 skip
+SUMMARY base=https://writeitdown.app: 12 pass, 26 fail, 2 skip

@@ -16,11 +16,13 @@ const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop', width: 1440, height: 900 }];
 const results = [];
+// Human pace (default): deliberate pauses so a recorded video is readable. WID_JOURNEY_PACE=fast disables them.
+const human = process.env.WID_JOURNEY_PACE !== 'fast';
 
 async function run(size, browser) {
   const tag = size.name;
   const log = (status, step, msg = '') => { results.push({ tag, status, step, msg }); console.log(`${status.padEnd(4)} [${tag}] ${step}${msg ? ' - ' + msg : ''}`); };
-  const step = async (name, fn) => { try { const m = await fn(); if (m === 'SKIP') return; log('PASS', name, typeof m === 'string' ? m : ''); } catch (e) { log('FAIL', name, String(e.message).split('\n')[0]); } };
+  const step = async (name, fn) => { try { const m = await fn(); if (m === 'SKIP') return; log('PASS', name, typeof m === 'string' ? m : ''); } catch (e) { log('FAIL', name, String(e.message).split('\n')[0]); } if (human) await page.waitForTimeout(2000); };
   const ok = (c, m) => { if (!c) throw new Error(m); };
   const dir = path.join(out, tag);
   const ctx = await browser.newContext({
@@ -61,22 +63,17 @@ async function run(size, browser) {
     const bad = await page.locator('a,button').evaluateAll(els => els.filter(e => /^\s*(buy|checkout|purchase|sign in|log in)\b/i.test(e.textContent) || /checkout|stripe|waffo|\/login|\/signin/i.test(e.getAttribute('href') || '')).map(e => e.textContent.trim()));
     ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
   });
-  await step('try: "Give it 60 seconds" starts the real room and typing works', async () => {
-    await page.getByRole('link', { name: 'Give it 60 seconds' }).click();
-    await page.locator('#room').waitFor({ state: 'visible', timeout: 5000 });
-    await page.locator('#editor').click();
-    await page.keyboard.type('hello from a new visitor', { delay: 30 });
-    const v = await page.locator('#editor').inputValue();
-    ok(v.includes('hello from a new visitor'), `editor holds "${v}"`);
-    const c = await page.locator('#room-count').innerText();
-    ok(/^[1-9]/.test(c.trim()), `word count reads "${c}"`);
-    ok(/^[01]:[0-5]\d$/.test((await page.locator('#room-clock').innerText()).trim()), 'clock');
-  });
   await step('nav DOWNLOAD entry goes to /download/', async () => {
-    await page.goto(url('/'));
     await page.locator('nav a', { hasText: /^download/i }).click();
     await page.waitForURL(/\/download\/?$/, { timeout: 5000 });
     ok((await page.locator('h1').first().innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may be serving the landing as fallback)');
+  });
+  await step('download page: terms, button, DMG link and SHA-256 line on screen', async () => {
+    await page.evaluate(() => { const t = document.querySelector('#trial-terms').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
+    for (const sel of ['#trial-terms', 'a[data-launch="dmg"]', '#sha256']) {
+      const bx = await page.locator(sel).boundingBox();
+      ok(bx && bx.y >= 0 && bx.y + bx.height <= size.height, `${sel} is not fully on screen`);
+    }
   });
   let sha = null;
   await step('download page shows trial terms', async () => {
@@ -107,6 +104,20 @@ async function run(size, browser) {
     const got = crypto.createHash('sha256').update(body).digest('hex');
     ok(got === sha, `sha256 of file ${got} != published ${sha}`);
     return `${body.length} bytes, sha ok`;
+  });
+  await step('back to landing, then try: "Give it 60 seconds" starts the real room and typing works', async () => {
+    await page.goBack();
+    await page.waitForURL(/\/(index\.html)?$/);
+    await page.getByRole('link', { name: 'Give it 60 seconds' }).click();
+    await page.locator('#room').waitFor({ state: 'visible', timeout: 5000 });
+    await page.locator('#editor').click();
+    await page.keyboard.type('hello from a new visitor. I am writing forward and I will not stop. ', { delay: human ? 90 : 30 });
+    await page.keyboard.type('Nothing here is saved, so the only way out is through the next sentence.', { delay: human ? 90 : 30 });
+    const v = await page.locator('#editor').inputValue();
+    ok(v.includes('hello from a new visitor'), `editor holds "${v}"`);
+    const c = await page.locator('#room-count').innerText();
+    ok(/^[1-9]/.test(c.trim()), `word count reads "${c}"`);
+    ok(/^[01]:[0-5]\d$/.test((await page.locator('#room-clock').innerText()).trim()), 'clock');
   });
   for (const p of ['support', 'privacy', 'terms']) {
     await step(`${p} reachable`, async () => {

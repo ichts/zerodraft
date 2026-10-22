@@ -1,5 +1,5 @@
 {
- "base": "http://127.0.0.1:8016",
+ "base": "http://127.0.0.1:8017",
  "results": [
   {
    "tag": "phone",
@@ -40,13 +40,13 @@
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "step": "nav DOWNLOAD entry goes to /download/",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
    "msg": ""
   },
   {
@@ -78,6 +78,12 @@
    "status": "PASS",
    "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
    "msg": "2097152 bytes, sha ok"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": ""
   },
   {
    "tag": "phone",
@@ -154,13 +160,13 @@
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "step": "nav DOWNLOAD entry goes to /download/",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
    "msg": ""
   },
   {
@@ -192,6 +198,12 @@
    "status": "PASS",
    "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
    "msg": "2097152 bytes, sha ok"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": ""
   },
   {
    "tag": "desktop",

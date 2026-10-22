@@ -21,9 +21,11 @@ Download (or take given) DMG, size + sha vs published, codesign/stapler/spctl on
 ## Gate proof (runs on 2026-10-22)
 | Run | Target | Exit | Result | Video |
 |---|---|---|---|---|
-| live-before | https://writeitdown.app (old site) | 1 | 12 pass, 24 fail, 2 skip | live-before/{phone,desktop}/journey-*.webm |
+| live-before | https://writeitdown.app (old site) | 1 | 12 pass, 26 fail, 2 skip | live-before/{phone,desktop}/journey-*.webm |
 | local-release | PR 45 branch fm/zd-wid-release-web @ d80e010, local server, FIXTURE dmg | 0 | 36 pass, 0 fail, 2 skip | local-release/{phone,desktop}/journey-*.webm |
 | dmg-live-before | live DMG URL (serves a 5.7 KB HTML page) | 1 | 5 FAIL, stops before mount | n/a |
+
+One continuous video per viewport covers the whole journey in order (landing, nav DOWNLOAD, /download terms+button+sha on screen, DMG+SHA check, back, room typing, legal pages, waitlist). Human pace is the default (2 s pause per step, 90 ms keystrokes); WID_JOURNEY_PACE=fast disables it. Local run used port 8017. Durations: local-release phone 54.5 s, desktop 53.7 s; live-before phone 62.8 s, desktop 63.0 s.
 
 Videos are not committed (2.4 MB); they live in this directory in the worktree: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate.
 

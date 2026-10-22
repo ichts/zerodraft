@@ -143,7 +143,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* ---------- Landing: design system v1 components ("Paper in light", approved 2026-10-22) ----------
    Every value comes from tokens.css (scoped to .home). The hero sheet is the real demo.js preview;
    the writing room itself is #room and keeps its own styles. */
-.home{min-height:100vh;background:var(--page);color:var(--ink);font:400 var(--t-body)/1.5 var(--serif);-webkit-font-smoothing:antialiased}
+.home{min-height:100vh;background:var(--page);color:var(--ink);font:400 var(--t-body)/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 .home a{color:inherit;text-decoration:none}
 .home :focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl)}
 .home .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
@@ -190,6 +190,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .caret{width:2px;height:.95em}
 .home .numeral-band{top:56px;bottom:56px;font:italic 400 var(--num)/1 var(--serif);color:var(--red)}
 .home .paper.warn .anchor-wrap,.home .paper.warn .prev-band{opacity:.14}
+/* demo.js marks the report phase with the .report class on the sheet too; keep the sheet's own type. */
+.home .paper.report{font:inherit;letter-spacing:normal;color:inherit}
 .home #report{font:500 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--red)}
 .bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:1}
 .meter{position:absolute;left:0;right:0;bottom:0;height:3px}
@@ -202,13 +204,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .eyebrow{margin:0 0 14px;text-align:center;font:500 var(--t-small)/1.5 var(--sans);color:var(--mute)}
 .home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
 .home h2 .hand{font-size:1.5em;line-height:.8}
-.sub{margin:18px auto 0;max-width:46ch;text-align:center;font-size:19px;line-height:1.5;color:var(--mute)}
+.sub{margin:18px auto 0;max-width:46ch;text-align:center;font:400 var(--t-body)/1.55 var(--sans);color:var(--mute)}
 .cards,.moments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:var(--s7)}
 .home .card{background:var(--sheet);border-radius:var(--r-card);box-shadow:var(--lift);overflow:hidden;display:flex;flex-direction:column}
 .card .vis{height:190px;background:linear-gradient(180deg,var(--stage-a),var(--stage-b));display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--hair)}
 .card .txt{padding:22px var(--s5) 26px}
 .card h3{margin:0 0 var(--s2);font:500 var(--t-h3)/1.15 var(--serif);letter-spacing:-.01em}
-.card p{margin:0;color:var(--mute);font-size:18px;line-height:1.5}
+.card p{margin:0;color:var(--mute);font:400 var(--t-body)/1.55 var(--sans)}
 .keys{display:flex;gap:var(--s3)}
 .line8{width:78%}
 .line8 .track{height:8px;border-radius:var(--r-pill);background:var(--hair-2);overflow:hidden}
@@ -230,7 +232,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* Mac block: card + price facts */
 .home .mac-card{padding:clamp(28px,5vw,56px);display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
-.mac-card p{color:var(--mute);font-size:19px;line-height:1.55;margin:14px 0 0;max-width:46ch}
+.mac-card p{color:var(--mute);font:400 var(--t-body)/1.6 var(--sans);margin:14px 0 0;max-width:46ch}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
 .facts{list-style:none;margin:0;padding:0;display:grid}
 .facts li{display:flex;align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}

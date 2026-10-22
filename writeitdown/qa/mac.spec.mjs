@@ -177,7 +177,9 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(ink.actual, 'the two headline parts differ in color').not.toBe(ink.line1);
   const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
-  expect(tokens[5], 'the system sans maps to the locked mono face').toMatch(/IBM Plex Mono/);
+  expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
+  for (const selector of ['.home-nav .btn', '.cta .btn', '#paper .tag', '#clock', '#paper .saved', '#count'])
+    await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
   const nav = page.locator('.home-nav a.btn-quiet');
   await expect(nav).toHaveText('Download for Mac');

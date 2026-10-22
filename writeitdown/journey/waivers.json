@@ -1,0 +1,26 @@
+[
+  {
+    "step": "sign-in",
+    "reason": "This release has no account or sign-in feature.",
+    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
+    "unwaive_when": "feature ships"
+  },
+  {
+    "step": "checkout",
+    "reason": "This release offers a free Mac download; buying opens soon.",
+    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
+    "unwaive_when": "feature ships"
+  },
+  {
+    "step": "test-payment",
+    "reason": "No payment feature exists in this release.",
+    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
+    "unwaive_when": "feature ships"
+  },
+  {
+    "step": "post-payment-output",
+    "reason": "There is no paid journey or post-payment output in this release.",
+    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
+    "unwaive_when": "feature ships"
+  }
+]

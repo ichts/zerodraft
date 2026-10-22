@@ -11,6 +11,7 @@ import { chromium, webkit, devices } from '@playwright/test';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateWaivers, waivedOffers, assertNoWaivedOffers } from './waivers.mjs';
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i < 0 ? d : process.argv[i + 1]; };
 const base = (arg('base') || '').replace(/\/+$/, '');
@@ -24,6 +25,17 @@ if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe'].includ
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
 const results = [];
+let waivers;
+try {
+  waivers = validateWaivers(JSON.parse(fs.readFileSync(new URL('./waivers.json', import.meta.url), 'utf8')));
+} catch (error) {
+  console.error(`FAIL release waivers: ${error.message}`); process.exit(1);
+}
+console.log('\nWAIVED (feature does not exist yet)');
+for (const waiver of waivers) {
+  results.push({ ...waiver, tag: 'release', status: 'WAIVED', name: waiver.step });
+  console.log(`  ${waiver.step}: ${waiver.reason} Approved by ${waiver.approved_by}; unwaive when ${waiver.unwaive_when}.`);
+}
 const NOISE = /cloudflareinsights|favicon|Access-Control-Allow-Origin|access control checks/i; // third-party beacon / local-server noise
 const ok = (c, m) => { if (!c) throw new Error(m); };
 
@@ -46,7 +58,11 @@ async function run(size, browser) {
   const log = (status, name, msg = '') => { results.push({ tag, status, name, msg }); console.log(`${status.padEnd(4)} [${tag}] ${name}${msg ? ' - ' + msg : ''}`); };
   let current = '';
   const step = async (name, fn) => {
-    try { const m = await fn(); log('PASS', `${current}: ${name}`, typeof m === 'string' ? m : ''); }
+    try {
+      const m = await fn();
+      await assertNoWaivedOffers(page);
+      log('PASS', `${current}: ${name}`, typeof m === 'string' ? m : '');
+    }
     catch (e) { log('FAIL', `${current}: ${name}`, String(e.message).split('\n')[0]); }
     await page.waitForTimeout(2000);
   };
@@ -55,7 +71,6 @@ async function run(size, browser) {
     current = name; await fn();
   };
   const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));
-  const offers = (scope) => page.locator(`${scope} a, ${scope} button`).evaluateAll(els => els.filter(e => /^\s*(buy|checkout|purchase|sign in|log in)\b/i.test(e.textContent) || /checkout|stripe|waffo|\/login|\/signin/i.test(e.getAttribute('href') || '')).map(e => e.textContent.trim()));
   let sha = null;
   const ldGraph = async () => (JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent()))['@graph'];
 
@@ -93,7 +108,7 @@ async function run(size, browser) {
       ok(await page.getByRole('link', { name: 'Give it 60 seconds' }).count() >= 1, 'CTA missing');
     });
     await step('no price/buy/sign-in button offered (checkout does not exist yet)', async () => {
-      const bad = await offers('body'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
+      const bad = await waivedOffers(page); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
     });
   });
   await block('landing/seo', async () => {
@@ -196,7 +211,7 @@ async function run(size, browser) {
       const t = (await page.locator('#trial-terms').innerText()).toUpperCase();
       ok(/3 SESSIONS/.test(t) && /USD 4\.99 ONE-TIME/.test(t) && /BUYING OPENS SOON/.test(t), `terms read "${t}"`);
     });
-    await step('no buy/checkout offered', async () => { const bad = await offers('main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
+    await step('no buy/checkout offered', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
     await step('DMG link is the canonical URL', async () => {
       const h = await page.locator('a[data-launch="dmg"]').getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
@@ -290,9 +305,6 @@ async function run(size, browser) {
       for (const s of ['#waitlist-email', 'input[name=consent]']) ok(await page.locator(s).count() === 1, `${s} missing`);
     });
   });
-  await block('later', async () => {
-    log('SKIP', 'sign-in / checkout / test payment / output after payment', 'not built yet; asserted above that none is offered. Add real steps when they ship.');
-  });
   await block('console', async () => { await step('no console errors across the journey', async () => ok(errors.length === 0, errors.slice(0, 3).join(' | '))); });
 
   const vid = page.video(); await ctx.close();
@@ -307,5 +319,5 @@ for (const s of sizes) await run(s, s.engine === 'webkit' ? wk : chrome);
 await wk.close(); await chrome.close();
 const fails = results.filter(r => r.status === 'FAIL');
 fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, scenarios: scenarios ?? null, results }, null, 1));
-console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${results.filter(r => r.status === 'SKIP').length} EXEMPT pending captain approval: not built (sign-in / checkout / test payment / output after payment)`);
+console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${waivers.length} WAIVED (feature does not exist yet)`);
 process.exit(fails.length ? 1 : 0);

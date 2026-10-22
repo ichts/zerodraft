@@ -13,7 +13,9 @@
 #            no TCC grants of its own. The app is launched directly (binary path,
 #            fresh CFFIXED_USER_HOME) and every action is background-delivered:
 #            no focus steal, no Computer Use dependency. Keys are addressed at the
-#            room's AXTextArea token so delivery is read-back confirmed.
+#            room's AXTextArea token so delivery is read-back confirmed. Warn/wipe
+#            waits poll the full AX tree; a no-match driver query returns an empty
+#            tree and can stall the snapshot.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -120,12 +122,13 @@ snap() { # snap <name> [query]
 }
 
 # Cheap poll: AX only, no capture; used while racing the warn window. Also keeps
-# its JSON at last-poll.json for the caller.
-poll() { # poll <name> <query>
-  local name="$1" query="$2" file json
+# its JSON at last-poll.json for the caller. The second argument is a caller label
+# only: do not send it as a driver query, because a miss empties the tree.
+poll() { # poll <name> [label]
+  local name="$1" file json
   snap_n=$((snap_n + 1))
   file="$output/$(printf '%02d' "$snap_n")-$name"
-  json="$(cua get_window_state "{\"pid\":$pid,\"window_id\":$window_id,\"include_screenshot\":false,\"query\":\"$query\"}" | normalize)"
+  json="$(cua get_window_state "{\"pid\":$pid,\"window_id\":$window_id,\"include_screenshot\":false}" | normalize)"
   printf '%s\n' "$json" | tee "$file.json" >"$output/last-poll.json"
   ta_token="$(jq -r '[.elements[] | select(.role == "AXTextArea")][0].element_token // empty' "$output/last-poll.json")"
 }

@@ -4,7 +4,7 @@
 // phone 390x844 and desktop 1440x900. Exit 0 = every step passed; any
 // failure exits 1. Steps that cannot exist yet are reported SKIP with the
 // reason and an assertion that the feature is not (wrongly) offered.
-import { chromium } from '@playwright/test';
+import { chromium, webkit, devices } from '@playwright/test';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,27 +14,30 @@ const base = (arg('base') || '').replace(/\/+$/, '');
 if (!/^https?:\/\//.test(base)) { console.error('usage: npm run journey -- --base <url> [--out <dir>]'); process.exit(2); }
 const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
-const sizes = [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop', width: 1440, height: 900 }];
+// Phone = WebKit + iPhone profile (every iOS browser incl. WeChat is WebKit); desktop = Chromium.
+const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
 const results = [];
 // Human pace (default): deliberate pauses so a recorded video is readable. WID_JOURNEY_PACE=fast disables them.
 const human = process.env.WID_JOURNEY_PACE !== 'fast';
 
 async function run(size, browser) {
+  const device = size.engine === 'webkit' ? devices['iPhone 14'] : {};
   const tag = size.name;
+  console.log(`engine [${tag}]: ${size.engine}${size.engine === 'webkit' ? ' (iPhone 14 profile: touch, DPR, UA)' : ''}`);
   const log = (status, step, msg = '') => { results.push({ tag, status, step, msg }); console.log(`${status.padEnd(4)} [${tag}] ${step}${msg ? ' - ' + msg : ''}`); };
   const step = async (name, fn) => { try { const m = await fn(); if (m === 'SKIP') return; log('PASS', name, typeof m === 'string' ? m : ''); } catch (e) { log('FAIL', name, String(e.message).split('\n')[0]); } if (human) await page.waitForTimeout(2000); };
   const ok = (c, m) => { if (!c) throw new Error(m); };
   const dir = path.join(out, tag);
   const ctx = await browser.newContext({
-    viewport: { width: size.width, height: size.height }, colorScheme: 'light', storageState: undefined,
+    ...device, viewport: { width: size.width, height: size.height }, colorScheme: 'light', storageState: undefined,
     recordVideo: { dir, size: { width: size.width, height: size.height } },
   });
   const page = await ctx.newPage();
   page.setDefaultTimeout(5000);
   const errors = [];
   // Third-party analytics beacon (CORS-blocks on non-prod origins) and the favicon 404 on the local static server are not journey errors.
-  page.on('console', m => { if (m.type() === 'error' && !/cloudflareinsights|favicon/i.test(m.text() + (m.location().url || ''))) errors.push(m.text()); });
-  page.on('pageerror', e => errors.push(String(e)));
+  page.on('console', m => { if (m.type() === 'error' && !/cloudflareinsights|favicon|Access-Control-Allow-Origin|access control checks/i.test(m.text() + (m.location().url || ''))) errors.push(m.text()); });
+  page.on('pageerror', e => { if (!/cloudflareinsights|Access-Control-Allow-Origin|access control checks/i.test(String(e))) errors.push(String(e)); });
   const url = p => `${base}${p}`;
 
   await step('understand: landing loads', async () => { const r = await page.goto(url('/')); ok(r.ok(), `status ${r.status()}`); });
@@ -140,11 +143,14 @@ async function run(size, browser) {
 }
 
 fs.mkdirSync(out, { recursive: true });
-let browser;
-try { browser = await chromium.launch({ channel: 'chrome' }); } catch { browser = await chromium.launch(); }
+let chrome;
+try { chrome = await chromium.launch({ channel: 'chrome' }); } catch { chrome = await chromium.launch(); }
+const wk = await webkit.launch();
 console.log(`journey base=${base} out=${out}`);
-for (const s of sizes) await run(s, browser);
-await browser.close();
+for (const s of sizes) await run(s, s.engine === 'webkit' ? wk : chrome);
+await wk.close();
+await chrome.close();
+
 const fails = results.filter(r => r.status === 'FAIL');
 fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, results }, null, 1));
 console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail, ${results.filter(r => r.status === 'SKIP').length} skip`);

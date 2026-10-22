@@ -49,6 +49,7 @@ async function run(size, browser) {
   const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));
   const offers = (scope) => page.locator(`${scope} a, ${scope} button`).evaluateAll(els => els.filter(e => /^\s*(buy|checkout|purchase|sign in|log in)\b/i.test(e.textContent) || /checkout|stripe|waffo|\/login|\/signin/i.test(e.getAttribute('href') || '')).map(e => e.textContent.trim()));
   let sha = null;
+  const ldGraph = async () => (JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent()))['@graph'];
 
   await block('landing/hero', async () => {
     await step('page loads', async () => { const r = await page.goto(url('/')); ok(r.ok(), `status ${r.status()}`); });
@@ -81,39 +82,99 @@ async function run(size, browser) {
       const d = await page.locator('.deck').boundingBox(), p = await page.locator('#demo').boundingBox();
       ok(d.y >= p.y + p.height - 2, 'deck is not below the demo');
       ok(/8 seconds/.test(await page.locator('.deck').innerText()), 'deck text');
-      ok(await page.getByRole('link', { name: 'Give it 60 seconds' }).count() === 1, 'CTA missing');
+      ok(await page.getByRole('link', { name: 'Give it 60 seconds' }).count() >= 1, 'CTA missing');
     });
     await step('no price/buy/sign-in button offered (checkout does not exist yet)', async () => {
       const bad = await offers('body'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
     });
   });
+  await block('landing/seo', async () => {
+    await step('canonical, meta description, og:*, twitter:card present and correct', async () => {
+      const m = await page.evaluate(() => {
+        const g = (sel, at) => document.querySelector(sel)?.getAttribute(at) || '';
+        return { canonical: g('link[rel=canonical]', 'href'), desc: g('meta[name=description]', 'content'), ogt: g('meta[property="og:title"]', 'content'), ogd: g('meta[property="og:description"]', 'content'), ogi: g('meta[property="og:image"]', 'content'), ogu: g('meta[property="og:url"]', 'content'), tw: g('meta[name="twitter:card"]', 'content'), title: document.title };
+      });
+      ok(m.canonical === 'https://writeitdown.app/', `canonical ${m.canonical}`);
+      ok(m.desc.length > 40 && m.ogd.length > 40 && m.ogt.length > 5, 'description/og text missing');
+      ok(/^https:\/\/writeitdown\.app\/og\.png$/.test(m.ogi) && m.ogu === 'https://writeitdown.app/' && m.tw, `og image/url/twitter ${m.ogi} ${m.ogu} ${m.tw}`);
+      ok(/write it down/i.test(m.title), `title ${m.title}`);
+    });
+    await step('og.png is served as an image', async () => {
+      const r = await ctx.request.get(url('/og.png')); ok(r.status() === 200 && /image\/png/.test(r.headers()['content-type'] || ''), `og.png ${r.status()} ${r.headers()['content-type']}`);
+    });
+    await step('SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+', async () => {
+      const g = await ldGraph(); const a = g.find(x => x['@type'] === 'SoftwareApplication'); ok(a, 'no SoftwareApplication');
+      ok(a.offers.price === '4.99' && a.offers.priceCurrency === 'USD', `offer ${JSON.stringify(a.offers)}`);
+      ok(/PreOrder$/.test(a.offers.availability), `availability ${a.offers.availability}`);
+      ok(/macOS 14/.test(a.operatingSystem), `os ${a.operatingSystem}`);
+    });
+    await step('heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ', async () => {
+      const tree = (await page.locator('#landing h1, #landing h2, #landing h3').evaluateAll(els => els.map(e => e.tagName.toLowerCase() + ' ' + e.textContent.replace(/\s+/g, ' ').trim()))).join('\n');
+      const h = tree.split('\n'); ok(h.filter(x => x.startsWith('h1 ')).length === 1, 'need exactly one h1 in the landing');
+      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h3 No way back/, /^h3 Eight seconds of silence/, /^h3 Reach zero, keep it/, /^h2 Real rules, real numbers/, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
+      order.forEach((re, i) => ok(re.test(h[i] || ''), `heading ${i}: "${h[i]}" does not match ${re}`));
+      ok(h.slice(9, 17).every(x => x.startsWith('h3 ')) && h.length === 18 && /^h2 We force you to write it down$/.test(h[17]), `FAQ/callback headings: ${JSON.stringify(h.slice(9))}`);
+    });
+  });
+  await block('landing/core-rule', async () => {
+    await step('three moments: writing, warning 3, deleted', async () => {
+      await show('#core'); ok(await page.locator('#core .mo').count() === 3, 'need 3 states'); ok(/DRAFT DELETED/.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
+    });
+  });
   await block('landing/how-it-works', async () => {
     await step('3 cards: no way back, eight seconds, reach zero', async () => {
-      await show('#how');
-      const t = await page.locator('.cards .card h3').allInnerTexts();
+      await show('#how'); const t = await page.locator('#how .cards .card h3').allInnerTexts();
       ok(t.length === 3 && /no way back/i.test(t[0]) && /eight seconds/i.test(t[1]) && /reach zero/i.test(t[2]), `cards ${JSON.stringify(t)}`);
     });
   });
-  await block('landing/stop-states', async () => {
-    await step('writing / warning / deleted strip', async () => {
-      await show('#moment');
-      ok(await page.locator('.moments .mo').count() === 3, 'need 3 states');
-      ok(/DRAFT DELETED/.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
+  await block('landing/facts', async () => {
+    await step('ledger: six rows incl. blocked, pressure, privacy, length, price, maker', async () => {
+      await show('#facts'); const t = (await page.locator('#facts .ledger b').allInnerTexts()).map(x => x.toLowerCase());
+      ok(['blocked', 'pressure', 'privacy', 'length', 'price', 'maker'].every((k, i) => t[i] === k), `rows ${JSON.stringify(t)}`);
+      ok(/\$4\.99/.test(await page.locator('#facts').innerText()), 'price row');
     });
   });
   await block('landing/mac-block', async () => {
-    await step('USD 4.99 / 2 Macs / 14 days and honest "buying opens soon"', async () => {
-      await show('#mac');
-      const t = await page.locator('#mac').innerText();
-      ok(/3 sessions/i.test(t) && /\$4\.99/.test(t) && /2 Macs/.test(t) && /14 days/.test(t), 'facts missing');
-      ok(/buying opens soon/i.test(t), 'honest "buying opens soon" missing');
+    await step('USD 4.99 / 2 Macs / 14 days / macOS 14 and honest "buying opens soon"', async () => {
+      await show('#mac'); const t = await page.locator('#mac').innerText();
+      ok(/3 sessions/i.test(t) && /\$4\.99/.test(t) && /2 Macs/.test(t) && /14 days/.test(t) && /macOS 14/.test(t), 'facts missing'); ok(/buying opens soon/i.test(t), '"buying opens soon" missing');
+    });
+    await step('Download free trial link reaches /download/ (200, real page)', async () => {
+      const h = await page.locator('#mac a', { hasText: /^download free trial$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
+      const r = await ctx.request.get(url('/download/')); ok(r.status() === 200 && /<h1>Write It Down for Mac<\/h1>/.test(await r.text()), 'download page is not the real page');
+    });
+    await step('waitlist link points at mac.html#waitlist', async () => {
+      ok(await page.locator('#mac a[href="mac.html#waitlist"]').count() === 1, 'waitlist link missing');
+    });
+  });
+  await block('landing/faq', async () => {
+    await step('FAQ: 8 details, first open; open/close toggles by click and keyboard', async () => {
+      await show('#faq'); const d = page.locator('#faq details'); ok(await d.count() === 8, `${await d.count()} items`);
+      ok(await d.nth(0).evaluate(e => e.open), 'first item should start open');
+      const sum = d.nth(1).locator('summary'); await sum.click(); ok(await d.nth(1).evaluate(e => e.open), 'did not open on click');
+      ok(await d.nth(1).locator('p').isVisible(), 'answer not visible when open');
+      await sum.click(); ok(!(await d.nth(1).evaluate(e => e.open)), 'did not close on click');
+      await sum.focus(); await page.keyboard.press('Enter'); ok(await d.nth(1).evaluate(e => e.open), 'did not open on Enter');
+      await page.keyboard.press('Enter'); ok(!(await d.nth(1).evaluate(e => e.open)), 'did not close on Enter');
+    });
+    await step('FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)', async () => {
+      const q = (await ldGraph()).find(x => x['@type'] === 'FAQPage'); ok(q && q.mainEntity.length === 8, 'FAQPage needs 8 questions');
+      const vis = await page.locator('#faq details').evaluateAll(els => els.map(e => [e.querySelector('summary h3').textContent.replace(/\s+/g, ' ').trim(), e.querySelector('p').textContent.replace(/\s+/g, ' ').trim()]));
+      q.mainEntity.forEach((m, i) => { ok(vis[i][0] === m.name, `Q${i + 1} "${vis[i][0]}" != JSON-LD "${m.name}"`); ok(vis[i][1] === m.acceptedAnswer.text.replace(/\s+/g, ' ').trim(), `A${i + 1} differs from JSON-LD`); });
+    });
+  });
+  await block('landing/callback', async () => {
+    await step('call-back band repeats the line and the 60-second door', async () => {
+      await show('.callback'); const t = (await page.locator('.callback').innerText()).replace(/\s+/g, ' ');
+      ok(/we force you to write it down/i.test(t) && /8 seconds/.test(t), 'band text'); ok(await page.locator('.callback a[href="#trial"]').count() === 1, 'door missing');
     });
   });
   await block('landing/footer', async () => {
-    await step('Trefoil Studio + Support/Privacy/Terms links', async () => {
-      await show('footer');
-      ok(/Trefoil Studio/.test(await page.locator('footer').innerText()), 'Trefoil Studio missing');
-      for (const n of ['Support', 'Privacy', 'Terms']) ok(await page.locator('footer a', { hasText: n }).count() === 1, `${n} link missing`);
+    await step('Trefoil Studio, Product/Help/Legal links all resolve', async () => {
+      await show('footer'); const t = await page.locator('footer').innerText(); ok(/Trefoil Studio/.test(t), 'Trefoil Studio missing');
+      const hrefs = await page.locator('footer a').evaluateAll(els => els.map(e => e.getAttribute('href')));
+      for (const n of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#waitlist']) ok(hrefs.includes(n), `footer link ${n} missing`);
+      for (const h of hrefs.filter(h => !/^(mailto:|#)/.test(h))) { const r = await ctx.request.get(url('/' + h.split('#')[0])); ok(r.status() === 200, `${h} -> ${r.status()}`); }
     });
   });
   await block('download', async () => {
@@ -140,6 +201,13 @@ async function run(size, browser) {
         const bx = await page.locator(sel).boundingBox(); ok(bx && bx.y >= 0 && bx.y + bx.height <= size.height, `${sel} is not fully on screen`);
       }
     });
+    await step('download page: canonical + og tags + title', async () => {
+      const m = await page.evaluate(() => ({ c: document.querySelector('link[rel=canonical]')?.href, t: document.querySelector('meta[property="og:title"]')?.content, d: document.querySelector('meta[name=description]')?.content, u: document.querySelector('meta[property="og:url"]')?.content }));
+      ok(m.c === 'https://writeitdown.app/download/' && m.u === 'https://writeitdown.app/download/' && m.t && m.d, `meta ${JSON.stringify(m)}`);
+    });
+    await step('download page: Install / Activate / Refunds sections', async () => {
+      const t = await page.locator('.steps3 h2, .steps3 h3, #install h2, #trial h2, #refunds h2').allInnerTexts(); ok(['Install', 'Activate', 'Refunds'].every(k => t.includes(k)), `sections ${JSON.stringify(t)}`);
+    });
     await step('DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published', async () => {
       const r = await ctx.request.get(url(new URL(DMG_URL).pathname));
       ok(r.status() === 200, `status ${r.status()}`);
@@ -154,7 +222,7 @@ async function run(size, browser) {
   await block('room', async () => {
     await step('back to landing, "Give it 60 seconds" starts the real room, typing works', async () => {
       await page.goBack(); await page.waitForURL(/\/(index\.html)?$/);
-      await page.getByRole('link', { name: 'Give it 60 seconds' }).click();
+      await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
       await page.locator('#room').waitFor({ state: 'visible' });
       await page.locator('#editor').click();
       const d = human ? 90 : 30;

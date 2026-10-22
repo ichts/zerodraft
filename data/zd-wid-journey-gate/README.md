@@ -18,15 +18,16 @@ cd writeitdown && npm run journey -- --base http://127.0.0.1:8016
 ## DMG (apps/macos/FirstLine/scripts/dmg-journey.sh [dmg-path] [out-dir])
 Download (or take given) DMG, size + sha vs published, codesign/stapler/spctl on DMG and app, mount, Applications shortcut, ditto copy with quarantine, real-window first launch via cua-driver, 3 free sessions ("Free trial: N of 3 sessions left."), then activation page. Exit 0 pass, 1 failure, 2 = automated steps passed but the physical clean-user run is still manual (script prints exactly what; set WID_DMG_CLEAN_USER_EVIDENCE=<file> to clear). The launch/trial half is UNVERIFIED here: no real DMG exists yet, only the failure path was run. Strings come from branch fm/zd-wid-free-trial-launch.
 
-## Gate proof (v3 landing, main cd81645, runs headless)
-Command: `cd writeitdown && npm run journey -- --base <url> --expect-sha 96c0c0a34733f92c1b47b1231c3243612c71614074dd6179ac3d61c80d5462cd --out <dir>`
-Phone = WebKit + iPhone 14 profile 390x844; desktop = Chromium 1440x900. Assertions are one `block()` per page section in `writeitdown/journey/journey.mjs`; PR B sections add blocks.
+## How main runs it
+Release gate for writeitdown.app: after deploy run `cd writeitdown && npm ci && npx playwright install webkit && npm run journey:live` (base https://writeitdown.app, expects the published SHA-256 96c0...62cd; add `-- --out <dir>` for videos). Pre-deploy, serve the tree and the real DMG locally: `node journey/serve-local.mjs --root writeitdown --dmg-file <Write-It-Down-1.0.dmg> --port 8025 &` then `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. Phone = WebKit iPhone 14 at 390x844, desktop = Chromium 1440x900, one continuous human-paced video each (`WID_JOURNEY_PACE=fast` skips pauses); exit 0 only if every assertion passes. Assertions live in `writeitdown/journey/journey.mjs`, one `block()` per page section (seo, core-rule, how-it-works, facts, mac-block, faq, callback, footer, download, room, legal, waitlist, console): add a block for any new section and a step for every user-visible bug found.
+
+## Gate proof (main a4a201c, headless)
 | Run | Target | Exit | Assertions | Durations |
 |---|---|---|---|---|
-| live-before | https://writeitdown.app (old site, not deployed) | 1 | 14 pass, 34 fail, 2 skip | phone 84.3 s, desktop 83.9 s |
-| local-release | main cd81645 served locally with the real DMG release-fc4fbb22 (sha 96c0...62cd; page sha line is injected by serve-local.mjs until PR B lands) | 0 | 48 pass, 0 fail, 2 skip | phone 62.7 s, desktop 63.9 s |
+| live-before | https://writeitdown.app (old site, not yet deployed) | 1 | 18 pass, 54 fail, 2 skip | phone 138.9 s, desktop 140.8 s |
+| local-release | main a4a201c local + real DMG release-fc4fbb22 | 0 | 72 pass, 0 fail, 2 skip | phone 86.8 s, desktop 86.6 s |
 
-Videos (not committed): live-before/{phone,desktop}/journey-*.webm, local-release/{phone,desktop}/journey-*.webm under this directory.
+Videos (not committed): <dir>/{local-release,live-before}/{phone,desktop}/journey-*.webm; copied to ~/Desktop/WID journey gate videos.
 
 ## Findings
 - Live /download/ answers 200 with the landing page (host fallback): a status-only check would pass the broken state. Asserted by content.
@@ -34,4 +35,4 @@ Videos (not committed): live-before/{phone,desktop}/journey-*.webm, local-releas
 - Local server logs a favicon 404 (no favicon declared); excluded from the console-error assertion, bounded follow-up.
 - Old live H1 ends with a period and the demo covers only 34% (phone) / 25% (desktop) of the viewport.
 - Repo AGENTS.md still says Mac has no native trial; release-web copy and the trial-launch branch say 3 free sessions. Needs doc alignment.
-- v3 /download/ and legal pages still use the old bone/mono look while the landing is the new light sans; visual inconsistency to decide on (PR B).
+- Legal pages (support/privacy/terms/mac.html) still use the old bone/mono look; /download is restyled in PR B.

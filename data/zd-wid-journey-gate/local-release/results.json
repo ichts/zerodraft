@@ -1,5 +1,5 @@
 {
- "base": "http://127.0.0.1:8023",
+ "base": "http://127.0.0.1:8025",
  "results": [
   {
    "tag": "phone",
@@ -52,25 +52,85 @@
   {
    "tag": "phone",
    "status": "PASS",
+   "name": "landing/seo: canonical, meta description, og:*, twitter:card present and correct",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/seo: og.png is served as an image",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/seo: SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/seo: heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/core-rule: three moments: writing, warning 3, deleted",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
    "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "name": "landing/stop-states: writing / warning / deleted strip",
+   "name": "landing/facts: ledger: six rows incl. blocked, pressure, privacy, length, price, maker",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days / macOS 14 and honest \"buying opens soon\"",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
+   "name": "landing/mac-block: Download free trial link reaches /download/ (200, real page)",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/mac-block: waitlist link points at mac.html#waitlist",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/faq: FAQ: 8 details, first open; open/close toggles by click and keyboard",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/faq: FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/callback: call-back band repeats the line and the 60-second door",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/footer: Trefoil Studio, Product/Help/Legal links all resolve",
    "msg": ""
   },
   {
@@ -101,6 +161,18 @@
    "tag": "phone",
    "status": "PASS",
    "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "download: download page: canonical + og tags + title",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "download: download page: Install / Activate / Refunds sections",
    "msg": ""
   },
   {
@@ -202,25 +274,85 @@
   {
    "tag": "desktop",
    "status": "PASS",
+   "name": "landing/seo: canonical, meta description, og:*, twitter:card present and correct",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/seo: og.png is served as an image",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/seo: SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/seo: heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/core-rule: three moments: writing, warning 3, deleted",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
    "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "name": "landing/stop-states: writing / warning / deleted strip",
+   "name": "landing/facts: ledger: six rows incl. blocked, pressure, privacy, length, price, maker",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days / macOS 14 and honest \"buying opens soon\"",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
+   "name": "landing/mac-block: Download free trial link reaches /download/ (200, real page)",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/mac-block: waitlist link points at mac.html#waitlist",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/faq: FAQ: 8 details, first open; open/close toggles by click and keyboard",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/faq: FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/callback: call-back band repeats the line and the 60-second door",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/footer: Trefoil Studio, Product/Help/Legal links all resolve",
    "msg": ""
   },
   {
@@ -251,6 +383,18 @@
    "tag": "desktop",
    "status": "PASS",
    "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "download: download page: canonical + og tags + title",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "download: download page: Install / Activate / Refunds sections",
    "msg": ""
   },
   {

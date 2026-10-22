@@ -1,5 +1,6 @@
 // Write It Down release journey gate. Deterministic, no model clicking.
 // Usage: npm run journey -- --base <url> [--out <dir>] [--expect-sha <hex>]
+//        [--scenarios full-session,silence-wipe]
 // Fresh visitor (new context, light, video on): phone = WebKit + iPhone 14 profile
 // at 390x844 (every iOS browser incl. WeChat is WebKit), desktop = Chromium 1440x900.
 // ONE context + page per viewport, one continuous human-paced video.
@@ -16,6 +17,10 @@ const base = (arg('base') || '').replace(/\/+$/, '');
 if (!/^https?:\/\//.test(base)) { console.error('usage: npm run journey -- --base <url> [--out <dir>] [--expect-sha <hex>]'); process.exit(2); }
 const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const expectSha = arg('expect-sha', null);
+const scenarios = arg('scenarios', null)?.split(',');
+if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe'].includes(name))) {
+  console.error('--scenarios accepts full-session,silence-wipe'); process.exit(2);
+}
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
 const results = [];
@@ -29,6 +34,7 @@ async function run(size, browser) {
   const ctx = await browser.newContext({
     ...(size.engine === 'webkit' ? devices['iPhone 14'] : {}),
     viewport: { width: size.width, height: size.height }, colorScheme: 'light',
+    permissions: size.engine === 'webkit' ? ['clipboard-read'] : ['clipboard-read', 'clipboard-write'],
     recordVideo: { dir, size: { width: size.width, height: size.height } },
   });
   const page = await ctx.newPage();
@@ -44,7 +50,10 @@ async function run(size, browser) {
     catch (e) { log('FAIL', `${current}: ${name}`, String(e.message).split('\n')[0]); }
     await page.waitForTimeout(2000);
   };
-  const block = async (name, fn) => { current = name; await fn(); };
+  const block = async (name, fn) => {
+    if (scenarios && !scenarios.includes(name)) return;
+    current = name; await fn();
+  };
   const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));
   const offers = (scope) => page.locator(`${scope} a, ${scope} button`).evaluateAll(els => els.filter(e => /^\s*(buy|checkout|purchase|sign in|log in)\b/i.test(e.textContent) || /checkout|stripe|waffo|\/login|\/signin/i.test(e.getAttribute('href') || '')).map(e => e.textContent.trim()));
   let sha = null;
@@ -224,9 +233,9 @@ async function run(size, browser) {
       ok(!/<(?:!doctype|html)\b/i.test(await r.text()), 'HTML fallback body');
     });
   });
-  await block('room', async () => {
-    await step('full real-time minute keeps exactly the typed draft and allows copying', async () => {
-      await page.goBack(); await page.waitForURL(/\/(index\.html)?$/);
+  await block('full-session', async () => {
+    await step('finished draft and real clipboard equal typed text', async () => {
+      await page.goto(url('/'));
       await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
       await page.locator('#room').waitFor({ state: 'visible' });
       await page.locator('#editor').click();
@@ -247,17 +256,24 @@ async function run(size, browser) {
       ok(/0:00.*WORDS? KEPT\./.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
       ok((await page.locator('#room-report').textContent()).trim() === '', 'deletion report present after completion');
       ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
+      await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
       await page.locator('#copy').click();
       await page.getByRole('button', { name: 'COPIED', exact: true }).waitFor({ state: 'visible' });
+      const copied = await page.evaluate(() => navigator.clipboard.readText());
+      ok(copied === typed, 'clipboard differs from the finished draft');
     });
-    await step('fresh session deletes its draft after nine seconds of silence', async () => {
-      await page.locator('#restart').click();
+  });
+  await block('silence-wipe', async () => {
+    await step('draft is deleted after eight seconds of silence', async () => {
+      await page.goto(url('/'));
+      await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
+      await page.locator('#room').waitFor({ state: 'visible' });
       ok(await page.locator('#editor').inputValue() === '', 'restart retained text');
       await page.locator('#editor').click();
       const text = 'The rain has stopped and I can hear the birds outside.';
       await page.keyboard.type(text, { delay: 90 });
       ok(await page.locator('#editor').inputValue() === text, 'fresh session did not accept the sentence');
-      await page.waitForTimeout(9000);
+      await page.waitForTimeout(8100);
       ok(await page.locator('#editor').inputValue() === '', 'silent draft was not deleted');
       ok(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/.test(await page.locator('#room-report').innerText()), 'deletion receipt missing');
       ok(!await page.locator('#kept').isVisible(), 'silent session incorrectly kept');
@@ -290,6 +306,6 @@ console.log(`journey base=${base} out=${out}`);
 for (const s of sizes) await run(s, s.engine === 'webkit' ? wk : chrome);
 await wk.close(); await chrome.close();
 const fails = results.filter(r => r.status === 'FAIL');
-fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, results }, null, 1));
+fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, scenarios: scenarios ?? null, results }, null, 1));
 console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${results.filter(r => r.status === 'SKIP').length} EXEMPT pending captain approval: not built (sign-in / checkout / test payment / output after payment)`);
 process.exit(fails.length ? 1 : 0);

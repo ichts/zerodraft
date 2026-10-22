@@ -50,23 +50,19 @@ writeitdown.app {
 
 The DMG branch has no fallback: `file_server` returns 404 when the image is absent. The page branch resolves `/download/` to `download/index.html` before trying the home page.
 
-After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with one continuous video per viewport on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900). Its single fixed pace uses a two-second reading pause after every step and 90 ms keystrokes; there is no fast mode. It completes a real sixty-second session, verifies the exact kept draft and COPY TEXT/COPIED action, then restarts and verifies deletion after nine seconds of silence. The browser's deletion receipt is `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` It also checks the DMG content type, size and SHA-256 against the page and a random missing DMG's 404. Sign-in and payment remain SKIPs, printed as `EXEMPT pending captain approval: not built`, not passes. A successful script exit does not approve those exemptions or authorize release.
+After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with one continuous video per viewport on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900). Its single fixed pace uses a two-second reading pause after every step and 90 ms keystrokes; there is no fast mode. The named `full-session` scenario completes a real sixty-second session and verifies the exact kept draft, COPY TEXT/COPIED action and real clipboard contents. The independent `silence-wipe` scenario enters a fresh room and verifies deletion after eight seconds of silence (100 ms scheduling allowance). Chromium grants clipboard read/write permissions; WebKit grants clipboard read permission and uses its gesture-authorized write path because Playwright WebKit does not accept a clipboard-write permission. The browser's deletion receipt is `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` It also checks the DMG content type, size and SHA-256 against the page and a random missing DMG's 404. Sign-in and payment remain SKIPs, printed as `EXEMPT pending captain approval: not built`, not passes. A successful script exit does not approve those exemptions or authorize release.
 
 Pre-deploy, serve the tree plus the real DMG with `node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025` and run `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. The server does not generate installers or rewrite the published checksum; use the release artifact matching the page. The assertions are one `block()` per page section in `journey/journey.mjs`.
 
-Prove the gate rejects a known-broken room before accepting it. From `writeitdown/`, copy only production assets into a disposable directory inside the worktree, disable the room module there, and serve that copy:
+Prove the room assertions reject broken behavior before accepting them. From `writeitdown/`, run:
 
 ```sh
-mkdir -p .journey-broken
-cp *.css *.js *.mjs *.html *.woff2 og.png .journey-broken/
-cp -R download .journey-broken/
-printf 'export {};\n' > .journey-broken/room.js
-node journey/serve-local.mjs --root .journey-broken --dmg-file <real-dmg> --port 8026
-# In another terminal, from writeitdown/:
-npm run journey -- --base http://127.0.0.1:8026 --out journey-results/broken-room --expect-sha <sha>
+node journey/verify-room.mjs
 ```
 
-Require exit 1 and a room failure in `results.json`; retain the videos and results. Then run the unchanged gate against the intact tree and finally the live domain. A broken-room run is negative evidence only, never a release pass.
+It copies production assets into disposable sites under the worktree's `tmp/journey-controls/`, leaving production source unchanged. Three `room.js` mutations disable completion, disable the silence wipe, or show COPIED without writing anything. It executes the same named journey scenarios headlessly against each local site on WebKit iPhone and Chromium desktop, requires exit 1 and the expected failing assertion on both viewports, then requires both scenarios to pass on the intact site with exit 0. Each run retains continuous videos, `results.json` and a log; `report.json` records exit codes and failing assertion names. A missing browser or unrelated failure does not count as a successful negative control.
+
+For a focused reproduction against a running local site, use `npm run journey -- --base http://127.0.0.1:8025 --scenarios full-session,silence-wipe`. Omitting `--scenarios` runs the complete release journey. Focused room checks do not validate downloads or the remaining marketing/support journey, and never replace the full gate against the live domain.
 
 ### Shipped Mac journey
 

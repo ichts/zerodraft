@@ -228,6 +228,34 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
 
+test('legal pages state the 3-session trial and the local counter', async ({ page }) => {
+  await page.goto('privacy.html');
+  const privacy = page.locator('#mac + p');
+  await expect(privacy).toContainText('Your first 3 writing sessions are free.');
+  await expect(privacy).toContainText('USD 4.99 one-time license covers 2 Macs, with a 14-day refund');
+  await expect(privacy).toContainText('Buying opens soon.');
+  await expect(privacy).toContainText('local trial session counter in its settings file on the Mac');
+  await expect(privacy).toContainText('That counter is not sent anywhere.');
+
+  await page.goto('terms.html');
+  const terms = page.locator('#mac + p');
+  await expect(terms).toContainText('The Mac app includes 3 free writing sessions.');
+  await expect(terms).toContainText('USD 4.99 once for two Macs, with a 14-day refund');
+  await expect(terms).toContainText('Buying is not open yet.');
+
+  await page.goto('support.html');
+  const support = page.locator('#mac + p');
+  await expect(support).toContainText('your first 3 writing sessions are free.');
+  await expect(support).toContainText('USD 4.99 one-time license covers 2 Macs, with a 14-day refund');
+  await expect(support).toContainText('Buying is not open yet.');
+
+  await page.goto('mac.html');
+  const stored = page.locator('#privacy + p');
+  await expect(stored).toContainText('local trial session counter in its settings file on the Mac');
+  await expect(stored).toContainText('That counter is not sent anywhere.');
+  await expect(page.locator('main')).not.toContainText(/purchase is required before|activation before writing/i);
+});
+
 test('installer refuses to publish the signup form before the collector answers', () => {
   test.skip(test.info().project.name !== '1440-dark-no-preference', 'filesystem check, one project is enough');
   expect(execFileSync('python3', ['qa/test-install.py'], { encoding: 'utf8' })).toContain('refused while the waitlist collector is down');

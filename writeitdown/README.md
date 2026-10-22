@@ -27,11 +27,11 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 ### Mac download release
 
-`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. Upload the signed DMG into `/var/www/writeitdown.app/download/` first, replace the pending SHA-256 line with the published checksum (one line; the template sits in the comment above it), and pass `npm run release-check -- --download --live` before installing the site. Checkout stays closed; that gate is below.
+`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed DMG into `/var/www/writeitdown.app/download/` first, replace the pending SHA-256 line with the published checksum (one line; the template sits in the comment above it), and pass `npm run release-check -- --download --live` before installing the site. Checkout stays closed; that gate is below.
 
 ### Mac page release order
 
-`mac.html` describes the Mac app (3 free sessions, then a paid license whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
+`mac.html` describes the Mac app (3 free sessions, then a USD 4.99 one-time license for 2 Macs with a 14-day refund, whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
 
 1. Deploy the Go collector using [`services/waitlist/README.md`](../services/waitlist/README.md) behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. This is only a preflight: submit one real test address from the page, confirm its stored line, then remove it. Neither the collector's presence in this repository nor a local test proves deployment.
 2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.

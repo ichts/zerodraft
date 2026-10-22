@@ -26,7 +26,7 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 ## Signing
 - [x] Account Holder installed a valid Developer ID Application identity in the login keychain. Staging signing and notarization were verified; see `MANUAL_QA.md`. A production DMG is still pending.
 - [x] Assemble the local release app with `scripts/package-app.sh --adhoc`; the packaged resource bundle is under `Contents/Resources/` and the icon is compiled to `.icns`.
-- [ ] Set the verified Waffo checkout URL, license-service HTTPS origin, product ID and raw Ed25519 public key in `Sources/FirstLine/Info.plist`; keep them empty until then. Field formats are in `LICENSE_PAYMENT_SPEC.md`. `scripts/release-dmg.sh` refuses to ship without them; `--staging` notarizes a non-sellable build only.
+- [ ] Keep checkout and license fields empty until a verified Waffo configuration is ready. Field formats are in `LICENSE_PAYMENT_SPEC.md`. `scripts/release-dmg.sh` ships all-empty live as the three-session trial; partial or invalid fields block; `--staging` accepts only the empty configuration.
 - [ ] Run `scripts/release-dmg.sh` to sign the app with hardened runtime and timestamp, verify recursively, build the DMG, notarize, staple, validate, and write the SHA-256 checksum.
 
 ## Notarization

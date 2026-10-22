@@ -13,7 +13,7 @@ The Mac app uses the Waffo-backed service in `services/license/`, not Polar. Pri
 - `WIDLicenseProductID`: exact product identity from the service configuration.
 - `WIDLicensePublicKey`: base64 of the raw 32-byte Ed25519 **public** key, not PEM and not a private key. This is the service's token-verification key, not Waffo's RSA webhook key.
 
-No merchant credential belongs in the app. Missing or invalid configuration fails closed. `scripts/release-dmg.sh` validates these fields; `--staging` requires all four empty. Configuration does not prove that a test purchase passed.
+No merchant credential belongs in the app. All-empty live configuration is the three-session trial; partial or invalid fields still block. `scripts/release-dmg.sh` validates these fields; `--staging` requires all four empty. Configuration does not prove that a test purchase passed.
 
 ## Entitlement and persisted state
 

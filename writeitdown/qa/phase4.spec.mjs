@@ -164,6 +164,44 @@ test('demo and trial active-line placement', async ({ page }, info) => {
   console.log(info.project.name, JSON.stringify({ demo, states }));
 });
 
+test('mobile dynamic viewport keeps EXIT and word count visible with expanded toolbars', async ({ page }, info) => {
+  test.skip(info.project.use.viewport.width !== 390, 'Mobile toolbar geometry');
+  await page.addStyleTag({ content: '.home { min-height: 844px; }' });
+  for (const [state, height] of [['collapsed', 844], ['expanded', 664], ['collapsed-again', 844]]) {
+    await page.setViewportSize({ width: 390, height });
+    const demo = await page.locator('.script').evaluate(e => {
+      const line = e.getBoundingClientRect();
+      const sheet = e.closest('.paper').getBoundingClientRect();
+      return { height: sheet.height, viewport: innerHeight, ratio: (line.top + line.height / 2 - sheet.top) / sheet.height };
+    });
+    expect(demo.height / demo.viewport).toBeGreaterThanOrEqual(0.6);
+    expect(Math.abs(demo.height - (demo.viewport * 0.61 + 2))).toBeLessThan(1);
+    await enter(page);
+    await page.keyboard.insertText('Keep writing.');
+    await expect(page.locator('#room-count')).toHaveText('2 WORDS');
+    const room = await assertZen(page);
+    expect(Math.abs(demo.ratio - room.ratio)).toBeLessThanOrEqual(0.02);
+    expect(Math.abs(room.ratio - 0.39)).toBeLessThan(0.005);
+    for (const selector of ['#exit', '#room-count']) {
+      const bounds = await page.locator(selector).evaluate(e => {
+        const rect = e.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, width: rect.width,
+          height: rect.height, viewportWidth: innerWidth, viewportHeight: innerHeight };
+      });
+      expect(bounds.width).toBeGreaterThan(0);
+      expect(bounds.height).toBeGreaterThan(0);
+      expect(bounds.top).toBeGreaterThanOrEqual(0);
+      expect(bounds.left).toBeGreaterThanOrEqual(0);
+      expect(bounds.bottom).toBeLessThanOrEqual(bounds.viewportHeight);
+      expect(bounds.right).toBeLessThanOrEqual(bounds.viewportWidth);
+    }
+    await capture(page, info, `trial-toolbar-${state}`);
+    await page.locator('#exit').click();
+    await expect(page.locator('#landing .cta a')).toBeFocused();
+    await expect(page.locator('#room')).toBeHidden();
+  }
+});
+
 test('short rooms keep the writing aperture below the clock', async ({ page }, info) => {
   await page.setViewportSize({ width: info.project.use.viewport.width, height: 350 });
   await enter(page);

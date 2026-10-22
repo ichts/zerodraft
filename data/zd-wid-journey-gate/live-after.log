@@ -1,0 +1,81 @@
+journey base=https://writeitdown.app out=/Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/live-after
+engine [phone]: webkit (iPhone 14 profile: touch, DPR, UA)
+PASS [phone] landing/hero: page loads
+PASS [phone] landing/hero: H1 "We force you to" + "write it down", no final period
+PASS [phone] landing/hero: second line is the red handwritten one
+PASS [phone] landing/hero: top bar: Download for Mac pill present
+PASS [phone] landing/demo: demo sheet fills >=60% of the first viewport - 61%
+PASS [phone] landing/demo: demo is the scripted preview with a 60-second clock
+PASS [phone] landing/demo: deck line sits under the demo; CTA "Give it 60 seconds" present
+PASS [phone] landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)
+PASS [phone] landing/seo: canonical, meta description, og:*, twitter:card present and correct
+PASS [phone] landing/seo: og.png is served as an image
+PASS [phone] landing/seo: SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+
+PASS [phone] landing/seo: heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ
+PASS [phone] landing/core-rule: three moments: writing, warning 3, deleted
+PASS [phone] landing/how-it-works: 3 cards: no way back, eight seconds, reach zero
+PASS [phone] landing/facts: ledger: six rows incl. blocked, pressure, privacy, length, price, maker
+PASS [phone] landing/mac-block: USD 4.99 / 2 Macs / 14 days / macOS 14 and honest "buying opens soon"
+PASS [phone] landing/mac-block: Download free trial link reaches /download/ (200, real page)
+PASS [phone] landing/mac-block: waitlist link points at mac.html#waitlist
+PASS [phone] landing/faq: FAQ: 8 details, first open; open/close toggles by click and keyboard
+PASS [phone] landing/faq: FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)
+PASS [phone] landing/callback: call-back band repeats the line and the 60-second door
+PASS [phone] landing/footer: Trefoil Studio, Product/Help/Legal links all resolve
+PASS [phone] download: top-bar pill goes to /download/
+PASS [phone] download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon
+PASS [phone] download: no buy/checkout offered
+PASS [phone] download: DMG link is the canonical URL
+PASS [phone] download: published SHA-256 present; terms, button, DMG link, sha all on screen
+PASS [phone] download: download page: canonical + og tags + title
+PASS [phone] download: download page: Install / Activate / Refunds sections
+PASS [phone] download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published - 7883205 bytes, sha ok
+PASS [phone] room: back to landing, "Give it 60 seconds" starts the real room, typing works
+PASS [phone] legal: support reachable
+PASS [phone] legal: privacy reachable
+PASS [phone] legal: terms reachable
+PASS [phone] waitlist: waitlist form reachable
+SKIP [phone] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
+PASS [phone] console: no console errors across the journey
+video [phone]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/live-after/phone/journey-phone.webm
+engine [desktop]: chromium
+PASS [desktop] landing/hero: page loads
+PASS [desktop] landing/hero: H1 "We force you to" + "write it down", no final period
+PASS [desktop] landing/hero: second line is the red handwritten one
+PASS [desktop] landing/hero: top bar: Download for Mac pill present
+PASS [desktop] landing/demo: demo sheet fills >=60% of the first viewport - 61%
+PASS [desktop] landing/demo: demo is the scripted preview with a 60-second clock
+PASS [desktop] landing/demo: deck line sits under the demo; CTA "Give it 60 seconds" present
+PASS [desktop] landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)
+PASS [desktop] landing/seo: canonical, meta description, og:*, twitter:card present and correct
+PASS [desktop] landing/seo: og.png is served as an image
+PASS [desktop] landing/seo: SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+
+PASS [desktop] landing/seo: heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ
+PASS [desktop] landing/core-rule: three moments: writing, warning 3, deleted
+PASS [desktop] landing/how-it-works: 3 cards: no way back, eight seconds, reach zero
+PASS [desktop] landing/facts: ledger: six rows incl. blocked, pressure, privacy, length, price, maker
+PASS [desktop] landing/mac-block: USD 4.99 / 2 Macs / 14 days / macOS 14 and honest "buying opens soon"
+PASS [desktop] landing/mac-block: Download free trial link reaches /download/ (200, real page)
+PASS [desktop] landing/mac-block: waitlist link points at mac.html#waitlist
+PASS [desktop] landing/faq: FAQ: 8 details, first open; open/close toggles by click and keyboard
+PASS [desktop] landing/faq: FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)
+PASS [desktop] landing/callback: call-back band repeats the line and the 60-second door
+PASS [desktop] landing/footer: Trefoil Studio, Product/Help/Legal links all resolve
+PASS [desktop] download: top-bar pill goes to /download/
+PASS [desktop] download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon
+PASS [desktop] download: no buy/checkout offered
+PASS [desktop] download: DMG link is the canonical URL
+PASS [desktop] download: published SHA-256 present; terms, button, DMG link, sha all on screen
+PASS [desktop] download: download page: canonical + og tags + title
+PASS [desktop] download: download page: Install / Activate / Refunds sections
+PASS [desktop] download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published - 7883205 bytes, sha ok
+PASS [desktop] room: back to landing, "Give it 60 seconds" starts the real room, typing works
+PASS [desktop] legal: support reachable
+PASS [desktop] legal: privacy reachable
+PASS [desktop] legal: terms reachable
+PASS [desktop] waitlist: waitlist form reachable
+SKIP [desktop] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
+PASS [desktop] console: no console errors across the journey
+video [desktop]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/live-after/desktop/journey-desktop.webm
+
+SUMMARY base=https://writeitdown.app: 72 pass, 0 fail, 2 skip

@@ -29,6 +29,20 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 `download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Checkout stays closed; that gate is below.
 
+### Host routing (Caddy) and the release journey gate
+
+The Caddy site block for writeitdown.app must use `try_files {path} {path}/index.html /index.html`, so `/download/` serves `download/index.html` (a bare `try_files {path} /index.html` once served the home page there) and real files win. A missing `.dmg` must return 404, never the HTML fallback: guard the downloads with a matcher that skips the fallback, and serve the disk image with its type:
+
+```
+@dmg path *.dmg
+handle @dmg {
+	header Content-Type application/x-apple-diskimage
+	try_files {path}
+}
+```
+
+(`try_files {path}` with no fallback answers 404 for a missing file.) After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with a continuous video on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900), and checks the DMG type, size and SHA-256 against the page. Pre-deploy, serve the tree plus the real DMG with `node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025` and run `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. The assertions are one `block()` per page section in `journey/journey.mjs`.
+
 ### Mac page release order
 
 `mac.html` describes the Mac app (3 free sessions, then a USD 4.99 one-time license for 2 Macs with a 14-day refund, whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.

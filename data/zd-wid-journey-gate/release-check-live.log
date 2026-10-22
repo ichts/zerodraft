@@ -1,0 +1,6 @@
+
+> release-check
+> node release-check.mjs --download --live
+
+LIVE CHECK PASSED: inputs present and reachable.
+Download page ready: the DMG link and its published SHA-256 are in place.

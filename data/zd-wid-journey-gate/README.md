@@ -21,6 +21,8 @@ Download (or take given) DMG, size + sha vs published, codesign/stapler/spctl on
 ## How main runs it
 Release gate for writeitdown.app: after deploy run `cd writeitdown && npm ci && npx playwright install webkit && npm run journey:live` (base https://writeitdown.app, expects the published SHA-256 96c0...62cd; add `-- --out <dir>` for videos). Pre-deploy, serve the tree and the real DMG locally: `node journey/serve-local.mjs --root writeitdown --dmg-file <Write-It-Down-1.0.dmg> --port 8025 &` then `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. Phone = WebKit iPhone 14 at 390x844, desktop = Chromium 1440x900, one continuous human-paced video each (`WID_JOURNEY_PACE=fast` skips pauses); exit 0 only if every assertion passes. Assertions live in `writeitdown/journey/journey.mjs`, one `block()` per page section (seo, core-rule, how-it-works, facts, mac-block, faq, callback, footer, download, room, legal, waitlist, console): add a block for any new section and a step for every user-visible bug found.
 
+## Live after deploy (a4a201c + DMG 96c0c0a3): exit 0, 72 pass, 0 fail, 2 skip, phone 89.0 s, desktop 89.2 s; release-check --download --live exit 0
+
 ## Gate proof (main a4a201c, headless)
 | Run | Target | Exit | Assertions | Durations |
 |---|---|---|---|---|

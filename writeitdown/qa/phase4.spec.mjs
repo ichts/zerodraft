@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
+import { wordCount } from '../session.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -300,6 +301,9 @@ test('demo is forward-only: every event appends, Backspace is tried once and blo
   await expect(page.locator('#deny-key .key')).toHaveText('\u232B');
   await expect(page.locator('#deny-key .no-sign')).toBeVisible();
   await expect(page.locator('#cur')).toHaveText(deny.cur);
+  // The counter is the true count of everything typed so far (lines that scrolled up included), like the room.
+  const typed = count => `${count} ${count === 1 ? 'WORD' : 'WORDS'}`;
+  await expect(page.locator('#count')).toHaveText(typed(wordCount(LINES.slice(0, deny.dn).concat(deny.cur).join(' '))));
   const shake = await page.locator('#paper').evaluate(paper => paper.getAnimations().some(a => a.effect.getKeyframes().some(f => f.transform === 'translateX(-2px)')));
   expect(shake, 'the sheet shakes on the blocked Backspace').toBe(true);
   await capture(page, info, 'demo-deny');
@@ -309,6 +313,7 @@ test('demo is forward-only: every event appends, Backspace is tried once and blo
   await expect(page.locator('#deny-key')).toBeHidden();
   await seek(TIMELINE.typeEnd + 100);
   await expect(page.locator('#prev-0')).toHaveText("i'm just prete pretending.");
+  await expect(page.locator('#count')).toHaveText(typed(wordCount(LINES.join(' '))));
 });
 
 test('demo loop: forward typing, silence warning 3-2-1, cut, centered report', async ({ page }, info) => {

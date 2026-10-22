@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
 
 // Indexed pages. mac.html ships and is linked, but stays out of the sitemap until sales open.
-const pages = ['/', '/support.html', '/privacy.html', '/terms.html'];
+const pages = ['/', '/download/', '/support.html', '/privacy.html', '/terms.html'];
 const shipped = [...pages, '/mac.html'];
 const origin = 'https://writeitdown.app';
 
@@ -18,7 +18,7 @@ test('public URLs have a single apex canonical and a discoverable sitemap', asyn
   expect(urls).toEqual(pages.map(path => origin + path));
 
   for (const path of shipped) {
-    const response = await request.get('/writeitdown' + (path === '/' ? '/index.html' : path));
+    const response = await request.get('/writeitdown' + (path.endsWith('/') ? path + 'index.html' : path));
     expect(response.ok()).toBe(true);
     expect(await response.text()).toContain(`<link rel="canonical" href="${origin + path}">`);
   }
@@ -45,7 +45,7 @@ test('IndexNow key file is served, exact, and shipped by the installer', async (
 
 test('Cloudflare beacon appears exactly once on each shipped page', async ({ request }) => {
   for (const path of shipped) {
-    const response = await request.get('/writeitdown' + (path === '/' ? '/index.html' : path));
+    const response = await request.get('/writeitdown' + (path.endsWith('/') ? path + 'index.html' : path));
     const html = await response.text();
     expect(html.match(/beacon\.min\.js/g)).toHaveLength(1);
     expect(html.match(/df0c43279d154d5eb9ee4ef8a7d92fec/g)).toHaveLength(1);

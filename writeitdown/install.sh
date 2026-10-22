@@ -3,7 +3,7 @@ set -eu
 
 TARGET=/var/www/writeitdown.app
 SOURCE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-FILES='site.css archivo-expanded-800.woff2 OFL-Archivo.txt reenie-beanie.woff2 OFL-ReenieBeanie.txt theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js waitlist.js privacy.html terms.html support.html mac.html index.html og.png robots.txt sitemap.xml BingSiteAuth.xml google7787e5a0693832e8.html 1bcb6b66144003eb070fe87774217f86.txt'
+FILES='download/index.html site.css archivo-expanded-800.woff2 OFL-Archivo.txt reenie-beanie.woff2 OFL-ReenieBeanie.txt theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js waitlist.js privacy.html terms.html support.html mac.html index.html og.png robots.txt sitemap.xml BingSiteAuth.xml google7787e5a0693832e8.html 1bcb6b66144003eb070fe87774217f86.txt'
 
 [ "$(id -u)" -eq 0 ] || { echo 'Run this installer as root.' >&2; exit 1; }
 [ -d /var/www ] || { echo '/var/www must already exist.' >&2; exit 1; }
@@ -12,6 +12,7 @@ for file in $FILES; do
   [ -f "$SOURCE/$file" ] || { echo "Missing source: $file" >&2; exit 1; }
   [ ! -L "$TARGET/$file" ] || { echo "Refusing symlink: $file" >&2; exit 1; }
 done
+[ ! -L "$TARGET/download" ] || { echo 'Refusing a symlink download directory.' >&2; exit 1; }
 [ ! -L "$TARGET/index.html.dc-bak2" ] || { echo 'Refusing a symlink backup.' >&2; exit 1; }
 # mac.html carries the waitlist form: never publish it before its collector answers.
 HEALTH=${WAITLIST_HEALTH_URL:-https://writeitdown.app/api/waitlist/health}
@@ -19,6 +20,8 @@ HEALTH=${WAITLIST_HEALTH_URL:-https://writeitdown.app/api/waitlist/health}
   echo "Refusing: the waitlist collector at $HEALTH does not answer ok. Deploy services/waitlist first." >&2; exit 1; }
 
 mkdir -p "$TARGET"
+# download/ also holds the DMG, uploaded separately; only its index.html comes from here.
+install -d -m 0755 "$TARGET/download"
 if [ -f "$TARGET/index.html" ] && [ ! -e "$TARGET/index.html.dc-bak2" ]; then
   cp -p "$TARGET/index.html" "$TARGET/index.html.dc-bak2"
 fi

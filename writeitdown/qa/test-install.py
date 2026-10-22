@@ -15,7 +15,9 @@ with tempfile.TemporaryDirectory(prefix='install-check-') as temp:
     target.mkdir(parents=True)
     files = re.search(r"^FILES='([^']*)'", (source / 'install.sh').read_text(), re.M).group(1).split()
     assert 'mac.html' in files and 'index.html' in files
+    assert 'download/index.html' in files
     for name in files:
+        (payload / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, payload / name)
     script = (source / 'install.sh').read_text()
     script = script.replace('TARGET=/var/www/writeitdown.app', f'TARGET={target}')

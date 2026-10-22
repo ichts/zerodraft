@@ -5,20 +5,21 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer } from 'node:net';
 
-const shipped = ['index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html'];
+const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html'];
+const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
 
-test('Mac page sells a paid app, points to the free web trial, and has no dead or fake CTA', async ({ page }, info) => {
+test('Mac page offers the free trial download, keeps buying closed, and has no dead or fake CTA', async ({ page }, info) => {
   await page.goto('mac.html');
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
-  await expect(main).toContainText('When the native Mac app launches, a single $4.99 payment covers 2 Macs and comes with a 14-day refund.');
-  await expect(main).not.toContainText(/free (writing )?sessions|three/i);
+  await expect(main).toContainText('Your first 3 writing sessions are free. After that, a single $4.99 payment covers 2 Macs and comes with a 14-day refund. Buying opens soon.');
+  await expect(main).not.toContainText(/being prepared|when (it|sales) opens?, pick|planned/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
 
-  for (const slot of ['checkout', 'download', 'license']) {
+  for (const slot of ['checkout', 'license']) {
     const live = page.locator(`[data-launch="${slot}"]`);
     const pending = page.locator(`[data-launch-pending="${slot}"]`);
     expect(await live.count() + await pending.count(), `${slot}: exactly one live element or one pending notice`).toBe(1);
@@ -31,8 +32,10 @@ test('Mac page sells a paid app, points to the free web trial, and has no dead o
   await expect(page.locator('#waitlist-form button.door[type="submit"]')).toHaveText('NOTIFY ME');
   for (const door of await page.locator('.door:not(#waitlist-form .door)').all()) {
     expect(await door.evaluate(e => e.tagName)).toBe('A');
-    expect(await door.getAttribute('href')).toMatch(/^(index\.html#trial|https:\/\/\S+)$/);
+    expect(await door.getAttribute('href')).toMatch(/^(index\.html#trial|download\/|https:\/\/\S+)$/);
   }
+  await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
+  await expect(page.locator('.door', { hasText: 'DOWNLOAD FREE TRIAL FOR MAC' })).toHaveAttribute('href', 'download/');
   await page.locator('.door', { hasText: 'TRY IT IN YOUR BROWSER' }).click();
   await expect(page.locator('#editor')).toBeFocused();
 
@@ -76,12 +79,13 @@ test('help pages route to the Mac page', async ({ page }) => {
 });
 
 // Runs the real release gate CLI against a site copy and returns [exit code, output].
-function releaseCheck({ mac, support, checkout = '' }, ...args) {
+function releaseCheck({ mac, support, download = readFileSync('download/index.html', 'utf8'), checkout = '' }, ...args) {
   const root = mkdtempSync(join(tmpdir(), 'wid-release-'));
   const site = join(root, 'writeitdown');
   const plistDir = join(root, 'apps/macos/FirstLine/Sources/FirstLine');
-  mkdirSync(site); mkdirSync(plistDir, { recursive: true });
+  mkdirSync(join(site, 'download'), { recursive: true }); mkdirSync(plistDir, { recursive: true });
   writeFileSync(join(site, 'mac.html'), mac);
+  writeFileSync(join(site, 'download/index.html'), download);
   writeFileSync(join(site, 'support.html'), support);
   writeFileSync(join(plistDir, 'Info.plist'), readFileSync(plistPath, 'utf8')
     .replace(/(<key>WIDCheckoutURL<\/key>\s*<string>)[^<]*/, `$1${checkout}`));
@@ -96,21 +100,34 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const checkout = 'https://pay.writeitdown.app/wid-mac';
-  const downloadURL = 'https://downloads.writeitdown.app/Write-It-Down-1.0.dmg';
-  const fill = ({ buy = checkout, dmg = downloadURL,
+  const downloadPage = readFileSync('download/index.html', 'utf8');
+  const sha = 'a'.repeat(64);
+  const fill = ({ buy = checkout,
     steps = 'Open the purchase email, copy the license key, and paste it into Settings.' } = {}) => mac
     .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${buy}">BUY</a>`)
-    .replace(/<p[^>]*data-launch-pending="download"[^>]*>.*?<\/p>/, `<a class="door" data-launch="download" href="${dmg}">DOWNLOAD</a>`)
     .replace(/<p[^>]*data-launch-pending="license"[^>]*>.*?<\/p>/, `<p data-launch="license">${steps}</p>`);
+  const published = ({ digest = sha, dmg = dmgURL } = {}) => downloadPage
+    .replace(/<p[^>]*data-launch-pending="sha256"[^>]*>.*?<\/p>/, `<p class="report" id="sha256">SHA-256: <code data-launch="sha256">${digest}</code></p>`)
+    .replace(`href="${dmgURL}"`, `href="${dmg}"`);
   const contact = support;
   const noContact = support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD');
 
   const [current, currentOut] = releaseCheck({ mac, support }, '--live');
   expect(current).toBe(1);
-  for (const line of ['Checkout URL: not confirmed', 'DMG URL: not confirmed', 'activation steps: not confirmed'])
+  for (const line of ['Checkout URL: not confirmed', 'SHA-256: not published', 'activation steps: not confirmed'])
     expect(currentOut).toContain(line);
+  expect(currentOut).not.toContain('DMG URL');
 
-  const [ready, readyOut] = releaseCheck({ mac: fill(), support: contact, checkout });
+  const [pendingSha, pendingShaOut] = releaseCheck({ mac, support }, '--download');
+  expect(pendingSha).toBe(1);
+  expect(pendingShaOut).toContain('download page is not ready');
+  expect(pendingShaOut).toContain('SHA-256: not published');
+  expect(pendingShaOut).not.toContain('Checkout');
+  const [downloadReady, downloadReadyOut] = releaseCheck({ mac, support, download: published() }, '--download');
+  expect(downloadReady).toBe(0);
+  expect(downloadReadyOut).toContain('Download page ready');
+
+  const [ready, readyOut] = releaseCheck({ mac: fill(), support: contact, download: published(), checkout });
   expect(ready).toBe(0);
   expect(readyOut).toContain('Not verified live');
   expect(readyOut).toContain('real test order');
@@ -118,26 +135,27 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   const cases = [
     [{ mac: fill().replace(`<a class="door" data-launch="checkout" href="${checkout}">BUY</a>`,
       `<p data-launch="checkout" href="${checkout}">BUY</p>`) }, 'Checkout URL: not a clickable link'],
-    [{ mac: fill().replace(`<a class="door" data-launch="download" href="${downloadURL}">DOWNLOAD</a>`,
-      `<p data-launch="download" href="${downloadURL}">DOWNLOAD</p>`) }, 'DMG URL: not a clickable link'],
+    [{ download: published().replace(/<a class="door" data-launch="dmg"([^>]*)>(.*?)<\/a>/, '<p data-launch="dmg"$1>$2</p>') }, 'DMG URL: not a clickable link'],
     [{ mac: fill().replace(`data-launch="checkout" href="${checkout}"`, 'data-launch="checkout"') }, 'Checkout URL: not a real https destination'],
-    [{ mac: fill().replace(`data-launch="download" href="${downloadURL}"`, 'data-launch="download"') }, 'DMG URL: not a real https .dmg destination'],
+    [{ download: published().replace(`data-launch="dmg" href="${dmgURL}"`, 'data-launch="dmg"') }, 'DMG URL: not a real https .dmg destination'],
     [{ mac: fill({ buy: 'https://example.com/pay' }), checkout: 'https://example.com/pay' }, 'Checkout URL: not a real https destination'],
-    [{ mac: fill({ dmg: 'https://downloads.writeitdown.app/app.zip' }) }, 'DMG URL: not a real https .dmg destination'],
-    [{ mac: fill({ dmg: 'https://x.test/Write-It-Down.dmg' }) }, 'DMG URL: not a real https .dmg destination'],
+    [{ download: published({ dmg: 'https://writeitdown.app/download/app.zip' }) }, 'DMG URL: not a real https .dmg destination'],
+    [{ download: published({ dmg: 'https://x.test/Write-It-Down.dmg' }) }, 'DMG URL: not a real https .dmg destination'],
+    [{ download: published({ digest: 'TBD' }) }, 'SHA-256: not 64 lowercase hex digits'],
+    [{ download: published({ digest: 'A'.repeat(64) }) }, 'SHA-256: not 64 lowercase hex digits'],
     [{ mac: fill({ steps: 'Steps.' }) }, 'activation steps: placeholder copy'],
     [{ mac: fill(), checkout: '' }, 'WIDCheckoutURL differs'],
     [{ mac: fill().replace(`${appPrice} ONCE.`, '$9 ONCE.') }, 'Price:'],
     [{ mac: fill(), support: noContact }, 'Support address'],
   ];
   for (const [input, message] of cases) {
-    const [code, out] = releaseCheck({ support: contact, checkout, ...input });
+    const [code, out] = releaseCheck({ mac: fill(), support: contact, download: published(), checkout, ...input });
     expect(code, message).toBe(1);
     expect(out).toContain(message);
   }
 });
 
-test('landing keeps Try web primary and offers the Mac app as a secondary coming-soon link', async ({ page }, info) => {
+test('landing leads with the Mac free-trial download and keeps the web room as the second action', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
   await expect(hero.locator('h1')).toHaveText('We force you to write it down.');
@@ -166,13 +184,48 @@ test('landing keeps Try web primary and offers the Mac app as a secondary coming
   await expect(hero.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
-  await expect(hero.locator('.door')).toHaveText('Give it sixty seconds.');
-  const secondary = hero.locator('a.hero-secondary');
-  await expect(secondary).toHaveText(/BUY MAC USD 4\.99 - COMING SOON/);
+  const doors = hero.locator('.door');
+  await expect(doors).toHaveCount(2);
+  const primary = doors.first();
+  await expect(primary).toHaveText('Download free trial for Mac');
+  await expect(primary).toHaveAttribute('href', 'download/');
+  await expect(hero.locator('.offer')).toHaveText('USD 4.99 after 3 sessions, buying opens soon');
+  const web = hero.locator('a.door-ghost');
+  await expect(web).toHaveText('Try it in your browser');
+  await expect(web).toHaveAttribute('href', '#trial');
+  for (const [name, el] of [['download', primary], ['offer', hero.locator('.offer')], ['web trial', web]]) {
+    const box = await el.boundingBox();
+    expect(box.y + box.height, `${name} is on the first screen`).toBeLessThanOrEqual(page.viewportSize().height);
+  }
+  const [solid, ghost] = await Promise.all([primary, web].map(d => d.evaluate(e => getComputedStyle(e).backgroundColor)));
+  expect(ghost, 'only one primary button').toBe('rgba(0, 0, 0, 0)');
+  expect(solid).not.toBe(ghost);
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
-  await secondary.click();
-  await expect(page).toHaveURL(/\/mac\.html#waitlist$/);
-  await expect(page.locator('#waitlist-form')).toBeVisible();
+  await primary.click();
+  await expect(page).toHaveURL(/\/download\/$/);
+  await expect(page.locator('h1')).toHaveText('Write It Down for Mac');
+  await page.goBack();
+  await web.click();
+  await expect(page.locator('#editor')).toBeFocused();
+});
+
+test('download page states the trial, the DMG, its checksum slot, requirements, and the signer', async ({ page }, info) => {
+  await page.goto('download/');
+  const main = page.locator('main');
+  await expect(page.locator('#trial-terms')).toHaveText('FREE TRIAL: 3 SESSIONS, THEN USD 4.99 ONE-TIME (2 MACS, 14-DAY REFUND) - BUYING OPENS SOON.');
+  const dmg = page.locator('[data-launch="dmg"]');
+  await expect(dmg).toHaveText('Download free trial for Mac');
+  await expect(dmg).toHaveAttribute('href', dmgURL);
+  const sha = page.locator('#sha256');
+  await expect(sha).toBeVisible();
+  await expect(sha).toHaveText(/^SHA-256: ([0-9a-f]{64}|PUBLISHED WITH THE RELEASE\.)$/);
+  await expect(main).toContainText('macOS 14 Sonoma or later. One universal app for Apple silicon and Intel Macs.');
+  await expect(main).toContainText('Ziying WANG (Developer ID)');
+  await expect(main).toContainText('Buying is not open yet.');
+  await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
+  await expect(page.locator('main a[href="../mac.html#waitlist"]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+  await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
 
 test('installer refuses to publish the signup form before the collector answers', () => {

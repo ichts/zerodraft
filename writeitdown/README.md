@@ -1,6 +1,6 @@
 # WRITE_IT_DOWN
 
-A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or use the landing CTA.
+A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Try it in your browser on the landing. The solid landing button is the Mac free-trial download.
 
 ```sh
 python3 -m http.server 8000
@@ -35,6 +35,6 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 1. Deploy the Go collector using [`services/waitlist/README.md`](../services/waitlist/README.md) behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. This is only a preflight: submit one real test address from the page, confirm its stored line, then remove it. Neither the collector's presence in this repository nor a local test proves deployment.
 2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.
-3. Keep the sale closed until the separate Mac three-session trial build and its paid activation path are independently verified. Then replace each `data-launch-pending` notice on `mac.html` (checkout, license steps) with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real Waffo TEST order through checkout, callback, license email, activation and refund, and explicit approval to open.
+3. Keep the sale closed until paid checkout is integrated and independently verified. Then replace each `data-launch-pending` notice on `mac.html` (checkout, license steps) with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real Waffo TEST order through checkout, callback, license email, activation and refund, and explicit approval to open.
 
 See `QA.md` for validation evidence and limits.

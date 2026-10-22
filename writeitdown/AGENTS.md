@@ -19,7 +19,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `session.test.mjs`: deterministic timing and multilingual-count regressions.
 - `qa/input-regression.js`: browser event-path checks, including synthetic IME composition; not an OS input-method test.
 - `qa/zen-regression.js`: long multilingual text, fixed zen geometry, scroll containment, and deny-feedback regressions.
-- `qa/mac.spec.mjs`: sale-page CTA honesty, site-wide link and fragment resolution, release gate CLI fixtures, the waitlist form's JS/no-JS outcomes against both a mocked collector and the real Go collector, and the installer's collector guard.
+- `qa/mac.spec.mjs`: landing, download-page, and mac-page CTA honesty (no live checkout), site-wide link and fragment resolution, release gate CLI fixtures, the waitlist form's JS/no-JS outcomes against both a mocked collector and the real Go collector, and the installer's collector guard.
 - `qa/phase4.spec.mjs`, `playwright.config.mjs`: executable eight-project browser acceptance, accelerated clocks, screenshots, and console/network checks. Playwright is test-only; the deployed site has no package runtime.
 - `og.png`: 1200×630 light-theme social share card referenced by landing metadata.
 - `robots.txt`, `sitemap.xml`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Keep the sitemap aligned with the indexed canonical pages.

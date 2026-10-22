@@ -98,6 +98,7 @@ mkdir "$vol"
 trap 'hdiutil detach "$vol" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 hdiutil create -volname 'Write It Down' -srcfolder "$stage" -format UDRW -ov "$rw"
 hdiutil attach -readwrite -noverify -noautoopen -mountpoint "$vol" "$rw"
+# Custom-icon bit belongs on the mounted volume; -srcfolder drops folder FinderInfo.
 xcrun SetFile -a C "$vol"
 hdiutil detach "$vol"
 hdiutil convert "$rw" -format UDZO -ov -o "$dmg"

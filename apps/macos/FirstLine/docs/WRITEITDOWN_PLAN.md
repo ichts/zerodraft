@@ -225,8 +225,8 @@ These are the captain's account actions. They are needed at batch 7 and do not b
 - [x] Store notarization credentials using the existing App Store Connect API key in the login keychain under profile `writeitdown-notary`; validation succeeded. No app-specific password is needed.
 - [ ] Verify a genuine Waffo test-mode $4.99 one-time order, its signed callback, buyer-visible order number, real app activation and refund rejection. Synthetic HTTP/window fixtures do not satisfy this gate.
 - [ ] After merchant onboarding and test acceptance, supply the verified live checkout URL and service origin/product/Ed25519 public key described in `LICENSE_PAYMENT_SPEC.md`. No live checkout is configured before approval.
-- [ ] Confirm a working support email and legal copyright holder. Proposed `support@writeitdown.app` only if the mailbox exists; current Info.plist says `writeitdown`, while `LICENSE` still has a `Your Company` placeholder. Do not publish an unverified address or change legal attribution without confirmation.
-- [ ] Approve the final app icon. The current 1024 px asset was copied to `~/Desktop/writeitdown-icon.png` for review.
+- [ ] Confirm a working support email and legal copyright holder. Proposed `support@writeitdown.app` only if the mailbox exists; Info.plist copyright now says Trefoil Studio, while `LICENSE` still has a `Your Company` placeholder. Do not publish an unverified address or change legal attribution without confirmation.
+- [ ] Approve the final app icon. The current AppIcon set is in `Sources/FirstLine/Assets.xcassets/AppIcon.appiconset/`.
 - [ ] Approve the site copy for the Mac section in `writeitdown/support.html` and install the updated site bundle.
 
 ## 9. Batches

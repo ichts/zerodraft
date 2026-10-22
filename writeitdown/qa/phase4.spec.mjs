@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { TIMELINE } from '../demo-timeline.mjs';
+import { LINES, TIMELINE } from '../demo-timeline.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -39,8 +39,10 @@ async function assertZen(page) {
   expect(Math.abs(geometry.height - geometry.line * 5)).toBeLessThan(1);
   expect(geometry.visibleTextLines).toBe(3);
   expect(Math.abs(geometry.centerOffset)).toBeLessThan(1);
-  expect(Math.abs(geometry.activeCenter - Math.max(geometry.viewportHeight * 0.39,
-    geometry.roomGut + 64 + 2.5 * geometry.line))).toBeLessThan(2);
+  // The active line sits at 39% of the sheet, the Mac app's anchor (view height * 0.39), unless the sheet is too
+  // short to fit the aperture under the clock.
+  expect(Math.abs(geometry.activeCenter - geometry.paperTop - Math.max(geometry.paperHeight * 0.39,
+    44 + 2.5 * geometry.line))).toBeLessThan(2);
   expect(Math.abs(geometry.writingAreaCenter - geometry.activeCenter)).toBeLessThan(1);
   expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.bottomGap).toBeLessThan(2);
@@ -114,8 +116,8 @@ test.beforeEach(async ({ page }) => {
   demoGeometry.set(page, await page.locator('.script').evaluate(e => {
     const rect = e.getBoundingClientRect();
     const paper = e.closest('.paper').getBoundingClientRect();
-    return { line: parseFloat(getComputedStyle(e).lineHeight), paperHeight: paper.height,
-      ratio: (rect.top + rect.height / 2 - paper.top) / paper.height };
+    return { line: parseFloat(getComputedStyle(e).lineHeight), fontSize: getComputedStyle(e).fontSize,
+      paperHeight: paper.height, ratio: (rect.top + rect.height / 2 - paper.top) / paper.height };
   }));
 });
 
@@ -133,10 +135,10 @@ test('landing demo types into #cur after a hard load', async ({ page }, info) =>
   await page.reload();
   await page.evaluate(() => document.fonts.ready);
   if (info.project.use.reducedMotion === 'reduce') {
-    await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
+    await expect(page.locator('#cur')).toHaveText(LINES.at(-1));
   } else {
     await page.clock.fastForward(TIMELINE.events[0].t + 100);
-    await expect(page.locator('#cur')).toHaveText(/^c/);
+    await expect(page.locator('#cur')).toHaveText(/^i/);
   }
   await capture(page, info, 'demo-hard-load');
 });
@@ -152,6 +154,11 @@ test('demo and trial active-line placement', async ({ page }, info) => {
     states[state] = await assertZen(page);
     await capture(page, info, `placement-${state}`);
   }
+  // Journey: the demo's start line sits where the room's does (within 2% of the sheet), at the same size.
+  for (const state of Object.values(states)) expect(Math.abs(demo.ratio - state.ratio)).toBeLessThanOrEqual(0.02);
+  expect(Math.abs(demo.ratio - 0.39)).toBeLessThan(0.005);
+  expect(demo.fontSize).toBe(await editor(page).evaluate(e => getComputedStyle(e).fontSize));
+  expect(demo.line).toBeCloseTo(states.empty.line, 1);
   await info.attach('placement', { body: JSON.stringify({ demo, states }), contentType: 'application/json' });
   console.log(info.project.name, JSON.stringify({ demo, states }));
 });
@@ -266,51 +273,66 @@ test('mocked sixty-second kept, copy and Escape', async ({ page, context }, info
   await capture(page, info, 'escape');
 });
 
-test('demo correction beat: visible rhythmic deletion, then retype', async ({ page }, info) => {
-  test.skip(info.project.use.reducedMotion === 'reduce', 'reduced motion renders the static draft');
-  expect(TIMELINE.typeEnd).toBeGreaterThan(12000);
-  expect(TIMELINE.typeEnd).toBeLessThan(17000);
+test('demo is forward-only: every event appends, Backspace is tried once and blocked', async ({ page }, info) => {
   const events = TIMELINE.events;
-  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotino'));
-  const backs = events.filter(event => event.kind === 'back');
-  const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
-  expect(backs).toHaveLength(2);
-  expect(backs[0].t - typo.t).toBeLessThan(700);
-  expect(backs[1].t - backs[0].t).toBeLessThan(200);
-  expect(fixed.t - backs[1].t).toBeLessThan(550);
+  expect(events.some(event => event.kind === 'back')).toBe(false);
+  for (let i = 1; i < events.length; i++) {
+    const [before, after] = [events[i - 1], events[i]];
+    if (after.dn === before.dn) expect(after.cur.startsWith(before.cur), `${before.cur} -> ${after.cur}`).toBe(true);
+    else expect(after.dn).toBe(before.dn + 1);
+  }
+  const denies = events.filter(event => event.kind === 'deny');
+  expect(denies).toHaveLength(1);
+  const deny = denies[0];
+  expect(deny.cur).toBe("i'm just prete");
+  expect(TIMELINE.typeEnd).toBeLessThan(15000);
+  test.skip(info.project.use.reducedMotion === 'reduce', 'reduced motion renders the static draft');
   let at = 0;
   const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
-  await seek(typo.t + 55); // a 50ms tick lands past the event, before the next one
-  await expect(page.locator('#cur')).toHaveText('i dont want the promotino');
-  await capture(page, info, 'correction-typo');
-  await seek(backs[1].t + 55);
-  await expect(page.locator('#cur')).toHaveText(backs[1].cur);
-  expect(backs[1].cur.length).toBe(typo.cur.length - 2);
-  await capture(page, info, 'correction-deleting');
-  await seek(fixed.t + 55);
-  await expect(page.locator('#cur')).toHaveText('i dont want the promotion');
-  await capture(page, info, 'correction-fixed');
+  await seek(deny.t - 100);
+  await expect(page.locator('#deny-key')).toBeHidden();
+  // A visitor's own Backspace never edits the demo either.
+  await page.locator('body').click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#cur')).toHaveText(deny.cur);
+  await seek(deny.t + 55);
+  await expect(page.locator('#deny-key')).toBeVisible();
+  await expect(page.locator('#deny-key .key')).toHaveText('\u232B');
+  await expect(page.locator('#deny-key .no-sign')).toBeVisible();
+  await expect(page.locator('#cur')).toHaveText(deny.cur);
+  const shake = await page.locator('#paper').evaluate(paper => paper.getAnimations().some(a => a.effect.getKeyframes().some(f => f.transform === 'translateX(-2px)')));
+  expect(shake, 'the sheet shakes on the blocked Backspace').toBe(true);
+  await capture(page, info, 'demo-deny');
+  await seek(deny.t + 700);
+  await expect(page.locator('#cur')).toHaveText(deny.cur);
+  await seek(deny.t + 1100);
+  await expect(page.locator('#deny-key')).toBeHidden();
+  await seek(TIMELINE.typeEnd + 100);
+  await expect(page.locator('#prev-0')).toHaveText("i'm just prete pretending.");
 });
 
-test('historical demo sample without subtitles, centered report', async ({ page }, info) => {
+test('demo loop: forward typing, silence warning 3-2-1, cut, centered report', async ({ page }, info) => {
   await expect(page.locator('#demo-key')).toHaveCount(0);
   const typeEnd = TIMELINE.typeEnd, SILENT = typeEnd + 5000, WARN = SILENT + 3000, CUT = WARN + 200;
   let at = 0;
   const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
   if (info.project.use.reducedMotion !== 'reduce') await seek(typeEnd + 250);
-  await expect(page.locator('#prev-1')).toHaveText('cant say this out loud but');
-  // The demo corrects its typo on screen now, so the kept line shows the fix.
-  await expect(page.locator('#prev-0')).toHaveText('i dont want the promotion');
-  await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
+  await expect(page.locator('#prev-1')).toHaveText(LINES[1]);
+  await expect(page.locator('#prev-0')).toHaveText(LINES[2]);
+  await expect(page.locator('#cur')).toHaveText(LINES[3]);
   await capture(page, info, 'demo-typing');
   if (info.project.use.reducedMotion === 'reduce') {
     await page.clock.fastForward(30000);
     await expect(page.locator('#clock')).toHaveText('1:00');
-    await expect(page.locator('#cur')).toHaveText('promotion. i want time off');
+    await expect(page.locator('#cur')).toHaveText(LINES[3]);
+    await expect(page.locator('#deny-key')).toBeHidden();
     return;
   }
-  await seek(SILENT + 150);
-  await expect(page.locator('#paper')).toHaveClass('paper warn');
+  for (const [offset, numeral] of [[150, '3'], [1150, '2'], [2150, '1']]) {
+    await seek(SILENT + offset);
+    await expect(page.locator('#paper')).toHaveClass('paper warn');
+    await expect(page.locator('#numeral')).toHaveText(numeral);
+  }
   await capture(page, info, 'demo-warn');
   await seek(WARN + 100);
   await expect(page.locator('#paper')).toHaveClass('paper cut');
@@ -329,4 +351,34 @@ test('historical demo sample without subtitles, centered report', async ({ page 
   await capture(page, info, 'demo-report');
   await seek(CUT + 1800);
   await expect(page.locator('#cur')).not.toHaveText('');
+});
+
+test('the room wears the landing design system', async ({ page }) => {
+  await enter(page);
+  const look = await page.evaluate(() => {
+    const css = s => getComputedStyle(document.querySelector(s));
+    const probe = name => {
+      const i = document.createElement('i');
+      i.style.color = getComputedStyle(document.querySelector('#room')).getPropertyValue(name);
+      document.querySelector('#room').append(i);
+      const c = getComputedStyle(i).color; i.remove(); return c;
+    };
+    return {
+      page: css('#room').backgroundColor, pageToken: probe('--page'),
+      sheet: css('.room-paper').backgroundColor, sheetToken: probe('--sheet'),
+      sheetShadow: css('.room-paper').boxShadow, roomShadow: css('#room').boxShadow,
+      writing: css('#editor').fontFamily, tool: ['#room-clock', '#room-count', '#exit'].map(s => css(s).fontFamily),
+      washes: document.querySelectorAll('#room .wash').length,
+    };
+  });
+  expect(look.page).toBe(look.pageToken);
+  expect(look.sheet).toBe(look.sheetToken);
+  expect(look.sheetShadow).not.toBe('none');
+  expect(look.roomShadow).toBe('none');
+  expect(look.writing).toMatch(/^"?Newsreader/);
+  for (const family of look.tool) expect(family).toMatch(/system-ui/);
+  expect(look.washes, 'the warning wash lives on the sheet only').toBe(1);
+  await expect(page.locator('#room .home-nav [data-theme-toggle]')).toBeVisible();
+  await page.locator('#room [data-theme-toggle]').click();
+  await expect(editor(page), 'switching theme hands focus back to the writing').toBeFocused();
 });

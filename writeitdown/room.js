@@ -153,6 +153,10 @@ editor.addEventListener('keydown', event => {
 for (const name of ['paste', 'cut', 'drop']) editor.addEventListener(name, deny);
 editor.addEventListener('pointerup', () => { if (compositionBase === null) endCaret(); });
 $('exit').addEventListener('click', exit);
+// Switching theme from the room header hands the keyboard straight back to the writing.
+room.querySelector('[data-theme-toggle]').addEventListener('click', () => {
+  if (state.phase !== 'kept') editor.focus({ preventScroll: true });
+});
 $('restart').addEventListener('click', () => { reset(); editor.focus(); });
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && !event.isComposing && !room.hidden) exit();

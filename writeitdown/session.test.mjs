@@ -56,8 +56,8 @@ test('whitespace does not produce a kept draft', () => {
 test('demo timeline is deterministic and paced like a person', () => {
   assert.deepEqual(buildTimeline(), TIMELINE);
   const { events, typeEnd } = TIMELINE;
-  // The preview keeps a human rhythm without making the correction a
-  // performance: it should finish in roughly fifteen seconds.
+  // The preview keeps a human rhythm and a short loop: typing ends in
+  // roughly thirteen seconds.
   assert.ok(typeEnd > 12000, `typing ends at ${typeEnd}, expected over 12000`);
   assert.ok(typeEnd < 17000, `typing ends at ${typeEnd}, expected under 17000`);
   const gaps = events.slice(1).map((event, i) => event.t - events[i].t);
@@ -67,23 +67,21 @@ test('demo timeline is deterministic and paced like a person', () => {
   assert.equal(events.filter(event => event.kind === 'line').length, LINES.length - 1);
 });
 
-test('demo correction beat deletes the typo visibly, then retypes it', () => {
+test('demo is forward-only: the false start stays, Backspace is tried once and blocked', () => {
   const { events } = TIMELINE;
-  const typo = events.find(event => event.kind === 'type' && event.cur.endsWith('promotino'));
-  const backs = events.filter(event => event.kind === 'back');
-  const fixed = events.find(event => event.kind === 'type' && event.cur === 'i dont want the promotion');
-  assert.ok(typo, 'the typo word is typed in full');
-  assert.equal(backs.length, 2, 'two quick backspaces keep the correction legible');
-  assert.ok(backs.every(back => back.t > typo.t), 'deletion starts after a pause, not instantly');
-  assert.ok(backs[0].t - typo.t < 700, 'the correction starts without a long performance pause');
-  assert.ok(backs[1].t - backs[0].t < 200, 'backspace beats stay close together');
-  assert.deepEqual(backs.map(back => back.cur.length),
-    [backs[0].cur.length, backs[0].cur.length - 1],
-    'each backspace visibly removes exactly one character');
-  assert.equal(LINES[1], 'i dont want the promotino'.slice(0, -2) + 'on');
-  assert.ok(fixed && fixed.t > backs[1].t, 'the corrected word appears after the deletion');
-  assert.ok(fixed.t - backs[1].t < 550, 'the retype follows the correction quickly');
-  assert.equal(fixed.cur, LINES[1]);
+  assert.equal(events.filter(event => event.kind === 'back').length, 0, 'the demo never deletes');
+  for (let i = 1; i < events.length; i++) {
+    const [before, after] = [events[i - 1], events[i]];
+    if (after.dn === before.dn) assert.ok(after.cur.startsWith(before.cur), `${before.cur} -> ${after.cur} only appends`);
+  }
+  const denies = events.filter(event => event.kind === 'deny');
+  assert.equal(denies.length, 1, 'one blocked Backspace');
+  const [deny] = denies;
+  const before = events[events.indexOf(deny) - 1], after = events[events.indexOf(deny) + 1];
+  assert.equal(deny.cur, before.cur, 'the blocked Backspace changes nothing');
+  assert.ok(deny.t - before.t >= 350, 'a beat to notice the false start');
+  assert.ok(after.t - deny.t >= 900, 'the blocked keycap holds before typing goes on');
+  assert.equal(LINES[2], deny.cur + ' pretending.', 'the false start stays in the draft');
 });
 
 test('clock and word labels', () => {

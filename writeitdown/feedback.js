@@ -12,7 +12,8 @@ function unlock(event) {
 document.addEventListener('pointerdown', unlock);
 document.addEventListener('keydown', unlock);
 
-export function denyFeedback(paper) {
+// The landing demo replays the beat with { sound: false }: a watch-only preview never makes noise.
+export function denyFeedback(paper, { sound = true } = {}) {
   if (feedback.get(paper)?.playState === 'running') return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) paper.animate([
@@ -26,7 +27,7 @@ export function denyFeedback(paper) {
   feedback.set(paper, paper.animate([
     { outline: '1px solid var(--alarm)' }, { outline: '1px solid var(--alarm)' }
   ], { duration: FEEDBACK_DURATION }));
-  if (audio?.state !== 'running') return;
+  if (!sound || audio?.state !== 'running') return;
   const tone = audio.createOscillator();
   const gain = audio.createGain();
   tone.frequency.setValueAtTime(110, audio.currentTime);

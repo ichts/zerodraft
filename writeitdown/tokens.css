@@ -22,7 +22,8 @@
   --serif:'Newsreader',Georgia,'Times New Roman',serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
   --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
-  --t-write:clamp(22px,2.9vw,40px);
+  /* writing size and placement match the Mac app's default (28pt, anchor at 39% of the writing view) */
+  --t-write:28px;--lh-write:calc(var(--t-write) * 1.6);--write-anchor:39%;
   --t-display:clamp(34px,4.3vw,62px);
   --t-h2:clamp(34px,4.6vw,58px);--t-h3:25px;--t-body:17px;--t-ui:15px;--t-small:13px;
   /* space: 4-pt scale */
@@ -56,3 +57,4 @@
   --press:0 1px 1px rgba(0,0,0,.3),0 8px 16px -6px rgba(0,0,0,.5);
 }
 @media (max-width:820px){.home{--gut:20px;--nav-h:56px}}
+@media (max-width:767px){.home{--t-write:21px}}

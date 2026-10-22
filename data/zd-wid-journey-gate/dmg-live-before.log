@@ -1,0 +1,7 @@
+PASS download DMG (HTTP 200)
+FAIL DMG size implausible (5792 bytes)
+FAIL SHA-256 a169d1ad9c1a08f212a2ea2e6fedb086441991a44179dd1cc6fd47563cf38cf7 != published 'none'
+FAIL codesign verifies the DMG
+FAIL stapler validates the DMG ticket
+FAIL spctl accepts the DMG (open context)
+STOP: 5 failure(s) on the DMG file itself; not mounting

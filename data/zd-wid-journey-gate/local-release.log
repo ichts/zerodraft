@@ -1,0 +1,43 @@
+journey base=http://127.0.0.1:8016 out=/Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release
+PASS [phone] understand: landing loads
+PASS [phone] understand: H1 is "We force you to write it down" without final period
+PASS [phone] understand: handwritten second line
+PASS [phone] understand: deck below the demo
+PASS [phone] try: demo takes >=60% of first viewport height - 62%
+PASS [phone] no price/buy/checkout offered on landing (checkout does not exist yet)
+PASS [phone] try: "Give it 60 seconds" starts the real room and typing works
+PASS [phone] nav DOWNLOAD entry goes to /download/
+PASS [phone] download page shows trial terms
+PASS [phone] download page offers no buy/checkout (checkout does not exist yet)
+PASS [phone] download page DMG link is the canonical URL
+PASS [phone] published SHA-256 present on the page
+PASS [phone] DMG answers 200, diskimage type, plausible size, sha matches published - 2097152 bytes, sha ok
+PASS [phone] support reachable
+PASS [phone] privacy reachable
+PASS [phone] terms reachable
+PASS [phone] waitlist form reachable
+SKIP [phone] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
+PASS [phone] no console errors across the journey
+video [phone]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release/phone/journey-phone.webm
+PASS [desktop] understand: landing loads
+PASS [desktop] understand: H1 is "We force you to write it down" without final period
+PASS [desktop] understand: handwritten second line
+PASS [desktop] understand: deck below the demo
+PASS [desktop] try: demo takes >=60% of first viewport height - 61%
+PASS [desktop] no price/buy/checkout offered on landing (checkout does not exist yet)
+PASS [desktop] try: "Give it 60 seconds" starts the real room and typing works
+PASS [desktop] nav DOWNLOAD entry goes to /download/
+PASS [desktop] download page shows trial terms
+PASS [desktop] download page offers no buy/checkout (checkout does not exist yet)
+PASS [desktop] download page DMG link is the canonical URL
+PASS [desktop] published SHA-256 present on the page
+PASS [desktop] DMG answers 200, diskimage type, plausible size, sha matches published - 2097152 bytes, sha ok
+PASS [desktop] support reachable
+PASS [desktop] privacy reachable
+PASS [desktop] terms reachable
+PASS [desktop] waitlist form reachable
+SKIP [desktop] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
+PASS [desktop] no console errors across the journey
+video [desktop]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release/desktop/journey-desktop.webm
+
+SUMMARY base=http://127.0.0.1:8016: 36 pass, 0 fail, 2 skip

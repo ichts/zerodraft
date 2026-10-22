@@ -1,0 +1,233 @@
+{
+ "base": "http://127.0.0.1:8016",
+ "results": [
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "understand: landing loads",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "understand: handwritten second line",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "understand: deck below the demo",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "try: demo takes >=60% of first viewport height",
+   "msg": "62%"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "nav DOWNLOAD entry goes to /download/",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "download page shows trial terms",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "download page DMG link is the canonical URL",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "published SHA-256 present on the page",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "msg": "2097152 bytes, sha ok"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "waitlist form reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "SKIP",
+   "step": "sign-in / checkout / test payment / output after payment",
+   "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "no console errors across the journey",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "understand: landing loads",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "understand: handwritten second line",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "understand: deck below the demo",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "try: demo takes >=60% of first viewport height",
+   "msg": "61%"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "nav DOWNLOAD entry goes to /download/",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "download page shows trial terms",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "download page DMG link is the canonical URL",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "published SHA-256 present on the page",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "msg": "2097152 bytes, sha ok"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "waitlist form reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "SKIP",
+   "step": "sign-in / checkout / test payment / output after payment",
+   "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "no console errors across the journey",
+   "msg": ""
+  }
+ ]
+}

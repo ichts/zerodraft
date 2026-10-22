@@ -1,0 +1,233 @@
+{
+ "base": "https://writeitdown.app",
+ "results": [
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "understand: landing loads",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "msg": "H1 is \"We force you to write it down.\""
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "understand: handwritten second line",
+   "msg": "second line text"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "understand: deck below the demo",
+   "msg": "deck is not below the demo"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "try: demo takes >=60% of first viewport height",
+   "msg": "demo paper covers 34% of the viewport"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": "locator.click: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "nav DOWNLOAD entry goes to /download/",
+   "msg": "locator.click: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "download page shows trial terms",
+   "msg": "locator.innerText: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "download page DMG link is the canonical URL",
+   "msg": "locator.getAttribute: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "published SHA-256 present on the page",
+   "msg": "locator.innerText: Timeout 2000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "msg": "content-type text/html; charset=utf-8"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "waitlist form reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "SKIP",
+   "step": "sign-in / checkout / test payment / output after payment",
+   "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "step": "no console errors across the journey",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "understand: landing loads",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "msg": "H1 is \"We force you to write it down.\""
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "understand: handwritten second line",
+   "msg": "second line text"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "understand: deck below the demo",
+   "msg": "deck is not below the demo"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "try: demo takes >=60% of first viewport height",
+   "msg": "demo paper covers 25% of the viewport"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "try: \"Give it 60 seconds\" starts the real room and typing works",
+   "msg": "locator.click: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "nav DOWNLOAD entry goes to /download/",
+   "msg": "locator.click: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "download page shows trial terms",
+   "msg": "locator.innerText: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "download page DMG link is the canonical URL",
+   "msg": "locator.getAttribute: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "published SHA-256 present on the page",
+   "msg": "locator.innerText: Timeout 2000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "msg": "content-type text/html; charset=utf-8"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "waitlist form reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "SKIP",
+   "step": "sign-in / checkout / test payment / output after payment",
+   "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "step": "no console errors across the journey",
+   "msg": ""
+  }
+ ]
+}

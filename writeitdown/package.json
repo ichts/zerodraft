@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
-    "release-check": "node release-check.mjs"
+    "release-check": "node release-check.mjs",
+    "journey": "node journey/journey.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

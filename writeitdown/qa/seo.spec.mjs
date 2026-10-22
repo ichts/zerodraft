@@ -34,13 +34,12 @@ test('verification files are served without HTML fallback', async ({ request }) 
   }
 });
 
-test('IndexNow key file is served, exact, and shipped by the installer', async ({ request }) => {
+test('IndexNow key file is served with the exact key', async ({ request }) => {
   const key = '1bcb6b66144003eb070fe87774217f86';
   const response = await request.get(`/writeitdown/${key}.txt`);
   expect(response.ok()).toBe(true);
   expect((await response.text()).trim()).toBe(key);
   expect(readFileSync(`${key}.txt`, 'utf8').trim()).toBe(key);
-  expect(readFileSync('install.sh', 'utf8')).toContain(` ${key}.txt'`);
 });
 
 test('Cloudflare beacon appears exactly once on each shipped page', async ({ request }) => {

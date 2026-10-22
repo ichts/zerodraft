@@ -167,45 +167,50 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(families.every(f => ['Newsreader', 'Reenie Beanie', 'IBM Plex Mono'].includes(f)), families.join(', ')).toBe(true);
   const ink = await hero.evaluate(h => {
     const probe = document.createElement('i');
-    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--hand');
+    probe.style.color = getComputedStyle(h).getPropertyValue('--red');
     h.append(probe);
     const hand = getComputedStyle(probe).color;
     probe.remove();
     return { hand, actual: getComputedStyle(h.querySelector('h1 .hand')).color, line1: getComputedStyle(h.querySelector('h1 .l1')).color };
   });
-  expect(ink.actual, 'the handwritten line wears the theme red').toBe(ink.hand);
+  expect(ink.actual, 'the handwritten words wear the token red').toBe(ink.hand);
   expect(ink.actual, 'the two headline parts differ in color').not.toBe(ink.line1);
+  const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
+  expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
+  expect(tokens[5], 'the system sans maps to the locked mono face').toMatch(/IBM Plex Mono/);
 
-  const nav = page.locator('.home-nav a.pill');
+  const nav = page.locator('.home-nav a.btn-quiet');
   await expect(nav).toHaveText('Download for Mac');
   await expect(nav).toHaveAttribute('href', 'download/');
-  const card = page.locator('.card-stage');
-  await expect(card.locator('.chip')).toHaveText(/60 seconds, forward only/i);
+  const card = page.locator('.desk');
+  await expect(card.locator('.tag')).toHaveText(/60 seconds, forward only/i);
   await expect(card.locator('#clock')).toBeVisible();
   await expect(card.locator('.saved')).toHaveText(/nothing is saved/i);
   await expect(card.locator('#count')).toHaveText(/\d+ WORDS?/);
   const cta = page.locator('.cta');
   await expect(cta.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
-  const door = cta.locator('a.door');
+  const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a[href="#trial"]')).toHaveCount(1);
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { card: r('.card-stage'), deck: r('.cta .deck').top, door: r('.cta .door').bottom, vh: innerHeight };
+    return { card: r('.desk'), paper: r('#paper'), deck: r('.cta .deck').top, door: r('.cta .btn').bottom, vh: innerHeight };
   });
+  expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
+  expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);
   expect(layout.deck, 'the deck line sits under the demo card').toBeGreaterThan(layout.card.bottom);
   expect(layout.door, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
   const box = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { deck: r('.cta .deck'), door: r('.cta .door') };
+    return { deck: r('.cta .deck'), door: r('.cta .btn') };
   });
   const overlap = !(box.deck.right <= box.door.left || box.door.right <= box.deck.left || box.deck.bottom <= box.door.top || box.door.bottom <= box.deck.top);
   expect(overlap, 'the deck line and the room button do not overlap').toBe(false);
   expect(box.deck.bottom, 'the deck line is fully on the first screen').toBeLessThanOrEqual(layout.vh);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
-  await expect(page.locator('.how-card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
+  await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
   await expect(mac).toContainText('Your first 3 sessions are free. Buying opens soon.');

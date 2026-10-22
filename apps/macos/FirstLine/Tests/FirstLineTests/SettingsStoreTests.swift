@@ -98,13 +98,13 @@ struct SettingsStoreTests {
     }
 
     @Test(arguments: [nil, "", " \t\n", "TEST-KEY"] as [String?])
-    func activeSettingsRequireNonblankKeyOnInitializationAndReload(key: String?) throws {
+    func activeSettingsPreserveLicenseRecordWithoutKeyOnReload(key: String?) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
         let settings = AppSettings(theme: .dark, defaultDuration: 300, reducedMotion: .always,
                                    licenseKey: key, licenseStatus: .active)
-        #expect(settings.licenseStatus == (key == "TEST-KEY" ? .active : .inactive))
+        #expect(settings.licenseStatus == .active)
         try store.save(settings)
         #expect(try store.load() == settings)
     }

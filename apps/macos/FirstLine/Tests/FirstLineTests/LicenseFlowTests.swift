@@ -572,7 +572,7 @@ struct LicenseFlowTests {
     @Test
     func activeFlagWithoutKeyCannotSkipOfflineGrace() throws {
         let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
-                              licenseStatus: .active)
+                              trialSessionsUsed: 3, licenseStatus: .active)
         let (state, _, _, fm, root) = try makeAppState(initialSettings: old,
             clockNow: Date(timeIntervalSince1970: 2_000_000_000))
         defer { try? fm.removeItem(at: root) }

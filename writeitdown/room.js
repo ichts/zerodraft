@@ -98,7 +98,7 @@ function route() {
   room.hidden = !active;
   reset();
   if (active) { fitEditor(); editor.focus({ preventScroll: true }); }
-  else if (returning) document.querySelector('.door').focus({ preventScroll: true });
+  else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
 }
 
 function exit() {

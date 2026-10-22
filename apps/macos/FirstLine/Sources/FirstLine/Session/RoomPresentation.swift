@@ -1,8 +1,8 @@
 /*
- * [INPUT]: Site room copy and deadline/idle values from SessionEngine.
- * [OUTPUT]: Room clock, report, receipt, chosen-limit wash strength, copy, and deny state.
+ * [INPUT]: Deadline and idle values from SessionEngine, plus whether the next session may restart.
+ * [OUTPUT]: Room clock, elapsed deletion report with restart/activation copy, receipt, chosen-limit wash strength, copy, and deny state.
  * [POS]: Stateless presentation rules shared by the AppKit room and its tests.
- * [PROTOCOL]: Keep strings and wash timing aligned with writeitdown/room.js.
+ * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native wipe and receipt copy live here and are not required to match the website.
  */
 import AppKit
 
@@ -11,8 +11,8 @@ enum RoomPresentation {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    static func wipeReport(unused: Int) -> String {
-        "DRAFT WIPED - \(clock(unused)) UNUSED. TYPE TO RESTART."
+    static func wipeReport(elapsed: Int, canRestart: Bool) -> String {
+        "DRAFT DELETED AT \(clock(elapsed)). \(canRestart ? "TYPE TO START AGAIN." : "ACTIVATE TO KEEP WRITING.")"
     }
 
     static func wordLabel(_ count: Int) -> String {

@@ -244,11 +244,14 @@ struct WaffoLicenseClientTests {
         }
     }
 
-    @Test func activationRequiredBeforeFirstSessionAndAfterRefundOrExpiry() async throws {
+    @Test func activationRequiredAfterTrialAndAfterRefundOrExpiry() async throws {
         let f = SignedLicenseFixture()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         var now = f.now
+        var exhausted = AppSettings.defaultValue
+        exhausted.trialSessionsUsed = 3
+        try SettingsStore(configDirectory: root).save(exhausted)
         let state = makeState(f, root: root, clock: { now })
         #expect(state.selectedSurface == .upgrade)
         state.startSession()

@@ -10,8 +10,51 @@ struct RoomTests {
         #expect(RoomPresentation.clock(0) == "0:00")
     }
 
-    @Test func wipeReportTextMatchesWeb() {
-        #expect(RoomPresentation.wipeReport(unused: 45) == "DRAFT WIPED - 0:45 UNUSED. TYPE TO RESTART.")
+    @Test func wipeReportStatesDeletionAndRestart() {
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: true) == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN.")
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: false) == "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
+    }
+
+    @Test func wipeRearmsClockAndRestoresInputHint() throws {
+        var now = 0.0
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine(now: { now })
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root))
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        _ = room.view
+        engine.registerCommittedText("one sentence")
+        now = 7
+        room.tick()
+        now = 8.1
+        room.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.deletionElapsedSeconds == 8)
+
+        func fields(_ view: NSView) -> [NSTextField] {
+            view.subviews.flatMap { child in
+                ((child as? NSTextField).map { [$0] } ?? []) + fields(child)
+            }
+        }
+        let clock = try #require(fields(room.view).first(where: { $0.accessibilityLabel()?.hasPrefix("Time remaining") == true }))
+        let hint = try #require(fields(room.view).first(where: { $0.stringValue == "Start typing." }))
+        #expect(clock.stringValue == "1:00")
+        #expect(fields(room.view).contains { $0.stringValue == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN." && !$0.isHidden })
+        #expect(!hint.isHidden)
+    }
+
+    @Test func wipeReportUsesExactDeadlineDespiteFractionalStart() {
+        var now = 0.7
+        let engine = SessionEngine(now: { now })
+        engine.start(duration: 60)
+        engine.registerCommittedText("a")
+        now = 8.7
+        engine.tick()
+        #expect(engine.phase == .failure)
+        #expect(engine.deletionElapsedSeconds == 8)
+        #expect(RoomPresentation.wipeReport(elapsed: engine.deletionElapsedSeconds ?? -1, canRestart: false) ==
+            "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
     }
 
     @Test func keptReceiptTextMatchesWeb() {

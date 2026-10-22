@@ -97,12 +97,12 @@ struct SmokeFlowTests {
         let config = root.appendingPathComponent("Config", isDirectory: true)
         let store = SettingsStore(configDirectory: config)
         try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
-                                   licenseStatus: .active))
+                                   trialSessionsUsed: 3, licenseStatus: .active))
         let state = AppState(settingsStore: store, installIDStore: InstallIDStore(configDirectory: config))
         state.startSession()
         #expect(state.sessionEngine.phase == .idle)
         #expect(state.selectedSurface == .upgrade)
-        #expect(state.settings.licenseStatus == .inactive)
+        #expect(state.settings.licenseStatus == .active)
     }
 
     @Test
@@ -263,7 +263,9 @@ struct SmokeFlowTests {
                 input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
             }
             #expect(state.selectedSurface == .upgrade)
-            #expect(state.sessionEngine.phase == .failure)
+            #expect(state.sessionEngine.phase == .idle)
+            #expect(state.sessionEngine.text.isEmpty)
+            #expect(!state.canUseApp)
             #expect(input.string.isEmpty)
         }
     }

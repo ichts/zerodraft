@@ -13,7 +13,13 @@ struct LicenseEntitlementTests {
 
     private func makeState(at root: URL, client: MockLicenseClient = MockLicenseClient(),
                            openURL: @escaping (URL) -> Void = { _ in }) -> AppState {
-        AppState(settingsStore: SettingsStore(configDirectory: root), licenseClient: client,
+        let store = SettingsStore(configDirectory: root)
+        if !FileManager.default.fileExists(atPath: root.appendingPathComponent("settings.json").path) {
+            var exhausted = AppSettings.defaultValue
+            exhausted.trialSessionsUsed = AppState.trialSessionLimit
+            try! store.save(exhausted)
+        }
+        return AppState(settingsStore: store, licenseClient: client,
                  installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock",
                  openExternalURL: openURL)
     }
@@ -28,12 +34,13 @@ struct LicenseEntitlementTests {
         state.openSettings()
         state.closeSettings()
         #expect(!state.prepareSessionInput())
+        #expect(!state.canUseApp)
         #expect(state.selectedSurface == .upgrade)
         #expect(state.sessionEngine.phase == .idle)
         #expect(state.sessionEngine.text.isEmpty)
     }
 
-    @Test func freshInstallOnlyOffersActivationAndFullWebTrial() throws {
+    @Test func exhaustedTrialOnlyOffersActivationAndFullWebTrial() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         var opened: URL?
@@ -83,7 +90,7 @@ struct LicenseEntitlementTests {
     }
 
     @Test(arguments: [false, true])
-    func unactivatedStaleEditorRejectsCommittedAndMarkedInput(marked: Bool) throws {
+    func exhaustedStaleEditorRejectsCommittedAndMarkedInput(marked: Bool) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let state = makeState(at: root)
@@ -102,7 +109,9 @@ struct LicenseEntitlementTests {
     }
 
     @Test(arguments: [-1, 0, 1, 2, 3, 99])
-    func legacyTrialBudgetAndUnlockFlagCannotGrantAnySession(used: Int) throws {
+    func legacyTrialBudgetIsRetainedButUnlockFlagCannotGrantALicense(used: Int) throws {
+        let limit = AppState.trialSessionLimit
+        let expectedUsed = (0...limit).contains(used) ? used : limit
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -115,11 +124,13 @@ struct LicenseEntitlementTests {
             #expect(state.settings.defaultDuration == 300)
             #expect(state.settings.reducedMotion == .always)
             #expect(state.settings.licenseStatus == .inactive)
-            assertLocked(state)
+            #expect(!state.hasFullAccess)
+            #expect(state.trialSessionsRemaining == limit - expectedUsed)
+            if expectedUsed == limit { assertLocked(state) }
             try state.settingsStore.save(state.settings)
         }
         let persisted = try JSONSerialization.jsonObject(with: Data(contentsOf: root.appendingPathComponent("settings.json"))) as? [String: Any]
-        #expect(persisted?["trialSessionsUsed"] == nil)
+        #expect(persisted?["trialSessionsUsed"] as? Int == expectedUsed)
         #expect(persisted?["hasUnlockedFullAccess"] == nil)
     }
 

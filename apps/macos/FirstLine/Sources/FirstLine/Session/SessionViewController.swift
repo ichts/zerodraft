@@ -1,8 +1,8 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Window-relative writing anchor, editor focus, paid-license input gate, session-ID-bound reset, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
- * [PROTOCOL]: Keep copy and wash timing aligned with writeitdown/room.js; check nearest AGENTS.md.
+ * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native receipts live in RoomPresentation; check nearest AGENTS.md.
  */
 import AppKit
 
@@ -274,7 +274,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             countLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -24), countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
             exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -20), exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 28),
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -80),
-            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), placeholderAnchor,
+            placeholderLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 24), placeholderAnchor,
             numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), numeralLabel.centerYAnchor.constraint(equalTo: paper.bottomAnchor, constant: -170),
             warningLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), warningLabel.topAnchor.constraint(equalTo: numeralLabel.bottomAnchor, constant: 8),
         ])
@@ -282,11 +282,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func configureEditor() {
         if !engine.text.isEmpty { textView.loadRestoredText(engine.text) }
-        textView.onPrepareInput = { [weak self] in
+        textView.onPrepareInput = { [weak self] isActivity in
             guard let self else { return false }
+            if !isActivity && self.engine.phase == .failure { return true }
             let sessionID = self.engine.sessionID
-            let allowed = self.appState.prepareSessionInput()
-            if self.engine.sessionID != sessionID || self.engine.phase == .failure { self.textView.clearWipedText() }
+            let allowed = self.appState.prepareSessionInput(isActivity: isActivity)
+            if !allowed || self.engine.sessionID != sessionID || self.engine.phase == .failure || self.engine.phase == .idle {
+                self.textView.clearWipedText()
+            }
             return allowed
         }
         textView.onCommittedText = { [weak self] text in
@@ -396,8 +399,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             announce("Keep typing or the draft is deleted. Three seconds left.")
         }
         if phase == .failure, lastPhase != .failure,
-           let unused = engine.unusedSeconds {
-            announce(RoomPresentation.wipeReport(unused: unused))
+           let elapsed = engine.deletionElapsedSeconds {
+            announce(RoomPresentation.wipeReport(elapsed: elapsed, canRestart: appState.canStartSession))
         }
         if phase == .success, lastPhase != .success {
             announce("Draft kept. Copy your text before closing.")
@@ -410,13 +413,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if sessionChanged, phase == .writing {
             DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
         }
-        if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
+        if (phase == .failure || phase == .idle), !textView.string.isEmpty { textView.clearWipedText() }
         reportLabel.isHidden = phase != .failure
-        placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
-        if let unused = engine.unusedSeconds, phase == .failure {
-            reportLabel.stringValue = RoomPresentation.wipeReport(unused: unused)
+        if let elapsed = engine.deletionElapsedSeconds, phase == .failure {
+            reportLabel.stringValue = RoomPresentation.wipeReport(elapsed: elapsed, canRestart: appState.canStartSession)
         }
-        let seconds = max(0, Int(ceil(engine.remaining)))
+        let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
@@ -428,7 +430,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion, limit: engine.silenceLimit) : 0
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
-        placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
+        placeholderLabel.isHidden = (phase != .writing && phase != .failure) || !engine.text.isEmpty || !textView.string.isEmpty
         if !textView.hasMarkedText() { prepareViewport() }
     }
 

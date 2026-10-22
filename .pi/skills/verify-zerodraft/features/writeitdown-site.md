@@ -14,6 +14,6 @@ npm test                        # qa/phase4.spec.mjs, 8 projects: {1440,390} x {
 npx playwright test --project=1440-light-no-preference   # single project while iterating
 ```
 
-The suite enters through `#landing .door`, drives the editor (`#editor`), and asserts the zen geometry, forward-only denial, warn/wipe/recovery, the kept state with copy, ESC/EXIT, theme, and reduced-motion behavior, capturing per-state screenshots into `writeitdown/test-results/`.
+The suite enters through `#landing a[href="#trial"]`, drives the editor (`#editor`), and asserts the zen geometry, forward-only denial, warn/wipe/recovery, the kept state with copy, ESC/EXIT, theme, and reduced-motion behavior, capturing per-state screenshots into `writeitdown/test-results/`.
 
-**Observable end state that proves it works:** `npm test` exits 0 across all 8 projects (32 tests). Evidence (screenshots, traces on failure) lands under `writeitdown/test-results/` (override with `WID_QA_OUTPUT`).
+**Observable end state that proves it works:** `npm test` exits 0 across all 8 projects. Evidence (screenshots, traces on failure) lands under `writeitdown/test-results/` (override with `WID_QA_OUTPUT`).

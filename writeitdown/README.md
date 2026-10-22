@@ -27,7 +27,7 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 ### Mac download release
 
-`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first, replace the pending SHA-256 line with the published checksum (one line; the template sits in the comment above it), and pass `npm run release-check -- --download --live` before installing the site. Checkout stays closed; that gate is below.
+`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Checkout stays closed; that gate is below.
 
 ### Mac page release order
 

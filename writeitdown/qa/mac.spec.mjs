@@ -279,8 +279,13 @@ test('landing sections: heading tree, honest facts, FAQ matches its schema, call
   const faq = graph.find(node => node['@type'] === 'FAQPage');
   expect(faq.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), 'the FAQ schema matches the visible FAQ').toEqual(visible);
   const app = graph.find(node => node['@type'] === 'SoftwareApplication');
-  expect(app.offers).toEqual({ '@type': 'Offer', price: '4.99', priceCurrency: 'USD' });
+  expect(app.offers).toEqual({ '@type': 'Offer', price: '4.99', priceCurrency: 'USD', availability: 'https://schema.org/PreOrder' });
   expect(app.operatingSystem).toBe('macOS 14 or later');
+  expect(app.downloadUrl).toBe('https://writeitdown.app/download/');
+  const schemaProperties = value => value && typeof value === 'object'
+    ? Object.entries(value).flatMap(([key, child]) => [key, ...schemaProperties(child)]) : [];
+  for (const property of ['publisher', 'aggregateRating', 'review'])
+    expect(schemaProperties(graph)).not.toContain(property);
 
   await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
   await expect(page.locator('#mac a[href="mac.html#waitlist"]')).toHaveText('Get one email when it opens');

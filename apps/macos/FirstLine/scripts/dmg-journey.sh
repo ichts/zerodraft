@@ -3,8 +3,9 @@
 #         and output dir (default /tmp/wid-dmg-journey/<timestamp>). Env:
 #         WID_DMG_URL, WID_DMG_CLEAN_USER_EVIDENCE=<directory> (see MANUAL below).
 # [OUTPUT] Per-step PASS/FAIL lines, AX snapshots + screenshots, required screen.mov,
-#          app.log, journey.log. Exit 0 only when
-#          every automated step passed AND clean-user evidence was supplied;
+#          app.log, journey.log. Covers input, silence deletion, timed kept/copy,
+#          and exhausted-trial activation. Exit 0 only when every automated step
+#          passed AND clean-user evidence was supplied;
 #          exit 1 on any automated failure; exit 2 when automated steps passed
 #          but the manual evidence is still missing (prints exactly what).
 # [POS] apps/macos/FirstLine/scripts/dmg-journey.sh - release journey gate for the
@@ -134,6 +135,16 @@ token() { jq -r --arg r "$1" --arg l "$2" '[.elements[] | select((.role|ascii_do
 wait_has() { local i; for i in {1..40}; do snap "$1"; has "$2" && return 0; sleep 0.5; done; return 1; }
 key() { local t; t="$(jq -r '[.elements[] | select(.role == "AXTextArea")][0].element_token // empty' "$snapf")"
   cua press_key "{\"pid\":$pid,\"window_id\":$window_id,\"element_token\":\"$t\",\"key\":\"$1\"}" >/dev/null; }
+type_text() {
+  local i char
+  for ((i = 0; i < ${#1}; i++)); do
+    char="${1:i:1}"
+    [[ "$char" == ' ' ]] && char=space
+    key "$char" || return 1
+    sleep 0.09
+  done
+}
+clock_now() { python3 -c 'import time; print(time.monotonic())'; }
 
 wait_has home 'Free trial: 3 of 3 sessions left' && pass 'fresh Mac shows "Free trial: 3 of 3 sessions left."' \
   || { bad 'fresh launch does not show 3 of 3 free sessions'; exit 1; }
@@ -141,34 +152,61 @@ for used in 1 2 3; do
   tok="$(token button '1')"; [[ -n "$tok" ]] || { bad "no 1-minute button (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
   wait_has "room-$used" 'Start typing' || wait_has "room-$used" 'WORDS' || { bad "session $used room did not open"; exit 1; }
-  sentence='I watched the morning light move across the kitchen table.'
-  for ((i = 0; i < ${#sentence}; i++)); do
-    char="${sentence:i:1}"
-    [[ "$char" == ' ' ]] && char=space
-    key "$char" || { bad "session $used key delivery failed"; exit 1; }
-    sleep 0.09
-  done
+  sentence='I watched the rain cross the garden.'
+  started="$(clock_now)" || { bad 'monotonic clock unavailable'; exit 1; }
+  type_text "$sentence" || { bad "session $used key delivery failed"; exit 1; }
   snap "typed-$used"
   jq -e --arg text "$sentence" '[.elements[] | select(.role == "AXTextArea" and .value == $text)] | length == 1' "$snapf" >/dev/null \
     && pass "session $used editor contains the typed sentence" \
     || { bad "session $used editor text differs from the typed sentence"; exit 1; }
-  key escape
+  if [[ "$used" -eq 2 ]]; then
+    sleep 9
+    snap wiped-second
+    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' \
+      && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
+      && ! has 'COPY TEXT' \
+      && pass 'session 2 silence deleted the draft with a restart receipt' \
+      || { bad 'session 2 did not delete the draft after nine seconds of silence'; exit 1; }
+  elif [[ "$used" -eq 3 ]]; then
+    typed="$sentence"
+    continuation=' The clouds are moving east and the birds have started singing again.'
+    i=0
+    while python3 -c 'import sys,time; sys.exit(not (time.monotonic() - float(sys.argv[1]) < 57))' "$started"; do
+      char="${continuation:i:1}"
+      type_text "$char" || { bad 'session 3 continuous input failed'; exit 1; }
+      typed="$typed$char"
+      i=$(((i + 1) % ${#continuation}))
+    done
+    wait_has kept-third '0:00 - ' || { bad 'session 3 never reached the kept receipt'; exit 1; }
+    python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
+      || { bad 'session 3 completed before a full minute'; exit 1; }
+    has 'WORDS KEPT.' && ! has 'DRAFT DELETED AT ' \
+      && jq -e --arg text "$typed" '[.elements[] | select(.role == "AXTextArea" and .value == $text)] | length > 0' "$snapf" >/dev/null \
+      || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
+    tok="$(token button 'COPY TEXT')"
+    [[ -n "$tok" ]] || { bad 'session 3 COPY TEXT affordance missing'; exit 1; }
+    pass 'session 3 completed a full minute with exact kept text and COPY TEXT'
+    printf 'journey clipboard sentinel' | pbcopy || { bad 'could not seed clipboard for the copy assertion'; exit 1; }
+    cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
+      && wait_has copied-third 'COPIED' \
+      && python3 -c 'import subprocess,sys; sys.exit(subprocess.check_output(["pbpaste"]).decode() != sys.argv[1])' "$typed" \
+      && pass 'session 3 copied exactly the kept draft' \
+      || { bad 'session 3 copy failed or clipboard differs from kept text'; exit 1; }
+    tok="$(token button 'RUN IT AGAIN')"
+    [[ -n "$tok" ]] && cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
+      || { bad 'session 3 restart affordance missing or failed'; exit 1; }
+  fi
+  if [[ "$used" -lt 3 ]]; then
+    key escape || { bad "session $used exit failed"; exit 1; }
+  fi
   left=$((3 - used))
   if [[ "$left" -gt 0 ]]; then
     wait_has "home-$used" "Free trial: $left of 3 sessions left" && pass "session $used counted; $left left" \
       || { bad "after session $used the home does not say $left of 3 left"; exit 1; }
-  else
-    pass 'session 3 typed'
   fi
 done
 # 5. After the third session, writing needs a license: the activation page.
-snap after-third
-if ! has 'Activate Write It Down'; then
-  tok="$(token button '1')"; [[ -n "$tok" ]] && cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
-  wait_has activation 'Activate Write It Down' || true
-  snap activation
-fi
-has 'Activate Write It Down' && pass 'after 3 free sessions the activation page appears' \
+wait_has activation 'Activate Write It Down' && pass 'after 3 free sessions the activation page appears' \
   || bad 'activation page not shown after the third session'
 has 'Start typing.' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
 

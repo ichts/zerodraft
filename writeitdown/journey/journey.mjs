@@ -17,7 +17,6 @@ if (!/^https?:\/\//.test(base)) { console.error('usage: npm run journey -- --bas
 const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const expectSha = arg('expect-sha', null);
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
-const human = process.env.WID_JOURNEY_PACE !== 'fast'; // 2 s pause per step, 90 ms keystrokes
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
 const results = [];
 const NOISE = /cloudflareinsights|favicon|Access-Control-Allow-Origin|access control checks/i; // third-party beacon / local-server noise
@@ -43,7 +42,7 @@ async function run(size, browser) {
   const step = async (name, fn) => {
     try { const m = await fn(); log('PASS', `${current}: ${name}`, typeof m === 'string' ? m : ''); }
     catch (e) { log('FAIL', `${current}: ${name}`, String(e.message).split('\n')[0]); }
-    if (human) await page.waitForTimeout(2000);
+    await page.waitForTimeout(2000);
   };
   const block = async (name, fn) => { current = name; await fn(); };
   const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));

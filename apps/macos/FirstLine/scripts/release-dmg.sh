@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# [INPUT] Mode: (none) release of the Info.plist WIDReleaseMode build, or --staging (empty
-#         checkout/license configuration). free-trial requires no sale or license config and a
-#         real HTTPS WIDWaitlistURL; paid requires Waffo checkout and license service config.
+# [INPUT] Mode: (none) release or --staging. Empty checkout/license configuration is the
+#         three-session free trial; a non-empty one must be a complete Waffo configuration
+#         (--staging accepts only the empty one).
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
 #          The app is notarized and stapled on its own before the DMG, so it keeps a ticket

@@ -21,7 +21,7 @@ No merchant credential belongs in the app. Missing or invalid configuration fail
 
 Full access requires all of the following:
 
-- Active status and a nonblank order number. The old `hasUnlockedFullAccess` flag is ignored; active records without an order number are demoted to inactive without changing writing preferences.
+- Active status and a nonblank order number. The old `hasUnlockedFullAccess` flag is ignored.
 - A configured service, matching product and activation ID, and a token signed by the pinned Ed25519 public key for this installation.
 - Nonempty license and activation IDs, issuance no more than 60 seconds ahead of the clock, a seven-day signed lifetime and an expiration strictly later than now. The local validation timestamp cannot extend the signed expiration.
 - Completion of the launch validation attempt. Only transport errors, HTTP 429 and 5xx preserve valid offline access. Explicit HTTP 403 revokes it; malformed tokens, invalid signatures and unexpected responses fail closed.

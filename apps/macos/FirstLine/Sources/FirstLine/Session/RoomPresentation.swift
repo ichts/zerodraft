@@ -1,8 +1,8 @@
 /*
- * [INPUT]: Site room copy and deadline/idle values from SessionEngine.
+ * [INPUT]: Deadline and idle values from SessionEngine, plus whether the next session may restart.
  * [OUTPUT]: Room clock, elapsed deletion report with restart/activation copy, receipt, chosen-limit wash strength, copy, and deny state.
  * [POS]: Stateless presentation rules shared by the AppKit room and its tests.
- * [PROTOCOL]: Keep strings and wash timing aligned with writeitdown/room.js.
+ * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native wipe and receipt copy live here and are not required to match the website.
  */
 import AppKit
 

@@ -64,10 +64,3 @@ Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mo
 法则: 草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 Waffo-backed license service，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；真实 Waffo 测试订单和真实窗口激活通过前不得公开售卖；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。
-
-## Maintaining this file
-
-Keep this file for knowledge useful to almost every future agent session in this project.
-Do not repeat what the codebase already shows; point to the authoritative file or command instead.
-Prefer rewriting or pruning existing entries over appending new ones.
-When updating this file, preserve this bar for all agents and keep entries concise.

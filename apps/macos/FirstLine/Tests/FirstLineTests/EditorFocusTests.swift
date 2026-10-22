@@ -45,11 +45,21 @@ struct EditorFocusTests {
         #expect(abs(firstY - placeholderY) < 2)
         #expect(placeholder.isHidden)
 
-        editor.insertText("\nTwo\nThree\nFour", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let firstX = try firstLineOriginX(in: editor, room: room)
+        let hintX = room.view.convert(.zero, from: placeholder).x
+        #expect(abs(firstX - hintX) <= 2)
+        editor.insertText(" more words", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
-        let grownY = try inkCenterY(in: editor, room: room)
-        #expect((0.38...0.40).contains(grownY / room.view.bounds.height))
-        #expect(abs(grownY - placeholderY) < 2)
+        #expect(abs(try firstLineOriginX(in: editor, room: room) - firstX) <= 1)
+
+        let firstLineY = try firstLineTopY(in: editor, room: room)
+        editor.insertText("\nTwo", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        #expect(abs(try firstLineTopY(in: editor, room: room) - firstLineY) <= 1)
+        #expect(try inkCenterY(in: editor, room: room) > firstY + 20)
+        editor.insertText("\nThree\nFour\nFive\nSix\nSeven\nEight", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        #expect(try inkCenterY(in: editor, room: room) < room.view.bounds.height - 70)
     }
 
     private func descendants<T: NSView>(of view: NSView, as type: T.Type) -> [T] {
@@ -70,6 +80,22 @@ struct EditorFocusTests {
             ? layout.extraLineFragmentRect
             : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1), effectiveRange: nil)
         return windowTop(of: textView.textContainerOrigin.y + line.midY, in: textView, room: room)
+    }
+
+    private func firstLineTopY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        let line = layout.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
+        return windowTop(of: textView.textContainerOrigin.y + line.minY, in: textView, room: room)
+    }
+
+    private func firstLineOriginX(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        let line = layout.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
+        return room.view.convert(NSPoint(x: textView.textContainerOrigin.x + line.minX, y: 0), from: textView).x
     }
 
     private func inkCenterY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {

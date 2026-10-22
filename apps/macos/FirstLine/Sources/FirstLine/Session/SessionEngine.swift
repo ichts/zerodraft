@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
- * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds
+ * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds
  * [POS]: 首次输入启动时钟与绝对截止时间裁决；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
@@ -40,6 +40,7 @@ final class SessionEngine {
     private(set) var idleSeconds: TimeInterval = 0
     private(set) var wipedText = ""
     private(set) var unusedSeconds: Int?
+    private(set) var deletionElapsedSeconds: Int?
     private(set) var lastDenyAt: TimeInterval?
     private(set) var sessionID = UUID()
     var onStateChange: ((SessionPhase) -> Void)?
@@ -79,6 +80,7 @@ final class SessionEngine {
         idleSeconds = 0
         wipedText = ""
         unusedSeconds = nil
+        deletionElapsedSeconds = nil
         lastDenyAt = nil
         text = ""
         wordCount = 0
@@ -134,6 +136,9 @@ final class SessionEngine {
         if wipePassed && (!finishPassed || wipe <= finish) ||
             finishPassed && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             unusedSeconds = max(0, Int(ceil(finish - wipe)))
+            let deletionElapsed = min(duration, (wipePassed ? wipe : finish) - startedAt)
+            // Deadline arithmetic can yield 7.999999999999999 for an exact eight-second wipe.
+            deletionElapsedSeconds = max(0, Int(floor(deletionElapsed + 1e-9)))
             wipedText = text
             text = ""
             wordCount = 0
@@ -155,6 +160,7 @@ final class SessionEngine {
         idleSeconds = 0
         wipedText = ""
         unusedSeconds = nil
+        deletionElapsedSeconds = nil
         lastDenyAt = nil
         text = ""
         wordCount = 0

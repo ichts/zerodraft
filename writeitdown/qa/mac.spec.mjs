@@ -155,11 +155,11 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   }
 });
 
-test('landing leads with the Mac free-trial download and keeps the web room as the second action', async ({ page }, info) => {
+test('landing: unpunctuated headline, one web-room button, a demo that fills the first screen, the download in the nav', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
-  await expect(hero.locator('h1')).toHaveText('We force you to write it down.');
-  await expect(hero.locator('h1 .hand')).toHaveText('write it down.');
+  await expect(hero.locator('h1')).toHaveText('We force you to write it down');
+  await expect(hero.locator('h1 .hand')).toHaveText('write it down');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
   await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /Archivo Expanded/);
   const loaded = await page.evaluate(() => [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family));
@@ -181,31 +181,31 @@ test('landing leads with the Mac free-trial download and keeps the web room as t
     return (hand.getBoundingClientRect().top - h.querySelector('h1 .l1').getBoundingClientRect().bottom) / parseFloat(getComputedStyle(hand).fontSize);
   });
   expect(gap, 'the handwritten line sits clearly apart from line 1').toBeGreaterThanOrEqual(0.2);
-  await expect(hero.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
+  await expect(hero.locator('.deck')).toHaveCount(0);
+  const after = page.locator('.after .deck');
+  await expect(after).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
   const doors = hero.locator('.door');
-  await expect(doors).toHaveCount(2);
-  const primary = doors.first();
-  await expect(primary).toHaveText('Download free trial for Mac');
-  await expect(primary).toHaveAttribute('href', 'download/');
-  await expect(hero.locator('.offer')).toHaveText('USD 4.99 after 3 sessions, buying opens soon');
-  const web = hero.locator('a.door-ghost');
-  await expect(web).toHaveText('Try it in your browser');
-  await expect(web).toHaveAttribute('href', '#trial');
-  for (const [name, el] of [['download', primary], ['offer', hero.locator('.offer')], ['web trial', web]]) {
-    const box = await el.boundingBox();
-    expect(box.y + box.height, `${name} is on the first screen`).toBeLessThanOrEqual(page.viewportSize().height);
-  }
-  const [solid, ghost] = await Promise.all([primary, web].map(d => d.evaluate(e => getComputedStyle(e).backgroundColor)));
-  expect(ghost, 'only one primary button').toBe('rgba(0, 0, 0, 0)');
-  expect(solid).not.toBe(ghost);
+  await expect(doors).toHaveCount(1);
+  await expect(doors).toHaveText('Give it 60 seconds');
+  await expect(doors).toHaveAttribute('href', '#trial');
+  await expect(page.locator('#landing a[href*="download"]:not(.nav a)')).toHaveCount(0);
+  const nav = page.locator('.nav a[href="download/"]');
+  await expect(nav).toHaveText(/^DOWNLOAD/);
+  const layout = await page.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    return { door: r('.hero .door').bottom, paper: r('#paper'), deck: r('.after .deck').top, vh: innerHeight };
+  });
+  expect(layout.door, 'the button is on the first screen').toBeLessThanOrEqual(layout.vh);
+  expect((Math.min(layout.paper.bottom, layout.vh) - layout.paper.top) / layout.vh, 'the demo fills at least 60% of the first screen').toBeGreaterThanOrEqual(0.6);
+  expect(layout.deck, 'the mechanism line sits after the demo').toBeGreaterThan(layout.paper.bottom);
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
-  await primary.click();
+  await nav.click();
   await expect(page).toHaveURL(/\/download\/$/);
   await expect(page.locator('h1')).toHaveText('Write It Down for Mac');
   await page.goBack();
-  await web.click();
+  await doors.click();
   await expect(page.locator('#editor')).toBeFocused();
 });
 

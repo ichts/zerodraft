@@ -4,7 +4,7 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 
 ## Map
 
-- `index.html`: landing and directly addressable `#trial` room. The home-page H1 copy is locked to `We force you to write it down.` by captain ruling; `site.css` owns its visual treatment. Self-hosted fonts and their OFL licenses ship via `install.sh`; `qa/mac.spec.mjs` checks the headline. The first screen has one primary button, the Mac free-trial download (`download/`) with its price line, and the web room as the outlined second action; `room.js` returns focus to that `#trial` link.
+- `index.html`: landing and directly addressable `#trial` room. The home-page H1 copy is locked to `We force you to write it down` (no final period) by captain ruling; `site.css` owns its visual treatment. Self-hosted fonts and their OFL licenses ship via `install.sh`; `qa/mac.spec.mjs` checks the headline. The first screen holds the H1, one button (`Give it 60 seconds`, `#trial`; `room.js` returns focus to it), and the demo paper filling at least 60% of the viewport height; the Mac download is the nav's `DOWNLOAD` link, and the mechanism line sits after the demo.
 - `download/index.html`: the Mac free-trial download page at `/download/` (a directory because the DMG lives beside it in `download/`, uploaded separately). The DMG link and its published SHA-256 are `data-launch` slots; the checksum stays a `data-launch-pending` notice until the real DMG exists, and filling it is a one-line change.
 - `site.css`: shared geometry and semantic tokens. Both themes keep paper brighter than wall, including wash and cut.
 - `theme.js`: appearance preference only. System appearance is the default; `writeitdown-theme` is the only localStorage key.

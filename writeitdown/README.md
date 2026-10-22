@@ -1,6 +1,6 @@
 # WRITE_IT_DOWN
 
-A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Try it in your browser on the landing. The solid landing button is the Mac free-trial download.
+A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Give it 60 seconds on the landing. The landing nav's DOWNLOAD link opens the Mac free-trial download page.
 
 ```sh
 python3 -m http.server 8000

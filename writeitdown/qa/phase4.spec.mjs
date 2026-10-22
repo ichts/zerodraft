@@ -8,7 +8,7 @@ const browserEvidence = new WeakMap();
 const demoGeometry = new WeakMap();
 
 async function enter(page) {
-  await page.locator('#landing a[href="#trial"]').click();
+  await page.locator('#landing .cta a[href="#trial"]').click();
   await expect(editor(page)).toBeFocused();
 }
 
@@ -241,7 +241,7 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   await assertZen(page);
   await capture(page, info, 'wipe-report');
   await page.locator('#exit').click();
-  await expect(page.locator('#landing a[href="#trial"]')).toBeFocused();
+  await expect(page.locator('#landing .cta a[href="#trial"]')).toBeFocused();
   await capture(page, info, 'exit');
 });
 
@@ -262,7 +262,7 @@ test('mocked sixty-second kept, copy and Escape', async ({ page, context }, info
   await capture(page, info, 'copied');
   await page.keyboard.press('Escape');
   await expect(page.locator('#room')).toBeHidden();
-  await expect(page.locator('#landing a[href="#trial"]')).toBeFocused();
+  await expect(page.locator('#landing .cta a[href="#trial"]')).toBeFocused();
   await capture(page, info, 'escape');
 });
 

@@ -18,6 +18,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="preload" href="reenie-beanie.woff2" as="font" type="font/woff2" crossorigin>
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "Write It Down", "applicationCategory": "ProductivityApplication", "operatingSystem": "macOS 14 or later", "description": "Sixty seconds, forward only. Stop typing for eight seconds and your draft is deleted. Nothing is saved.", "url": "https://writeitdown.app/", "downloadUrl": "https://writeitdown.app/download/", "offers": {"@type": "Offer", "price": "4.99", "priceCurrency": "USD"}, "publisher": {"@type": "Organization", "name": "Trefoil Studio", "email": "contact@trefoilstudio.com"}}, {"@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "What happens if I stop typing?", "acceptedAnswer": {"@type": "Answer", "text": "After 5 seconds of silence a warning appears. At 8 seconds the draft is deleted. On the Mac you can choose Strict 5 s, Standard 8 s or Relaxed 12 s."}}, {"@type": "Question", "name": "Can I delete, paste or undo?", "acceptedAnswer": {"@type": "Answer", "text": "No. Deleting, pasting, cutting and undo are blocked. You can only add the next word."}}, {"@type": "Question", "name": "Is my writing saved or uploaded?", "acceptedAnswer": {"@type": "Answer", "text": "No. Nothing you write is saved. On the Mac the draft stays in memory. License checks send license details and a random installation identifier, never your draft."}}, {"@type": "Question", "name": "How long is a session?", "acceptedAnswer": {"@type": "Answer", "text": "The web version is 60 seconds. The Mac app lets you pick 1, 5, 10, 20 or 30 minutes."}}, {"@type": "Question", "name": "What happens when the clock reaches zero?", "acceptedAnswer": {"@type": "Answer", "text": "The text is yours to copy. Write It Down does not keep a copy."}}, {"@type": "Question", "name": "Is there a free trial?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. The web version is free with no sign-up, and the Mac app includes 3 free sessions before a license is required."}}, {"@type": "Question", "name": "How much does the Mac app cost?", "acceptedAnswer": {"@type": "Answer", "text": "$4.99 once, no subscription. One license works on 2 Macs, with a 14-day refund and no reason needed. Buying is not open yet: leave your email to get one notice when it opens."}}, {"@type": "Question", "name": "Which Macs does it run on?", "acceptedAnswer": {"@type": "Answer", "text": "macOS 14 Sonoma or later, on Apple silicon or Intel."}}]}]}</script>
 <script src="theme.js"></script>
 <link rel="stylesheet" href="site.css">
 <link rel="stylesheet" href="tokens.css">
@@ -64,9 +65,20 @@
     <a class="btn btn-primary" href="#trial">Give it 60 seconds</a>
   </div>
 
-  <section class="sect" aria-labelledby="how">
+  <section class="sect" id="core" aria-labelledby="core-title">
+    <p class="eyebrow">The core rule</p>
+    <h2 id="core-title">What it feels like when you <span class="hand">stop</span></h2>
+    <p class="sub">Write forward for sixty seconds. If you stop, the draft goes. Three moments, one rule.</p>
+    <div class="moments">
+      <div class="mo m1"><small>0:41 &middot; writing</small><div class="t">promotion. i want time off<span class="cur" aria-hidden="true"></span></div></div>
+      <div class="mo m2"><small>5 s &middot; warning</small><div class="n" aria-label="Three seconds left">3</div></div>
+      <div class="mo m3"><small>8 s &middot; deleted</small><div class="r">DRAFT DELETED AT 0:44. TYPE TO START AGAIN.</div></div>
+    </div>
+  </section>
+
+  <section class="sect" id="how" aria-labelledby="how-title">
     <p class="eyebrow">How it works</p>
-    <h2 id="how">Sixty seconds. Forward only. <span class="hand">Nothing kept.</span></h2>
+    <h2 id="how-title">Sixty seconds. Forward only. <span class="hand">Nothing kept.</span></h2>
     <p class="sub">Open it, start typing, say the thing you have been avoiding. The only way out is through.</p>
     <div class="cards">
       <article class="card"><div class="vis" aria-hidden="true"><div class="keys"><span class="key no">&#9003;</span><span class="key no">&#8984;V</span><span class="key no">&#8984;Z</span></div></div><div class="txt"><h3>No way back</h3><p>Deleting, pasting, cutting and undo are blocked. You can only add the next word.</p></div></article>
@@ -75,13 +87,16 @@
     </div>
   </section>
 
-  <section class="sect" aria-labelledby="moment">
-    <p class="eyebrow">The moment that matters</p>
-    <h2 id="moment">What it feels like when you <span class="hand">stop</span></h2>
-    <div class="moments">
-      <div class="mo m1"><small>0:41 &middot; writing</small><div class="t">promotion. i want time off<span class="cur" aria-hidden="true"></span></div></div>
-      <div class="mo m2"><small>5 s &middot; warning</small><div class="n" aria-label="Three seconds left">3</div></div>
-      <div class="mo m3"><small>8 s &middot; deleted</small><div class="r">DRAFT DELETED AT 0:44. TYPE TO START AGAIN.</div></div>
+  <section class="sect" id="facts" aria-labelledby="facts-title">
+    <p class="eyebrow">The facts</p>
+    <h2 id="facts-title">Real rules, real numbers</h2>
+    <div class="ledger">
+      <div><b>Blocked</b><span>Deleting, pasting, cutting and undo. You can only add the next word.</span></div>
+      <div><b>Pressure</b><span>Warning at 5 seconds of silence, deletion at 8. On the Mac: Strict 5 s, Standard 8 s or Relaxed 12 s.</span></div>
+      <div><b>Privacy</b><span>Nothing you write is saved. The Mac draft stays in memory and is never uploaded.</span></div>
+      <div><b>Length</b><span>60 seconds on the web. 1, 5, 10, 20 or 30 minutes on the Mac.</span></div>
+      <div><b>Price</b><span>3 free sessions on the Mac, then $4.99 once, no subscription, 2 Macs, 14-day refund with no reason needed. Buying opens soon.</span></div>
+      <div><b>Maker</b><span>Trefoil Studio. Write to contact@trefoilstudio.com.</span></div>
     </div>
   </section>
 
@@ -90,6 +105,7 @@
       <div>
         <h2 id="mac-title">Write It Down for Mac</h2>
         <p>A native writing room. Pick a session from one to thirty minutes and write forward. Your draft stays in memory on your Mac and is never uploaded. Your first 3 sessions are free. Buying opens soon.</p>
+        <p class="req">macOS 14 Sonoma or later &middot; Apple silicon and Intel &middot; 3 free sessions &middot; 14-day refund</p>
         <div class="actions"><a class="btn btn-primary" href="download/">Download free trial</a><a class="btn btn-ghost" href="mac.html#waitlist">Get one email when it opens</a></div>
       </div>
       <ul class="facts">
@@ -101,9 +117,36 @@
     </div>
   </section>
 
+  <section class="sect" id="faq" aria-labelledby="faq-title">
+    <div class="faqwrap">
+      <div class="side"><h2 id="faq-title">Questions, answered</h2><p>Straight answers, taken from how the app works today. Still unsure? Write to <a href="mailto:contact@trefoilstudio.com">contact@trefoilstudio.com</a>.</p></div>
+      <div class="faq">
+        <details open><summary><h3>What happens if I stop typing?</h3></summary><p>After 5 seconds of silence a warning appears. At 8 seconds the draft is deleted. On the Mac you can choose Strict 5 s, Standard 8 s or Relaxed 12 s.</p></details>
+        <details><summary><h3>Can I delete, paste or undo?</h3></summary><p>No. Deleting, pasting, cutting and undo are blocked. You can only add the next word.</p></details>
+        <details><summary><h3>Is my writing saved or uploaded?</h3></summary><p>No. Nothing you write is saved. On the Mac the draft stays in memory. License checks send license details and a random installation identifier, never your draft.</p></details>
+        <details><summary><h3>How long is a session?</h3></summary><p>The web version is 60 seconds. The Mac app lets you pick 1, 5, 10, 20 or 30 minutes.</p></details>
+        <details><summary><h3>What happens when the clock reaches zero?</h3></summary><p>The text is yours to copy. Write It Down does not keep a copy.</p></details>
+        <details><summary><h3>Is there a free trial?</h3></summary><p>Yes. The web version is free with no sign-up, and the Mac app includes 3 free sessions before a license is required.</p></details>
+        <details><summary><h3>How much does the Mac app cost?</h3></summary><p>$4.99 once, no subscription. One license works on 2 Macs, with a 14-day refund and no reason needed. Buying is not open yet: leave your email to get one notice when it opens.</p></details>
+        <details><summary><h3>Which Macs does it run on?</h3></summary><p>macOS 14 Sonoma or later, on Apple silicon or Intel.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="callback" aria-labelledby="callback-title">
+    <h2 id="callback-title">We force you to <span class="hand">write it down</span></h2>
+    <p>Stop typing for 8 seconds and it deletes everything you wrote.</p>
+    <a class="btn btn-primary" href="#trial">Give it 60 seconds</a>
+  </section>
+
   <footer class="home-foot">
-    <span>&copy; Trefoil Studio</span>
-    <nav aria-label="Footer"><a href="mac.html">Mac app</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><button class="mini-link theme-toggle" type="button" data-theme-toggle>DARK</button></nav>
+    <div class="foot-grid">
+      <div><a class="brand" href="./">Write It Down<i aria-hidden="true"></i></a><p class="note">Nothing you write is saved. Made by Trefoil Studio.</p></div>
+      <nav aria-label="Product"><p class="foot-h">Write It Down</p><a href="#trial">Try it in your browser</a><a href="download/">Mac app</a><a href="mac.html#waitlist">Get one email</a></nav>
+      <nav aria-label="Help"><p class="foot-h">Help</p><a href="support.html">Support</a><a href="mailto:contact@trefoilstudio.com">Contact</a></nav>
+      <nav aria-label="Legal"><p class="foot-h">Legal</p><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></nav>
+    </div>
+    <div class="copy"><span>&copy; 2026 Trefoil Studio</span><span>contact@trefoilstudio.com</span><button class="theme-toggle" type="button" data-theme-toggle>DARK</button></div>
   </footer>
 </main>
 <section class="stage room" id="room" aria-label="Sixty-second writing room" hidden>

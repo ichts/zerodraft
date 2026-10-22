@@ -106,19 +106,24 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
     steps = 'Open the purchase email, copy the license key, and paste it into Settings.' } = {}) => mac
     .replace(/<p[^>]*data-launch-pending="checkout"[^>]*>.*?<\/p>/, `<a class="door" data-launch="checkout" href="${buy}">BUY</a>`)
     .replace(/<p[^>]*data-launch-pending="license"[^>]*>.*?<\/p>/, `<p data-launch="license">${steps}</p>`);
+  const shaLine = /<p[^>]*id="sha256"[^>]*>.*?<\/p>/;
+  expect(downloadPage, 'the shipped page publishes a checksum').toMatch(/data-launch="sha256">[0-9a-f]{64}</);
+  const pendingPage = downloadPage.replace(shaLine, '<p class="sha" id="sha256" data-launch-pending="sha256">SHA-256: PUBLISHED WITH THE RELEASE.</p>');
   const published = ({ digest = sha, dmg = dmgURL } = {}) => downloadPage
-    .replace(/<p[^>]*data-launch-pending="sha256"[^>]*>.*?<\/p>/, `<p class="report" id="sha256">SHA-256: <code data-launch="sha256">${digest}</code></p>`)
+    .replace(shaLine, `<p class="sha" id="sha256">SHA-256: <code data-launch="sha256">${digest}</code></p>`)
     .replace(`href="${dmgURL}"`, `href="${dmg}"`);
   const contact = support;
   const noContact = support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD');
 
-  const [current, currentOut] = releaseCheck({ mac, support }, '--live');
+  const [current, currentOut] = releaseCheck({ mac, support, download: pendingPage }, '--live');
   expect(current).toBe(1);
   for (const line of ['Checkout URL: not confirmed', 'SHA-256: not published', 'activation steps: not confirmed'])
     expect(currentOut).toContain(line);
   expect(currentOut).not.toContain('DMG URL');
 
-  const [pendingSha, pendingShaOut] = releaseCheck({ mac, support }, '--download');
+  const [pendingSha, pendingShaOut] = releaseCheck({ mac, support, download: pendingPage }, '--download');
+  const [shipped, shippedOut] = releaseCheck({ mac, support }, '--download');
+  expect(shipped, shippedOut).toBe(0);
   expect(pendingSha).toBe(1);
   expect(pendingShaOut).toContain('download page is not ready');
   expect(pendingShaOut).toContain('SHA-256: not published');
@@ -135,7 +140,7 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   const cases = [
     [{ mac: fill().replace(`<a class="door" data-launch="checkout" href="${checkout}">BUY</a>`,
       `<p data-launch="checkout" href="${checkout}">BUY</p>`) }, 'Checkout URL: not a clickable link'],
-    [{ download: published().replace(/<a class="door" data-launch="dmg"([^>]*)>(.*?)<\/a>/, '<p data-launch="dmg"$1>$2</p>') }, 'DMG URL: not a clickable link'],
+    [{ download: published().replace(/<a class="[^"]*" data-launch="dmg"([^>]*)>(.*?)<\/a>/, '<p data-launch="dmg"$1>$2</p>') }, 'DMG URL: not a clickable link'],
     [{ mac: fill().replace(`data-launch="checkout" href="${checkout}"`, 'data-launch="checkout"') }, 'Checkout URL: not a real https destination'],
     [{ download: published().replace(`data-launch="dmg" href="${dmgURL}"`, 'data-launch="dmg"') }, 'DMG URL: not a real https .dmg destination'],
     [{ mac: fill({ buy: 'https://example.com/pay' }), checkout: 'https://example.com/pay' }, 'Checkout URL: not a real https destination'],
@@ -194,7 +199,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
-  await expect(page.locator('#landing a[href="#trial"]')).toHaveCount(1);
+  await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
     return { card: r('#paper'), paper: r('#paper'), deck: r('.cta .deck').top, door: r('.cta .btn').bottom, vh: innerHeight };
@@ -249,6 +254,43 @@ test('light is the default theme; the toggle switches to dark and remembers it',
   await context.close();
 });
 
+test('landing sections: heading tree, honest facts, FAQ matches its schema, call-back enters the room', async ({ page }) => {
+  await page.goto('index.html');
+  await expect(page.locator('#landing h1')).toHaveCount(1);
+  await expect(page.locator('#landing h2')).toHaveText([
+    /What it feels like when you stop/, /Sixty seconds\. Forward only\. Nothing kept\./, 'Real rules, real numbers',
+    'Write It Down for Mac', 'Questions, answered', /We force you to write it down/]);
+  const ledger = page.locator('#facts .ledger');
+  for (const fact of ['Strict 5 s, Standard 8 s or Relaxed 12 s', '1, 5, 10, 20 or 30 minutes', '3 free sessions on the Mac, then $4.99 once', 'Buying opens soon.', 'Trefoil Studio'])
+    await expect(ledger).toContainText(fact);
+  await expect(page.locator('#mac')).toContainText('macOS 14 Sonoma or later');
+
+  const questions = page.locator('#faq details');
+  await expect(questions).toHaveCount(8);
+  await expect(questions.first()).toHaveAttribute('open', '');
+  const second = questions.nth(1);
+  await expect(second.locator('p')).toBeHidden();
+  await second.locator('summary').click();
+  await expect(second.locator('p')).toBeVisible();
+  await second.locator('summary').click();
+  await expect(second.locator('p')).toBeHidden();
+  const visible = await questions.evaluateAll(list => list.map(d => [d.querySelector('summary').textContent.trim(), d.querySelector('p').textContent.trim()]));
+  const graph = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent())['@graph'];
+  const faq = graph.find(node => node['@type'] === 'FAQPage');
+  expect(faq.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), 'the FAQ schema matches the visible FAQ').toEqual(visible);
+  const app = graph.find(node => node['@type'] === 'SoftwareApplication');
+  expect(app.offers).toEqual({ '@type': 'Offer', price: '4.99', priceCurrency: 'USD' });
+  expect(app.operatingSystem).toBe('macOS 14 or later');
+
+  await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
+  await expect(page.locator('#mac a[href="mac.html#waitlist"]')).toHaveText('Get one email when it opens');
+  await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
+  for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mac.html#waitlist'])
+    await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
+  await page.locator('.callback a.btn-primary').click();
+  await expect(page.locator('#editor')).toBeFocused();
+});
+
 test('download page states the trial, the DMG, its checksum slot, requirements, and the signer', async ({ page }, info) => {
   await page.goto('download/');
   const main = page.locator('main');
@@ -258,12 +300,16 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(dmg).toHaveAttribute('href', dmgURL);
   const sha = page.locator('#sha256');
   await expect(sha).toBeVisible();
-  await expect(sha).toHaveText(/^SHA-256: ([0-9a-f]{64}|PUBLISHED WITH THE RELEASE\.)$/);
-  await expect(main).toContainText('macOS 14 Sonoma or later. One universal app for Apple silicon and Intel Macs.');
+  await expect(sha).toHaveText('SHA-256: 96c0c0a34733f92c1b47b1231c3243612c71614074dd6179ac3d61c80d5462cd');
+  await expect(page.locator('#requirements')).toContainText('macOS 14 Sonoma or later');
+  await expect(page.locator('#requirements')).toContainText('One universal app for Apple silicon and Intel Macs.');
   await expect(main).toContainText('Ziying WANG (Developer ID)');
   await expect(main).toContainText('Buying is not open yet.');
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
-  await expect(page.locator('main a[href="../mac.html#waitlist"]')).toBeVisible();
+  await expect(page.locator('main a[href="../mac.html#waitlist"]').first()).toBeVisible();
+  await expect(page.locator('h1')).toHaveCount(1);
+  for (const id of ['install', 'trial', 'refunds']) await expect(page.locator(`#${id} h2`)).toBeVisible();
+  await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });

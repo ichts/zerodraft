@@ -1,13 +1,14 @@
-/* Write It Down design tokens v1 (design system 2026-10-22, "Paper in light").
+/* Write It Down design tokens (design system v1, with the captain's background option A: near-white page,
+   no beige desk, depth from the white sheet's shadow only).
    Source of truth for colour, type, space, shape, depth and motion on the landing; the Mac app mirrors the
    same names. Scoped to .home until the other pages adopt the system. Faces stay the locked pair: Newsreader
    (what you write) and Reenie Beanie (the pen). The system's UI sans maps to IBM Plex Mono, the site's
    existing tool face. Dark keeps the same names. */
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
-  --page:#fbfaf7;
-  --stage-a:#efe9dc;--stage-b:#e5dece;
-  --sheet:#fffefb;
+  --page:#f7f7f5;
+  --stage-a:var(--page);--stage-b:var(--page);
+  --sheet:#ffffff;
   --ink:#1c1917;
   --mute:#6b655c;
   --chrome:#5c564d;
@@ -15,7 +16,7 @@
   --hair-2:rgba(28,25,23,.16);
   --red:#b02a1e;
   --red-soft:#f6e2dc;--red-deep:#ebc8bd;
-  --tag-bg:#f5f2ea;
+  --tag-bg:#f2f2f0;
   --on-ink:#ffffff;
   /* type: serif = written text and display, hand = the pen, sans = the tool */
   --serif:'Newsreader',Georgia,'Times New Roman',serif;
@@ -31,16 +32,15 @@
   --r-ctl:8px;--r-sheet:16px;--r-card:22px;--r-stage:28px;--r-pill:999px;
   /* depth: hairline ring + 3 soft layers tinted with ink */
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(28,25,23,.04),0 2px 4px rgba(28,25,23,.04),0 8px 16px -4px rgba(28,25,23,.06),0 24px 48px -16px rgba(28,25,23,.10);
-  --sheet-shadow:0 0 0 1px rgba(28,25,23,.07),0 1px 1px rgba(28,25,23,.05),0 6px 12px -4px rgba(28,25,23,.08),0 28px 56px -20px rgba(28,25,23,.22);
+  --sheet-shadow:0 0 0 1px rgba(28,25,23,.07),0 2px 4px rgba(28,25,23,.05),0 12px 24px -8px rgba(28,25,23,.12),0 36px 72px -24px rgba(28,25,23,.20);
   --press:inset 0 1px 0 rgba(255,255,255,.14),0 1px 1px rgba(0,0,0,.2),0 8px 16px -6px rgba(28,25,23,.35);
-  --desk-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 1px 1px rgba(28,25,23,.04),0 12px 24px -12px rgba(28,25,23,.12);
   /* motion: feedback fast, entrances slow, expo ease-out */
   --ease-out:cubic-bezier(.22,1,.36,1);
   --d-feedback:.16s;--d-enter:.6s;--d-write:.9s;
 }
 :root:not([data-theme="light"]) .home{
   --page:#15140f;
-  --stage-a:#1f1d17;--stage-b:#1a1813;
+  --stage-a:var(--page);--stage-b:var(--page);
   --sheet:#26231c;
   --ink:#ece7d9;
   --mute:#a39d8e;
@@ -54,6 +54,5 @@
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.2),0 24px 48px -16px rgba(0,0,0,.5);
   --sheet-shadow:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.25),0 28px 56px -20px rgba(0,0,0,.6);
   --press:0 1px 1px rgba(0,0,0,.3),0 8px 16px -6px rgba(0,0,0,.5);
-  --desk-shadow:inset 0 1px 0 rgba(236,231,217,.05),0 12px 24px -12px rgba(0,0,0,.4);
 }
 @media (max-width:820px){.home{--gut:20px;--nav-h:56px}}

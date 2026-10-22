@@ -170,13 +170,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .hand{font-family:var(--hand);font-weight:400;color:var(--red);letter-spacing:0;white-space:nowrap}
 .home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
 @keyframes wid-write{to{clip-path:inset(-10% -4% -20% 0)}}
-/* stage (the desk) + sheet (the paper): the demo.js preview */
+/* sheet (the paper): the demo.js preview */
 .stagewrap{max-width:var(--maxw);margin:22px auto 0;padding:0 var(--gut)}
-/* The captain's rule: the paper holding the demo is at least 60% of the first viewport. */
-.desk{--desk-pad:clamp(12px,3vw,34px);position:relative;border-radius:var(--r-stage);border:1px solid var(--hair-2);background:linear-gradient(180deg,var(--stage-a),var(--stage-b));box-shadow:var(--desk-shadow);height:max(420px,calc(61svh + 2 * var(--desk-pad) + 2px));padding:var(--desk-pad);overflow:hidden}
-.desk > .wash{border-radius:inherit}
-.home .paper{height:100%;max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-wall:var(--red-soft);--wash-paper:var(--red-soft);--deep-wall:var(--red-deep);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:calc(var(--t-write) * 1.36);--num:clamp(110px,16vw,190px)}
-.desk{--wash-wall:var(--red-soft);--deep-wall:var(--red-deep)}
+/* The sheet sits straight on the page (background option A). The captain's rule: the demo sheet is at least 60% of the first viewport. */
+.stagewrap{position:relative;--wash-wall:var(--red-soft);--deep-wall:var(--red-deep)}
+/* No desk behind the sheet, so the warning wash lives on the sheet only. */
+.stagewrap > .wash{display:none}
+.home .paper{height:max(320px,calc(61svh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-wall:var(--red-soft);--wash-paper:var(--red-soft);--deep-wall:var(--red-deep);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:calc(var(--t-write) * 1.36);--num:clamp(110px,16vw,190px)}
 .home .paper > .wash{border-radius:inherit}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:space-between;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);color:var(--ink)}
@@ -248,7 +248,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .home .h1{flex-direction:column;align-items:center;font-size:clamp(34px,10.5vw,44px)}
   .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 4.6));margin-top:.02em}
   .stagewrap{margin-top:10px}
-  .desk{border-radius:var(--r-card)}
   .home .paper{border-radius:14px}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
   .cta{gap:var(--s2);padding-top:10px;flex-direction:column}

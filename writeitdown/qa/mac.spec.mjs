@@ -182,7 +182,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const nav = page.locator('.home-nav a.btn-quiet');
   await expect(nav).toHaveText('Download for Mac');
   await expect(nav).toHaveAttribute('href', 'download/');
-  const card = page.locator('.desk');
+  const card = page.locator('#paper');
   await expect(card.locator('.tag')).toHaveText(/60 seconds, forward only/i);
   await expect(card.locator('#clock')).toBeVisible();
   await expect(card.locator('.saved')).toHaveText(/nothing is saved/i);
@@ -195,7 +195,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#landing a[href="#trial"]')).toHaveCount(1);
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { card: r('.desk'), paper: r('#paper'), deck: r('.cta .deck').top, door: r('.cta .btn').bottom, vh: innerHeight };
+    return { card: r('#paper'), paper: r('#paper'), deck: r('.cta .deck').top, door: r('.cta .btn').bottom, vh: innerHeight };
   });
   expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);

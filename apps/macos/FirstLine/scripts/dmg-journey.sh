@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # [INPUT] Optional DMG path (default: download https://writeitdown.app/download/Write-It-Down-1.0.dmg)
 #         and output dir (default /tmp/wid-dmg-journey/<timestamp>). Env:
-#         WID_DMG_URL, WID_DMG_CLEAN_USER_EVIDENCE=<file> (see MANUAL below).
-# [OUTPUT] Per-step PASS/FAIL lines, AX snapshots + screenshots, screen.mov when
-#          screen recording is permitted, app.log, journey.log. Exit 0 only when
+#         WID_DMG_URL, WID_DMG_CLEAN_USER_EVIDENCE=<directory> (see MANUAL below).
+# [OUTPUT] Per-step PASS/FAIL lines, AX snapshots + screenshots, required screen.mov,
+#          app.log, journey.log. Exit 0 only when
 #          every automated step passed AND clean-user evidence was supplied;
 #          exit 1 on any automated failure; exit 2 when automated steps passed
 #          but the manual evidence is still missing (prints exactly what).
@@ -17,8 +17,8 @@
 #            quarantined copy (launching the binary directly bypasses it).
 #            MANUAL: a physically clean macOS user (fresh login, real Finder
 #            drag-to-Applications, first-launch Gatekeeper dialog) cannot be
-#            scripted from this session. Supply a file at WID_DMG_CLEAN_USER_EVIDENCE
-#            (a recording or note of that run) to turn the final exit from 2 to 0.
+#            scripted from this session. WID_DMG_CLEAN_USER_EVIDENCE must contain
+#            a nonempty .mov/.mp4 recording and notes.md or notes.txt for exit 0.
 set -uo pipefail
 
 DMG_URL="${WID_DMG_URL:-https://writeitdown.app/download/Write-It-Down-1.0.dmg}"
@@ -32,17 +32,43 @@ pass() { log "PASS $1"; }
 bad() { log "FAIL $1"; failures=$((failures + 1)); }
 step() { local name="$1"; shift; if "$@" >>"$out/journey.log" 2>&1; then pass "$name"; else bad "$name"; return 1; fi; }
 cleanup() {
+  local status=$? recorder_status=0 i
+  trap - EXIT
   [[ -n "$pid" ]] && { kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; }
-  [[ -n "$rec_pid" ]] && { kill -INT "$rec_pid" 2>/dev/null; sleep 4; kill -TERM "$rec_pid" 2>/dev/null; }
+  if [[ -n "$rec_pid" ]]; then
+    if kill -0 "$rec_pid" 2>/dev/null; then
+      kill -INT "$rec_pid" 2>/dev/null || bad 'could not stop screen recorder'
+      for i in {1..50}; do
+        kill -0 "$rec_pid" 2>/dev/null || break
+        sleep 0.1
+      done
+      if kill -0 "$rec_pid" 2>/dev/null; then
+        bad 'screen recorder failed to finish after stopping'
+        kill -TERM "$rec_pid" 2>/dev/null
+      fi
+    else
+      bad 'screen recorder exited before the journey ended'
+    fi
+    wait "$rec_pid" || recorder_status=$?
+    [[ "$recorder_status" -eq 0 ]] || bad "screen recorder exited with status $recorder_status"
+    [[ -s "$out/screen.mov" ]] && pass 'nonempty screen.mov recorded' || bad 'screen.mov missing or empty'
+  else
+    bad 'screen recorder was not started'
+  fi
   [[ -n "$mnt" ]] && hdiutil detach "$mnt" -quiet -force 2>/dev/null
   rm -rf "$work"
+  [[ "$failures" -eq 0 ]] || status=1
+  log "FINAL automated failures: $failures; exit $status"
+  exit "$status"
 }
 trap cleanup EXIT
 
-# Screen recording (needs the invoking terminal to hold screen-recording permission).
-if screencapture -v -V 600 "$out/screen.mov" 2>/dev/null & rec_pid=$!; sleep 2; ! kill -0 "$rec_pid" 2>/dev/null; then
-  log 'WARN screen.mov not recorded (grant screen recording to this terminal); per-step screenshots are still captured'
-  rec_pid=''
+[[ ! -e "$out/screen.mov" ]] || { bad 'screen.mov already exists; use a fresh output directory'; exit 1; }
+screencapture -v -V 600 "$out/screen.mov" 2>"$out/recorder.log" & rec_pid=$!
+sleep 2
+if ! kill -0 "$rec_pid" 2>/dev/null; then
+  bad 'screen recording failed to start (check terminal screen-recording permission)'
+  exit 1
 fi
 
 # 1. Obtain the DMG and compare with the published checksum.
@@ -115,7 +141,18 @@ for used in 1 2 3; do
   tok="$(token button '1')"; [[ -n "$tok" ]] || { bad "no 1-minute button (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
   wait_has "room-$used" 'Start typing' || wait_has "room-$used" 'WORDS' || { bad "session $used room did not open"; exit 1; }
-  key a; sleep 0.5; key escape            # first character counts the session
+  sentence='I watched the morning light move across the kitchen table.'
+  for ((i = 0; i < ${#sentence}; i++)); do
+    char="${sentence:i:1}"
+    [[ "$char" == ' ' ]] && char=space
+    key "$char" || { bad "session $used key delivery failed"; exit 1; }
+    sleep 0.09
+  done
+  snap "typed-$used"
+  jq -e --arg text "$sentence" '[.elements[] | select(.role == "AXTextArea" and .value == $text)] | length == 1' "$snapf" >/dev/null \
+    && pass "session $used editor contains the typed sentence" \
+    || { bad "session $used editor text differs from the typed sentence"; exit 1; }
+  key escape
   left=$((3 - used))
   if [[ "$left" -gt 0 ]]; then
     wait_has "home-$used" "Free trial: $left of 3 sessions left" && pass "session $used counted; $left left" \
@@ -138,8 +175,15 @@ has 'Start typing.' && bad 'editor is still writable after the free sessions' ||
 # 6. Manual remainder.
 log "SUMMARY automated failures: $failures (artifacts: $out)"
 [[ "$failures" -eq 0 ]] || exit 1
-if [[ -n "${WID_DMG_CLEAN_USER_EVIDENCE:-}" && -s "$WID_DMG_CLEAN_USER_EVIDENCE" ]]; then
-  log "PASS clean-user evidence supplied: $WID_DMG_CLEAN_USER_EVIDENCE"; exit 0
+evidence="${WID_DMG_CLEAN_USER_EVIDENCE:-}"
+if [[ -d "$evidence" ]]; then
+  recording=''
+  for candidate in "$evidence"/*.mov "$evidence"/*.mp4; do
+    [[ -f "$candidate" && -s "$candidate" ]] && { recording="$candidate"; break; }
+  done
+  if [[ -n "$recording" ]] && { [[ -f "$evidence/notes.md" && -s "$evidence/notes.md" ]] || [[ -f "$evidence/notes.txt" && -s "$evidence/notes.txt" ]]; }; then
+    log "PASS clean-user evidence supplied: $evidence"; exit 0
+  fi
 fi
 cat <<'MSG' | tee -a "$out/journey.log"
 MANUAL REMAINING (exit 2 until evidence is supplied):
@@ -149,6 +193,8 @@ MANUAL REMAINING (exit 2 until evidence is supplied):
   3. First launch from /Applications: confirm the Gatekeeper dialog names
      "Ziying WANG (Developer ID)" and Open succeeds with no "damaged" warning.
   4. Use 3 free sessions, confirm the activation page after the third.
-  Record the screen, then re-run with WID_DMG_CLEAN_USER_EVIDENCE=<recording or note>.
+  Record the screen, then re-run with WID_DMG_CLEAN_USER_EVIDENCE=<directory>.
+  The directory must contain a nonempty .mov or .mp4 recording AND a nonempty
+  notes.md or notes.txt describing the user, build checksum, steps and outcomes.
 MSG
 exit 2

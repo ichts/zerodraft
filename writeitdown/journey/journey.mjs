@@ -211,26 +211,57 @@ async function run(size, browser) {
     await step('DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published', async () => {
       const r = await ctx.request.get(url(new URL(DMG_URL).pathname));
       ok(r.status() === 200, `status ${r.status()}`);
-      const ct = r.headers()['content-type'] || ''; ok(/diskimage|octet-stream/.test(ct), `content-type ${ct}`);
+      const ct = r.headers()['content-type'] || ''; ok(ct.split(';')[0].trim() === 'application/x-apple-diskimage', `content-type ${ct}`);
       const body = await r.body(); ok(body.length >= 1_000_000, `size ${body.length} bytes is implausible for a DMG`);
       ok(!/^<!doctype html|^<html/i.test(body.subarray(0, 64).toString()), 'body is an HTML page');
       ok(sha, 'no published sha to compare');
       const got = crypto.createHash('sha256').update(body).digest('hex'); ok(got === sha, `sha256 of file ${got} != published ${sha}`);
       return `${body.length} bytes, sha ok`;
     });
+    await step('missing DMG returns 404, never HTML', async () => {
+      const r = await ctx.request.get(url(`/download/missing-${crypto.randomUUID()}.dmg`));
+      ok(r.status() === 404, `status ${r.status()}`);
+      ok(!/text\/html/i.test(r.headers()['content-type'] || ''), 'HTML content type');
+      ok(!/<(?:!doctype|html)\b/i.test(await r.text()), 'HTML fallback body');
+    });
   });
   await block('room', async () => {
-    await step('back to landing, "Give it 60 seconds" starts the real room, typing works', async () => {
+    await step('full real-time minute keeps exactly the typed draft and allows copying', async () => {
       await page.goBack(); await page.waitForURL(/\/(index\.html)?$/);
       await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
       await page.locator('#room').waitFor({ state: 'visible' });
       await page.locator('#editor').click();
-      const d = human ? 90 : 30;
-      await page.keyboard.type('hello from a new visitor. I am writing forward and I will not stop. ', { delay: d });
-      await page.keyboard.type('Nothing here is saved, so the only way out is through the next sentence.', { delay: d });
-      ok((await page.locator('#editor').inputValue()).includes('through the next sentence'), 'editor text');
-      ok(/^[1-9]/.test((await page.locator('#room-count').innerText()).trim()), 'word count');
-      ok(/^[01]:[0-5]\d$/.test((await page.locator('#room-clock').innerText()).trim()), 'clock');
+      const prose = 'I walked to the station this morning and watched the sun rise over the roofs. The next train was late, so I had time to think about the letter I wanted to write. I am putting those thoughts on paper now, one sentence at a time. ';
+      let typed = '';
+      const started = Date.now();
+      while (Date.now() - started < 59000) {
+        ok(await page.locator('#editor').isVisible(), 'session finished before sixty seconds');
+        const char = prose[typed.length % prose.length];
+        await page.keyboard.type(char, { delay: 90 });
+        typed += char;
+        ok(await page.locator('#editor').inputValue() === typed, 'input lost or draft wiped during continuous typing');
+      }
+      await page.locator('#kept').waitFor({ state: 'visible', timeout: 5000 });
+      ok(Date.now() - started >= 60000, 'session finished before sixty seconds');
+      ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
+      ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
+      ok(/0:00.*WORDS? KEPT\./.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
+      ok((await page.locator('#room-report').textContent()).trim() === '', 'deletion report present after completion');
+      ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
+      await page.locator('#copy').click();
+      await page.getByRole('button', { name: 'COPIED', exact: true }).waitFor({ state: 'visible' });
+    });
+    await step('fresh session deletes its draft after nine seconds of silence', async () => {
+      await page.locator('#restart').click();
+      ok(await page.locator('#editor').inputValue() === '', 'restart retained text');
+      await page.locator('#editor').click();
+      const text = 'The rain has stopped and I can hear the birds outside.';
+      await page.keyboard.type(text, { delay: 90 });
+      ok(await page.locator('#editor').inputValue() === text, 'fresh session did not accept the sentence');
+      await page.waitForTimeout(9000);
+      ok(await page.locator('#editor').inputValue() === '', 'silent draft was not deleted');
+      ok(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/.test(await page.locator('#room-report').innerText()), 'deletion receipt missing');
+      ok(!await page.locator('#kept').isVisible(), 'silent session incorrectly kept');
     });
   });
   await block('legal', async () => {
@@ -261,5 +292,5 @@ for (const s of sizes) await run(s, s.engine === 'webkit' ? wk : chrome);
 await wk.close(); await chrome.close();
 const fails = results.filter(r => r.status === 'FAIL');
 fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, results }, null, 1));
-console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail, ${results.filter(r => r.status === 'SKIP').length} skip`);
+console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${results.filter(r => r.status === 'SKIP').length} EXEMPT pending captain approval: not built (sign-in / checkout / test payment / output after payment)`);
 process.exit(fails.length ? 1 : 0);

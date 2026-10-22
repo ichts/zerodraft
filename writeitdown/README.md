@@ -31,17 +31,53 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 ### Host routing (Caddy) and the release journey gate
 
-The Caddy site block for writeitdown.app must use `try_files {path} {path}/index.html /index.html`, so `/download/` serves `download/index.html` (a bare `try_files {path} /index.html` once served the home page there) and real files win. A missing `.dmg` must return 404, never the HTML fallback: guard the downloads with a matcher that skips the fallback, and serve the disk image with its type:
+Use mutually exclusive download and page handlers. Do not put a site-level `try_files` before these handlers: it would rewrite missing downloads into the home page before the DMG matcher runs. Preserve the host's existing API routes separately.
 
-```
-@dmg path *.dmg
-handle @dmg {
-	header Content-Type application/x-apple-diskimage
-	try_files {path}
+```caddyfile
+writeitdown.app {
+	root * /var/www/writeitdown.app
+	@dmg path *.dmg
+	handle @dmg {
+		header Content-Type application/x-apple-diskimage
+		file_server
+	}
+	handle {
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
 }
 ```
 
-(`try_files {path}` with no fallback answers 404 for a missing file.) After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with a continuous video on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900), and checks the DMG type, size and SHA-256 against the page. Pre-deploy, serve the tree plus the real DMG with `node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025` and run `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. The assertions are one `block()` per page section in `journey/journey.mjs`.
+The DMG branch has no fallback: `file_server` returns 404 when the image is absent. The page branch resolves `/download/` to `download/index.html` before trying the home page.
+
+After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with one continuous video per viewport on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900). It completes a real sixty-second session, verifies the exact kept draft and COPY TEXT/COPIED action, then restarts and verifies deletion after nine seconds of silence. The browser's deletion receipt is `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` It also checks the DMG content type, size and SHA-256 against the page and a random missing DMG's 404. Sign-in and payment remain SKIPs, printed as `EXEMPT pending captain approval: not built`, not passes. A successful script exit does not approve those exemptions or authorize release.
+
+Pre-deploy, serve the tree plus the real DMG with `node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025` and run `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. The server does not generate installers or rewrite the published checksum; use the release artifact matching the page. The assertions are one `block()` per page section in `journey/journey.mjs`.
+
+Prove the gate rejects a known-broken room before accepting it. From `writeitdown/`, copy only production assets into a disposable directory inside the worktree, disable the room module there, and serve that copy:
+
+```sh
+mkdir -p .journey-broken
+cp *.css *.js *.mjs *.html *.woff2 og.png .journey-broken/
+cp -R download .journey-broken/
+printf 'export {};\n' > .journey-broken/room.js
+node journey/serve-local.mjs --root .journey-broken --dmg-file <real-dmg> --port 8026
+# In another terminal, from writeitdown/:
+npm run journey -- --base http://127.0.0.1:8026 --out journey-results/broken-room --expect-sha <sha>
+```
+
+Require exit 1 and a room failure in `results.json`; retain the videos and results. Then run the unchanged gate against the intact tree and finally the live domain. A broken-room run is negative evidence only, never a release pass.
+
+### Shipped Mac journey
+
+From the repository root, run `bash apps/macos/FirstLine/scripts/dmg-journey.sh <real-dmg> <worktree-evidence-directory>` on an approved GUI test machine. It exercises the shipped image, verifies each free session's full sentence through the editor AX value, and requires this run's nonempty `screen.mov`. Recorder startup failure, early exit, unsuccessful stop or missing output fails the gate. Do not run GUI journeys on the Mini screen.
+
+The automated isolated home does not prove Finder installation and first launch under a physically clean macOS login. Until that manual evidence is supplied, successful automation exits 2. Set `WID_DMG_CLEAN_USER_EVIDENCE` to a directory containing both:
+
+- A nonempty `.mov` or `.mp4` screen recording of Safari download, Finder drag to Applications, eject, first launch and Gatekeeper approval, and the three-session trial reaching activation.
+- A nonempty `notes.md` or `notes.txt` identifying the clean login, date, macOS version, DMG SHA-256, steps and observed outcomes, including the Developer ID identity and absence of a damaged-app warning.
+
+The script checks the directory, recording and notes before allowing exit 0. Their presence is an evidence prerequisite, not an automated judgment of their contents; captain review is still required.
 
 ### Mac page release order
 

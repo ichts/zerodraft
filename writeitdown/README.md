@@ -1,6 +1,6 @@
 # WRITE_IT_DOWN
 
-A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or use the landing CTA.
+A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Give it 60 seconds on the landing. The landing nav's Download for Mac pill opens the Mac free-trial download page.
 
 ```sh
 python3 -m http.server 8000
@@ -17,7 +17,7 @@ The watch-only preview has its own clock. It types the original private messy dr
 
 The writing viewport shows the active line at full opacity in the center of a fixed aperture, with two previous lines fading above it. The trial anchors the writing line at about 39% of the viewport height, leaving room for the clock in short windows; earlier lines rise as the draft grows. Native textarea padding and a CSS mask provide this without a mirrored draft or a custom text layout engine. It follows the end automatically but cannot be manually scrolled. The full draft remains available in the kept result.
 
-`session.mjs` owns the real deadline rules and the count: Unicode words, with Han characters counted individually. Punctuation, emoji and whitespace do not count. This is a writing-unit count, not a linguistic Chinese word count. The room counter's tooltip and accessible description explain it. `room.js` connects the session to the browser editor. `theme.js` stores only the appearance preference. The default follows the system.
+`session.mjs` owns the real deadline rules and the count: Unicode words, with Han characters counted individually. Punctuation, emoji and whitespace do not count. This is a writing-unit count, not a linguistic Chinese word count. The room counter's tooltip and accessible description explain it. `room.js` connects the session to the browser editor. `theme.js` stores only the appearance preference. Light is the default; dark is a stored toggle choice.
 
 ## Deploy
 
@@ -25,12 +25,16 @@ Transfer and extract the tested deployment bundle on the target host, then run `
 
 The legal pages disclose Google Fonts requests, possible hosting access logs, and the Mac waitlist. The public contact is contact@trefoilstudio.com (Trefoil Studio).
 
+### Mac download release
+
+`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first, replace the pending SHA-256 line with the published checksum (one line; the template sits in the comment above it), and pass `npm run release-check -- --download --live` before installing the site. Checkout stays closed; that gate is below.
+
 ### Mac page release order
 
-`mac.html` describes a planned paid app whose purchase is not open yet: the free web room is its working CTA, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
+`mac.html` describes the Mac app (3 free sessions, then a USD 4.99 one-time license for 2 Macs with a 14-day refund, whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
 
 1. Deploy the Go collector using [`services/waitlist/README.md`](../services/waitlist/README.md) behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. This is only a preflight: submit one real test address from the page, confirm its stored line, then remove it. Neither the collector's presence in this repository nor a local test proves deployment.
 2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.
-3. Keep the sale closed until the separate Mac three-session trial build and its paid activation path are independently verified. Then replace each `data-launch-pending` notice on `mac.html` with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real Waffo TEST order through checkout, callback, license email, activation and refund, and explicit approval to open.
+3. Keep the sale closed until paid checkout is integrated and independently verified. Then replace each `data-launch-pending` notice on `mac.html` (checkout, license steps) with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace a real Waffo TEST order through checkout, callback, license email, activation and refund, and explicit approval to open.
 
 See `QA.md` for validation evidence and limits.

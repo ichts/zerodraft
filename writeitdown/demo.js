@@ -22,6 +22,8 @@ import { clock, wordCount } from './session.mjs';
   var numeralEl = document.getElementById("numeral");
   var reportEl = document.getElementById("report");
   var countEl = document.getElementById("count");
+  var barEl = document.getElementById("bar");
+  var meterEl = document.querySelector("#meter i");
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   var t0 = Date.now();
@@ -63,6 +65,12 @@ import { clock, wordCount } from './session.mjs';
     if (seen.ww !== wall) { seen.ww = wall; washWall.style.background = wall; }
     if (seen.wp !== pap) { seen.wp = pap; washPaper.style.background = pap; }
   }
+  // Draining minute (top bar) and silence meter (bottom line): 1 = full.
+  function setGauges(left, idle) {
+    var b = "scaleX(" + left.toFixed(3) + ")", m = Math.round(idle * 100) + "%";
+    if (barEl && seen.bar !== b) { seen.bar = b; barEl.style.transform = b; }
+    if (meterEl && seen.meter !== m) { seen.meter = m; meterEl.style.width = m; }
+  }
   function renderDraft(d) {
     var r = d.done.slice().reverse();
     put(prevEls[0], "p0", r[0] || "");
@@ -79,6 +87,7 @@ import { clock, wordCount } from './session.mjs';
       put(reportEl, "rep", "");
       renderDraft(t < TYPE_END ? draftAt(t) : full());
       put(clockEl, "clock", clockAt(t));
+      setGauges(1 - t / 60000, t > TYPE_END ? (t - TYPE_END) / 8000 : 0);
     } else if (t < WARN_END) {
       setPhase("warn");
       setWash((t - SILENT_END) / WARN_MS);
@@ -86,6 +95,7 @@ import { clock, wordCount } from './session.mjs';
       put(reportEl, "rep", "");
       renderDraft(full());
       put(clockEl, "clock", clockAt(t));
+      setGauges(1 - t / 60000, (t - TYPE_END) / 8000);
     } else if (t < CUT_END) {
       setPhase("cut");
       setWash("deep");
@@ -93,6 +103,7 @@ import { clock, wordCount } from './session.mjs';
       put(reportEl, "rep", "");
       renderDraft({ done: [], cur: "" });
       put(clockEl, "clock", "1:00");
+      setGauges(1, 1);
     } else {
       setPhase("report");
       setWash(null);
@@ -100,6 +111,7 @@ import { clock, wordCount } from './session.mjs';
       put(reportEl, "rep", "DRAFT DELETED AT " + clock(60 - Math.round(CUT_END / 1000)) + ". TYPE TO START AGAIN.");
       renderDraft({ done: [], cur: "" });
       put(clockEl, "clock", "1:00");
+      setGauges(1, 0);
     }
   }
 
@@ -110,6 +122,7 @@ import { clock, wordCount } from './session.mjs';
     put(reportEl, "rep", "");
     renderDraft(full());
     put(clockEl, "clock", "1:00");
+    setGauges(1, 0);
   }
 
   function tick() {

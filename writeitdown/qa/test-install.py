@@ -1,21 +1,45 @@
 """Exercise the fixed-target installer in a worktree-local sandbox, not /var/www."""
+from html.parser import HTMLParser
 from pathlib import Path
 import shutil
+import stat
 import subprocess
 import os
-import re
 import tempfile
+from urllib.parse import unquote, urlsplit
 
 source = Path(__file__).resolve().parents[1]
-with tempfile.TemporaryDirectory(prefix='install-check-') as temp:
+files = {
+    'download/index.html', 'index.html', 'mac.html', 'privacy.html',
+    'terms.html', 'support.html', 'site.css', 'tokens.css',
+    'reenie-beanie.woff2', 'OFL-ReenieBeanie.txt', 'theme.js', 'demo.js',
+    'demo-timeline.mjs', 'feedback.js', 'session.mjs', 'room.js', 'waitlist.js',
+    'og.png', 'robots.txt', 'sitemap.xml', 'BingSiteAuth.xml',
+    'google7787e5a0693832e8.html', '1bcb6b66144003eb070fe87774217f86.txt',
+}
+
+
+class LocalReferences(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.references = []
+
+    def handle_starttag(self, tag, attrs):
+        for name, value in attrs:
+            if name in {'src', 'href'} and value:
+                url = urlsplit(value)
+                if not url.scheme and not url.netloc and url.path:
+                    self.references.append(unquote(url.path))
+
+
+with tempfile.TemporaryDirectory(prefix='install-check-', dir=source) as temp:
     base = Path(temp)
     payload = base / 'payload'
     payload.mkdir()
     target = base / 'www' / 'writeitdown.app'
     target.mkdir(parents=True)
-    files = re.search(r"^FILES='([^']*)'", (source / 'install.sh').read_text(), re.M).group(1).split()
-    assert 'mac.html' in files and 'index.html' in files
     for name in files:
+        (payload / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source / name, payload / name)
     script = (source / 'install.sh').read_text()
     script = script.replace('TARGET=/var/www/writeitdown.app', f'TARGET={target}')
@@ -30,11 +54,28 @@ with tempfile.TemporaryDirectory(prefix='install-check-') as temp:
     assert not (target / 'mac.html').exists() and (target / 'index.html').read_text() == 'original'
     health.write_text('ok\n')
     subprocess.run(['sh', str(payload / 'install.sh')], check=True, env=env)
-    for name in files:
-        assert (target / name).read_bytes() == (source / name).read_bytes(), name
-    assert (target / 'index.html.dc-bak2').read_text() == 'original'
-    subprocess.run(['sh', str(payload / 'install.sh')], check=True, env=env)
-    assert (target / 'index.html.dc-bak2').read_text() == 'original'
+    for attempt in range(2):
+        if attempt:
+            subprocess.run(['sh', str(payload / 'install.sh')], check=True, env=env)
+        installed = {path.relative_to(target).as_posix()
+                     for path in target.rglob('*') if path.is_file()}
+        assert installed == files | {'index.html.dc-bak2'}, installed ^ files
+        for name in files:
+            output = target / name
+            assert output.read_bytes() == (source / name).read_bytes(), name
+            assert stat.S_IMODE(output.stat().st_mode) == 0o644, name
+        assert (target / 'index.html.dc-bak2').read_text() == 'original'
+        for name in ['index.html', 'download/index.html']:
+            page = target / name
+            parser = LocalReferences()
+            parser.feed(page.read_text())
+            for reference in parser.references:
+                asset = ((target / reference.lstrip('/')) if reference.startswith('/')
+                         else page.parent / reference).resolve()
+                if asset.is_dir():
+                    asset /= 'index.html'
+                assert asset.is_relative_to(target), (name, reference)
+                assert asset.relative_to(target).as_posix() in files, (name, reference)
     victim = base / 'untouched'
     victim.write_text('protected')
     (target / 'room.js').unlink()

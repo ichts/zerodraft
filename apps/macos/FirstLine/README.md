@@ -14,7 +14,7 @@ swift build
 swift test
 ```
 
-The executable product is `WriteItDown`. The source directory retains its historical path. License data is cached, but old trial and unlock markers cannot grant access; see `docs/LICENSE_PAYMENT_SPEC.md`.
+The executable product is `WriteItDown`. The source directory retains its historical path. Trial-counter and signed-license rules are in `docs/LICENSE_PAYMENT_SPEC.md`.
 
 ## License
 

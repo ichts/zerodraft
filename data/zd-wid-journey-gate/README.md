@@ -18,16 +18,15 @@ cd writeitdown && npm run journey -- --base http://127.0.0.1:8016
 ## DMG (apps/macos/FirstLine/scripts/dmg-journey.sh [dmg-path] [out-dir])
 Download (or take given) DMG, size + sha vs published, codesign/stapler/spctl on DMG and app, mount, Applications shortcut, ditto copy with quarantine, real-window first launch via cua-driver, 3 free sessions ("Free trial: N of 3 sessions left."), then activation page. Exit 0 pass, 1 failure, 2 = automated steps passed but the physical clean-user run is still manual (script prints exactly what; set WID_DMG_CLEAN_USER_EVIDENCE=<file> to clear). The launch/trial half is UNVERIFIED here: no real DMG exists yet, only the failure path was run. Strings come from branch fm/zd-wid-free-trial-launch.
 
-## Gate proof (runs on 2026-10-22)
-| Run | Target | Exit | Result | Video |
+## Gate proof (v3 landing, main cd81645, runs headless)
+Command: `cd writeitdown && npm run journey -- --base <url> --expect-sha 96c0c0a34733f92c1b47b1231c3243612c71614074dd6179ac3d61c80d5462cd --out <dir>`
+Phone = WebKit + iPhone 14 profile 390x844; desktop = Chromium 1440x900. Assertions are one `block()` per page section in `writeitdown/journey/journey.mjs`; PR B sections add blocks.
+| Run | Target | Exit | Assertions | Durations |
 |---|---|---|---|---|
-| live-before | https://writeitdown.app (old site) | 1 | 12 pass, 26 fail, 2 skip | live-before/{phone,desktop}/journey-*.webm |
-| local-release | PR 45 branch fm/zd-wid-release-web @ d80e010, local server, FIXTURE dmg | 0 | 36 pass, 0 fail, 2 skip | local-release/{phone,desktop}/journey-*.webm |
-| dmg-live-before | live DMG URL (serves a 5.7 KB HTML page) | 1 | 5 FAIL, stops before mount | n/a |
+| live-before | https://writeitdown.app (old site, not deployed) | 1 | 14 pass, 34 fail, 2 skip | phone 84.3 s, desktop 83.9 s |
+| local-release | main cd81645 served locally with the real DMG release-fc4fbb22 (sha 96c0...62cd; page sha line is injected by serve-local.mjs until PR B lands) | 0 | 48 pass, 0 fail, 2 skip | phone 62.7 s, desktop 63.9 s |
 
-One continuous video per viewport covers the whole journey in order (landing, nav DOWNLOAD, /download terms+button+sha on screen, DMG+SHA check, back, room typing, legal pages, waitlist). Human pace is the default (2 s pause per step, 90 ms keystrokes); WID_JOURNEY_PACE=fast disables it. Local run used port 8017. Durations: local-release phone 54.5 s, desktop 53.7 s; live-before phone 62.8 s, desktop 63.0 s.
-
-Videos are not committed (2.4 MB); they live in this directory in the worktree: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate.
+Videos (not committed): live-before/{phone,desktop}/journey-*.webm, local-release/{phone,desktop}/journey-*.webm under this directory.
 
 ## Findings
 - Live /download/ answers 200 with the landing page (host fallback): a status-only check would pass the broken state. Asserted by content.
@@ -35,3 +34,4 @@ Videos are not committed (2.4 MB); they live in this directory in the worktree: 
 - Local server logs a favicon 404 (no favicon declared); excluded from the console-error assertion, bounded follow-up.
 - Old live H1 ends with a period and the demo covers only 34% (phone) / 25% (desktop) of the viewport.
 - Repo AGENTS.md still says Mac has no native trial; release-web copy and the trial-launch branch say 3 free sessions. Needs doc alignment.
+- v3 /download/ and legal pages still use the old bone/mono look while the landing is the new light sans; visual inconsistency to decide on (PR B).

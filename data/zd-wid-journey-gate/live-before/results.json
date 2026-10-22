@@ -4,241 +4,301 @@
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "understand: landing loads",
+   "name": "landing/hero: page loads",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "name": "landing/hero: H1 \"We force you to\" + \"write it down\", no final period",
    "msg": "H1 is \"We force you to write it down.\""
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "understand: handwritten second line",
-   "msg": "second line text"
+   "name": "landing/hero: second line is the red handwritten one",
+   "msg": "colour rgb(26, 24, 19) is not red"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "understand: deck below the demo",
+   "name": "landing/hero: top bar: Download for Mac pill present",
+   "msg": "pill missing"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "landing/demo: demo sheet fills >=60% of the first viewport",
+   "msg": "demo sheet covers 34% of the viewport"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "landing/demo: demo is the scripted preview with a 60-second clock",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "landing/demo: deck line sits under the demo; CTA \"Give it 60 seconds\" present",
    "msg": "deck is not below the demo"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "try: demo takes >=60% of first viewport height",
-   "msg": "demo paper covers 34% of the viewport"
-  },
-  {
-   "tag": "phone",
-   "status": "FAIL",
-   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "name": "landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)",
    "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "landing/stop-states: writing / warning / deleted strip",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
+   "msg": "Trefoil Studio missing"
+  },
+  {
+   "tag": "phone",
+   "status": "FAIL",
+   "name": "download: top-bar pill goes to /download/",
    "msg": "locator.click: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
-   "msg": "page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')"
-  },
-  {
-   "tag": "phone",
-   "status": "FAIL",
-   "step": "download page shows trial terms",
+   "name": "download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon",
    "msg": "locator.innerText: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "name": "download: no buy/checkout offered",
    "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "download page DMG link is the canonical URL",
+   "name": "download: DMG link is the canonical URL",
    "msg": "locator.getAttribute: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "published SHA-256 present on the page",
-   "msg": "locator.innerText: Timeout 2000ms exceeded."
+   "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": "page.evaluate: TypeError: null is not an object (evaluating 'document.querySelector('#trial-terms').getBoundingClientRect')"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "name": "download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published",
    "msg": "content-type text/html; charset=utf-8"
   },
   {
    "tag": "phone",
    "status": "FAIL",
-   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "name": "room: back to landing, \"Give it 60 seconds\" starts the real room, typing works",
    "msg": "page.waitForURL: Timeout 5000ms exceeded."
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "support reachable",
+   "name": "legal: support reachable",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "privacy reachable",
+   "name": "legal: privacy reachable",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "terms reachable",
+   "name": "legal: terms reachable",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "waitlist form reachable",
+   "name": "waitlist: waitlist form reachable",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "SKIP",
-   "step": "sign-in / checkout / test payment / output after payment",
+   "name": "sign-in / checkout / test payment / output after payment",
    "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "no console errors across the journey",
+   "name": "console: no console errors across the journey",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "understand: landing loads",
+   "name": "landing/hero: page loads",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "name": "landing/hero: H1 \"We force you to\" + \"write it down\", no final period",
    "msg": "H1 is \"We force you to write it down.\""
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "understand: handwritten second line",
-   "msg": "second line text"
+   "name": "landing/hero: second line is the red handwritten one",
+   "msg": "colour rgb(26, 24, 19) is not red"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "understand: deck below the demo",
+   "name": "landing/hero: top bar: Download for Mac pill present",
+   "msg": "pill missing"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "landing/demo: demo sheet fills >=60% of the first viewport",
+   "msg": "demo sheet covers 25% of the viewport"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "landing/demo: demo is the scripted preview with a 60-second clock",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "landing/demo: deck line sits under the demo; CTA \"Give it 60 seconds\" present",
    "msg": "deck is not below the demo"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "try: demo takes >=60% of first viewport height",
-   "msg": "demo paper covers 25% of the viewport"
-  },
-  {
-   "tag": "desktop",
-   "status": "FAIL",
-   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "name": "landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)",
    "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "landing/stop-states: writing / warning / deleted strip",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
+   "msg": "locator.evaluate: Timeout 5000ms exceeded."
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
+   "msg": "Trefoil Studio missing"
+  },
+  {
+   "tag": "desktop",
+   "status": "FAIL",
+   "name": "download: top-bar pill goes to /download/",
    "msg": "locator.click: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
-   "msg": "page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')"
-  },
-  {
-   "tag": "desktop",
-   "status": "FAIL",
-   "step": "download page shows trial terms",
+   "name": "download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon",
    "msg": "locator.innerText: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "name": "download: no buy/checkout offered",
    "msg": "found [\"BUY MAC USD 4.99 - COMING SOON →\"]"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "download page DMG link is the canonical URL",
+   "name": "download: DMG link is the canonical URL",
    "msg": "locator.getAttribute: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "published SHA-256 present on the page",
-   "msg": "locator.innerText: Timeout 2000ms exceeded."
+   "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": "page.evaluate: TypeError: Cannot read properties of null (reading 'getBoundingClientRect')"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
+   "name": "download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published",
    "msg": "content-type text/html; charset=utf-8"
   },
   {
    "tag": "desktop",
    "status": "FAIL",
-   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "name": "room: back to landing, \"Give it 60 seconds\" starts the real room, typing works",
    "msg": "page.waitForURL: Timeout 5000ms exceeded."
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "support reachable",
+   "name": "legal: support reachable",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "privacy reachable",
+   "name": "legal: privacy reachable",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "terms reachable",
+   "name": "legal: terms reachable",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "waitlist form reachable",
+   "name": "waitlist: waitlist form reachable",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "SKIP",
-   "step": "sign-in / checkout / test payment / output after payment",
+   "name": "sign-in / checkout / test payment / output after payment",
    "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "no console errors across the journey",
+   "name": "console: no console errors across the journey",
    "msg": ""
   }
  ]

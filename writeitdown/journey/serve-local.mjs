@@ -1,3 +1,4 @@
+// With --dmg-file <path> the given real file is served instead of random bytes.
 // Local pre-deploy server for the journey gate.
 // Serves a writeitdown site tree (--root) and, with --fixture-dmg, a generated
 // 2 MB FIXTURE DMG at /download/Write-It-Down-1.0.dmg. With the fixture, the
@@ -12,7 +13,8 @@ const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i < 0 ?
 const root = path.resolve(arg('root', '.'));
 const port = Number(arg('port', 8016));
 const fixture = process.argv.includes('--fixture-dmg');
-const dmg = fixture ? crypto.randomBytes(2 * 1024 * 1024) : null;
+const dmgFile = arg('dmg-file', null);
+const dmg = dmgFile ? fs.readFileSync(path.resolve(dmgFile)) : fixture ? crypto.randomBytes(2 * 1024 * 1024) : null;
 const sha = dmg && crypto.createHash('sha256').update(dmg).digest('hex');
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png', '.txt': 'text/plain', '.xml': 'application/xml' };
 
@@ -33,4 +35,4 @@ http.createServer((req, res) => {
   }
   res.writeHead(200, { 'content-type': types[path.extname(f)] || 'application/octet-stream' });
   res.end(req.method === 'HEAD' ? undefined : body);
-}).listen(port, '127.0.0.1', () => console.log(`serving ${root} on http://127.0.0.1:${port}${fixture ? ` (FIXTURE dmg sha ${sha})` : ''}`));
+}).listen(port, '127.0.0.1', () => console.log(`serving ${root} on http://127.0.0.1:${port}${dmg ? ` (served dmg ${dmgFile || 'FIXTURE'} sha ${sha})` : ''}`));

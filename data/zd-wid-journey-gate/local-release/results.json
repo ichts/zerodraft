@@ -1,244 +1,304 @@
 {
- "base": "http://127.0.0.1:8017",
+ "base": "http://127.0.0.1:8023",
  "results": [
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "understand: landing loads",
+   "name": "landing/hero: page loads",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "name": "landing/hero: H1 \"We force you to\" + \"write it down\", no final period",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "understand: handwritten second line",
+   "name": "landing/hero: second line is the red handwritten one",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "understand: deck below the demo",
+   "name": "landing/hero: top bar: Download for Mac pill present",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "try: demo takes >=60% of first viewport height",
-   "msg": "62%"
+   "name": "landing/demo: demo sheet fills >=60% of the first viewport",
+   "msg": "61%"
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "name": "landing/demo: demo is the scripted preview with a 60-second clock",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "name": "landing/demo: deck line sits under the demo; CTA \"Give it 60 seconds\" present",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
+   "name": "landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "download page shows trial terms",
+   "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "name": "landing/stop-states: writing / warning / deleted strip",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "download page DMG link is the canonical URL",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "published SHA-256 present on the page",
+   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
-   "msg": "2097152 bytes, sha ok"
-  },
-  {
-   "tag": "phone",
-   "status": "PASS",
-   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "name": "download: top-bar pill goes to /download/",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "support reachable",
+   "name": "download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "privacy reachable",
+   "name": "download: no buy/checkout offered",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "terms reachable",
+   "name": "download: DMG link is the canonical URL",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "waitlist form reachable",
+   "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published",
+   "msg": "7883205 bytes, sha ok"
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "room: back to landing, \"Give it 60 seconds\" starts the real room, typing works",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "legal: support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "legal: privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "legal: terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "phone",
+   "status": "PASS",
+   "name": "waitlist: waitlist form reachable",
    "msg": ""
   },
   {
    "tag": "phone",
    "status": "SKIP",
-   "step": "sign-in / checkout / test payment / output after payment",
+   "name": "sign-in / checkout / test payment / output after payment",
    "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
   },
   {
    "tag": "phone",
    "status": "PASS",
-   "step": "no console errors across the journey",
+   "name": "console: no console errors across the journey",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "understand: landing loads",
+   "name": "landing/hero: page loads",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "understand: H1 is \"We force you to write it down\" without final period",
+   "name": "landing/hero: H1 \"We force you to\" + \"write it down\", no final period",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "understand: handwritten second line",
+   "name": "landing/hero: second line is the red handwritten one",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "understand: deck below the demo",
+   "name": "landing/hero: top bar: Download for Mac pill present",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "try: demo takes >=60% of first viewport height",
+   "name": "landing/demo: demo sheet fills >=60% of the first viewport",
    "msg": "61%"
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "no price/buy/checkout offered on landing (checkout does not exist yet)",
+   "name": "landing/demo: demo is the scripted preview with a 60-second clock",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "nav DOWNLOAD entry goes to /download/",
+   "name": "landing/demo: deck line sits under the demo; CTA \"Give it 60 seconds\" present",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "download page: terms, button, DMG link and SHA-256 line on screen",
+   "name": "landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "download page shows trial terms",
+   "name": "landing/how-it-works: 3 cards: no way back, eight seconds, reach zero",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "download page offers no buy/checkout (checkout does not exist yet)",
+   "name": "landing/stop-states: writing / warning / deleted strip",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "download page DMG link is the canonical URL",
+   "name": "landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest \"buying opens soon\"",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "published SHA-256 present on the page",
+   "name": "landing/footer: Trefoil Studio + Support/Privacy/Terms links",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "DMG answers 200, diskimage type, plausible size, sha matches published",
-   "msg": "2097152 bytes, sha ok"
-  },
-  {
-   "tag": "desktop",
-   "status": "PASS",
-   "step": "back to landing, then try: \"Give it 60 seconds\" starts the real room and typing works",
+   "name": "download: top-bar pill goes to /download/",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "support reachable",
+   "name": "download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "privacy reachable",
+   "name": "download: no buy/checkout offered",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "terms reachable",
+   "name": "download: DMG link is the canonical URL",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "waitlist form reachable",
+   "name": "download: published SHA-256 present; terms, button, DMG link, sha all on screen",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published",
+   "msg": "7883205 bytes, sha ok"
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "room: back to landing, \"Give it 60 seconds\" starts the real room, typing works",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "legal: support reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "legal: privacy reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "legal: terms reachable",
+   "msg": ""
+  },
+  {
+   "tag": "desktop",
+   "status": "PASS",
+   "name": "waitlist: waitlist form reachable",
    "msg": ""
   },
   {
    "tag": "desktop",
    "status": "SKIP",
-   "step": "sign-in / checkout / test payment / output after payment",
+   "name": "sign-in / checkout / test payment / output after payment",
    "msg": "not built yet; asserted above that none is offered. Add real steps when they ship."
   },
   {
    "tag": "desktop",
    "status": "PASS",
-   "step": "no console errors across the journey",
+   "name": "console: no console errors across the journey",
    "msg": ""
   }
  ]

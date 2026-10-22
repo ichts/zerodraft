@@ -1,45 +1,57 @@
-journey base=http://127.0.0.1:8017 out=/Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release
-PASS [phone] understand: landing loads
-PASS [phone] understand: H1 is "We force you to write it down" without final period
-PASS [phone] understand: handwritten second line
-PASS [phone] understand: deck below the demo
-PASS [phone] try: demo takes >=60% of first viewport height - 62%
-PASS [phone] no price/buy/checkout offered on landing (checkout does not exist yet)
-PASS [phone] nav DOWNLOAD entry goes to /download/
-PASS [phone] download page: terms, button, DMG link and SHA-256 line on screen
-PASS [phone] download page shows trial terms
-PASS [phone] download page offers no buy/checkout (checkout does not exist yet)
-PASS [phone] download page DMG link is the canonical URL
-PASS [phone] published SHA-256 present on the page
-PASS [phone] DMG answers 200, diskimage type, plausible size, sha matches published - 2097152 bytes, sha ok
-PASS [phone] back to landing, then try: "Give it 60 seconds" starts the real room and typing works
-PASS [phone] support reachable
-PASS [phone] privacy reachable
-PASS [phone] terms reachable
-PASS [phone] waitlist form reachable
+journey base=http://127.0.0.1:8023 out=/Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release
+engine [phone]: webkit (iPhone 14 profile: touch, DPR, UA)
+PASS [phone] landing/hero: page loads
+PASS [phone] landing/hero: H1 "We force you to" + "write it down", no final period
+PASS [phone] landing/hero: second line is the red handwritten one
+PASS [phone] landing/hero: top bar: Download for Mac pill present
+PASS [phone] landing/demo: demo sheet fills >=60% of the first viewport - 61%
+PASS [phone] landing/demo: demo is the scripted preview with a 60-second clock
+PASS [phone] landing/demo: deck line sits under the demo; CTA "Give it 60 seconds" present
+PASS [phone] landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)
+PASS [phone] landing/how-it-works: 3 cards: no way back, eight seconds, reach zero
+PASS [phone] landing/stop-states: writing / warning / deleted strip
+PASS [phone] landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest "buying opens soon"
+PASS [phone] landing/footer: Trefoil Studio + Support/Privacy/Terms links
+PASS [phone] download: top-bar pill goes to /download/
+PASS [phone] download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon
+PASS [phone] download: no buy/checkout offered
+PASS [phone] download: DMG link is the canonical URL
+PASS [phone] download: published SHA-256 present; terms, button, DMG link, sha all on screen
+PASS [phone] download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published - 7883205 bytes, sha ok
+PASS [phone] room: back to landing, "Give it 60 seconds" starts the real room, typing works
+PASS [phone] legal: support reachable
+PASS [phone] legal: privacy reachable
+PASS [phone] legal: terms reachable
+PASS [phone] waitlist: waitlist form reachable
 SKIP [phone] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
-PASS [phone] no console errors across the journey
+PASS [phone] console: no console errors across the journey
 video [phone]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release/phone/journey-phone.webm
-PASS [desktop] understand: landing loads
-PASS [desktop] understand: H1 is "We force you to write it down" without final period
-PASS [desktop] understand: handwritten second line
-PASS [desktop] understand: deck below the demo
-PASS [desktop] try: demo takes >=60% of first viewport height - 61%
-PASS [desktop] no price/buy/checkout offered on landing (checkout does not exist yet)
-PASS [desktop] nav DOWNLOAD entry goes to /download/
-PASS [desktop] download page: terms, button, DMG link and SHA-256 line on screen
-PASS [desktop] download page shows trial terms
-PASS [desktop] download page offers no buy/checkout (checkout does not exist yet)
-PASS [desktop] download page DMG link is the canonical URL
-PASS [desktop] published SHA-256 present on the page
-PASS [desktop] DMG answers 200, diskimage type, plausible size, sha matches published - 2097152 bytes, sha ok
-PASS [desktop] back to landing, then try: "Give it 60 seconds" starts the real room and typing works
-PASS [desktop] support reachable
-PASS [desktop] privacy reachable
-PASS [desktop] terms reachable
-PASS [desktop] waitlist form reachable
+engine [desktop]: chromium
+PASS [desktop] landing/hero: page loads
+PASS [desktop] landing/hero: H1 "We force you to" + "write it down", no final period
+PASS [desktop] landing/hero: second line is the red handwritten one
+PASS [desktop] landing/hero: top bar: Download for Mac pill present
+PASS [desktop] landing/demo: demo sheet fills >=60% of the first viewport - 61%
+PASS [desktop] landing/demo: demo is the scripted preview with a 60-second clock
+PASS [desktop] landing/demo: deck line sits under the demo; CTA "Give it 60 seconds" present
+PASS [desktop] landing/demo: no price/buy/sign-in button offered (checkout does not exist yet)
+PASS [desktop] landing/how-it-works: 3 cards: no way back, eight seconds, reach zero
+PASS [desktop] landing/stop-states: writing / warning / deleted strip
+PASS [desktop] landing/mac-block: USD 4.99 / 2 Macs / 14 days and honest "buying opens soon"
+PASS [desktop] landing/footer: Trefoil Studio + Support/Privacy/Terms links
+PASS [desktop] download: top-bar pill goes to /download/
+PASS [desktop] download: trial terms: 3 sessions, USD 4.99 one-time, buying opens soon
+PASS [desktop] download: no buy/checkout offered
+PASS [desktop] download: DMG link is the canonical URL
+PASS [desktop] download: published SHA-256 present; terms, button, DMG link, sha all on screen
+PASS [desktop] download: DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published - 7883205 bytes, sha ok
+PASS [desktop] room: back to landing, "Give it 60 seconds" starts the real room, typing works
+PASS [desktop] legal: support reachable
+PASS [desktop] legal: privacy reachable
+PASS [desktop] legal: terms reachable
+PASS [desktop] waitlist: waitlist form reachable
 SKIP [desktop] sign-in / checkout / test payment / output after payment - not built yet; asserted above that none is offered. Add real steps when they ship.
-PASS [desktop] no console errors across the journey
+PASS [desktop] console: no console errors across the journey
 video [desktop]: /Users/ichts/.treehouse/zerodraft-14838c/11/zerodraft/data/zd-wid-journey-gate/local-release/desktop/journey-desktop.webm
 
-SUMMARY base=http://127.0.0.1:8017: 38 pass, 0 fail, 2 skip
+SUMMARY base=http://127.0.0.1:8023: 48 pass, 0 fail, 2 skip

@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
  * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
- * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
+ * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native receipts live in RoomPresentation; check nearest AGENTS.md.
  */
 import AppKit
@@ -287,7 +287,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             if !isActivity && self.engine.phase == .failure { return true }
             let sessionID = self.engine.sessionID
             let allowed = self.appState.prepareSessionInput(isActivity: isActivity)
-            if self.engine.sessionID != sessionID || self.engine.phase == .failure { self.textView.clearWipedText() }
+            if !allowed || self.engine.sessionID != sessionID || self.engine.phase == .failure || self.engine.phase == .idle {
+                self.textView.clearWipedText()
+            }
             return allowed
         }
         textView.onCommittedText = { [weak self] text in
@@ -411,7 +413,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if sessionChanged, phase == .writing {
             DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
         }
-        if phase == .failure, !textView.string.isEmpty { textView.clearWipedText() }
+        if (phase == .failure || phase == .idle), !textView.string.isEmpty { textView.clearWipedText() }
         reportLabel.isHidden = phase != .failure
         if let elapsed = engine.deletionElapsedSeconds, phase == .failure {
             reportLabel.stringValue = RoomPresentation.wipeReport(elapsed: elapsed, canRestart: appState.canStartSession)

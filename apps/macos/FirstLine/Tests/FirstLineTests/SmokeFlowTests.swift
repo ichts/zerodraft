@@ -263,7 +263,9 @@ struct SmokeFlowTests {
                 input.insertText("new", replacementRange: NSRange(location: NSNotFound, length: 0))
             }
             #expect(state.selectedSurface == .upgrade)
-            #expect(state.sessionEngine.phase == .failure)
+            #expect(state.sessionEngine.phase == .idle)
+            #expect(state.sessionEngine.text.isEmpty)
+            #expect(!state.canUseApp)
             #expect(input.string.isEmpty)
         }
     }

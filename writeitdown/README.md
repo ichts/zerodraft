@@ -1,6 +1,6 @@
 # WRITE_IT_DOWN
 
-A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Give it 60 seconds on the landing. The landing nav's DOWNLOAD link opens the Mac free-trial download page.
+A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Give it 60 seconds on the landing. The landing nav's Download for Mac pill opens the Mac free-trial download page.
 
 ```sh
 python3 -m http.server 8000
@@ -17,7 +17,7 @@ The watch-only preview has its own clock. It types the original private messy dr
 
 The writing viewport shows the active line at full opacity in the center of a fixed aperture, with two previous lines fading above it. The trial anchors the writing line at about 39% of the viewport height, leaving room for the clock in short windows; earlier lines rise as the draft grows. Native textarea padding and a CSS mask provide this without a mirrored draft or a custom text layout engine. It follows the end automatically but cannot be manually scrolled. The full draft remains available in the kept result.
 
-`session.mjs` owns the real deadline rules and the count: Unicode words, with Han characters counted individually. Punctuation, emoji and whitespace do not count. This is a writing-unit count, not a linguistic Chinese word count. The room counter's tooltip and accessible description explain it. `room.js` connects the session to the browser editor. `theme.js` stores only the appearance preference. The default follows the system.
+`session.mjs` owns the real deadline rules and the count: Unicode words, with Han characters counted individually. Punctuation, emoji and whitespace do not count. This is a writing-unit count, not a linguistic Chinese word count. The room counter's tooltip and accessible description explain it. `room.js` connects the session to the browser editor. `theme.js` stores only the appearance preference. Light is the default; dark is a stored toggle choice.
 
 ## Deploy
 

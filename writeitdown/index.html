@@ -3,42 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WRITE_IT_DOWN - We force you to write it down</title>
+<title>Write It Down - We force you to write it down</title>
 <link rel="canonical" href="https://writeitdown.app/">
 <meta name="description" content="Sixty seconds, forward only. Stop typing for eight seconds and your draft is deleted. Nothing is saved.">
-<meta property="og:title" content="WRITE_IT_DOWN - We force you to write it down">
+<meta property="og:title" content="Write It Down - We force you to write it down">
 <meta property="og:description" content="Sixty seconds, forward only. Stop typing for eight seconds and your draft is deleted. Nothing is saved.">
 <meta property="og:image" content="https://writeitdown.app/og.png">
 <meta property="og:url" content="https://writeitdown.app/">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://writeitdown.app/og.png">
-<meta name="twitter:title" content="WRITE_IT_DOWN - We force you to write it down">
+<meta name="twitter:title" content="Write It Down - We force you to write it down">
 <meta name="twitter:description" content="Sixty seconds, forward only. Stop typing for eight seconds and your draft is deleted. Nothing is saved.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="preload" href="archivo-expanded-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="reenie-beanie.woff2" as="font" type="font/woff2" crossorigin>
 <script src="theme.js"></script>
 <link rel="stylesheet" href="site.css">
 </head>
 <body>
-<main class="stage" id="landing">
-  <div class="wash" id="wash-wall" aria-hidden="true"></div>
-  <div class="col">
-    <nav class="row nav">
-      <div class="logotype">WRITE_IT_DOWN</div>
-      <div class="nav-actions"><a class="mini-link" href="download/">DOWNLOAD &#8594;</a><button class="mini-link theme-toggle" type="button" data-theme-toggle>LIGHT</button></div>
-    </nav>
-    <header class="row hero">
-      <h1 class="h1"><span class="l1">We force you to</span> <span class="hand">write it down</span></h1>
-      <a class="door" href="#trial">Give it 60 seconds</a>
-    </header>
-    <section class="row demo-wrap" id="demo" aria-label="Scripted preview, not the live trial">
-      <p class="sr-only">Scripted preview. The typist fixes a typo; the real room blocks deletion. Eight seconds without typing deletes the draft.</p>
+<main class="home" id="landing">
+  <nav class="home-nav" aria-label="Main">
+    <a class="brand" href="./">Write It Down<i aria-hidden="true"></i></a>
+    <a class="pill" href="download/">Download for Mac</a>
+  </nav>
+  <header class="hero">
+    <h1 class="h1"><span class="l1">We force you to</span> <span class="hand">write it down</span></h1>
+  </header>
+  <section class="stagewrap" id="demo" aria-label="Scripted preview, not the live trial">
+    <p class="sr-only">Scripted preview. The typist fixes a typo; the real room blocks deletion. Eight seconds without typing deletes the draft.</p>
+    <div class="card-stage">
+      <div class="wash" id="wash-wall" aria-hidden="true"></div>
       <div class="paper" id="paper">
         <div class="wash" id="wash-paper" aria-hidden="true"></div>
+        <div class="bar" id="bar" aria-hidden="true"></div>
         <div class="chrome-row">
+          <span class="chip"><b></b>60 seconds, forward only</span>
           <div class="clock" id="clock">1:00</div>
         </div>
         <div class="prev-band" aria-hidden="true">
@@ -53,22 +53,59 @@
         <div class="numeral-band" id="numeral" aria-hidden="true"></div>
         <div class="report" id="report"></div>
         <div class="paper-foot">
+          <span class="saved">Nothing is saved</span>
           <div class="count" id="count">0 WORDS</div>
         </div>
+        <div class="meter" id="meter" aria-hidden="true"><i></i></div>
       </div>
-    </section>
-    <section class="row after" aria-label="How it works">
-      <p class="deck">Stop typing for 8 seconds and it deletes everything you wrote.</p>
-    </section>
-    <footer class="row foot">
-      <div class="foot-links">
-        <a class="mini-link" href="mac.html">MAC APP</a>
-        <a class="mini-link" href="support.html">SUPPORT</a>
-        <a class="mini-link" href="privacy.html">PRIVACY</a>
-        <a class="mini-link" href="terms.html">TERMS</a>
-      </div>
-    </footer>
+    </div>
+  </section>
+  <div class="cta">
+    <p class="deck">Stop typing for 8 seconds and it deletes everything you wrote.</p>
+    <a class="door" href="#trial">Give it 60 seconds</a>
   </div>
+
+  <section class="sect" aria-labelledby="how">
+    <p class="eyebrow">How it works</p>
+    <h2 id="how">Sixty seconds. Forward only. <span class="hand">Nothing kept.</span></h2>
+    <p class="sub">Open it, start typing, say the thing you have been avoiding. The only way out is through.</p>
+    <div class="cards">
+      <article class="how-card"><div class="vis" aria-hidden="true"><div class="keys"><span class="key">&#9003;</span><span class="key">&#8984;V</span><span class="key">&#8984;Z</span></div></div><div class="txt"><h3>No way back</h3><p>Deleting, pasting, cutting and undo are blocked. You can only add the next word.</p></div></article>
+      <article class="how-card"><div class="vis" aria-hidden="true"><div class="line8"><div class="track"><i></i></div><div class="lab"><span>Last key</span><b>5 s of silence</b><span>8 s</span></div></div></div><div class="txt"><h3>Eight seconds of silence</h3><p>Stop typing for eight seconds and the draft is deleted. A warning appears at five.</p></div></article>
+      <article class="how-card"><div class="vis" aria-hidden="true"><div class="keep"><span class="z">0:00</span><span class="cp">COPY TEXT</span></div></div><div class="txt"><h3>Reach zero, keep it</h3><p>Make it to the end of the clock and the text is yours to copy. Nothing is uploaded.</p></div></article>
+    </div>
+  </section>
+
+  <section class="sect" aria-labelledby="moment">
+    <p class="eyebrow">The moment that matters</p>
+    <h2 id="moment">What it feels like when you <span class="hand">stop</span></h2>
+    <div class="moments">
+      <div class="mo m1"><small>0:41 &middot; writing</small><div class="t">promotion. i want time off<span class="cur" aria-hidden="true"></span></div></div>
+      <div class="mo m2"><small>5 s &middot; warning</small><div class="n" aria-label="Three seconds left">3</div></div>
+      <div class="mo m3"><small>8 s &middot; deleted</small><div class="r">DRAFT DELETED AT 0:44. TYPE TO START AGAIN.</div></div>
+    </div>
+  </section>
+
+  <section class="sect" id="mac" aria-labelledby="mac-title">
+    <div class="mac-card">
+      <div>
+        <h2 id="mac-title">Write It Down for Mac</h2>
+        <p>A native writing room. Pick a session from one to thirty minutes and write forward. Your draft stays in memory on your Mac and is never uploaded. Your first 3 sessions are free. Buying opens soon.</p>
+        <div class="actions"><a class="door" href="download/">Download free trial</a><a class="door-alt" href="mac.html#waitlist">Get one email when it opens</a></div>
+      </div>
+      <ul class="facts">
+        <li><b>3 sessions</b>free trial</li>
+        <li><b>$4.99</b>once, no subscription</li>
+        <li><b>2 Macs</b>on one license</li>
+        <li><b>14 days</b>refund, no reason needed</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer class="home-foot">
+    <span>&copy; Trefoil Studio</span>
+    <nav aria-label="Footer"><a href="mac.html">Mac app</a><a href="support.html">Support</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><button class="mini-link theme-toggle" type="button" data-theme-toggle>DARK</button></nav>
+  </footer>
 </main>
 <section class="stage room" id="room" aria-label="Sixty-second writing room" hidden>
   <div class="wash room-wall-wash" aria-hidden="true"></div>

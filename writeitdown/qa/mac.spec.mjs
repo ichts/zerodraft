@@ -155,58 +155,91 @@ test('release gate stays blocked on missing, fake, or placeholder launch inputs'
   }
 });
 
-test('landing: unpunctuated headline, one web-room button, a demo that fills the first screen, the download in the nav', async ({ page }, info) => {
+test('landing: Paper in light - headline, demo card, one room button, sections, honest Mac block', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
   await expect(hero.locator('h1')).toHaveText('We force you to write it down');
   await expect(hero.locator('h1 .hand')).toHaveText('write it down');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
-  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /Archivo Expanded/);
-  const loaded = await page.evaluate(() => [...document.fonts].filter(f => f.status === 'loaded').map(f => f.family));
-  expect(loaded.some(f => f.includes('Reenie')), 'handwriting face loaded').toBe(true);
-  expect(loaded.some(f => f.includes('Archivo Expanded')), 'line 1 face loaded').toBe(true);
+  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Newsreader/);
+  const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
+  expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
+  expect(families.every(f => ['Newsreader', 'Reenie Beanie', 'IBM Plex Mono'].includes(f)), families.join(', ')).toBe(true);
   const ink = await hero.evaluate(h => {
-    const css = getComputedStyle(h.querySelector('h1 .hand'));
     const probe = document.createElement('i');
     probe.style.color = getComputedStyle(document.documentElement).getPropertyValue('--hand');
     h.append(probe);
     const hand = getComputedStyle(probe).color;
     probe.remove();
-    return { hand, actual: css.color, line1: getComputedStyle(h.querySelector('h1 .l1')).color };
+    return { hand, actual: getComputedStyle(h.querySelector('h1 .hand')).color, line1: getComputedStyle(h.querySelector('h1 .l1')).color };
   });
   expect(ink.actual, 'the handwritten line wears the theme red').toBe(ink.hand);
-  expect(ink.actual, 'the two headline lines differ in color').not.toBe(ink.line1);
-  const gap = await hero.evaluate(h => {
-    const hand = h.querySelector('h1 .hand');
-    return (hand.getBoundingClientRect().top - h.querySelector('h1 .l1').getBoundingClientRect().bottom) / parseFloat(getComputedStyle(hand).fontSize);
-  });
-  expect(gap, 'the handwritten line sits clearly apart from line 1').toBeGreaterThanOrEqual(0.2);
-  await expect(hero.locator('.deck')).toHaveCount(0);
-  const after = page.locator('.after .deck');
-  await expect(after).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
-  await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
-  const doors = hero.locator('.door');
-  await expect(doors).toHaveCount(1);
-  await expect(doors).toHaveText('Give it 60 seconds');
-  await expect(doors).toHaveAttribute('href', '#trial');
-  await expect(page.locator('#landing a[href*="download"]:not(.nav a)')).toHaveCount(0);
-  const nav = page.locator('.nav a[href="download/"]');
-  await expect(nav).toHaveText(/^DOWNLOAD/);
+  expect(ink.actual, 'the two headline parts differ in color').not.toBe(ink.line1);
+
+  const nav = page.locator('.home-nav a.pill');
+  await expect(nav).toHaveText('Download for Mac');
+  await expect(nav).toHaveAttribute('href', 'download/');
+  const card = page.locator('.card-stage');
+  await expect(card.locator('.chip')).toHaveText(/60 seconds, forward only/i);
+  await expect(card.locator('#clock')).toBeVisible();
+  await expect(card.locator('.saved')).toHaveText(/nothing is saved/i);
+  await expect(card.locator('#count')).toHaveText(/\d+ WORDS?/);
+  const cta = page.locator('.cta');
+  await expect(cta.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
+  const door = cta.locator('a.door');
+  await expect(door).toHaveText('Give it 60 seconds');
+  await expect(door).toHaveAttribute('href', '#trial');
+  await expect(page.locator('#landing a[href="#trial"]')).toHaveCount(1);
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { door: r('.hero .door').bottom, paper: r('#paper'), deck: r('.after .deck').top, vh: innerHeight };
+    return { card: r('.card-stage'), deck: r('.cta .deck').top, door: r('.cta .door').bottom, vh: innerHeight };
   });
-  expect(layout.door, 'the button is on the first screen').toBeLessThanOrEqual(layout.vh);
-  expect((Math.min(layout.paper.bottom, layout.vh) - layout.paper.top) / layout.vh, 'the demo fills at least 60% of the first screen').toBeGreaterThanOrEqual(0.6);
-  expect(layout.deck, 'the mechanism line sits after the demo').toBeGreaterThan(layout.paper.bottom);
+  expect(layout.deck, 'the deck line sits under the demo card').toBeGreaterThan(layout.card.bottom);
+  expect(layout.door, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
+  const box = await page.evaluate(() => {
+    const r = s => document.querySelector(s).getBoundingClientRect();
+    return { deck: r('.cta .deck'), door: r('.cta .door') };
+  });
+  const overlap = !(box.deck.right <= box.door.left || box.door.right <= box.deck.left || box.deck.bottom <= box.door.top || box.door.bottom <= box.deck.top);
+  expect(overlap, 'the deck line and the room button do not overlap').toBe(false);
+  expect(box.deck.bottom, 'the deck line is fully on the first screen').toBeLessThanOrEqual(layout.vh);
+
+  await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
+  await expect(page.locator('.how-card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
+  await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
+  const mac = page.locator('#mac');
+  await expect(mac).toContainText('Your first 3 sessions are free. Buying opens soon.');
+  await expect(mac.locator('.facts')).toContainText('$4.99');
+  await expect(mac.locator('.facts')).toContainText('2 Macs');
+  await expect(mac.locator('.facts')).toContainText('14 days');
+  await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
+  await expect(mac.locator('a[href="mac.html#waitlist"]')).toHaveText('Get one email when it opens');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
+  await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
+  for (const label of ['Support', 'Privacy', 'Terms']) await expect(page.locator('.home-foot nav a', { hasText: label })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+  await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
+
   await nav.click();
   await expect(page).toHaveURL(/\/download\/$/);
   await expect(page.locator('h1')).toHaveText('Write It Down for Mac');
   await page.goBack();
-  await doors.click();
+  await door.click();
   await expect(page.locator('#editor')).toBeFocused();
+});
+
+test('light is the default theme; the toggle switches to dark and remembers it', async ({ browser }) => {
+  const context = await browser.newContext({ colorScheme: 'dark', storageState: { cookies: [], origins: [] } });
+  const page = await context.newPage();
+  await page.goto('http://127.0.0.1:8015/writeitdown/index.html');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await page.locator('.home-foot [data-theme-toggle]').click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
+  expect(bg).toBe('rgb(21, 20, 15)');
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await context.close();
 });
 
 test('download page states the trial, the DMG, its checksum slot, requirements, and the signer', async ({ page }, info) => {

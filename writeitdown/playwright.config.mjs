@@ -14,7 +14,9 @@ export default defineConfig({
   projects: [1440, 390].flatMap(width => ['dark', 'light'].flatMap(colorScheme =>
     ['no-preference', 'reduce'].map(reducedMotion => ({
       name: `${width}-${colorScheme}-${reducedMotion}`,
-      use: { viewport: { width, height: width === 1440 ? 900 : 844 }, colorScheme, reducedMotion },
+      // Light is the site default; dark projects choose dark the way a visitor does, via the stored toggle.
+      use: { viewport: { width, height: width === 1440 ? 900 : 844 }, colorScheme, reducedMotion,
+        storageState: { cookies: [], origins: [{ origin: 'http://127.0.0.1:8015', localStorage: [{ name: 'writeitdown-theme', value: colorScheme }] }] } },
     })))),
   webServer: {
     command: 'python3 -m http.server 8015 --bind 127.0.0.1 --directory ..',

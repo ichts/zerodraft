@@ -34,6 +34,7 @@ struct LicenseEntitlementTests {
         state.openSettings()
         state.closeSettings()
         #expect(!state.prepareSessionInput())
+        #expect(!state.canUseApp)
         #expect(state.selectedSurface == .upgrade)
         #expect(state.sessionEngine.phase == .idle)
         #expect(state.sessionEngine.text.isEmpty)

@@ -157,6 +157,20 @@ struct TrialReleaseTests {
         #expect(field.string.isEmpty)
         #expect(state.selectedSurface == .upgrade)
         #expect(state.settings.trialSessionsUsed == 3)
+        #expect(!state.canUseApp)
+        #expect(state.sessionEngine.phase == .idle)
+        state.openSettings()
+        state.openWritingMode()
+        state.newPiece()
+        state.goHome()
+        #expect(state.selectedSurface == .upgrade)
+        let delegate = FirstLineAppDelegate(appState: state)
+        let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
+        for action in [#selector(FirstLineAppDelegate.newPiece(_:)), #selector(FirstLineAppDelegate.goHome(_:)),
+                       #selector(FirstLineAppDelegate.openWriting(_:)), #selector(FirstLineAppDelegate.openSettings(_:))] {
+            let item = try #require(menu.items.flatMap { $0.submenu?.items ?? [] }.first { $0.action == action })
+            #expect(!delegate.validateMenuItem(item))
+        }
     }
 
     @Test func lastSessionCanRecoverCompleteAndOfferCopyBeforeNextGate() throws {

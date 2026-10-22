@@ -1,6 +1,6 @@
 /* Write It Down design tokens v2 (design system 2026-10-22 with the captain's background option A: near-white
    page, no beige desk, depth from the white sheet's shadow).
-   Source of truth for colour, type, space, shape, depth and motion on the landing; the Mac app mirrors the
+   Source of truth for colour, type, space, shape, depth and motion on the landing and trial room; the Mac app mirrors the
    same names. Values match the design-system tokens.css; scoped to .home until the other pages adopt the
    system. Faces: Newsreader (what you write, headlines), Reenie Beanie (the pen), and the system UI stack for
    the tool (no webfont). Newsreader loads with the site's existing font link. Dark keeps the same names. */

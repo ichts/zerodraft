@@ -1,5 +1,13 @@
 # Current acceptance
 
+Current user-visible behavior is documented in [README.md](README.md); shared writing geometry is owned by `tokens.css` and `site.css`. Run the browser acceptance command in the README for this revision. The records below describe earlier revisions, not evidence that the current change passed.
+
+`qa/mac.spec.mjs` covers removed demo labels and caption and header theme controls. `qa/phase4.spec.mjs` covers shared demo/trial start-line placement, the blocked demo Backspace, the reduced-height mobile trial footer, the demo loop and room interactions. Use the current run's results and screenshots for release acceptance.
+
+Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
+
+# Centered-aperture acceptance (historical)
+
 This pass centers the trial writing aperture on the paper instead of pinning it to the upper third. The active-line center is y=450 at 1440x900 and y=422 at 390x844, matching the paper center at both widths. The editor's computed mask keeps mirrored alpha stops around the 40%-60% clear band in both themes.
 
 The landing demo now loads its module graph from the deploy bundle, including `demo-timeline.mjs`; a hard-load browser regression proves that `#cur` receives the first typed character. The shortened timeline completes in about 12.7 seconds, uses two quick backspaces for the correction, and holds the wipe report for one second before looping. Deny feedback is a lighter 280ms beat and reduced motion still removes spatial movement.

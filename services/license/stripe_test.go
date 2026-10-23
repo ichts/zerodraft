@@ -272,16 +272,62 @@ func TestStripeRefundUnknownBinding(t *testing.T) {
 	expect(t, stripeRequest(s, stripeFixture("checkout.session.completed")), 200)
 	expect(t, stripeRequest(s, stripeFixture("charge.refunded")), 200)
 }
-func TestStripeExpiredAndConflict(t *testing.T) {
+func TestStripeExpired(t *testing.T) {
 	s := stripeServer(t)
 	expect(t, stripeRequest(s, stripeFixture("checkout.session.expired")), 200)
 	if stripeRows(t, s, "licenses") != 0 {
 		t.Fatal("expired checkout issued license")
 	}
-	e := stripeFixture("checkout.session.completed")
-	expect(t, stripeRequest(s, e), 200)
-	stripeFixtureObject(e)["ignored_field"] = "changed"
-	expect(t, stripeRequest(s, e), 409)
+}
+
+func TestStripeDuplicateDelivery(t *testing.T) {
+	for _, typ := range []string{"checkout.session.completed", "checkout.session.expired", "charge.refunded"} {
+		t.Run(typ, func(t *testing.T) {
+			s := stripeServer(t)
+			if typ == "charge.refunded" {
+				expect(t, stripeRequest(s, stripeFixture("checkout.session.completed")), 200)
+			}
+			e := stripeFixture(typ)
+			expect(t, stripeRequest(s, e), 200)
+			var hash string
+			var receivedAt int64
+			if err := s.db.QueryRow("SELECT payload_hash, received_at FROM stripe_events WHERE event_id=?", e["id"]).Scan(&hash, &receivedAt); err != nil {
+				t.Fatal(err)
+			}
+			counts := map[string]int{}
+			for _, table := range []string{"licenses", "stripe_purchases", "stripe_events"} {
+				counts[table] = stripeRows(t, s, table)
+			}
+			// Stripe redelivery can change non-business fields without changing event identity.
+			stripeFixtureObject(e)["ignored_field"] = "changed"
+			now := s.now().Add(time.Second)
+			s.now = func() time.Time { return now }
+			expect(t, stripeRequest(s, e), 200)
+			for table, count := range counts {
+				if stripeRows(t, s, table) != count {
+					t.Fatalf("redelivery changed %s count", table)
+				}
+			}
+			var gotHash string
+			var gotReceivedAt int64
+			if err := s.db.QueryRow("SELECT payload_hash, received_at FROM stripe_events WHERE event_id=?", e["id"]).Scan(&gotHash, &gotReceivedAt); err != nil {
+				t.Fatal(err)
+			}
+			if gotHash != hash || gotReceivedAt != receivedAt {
+				t.Fatal("redelivery changed original receipt")
+			}
+			if typ == "charge.refunded" {
+				var status string
+				var revokedAt int64
+				if err := s.db.QueryRow("SELECT status, revoked_at FROM licenses").Scan(&status, &revokedAt); err != nil {
+					t.Fatal(err)
+				}
+				if status != "revoked" || revokedAt != receivedAt {
+					t.Fatal("redelivery reapplied refund")
+				}
+			}
+		})
+	}
 }
 
 func TestStripeCheckoutAndLineItemLookup(t *testing.T) {

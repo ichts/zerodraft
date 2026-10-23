@@ -241,15 +241,10 @@ func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {
 		return 500
 	}
 	defer tx.Rollback()
-	hash := sha256.Sum256(body)
-	payloadHash := hex.EncodeToString(hash[:])
-	var previous string
-	err = tx.QueryRow("SELECT payload_hash FROM stripe_events WHERE event_id=?", e.ID).Scan(&previous)
+	var recordedID string
+	err = tx.QueryRow("SELECT event_id FROM stripe_events WHERE event_id=?", e.ID).Scan(&recordedID)
 	if err == nil {
-		if previous == payloadHash {
-			return 200
-		}
-		return 409
+		return 200
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return 500
@@ -272,6 +267,8 @@ func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {
 	if err != nil {
 		return 500
 	}
+	hash := sha256.Sum256(body)
+	payloadHash := hex.EncodeToString(hash[:])
 	_, err = tx.Exec("INSERT INTO stripe_events(event_id,event_type,payload_hash,received_at) VALUES(?,?,?,?)", e.ID, e.Type, payloadHash, s.now().Unix())
 	if err == nil {
 		err = tx.Commit()

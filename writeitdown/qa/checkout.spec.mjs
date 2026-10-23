@@ -81,6 +81,19 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   await expect(page).toHaveURL(/\/index\.html$/);
 });
 
+test('a key padded by the service is displayed and copied without the padding', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route(`${service}/license?session_id=cs_test_padded_fixture`,
+    route => route.fulfill({ json: { licenseKey: `\r\n  ${key} \t\n` } }));
+  await page.goto('mac.html?session_id=cs_test_padded_fixture');
+  await expect(page.locator('#license-result')).toBeVisible();
+  // toHaveText normalizes whitespace, so compare the raw text to pin the exact bytes.
+  expect(await page.locator('#license-key').textContent()).toBe(key);
+  await page.getByRole('button', { name: 'COPY LICENSE KEY', exact: true }).click();
+  await expect(page.locator('#copy-license')).toHaveText('COPIED');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
+});
+
 for (const state of ['pending', 'unknown']) {
   test(`${state} session shows neutral message and no key`, async ({ page }, info) => {
     await page.route(`${service}/license?session_id=cs_test_${state}_fixture`, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));

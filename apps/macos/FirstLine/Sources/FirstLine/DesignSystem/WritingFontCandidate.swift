@@ -23,6 +23,7 @@ import os
 enum BundledFonts {
     // PostScript names (name table, nameID 6) of the registered default instances.
     static let newsreaderUprightPostScript = "Newsreader16pt-Regular"
+    static let newsreaderMediumPostScript = "NewsreaderRoman-Medium"
     static let newsreaderItalicPostScript = "Newsreader16pt-Italic"
     static let plexMonoRegularPostScript = "IBMPlexMono-Regular"
     static let zhuquePostScript = "ZhuqueFangsong-Regular"

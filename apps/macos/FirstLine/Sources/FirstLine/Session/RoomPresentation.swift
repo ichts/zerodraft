@@ -1,8 +1,8 @@
 /*
  * [INPUT]: Deadline and idle values from SessionEngine, plus whether the next session may restart.
- * [OUTPUT]: Room clock, elapsed deletion report with restart/activation copy, receipt, chosen-limit wash strength, copy, and deny state.
- * [POS]: Stateless presentation rules shared by the AppKit room and its tests.
- * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native wipe and receipt copy live here and are not required to match the website.
+ * [OUTPUT]: Room clock, unused-time deletion sentence with restart/activation copy, word count, kept receipt, chosen-limit wash strength, copy, exit-confirmation timing, and deny state.
+ * [POS]: Stateless presentation rules shared by the AppKit room and its tests; the visible sentences match writeitdown/room.js.
+ * [PROTOCOL]: Keep the strings and wash timing aligned with writeitdown/room.js and the consistency table; check nearest AGENTS.md.
  */
 import AppKit
 
@@ -11,16 +11,22 @@ enum RoomPresentation {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    static func wipeReport(elapsed: Int, canRestart: Bool) -> String {
-        "DRAFT DELETED AT \(clock(elapsed)). \(canRestart ? "TYPE TO START AGAIN." : "ACTIVATE TO KEEP WRITING.")"
+    /// `DRAFT DELETED AT 0:52. TYPE TO START AGAIN.` uses the session's unused seconds, like the web.
+    static func wipeReport(unused: Int, canRestart: Bool) -> String {
+        "DRAFT DELETED AT \(clock(unused)). \(canRestart ? "TYPE TO START AGAIN." : "ACTIVATE TO KEEP WRITING.")"
     }
 
     static func wordLabel(_ count: Int) -> String {
+        "\(count) \(count == 1 ? "word" : "words")"
+    }
+
+    static func wordCountLabel(_ count: Int) -> String {
         "\(count) \(count == 1 ? "WORD" : "WORDS")"
     }
 
-    static func keptReceipt(words: Int) -> String {
-        "0:00 - \(wordLabel(words)) KEPT."
+    /// `0:00 - N WORDS KEPT.` The wall-clock receipt on the kept sheet; the web hardcodes 0:00.
+    static func keptReceipt(wordCount: Int) -> String {
+        "0:00 - \(wordCountLabel(wordCount)) KEPT."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {
@@ -30,11 +36,38 @@ enum RoomPresentation {
         return CGFloat(min(max((idle - warnAt) / 3, 0), 1))
     }
 
-    static func shouldExitOnEscape(isComposing: Bool) -> Bool { !isComposing }
+    /// Escape is ignored while an IME composition owns the key.
+    static func handlesEscape(isComposing: Bool) -> Bool { !isComposing }
 
     static func copy(_ text: String, to board: NSPasteboard) -> Bool {
         board.clearContents()
         return board.setString(text, forType: .string)
+    }
+}
+
+/// Two-step, time-bounded room exit. The first request arms the inline confirmation;
+/// a second request inside the window leaves. Typing dismisses the armed state.
+struct ExitConfirmation: Equatable {
+    static let defaultWindow: TimeInterval = 2
+
+    let window: TimeInterval
+    private(set) var armedAt: TimeInterval?
+
+    init(window: TimeInterval = defaultWindow) {
+        self.window = window
+    }
+
+    mutating func request(now: TimeInterval) -> Bool {
+        if let armedAt, now - armedAt <= window {
+            self.armedAt = nil
+            return true
+        }
+        armedAt = now
+        return false
+    }
+
+    mutating func dismiss() {
+        armedAt = nil
     }
 }
 

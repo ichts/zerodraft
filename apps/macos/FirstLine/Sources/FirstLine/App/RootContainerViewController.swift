@@ -32,7 +32,7 @@ final class RootContainerViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        let canvas = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
+        let canvas = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
         canvas.autoresizingMask = [.width, .height]
         self.view = canvas
     }

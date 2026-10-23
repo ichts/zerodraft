@@ -35,9 +35,9 @@ enum SilenceLimit: Int, Codable, CaseIterable {
     case strict = 5, standard = 8, relaxed = 12
     var label: String {
         switch self {
-        case .strict: "Strict - 5s"
-        case .standard: "Standard - 8s"
-        case .relaxed: "Relaxed - 12s"
+        case .strict: "Strict 5 s"
+        case .standard: "Standard 8 s"
+        case .relaxed: "Relaxed 12 s"
         }
     }
 }

@@ -29,7 +29,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// session surface (Home -> Writing). User input is never weakened.
     private var isRestoringProgrammatically = false
     private var sessionFontSize: CGFloat = 28
-    private var writingAlignment: WritingAlignment = .centered
     private var typographyConfigured = false
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
@@ -106,7 +105,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
         pendingCompositionRefresh = true
-        applyFocusTypographyToExistingText()
+        applySessionTypography()
         onCommittedText?(inserted)
     }
 
@@ -358,28 +357,23 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         NSRange(location: NSNotFound, length: 0)
     }
 
-    func configureSessionTypography(size: CGFloat = 28, alignment: WritingAlignment = .centered) {
-        guard !typographyConfigured || size != sessionFontSize || alignment != writingAlignment else { return }
+    func configureSessionTypography(size: CGFloat = 28) {
+        guard !typographyConfigured || size != sessionFontSize else { return }
         typographyConfigured = true
         sessionFontSize = size
-        writingAlignment = alignment
         let paragraph = sessionParagraphStyle()
         let attributes = activeTextAttributes(paragraph: paragraph)
 
         defaultParagraphStyle = paragraph
         typingAttributes = attributes
-        insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
+        insertionPointColor = FirstLineColors.inkNSColor
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        self.alignment = .left
+        alignment = .center
         layoutManager?.delegate = self
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
-        applyFocusTypographyToExistingText()
-    }
-
-    func applySessionTypographyToExistingText() {
-        applyFocusTypographyToExistingText()
+        applySessionTypography()
     }
 
     /// Controlled restore of an existing engine draft when re-entering a live session
@@ -394,13 +388,15 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         defer { isRestoringProgrammatically = false }
         let whole = NSRange(location: 0, length: textStorage.length)
         textStorage.replaceCharacters(in: whole, with: text)
-        applyFocusTypographyToExistingText()
+        applySessionTypography()
         let end = NSRange(location: utf16Length, length: 0)
         if selectedRange() != end { setSelectedRange(end) }
         pendingCompositionRefresh = true
     }
 
-    func applyFocusTypographyToExistingText() {
+    /// One ink colour for every line. The room's gradient mask, not per-paragraph alpha,
+    /// fades earlier lines exactly like the live trial's `#editor` mask.
+    func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
 
@@ -409,19 +405,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard textStorage.length > 0 else { return }
 
         let range = NSRange(location: 0, length: textStorage.length)
-        let activeRange = currentThoughtRange(in: textStorage.string)
-        let previousRange = previousThoughtRange(before: activeRange, in: textStorage.string)
-
         textStorage.beginEditing()
         textStorage.removeAttribute(.shadow, range: range)
-        textStorage.addAttributes(hiddenTextAttributes(paragraph: paragraph), range: range)
-        if let previousRange, previousRange.length > 0 {
-            textStorage.addAttributes(inactiveTextAttributes(paragraph: paragraph), range: previousRange)
-        }
-        if activeRange.length > 0 {
-            textStorage.addAttributes(activeTextAttributes(paragraph: paragraph), range: activeRange)
-            textStorage.removeAttribute(.shadow, range: activeRange)
-        }
+        textStorage.addAttributes(activeTextAttributes(paragraph: paragraph), range: range)
         applyLightPunctuationTypography(in: range, textStorage: textStorage)
         applyScriptBoundaryKerning(in: range, textStorage: textStorage)
         textStorage.endEditing()
@@ -438,7 +424,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
-        let initialY = round(textContainerOrigin.y + firstLineInkCenter() - compositionAnchorY)
+        // Zen: the current (last) line sits at the anchor; earlier lines move up and fade.
+        let initialY = round(textContainerOrigin.y + line.midY - compositionAnchorY)
         let targetY = max(
             -scrollView.contentInsets.top, initialY,
             ceil(textContainerOrigin.y + line.maxY - scrollView.contentView.bounds.height + 40)
@@ -458,16 +445,24 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
     }
 
-    private func firstLineInkCenter() -> CGFloat {
-        guard !string.isEmpty, let layoutManager, let textContainer else {
-            return layoutManager?.extraLineFragmentRect.midY ?? 0
-        }
+    /// Offset from the line box centre to the rendered ink centre of the caret line.
+    /// TextKit puts its baseline lower in the 1.6 line box than CSS does; the room's
+    /// live gradient fade is applied to the rendered line centres.
+    func currentLineInkOffsetY() -> CGFloat? {
+        guard let layoutManager, let textContainer else { return nil }
         layoutManager.ensureLayout(for: textContainer)
-        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
-        guard let scalar = string.unicodeScalars.first,
-              let font = font(for: scalar),
-              let ink = glyphMetrics(for: scalar, font: font)?.bounds else { return line.midY }
-        return line.minY + layoutManager.location(forGlyphAt: 0).y - ink.midY
+        guard !string.isEmpty else { return 0 }
+        let length = (string as NSString).length
+        let location = min(max(selectedRange().location - 1, 0), max(length - 1, 0))
+        let glyph = layoutManager.glyphIndexForCharacter(at: location)
+        let line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
+        let baseline = line.minY + layoutManager.location(forGlyphAt: glyph).y
+        let character = (string as NSString).character(at: location)
+        let fontForGlyph = font(for: UnicodeScalar(character) ?? "x")
+        guard let fontForGlyph, let ink = glyphMetrics(for: UnicodeScalar(character) ?? "x", font: fontForGlyph)?.bounds else {
+            return 0
+        }
+        return baseline - ink.midY - line.midY
     }
 
     func clearPendingCompositionRefresh() {
@@ -649,8 +644,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .left
-        paragraph.lineHeightMultiple = 1.45
+        paragraph.alignment = .center
+        paragraph.lineHeightMultiple = 1.6
         paragraph.lineSpacing = 0
         return paragraph
     }
@@ -663,56 +658,4 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         ]
     }
 
-    private func inactiveTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
-        let shadow = NSShadow()
-        shadow.shadowBlurRadius = 3.5
-        shadow.shadowOffset = .zero
-        shadow.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.26)
-
-        return [
-            .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.12),
-            .paragraphStyle: paragraph,
-            .shadow: shadow,
-        ]
-    }
-
-    private func hiddenTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
-        [
-            .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0),
-            .paragraphStyle: paragraph,
-        ]
-    }
-
-    private func currentThoughtRange(in value: String) -> NSRange {
-        let nsString = value as NSString
-        guard nsString.length > 0 else { return NSRange(location: 0, length: 0) }
-
-        let insertionLocation = min(max(selectedRange().location, 0), nsString.length)
-        if insertionLocation == nsString.length,
-           nsString.length > 0,
-           nsString.substring(with: NSRange(location: nsString.length - 1, length: 1)) == "\n" {
-            return NSRange(location: nsString.length, length: 0)
-        }
-
-        let characterLocation = max(insertionLocation - 1, 0)
-        return nsString.paragraphRange(for: NSRange(location: characterLocation, length: 0))
-    }
-
-    private func previousThoughtRange(before currentRange: NSRange, in value: String) -> NSRange? {
-        let nsString = value as NSString
-        guard nsString.length > 0 else { return nil }
-
-        let boundary = min(max(currentRange.location, 0), nsString.length)
-        let probeLocation = boundary - 1
-        guard probeLocation >= 0 else { return nil }
-
-        let previousRange = nsString.paragraphRange(for: NSRange(location: probeLocation, length: 0))
-        guard previousRange.location != currentRange.location || previousRange.length != currentRange.length else {
-            return nil
-        }
-
-        return previousRange
-    }
 }

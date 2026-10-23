@@ -35,6 +35,7 @@
   const status = document.getElementById('license-status');
   const key = document.getElementById('license-key');
   const copy = document.getElementById('copy-license');
+  let deliveredKey = '';
   document.getElementById('license-delivery').hidden = false;
   status.textContent = 'Checking your license...';
 
@@ -45,8 +46,10 @@
       const response = await fetch(url, { ...options, headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('License unavailable');
       const { licenseKey } = await response.json();
-      if (typeof licenseKey !== 'string' || !licenseKey.trim()) throw new Error('License unavailable');
-      key.textContent = licenseKey;
+      // Surrounding whitespace is paste noise; the displayed and copied key are the same trimmed value.
+      deliveredKey = typeof licenseKey === 'string' ? licenseKey.trim() : '';
+      if (!deliveredKey) throw new Error('License unavailable');
+      key.textContent = deliveredKey;
       status.textContent = 'Your license key is ready.';
       document.getElementById('license-result').hidden = false;
       const clean = new URL(location.href);
@@ -59,7 +62,7 @@
 
   copy.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(key.textContent);
+      await navigator.clipboard.writeText(deliveredKey);
       copy.textContent = 'COPIED';
       document.getElementById('copy-status').textContent = '';
     } catch {

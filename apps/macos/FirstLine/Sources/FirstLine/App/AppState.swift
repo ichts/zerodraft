@@ -1,5 +1,5 @@
 /**
- * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient 管理应用状态
+ * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
  * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、配置驱动结账与 Waffo 签名 token 持久化
  * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；完整访问仍须订单号与合法签名 token；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
@@ -37,11 +37,16 @@ final class AppState {
                            publicKey: Data(base64Encoded: configuration["WIDLicensePublicKey"] as? String ?? "") ?? Data())
     }
     static let webTrialURL = URL(string: "https://writeitdown.app/")!
+    /// Public Mac page used when the hosted checkout request fails. This is the error fallback,
+    /// never the in-app Buy action itself.
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
               let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
         return url
+    }
+    static var configuredCheckoutClient: HostedCheckoutClient {
+        HostedCheckoutClient(baseURL: (configuration["WIDLicenseServiceURL"] as? String).flatMap(URL.init(string:)))
     }
     /// 网络故障不延长签名 token 的七天有效期。
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
@@ -52,6 +57,7 @@ final class AppState {
     let sessionEngine: SessionEngine
     let settingsStore: SettingsStore
     let licenseClient: LicenseClient
+    let checkoutClient: CheckoutClient
     let installIDStore: InstallIDStore
     let clock: () -> Date
     let productID: String
@@ -98,11 +104,13 @@ final class AppState {
     var licenseActivationInFlight = false
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
+    private(set) var checkoutInFlight = false
 
     init(
         sessionEngine: SessionEngine = SessionEngine(),
         settingsStore: SettingsStore = SettingsStore(),
         licenseClient: LicenseClient = AppState.configuredLicenseClient,
+        checkoutClient: CheckoutClient = AppState.configuredCheckoutClient,
         installIDStore: InstallIDStore = InstallIDStore(),
         clock: @escaping () -> Date = Date.init,
         productID: String = AppState.licenseProductID,
@@ -111,6 +119,7 @@ final class AppState {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
         self.licenseClient = licenseClient
+        self.checkoutClient = checkoutClient
         self.installIDStore = installIDStore
         self.clock = clock
         self.productID = productID
@@ -276,9 +285,19 @@ final class AppState {
         persistSettings()
     }
 
-    func openCheckout() {
-        guard let url = Self.checkoutURL else { return }
-        openExternalURL(url)
+    var checkoutAvailable: Bool { checkoutClient.isConfigured && Self.checkoutURL != nil }
+
+    /// The host checkout is the purchase path; the public Mac page is the error fallback.
+    /// Neither the hosted URL nor any buyer credential is logged.
+    func openCheckout() async {
+        guard !checkoutInFlight else { return }
+        checkoutInFlight = true
+        defer { checkoutInFlight = false }
+        do {
+            openExternalURL(try await checkoutClient.createCheckoutSession())
+        } catch {
+            if let fallback = Self.checkoutURL { openExternalURL(fallback) }
+        }
     }
 
     func openWebTrial() {
@@ -292,7 +311,10 @@ final class AppState {
 
     func activateLicense(key: String) async {
         guard !licenseActivationInFlight else { return }
-        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        // Surrounding whitespace is paste noise, never part of the credential. Trim once at the
+        // entry point so the empty check, cache comparison, request body and stored key agree.
+        let licenseKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !licenseKey.isEmpty else {
             licenseActivationError = .emptyKey
             return
         }
@@ -305,7 +327,7 @@ final class AppState {
             licenseActivationError = .productNotConfigured
             return
         }
-        if settings.licenseKey?.utf8.elementsEqual(key.utf8) == true, settings.licenseInstanceID != nil,
+        if settings.licenseKey?.utf8.elementsEqual(licenseKey.utf8) == true, settings.licenseInstanceID != nil,
            settings.licenseToken != nil, settings.licenseProductID == productID {
             switch await validateLicenseIfNeeded(allowInactive: true) {
             case .some(true): return
@@ -318,7 +340,7 @@ final class AppState {
             }
         }
         do {
-            let activation = try await licenseClient.activate(licenseKey: key, instanceName: installLabel)
+            let activation = try await licenseClient.activate(licenseKey: licenseKey, instanceName: installLabel)
             guard activation.productID == productID else {
                 await rejectActivation(activation, reason: .wrongProduct)
                 return
@@ -331,7 +353,7 @@ final class AppState {
             // Snapshot the pre-activation state so a failed persist cannot leave the
             // app granting access that is not durable on disk.
             let preActivation = settings
-            settings.licenseKey = key
+            settings.licenseKey = licenseKey
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
             settings.licenseProductID = productID

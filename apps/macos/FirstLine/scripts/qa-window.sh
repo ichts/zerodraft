@@ -164,6 +164,28 @@ type_text() {
   done
 }
 
+assert_exit_hint() { # first Escape/click must arm the inline confirmation, not leave
+  poll exit-hint
+  assert_text "$output/last-poll.json" 'Press Esc again to leave. The draft is deleted.'
+}
+
+exit_room_by_key() {
+  press escape
+  assert_exit_hint
+  press escape
+}
+
+exit_room_by_click() {
+  local token
+  token="$(token_of "$output/last-poll.json" button 'ESC - EXIT')"
+  [[ -n "$token" ]] || fail 'no ESC - EXIT button in the room'
+  cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+  assert_exit_hint
+  token="$(token_of "$output/last-poll.json" button 'ESC - EXIT')"
+  [[ -n "$token" ]] || fail 'no ESC - EXIT button after the exit hint'
+  cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+}
+
 wait_text() { # wait_text <stage> <ax-query> <expected-substring> <max-polls>
   local stage="$1" query="$2" text="$3" max="$4" i
   for ((i = 1; i <= max; i++)); do
@@ -191,8 +213,14 @@ assert_timing() {
 
 enter_room() { # enter_room <home-snapshot>
   local token
-  token="$(token_of "$1" button '1')"
-  [[ -n "$token" ]] || fail 'no element token for the 1-minute button'
+  token="$(token_of "$1" radio '1 minute')"
+  [[ -n "$token" ]] || fail 'no element token for the 1-minute radio'
+  cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
+  snap selected-minute >"$output/selected-minute.json"
+  jq -e '[.elements[] | select(.role == "AXRadioButton" and .label == "1 minute" and (.value | tostring) == "1")] | length == 1' \
+    >/dev/null "$output/selected-minute.json" || fail '1 minute is not selected'
+  token="$(token_of "$output/selected-minute.json" button 'Begin writing')"
+  [[ -n "$token" ]] || fail 'no element token for Begin'
   cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
 }
 
@@ -212,26 +240,28 @@ check_warn_recovery_wipe() {
   local warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json" wipe_start warn_min warn_max
   warn_min="$(awk -v t="$limit" 'BEGIN { print t - 3 - 0.5 }')"
   warn_max="$(awk -v t="$limit" 'BEGIN { print t - 3 + 2.5 }')"
-  wait_text "$tier-warn" 'KEEP TYPING' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
+  wait_text "$tier-warn" 'KEEP TYPING OR THE DRAFT IS DELETED.' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
   assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
   assert_text "$warn" 'KEEP TYPING OR THE DRAFT IS DELETED.'
+  assert_text "$warn" 'ESC - EXIT'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
   wipe_start="$(clock_now)"
   press k
   snap "$tier-recovered-state" >"$recovered"
-  absent_text "$recovered" 'KEEP TYPING OR THE DRAFT IS DELETED.'
+  absent_text "$recovered" 'KEEP TYPING'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
-  wait_text "$tier-wiped" 'DRAFT DELETED' 'DRAFT DELETED AT ' "$max"
+  wait_text "$tier-wiped" 'DRAFT DELETED AT ' 'DRAFT DELETED AT ' "$max"
   assert_timing "$tier" wipe "$wipe_start" "$matched_at" "$(awk -v t="$limit" 'BEGIN { print t - 0.5 }')" "$((limit + 3))"
   snap "$tier-wiped-full" >"$wiped"
   jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. TYPE TO START AGAIN\\.")' >/dev/null "$wiped" \
     || fail "$tier wipe report is not the literal receipt"
-  assert_text "$wiped" '0 WORDS'
+  assert_text "$wiped" '0 words'
   assert_text "$wiped" '1:00'
   assert_text "$wiped" 'Start typing.'
-  press escape
+  [[ "$(draft_value "$wiped")" == '' ]] || fail "$tier wipe retained editor text"
+  exit_room_by_key
   snap "$tier-exit" >"$output/$tier-exit.json"
 }
 
@@ -240,7 +270,7 @@ snap fresh-trial >"$output/fresh-trial.json"
 assert_text "$output/fresh-trial.json" 'Free trial: 3 of 3 sessions left.'
 enter_room "$output/fresh-trial.json"
 snap empty-trial >"$output/empty-trial.json"
-press escape
+exit_room_by_key
 snap unspent-trial >"$output/unspent-trial.json"
 assert_text "$output/unspent-trial.json" 'Free trial: 3 of 3 sessions left.'
 for used in 1 2 3; do
@@ -252,15 +282,14 @@ for used in 1 2 3; do
   [[ "$(draft_value "$output/trial-input.json")" == a ]] || fail 'trial input was blocked'
   # Escape may cancel an active IME composition instead of leaving the room.
   if [[ "$used" == 3 ]]; then
-    wait_text last-trial-wiped 'DRAFT DELETED' 'DRAFT DELETED AT ' 32
+    wait_text last-trial-wiped 'DRAFT DELETED AT ' 'DRAFT DELETED AT ' 32
     snap last-trial-wiped-full >"$output/last-trial-wiped.json"
-    assert_text "$output/last-trial-wiped.json" 'DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.'
+    assert_text "$output/last-trial-wiped.json" 'DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.'
     press a
     snap trial-exhausted-input >"$output/trial-exhausted-input.json"
     assert_text "$output/trial-exhausted-input.json" 'Activate Write It Down'
   else
-    exit_token="$(token_of "$output/trial-input.json" button 'ESC - EXIT')"
-    cua click "{\"pid\":$pid,\"element_token\":\"$exit_token\"}" >/dev/null
+    exit_room_by_click
     snap "trial-$used-exit" >"$output/trial-exit.json"
     assert_text "$output/trial-exit.json" "Free trial: $((3 - used)) of 3 sessions left."
   fi
@@ -282,7 +311,7 @@ cua type_text "{\"pid\":$pid,\"element_token\":\"$field\",\"text\":\"window-qa-o
 snap order-entered >"$output/order-entered.json"
 activate="$(token_of "$output/order-entered.json" button 'Activate')"
 cua click "{\"pid\":$pid,\"element_token\":\"$activate\"}" >/dev/null
-wait_text activated 'License active' 'License active on this Mac.' 30
+wait_text activated 'This Mac is licensed.' 'This Mac is licensed.' 30
 snap activated >"$output/activated.json"
 start="$(token_of "$output/activated.json" button 'Start writing')"
 cua click "{\"pid\":$pid,\"element_token\":\"$start\"}" >/dev/null
@@ -291,18 +320,20 @@ snap activated-home >"$output/activated-home.json"
 if [[ "$license_only" != 1 ]]; then
 ### 1. Home: duration buttons, silence radio, license status
 snap home >"$output/home.json"
-assert_text "$output/home.json" 'Standard - 8s'
+assert_text "$output/home.json" 'Standard 8 s'
 for b in 1 5 10 20 30; do
-  [[ -n "$(token_of "$output/home.json" button "$b")" ]] || fail "home is missing duration button '$b'"
+  label="$b minutes"
+  [[ "$b" == 1 ]] && label='1 minute'
+  [[ -n "$(token_of "$output/home.json" radio "$label")" ]] || fail "home is missing duration radio '$label'"
 done
 
 ### 2. Enter the room via the 1-minute button
-select_tier "$output/home.json" 'Standard - 8s' standard
+select_tier "$output/home.json" 'Standard 8 s' standard
 enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
 assert_text "$output/room.json" 'Start typing.'
 assert_text "$output/room.json" '1:00'
-assert_text "$output/room.json" '0 WORDS'
+assert_text "$output/room.json" '0 words'
 assert_text "$output/room.json" 'ESC - EXIT'
 jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$output/room.json" \
   || fail 'no text area in the room'
@@ -311,7 +342,7 @@ jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$
 type_text 'hello world'
 snap typed >"$output/typed.json"
 [[ "$(draft_value "$output/typed.json")" == 'hello world' ]] || fail "draft is '$(draft_value "$output/typed.json")', expected 'hello world'"
-assert_text "$output/typed.json" '2 WORDS'
+assert_text "$output/typed.json" '2 words'
 press delete
 snap deny >"$output/deny.json"
 [[ "$(draft_value "$output/deny.json")" == 'hello world' ]] || fail 'Backspace mutated the draft; forward-only contract broken'
@@ -320,18 +351,18 @@ snap deny >"$output/deny.json"
 warn_start="$(clock_now)"
 press x
 check_warn_recovery_wipe standard 32 'hello worldx' 8 "$warn_start"
-assert_text "$output/standard-exit.json" 'Standard - 8s'
+assert_text "$output/standard-exit.json" 'Standard 8 s'
 
 ### 5. Strict and Relaxed: each selection, warn, recovery, wipe, exit
 for tier in strict relaxed; do
   home="$output/$tier-home.json"
   snap "$tier-home" >"$home"
   if [[ "$tier" == strict ]]; then
-    label='Strict - 5s'
+    label='Strict 5 s'
     max_polls=25
     silence_limit=5
   else
-    label='Relaxed - 12s'
+    label='Relaxed 12 s'
     max_polls=48
     silence_limit=12
   fi
@@ -359,7 +390,7 @@ snap activated-room >"$output/activated-room.json"
 press a
 snap paid-input >"$output/paid-input.json"
 [[ "$(draft_value "$output/paid-input.json")" == a ]] || fail 'activated input was blocked'
-press escape
+exit_room_by_key
 
 ### 3. Restart offline, then with an explicit refund response.
 for mode in offline refunded; do

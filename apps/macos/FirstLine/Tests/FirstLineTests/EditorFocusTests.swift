@@ -6,7 +6,7 @@ import Testing
 @MainActor
 struct EditorFocusTests {
     @Test(arguments: [WritingAlignment.centered, .left], [false, true])
-    func writingLineMatchesWindowAndPlaceholder(alignment: WritingAlignment, focus: Bool) throws {
+    func currentLineSitsAtTheSheetAnchorAndIsCentered(alignment: WritingAlignment, focus: Bool) throws {
         for size in [NSSize(width: 1040, height: 720), NSSize(width: 1440, height: 900)] {
             try checkWritingLine(alignment: alignment, focus: focus, size: size)
         }
@@ -27,40 +27,126 @@ struct EditorFocusTests {
         room.view.layoutSubtreeIfNeeded()
         room.viewDidLayout()
         room.view.layoutSubtreeIfNeeded()
+        RoomWindowKeeper.windows.append(window)
 
         let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let scroll = try #require(editor.enclosingScrollView)
+        let paper = try #require(scroll.superview)
         let placeholder = try #require(descendants(of: room.view, as: NSTextField.self)
             .first(where: { $0.stringValue == "Start typing." }))
-        let emptyY = try activeLineY(in: editor, room: room)
-        let placeholderY = windowTop(of: placeholder.bounds.midY, in: placeholder, room: room)
-        #expect(abs(emptyY / room.view.bounds.height - 0.39) < 0.01)
-        #expect(abs(placeholderY - emptyY) < 3)
-        #expect(!placeholder.isHidden)
+        let lineHeight = CGFloat(WritingFontSize.medium.points) * 1.6
 
+        // Empty sheet: the placeholder sits at 39% of the sheet and is horizontally centred.
+        let placeholderY = topInPaper(placeholder.bounds.midY, of: placeholder, paper: paper)
+        #expect(abs(placeholderY / paper.bounds.height - 0.39) < 0.01)
+        let placeholderX = paper.convert(NSPoint(x: placeholder.bounds.midX, y: 0), from: placeholder).x
+        #expect(abs(placeholderX - paper.bounds.midX) <= 1)
+        #expect(!placeholder.isHidden)
+        #expect(editor.alignment == .center)
+        let emptyY = try currentLineTop(in: editor, paper: paper)
+        #expect(abs(emptyY - placeholderY) < 3)
+
+        // One line: the current line replaces the hint at the same anchor, centred.
         editor.insertText("One", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
-        let firstY = try inkCenterY(in: editor, room: room)
-        #expect((0.38...0.40).contains(firstY / room.view.bounds.height))
-        #expect(abs(firstY - placeholderY) < 2)
+        let firstY = try currentLineTop(in: editor, paper: paper)
+        #expect(abs(firstY / paper.bounds.height - 0.39) < 0.01)
+        #expect(abs(firstY - placeholderY) < 3)
         #expect(placeholder.isHidden)
+        let firstLineX = try lineCentreX(in: editor, paper: paper)
+        #expect(abs(firstLineX - paper.bounds.midX) <= 2)
 
-        let firstX = try firstLineOriginX(in: editor, room: room)
-        let hintX = room.view.convert(.zero, from: placeholder).x
-        #expect(abs(firstX - hintX) <= 2)
-        editor.insertText(" more words", replacementRange: NSRange(location: NSNotFound, length: 0))
-        room.viewDidLayout()
-        #expect(abs(try firstLineOriginX(in: editor, room: room) - firstX) <= 1)
-
-        let firstLineY = try firstLineTopY(in: editor, room: room)
+        // Zen: adding a line keeps the current line at the anchor and moves the first line up one line.
+        let firstLineTopBefore = try firstLineTop(in: editor, paper: paper)
         editor.insertText("\nTwo", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
-        #expect(abs(try firstLineTopY(in: editor, room: room) - firstLineY) <= 1)
-        #expect(try inkCenterY(in: editor, room: room) > firstY + 20)
-        editor.insertText("\nThree\nFour\nFive\nSix\nSeven\nEight", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(abs(try currentLineTop(in: editor, paper: paper) - firstY) <= 2)
+        let firstLineTopAfter = try firstLineTop(in: editor, paper: paper)
+        #expect(abs((firstLineTopBefore - firstLineTopAfter) - lineHeight) <= 2)
+
+        // A long draft keeps the current line at the anchor; earlier lines leave the top of the sheet.
+        editor.insertText("\nThree\nFour\nFive\nSix\nSeven\nEight\nNine\nTen",
+                          replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
-        #expect(try inkCenterY(in: editor, room: room) < room.view.bounds.height - 70)
+        #expect(abs(try currentLineTop(in: editor, paper: paper) - firstY) <= 2)
+        #expect(try firstLineTop(in: editor, paper: paper) < 0)
+        #expect(abs(try lineCentreX(in: editor, paper: paper) - paper.bounds.midX) <= 2)
     }
+
+    @Test
+    func lineFadeMaskMatchesTheLiveTrialGradient() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let clock = FocusClock(0)
+        let engine = SessionEngine(now: { clock.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: root))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let scroll = try #require(editor.enclosingScrollView)
+        let paper = try #require(scroll.superview)
+        editor.insertText("one\ntwo\nthree", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        room.refreshRoom()
+        RoomWindowKeeper.windows.append(window)
+
+        let mask = try #require(scroll.layer?.mask as? CAGradientLayer)
+        #expect(scroll.layer?.isGeometryFlipped == true)
+        #expect(mask.startPoint == CGPoint(x: 0.5, y: 0))
+        let height = scroll.bounds.height
+        let locations = try #require(mask.locations).map { CGFloat(truncating: $0) }
+        let colors = try #require(mask.colors) as! [CGColor]
+        let scrollTop = paper.bounds.height - scroll.frame.maxY
+        let boxTop = try currentLineTop(in: editor, paper: paper) - scrollTop
+        let inkOffset = try #require(editor.currentLineInkOffsetY())
+        let renderedCentre = boxTop + inkOffset
+        let line = CGFloat(WritingFontSize.medium.points) * 1.6
+        #expect(inkOffset > 0)
+        #expect(inkOffset < line / 2)
+        func alpha(at offset: CGFloat) -> CGFloat? {
+            let target = (renderedCentre + offset) / height
+            guard let index = locations.firstIndex(where: { abs($0 - target) < 0.0005 }) else { return nil }
+            return colors[index].alpha
+        }
+        #expect(abs((alpha(at: -line) ?? -1) - 0.22) < 0.01)
+        #expect(abs((alpha(at: -2 * line) ?? -1) - 0.07) < 0.01)
+        #expect(abs((alpha(at: -0.5 * line) ?? -1) - 1) < 0.01)
+        #expect(abs((alpha(at: 0.5 * line) ?? -1) - 1) < 0.01)
+        #expect(abs((alpha(at: line) ?? -1) - 0.22) < 0.01)
+        #expect(abs((alpha(at: 2 * line) ?? -1) - 0.07) < 0.01)
+        let top = try #require(alpha(at: -2.5 * line))
+        #expect(top <= 0.001)
+    }
+
+    @Test
+    func sessionTypographyUsesOneInkColourForEveryLine() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\ncurrent"))
+        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
+
+        textView.applySessionTypography()
+
+        let storage = try #require(textView.textStorage)
+        for location in [0, 6, 13, textView.string.count - 1] {
+            let color = try #require(storage.attribute(.foregroundColor, at: location, effectiveRange: nil) as? NSColor)
+            #expect(abs(color.alphaComponent - 1) < 0.001)
+            #expect(storage.attribute(.shadow, at: location, effectiveRange: nil) == nil)
+        }
+        #expect(textView.alignment == .center)
+        let paragraph = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        #expect(paragraph.alignment == .center)
+    }
+
+    // MARK: - Geometry helpers
 
     private func descendants<T: NSView>(of view: NSView, as type: T.Type) -> [T] {
         view.subviews.flatMap { child in
@@ -68,115 +154,38 @@ struct EditorFocusTests {
         }
     }
 
-    private func windowTop(of y: CGFloat, in view: NSView, room: SessionViewController) -> CGFloat {
-        room.view.bounds.height - room.view.convert(NSPoint(x: 0, y: y), from: view).y
+    private func topInPaper(_ y: CGFloat, of view: NSView, paper: NSView) -> CGFloat {
+        paper.bounds.height - paper.convert(NSPoint(x: 0, y: y), from: view).y
     }
 
-    private func activeLineY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
+    private func currentLineRect(in textView: AppendOnlyTextView) throws -> NSRect {
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
         layout.ensureLayout(for: container)
-        let line = textView.string.isEmpty
-            ? layout.extraLineFragmentRect
-            : layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1), effectiveRange: nil)
-        return windowTop(of: textView.textContainerOrigin.y + line.midY, in: textView, room: room)
+        let length = (textView.string as NSString).length
+        if textView.string.isEmpty || textView.string.hasSuffix("\n") {
+            return layout.extraLineFragmentRect
+        }
+        let glyph = layout.glyphIndexForCharacter(at: max(length - 1, 0))
+        return layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
     }
 
-    private func firstLineTopY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
+    private func currentLineTop(in textView: AppendOnlyTextView, paper: NSView) throws -> CGFloat {
+        let line = try currentLineRect(in: textView)
+        return topInPaper(textView.textContainerOrigin.y + line.midY, of: textView, paper: paper)
+    }
+
+    private func firstLineTop(in textView: AppendOnlyTextView, paper: NSView) throws -> CGFloat {
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
         layout.ensureLayout(for: container)
         let line = layout.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
-        return windowTop(of: textView.textContainerOrigin.y + line.minY, in: textView, room: room)
+        return topInPaper(textView.textContainerOrigin.y + line.minY, of: textView, paper: paper)
     }
 
-    private func firstLineOriginX(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
-        let layout = try #require(textView.layoutManager)
-        let container = try #require(textView.textContainer)
-        layout.ensureLayout(for: container)
-        let line = layout.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
-        return room.view.convert(NSPoint(x: textView.textContainerOrigin.x + line.minX, y: 0), from: textView).x
-    }
-
-    private func inkCenterY(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
-        let layout = try #require(textView.layoutManager)
-        let container = try #require(textView.textContainer)
-        layout.ensureLayout(for: container)
-        let glyph = layout.glyphIndexForCharacter(at: (textView.string as NSString).length - 1)
-        let line = layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-        var lineGlyphs = NSRange()
-        layout.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: &lineGlyphs)
-        let first = layout.characterIndexForGlyph(at: lineGlyphs.location)
-        let font = try #require(textView.textStorage?.attribute(.font, at: first, effectiveRange: nil) as? NSFont)
-        let character = (textView.string as NSString).character(at: first)
-        let coreFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var codeUnit = character
-        var measuredGlyph = CGGlyph()
-        #expect(CTFontGetGlyphsForCharacters(coreFont, &codeUnit, &measuredGlyph, 1))
-        var bounds = CGRect.zero
-        CTFontGetBoundingRectsForGlyphs(coreFont, .horizontal, &measuredGlyph, &bounds, 1)
-        return windowTop(of: textView.textContainerOrigin.y + line.minY
-            + layout.location(forGlyphAt: glyph).y - bounds.midY, in: textView, room: room)
-    }
-
-    @Test
-    func focusTypographyBlursPreviousParagraphAndKeepsCurrentClear() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "old thought\ncurrent thought"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applyFocusTypographyToExistingText()
-
-        let storage = try #require(textView.textStorage)
-        try #require(storage.length > 0)
-        #expect(storage.attribute(.shadow, at: 0, effectiveRange: nil) is NSShadow)
-        #expect(storage.attribute(.shadow, at: textView.string.count - 1, effectiveRange: nil) == nil)
-    }
-
-    @Test
-    func focusTypographyBlursPreviousParagraphAfterNewline() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "old thought\n"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applyFocusTypographyToExistingText()
-
-        let storage = try #require(textView.textStorage)
-        try #require(storage.length > 0)
-        #expect(storage.attribute(.shadow, at: 0, effectiveRange: nil) is NSShadow)
-    }
-
-    @Test
-    func focusTypographyHidesEverythingBeforePreviousParagraph() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\ncurrent"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applyFocusTypographyToExistingText()
-
-        let storage = try #require(textView.textStorage)
-        let firstColor = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
-        #expect(firstColor.alphaComponent == 0)
-        #expect(storage.attribute(.shadow, at: 6, effectiveRange: nil) is NSShadow)
-        #expect(storage.attribute(.shadow, at: textView.string.count - 1, effectiveRange: nil) == nil)
-    }
-
-    @Test
-    func focusTypographyAfterNewlineShowsOnlyPreviousParagraph() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\n"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applyFocusTypographyToExistingText()
-
-        let storage = try #require(textView.textStorage)
-        let firstColor = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
-        #expect(firstColor.alphaComponent == 0)
-        #expect(storage.attribute(.shadow, at: 6, effectiveRange: nil) is NSShadow)
+    private func lineCentreX(in textView: AppendOnlyTextView, paper: NSView) throws -> CGFloat {
+        let line = try currentLineRect(in: textView)
+        return paper.convert(NSPoint(x: textView.textContainerOrigin.x + line.midX, y: 0), from: textView).x
     }
 
     @Test
@@ -190,7 +199,7 @@ struct EditorFocusTests {
         textView.textStorage?.setAttributedString(NSAttributedString(string: "hello, world."))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
 
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
         let wordFont = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
@@ -217,7 +226,7 @@ struct EditorFocusTests {
         textView.textStorage?.setAttributedString(NSAttributedString(string: "我们 write."))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
 
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
         let font = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
@@ -325,7 +334,7 @@ struct EditorFocusTests {
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民xianyan"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let adjusted = try caretRect(for: textView)
 
@@ -343,7 +352,7 @@ struct EditorFocusTests {
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民 "))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let adjusted = try caretRect(for: textView)
 
@@ -357,7 +366,7 @@ struct EditorFocusTests {
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "集成革命\n"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         guard let layoutManager = textView.layoutManager,
               let textContainer = textView.textContainer else {
@@ -390,7 +399,7 @@ struct EditorFocusTests {
         textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民xianyan"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
 
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
         let boundaryKern = storage.attribute(.kern, at: 2, effectiveRange: nil) as? CGFloat
@@ -408,7 +417,7 @@ struct EditorFocusTests {
         textView.textStorage?.setAttributedString(NSAttributedString(string: "飘扬在qianxiong 不怕"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
 
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
         let boundaryKern = try #require(storage.attribute(.kern, at: 11, effectiveRange: nil) as? CGFloat)
@@ -423,7 +432,7 @@ struct EditorFocusTests {
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "一个"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-        textView.applyFocusTypographyToExistingText()
+        textView.applySessionTypography()
 
         let before = try glyphBaselineY(in: textView, characterIndex: 0)
         textView.setMarkedText(
@@ -833,4 +842,14 @@ struct EditorFocusTests {
         )
         return lineRect.minY + layoutManager.location(forGlyphAt: glyphIndex).y
     }
+}
+
+@MainActor
+private enum RoomWindowKeeper {
+    static var windows: [NSWindow] = []
+}
+
+private final class FocusClock {
+    var now: TimeInterval
+    init(_ now: TimeInterval) { self.now = now }
 }

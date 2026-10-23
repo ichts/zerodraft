@@ -90,6 +90,21 @@ struct SnapshotTests {
                      output: output, sheetPoint: NSPoint(x: 170, y: 360))
     }
 
+    @Test func keptCopyFocusRendersInLightAndDark() throws {
+        let output = ProcessInfo.processInfo.environment["WID_SNAPSHOT_DIR"]
+            .map { URL(fileURLWithPath: $0, isDirectory: true) }
+        if let output { try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true) }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let suffix = appearance == .aqua ? "light" : "dark"
+            for copied in [false, true] {
+                let room = keptState(appearance: appearance, copy: copied)
+                let label = copied ? "copied" : "copy"
+                try snapshot(room, name: "room-\(label)-focus-\(suffix)", appearance: appearance,
+                             output: output, sheetPoint: NSPoint(x: 170, y: 360), focus: true)
+            }
+        }
+    }
+
     // MARK: - States
 
     private func trialState(used: Int, checkoutConfigured: Bool = true) throws -> AppState {
@@ -237,11 +252,21 @@ struct SnapshotTests {
         if focus {
             window.makeKeyAndOrderFront(nil)
             controller.viewDidAppear()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
             controller.view.layoutSubtreeIfNeeded()
         }
         controller.view.displayIfNeeded()
         let rep = try #require(controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds))
         controller.view.cacheDisplay(in: controller.view.bounds, to: rep)
+        if focus, controller is SessionViewController {
+            let button = try #require(window.firstResponder as? NSButton)
+            #expect(["COPY TEXT", "COPIED"].contains(button.title))
+            let outline = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.maxY + 4),
+                                         to: controller.view)
+            let scale = CGFloat(rep.pixelsWide) / size.width
+            try assertPixel(rep, at: NSPoint(x: outline.x * scale, y: (size.height - outline.y) * scale),
+                            equals: FirstLineColors.inkNSColor, in: appearance, name: name)
+        }
         if let output {
             let data = try #require(rep.representation(using: .png, properties: [:]))
             try data.write(to: output.appendingPathComponent("\(name).png"))

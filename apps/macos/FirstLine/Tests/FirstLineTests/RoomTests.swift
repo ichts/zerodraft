@@ -239,7 +239,16 @@ struct RoomTests {
         fixture.clock.now = 60
         fixture.room.tick()
         let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "COPY TEXT" })
+        fixture.room.view.layoutSubtreeIfNeeded()
+        fixture.room.viewDidLayout()
+        let originalWidth = copy.frame.width
+        let originalCenter = copy.convert(NSPoint(x: copy.bounds.midX, y: copy.bounds.midY), to: fixture.room.view)
         copy.performClick(nil)
+        fixture.room.view.layoutSubtreeIfNeeded()
+        fixture.room.viewDidLayout()
+        #expect(copy.frame.width < originalWidth)
+        let copiedCenter = copy.convert(NSPoint(x: copy.bounds.midX, y: copy.bounds.midY), to: fixture.room.view)
+        #expect(abs(copiedCenter.x - originalCenter.x) < 1)
         #expect(copy.title == "COPIED")
         fixture.room.tick()
         let move = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: .zero,
@@ -329,7 +338,8 @@ struct RoomTests {
         }
     }
 
-    @Test func keptStateFocusesCopyText() throws {
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua])
+    func keptStateFocusesCopyText(appearance: NSAppearance.Name) throws {
         let fixture = try roomFixture(typed: false)
         fixture.editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
         for second in stride(from: 4.0, to: 60.0, by: 4.0) {
@@ -340,10 +350,50 @@ struct RoomTests {
         fixture.room.tick()
         #expect(fixture.engine.phase == .success)
         let window = try #require(fixture.room.view.window)
+        window.appearance = NSAppearance(named: appearance)
         window.makeKeyAndOrderFront(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-        #expect((window.firstResponder as? NSButton)?.title == "COPY TEXT")
+        let copy = try #require(window.firstResponder as? NSButton)
+        #expect(copy.title == "COPY TEXT")
+        #expect(copy.focusRingType == .none)
+        let outline = try #require(copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }.first)
+        #expect(!outline.isHidden)
+        #expect(outline.lineWidth == 2)
+        #expect(outline.path?.boundingBox == copy.bounds.insetBy(dx: -4, dy: -4))
+        let stroke = try #require(outline.strokeColor)
+        let ink = try #require(NSColor(cgColor: stroke))
+        #expect(sameColor(ink, FirstLineColors.inkNSColor, appearance: appearance))
+        window.makeFirstResponder(nil)
+        #expect(outline.isHidden)
         window.orderOut(nil)
+    }
+
+    @Test func keptCopyMatchesLiveHoverAndPressMotion() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        advance(fixture, to: .success)
+        let kept = try #require(descendants(fixture.room.view, of: SessionKeptView.self).first)
+        let copy = kept.copyButton
+        let event = try #require(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero,
+            modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+            eventNumber: 0, trackingNumber: 0, userData: nil))
+        copy.mouseEntered(with: event)
+        #expect(copy.layer?.affineTransform().ty == 1)
+        let motion = try #require(copy.layer?.animation(forKey: "transform") as? CABasicAnimation)
+        #expect(motion.duration == 0.16)
+        var control: [Float] = [0, 0]
+        motion.timingFunction?.getControlPoint(at: 1, values: &control)
+        #expect(abs(control[0] - 0.22) < 0.001)
+        #expect(control[1] == 1)
+        copy.highlight(true)
+        #expect(abs((copy.layer?.affineTransform().a ?? 0) - 0.97) < 0.001)
+        copy.highlight(false)
+        copy.mouseExited(with: event)
+        #expect(copy.layer?.affineTransform() == .identity)
+        fixture.state.settings.reducedMotion = .always
+        fixture.room.tick()
+        copy.highlight(true)
+        #expect(copy.layer?.animation(forKey: "transform") == nil)
     }
 
     @Test func longKeptDraftStaysReadableInsideItsOwnScroller() throws {
@@ -362,6 +412,12 @@ struct RoomTests {
             .first { $0.documentView?.subviews.contains { $0 is NSStackView } == true })
         #expect(scroll.documentView!.frame.height > scroll.contentSize.height)
         #expect(scroll.documentView!.frame.height > 1000)
+        #expect(!scroll.hasVerticalScroller)
+        let before = scroll.contentView.bounds.origin.y
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: before + 200))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        #expect(scroll.contentView.bounds.origin.y > before)
+        #expect(scroll.documentVisibleRect.maxY <= scroll.documentView!.bounds.maxY)
     }
 
     @Test func warnWashTracksSelectedSilenceLimit() {
@@ -391,6 +447,57 @@ struct RoomTests {
         #expect(button.accessibilityLabel() == "Begin writing")
         #expect(state.selectedSurface == .home)
         #expect(state.sessionEngine.phase == .idle)
+    }
+
+    @Test(arguments: ["commit", "replace", "cancel", "backspace", "forward", "selection"],
+          ["ni", "かな", "한글", "👩‍🚒"])
+    func inputClientCompositionNeverDenies(sequence: String, candidate: String) throws {
+        let fixture = try roomFixture()
+        let editor = fixture.editor
+        let end = NSRange(location: NSNotFound, length: 0)
+        editor.setMarkedText(candidate, selectedRange: NSRange(location: (candidate as NSString).length, length: 0),
+                             replacementRange: end)
+        #expect(fixture.engine.lastDenyAt == nil)
+        switch sequence {
+        case "commit":
+            editor.insertText("你", replacementRange: end)
+            #expect(editor.string == "private draft你")
+        case "replace":
+            editor.setMarkedText("你好", selectedRange: NSRange(location: 2, length: 0), replacementRange: editor.markedRange())
+            editor.unmarkText()
+            #expect(editor.string == "private draft你好")
+        case "cancel":
+            editor.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: editor.markedRange())
+            editor.unmarkText()
+            #expect(editor.string == "private draft")
+        case "forward":
+            for _ in candidate {
+                editor.setSelectedRange(NSRange(location: editor.markedRange().location, length: 0))
+                editor.deleteForward(nil)
+                #expect(fixture.engine.lastDenyAt == nil)
+            }
+            editor.unmarkText()
+            #expect(editor.string == "private draft")
+        case "selection":
+            editor.setSelectedRange(editor.markedRange())
+            editor.deleteBackward(nil)
+            editor.unmarkText()
+            #expect(editor.string == "private draft")
+        default:
+            for _ in candidate {
+                editor.deleteBackward(nil)
+                #expect(fixture.engine.lastDenyAt == nil)
+            }
+            editor.unmarkText()
+            #expect(editor.string == "private draft")
+        }
+        #expect(!editor.hasMarkedText())
+        #expect(fixture.engine.text == editor.string)
+        #expect(fixture.engine.lastDenyAt == nil)
+        let committed = editor.string
+        editor.deleteBackward(nil)
+        #expect(fixture.engine.lastDenyAt != nil)
+        #expect(editor.string == committed)
     }
 
     // MARK: - Helpers
@@ -471,11 +578,11 @@ struct RoomTests {
         descendants(room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" }
     }
 
-    private func sameColor(_ lhs: NSColor?, _ rhs: NSColor) -> Bool {
+    private func sameColor(_ lhs: NSColor?, _ rhs: NSColor, appearance: NSAppearance.Name = .aqua) -> Bool {
         guard let lhs else { return false }
         var left: NSColor?
         var right: NSColor?
-        NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+        NSAppearance(named: appearance)?.performAsCurrentDrawingAppearance {
             left = lhs.usingColorSpace(.sRGB)
             right = rhs.usingColorSpace(.sRGB)
         }

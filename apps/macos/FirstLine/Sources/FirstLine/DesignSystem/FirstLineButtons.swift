@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), secondary (44 outline pill) and quiet link factories.
- * [POS]: Shared native button specs for every surface; system sans labels and native focus rings.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories.
+ * [POS]: Shared native button specs; room primary opts into live hover/press motion and ink focus, other surfaces retain native focus rings.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
 
@@ -11,6 +11,11 @@ import AppKit
 enum FirstLineButtons {
     static func primary(title: String, target: AnyObject?, action: Selector) -> NSButton {
         styled(title: title, target: target, action: action, role: .primary)
+    }
+
+    static func roomPrimary(title: String, target: AnyObject?, action: Selector,
+                            reducesMotion: @escaping () -> Bool) -> NSButton {
+        styled(title: title, target: target, action: action, role: .primary, roomMotion: reducesMotion)
     }
 
     static func secondary(title: String, target: AnyObject?, action: Selector) -> NSButton {
@@ -33,7 +38,8 @@ enum FirstLineButtons {
         title: String,
         target: AnyObject?,
         action: Selector,
-        role: FirstLineButton.Role
+        role: FirstLineButton.Role,
+        roomMotion: (() -> Bool)? = nil
     ) -> NSButton {
         let button = FirstLineButton(title: title, target: target, action: action)
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -41,7 +47,8 @@ enum FirstLineButtons {
         button.isBordered = false
         button.bezelStyle = .inline
         button.font = FirstLineTypography.uiSemiboldNSFont
-        button.focusRingType = .default
+        button.focusRingType = roomMotion == nil ? .default : .none
+        button.roomMotion = roomMotion
         button.wantsLayer = true
         button.layer?.cornerRadius = role.height / 2
         button.heightAnchor.constraint(equalToConstant: role.height).isActive = true
@@ -77,6 +84,80 @@ private final class FirstLineButton: NSButton {
         }
     }
 
+    var roomMotion: (() -> Bool)?
+    private let focusOutline = CAShapeLayer()
+    private var hover = false
+    private var pressing = false
+    private var tracking: NSTrackingArea?
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        guard roomMotion != nil else { return }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        guard roomMotion != nil else { super.mouseEntered(with: event); return }
+        hover = true
+        updateRoomTransform()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        guard roomMotion != nil else { super.mouseExited(with: event); return }
+        hover = false
+        updateRoomTransform()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        pressing = true
+        updateRoomTransform()
+        defer {
+            pressing = false
+            updateRoomTransform()
+        }
+        super.mouseDown(with: event)
+    }
+
+    override func highlight(_ flag: Bool) {
+        super.highlight(flag)
+        updateRoomTransform()
+    }
+
+    private func updateRoomTransform() {
+        guard let roomMotion, let layer else { return }
+        let transform = (pressing || isHighlighted) ? CGAffineTransform(scaleX: 0.97, y: 0.97)
+            : CGAffineTransform(translationX: 0, y: hover ? 1 : 0)
+        let previous = layer.presentation()?.transform ?? layer.transform
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.setAffineTransform(transform)
+        CATransaction.commit()
+        layer.removeAnimation(forKey: "transform")
+        guard !roomMotion() else { return }
+        let motion = CABasicAnimation(keyPath: "transform")
+        motion.fromValue = NSValue(caTransform3D: previous)
+        motion.toValue = NSValue(caTransform3D: layer.transform)
+        motion.duration = 0.16
+        motion.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
+        layer.add(motion, forKey: "transform")
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        needsDisplay = true
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        focusOutline.isHidden = true
+        return accepted
+    }
+
     override var isEnabled: Bool {
         didSet { refreshAppearance() }
     }
@@ -110,6 +191,19 @@ private final class FirstLineButton: NSButton {
     override func updateLayer() {
         super.updateLayer()
         layer?.cornerRadius = bounds.height > 0 ? bounds.height / 2 : role.height / 2
+        if roomMotion != nil {
+            layer?.masksToBounds = false
+            if focusOutline.superlayer == nil { layer?.addSublayer(focusOutline) }
+            let outlineBounds = bounds.insetBy(dx: -4, dy: -4)
+            focusOutline.path = CGPath(roundedRect: outlineBounds, cornerWidth: outlineBounds.height / 2,
+                                       cornerHeight: outlineBounds.height / 2, transform: nil)
+            focusOutline.fillColor = nil
+            focusOutline.lineWidth = 2
+            focusOutline.isHidden = window?.firstResponder !== self
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                focusOutline.strokeColor = FirstLineColors.inkNSColor.cgColor
+            }
+        }
         effectiveAppearance.performAsCurrentDrawingAppearance {
             guard isEnabled else {
                 layer?.borderWidth = 0

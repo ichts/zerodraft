@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Engine text and word count, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet block: "You wrote it down.", centred selectable draft, "0:00 - N WORDS KEPT.", COPY TEXT and RUN IT AGAIN, centred when short and scrollable when tall.
+ * [OUTPUT]: The kept sheet block: centred selectable draft and receipt, ink-focused COPY TEXT with live motion, RUN IT AGAIN; long drafts scroll without a persistent scroller.
  * [POS]: One cohesive AppKit view for the room's completed state, matching the live trial's kept layout; the room owns phase routing and copy actions.
  * [PROTOCOL]: Keep strings, measure and centring aligned with writeitdown/index.html (#kept) and the consistency table; check nearest AGENTS.md.
  */
@@ -28,16 +28,17 @@ final class SessionKeptView: NSView {
     private var selectedDraft = ""
     private var renderedWordCount: Int?
 
-    init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector) {
-        copyButton = FirstLineButtons.primary(title: "COPY TEXT", target: copyTarget, action: copyAction)
+    init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector,
+         reducesMotion: @escaping () -> Bool) {
+        copyButton = FirstLineButtons.roomPrimary(title: "COPY TEXT", target: copyTarget, action: copyAction,
+                                                  reducesMotion: reducesMotion)
         copyButton.font = .systemFont(ofSize: 15, weight: .medium)
         restartButton = FirstLineButtons.link(title: "RUN IT AGAIN", target: restartTarget, action: restartAction)
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
+        scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = false
         scrollView.documentView = document
         addSubview(scrollView)

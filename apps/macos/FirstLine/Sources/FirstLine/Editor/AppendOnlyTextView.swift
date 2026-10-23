@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 安全、字号及窄/宽纸张的固定左起点、短段固定首行/临近下沿才滚动与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -135,7 +135,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             return
         }
 
-        super.deleteBackward(sender)
+        deleteMarkedCharacter(backward: true)
     }
 
     override func deleteForward(_ sender: Any?) {
@@ -144,7 +144,23 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             return
         }
 
-        super.deleteForward(sender)
+        deleteMarkedCharacter(backward: false)
+    }
+
+    private func deleteMarkedCharacter(backward: Bool) {
+        let marked = markedRange()
+        let candidate = (string as NSString).substring(with: marked) as NSString
+        let selection = selectedRange()
+        var deletion = NSRange(location: selection.location - marked.location, length: selection.length)
+        if deletion.length == 0 {
+            let index = backward ? deletion.location - 1 : deletion.location
+            guard index >= 0, index < candidate.length else { return }
+            deletion = candidate.rangeOfComposedCharacterSequence(at: index)
+        }
+        guard deletion.location >= 0, NSMaxRange(deletion) <= candidate.length else { return }
+        let remaining = candidate.replacingCharacters(in: deletion, with: "")
+        setMarkedText(remaining, selectedRange: NSRange(location: deletion.location, length: 0),
+                      replacementRange: marked)
     }
 
     override func cut(_ sender: Any?) {

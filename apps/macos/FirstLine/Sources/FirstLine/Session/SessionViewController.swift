@@ -263,7 +263,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func buildKeptView() {
         keptView = SessionKeptView(copyTarget: self, copyAction: #selector(copyText),
-                                   restartTarget: self, restartAction: #selector(restart))
+                                   restartTarget: self, restartAction: #selector(restart),
+                                   reducesMotion: { [weak self] in self?.reducesMotion ?? true })
         paper.addSubview(keptView)
         keptView.isHidden = true
     }

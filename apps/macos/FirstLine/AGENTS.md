@@ -41,7 +41,7 @@ Sources/FirstLine/Upgrade/UpgradeViewController.swift: After 白卡片激活面�
 Sources/FirstLine/Settings/SettingsViewController.swift: After 白卡片 Settings，含 appearance、motion、focus、alignment、font size、License；系统控件/原生 focus ring；观察异步许可与 checkout 变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
 Sources/FirstLine/DesignSystem/Colors.swift: writeitdown tokens.css v2（background A + 暗色同名角色）的 NSColor dynamic provider：page/sheet/ink/mute/chrome/hair/red/tag/on-ink/wash；无并行 palette。
 Sources/FirstLine/DesignSystem/Typography.swift: 系统无衬线 UI/标题字号 + bundled Newsreader 书写、kept 标题（Roman-Medium）和警告数字 token；不再把 IBM Plex Mono 用于界面 chrome。
-Sources/FirstLine/DesignSystem/FirstLineButtons.swift: After 语言主按钮（48 ink pill）、次按钮（44 outline pill）和 quiet link；原生 focus ring mask；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
+Sources/FirstLine/DesignSystem/FirstLineButtons.swift: After 语言主按钮（48 ink pill）、次按钮（44 outline pill）和 quiet link；房间主按钮使用 ink 2px/3px-offset 焦点、160ms live hover/press 反馈与 reduced-motion，其余保留原生 focus ring mask；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
 Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
 Sources/FirstLine/DesignSystem/Spacing.swift: 4-pt 间距与 ctl/sheet/card/stage 圆角 token。
@@ -52,9 +52,9 @@ Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用�
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。
 Tests/FirstLineTests/BatchFiveTests.swift: 时长选择、设置持久化和键盘动作验收。
-Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash 恢复/cut 收尾/减少动态效果、deny、复制状态跨 tick/hover/字体刷新与新会话重置、居中 kept 与两步退出（含 2 秒过期和输入取消）测试。
+Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash 恢复/cut 收尾/减少动态效果、deny、复制状态跨 tick/hover/字体刷新与新会话重置、居中 kept 与两步退出（含 2 秒过期和输入取消）、真实 NSTextInputClient 组合/删除序列、kept 无滚动条但可滚动、复制按钮焦点/反馈测试。
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
-Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态）PNG 快照与 page/sheet 像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
+Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功与失败不落盘、菜单无 Library、已激活导航、退款后的 restart 拒绝与无 key 拦截。

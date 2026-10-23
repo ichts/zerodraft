@@ -1,10 +1,12 @@
 import { LINES, TIMELINE } from './demo-timeline.mjs';
 import { clock, wordCount } from './session.mjs';
+import { denyFeedback } from './feedback.js';
 
 (function () {
   "use strict";
   // TIMELINE paces the typing like a person: uneven keystrokes, word and
-  // punctuation pauses, one visible backspace correction. The danger beats
+  // punctuation pauses, and one blocked Backspace (the deny beat: the sheet
+  // shakes, silently, and a no-sign keycap shows; nothing is deleted). The danger beats
   // stay absolute - 5s of silence after the last key, 3s of warn (wash and
   // 3-2-1), the 200ms cut, then a short report before the loop restarts.
   var TYPE_END = TIMELINE.typeEnd;
@@ -12,6 +14,8 @@ import { clock, wordCount } from './session.mjs';
   var SILENT_END = TYPE_END + SILENCE_MS, WARN_END = SILENT_END + WARN_MS,
       CUT_END = WARN_END + CUT_MS, LOOP = CUT_END + REPORT_HOLD_MS;
   var EVENTS = TIMELINE.events;
+  var DENY = EVENTS.filter(function (e) { return e.kind === "deny"; })[0];
+  var DENY_SHOW_MS = 900;
 
   var paper = document.getElementById("paper");
   var washWall = document.getElementById("wash-wall");
@@ -24,10 +28,12 @@ import { clock, wordCount } from './session.mjs';
   var countEl = document.getElementById("count");
   var barEl = document.getElementById("bar");
   var meterEl = document.querySelector("#meter i");
+  var denyKeyEl = document.getElementById("deny-key");
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   var t0 = Date.now();
   var seen = {};
+  var lastT = -1;
 
   function draftAt(t) {
     var snap = { dn: 0, cur: "" }, i;
@@ -79,7 +85,18 @@ import { clock, wordCount } from './session.mjs';
     put(countEl, "count", words(d));
   }
 
+  // The keycap is a pure function of t; the shake fires once as t crosses the
+  // deny beat (not when a hidden tab resumes far past it).
+  function renderDeny(t) {
+    var on = !!DENY && t >= DENY.t && t < DENY.t + DENY_SHOW_MS;
+    if (seen.deny !== on) { seen.deny = on; denyKeyEl.hidden = !on; }
+    if (DENY && lastT < DENY.t && t >= DENY.t && t - DENY.t < 250) denyFeedback(paper, { sound: false });
+    lastT = t;
+  }
+
   function render(t) {
+    if (t < lastT) lastT = -1;
+    renderDeny(t);
     if (t < SILENT_END) {
       setPhase("type");
       setWash(null);
@@ -117,6 +134,7 @@ import { clock, wordCount } from './session.mjs';
 
   function renderReduced() {
     setPhase("still");
+    if (seen.deny !== false) { seen.deny = false; denyKeyEl.hidden = true; }
     setWash(null);
     put(numeralEl, "num", "");
     put(reportEl, "rep", "");

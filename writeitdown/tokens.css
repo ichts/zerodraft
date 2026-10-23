@@ -1,6 +1,6 @@
 /* Write It Down design tokens v2 (design system 2026-10-22 with the captain's background option A: near-white
    page, no beige desk, depth from the white sheet's shadow).
-   Source of truth for colour, type, space, shape, depth and motion on the landing; the Mac app mirrors the
+   Source of truth for colour, type, space, shape, depth and motion on the landing and trial room; the Mac app mirrors the
    same names. Values match the design-system tokens.css; scoped to .home until the other pages adopt the
    system. Faces: Newsreader (what you write, headlines), Reenie Beanie (the pen), and the system UI stack for
    the tool (no webfont). Newsreader loads with the site's existing font link. Dark keeps the same names. */
@@ -22,7 +22,8 @@
   --serif:'Newsreader',Georgia,'Times New Roman',serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
   --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
-  --t-write:clamp(22px,2.9vw,40px);
+  /* writing size and placement match the Mac app's default (28pt, anchor at 39% of the writing view) */
+  --t-write:28px;--lh-write:calc(var(--t-write) * 1.6);--write-anchor:39%;
   --t-display:clamp(34px,4.3vw,62px);
   --t-h2:clamp(34px,4.6vw,58px);--t-h3:25px;--t-body:17px;--t-ui:15px;--t-small:13px;
   /* space: 4-pt scale */
@@ -56,3 +57,4 @@
   --press:0 1px 1px rgba(0,0,0,.3),0 8px 16px -6px rgba(0,0,0,.5);
 }
 @media (max-width:820px){.home{--gut:20px;--nav-h:56px}}
+@media (max-width:767px){.home{--t-write:21px}}

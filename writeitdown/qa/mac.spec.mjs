@@ -182,38 +182,35 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
   expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
-  for (const selector of ['.home-nav .btn', '.cta .btn', '#paper .tag', '#clock', '#paper .saved', '#count'])
+  for (const selector of ['#landing .home-nav .btn', '.cta .btn', '#clock', '#count'])
     await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
-  const nav = page.locator('.home-nav a.btn-quiet');
+  const nav = page.locator('#landing .home-nav a.btn-quiet');
   await expect(nav).toHaveText('Download for Mac');
   await expect(nav).toHaveAttribute('href', 'download/');
   const card = page.locator('#paper');
-  await expect(card.locator('.tag')).toHaveText(/60 seconds, forward only/i);
   await expect(card.locator('#clock')).toBeVisible();
-  await expect(card.locator('.saved')).toHaveText(/nothing is saved/i);
   await expect(card.locator('#count')).toHaveText(/\d+ WORDS?/);
+  // Journey: the sheet carries no tag and no saved label; under it there is only the button.
+  await expect(card.locator('.tag, .saved')).toHaveCount(0);
+  await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
+  await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('.cta');
-  await expect(cta.locator('.deck')).toHaveText('Stop typing for 8 seconds and it deletes everything you wrote.');
+  await expect(cta.locator('> *')).toHaveCount(1);
+  await expect(cta).not.toContainText('Stop typing for 8 seconds');
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { card: r('#paper'), paper: r('#paper'), deck: r('.cta .deck').top, door: r('.cta .btn').bottom, vh: innerHeight };
+    return { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), vh: innerHeight };
   });
   expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);
-  expect(layout.deck, 'the deck line sits under the demo card').toBeGreaterThan(layout.card.bottom);
-  expect(layout.door, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
-  const box = await page.evaluate(() => {
-    const r = s => document.querySelector(s).getBoundingClientRect();
-    return { deck: r('.cta .deck'), door: r('.cta .btn') };
-  });
-  const overlap = !(box.deck.right <= box.door.left || box.door.right <= box.deck.left || box.deck.bottom <= box.door.top || box.door.bottom <= box.deck.top);
-  expect(overlap, 'the deck line and the room button do not overlap').toBe(false);
-  expect(box.deck.bottom, 'the deck line is fully on the first screen').toBeLessThanOrEqual(layout.vh);
+  expect(layout.door.top, 'the room button sits under the demo card').toBeGreaterThan(layout.card.bottom);
+  expect(layout.door.bottom, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
+  expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred under the sheet').toBeLessThan(1);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
   await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
@@ -244,7 +241,7 @@ test('light is the default theme; the toggle switches to dark and remembers it',
   const page = await context.newPage();
   await page.goto('http://127.0.0.1:8015/writeitdown/index.html');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await page.locator('.home-foot [data-theme-toggle]').click();
+  await page.locator('#landing .home-nav [data-theme-toggle]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
   expect(bg).toBe('rgb(21, 20, 15)');
@@ -252,6 +249,45 @@ test('light is the default theme; the toggle switches to dark and remembers it',
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await context.close();
 });
+
+// Journey: one theme icon button, top right in the header of every page with a header; none in the footer.
+for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'trial'], ['download/', 'download'],
+  ['mac.html', 'mac'], ['terms.html', 'terms'], ['privacy.html', 'privacy'], ['support.html', 'support']]) {
+  test(`theme toggle is in the ${label} header and flips the theme`, async ({ page }) => {
+    await page.goto(path);
+    const header = page.locator('nav[aria-label="Main"]:visible');
+    await expect(header).toHaveCount(1);
+    const toggle = header.locator('button[data-theme-toggle]');
+    await expect(toggle).toHaveCount(1);
+    await expect(toggle).toBeVisible();
+    await expect(page.locator('[data-theme-toggle]:visible')).toHaveCount(1);
+    await expect(page.locator('footer [data-theme-toggle]')).toHaveCount(0);
+    const place = await toggle.evaluate(button => {
+      const r = button.getBoundingClientRect(), nav = button.closest('nav').getBoundingClientRect();
+      return { right: nav.right - r.right, top: r.top, width: r.width, height: r.height, overflow: document.documentElement.scrollWidth - innerWidth };
+    });
+    expect(place.right, 'the toggle ends the header row').toBeLessThan(40);
+    expect(place.top, 'the toggle is at the top of the page').toBeLessThan(40);
+    expect(Math.min(place.width, place.height)).toBeGreaterThanOrEqual(36);
+    expect(place.overflow, 'no horizontal overflow with the toggle in the header').toBeLessThanOrEqual(0);
+    const read = () => page.evaluate(() => {
+      const surface = [...document.querySelectorAll('#room, .home, .stage')].find(e => e.getClientRects().length);
+      return { theme: document.documentElement.dataset.theme, bg: getComputedStyle(surface).backgroundColor,
+        label: document.querySelector('nav[aria-label="Main"]:not([hidden] *) [data-theme-toggle]')?.getAttribute('aria-label') };
+    });
+    const before = await read();
+    expect(before.label).toBe(`Switch to ${before.theme === 'dark' ? 'light' : 'dark'} theme`);
+    await toggle.focus();
+    await expect(toggle).toBeFocused();
+    expect(await toggle.evaluate(b => getComputedStyle(b).outlineStyle), 'keyboard focus ring').not.toBe('none');
+    await page.keyboard.press('Enter');
+    const after = await read();
+    expect(after.theme).not.toBe(before.theme);
+    expect(after.bg).not.toBe(before.bg);
+    expect(after.label).toBe(`Switch to ${after.theme === 'dark' ? 'light' : 'dark'} theme`);
+    expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme'))).toBe(after.theme);
+  });
+}
 
 test('landing sections: heading tree, honest facts, FAQ matches its schema, call-back enters the room', async ({ page }) => {
   await page.goto('index.html');

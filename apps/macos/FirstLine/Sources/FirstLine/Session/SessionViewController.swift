@@ -166,7 +166,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         textView.textContainerInset = NSSize(width: 24, height: 0)
         textView.textContainer?.lineFragmentPadding = 0
         textView.textContainer?.widthTracksTextView = true
-        textView.configureSessionTypography(size: appState.settings.writingFontSize.points, alignment: appState.settings.writingAlignment)
+        textView.configureSessionTypography(size: appState.settings.writingFontSize.points)
         textView.setAccessibilityHelp("Clock and word count remain accessible in Focus Mode.")
         scrollView = NSScrollView()
         scrollView.documentView = textView
@@ -279,7 +279,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             preview.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -16),
             footer.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
             footer.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -22),
-            footer.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
+            footer.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -52),
             footer.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             receiptStatus.widthAnchor.constraint(lessThanOrEqualToConstant: 330),
         ])
@@ -325,7 +325,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
             exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
             warningHint.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -18),
-            warningHint.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
+            warningHint.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportLabel.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -80),
@@ -489,7 +489,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         numeralLabel.isHidden = !warning
         if warning { numeralLabel.stringValue = "\(engine.secondsUntilDeletion)" }
         warningHint.isHidden = !warning
-        exitButton.isHidden = warning || isKept
         countLabel.isHidden = isKept
         progressBar.isHidden = phase == .failure || phase == .success
         meter.isHidden = phase == .failure || phase == .success
@@ -531,10 +530,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let settings = appState.settings
         let width: CGFloat = settings.writingAlignment == .centered ? 720 : 880
         if paperWidth.constant != width { paperWidth.constant = width }
-        textView.configureSessionTypography(size: settings.writingFontSize.points, alignment: settings.writingAlignment)
+        textView.configureSessionTypography(size: settings.writingFontSize.points)
         applyKeptTypography()
         placeholderLabel.font = FirstLineTypography.writingItalicNSFont(size: settings.writingFontSize.points)
-        placeholderLabel.alignment = settings.writingAlignment == .centered ? .center : .left
+        placeholderLabel.alignment = .left
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0

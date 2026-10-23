@@ -29,7 +29,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// session surface (Home -> Writing). User input is never weakened.
     private var isRestoringProgrammatically = false
     private var sessionFontSize: CGFloat = 28
-    private var writingAlignment: WritingAlignment = .centered
     private var typographyConfigured = false
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
@@ -358,11 +357,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         NSRange(location: NSNotFound, length: 0)
     }
 
-    func configureSessionTypography(size: CGFloat = 28, alignment: WritingAlignment = .centered) {
-        guard !typographyConfigured || size != sessionFontSize || alignment != writingAlignment else { return }
+    func configureSessionTypography(size: CGFloat = 28) {
+        guard !typographyConfigured || size != sessionFontSize else { return }
         typographyConfigured = true
         sessionFontSize = size
-        writingAlignment = alignment
         let paragraph = sessionParagraphStyle()
         let attributes = activeTextAttributes(paragraph: paragraph)
 
@@ -371,7 +369,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         insertionPointColor = FirstLineColors.inkNSColor
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        self.alignment = writingAlignment == .centered ? .center : .left
+        alignment = .left
         layoutManager?.delegate = self
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
@@ -653,7 +651,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = writingAlignment == .centered ? .center : .left
+        paragraph.alignment = .left
         paragraph.lineHeightMultiple = 1.6
         paragraph.lineSpacing = 0
         return paragraph

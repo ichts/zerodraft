@@ -153,9 +153,14 @@ clock_now() { python3 -c 'import time; print(time.monotonic())'; }
 wait_has home 'Free trial: 3 of 3 sessions left' && pass 'fresh Mac shows "Free trial: 3 of 3 sessions left."' \
   || { bad 'fresh launch does not show 3 of 3 free sessions'; exit 1; }
 for used in 1 2 3; do
-  tok="$(token button '1')"; [[ -n "$tok" ]] || { bad "no 1-minute button (session $used)"; exit 1; }
+  tok="$(token radio '1 minute')"; [[ -n "$tok" ]] || { bad "no 1-minute radio (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
-  wait_has "room-$used" 'Start typing' || wait_has "room-$used" 'WORDS' || { bad "session $used room did not open"; exit 1; }
+  snap "selected-minute-$used"
+  jq -e '[.elements[] | select(.role == "AXRadioButton" and .label == "1 minute" and (.value | tostring) == "1")] | length == 1' "$snapf" >/dev/null \
+    || { bad "session $used did not select 1 minute"; exit 1; }
+  tok="$(token button 'Begin writing')"; [[ -n "$tok" ]] || { bad "no Begin button (session $used)"; exit 1; }
+  cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
+  wait_has "room-$used" 'Start typing.' || { bad "session $used room did not open"; exit 1; }
   sentence='I watched the rain cross the garden.'
   started="$(clock_now)" || { bad 'monotonic clock unavailable'; exit 1; }
   type_text "$sentence" || { bad "session $used key delivery failed"; exit 1; }
@@ -166,9 +171,9 @@ for used in 1 2 3; do
   if [[ "$used" -eq 2 ]]; then
     sleep 9
     snap wiped-second
-    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' \
+    has 'Draft deleted at ' && has 'Type to start again.' \
       && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
-      && ! has 'COPY TEXT' \
+      && ! has 'Copy text' \
       && pass 'session 2 silence deleted the draft with a restart receipt' \
       || { bad 'session 2 did not delete the draft after nine seconds of silence'; exit 1; }
   elif [[ "$used" -eq 3 ]]; then
@@ -181,22 +186,22 @@ for used in 1 2 3; do
       typed="$typed$char"
       i=$(((i + 1) % ${#continuation}))
     done
-    wait_has kept-third '0:00 - ' || { bad 'session 3 never reached the kept receipt'; exit 1; }
+    wait_has kept-third 'Not saved. Copy it before you leave.' || { bad 'session 3 never reached the kept receipt'; exit 1; }
     python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
       || { bad 'session 3 completed before a full minute'; exit 1; }
-    has 'WORDS KEPT.' && ! has 'DRAFT DELETED AT ' \
+    has '1 minute, done' && has '0:00' && has 'Esc to leave' && ! has 'Draft deleted at ' \
       && jq -e --arg text "$typed" '[.elements[] | select(.role == "AXTextArea" and .value == $text)] | length > 0' "$snapf" >/dev/null \
       || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
-    tok="$(token button 'COPY TEXT')"
+    tok="$(token button 'Copy text')"
     [[ -n "$tok" ]] || { bad 'session 3 COPY TEXT affordance missing'; exit 1; }
     pass 'session 3 completed a full minute with exact kept text and COPY TEXT'
     printf 'journey clipboard sentinel' | pbcopy || { bad 'could not seed clipboard for the copy assertion'; exit 1; }
     cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
-      && wait_has copied-third 'COPIED' \
+      && wait_has copied-third 'Copied' \
       && python3 -c 'import subprocess,sys; sys.exit(subprocess.check_output(["pbpaste"]).decode() != sys.argv[1])' "$typed" \
       && pass 'session 3 copied exactly the kept draft' \
       || { bad 'session 3 copy failed or clipboard differs from kept text'; exit 1; }
-    tok="$(token button 'RUN IT AGAIN')"
+    tok="$(token button 'Run it again')"
     [[ -n "$tok" ]] && cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
       || { bad 'session 3 restart affordance missing or failed'; exit 1; }
   fi

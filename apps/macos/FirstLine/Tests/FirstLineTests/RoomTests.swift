@@ -109,6 +109,56 @@ struct RoomTests {
         now += 1
     }
 
+    @Test(arguments: [SessionPhase.writing, .danger, .failure, .success], [WritingAlignment.centered, .left])
+    func mouseExitRemainsAvailableInEveryRoomPhase(phase: SessionPhase, alignment: WritingAlignment) throws {
+        var now = 0.0
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine(now: { now })
+        let state = licensedTestState(sessionEngine: engine, settingsStore: SettingsStore(configDirectory: root))
+        state.settings.writingAlignment = alignment
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        engine.registerCommittedText("private draft")
+        switch phase {
+        case .danger: now = 5.1
+        case .failure: now = 8.1
+        case .success:
+            for second in 1...59 {
+                now = Double(second)
+                engine.registerCommittedText("private draft continues")
+            }
+            now = 60
+        default: break
+        }
+        room.tick()
+        room.view.layoutSubtreeIfNeeded()
+        #expect(engine.phase == phase)
+        func descendants(_ view: NSView) -> [NSView] {
+            view.subviews.flatMap { [$0] + descendants($0) }
+        }
+        let views = descendants(room.view)
+        let exit = try #require(views.compactMap { $0 as? NSButton }.first { $0.title == "Esc to leave" })
+        #expect(!exit.isHiddenOrHasHiddenAncestor)
+        #expect(exit.isEnabled)
+        let exitRect = exit.convert(exit.bounds, to: room.view)
+        for other in views where !other.isHiddenOrHasHiddenAncestor {
+            if let button = other as? NSButton, button !== exit {
+                #expect(!exitRect.intersects(button.convert(button.bounds, to: room.view)))
+            }
+            if let hint = other as? NSTextField, hint.stringValue == "Keep typing" {
+                #expect(!exitRect.intersects(hint.convert(hint.bounds, to: room.view)))
+            }
+        }
+        exit.performClick(nil)
+        #expect(state.selectedSurface == .home)
+        #expect(engine.text.isEmpty)
+        #expect(engine.phase == .idle)
+    }
+
     @Test func homeRestoresStartButtonFocusWithoutStartingSession() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

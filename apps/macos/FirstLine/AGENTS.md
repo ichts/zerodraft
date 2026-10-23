@@ -27,7 +27,7 @@ Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源�
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、非空输入前试用授权、居中 zen 排版、当前行固定在 39% 锚点、统一 ink（上一行淡化由房间渐变遮罩负责）、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
-Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；保留无 key 的许可记录以阻止回退试用，损坏试用计数独立耗尽，不丢弃可解码许可；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
+Sources/FirstLine/Infrastructure/SettingsStore.swift: 设置读写、写作偏好与许可缓存；保留无 key 的许可记录以阻止回退试用，损坏试用计数独立耗尽，不丢弃可解码许可；统一 ASCII SPACE/TAB/CR/LF 凭据裁剪与空值判断；许可门槛见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Infrastructure/InstallIDStore.swift: 生成并持久化 stable install UUID，以完整 UUID 作为 service activate 的 installLabel。
 Sources/FirstLine/Licensing/LicenseModels.swift: LicenseStatus、LicenseActivation 及激活/校验错误；订单号沿用持久化 licenseKey 字段。
 Sources/FirstLine/Licensing/LicenseClient.swift: activate / token validate / deactivate 及本地 token 校验边界。
@@ -36,7 +36,7 @@ Sources/FirstLine/Licensing/WaffoLicenseClient.swift: 无状态 URLSession servi
 Sources/FirstLine/Licensing/CheckoutClient.swift: 无状态 POST /api/v1/checkout 客户端，只接受 https checkout.stripe.com 目标，拒绝 redirect；错误交给 AppState 回退；不记录 URL/买家凭据。
 Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds 和删除时已过秒数、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
 Sources/FirstLine/Session/RoomPresentation.swift: 时钟、按未用尽时间与剩余试用/许可分流的擦除句（live 原文）、字数与 kept 收据、wash 强度、复制、两步退出确认计时及拒绝反馈状态规则。
-Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）的 After 白纸，与 live trial 对齐：page/sheet、clock/count、居中 zen 书写（当前行固定在纸张 39%，上一行 22%/再上一行 7% 渐变遮罩）、wash/numeral、live 文案（KEEP TYPING、DRAFT DELETED AT 剩余时间、You wrote it down.、0:00 - N WORDS KEPT.、COPY TEXT/RUN IT AGAIN/ESC - EXIT）；无顶部 pill、无 bar/meter；两步 Esc/点击退出提示（2 秒窗口，输入即取消）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID / wipe / 拒绝重启时清空编辑器；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
+Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）的 After 白纸，与 live trial 对齐：page/sheet、clock/count、居中 zen 书写（当前行固定在纸张 39%，上一行 22%/再上一行 7% 渐变遮罩）、wash/numeral（归零 120ms linear，warn/cut 即时，reduced motion 无过渡）、live 文案（KEEP TYPING、DRAFT DELETED AT 剩余时间、You wrote it down.、0:00 - N WORDS KEPT.、COPY TEXT/RUN IT AGAIN/ESC - EXIT）；无顶部 pill、无 bar/meter；两步 Esc/点击退出提示（2 秒窗口，输入即取消）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID / wipe / 拒绝重启时清空编辑器；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: After 白卡片激活面；订单号/激活码、Activate、Buy、价格/网页试用；Buy 通过 AppState 调用 CheckoutClient，契约见 `docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`；观察异步许可与 checkoutInFlight 并原位更新；active 状态显示 Start writing。
 Sources/FirstLine/Settings/SettingsViewController.swift: After 白卡片 Settings，含 appearance、motion、focus、alignment、font size、License；系统控件/原生 focus ring；观察异步许可与 checkout 变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
 Sources/FirstLine/DesignSystem/Colors.swift: writeitdown tokens.css v2（background A + 暗色同名角色）的 NSColor dynamic provider：page/sheet/ink/mute/chrome/hair/red/tag/on-ink/wash；无并行 palette。
@@ -52,7 +52,7 @@ Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用�
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。
 Tests/FirstLineTests/BatchFiveTests.swift: 时长选择、设置持久化和键盘动作验收。
-Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash、deny、复制、居中 kept 与两步退出（含 2 秒过期和输入取消）测试。
+Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash 恢复/cut 收尾/减少动态效果、deny、复制状态跨 tick/hover/字体刷新与新会话重置、居中 kept 与两步退出（含 2 秒过期和输入取消）测试。
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
 Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态）PNG 快照与 page/sheet 像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。

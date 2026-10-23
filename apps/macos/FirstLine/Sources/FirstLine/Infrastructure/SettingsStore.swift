@@ -80,8 +80,12 @@ struct AppSettings: Codable, Equatable {
     var licenseProductID: String?
     var licenseToken: String?
 
+    static func trimmedLicenseKey(_ key: String) -> String {
+        key.trimmingCharacters(in: CharacterSet(charactersIn: " \t\r\n"))
+    }
+
     var hasLicenseKey: Bool {
-        licenseKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        licenseKey.map { !Self.trimmedLicenseKey($0).isEmpty } == true
     }
 
     init(

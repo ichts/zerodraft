@@ -241,6 +241,63 @@ struct RoomTests {
         let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "COPY TEXT" })
         copy.performClick(nil)
         #expect(copy.title == "COPIED")
+        fixture.room.tick()
+        let move = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: .zero,
+            modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
+            eventNumber: 0, clickCount: 0, pressure: 0))
+        fixture.room.mouseMoved(with: move)
+        fixture.room.mouseExited(with: move)
+        fixture.state.settings.writingFontSize = .large
+        fixture.room.tick()
+        #expect(copy.title == "COPIED")
+        let kept = try #require(descendants(fixture.room.view, of: SessionKeptView.self).first)
+        #expect(kept.draft == "draft")
+        fixture.state.abandonSession()
+        fixture.state.startSession(duration: 60)
+        fixture.room.refreshRoom()
+        #expect(copy.title == "COPY TEXT")
+        #expect(kept.draft.isEmpty)
+    }
+
+    @Test func washRecoveryFadesOnceAndWarningInterruptsImmediately() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        fixture.clock.now = 6.5
+        fixture.room.tick()
+        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+            .first { $0.alphaValue == 0.5 })
+        #expect(wash.layer?.animation(forKey: "opacity") == nil)
+        fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let fade = try #require(wash.layer?.animation(forKey: "opacity") as? CABasicAnimation)
+        #expect(fade.duration == 0.12)
+        #expect((fade.fromValue as? Float) == 0.5)
+        #expect((fade.toValue as? Float) == 0)
+        var control: [Float] = [0, 0]
+        fade.timingFunction?.getControlPoint(at: 1, values: &control)
+        #expect(control == [0, 0])
+        fixture.room.tick()
+        #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
+        fixture.clock.now = 13
+        fixture.room.tick()
+        #expect(wash.alphaValue == 0.5)
+        #expect(wash.layer?.animation(forKey: "opacity") == nil)
+        fixture.state.settings.reducedMotion = .always
+        fixture.editor.insertText("y", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(wash.alphaValue == 0)
+        #expect(wash.layer?.animation(forKey: "opacity") == nil)
+    }
+
+    @Test func cutCleanupUsesTheSameWashFade() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        fixture.clock.now = 8.1
+        fixture.room.tick()
+        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+            .first { $0.alphaValue == 1 })
+        #expect(wash.layer?.animation(forKey: "opacity") == nil)
+        fixture.room.endCutAnimation()
+        #expect(wash.alphaValue == 0)
+        #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
     }
 
     @Test func warningCaptionUsesTheLiveMachineVoice() throws {

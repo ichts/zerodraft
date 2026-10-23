@@ -311,9 +311,7 @@ final class AppState {
 
     func activateLicense(key: String) async {
         guard !licenseActivationInFlight else { return }
-        // Surrounding whitespace is paste noise, never part of the credential. Trim once at the
-        // entry point so the empty check, cache comparison, request body and stored key agree.
-        let licenseKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let licenseKey = AppSettings.trimmedLicenseKey(key)
         guard !licenseKey.isEmpty else {
             licenseActivationError = .emptyKey
             return

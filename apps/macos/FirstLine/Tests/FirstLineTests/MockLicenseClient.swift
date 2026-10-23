@@ -59,8 +59,7 @@ actor MockLicenseClient: LicenseClient {
         if let artificialDelay { try? await Task.sleep(for: artificialDelay) }
         lastActivateArguments = (licenseKey, instanceName)
 
-        let trimmed = licenseKey.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        guard !licenseKey.isEmpty else {
             throw LicenseActivationError.emptyKey
         }
 

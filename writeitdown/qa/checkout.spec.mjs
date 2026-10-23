@@ -94,6 +94,20 @@ test('a key padded by the service is displayed and copied without the padding', 
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
 });
 
+for (const credential of ['\u00a0', '\u2003KEY\u00a0', '\u2028', '\v', '\f', 'K E\tY\r\n内']) {
+  test(`key delivery preserves non-padding bytes ${JSON.stringify(credential)}`, async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.route(`${service}/license?session_id=cs_test_unicode_fixture`,
+      route => route.fulfill({ json: { licenseKey: ` \t\r\n${credential}\r\n\t ` } }));
+    await page.goto('mac.html?session_id=cs_test_unicode_fixture');
+    await expect(page.locator('#license-result')).toBeVisible();
+    expect(await page.locator('#license-key').textContent()).toBe(credential);
+    await page.getByRole('button', { name: 'COPY LICENSE KEY', exact: true }).click();
+    await expect(page.locator('#copy-license')).toHaveText('COPIED');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(credential);
+  });
+}
+
 for (const state of ['pending', 'unknown']) {
   test(`${state} session shows neutral message and no key`, async ({ page }, info) => {
     await page.route(`${service}/license?session_id=cs_test_${state}_fixture`, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
@@ -107,13 +121,13 @@ for (const state of ['pending', 'unknown']) {
   });
 }
 
-for (const failure of ['network', 'http', 'empty', 'malformed', 'non-string']) {
+for (const failure of ['network', 'http', 'empty', 'padding', 'malformed', 'non-string']) {
   test(`no license is shown after ${failure} fetch failure`, async ({ page }) => {
     await page.route(`${service}/license?session_id=cs_test_failure_fixture`, route => {
       if (failure === 'network') return route.abort();
       if (failure === 'http') return route.fulfill({ status: 500, json: { licenseKey: key } });
       if (failure === 'malformed') return route.fulfill({ contentType: 'application/json', body: '{' });
-      return route.fulfill({ json: { licenseKey: failure === 'empty' ? '' : 42 } });
+      return route.fulfill({ json: { licenseKey: failure === 'empty' ? '' : failure === 'padding' ? ' \t\r\n' : 42 } });
     });
     await page.goto('mac.html?session_id=cs_test_failure_fixture');
     await expect(page.locator('#license-status')).toHaveText(neutral);

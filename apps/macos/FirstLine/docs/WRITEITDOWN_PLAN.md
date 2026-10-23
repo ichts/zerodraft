@@ -113,7 +113,7 @@ Every room phase keeps one exit control and one Escape path. The first request s
 
 - The duration choices are exactly 1, 5, 10, 20, and 30 minutes. The last chosen duration is remembered in `settings.json` through `AppSettings.defaultDuration`; on first launch it is one minute.
 - The silence limits are exactly 5 seconds (Strict), 8 seconds (Standard), and 12 seconds (Relaxed). Standard is the default. These are fixed choices, not free-form input.
-- The warning starts during the final three seconds before the wipe: after 2, 5, or 9 seconds of silence respectively. Its wash and 3-2-1 numeral stop immediately when typing resumes.
+- The warning starts during the final three seconds before the wipe: after 2, 5, or 9 seconds of silence respectively. Its 3-2-1 numeral disappears immediately when typing resumes; the wash fades to zero over 120 ms linear, or immediately with reduced motion, matching the live trial. Warn and wipe-cut updates remain immediate.
 - The chosen limit governs the wipe deadline; the earlier session or wipe deadline still wins and a tie still wipes. A wipe restarts with the same duration and silence limit.
 - The captain's chosen settings replace the earlier recommendation to keep a fixed 5-second warning and 8-second wipe for every duration. Neither threshold scales with session length.
 

@@ -203,7 +203,7 @@ final class UpgradeViewController: NSViewController {
 
     @objc private func activateTapped() {
         let key = licenseField.stringValue
-        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !appState.licenseActivationInFlight else {
+        guard !AppSettings.trimmedLicenseKey(key).isEmpty, !appState.licenseActivationInFlight else {
             feedbackLabel.stringValue = "Enter your order number or activation code first."
             feedbackLabel.textColor = FirstLineColors.redNSColor
             feedbackLabel.isHidden = false

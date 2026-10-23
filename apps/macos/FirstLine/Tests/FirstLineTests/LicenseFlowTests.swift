@@ -157,6 +157,40 @@ struct LicenseFlowTests {
         #expect(appState.hasFullAccess)
     }
 
+    @Test(arguments: ["\u{a0}", "\u{2003}", "\u{2028}", "\u{b}", "\u{c}", "\u{a0}KEY\u{2003}", "K E\tY\r\n内"])
+    func activationPreservesNonPaddingCredentialBytes(credential: String) async throws {
+        let (state, client, store, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: " \t\r\n" + credential + "\r\n\t ")
+        let sent = try #require(await client.lastActivateArguments?.licenseKey)
+        let saved = try #require(store.load().licenseKey)
+        #expect(sent.utf8.elementsEqual(credential.utf8))
+        #expect(saved.utf8.elementsEqual(credential.utf8))
+        #expect(state.settings.hasLicenseKey)
+        #expect(state.hasFullAccess)
+        await state.activateLicense(key: credential)
+        #expect(await client.lastValidatedToken == "mock-token")
+    }
+
+    @Test func upgradePrecheckAcceptsNonASCIISpaceCredential() async throws {
+        let (state, client, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        let upgrade = UpgradeViewController(appState: state)
+        func descendants(_ view: NSView) -> [NSView] {
+            view.subviews.flatMap { [$0] + descendants($0) }
+        }
+        let views = descendants(upgrade.view)
+        let field = try #require(views.compactMap { $0 as? NSTextField }.first { $0.isEditable })
+        let activate = try #require(views.compactMap { $0 as? NSButton }.first { $0.title == "Activate" })
+        field.stringValue = " \t\u{a0}\r\n"
+        activate.performClick(nil)
+        for _ in 0..<100 where !state.licenseActivationJustSucceeded {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await client.lastActivateArguments?.licenseKey == "\u{a0}")
+        #expect(state.hasFullAccess)
+    }
+
     @Test func cachedCredentialDoesNotAliasUnicodeEquivalentInput() async throws {
         let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "\u{e9}-test-order", licenseStatus: .active,

@@ -177,6 +177,7 @@ exit_room_by_key() {
 
 exit_room_by_click() {
   local token
+  poll exit-before-click
   token="$(token_of "$output/last-poll.json" button 'ESC - EXIT')"
   [[ -n "$token" ]] || fail 'no ESC - EXIT button in the room'
   cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null

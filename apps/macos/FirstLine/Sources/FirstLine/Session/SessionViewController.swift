@@ -6,7 +6,7 @@
  */
 import AppKit
 
-private final class RoomWashView: NSView {
+final class RoomWashView: NSView {
     var fillColor: NSColor { didSet { needsDisplay = true } }
     var cornerRadius: CGFloat = 0 { didSet { needsDisplay = true } }
     init(fillColor: NSColor) {
@@ -31,6 +31,21 @@ private final class RoomWashView: NSView {
         needsDisplay = true
     }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    func setOpacity(_ opacity: CGFloat, reducesMotion: Bool) {
+        if reducesMotion { layer?.removeAnimation(forKey: "opacity") }
+        guard alphaValue != opacity else { return }
+        let previous = Float(alphaValue)
+        layer?.removeAnimation(forKey: "opacity")
+        alphaValue = opacity
+        guard opacity == 0, !reducesMotion else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = previous
+        fade.toValue = Float(0)
+        fade.duration = 0.12
+        fade.timingFunction = CAMediaTimingFunction(name: .linear)
+        layer?.add(fade, forKey: "opacity")
+    }
 }
 
 @MainActor
@@ -536,8 +551,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         placeholderLabel.alignment = .center
         if engine.phase == .success {
             updateKeptContent()
-        } else if let writingFont = FirstLineTypography.writingNSFont(size: settings.writingFontSize.points) {
-            keptView.setBodyFont(writingFont)
         }
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
@@ -560,7 +573,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             washIsCut = cut
             paperWash.fillColor = cut ? FirstLineColors.redDeepNSColor : FirstLineColors.redSoftNSColor
         }
-        if paperWash.alphaValue != opacity { paperWash.alphaValue = opacity }
+        paperWash.setOpacity(opacity, reducesMotion: reducesMotion)
     }
 
     private func showCut() {

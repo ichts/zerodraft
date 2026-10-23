@@ -46,8 +46,7 @@
       const response = await fetch(url, { ...options, headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('License unavailable');
       const { licenseKey } = await response.json();
-      // Surrounding whitespace is paste noise; the displayed and copied key are the same trimmed value.
-      deliveredKey = typeof licenseKey === 'string' ? licenseKey.trim() : '';
+      deliveredKey = typeof licenseKey === 'string' ? licenseKey.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '') : '';
       if (!deliveredKey) throw new Error('License unavailable');
       key.textContent = deliveredKey;
       status.textContent = 'Your license key is ready.';

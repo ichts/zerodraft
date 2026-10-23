@@ -26,6 +26,7 @@ final class SessionKeptView: NSView {
     private let receipt = NSTextField(labelWithString: "")
     private var bodyWidth: NSLayoutConstraint!
     private var selectedDraft = ""
+    private var renderedWordCount: Int?
 
     init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector) {
         copyButton = FirstLineButtons.primary(title: "COPY TEXT", target: copyTarget, action: copyAction)
@@ -89,7 +90,9 @@ final class SessionKeptView: NSView {
     var draft: String { selectedDraft }
 
     func setContent(text: String, wordCount: Int, writingFont: NSFont) {
+        guard selectedDraft != text || renderedWordCount != wordCount || body.font != writingFont else { return }
         selectedDraft = text
+        renderedWordCount = wordCount
         body.font = writingFont
         body.preferredMaxLayoutWidth = bodyWidth.constant
         body.attributedStringValue = FirstLineTypography.trackedText(
@@ -101,18 +104,14 @@ final class SessionKeptView: NSView {
         receipt.attributedStringValue = FirstLineTypography.trackedText(
             RoomPresentation.keptReceipt(wordCount: wordCount), font: FirstLineTypography.smallMediumNSFont,
             color: FirstLineColors.muteNSColor, kernEm: 0.02)
-        copyButton.title = "COPY TEXT"
         stack.needsLayout = true
-    }
-
-    func setBodyFont(_ font: NSFont) {
-        guard body.font?.pointSize != font.pointSize else { return }
-        body.font = font
     }
 
     func reset() {
         selectedDraft = ""
+        renderedWordCount = nil
         body.stringValue = ""
+        copyButton.title = "COPY TEXT"
     }
 
     /// Centres the block when it is shorter than the writing area and scrolls it when taller.

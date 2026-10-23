@@ -74,7 +74,7 @@ STRIPE_API_BASE=https://api.stripe.com
 
 `LICENSE_PRODUCT_ID` is the stable app/token product, not the LIVE Stripe billing-product ID. Do not change it on a mode switch. `STRIPE_PRODUCT_ID` is an optional fallback only when `LICENSE_PRODUCT_ID` is absent; if present, leave it fixed as well. Exact price-ID verification is the billing boundary. TEST and LIVE Stripe products/prices may differ without changing the token product or DMG. The same database preserves licenses from both modes.
 
-Startup refuses an absent webhook secret, API key, price or stable app product. The API key must be a test key (`sk_test_` or `rk_test_`) in TEST or a live key (`sk_live_` or `rk_live_`) in LIVE; a key from the other mode refuses startup. Both the event and its object must explicitly match the configured `livemode`; a mismatch returns 401 and changes nothing. The Waffo route and its TEST-only verifier remain independent and unchanged.
+Startup requirements, accepted API-key prefixes and cross-mode refusal are defined in the [Stripe adapter contract](../README.md#stripe-adapter). The Waffo route and its TEST-only verifier remain independent and unchanged.
 
 ## 4. Install and verify the replacement binary
 
@@ -111,7 +111,7 @@ sudo systemctl reload caddy
 curl --fail --silent --show-error https://licenses.writeitdown.app/api/v1/health
 ```
 
-The Checkout return URLs, buyer retrieval response and activation credential are defined in [`../README.md`](../README.md#stripe-adapter). The current `writeitdown/mac.html` has not yet implemented the buyer receipt flow; complete that integration before the genuine purchase acceptance below.
+The Checkout return URLs, buyer retrieval response and activation credential are defined in [`../README.md`](../README.md#stripe-adapter). The browser receipt flow is implemented; its release evidence and acceptance boundary are owned by [`writeitdown/README.md`](../../../writeitdown/README.md#mac-page-release-order).
 
 ## 6. Prove the genuine TEST purchase before LIVE
 
@@ -152,11 +152,11 @@ Only after the genuine TEST loop and required reviews are green, the maintainer 
 | Variable | TEST | LIVE |
 | --- | --- | --- |
 | `LICENSE_ENVIRONMENT` | `test` | `live` |
-| `STRIPE_SECRET_KEY` | Maintainer's TEST API key (`sk_test_` or `rk_test_`) | Maintainer's LIVE API key (`sk_live_` or `rk_live_`; GB's is the restricted `rk_live_` key) |
+| `STRIPE_SECRET_KEY` | Maintainer's TEST API key | Maintainer's LIVE API key |
 | `STRIPE_WEBHOOK_SECRET` | TEST endpoint signing secret | LIVE endpoint's own signing secret |
 | `STRIPE_PRICE_ID` | TEST $4.99 one-time price | Verified LIVE $4.99 one-time price |
 
-The webhook URL stays `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. The LIVE endpoint has its own signing secret; never reuse the TEST endpoint secret. GB delivered the LIVE configuration: price `price_1UTh0LRs8qwanmEvGLCgODdJ`, endpoint `we_1UTh1WRs8qwanmEvmmnxATsc` on that URL, and the restricted `rk_live_` key, permitted exactly Checkout Sessions Write, Charges and Refunds Read, Prices Read, Products Read, Events Read, everything else None. The adapter needs only Checkout Sessions Write; the README enumerates both outbound calls and their permission. Do not change `LICENSE_PRODUCT_ID`, `LICENSE_TOKEN_PRIVATE_KEY_FILE`, the database, API base, token format or claims. TEST and LIVE use **one Ed25519 key, one pinned public key and one app product ID**. A DMG configured with that public key and product can verify either mode's issued token. There is no rebuild, code edit or mode-specific migration.
+The webhook URL stays `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. The LIVE endpoint has its own signing secret; never reuse the TEST endpoint secret. GB delivered the LIVE configuration: price `price_1UTh0LRs8qwanmEvGLCgODdJ`, endpoint `we_1UTh1WRs8qwanmEvmmnxATsc` on that URL, and the restricted `rk_live_` key, permitted exactly Checkout Sessions Write, Charges and Refunds Read, Prices Read, Products Read, Events Read, everything else None. See the [Stripe adapter permission inventory](../README.md#stripe-adapter) for both outbound calls and the required permission. Do not change `LICENSE_PRODUCT_ID`, `LICENSE_TOKEN_PRIVATE_KEY_FILE`, the database, API base, token format or claims. TEST and LIVE use **one Ed25519 key, one pinned public key and one app product ID**. A DMG configured with that public key and product can verify either mode's issued token. There is no rebuild, code edit or mode-specific migration.
 
 Keep the four TEST values privately for rollback, edit the existing environment file through the secret channel, then restart:
 

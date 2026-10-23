@@ -13,13 +13,13 @@
     <key>WIDDisplayPrice</key>
     <string>$4.99</string>
     <key>WIDCheckoutURL</key>
-    <string></string>
+    <string>https://writeitdown.app/mac.html</string>
     <key>WIDLicenseServiceURL</key>
-    <string></string>
+    <string>https://licenses.writeitdown.app</string>
     <key>WIDLicenseProductID</key>
-    <string></string>
+    <string>prod_VUeTDTehcGAqJK</string>
     <key>WIDLicensePublicKey</key>
-    <string></string>
+    <string>ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>

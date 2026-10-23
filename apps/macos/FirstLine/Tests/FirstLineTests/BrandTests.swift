@@ -13,6 +13,12 @@ struct BrandTests {
         #expect(info["CFBundleIdentifier"] as? String == "app.writeitdown.mac")
         #expect(AppPaths.applicationSupportRoot.lastPathComponent == "WriteItDown")
         #expect(info["CFBundleName"] as? String == "Write It Down")
+        #expect(info["WIDDisplayPrice"] as? String == "$4.99")
+        #expect(AppState.checkoutURL?.absoluteString == "https://writeitdown.app/mac.html")
+        #expect(AppState.licenseProductID == "prod_VUeTDTehcGAqJK")
+        #expect(info["WIDLicenseServiceURL"] as? String == "https://licenses.writeitdown.app")
+        #expect(info["WIDLicensePublicKey"] as? String == "ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=")
+        #expect(AppState.configuredLicenseClient.isConfigured)
         #expect((info["NSHumanReadableCopyright"] as? String)?.contains("Your Company") == false)
     }
 

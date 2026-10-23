@@ -82,8 +82,12 @@ test('llms.txt is served as plain text, not the HTML fallback', async ({ request
   const text = await response.text();
   expect(text.startsWith('# Write It Down\n')).toBe(true);
   expect(text).not.toContain('<html');
-  // The file names the product, the trial, the closed sale and every public page, and no AI provider.
-  for (const fact of ['3 free writing sessions', 'not open yet', '14-day refund'])
+  // Purchase and refund details live on the Mac page; this public file points readers there.
+  for (const fact of [
+    '3 free writing sessions',
+    'See the Mac page for current purchase details and license delivery.',
+    'The price and refund terms are on that page.',
+  ])
     expect(text).toContain(fact);
   expect(text).not.toMatch(/\b(openai|chatgpt|anthropic|claude|perplexity|gemini|gpt-?\d|google|cloudflare)\b/i);
   for (const path of [...pages, '/mac.html'])

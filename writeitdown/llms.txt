@@ -8,12 +8,12 @@ Who it is for: people who edit instead of finishing, anyone who needs a first dr
 
 No draft is saved or sent. The web room keeps the writing in the browser tab. The Mac app keeps it in memory and never uploads it. The only browser storage is your light or dark appearance preference.
 
-Buying the Mac app is not open yet. When it opens, the price is USD 4.99 once, with no subscription, for one license on 2 Macs, with a 14-day refund and no reason needed.
+See the Mac page for current purchase details and license delivery. The price and refund terms are on that page.
 
 ## Main pages
 
 - [Write It Down](https://writeitdown.app/): the product, the sixty-second web room, the rules, and the Mac app.
-- [Write It Down for Mac](https://writeitdown.app/mac.html): the native Mac app, the 3 free sessions, the USD 4.99 license, and the waitlist.
+- [Write It Down for Mac](https://writeitdown.app/mac.html): the native Mac app, the 3 free sessions, and current purchase and activation details.
 - [Download the Mac free trial](https://writeitdown.app/download/): the disk image, its SHA-256, install steps, and refund terms.
 - [Support](https://writeitdown.app/support.html): start a session, find a draft, copy text, and contact.
 - [Privacy](https://writeitdown.app/privacy.html): what the browser and the Mac app keep and send.
@@ -24,7 +24,7 @@ Buying the Mac app is not open yet. When it opens, the price is USD 4.99 once, w
 - [What is Write It Down?](https://writeitdown.app/what-is-write-it-down.html): the product, its rule, who it is for, and what it costs.
 - [Write It Down for Mac or the web room](https://writeitdown.app/write-it-down-mac-vs-web.html): the shared rule and the differences in session length, silence settings, and price.
 - [How the free trial works](https://writeitdown.app/write-it-down-free-trial.html): the free web room, the 3 Mac sessions, and what happens after them.
-- [What Write It Down costs](https://writeitdown.app/write-it-down-price.html): USD 4.99 once, 2 Macs, the 14-day refund, and the closed checkout.
+- [What Write It Down costs](https://writeitdown.app/write-it-down-price.html): license pricing and refund terms.
 - [How to delete a draft](https://writeitdown.app/delete-a-draft.html): the five-second warning, the eight-second wipe, and why backspace is blocked.
 - [Is my writing saved?](https://writeitdown.app/is-my-writing-saved.html): no drafts in storage, the theme preference, the local trial counter, and license checks.
 

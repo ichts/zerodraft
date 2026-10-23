@@ -16,7 +16,7 @@ Select `LICENSE_PROVIDER=stripe` with `LICENSE_ENVIRONMENT=test|live`. Startup r
 
 Local synthetic coverage in `stripe_test.go`, `stripe_modes_test.go`, `stripe_signature_regression_test.go` and `http_browser_test.go` exercises signature rotation, business rejection, payment binding, replay/conflict handling, refunds, buyer retrieval, token activation and provider-mode isolation with a fake Stripe API. These tests do not prove a Stripe payment.
 
-Real Stripe TEST Checkout/card payment, genuine webhook delivery/refund, buyer receipt-page integration and native Mac activation remain unproven. Mac integration remains a separate follow-up; LIVE keys, payments and deployment remain forbidden until the genuine TEST loop and required reviews pass. [`deploy/DEPLOY.md`](deploy/DEPLOY.md) owns the permanent receiver configuration, maintainer-only secret provisioning and acceptance procedure. No real Stripe secrets belong in the build worker or deployment bundle.
+The browser purchase integration is implemented; its evidence and release boundary are owned by [`writeitdown/README.md`](../../writeitdown/README.md#mac-page-release-order). The genuine TEST purchase through installed-DMG activation and refund remains unproven. LIVE keys, payments and deployment remain forbidden until that loop and required reviews pass. [`deploy/DEPLOY.md`](deploy/DEPLOY.md) owns the permanent receiver configuration, maintainer-only secret provisioning and acceptance procedure. No real Stripe secrets belong in the build worker or deployment bundle.
 
 The common validation commands are in [Run and validate](#run-and-validate). Stripe-specific checks can also use `go test -run 'Stripe' -count=1 -v ./...`.
 

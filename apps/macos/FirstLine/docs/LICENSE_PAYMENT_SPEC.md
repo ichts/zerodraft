@@ -2,18 +2,18 @@
 
 The Mac app uses the signed-token service in `services/license/`, not a processor API. Its client type retains the historical `WaffoLicenseClient` name; the service now selects Waffo or Stripe independently. Price: USD $4.99 once, two installations per license. Mac offers three free writing sessions, then requires activation; the full web trial remains at https://writeitdown.app/. The refund window is 14 days. The selected payment adapter owns the charged amount; `WIDDisplayPrice` owns the app's displayed price.
 
-**Public sale is blocked.** The Stripe backend adapter is implemented, but genuine TEST payment, buyer receipt-page integration and real Mac activation/refund acceptance remain unproven. HTTP stubs and the window fixture are not purchase evidence. Service readiness and provider-specific gates belong to [`services/license/README.md`](../../../../services/license/README.md).
+Purchase-page integration and its installed-DMG TEST acceptance boundary are owned by [`writeitdown/README.md`](../../../../writeitdown/README.md#mac-page-release-order). HTTP stubs and the window fixture are not purchase evidence. Service readiness and provider-specific gates belong to [`services/license/README.md`](../../../../services/license/README.md).
 
 ## Release configuration
 
-`Sources/FirstLine/Info.plist` leaves these values empty until verified:
+`Sources/FirstLine/Info.plist` pins the purchase page, deployed service origin, stable product and deployed public key:
 
 - `WIDCheckoutURL`: verified buyer checkout HTTPS page, opened in the external browser. It cannot point directly at the service's POST-only checkout API.
 - `WIDLicenseServiceURL`: service HTTPS origin, without `/api/v1` or another path. Loopback HTTP is allowed by the client for local QA only; the release script rejects it.
 - `WIDLicenseProductID`: exact product identity from the service configuration.
 - `WIDLicensePublicKey`: base64 of the raw 32-byte Ed25519 **public** key, not PEM and not a private key. This is the service's token-verification key, not Waffo's RSA webhook key.
 
-No merchant credential belongs in the app. All-empty live configuration is the three-session trial; partial or invalid fields still block. `scripts/release-dmg.sh` validates these fields; `--staging` requires all four empty. Configuration does not prove that a test purchase passed.
+No merchant credential belongs in the app. `scripts/release-dmg.sh` requires all four fields for a release and rejects incomplete or invalid configuration; `--staging` requires all four empty. TEST and LIVE use the same app configuration; the service environment selects the payment mode. `scripts/test-release-config.py` covers the packaging gate without building or signing. Configuration does not prove that a test purchase passed.
 
 ## Entitlement and persisted state
 

@@ -1,18 +1,17 @@
 /**
  * [INPUT]: BundledFonts (Newsreader human serif) and the macOS system UI font.
- * [OUTPUT]: FirstLineTypography tokens: Newsreader for writing/display, system sans for every UI label.
+ * [OUTPUT]: FirstLineTypography tokens: Newsreader for writing and warning numerals, system sans for UI and display headings.
  * [POS]: Native typography layer; matches writeitdown/tokens.css (serif = what you write, sans = the tool).
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  *
  * The machine mono layer is retired from the app chrome. UI labels, buttons, clock, counts, tags and
- * field labels use the system font so controls stay native; only written text and display headings use
- * the bundled Newsreader. Accessors are computed because NSFont is not Sendable and fonts are cached.
+ * field labels and display headings use the system font so controls stay native; written text and
+ * warning numerals use the bundled Newsreader. Accessors are computed because NSFont is not Sendable and fonts are cached.
  */
 
 import AppKit
 
 enum FirstLineTypography {
-    // Human layer: bundled Newsreader. Display headings and written text.
     static func displayNSFont(size: CGFloat = 34) -> NSFont {
         .systemFont(ofSize: size, weight: .semibold)
     }

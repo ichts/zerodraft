@@ -2,7 +2,7 @@
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
  * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, tag/clock/bar/meter, wash and numeral, deleted sentence, kept copy/restart.
  * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
- * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native receipts live in RoomPresentation; check nearest AGENTS.md.
+ * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native deletion and session copy live in RoomPresentation; check nearest AGENTS.md.
  */
 import AppKit
 

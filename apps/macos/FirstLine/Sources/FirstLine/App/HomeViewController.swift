@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState choices, observable access status (free-trial count or license) and AppKit focus.
  * [OUTPUT]: "How long?" white card with minute/silence segmented controls, Begin, and the live access line.
- * [POS]: Pre-writing surface in the After language; direct-start choices remain, Begin starts the selected duration.
+ * [POS]: Pre-writing surface in the After language; selections persist, Begin enters the room.
  * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
  */
 import AppKit

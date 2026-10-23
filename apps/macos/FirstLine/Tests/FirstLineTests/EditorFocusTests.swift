@@ -46,11 +46,23 @@ struct EditorFocusTests {
         #expect(placeholder.isHidden)
 
         let firstX = try firstLineOriginX(in: editor, room: room)
+        let firstWidth = try firstLineWidth(in: editor)
         let hintX = room.view.convert(.zero, from: placeholder).x
-        #expect(abs(firstX - hintX) <= 2)
+        let hintCenterX = room.view.convert(NSPoint(x: placeholder.bounds.midX, y: 0), from: placeholder).x
+        if alignment == .centered {
+            #expect(abs((firstX + firstWidth / 2) - hintCenterX) <= 2)
+        } else {
+            #expect(abs(firstX - hintX) <= 2)
+        }
         editor.insertText(" more words", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
-        #expect(abs(try firstLineOriginX(in: editor, room: room) - firstX) <= 1)
+        let secondX = try firstLineOriginX(in: editor, room: room)
+        let secondWidth = try firstLineWidth(in: editor)
+        if alignment == .centered {
+            #expect(abs((secondX + secondWidth / 2) - (firstX + firstWidth / 2)) <= 1)
+        } else {
+            #expect(abs(secondX - firstX) <= 1)
+        }
 
         let firstLineY = try firstLineTopY(in: editor, room: room)
         editor.insertText("\nTwo", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -90,6 +102,13 @@ struct EditorFocusTests {
         return windowTop(of: textView.textContainerOrigin.y + line.minY, in: textView, room: room)
     }
 
+    private func firstLineWidth(in textView: AppendOnlyTextView) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        return layout.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil).width
+    }
+
     private func firstLineOriginX(in textView: AppendOnlyTextView, room: SessionViewController) throws -> CGFloat {
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
@@ -120,7 +139,7 @@ struct EditorFocusTests {
     }
 
     @Test
-    func focusTypographyBlursPreviousParagraphAndKeepsCurrentClear() throws {
+    func focusTypographyFadesPreviousParagraphAndKeepsCurrentClear() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "old thought\ncurrent thought"))
@@ -129,13 +148,15 @@ struct EditorFocusTests {
         textView.applyFocusTypographyToExistingText()
 
         let storage = try #require(textView.textStorage)
-        try #require(storage.length > 0)
-        #expect(storage.attribute(.shadow, at: 0, effectiveRange: nil) is NSShadow)
-        #expect(storage.attribute(.shadow, at: textView.string.count - 1, effectiveRange: nil) == nil)
+        let previous = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let current = try #require(storage.attribute(.foregroundColor, at: textView.string.count - 1, effectiveRange: nil) as? NSColor)
+        #expect(abs(previous.alphaComponent - 0.22) < 0.01)
+        #expect(abs(current.alphaComponent - 1) < 0.01)
+        #expect(storage.attribute(.shadow, at: 0, effectiveRange: nil) == nil)
     }
 
     @Test
-    func focusTypographyBlursPreviousParagraphAfterNewline() throws {
+    func focusTypographyFadesPreviousParagraphAfterNewline() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "old thought\n"))
@@ -144,28 +165,32 @@ struct EditorFocusTests {
         textView.applyFocusTypographyToExistingText()
 
         let storage = try #require(textView.textStorage)
-        try #require(storage.length > 0)
-        #expect(storage.attribute(.shadow, at: 0, effectiveRange: nil) is NSShadow)
+        let previous = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        #expect(abs(previous.alphaComponent - 0.22) < 0.01)
     }
 
     @Test
-    func focusTypographyHidesEverythingBeforePreviousParagraph() throws {
+    func focusTypographyHidesEverythingBeforeTheTwoFadedParagraphs() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\ncurrent"))
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\nthird\ncurrent"))
         textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
 
         textView.applyFocusTypographyToExistingText()
 
         let storage = try #require(textView.textStorage)
-        let firstColor = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
-        #expect(firstColor.alphaComponent == 0)
-        #expect(storage.attribute(.shadow, at: 6, effectiveRange: nil) is NSShadow)
-        #expect(storage.attribute(.shadow, at: textView.string.count - 1, effectiveRange: nil) == nil)
+        let oldest = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let older = try #require(storage.attribute(.foregroundColor, at: 6, effectiveRange: nil) as? NSColor)
+        let previous = try #require(storage.attribute(.foregroundColor, at: 13, effectiveRange: nil) as? NSColor)
+        let current = try #require(storage.attribute(.foregroundColor, at: textView.string.count - 1, effectiveRange: nil) as? NSColor)
+        #expect(oldest.alphaComponent == 0)
+        #expect(abs(older.alphaComponent - 0.10) < 0.01)
+        #expect(abs(previous.alphaComponent - 0.22) < 0.01)
+        #expect(abs(current.alphaComponent - 1) < 0.01)
     }
 
     @Test
-    func focusTypographyAfterNewlineShowsOnlyPreviousParagraph() throws {
+    func focusTypographyAfterNewlineShowsTwoFadedParagraphs() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\n"))
@@ -174,9 +199,10 @@ struct EditorFocusTests {
         textView.applyFocusTypographyToExistingText()
 
         let storage = try #require(textView.textStorage)
-        let firstColor = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
-        #expect(firstColor.alphaComponent == 0)
-        #expect(storage.attribute(.shadow, at: 6, effectiveRange: nil) is NSShadow)
+        let older = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        let previous = try #require(storage.attribute(.foregroundColor, at: 6, effectiveRange: nil) as? NSColor)
+        #expect(abs(older.alphaComponent - 0.10) < 0.01)
+        #expect(abs(previous.alphaComponent - 0.22) < 0.01)
     }
 
     @Test

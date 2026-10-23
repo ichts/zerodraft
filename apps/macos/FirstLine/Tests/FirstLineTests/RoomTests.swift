@@ -11,11 +11,11 @@ struct RoomTests {
     }
 
     @Test func wipeReportStatesDeletionAndRestart() {
-        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: true) == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN.")
-        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: false) == "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: true) == "Draft deleted at 0:08. Type to start again.")
+        #expect(RoomPresentation.wipeReport(elapsed: 8, canRestart: false) == "Draft deleted at 0:08. Activate to keep writing.")
     }
 
-    @Test func wipeRearmsClockAndRestoresInputHint() throws {
+    @Test func wipeRearmsClockAndHidesInputHint() throws {
         var now = 0.0
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -40,8 +40,8 @@ struct RoomTests {
         let clock = try #require(fields(room.view).first(where: { $0.accessibilityLabel()?.hasPrefix("Time remaining") == true }))
         let hint = try #require(fields(room.view).first(where: { $0.stringValue == "Start typing." }))
         #expect(clock.stringValue == "1:00")
-        #expect(fields(room.view).contains { $0.stringValue == "DRAFT DELETED AT 0:08. TYPE TO START AGAIN." && !$0.isHidden })
-        #expect(!hint.isHidden)
+        #expect(fields(room.view).contains { $0.stringValue == "Draft deleted at 0:08. Type to start again." && !$0.isHidden })
+        #expect(hint.isHidden)
     }
 
     @Test func wipeReportUsesExactDeadlineDespiteFractionalStart() {
@@ -54,14 +54,15 @@ struct RoomTests {
         #expect(engine.phase == .failure)
         #expect(engine.deletionElapsedSeconds == 8)
         #expect(RoomPresentation.wipeReport(elapsed: engine.deletionElapsedSeconds ?? -1, canRestart: false) ==
-            "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING.")
+            "Draft deleted at 0:08. Activate to keep writing.")
     }
 
-    @Test func keptReceiptTextMatchesWeb() {
-        #expect(RoomPresentation.keptReceipt(words: 12) == "0:00 - 12 WORDS KEPT.")
-        #expect(RoomPresentation.keptReceipt(words: 1) == "0:00 - 1 WORD KEPT.")
-        #expect(RoomPresentation.wordLabel(1) == "1 WORD")
-        #expect(RoomPresentation.wordLabel(0) == "0 WORDS")
+    @Test func sessionTagMatchesChosenLengthAndPhase() {
+        #expect(RoomPresentation.sessionTag(duration: 60, phase: .writing) == "1 minute, forward only")
+        #expect(RoomPresentation.sessionTag(duration: 300, phase: .danger) == "5 minutes, forward only")
+        #expect(RoomPresentation.sessionTag(duration: 60, phase: .success) == "1 minute, done")
+        #expect(RoomPresentation.wordLabel(1) == "1 word")
+        #expect(RoomPresentation.wordLabel(0) == "0 words")
     }
 
     @Test func copyTextPutsExactDraftOnPasteboard() {
@@ -120,8 +121,8 @@ struct RoomTests {
         window.contentViewController = home
         home.viewDidAppear()
         let button = try #require(window.firstResponder as? NSButton)
-        #expect(button.title == "1")
-        #expect(button.accessibilityLabel() == "Start 1 minute session")
+        #expect(button.title == "Begin")
+        #expect(button.accessibilityLabel() == "Begin writing")
         #expect(state.selectedSurface == .home)
         #expect(state.sessionEngine.phase == .idle)
     }
@@ -135,8 +136,8 @@ struct RoomTests {
             return current + view.subviews.flatMap(labels)
         }
         #expect(!labels(room.view).contains("You wrote it down."))
-        #expect(labels(room.view).contains("COPY TEXT"))
-        #expect(labels(room.view).contains("RUN IT AGAIN"))
+        #expect(labels(room.view).contains("Copy text"))
+        #expect(labels(room.view).contains("Run it again"))
     }
 
     @Test func warnWashTracksSelectedSilenceLimit() {

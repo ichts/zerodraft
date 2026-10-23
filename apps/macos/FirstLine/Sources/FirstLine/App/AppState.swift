@@ -37,11 +37,16 @@ final class AppState {
                            publicKey: Data(base64Encoded: configuration["WIDLicensePublicKey"] as? String ?? "") ?? Data())
     }
     static let webTrialURL = URL(string: "https://writeitdown.app/")!
+    /// Public Mac page used when the hosted checkout request fails. This is the error fallback,
+    /// never the in-app Buy action itself.
     static var checkoutURL: URL? { checkoutURL(in: configuration) }
     static func checkoutURL(in values: [String: Any]) -> URL? {
         guard let value = values["WIDCheckoutURL"] as? String,
               let url = URL(string: value), url.scheme == "https", url.host != nil else { return nil }
         return url
+    }
+    static var configuredCheckoutClient: HostedCheckoutClient {
+        HostedCheckoutClient(baseURL: (configuration["WIDLicenseServiceURL"] as? String).flatMap(URL.init(string:)))
     }
     /// 网络故障不延长签名 token 的七天有效期。
     static let licenseOfflineGraceInterval: TimeInterval = 7 * 24 * 60 * 60
@@ -52,6 +57,7 @@ final class AppState {
     let sessionEngine: SessionEngine
     let settingsStore: SettingsStore
     let licenseClient: LicenseClient
+    let checkoutClient: CheckoutClient
     let installIDStore: InstallIDStore
     let clock: () -> Date
     let productID: String
@@ -98,11 +104,13 @@ final class AppState {
     var licenseActivationInFlight = false
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
+    private(set) var checkoutInFlight = false
 
     init(
         sessionEngine: SessionEngine = SessionEngine(),
         settingsStore: SettingsStore = SettingsStore(),
         licenseClient: LicenseClient = AppState.configuredLicenseClient,
+        checkoutClient: CheckoutClient = AppState.configuredCheckoutClient,
         installIDStore: InstallIDStore = InstallIDStore(),
         clock: @escaping () -> Date = Date.init,
         productID: String = AppState.licenseProductID,
@@ -111,6 +119,7 @@ final class AppState {
         self.sessionEngine = sessionEngine
         self.settingsStore = settingsStore
         self.licenseClient = licenseClient
+        self.checkoutClient = checkoutClient
         self.installIDStore = installIDStore
         self.clock = clock
         self.productID = productID
@@ -276,9 +285,19 @@ final class AppState {
         persistSettings()
     }
 
-    func openCheckout() {
-        guard let url = Self.checkoutURL else { return }
-        openExternalURL(url)
+    var checkoutAvailable: Bool { checkoutClient.isConfigured && Self.checkoutURL != nil }
+
+    /// The host checkout is the purchase path; the public Mac page is the error fallback.
+    /// Neither the hosted URL nor any buyer credential is logged.
+    func openCheckout() async {
+        guard !checkoutInFlight else { return }
+        checkoutInFlight = true
+        defer { checkoutInFlight = false }
+        do {
+            openExternalURL(try await checkoutClient.createCheckoutSession())
+        } catch {
+            if let fallback = Self.checkoutURL { openExternalURL(fallback) }
+        }
     }
 
     func openWebTrial() {

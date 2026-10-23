@@ -55,7 +55,7 @@ What the reference does:
 - After about five seconds of silence the screen turns red with `You failed...` and a `Try again!` button, and the draft is gone.
 - On success the progress bar turns green, the full text stays on screen, and the page offers `Download N words` and `Start Again`.
 
-The reference above is historical evidence, not the native picker specification. The captain superseded its duration set and popover with the direct-start row in section 4. Word-count goals, Hardcore mode, prompts, and the red failure screen remain out of scope.
+The reference above is historical evidence, not the native picker specification. The captain superseded its duration set and popover with the duration/silence segments and Begin in section 4. Word-count goals, Hardcore mode, prompts, and the red failure screen remain out of scope.
 
 ## 3. Product rules: web to native
 
@@ -70,17 +70,17 @@ The web column cites the file that owns each rule today. The native column recor
 | 5 | After 8 s of silence the draft is wiped. The room stays open with `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.` and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 captures unused time and provides a minimal in-room wipe/restart route. Batch 4 removes the obsolete Failure screen and polishes the report. Batch 5 offers fixed 5/8/12-second wipe limits. |
 | 6 | The earlier deadline wins, and a tie goes to the wipe. | `writeitdown/session.mjs` | `SessionEngine.swift` (`adjudicateDeadlines`) | Keep. |
 | 7 | A whitespace-only draft at the deadline is wiped, not kept. | `writeitdown/session.mjs` (`!state.text.trim()`) | `SessionEngine.swift` ends an empty draft as idle and keeps a whitespace-only draft. | Batch 2 adopts the web rule. |
-| 8 | When the clock runs out, the native kept view shows the full text, `0:00 - N WORDS KEPT.`, `COPY TEXT` (then `COPIED`), and `RUN IT AGAIN`. Focus goes to COPY TEXT. It needs no promotional heading. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. Batch 4 shipped the web copy and layout; batch 5 removes the native kept heading. |
+| 8 | When the clock runs out, the native kept view shows the full text, the not-saved caption, `Copy text` (then `Copied`), and `Run it again`. Focus goes to Copy text. It needs no promotional heading or receipt. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. Batch 4 shipped the web copy and layout; batch 5 removes the native kept heading. |
 | 9 | The count is Unicode words, and each Han character counts as one. Punctuation and emoji do not count. | `writeitdown/session.mjs` (`wordCount`) | `SessionEngine.swift` (`wordCount`) splits on whitespace only. | Batch 2 ports the web rule. |
 | 10 | ESC and the `ESC - EXIT` control leave the room right away. Nothing is saved. | `writeitdown/room.js` (`exit`) | `SessionViewController.swift` has the `Abandon - the text is lost` button. `Cmd+0` goes Home. | Batch 4 adds `ESC - EXIT` at the bottom left and handles Escape outside IME composition. |
 | 11 | There is no early finish. A session ends only at the deadline or by exiting. | `writeitdown/room.js` | `SessionViewController.swift` has a `Finish` button and Cmd+Return. `SessionEngine.swift` has `finish()`. | Batch 2 removes the engine method, button, Cmd+Return paths, and tests together. |
-| 12 | The clock shows `M:SS` at the top right, and the count shows `N WORDS` at the bottom right. | `writeitdown/index.html`, `writeitdown/site.css` | `SessionViewController.swift` shows `MM:SS`, a progress bar, and lowercase `N words`. | Batch 4. |
+| 12 | The clock shows `M:SS` at the top right, and the count shows `N words` at the bottom right. | `writeitdown/index.html`, `writeitdown/site.css` | `SessionViewController.swift` shows `MM:SS`, a progress bar, and lowercase `N words`. | Batch 4. |
 | 13 | Appearance follows the system by default and can be switched between light and dark. | `writeitdown/theme.js`, `writeitdown/site.css` | `Sources/Infrastructure/SettingsStore.swift` (`AppTheme`), `Sources/DesignSystem/Colors.swift` (the Zero Draft bone palette with red `#c8392f`). | Batch 3 ports the site tokens for both appearances. |
 | 14 | No draft is stored. Only the appearance preference persists. | `writeitdown/theme.js` (`writeitdown-theme` is the only key) | Before batch 1, `Sources/Infrastructure/PersistenceService.swift` wrote kept drafts as Markdown and `Sources/Library/LibraryViewController.swift` browsed them. | Batch 1 deleted both. Settings keep only preferences and the license cache (section 7). |
 | 15 | The writing view shows the active line in an upper writing band with two fading lines above it and no scrollbar. | `writeitdown/site.css` (`#editor` mask), `writeitdown/room.js` (`fitEditor`) | `SessionViewController.swift` sets a window-content-relative anchor for the editor and empty placeholder; `AppendOnlyTextView.swift` keeps the current line at that anchor as earlier lines grow upward. | See the window-content-height contract in batch 4 below; the scroll viewport midpoint is not the anchor. |
-| 16 | The session length and silence limit are chosen before writing. | Fixed at 60 s and 8 s on the web | Fixed at 60 s and 8 s. `AppState.selectedDuration` and `AppSettings.defaultDuration` already exist but are pinned to 60. | Batch 5 adds the direct-start duration row and three silence choices. |
+| 16 | The session length and silence limit are chosen before writing. | Fixed at 60 s and 8 s on the web | Fixed at 60 s and 8 s. `AppState.selectedDuration` and `AppSettings.defaultDuration` already exist but are pinned to 60. | Batch 5 adds the duration/silence segments and one Begin action. |
 
-The native start screen needs only the duration and silence choices; selecting a duration is the start action. The native kept view needs only the writing, receipt, and copy or restart actions. The site headline, deck, and `Give it sixty seconds.` style slogans belong to the site, not the app.
+The native start screen needs only the duration and silence choices plus one Begin action; selecting a duration remembers it, and Begin starts it. The native kept view needs only the writing, the not-saved caption, and copy or restart actions. The site headline, deck, and `Give it sixty seconds.` style slogans belong to the site, not the app.
 
 The session flow after batch 5, using the web's phase names:
 
@@ -103,7 +103,7 @@ stateDiagram-v2
     Kept --> Start: Esc or ESC - EXIT
 ```
 
-`Start` is the cursor-ready pre-writing screen with direct-start duration buttons and silence choices. It replaces the Home screen in `Sources/App/HomeViewController.swift`.
+`Start` is the cursor-ready pre-writing screen with duration/silence segments and Begin. It replaces the Home screen in `Sources/App/HomeViewController.swift`.
 
 ## 4. Pre-writing choices and settings
 
@@ -117,7 +117,7 @@ stateDiagram-v2
 
 ### 4.2 Start screen
 
-- The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows one row of five duration buttons and the three silence choices; activating a duration starts writing immediately with the cursor ready.
+- The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows the After card with one row of five duration segments, the three silence choices, and one Begin action; selecting a duration remembers it, and Begin starts writing immediately with the cursor ready.
 - On opening the tool, the remembered duration button has keyboard focus. A keyboard-only writer can activate it without a mouse. Duration and silence choices are available on the start screen, not in Settings or the writing room; the clock starts on the first input after entering the room.
 - The three silence choices are available before writing, with Standard selected by default. Keep them compact and visibly labeled; do not add a second promotional start action.
 - Before the first keystroke, the room clock shows the chosen duration. The clock starts with the first committed or marked text. After a kept session, `RUN IT AGAIN` uses the current choices, subject to the trial/license gate. Escape exits immediately; after the last trial it opens activation.
@@ -347,7 +347,7 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
 
 ### Batch 5: Pre-writing choices and settings
 
-- Scope: implement section 4's five direct-start duration buttons and three fixed silence limits. Remember the last duration, default the silence limit to Standard, and keep both locked during writing.
+- Scope: implement section 4's duration/silence segments and one Begin action from the After design, with three fixed silence limits. Remember the last duration, default the silence limit to Standard, and keep both locked during writing.
 - Remove the site headline, deck, and slogan shipped on the start screen in batch 3 and the promotional kept heading shipped in batch 4. Keep the clock, counts, wipe report, kept receipt, `COPY TEXT`, and `RUN IT AGAIN`.
 - Move the warning to the final three seconds before the chosen wipe limit; preserve deadline precedence, the wipe-on-tie rule, and immediate warning cancellation on resumed typing.
 - Add Settings controls for Focus Mode, alignment, font size, and system-following appearance. Focus Mode fills the screen and reveals hidden clock and count chrome on pointer hover; make their information accessible by keyboard and VoiceOver.

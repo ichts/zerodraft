@@ -72,6 +72,7 @@ struct LicenseFlowTests {
         let appState = AppState(
             settingsStore: store,
             licenseClient: mock,
+            checkoutClient: MockCheckoutClient(),
             installIDStore: installStore,
             clock: { clockNow },
             productID: "prod_mock"
@@ -94,7 +95,7 @@ struct LicenseFlowTests {
         func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
         let all = views(upgrade.view)
         let buy = try #require(all.compactMap { $0 as? NSButton }.first { $0.title.contains("Buy a license") })
-        #expect(buy.isEnabled == (AppState.checkoutURL != nil))
+        #expect(buy.isEnabled == (AppState.checkoutURL != nil && AppState.configuredCheckoutClient.isConfigured))
         if AppState.checkoutURL == nil {
             #expect(all.compactMap { $0 as? NSTextField }.contains { $0.stringValue == "Checkout is not available yet." && !$0.isHidden })
         }
@@ -608,7 +609,7 @@ struct LicenseFlowTests {
         let upgradeView = upgrade.view
         let homeView = home.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Order number or activation code" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Order number or activation code" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "WID-XXXX-XXXX" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })
@@ -616,14 +617,15 @@ struct LicenseFlowTests {
 
         await state.validateLicenseIfNeeded()
         let status = valid ? "License active." : "License revoked. Enter a valid order number or activation code."
+        let upgradeStatus = valid ? "This Mac is licensed." : status
         for _ in 0..<50 {
             if fields(settingsView).contains(where: { $0.stringValue == status }) &&
-                fields(upgradeView).contains(where: { $0.stringValue == (valid ? "License active on this Mac." : status) }) &&
+                fields(upgradeView).contains(where: { $0.stringValue == upgradeStatus }) &&
                 fields(homeView).contains(where: { $0.stringValue == status }) { break }
             await Task.yield()
         }
         #expect(fields(settingsView).contains { $0.stringValue == status })
-        #expect(fields(upgradeView).contains { $0.stringValue == (valid ? "License active on this Mac." : status) })
+        #expect(fields(upgradeView).contains { $0.stringValue == upgradeStatus })
         #expect(fields(homeView).contains { $0.stringValue == status })
         #expect(settingsKey.stringValue == "unfinished key")
         #expect(upgradeKey.stringValue == "unfinished key")
@@ -887,6 +889,7 @@ struct LicenseFlowTests {
         let appState = AppState(
             settingsStore: store,
             licenseClient: mock,
+            checkoutClient: MockCheckoutClient(),
             installIDStore: installStore,
             clock: { Date(timeIntervalSince1970: 1_700_000_000) },
             productID: "prod_mock"

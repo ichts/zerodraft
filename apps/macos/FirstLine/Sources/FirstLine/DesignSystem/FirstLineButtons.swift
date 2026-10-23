@@ -1,8 +1,8 @@
 /**
- * [INPUT]: 依赖 AppKit、DesignSystem/Colors、DesignSystem/Typography
- * [OUTPUT]: FirstLineButtons - appearance-aware AppKit 主/次/链接按钮工厂
- * [POS]: First Line AppKit surface 共用按钮规格；与 SwiftUI ButtonStyles 的 24pt 水平 padding、44pt 高度一致
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
+ * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), secondary (44 outline pill) and quiet link factories.
+ * [POS]: Shared native button specs for every surface; system sans labels and native focus rings.
+ * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
 
 import AppKit
@@ -22,8 +22,10 @@ enum FirstLineButtons {
         button.translatesAutoresizingMaskIntoConstraints = false
         button.isBordered = false
         button.bezelStyle = .inline
-        button.font = FirstLineTypography.microcopyNSFont
-        button.contentTintColor = FirstLineColors.uiNSColor
+        button.font = .systemFont(ofSize: 13, weight: .medium)
+        button.contentTintColor = FirstLineColors.chromeNSColor
+        button.focusRingType = .default
+        button.setAccessibilityRole(.button)
         return button
     }
 
@@ -38,44 +40,99 @@ enum FirstLineButtons {
         button.role = role
         button.isBordered = false
         button.bezelStyle = .inline
-        button.font = FirstLineTypography.buttonLabelNSFont
+        button.font = FirstLineTypography.uiSemiboldNSFont
+        button.focusRingType = .default
         button.wantsLayer = true
-        button.layer?.cornerRadius = 8
-        button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        button.layer?.cornerRadius = role.height / 2
+        button.heightAnchor.constraint(equalToConstant: role.height).isActive = true
         return button
     }
 }
 
 private final class FirstLineButton: NSButton {
-    enum Role { case primary, secondary }
+    enum Role {
+        case primary, secondary
+
+        var height: CGFloat {
+            switch self {
+            case .primary: 48
+            case .secondary: 44
+            }
+        }
+
+        var horizontalPadding: CGFloat {
+            switch self {
+            case .primary: 24
+            case .secondary: 20
+            }
+        }
+    }
+
     // contentTintColor 是 content 属性，设它会触发 setNeedsLayout。绝不能在 updateLayer()（layout/display
     // pass 内）设它，否则触发 _NSViewLayoutFeedbackLoop 无限回环卡死。这里在 role 变更时设一次；
-    // ink/paper 是 dynamic NSColor，自动随明暗适配，无需在 updateLayer 里重设。
+    // ink/sheet 是 dynamic NSColor，自动随明暗适配，无需在 updateLayer 里重设。
     var role: Role = .secondary {
         didSet {
-            contentTintColor = role == .primary ? FirstLineColors.paperNSColor : FirstLineColors.inkNSColor
-            needsDisplay = true
+            refreshAppearance()
         }
+    }
+
+    override var isEnabled: Bool {
+        didSet { refreshAppearance() }
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshAppearance()
+    }
+
+    private func refreshAppearance() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            contentTintColor = isEnabled
+                ? (role == .primary ? FirstLineColors.onInkNSColor : FirstLineColors.inkNSColor)
+                : FirstLineColors.muteNSColor
+        }
+        needsDisplay = true
     }
 
     override var intrinsicContentSize: NSSize {
         let base = super.intrinsicContentSize
-        return NSSize(width: base.width + 48, height: 44)
+        return NSSize(width: base.width + role.horizontalPadding * 2, height: role.height)
     }
 
     override var wantsUpdateLayer: Bool { true }
 
     override func updateLayer() {
         super.updateLayer()
-        layer?.cornerRadius = 8
-        switch role {
-        case .primary:
-            layer?.borderWidth = 0
-            layer?.backgroundColor = FirstLineColors.inkNSColor.cgColor
-        case .secondary:
-            layer?.borderWidth = 1
-            layer?.borderColor = FirstLineColors.uiLightNSColor.cgColor
-            layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.cornerRadius = bounds.height > 0 ? bounds.height / 2 : role.height / 2
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            guard isEnabled else {
+                layer?.borderWidth = 0
+                layer?.borderColor = nil
+                layer?.backgroundColor = FirstLineColors.inkNSColor.withAlphaComponent(0.06).cgColor
+                return
+            }
+            switch role {
+            case .primary:
+                layer?.borderWidth = 0
+                layer?.borderColor = nil
+                layer?.backgroundColor = FirstLineColors.inkNSColor.cgColor
+            case .secondary:
+                layer?.borderWidth = 1
+                layer?.borderColor = FirstLineColors.hairStrongNSColor.cgColor
+                layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
+            }
         }
     }
+
+    override func drawFocusRingMask() {
+        NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
+    }
+
+    override var focusRingMaskBounds: NSRect { bounds }
 }

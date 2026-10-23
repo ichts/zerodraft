@@ -1,8 +1,8 @@
 /**
- * [INPUT]: writeitdown/site.css light and dark palette
- * [OUTPUT]: Dynamic AppKit colors for wall, paper, ink, chrome, alarm, wash and cut.
- * [POS]: Shared native color tokens; room choreography consumes wash/cut in batch 4.
- * [PROTOCOL]: Keep token values aligned with site.css and check FirstLine/AGENTS.md.
+ * [INPUT]: writeitdown/tokens.css v2 (background A light palette + dark palette, same role names)
+ * [OUTPUT]: Dynamic AppKit color roles for page, sheet, ink, mute, chrome, hairlines, red pen, wash, on-ink.
+ * [POS]: Shared native color tokens for every surface and the room wash; no parallel palette.
+ * [PROTOCOL]: Keep values aligned with writeitdown/tokens.css and check FirstLine/AGENTS.md.
  */
 
 import AppKit
@@ -17,18 +17,31 @@ enum FirstLineColors {
         }
     }
 
-    static var canvasNSColor: NSColor { adaptive(light: 0xd8d2c3, dark: 0x15140f) }
-    static var paperNSColor: NSColor { adaptive(light: 0xf7f4ea, dark: 0x211f18) }
-    static var inkNSColor: NSColor { adaptive(light: 0x1a1813, dark: 0xece7d9) }
-    static var dimNSColor: NSColor { adaptive(light: 0x6f6a5d, dark: 0x8f897a) }
-    static var faintNSColor: NSColor { adaptive(light: 0xb3ada0, dark: 0x5c574c) }
-    static var dangerNSColor: NSColor { adaptive(light: 0x8f4405, dark: 0xf2a93b) }
-    static var washWallNSColor: NSColor { adaptive(light: 0xd1c1ac, dark: 0x2e1712) }
-    static var washPaperNSColor: NSColor { adaptive(light: 0xebdfce, dark: 0x3a1c15) }
-    static var deepWallNSColor: NSColor { adaptive(light: 0xc6b095, dark: 0x3d1d15) }
-    static var deepPaperNSColor: NSColor { adaptive(light: 0xdecab3, dark: 0x4a2318) }
+    private static func adaptive(light: UInt32, dark: UInt32, lightAlpha: CGFloat, darkAlpha: CGFloat) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let darkMode = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let rgb = darkMode ? dark : light
+            return NSColor(srgbRed: CGFloat((rgb >> 16) & 255) / 255,
+                           green: CGFloat((rgb >> 8) & 255) / 255,
+                           blue: CGFloat(rgb & 255) / 255,
+                           alpha: darkMode ? darkAlpha : lightAlpha)
+        }
+    }
 
-    static var uiNSColor: NSColor { dimNSColor }
-    static var uiLightNSColor: NSColor { faintNSColor }
-    static var successNSColor: NSColor { inkNSColor }
+    // MARK: Roles (background A light, same names in dark)
+    static var pageNSColor: NSColor { adaptive(light: 0xF7F7F5, dark: 0x15140F) }
+    static var sheetNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x26231C) }
+    static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
+    static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }
+    static var chromeNSColor: NSColor { adaptive(light: 0x5C564D, dark: 0xA39D8E) }
+    static var hairNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.10, darkAlpha: 0.10) }
+    static var hairStrongNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.16, darkAlpha: 0.18) }
+    static var tagBackgroundNSColor: NSColor { adaptive(light: 0xF2F2F0, dark: 0x2E2A22) }
+    static var segmentTrackNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.06, darkAlpha: 0.10) }
+    static var redNSColor: NSColor { adaptive(light: 0xB02A1E, dark: 0xE4604A) }
+    static var redSoftNSColor: NSColor { adaptive(light: 0xF6E2DC, dark: 0x3A1C15) }
+    static var redDeepNSColor: NSColor { adaptive(light: 0xEBC8BD, dark: 0x4A2318) }
+    static var onInkNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x15140F) }
+    static var shadowNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0x000000) }
+    static var separatorNSColor: NSColor { hairNSColor }
 }

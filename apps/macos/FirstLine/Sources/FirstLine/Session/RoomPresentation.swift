@@ -12,15 +12,17 @@ enum RoomPresentation {
     }
 
     static func wipeReport(elapsed: Int, canRestart: Bool) -> String {
-        "DRAFT DELETED AT \(clock(elapsed)). \(canRestart ? "TYPE TO START AGAIN." : "ACTIVATE TO KEEP WRITING.")"
+        "Draft deleted at \(clock(elapsed)). \(canRestart ? "Type to start again." : "Activate to keep writing.")"
     }
 
     static func wordLabel(_ count: Int) -> String {
-        "\(count) \(count == 1 ? "WORD" : "WORDS")"
+        "\(count) \(count == 1 ? "word" : "words")"
     }
 
-    static func keptReceipt(words: Int) -> String {
-        "0:00 - \(wordLabel(words)) KEPT."
+    static func sessionTag(duration: TimeInterval, phase: SessionPhase) -> String {
+        let minutes = max(1, Int(duration / 60))
+        let length = minutes == 1 ? "1 minute" : "\(minutes) minutes"
+        return phase == .success ? "\(length), done" : "\(length), forward only"
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {

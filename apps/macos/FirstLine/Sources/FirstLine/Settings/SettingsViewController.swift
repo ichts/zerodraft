@@ -1,7 +1,7 @@
 /**
- * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons
- * [OUTPUT]: SettingsViewController - appearance, focus, alignment, font size, live trial count and license feedback
- * [POS]: AppKit Settings surface; live visual preferences do not reset engine, Done restores prior surface
+ * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons.
+ * [OUTPUT]: Settings white card: appearance, motion, focus, alignment, font size, license and about.
+ * [POS]: Native settings surface in the After language; changes stay live and Done restores the prior surface.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -13,7 +13,7 @@ final class SettingsViewController: NSViewController {
     private let appState: AppState
     private var licenseField: NSTextField?
     private var activateButton: NSButton?
-    private var licenseStatusLabel: NSTextField!
+    private var licenseStatus: FirstLineStatusView!
     private var licenseCleanupWarningLabel: NSTextField!
     private var licenseEntryView: NSView?
     private var licenseExplanationLabel: NSTextField?
@@ -30,21 +30,23 @@ final class SettingsViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        self.view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
+        self.view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
         buildInterface()
         refreshLicense()
         armLicenseObservation()
     }
 
     private func buildInterface() {
+        let card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 32, left: 32, bottom: 32, right: 32))
         let content = NSStackView()
         content.translatesAutoresizingMaskIntoConstraints = false
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 28
 
-        let header = horizontal(views: [heading("Settings"), spacer(), link("Done", #selector(doneTapped))])
-        content.addArrangedSubview(header)
+        let headerRow = header()
+        content.addArrangedSubview(headerRow)
+        headerRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         content.addArrangedSubview(section("Appearance", rows: [
             settingRow("Theme", control: themePopup()),
             settingRow("Reduced Motion", control: motionPopup()),
@@ -53,13 +55,15 @@ final class SettingsViewController: NSViewController {
             settingRow("Font Size", control: sizePopup()),
         ]))
         content.addArrangedSubview(section("License", rows: licenseRows()))
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
         content.addArrangedSubview(section("About", rows: [
-            settingRow("Write It Down", detail: "Version 0.1.0"),
+            settingRow("Write It Down", detail: "Version \(version)"),
         ]))
+        card.contentView.addSubview(content)
 
         let document = NSView()
         document.translatesAutoresizingMaskIntoConstraints = false
-        document.addSubview(content)
+        document.addSubview(card)
         let scroll = NSScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.documentView = document
@@ -74,57 +78,83 @@ final class SettingsViewController: NSViewController {
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
-            content.topAnchor.constraint(equalTo: document.topAnchor, constant: 56),
-            content.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 72),
-            content.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -72),
-            content.widthAnchor.constraint(lessThanOrEqualToConstant: 760),
-            document.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: 56),
-            header.widthAnchor.constraint(equalTo: content.widthAnchor),
+            card.centerXAnchor.constraint(equalTo: document.centerXAnchor),
+            card.topAnchor.constraint(greaterThanOrEqualTo: document.topAnchor, constant: 40),
+            card.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -40),
+            card.widthAnchor.constraint(equalToConstant: 680),
+            card.leadingAnchor.constraint(greaterThanOrEqualTo: document.leadingAnchor, constant: 32),
+            card.trailingAnchor.constraint(lessThanOrEqualTo: document.trailingAnchor, constant: -32),
+            content.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor),
+            content.topAnchor.constraint(equalTo: card.contentView.topAnchor),
+            content.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
+            document.heightAnchor.constraint(greaterThanOrEqualTo: scroll.contentView.heightAnchor),
         ])
+        let center = card.centerYAnchor.constraint(equalTo: document.centerYAnchor)
+        center.priority = .defaultHigh
+        center.isActive = true
+        document.heightAnchor.constraint(greaterThanOrEqualTo: card.heightAnchor, constant: 80).isActive = true
+        let fill = document.heightAnchor.constraint(equalTo: scroll.contentView.heightAnchor)
+        fill.priority = .defaultLow
+        fill.isActive = true
+    }
+
+    private func header() -> NSView {
+        let heading = NSTextField(labelWithString: "Settings")
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        heading.font = FirstLineTypography.displayNSFont(size: 28)
+        heading.textColor = FirstLineColors.inkNSColor
+        let done = FirstLineButtons.link(title: "Done", target: self, action: #selector(doneTapped))
+        return horizontal(views: [heading, spacer(), done])
     }
 
     private func licenseRows() -> [NSView] {
-        licenseStatusLabel = muted(appState.accessStatusText)
+        licenseStatus = FirstLineStatusView(text: appState.accessStatusText)
+        licenseStatus.widthAnchor.constraint(equalToConstant: 616).isActive = true
+
         licenseCleanupWarningLabel = muted("")
-        licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 640).isActive = true
-        var rows: [NSView] = [licenseStatusLabel, licenseCleanupWarningLabel]
+        licenseCleanupWarningLabel.textColor = FirstLineColors.redNSColor
+        licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 616).isActive = true
+        var rows: [NSView] = [licenseStatus, licenseCleanupWarningLabel]
 
         licenseDetails = (0..<3).map { _ in muted("") }
         rows.append(contentsOf: licenseDetails)
 
-        let explanation = muted("Enter your Waffo order number or activation code to activate this Mac.")
+        let explanation = muted("Enter your order number or activation code to activate this Mac.")
         licenseExplanationLabel = explanation
 
         let field = NSTextField(string: "")
         field.placeholderString = "Order number or activation code"
-        field.font = FirstLineTypography.microcopyNSFont
+        field.font = FirstLineTypography.uiNSFont
+        field.focusRingType = .default
         field.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
         licenseField = field
 
         let button = primary("Activate", #selector(activateTapped))
         activateButton = button
         let entry = NSStackView(views: [field, button])
+        entry.translatesAutoresizingMaskIntoConstraints = false
         entry.orientation = .horizontal
         entry.alignment = .centerY
         entry.spacing = 12
         licenseEntryView = entry
 
-        let buy = link("Buy a license - \(AppState.displayPrice), one time", #selector(openBuyTapped))
-        buy.isEnabled = AppState.checkoutURL != nil
+        let buy = FirstLineButtons.link(title: "Buy a license, \(AppState.displayPrice) once", target: self, action: #selector(openBuyTapped))
+        buy.alignment = .left
         buyPageButton = buy
-        rows.append(contentsOf: [explanation, entry, buy])
-        if !buy.isEnabled {
-            let unavailable = muted("Checkout is not available yet.")
-            checkoutStatusLabel = unavailable
-            rows.append(unavailable)
-        }
+        checkoutStatusLabel = muted("Checkout is not available yet.")
+        rows.append(contentsOf: [explanation, entry, buy, checkoutStatusLabel!])
         return rows
     }
 
     private func refreshLicense() {
         let active = appState.hasFullAccess
-        licenseStatusLabel.stringValue = active ? appState.licenseStatusText :
-            (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText)
+        let checking = appState.licenseValidationInFlight || appState.licenseActivationInFlight
+        let badStatus = appState.licenseActivationError != nil || appState.trialAccessError != nil ||
+            appState.settings.licenseStatus == .revoked || appState.settings.licenseStatus == .invalid
+        licenseStatus.setText(active ? appState.licenseStatusText :
+            (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText),
+            tone: checking || active || !badStatus ? .neutral : .bad)
         licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
         licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
         let values = [
@@ -140,13 +170,19 @@ final class SettingsViewController: NSViewController {
         licenseEntryView?.isHidden = !showEntry
         licenseExplanationLabel?.isHidden = !showEntry
         buyPageButton?.isHidden = !showEntry
-        checkoutStatusLabel?.isHidden = !showEntry || AppState.checkoutURL != nil
+        buyPageButton?.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight
+        buyPageButton?.title = appState.checkoutInFlight
+            ? "Opening checkout..."
+            : "Buy a license, \(AppState.displayPrice) once"
+        checkoutStatusLabel?.isHidden = !showEntry || appState.checkoutAvailable
     }
 
     private func armLicenseObservation() {
         withObservationTracking { [weak self] in
             guard let self else { return }
             _ = self.appState.licenseValidationInFlight
+            _ = self.appState.licenseActivationInFlight
+            _ = self.appState.checkoutInFlight
             _ = self.appState.settings
             _ = self.appState.licenseActivationError
         } onChange: { [weak self] in
@@ -160,7 +196,7 @@ final class SettingsViewController: NSViewController {
 
     private func themePopup() -> NSPopUpButton {
         let popup = NSPopUpButton()
-        popup.font = FirstLineTypography.microcopyNSFont
+        popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: AppTheme.allCases.map(\.label))
         popup.selectItem(at: AppTheme.allCases.firstIndex(of: appState.settings.theme) ?? 0)
         popup.target = self
@@ -170,7 +206,7 @@ final class SettingsViewController: NSViewController {
 
     private func motionPopup() -> NSPopUpButton {
         let popup = NSPopUpButton()
-        popup.font = FirstLineTypography.microcopyNSFont
+        popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: ReducedMotionOverride.allCases.map(\.label))
         popup.selectItem(at: ReducedMotionOverride.allCases.firstIndex(of: appState.settings.reducedMotion) ?? 0)
         popup.target = self
@@ -180,12 +216,14 @@ final class SettingsViewController: NSViewController {
 
     private func focusSwitch() -> NSButton {
         let button = NSButton(checkboxWithTitle: "Fullscreen focus", target: self, action: #selector(focusChanged(_:)))
+        button.font = FirstLineTypography.smallNSFont
         button.state = appState.settings.focusMode ? .on : .off
         return button
     }
 
     private func alignmentPopup() -> NSPopUpButton {
         let popup = NSPopUpButton()
+        popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: WritingAlignment.allCases.map(\.label))
         popup.selectItem(at: WritingAlignment.allCases.firstIndex(of: appState.settings.writingAlignment) ?? 0)
         popup.target = self
@@ -195,6 +233,7 @@ final class SettingsViewController: NSViewController {
 
     private func sizePopup() -> NSPopUpButton {
         let popup = NSPopUpButton()
+        popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: WritingFontSize.allCases.map(\.label))
         popup.selectItem(at: WritingFontSize.allCases.firstIndex(of: appState.settings.writingFontSize) ?? 1)
         popup.target = self
@@ -203,38 +242,48 @@ final class SettingsViewController: NSViewController {
     }
 
     private func section(_ title: String, rows: [NSView]) -> NSView {
-        let label = NSTextField(labelWithString: title.uppercased())
-        label.font = FirstLineTypography.sessionStatusNSFont
-        label.textColor = FirstLineColors.uiNSColor
-        let stack = NSStackView(views: [label] + rows)
+        let label = NSTextField(labelWithString: title)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = FirstLineTypography.smallSemiboldNSFont
+        label.textColor = FirstLineColors.chromeNSColor
+        let stack = NSStackView(views: [label])
+        stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 10
-        stack.setCustomSpacing(14, after: label)
+        stack.spacing = 0
+        stack.setCustomSpacing(10, after: label)
+        for (index, row) in rows.enumerated() {
+            if index > 0 {
+                let separator = FloodCanvasView(fillColor: FirstLineColors.hairNSColor)
+                separator.translatesAutoresizingMaskIntoConstraints = false
+                separator.heightAnchor.constraint(equalToConstant: 1).isActive = true
+                stack.addArrangedSubview(separator)
+                separator.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+            }
+            stack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
         return stack
     }
 
     private func settingRow(_ title: String, control: NSView? = nil, detail: String? = nil) -> NSView {
         let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = FirstLineTypography.bodyNSFont
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = FirstLineTypography.uiNSFont
         titleLabel.textColor = FirstLineColors.inkNSColor
         let trailing: NSView = control ?? muted(detail ?? "")
         let row = horizontal(views: [titleLabel, spacer(), trailing])
-        row.widthAnchor.constraint(greaterThanOrEqualToConstant: 640).isActive = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
         return row
-    }
-
-    private func heading(_ text: String) -> NSTextField {
-        let label = NSTextField(labelWithString: text)
-        label.font = FirstLineTypography.titleNSFont
-        label.textColor = FirstLineColors.inkNSColor
-        return label
     }
 
     private func muted(_ text: String) -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: text)
-        label.font = FirstLineTypography.microcopyNSFont
-        label.textColor = FirstLineColors.uiNSColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = FirstLineTypography.smallNSFont
+        label.textColor = FirstLineColors.chromeNSColor
+        label.maximumNumberOfLines = 0
         return label
     }
 
@@ -256,12 +305,9 @@ final class SettingsViewController: NSViewController {
         FirstLineButtons.primary(title: title, target: self, action: action)
     }
 
-    private func link(_ title: String, _ action: Selector) -> NSButton {
-        FirstLineButtons.link(title: title, target: self, action: action)
-    }
-
     private func formatted(_ date: Date) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US")
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
@@ -294,7 +340,7 @@ final class SettingsViewController: NSViewController {
     @objc private func activateTapped() {
         guard let licenseField, let activateButton else { return }
         activateButton.isEnabled = false
-        licenseStatusLabel.stringValue = "Activating..."
+        licenseStatus.setText("Activating...")
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: licenseField.stringValue)
@@ -304,6 +350,6 @@ final class SettingsViewController: NSViewController {
         }
     }
 
-    @objc private func openBuyTapped() { appState.openCheckout() }
+    @objc private func openBuyTapped() { Task { @MainActor in await appState.openCheckout() } }
     @objc private func doneTapped() { appState.closeSettings() }
 }

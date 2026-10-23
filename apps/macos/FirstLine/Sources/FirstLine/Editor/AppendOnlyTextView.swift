@@ -368,10 +368,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         defaultParagraphStyle = paragraph
         typingAttributes = attributes
-        insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
+        insertionPointColor = FirstLineColors.inkNSColor
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        self.alignment = .left
+        self.alignment = writingAlignment == .centered ? .center : .left
         layoutManager?.delegate = self
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
@@ -411,10 +411,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let range = NSRange(location: 0, length: textStorage.length)
         let activeRange = currentThoughtRange(in: textStorage.string)
         let previousRange = previousThoughtRange(before: activeRange, in: textStorage.string)
+        let olderRange = previousRange.flatMap { previousThoughtRange(before: $0, in: textStorage.string) }
 
         textStorage.beginEditing()
         textStorage.removeAttribute(.shadow, range: range)
         textStorage.addAttributes(hiddenTextAttributes(paragraph: paragraph), range: range)
+        if let olderRange, olderRange.length > 0 {
+            textStorage.addAttributes(olderTextAttributes(paragraph: paragraph), range: olderRange)
+        }
         if let previousRange, previousRange.length > 0 {
             textStorage.addAttributes(inactiveTextAttributes(paragraph: paragraph), range: previousRange)
         }
@@ -649,8 +653,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .left
-        paragraph.lineHeightMultiple = 1.45
+        paragraph.alignment = writingAlignment == .centered ? .center : .left
+        paragraph.lineHeightMultiple = 1.6
         paragraph.lineSpacing = 0
         return paragraph
     }
@@ -663,17 +667,19 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         ]
     }
 
-    private func inactiveTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
-        let shadow = NSShadow()
-        shadow.shadowBlurRadius = 3.5
-        shadow.shadowOffset = .zero
-        shadow.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.26)
-
-        return [
+    private func olderTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
+        [
             .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.12),
+            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.10),
             .paragraphStyle: paragraph,
-            .shadow: shadow,
+        ]
+    }
+
+    private func inactiveTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
+        [
+            .font: sessionFont,
+            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.22),
+            .paragraphStyle: paragraph,
         ]
     }
 

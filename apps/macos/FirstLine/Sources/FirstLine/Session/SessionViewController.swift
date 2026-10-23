@@ -1,6 +1,6 @@
 /*
- * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and site tokens.
- * [OUTPUT]: One AppKit room for rest, writing, warning, wipe, and kept copy/restart.
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
+ * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, tag/clock/bar/meter, wash and numeral, deleted sentence, kept copy/restart.
  * [POS]: Fixed writing origin, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, elapsed wipe report with next-action copy, hover-only chrome, live typography, deadline visuals, Escape and deny; no draft persistence.
  * [PROTOCOL]: Keep wash timing aligned with writeitdown/room.js; native receipts live in RoomPresentation; check nearest AGENTS.md.
  */
@@ -8,6 +8,7 @@ import AppKit
 
 private final class RoomWashView: NSView {
     var fillColor: NSColor { didSet { needsDisplay = true } }
+    var cornerRadius: CGFloat = 0 { didSet { needsDisplay = true } }
     init(fillColor: NSColor) {
         self.fillColor = fillColor
         super.init(frame: .zero)
@@ -18,8 +19,12 @@ private final class RoomWashView: NSView {
     override var wantsUpdateLayer: Bool { true }
     override func updateLayer() {
         super.updateLayer()
-        layer?.backgroundColor = fillColor.cgColor
-        layer?.borderColor = FirstLineColors.dangerNSColor.cgColor
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = fillColor.cgColor
+            layer?.cornerRadius = cornerRadius
+            layer?.masksToBounds = cornerRadius > 0
+            layer?.borderColor = FirstLineColors.redNSColor.cgColor
+        }
     }
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
@@ -36,20 +41,23 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
     private var paper: FloodCanvasView!
-    private var wallWash: RoomWashView!
+    private var paperShadow: FirstLineShadowView!
     private var paperWash: RoomWashView!
     private var outline: RoomWashView!
+    private var progressBar: FirstLineFillBar!
+    private var meter: FirstLineFillBar!
+    private var tagView: FirstLineTagView!
     private var timerLabel: NSTextField!
     private var countLabel: NSTextField!
     private var reportLabel: NSTextField!
     private var placeholderLabel: NSTextField!
     private var numeralLabel: NSTextField!
-    private var warningLabel: NSTextField!
+    private var warningHint: NSTextField!
     private var exitButton: NSButton!
-    private var keptView: NSView!
     private var keptText: NSTextView!
     private var keptScrollView: NSScrollView!
-    private var receiptLabel: NSTextField!
+    private var keptFooter: NSView!
+    private var receiptStatus: FirstLineStatusView!
     private var copyButton: NSButton!
     private var keyMonitor: Any?
     private var keyObserver: NSObjectProtocol?
@@ -61,6 +69,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var renderedSessionID: UUID?
     private var cutWork: DispatchWorkItem?
     private var washIsCut = false
+    /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
+    var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
     private var paperWidth: NSLayoutConstraint!
     private var placeholderAnchor: NSLayoutConstraint!
@@ -76,7 +86,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        view = FloodCanvasView(fillColor: FirstLineColors.canvasNSColor)
+        view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
         buildRoom()
         configureEditor()
         applyPhase()
@@ -95,6 +105,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         NSApp.activate(ignoringOtherApps: true)
         view.window?.makeKeyAndOrderFront(nil)
         focusForPhase()
+        // A window can arrive under a stationary pointer; do not let that first placement
+        // count as an intentional hover and reveal Focus Mode chrome.
+        chromeHover = false
+        applyVisualSettings()
     }
 
     override func viewDidLayout() {
@@ -109,11 +123,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         ticker = nil
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
         if let keyObserver { NotificationCenter.default.removeObserver(keyObserver); self.keyObserver = nil }
-        cutWork?.cancel()
+        endCutAnimation()
         denyWork?.cancel()
     }
 
-    private func label(_ text: String = "", font: NSFont? = FirstLineTypography.sessionStatusNSFont,
+    private func label(_ text: String = "", font: NSFont? = FirstLineTypography.smallNSFont,
                        color: NSColor = FirstLineColors.inkNSColor) -> NSTextField {
         let field = NSTextField(labelWithString: text)
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -124,17 +138,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func buildRoom() {
-        wallWash = RoomWashView(fillColor: FirstLineColors.washWallNSColor)
-        wallWash.translatesAutoresizingMaskIntoConstraints = false
-        wallWash.alphaValue = 0
-        view.addSubview(wallWash)
+        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.sheetNSColor)
+        paperShadow.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(paperShadow)
 
-        paper = FloodCanvasView(fillColor: FirstLineColors.paperNSColor)
+        paper = FloodCanvasView(fillColor: FirstLineColors.sheetNSColor)
         paper.translatesAutoresizingMaskIntoConstraints = false
-        paper.shadow = NSShadow()
-        paper.layer?.shadowOpacity = 0.08
-        paper.layer?.shadowRadius = 24
-        paper.layer?.shadowOffset = NSSize(width: 0, height: 12)
+        paper.cornerRadius = FirstLineRadius.sheet
+        paper.clipsContent = true
+        paper.borderColor = FirstLineColors.hairNSColor
+        paper.borderWidth = 1
         view.addSubview(paper)
 
         textView = AppendOnlyTextView()
@@ -162,42 +175,54 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         paper.addSubview(scrollView)
 
-        paperWash = RoomWashView(fillColor: FirstLineColors.washPaperNSColor)
+        paperWash = RoomWashView(fillColor: FirstLineColors.redSoftNSColor)
         paperWash.translatesAutoresizingMaskIntoConstraints = false
+        paperWash.cornerRadius = FirstLineRadius.sheet
         paperWash.alphaValue = 0
         paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
         outline = RoomWashView(fillColor: .clear)
         outline.translatesAutoresizingMaskIntoConstraints = false
+        outline.cornerRadius = FirstLineRadius.sheet
         outline.wantsLayer = true
         outline.layer?.borderWidth = 1
         outline.alphaValue = 0
         paper.addSubview(outline)
 
-        timerLabel = label()
+        progressBar = FirstLineFillBar(frame: .zero)
+        progressBar.fillColor = FirstLineColors.inkNSColor
+        paper.addSubview(progressBar)
+
+        meter = FirstLineFillBar(frame: .zero)
+        meter.fillColor = FirstLineColors.redNSColor
+        paper.addSubview(meter)
+
+        tagView = FirstLineTagView()
+        paper.addSubview(tagView)
+
+        timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.inkNSColor)
         timerLabel.alignment = .right
         timerLabel.setAccessibilityRole(.staticText)
         timerLabel.setAccessibilityElement(true)
         timerLabel.setAccessibilityHidden(false)
-        countLabel = label()
+        countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
         countLabel.alignment = .right
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
-        reportLabel = label()
+        reportLabel = label(font: .systemFont(ofSize: 15, weight: .medium), color: FirstLineColors.redNSColor)
         reportLabel.isHidden = true
-        placeholderLabel = label("Start typing.", font: FirstLineTypography.bodyNSFont, color: FirstLineColors.dimNSColor)
-        paper.addSubview(placeholderLabel)
-        numeralLabel = label(font: NSFont.monospacedSystemFont(ofSize: 104, weight: .semibold),
-                             color: FirstLineColors.dangerNSColor)
-        warningLabel = label("KEEP TYPING OR THE DRAFT IS DELETED.")
+        placeholderLabel = label("Start typing.",
+                                 font: FirstLineTypography.writingItalicNSFont(size: appState.settings.writingFontSize.points),
+                                 color: FirstLineColors.muteNSColor)
+        numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 150),
+                             color: FirstLineColors.redNSColor)
+        warningHint = label("Keep typing", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
+        warningHint.isHidden = true
         numeralLabel.isHidden = true
-        warningLabel.isHidden = true
-        exitButton = NSButton(title: "ESC - EXIT", target: self, action: #selector(exitRoom))
-        exitButton.isBordered = false
-        exitButton.font = FirstLineTypography.sessionStatusNSFont
-        exitButton.translatesAutoresizingMaskIntoConstraints = false
-        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningLabel!, exitButton!] {
+        exitButton = FirstLineButtons.link(title: "Esc to leave", target: self, action: #selector(exitRoom))
+
+        for element in [tagView!, timerLabel!, countLabel!, reportLabel!, placeholderLabel!, numeralLabel!, warningHint!, exitButton!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -209,7 +234,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         keptText.isEditable = false
         keptText.isSelectable = true
         keptText.drawsBackground = false
-        keptText.font = FirstLineTypography.bodyNSFont
         keptText.textColor = FirstLineColors.inkNSColor
         keptText.textContainerInset = .zero
         keptText.textContainer?.lineFragmentPadding = 0
@@ -222,46 +246,60 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         keptScrollView = preview
         preview.documentView = keptText
         preview.hasVerticalScroller = true
+        preview.autohidesScrollers = true
         preview.drawsBackground = false
         preview.translatesAutoresizingMaskIntoConstraints = false
-        receiptLabel = label()
-        copyButton = FirstLineButtons.primary(title: "COPY TEXT", target: self, action: #selector(copyText))
-        let restart = FirstLineButtons.link(title: "RUN IT AGAIN", target: self, action: #selector(restart))
-        let actions = NSStackView(views: [copyButton, restart])
-        actions.orientation = .horizontal
-        actions.spacing = 24
-        let stack = NSStackView(views: [preview, receiptLabel, actions])
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 20
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        keptView = stack
-        keptView.isHidden = true
-        paper.addSubview(keptView)
+        paper.addSubview(preview)
+
+        receiptStatus = FirstLineStatusView(text: "")
+        let restart = FirstLineButtons.link(title: "Run it again", target: self, action: #selector(restart))
+        let left = NSStackView(views: [receiptStatus, restart])
+        left.orientation = .horizontal
+        left.alignment = .centerY
+        left.spacing = 20
+        copyButton = FirstLineButtons.primary(title: "Copy text", target: self, action: #selector(copyText))
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let footer = NSStackView(views: [left, spacer, copyButton])
+        footer.orientation = .horizontal
+        footer.alignment = .centerY
+        footer.spacing = 16
+        footer.translatesAutoresizingMaskIntoConstraints = false
+        paper.addSubview(footer)
+        keptFooter = footer
+        primaryKeptTypography()
+        keptScrollView.isHidden = true
+        keptFooter.isHidden = true
+
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
-            stack.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -80),
-            stack.widthAnchor.constraint(equalTo: paper.widthAnchor, constant: -96),
-            stack.heightAnchor.constraint(lessThanOrEqualTo: paper.heightAnchor, constant: -140),
-            preview.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            preview.heightAnchor.constraint(greaterThanOrEqualToConstant: 100),
+            preview.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
+            preview.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
+            preview.topAnchor.constraint(equalTo: paper.topAnchor, constant: 64),
+            preview.bottomAnchor.constraint(equalTo: footer.topAnchor, constant: -16),
+            footer.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
+            footer.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -22),
+            footer.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
+            footer.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            receiptStatus.widthAnchor.constraint(lessThanOrEqualToConstant: 330),
         ])
     }
 
     private func installConstraints() {
         let safe = view.safeAreaLayoutGuide
-        paperWidth = paper.widthAnchor.constraint(equalToConstant: appState.settings.writingAlignment == .centered ? 720 : 920)
+        paperWidth = paper.widthAnchor.constraint(equalToConstant: appState.settings.writingAlignment == .centered ? 720 : 880)
         paperWidth.priority = .defaultHigh
         placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
         NSLayoutConstraint.activate([
-            wallWash.leadingAnchor.constraint(equalTo: view.leadingAnchor), wallWash.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            wallWash.topAnchor.constraint(equalTo: view.topAnchor), wallWash.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            paperShadow.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
+            paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            paperShadow.topAnchor.constraint(equalTo: paper.topAnchor),
+            paperShadow.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             paper.centerXAnchor.constraint(equalTo: safe.centerXAnchor), paperWidth,
             paper.leadingAnchor.constraint(greaterThanOrEqualTo: safe.leadingAnchor, constant: 32),
             paper.trailingAnchor.constraint(lessThanOrEqualTo: safe.trailingAnchor, constant: -32),
-            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 20),
-            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -20),
+            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 36),
+            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -28),
             scrollView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             scrollView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
             scrollView.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
@@ -270,13 +308,32 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paperWash.topAnchor.constraint(equalTo: paper.topAnchor), paperWash.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             outline.leadingAnchor.constraint(equalTo: paper.leadingAnchor), outline.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             outline.topAnchor.constraint(equalTo: paper.topAnchor), outline.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
-            timerLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 24), timerLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
-            countLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -24), countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -28),
-            exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -20), exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 28),
-            reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -80),
-            placeholderLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 24), placeholderAnchor,
-            numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), numeralLabel.centerYAnchor.constraint(equalTo: paper.bottomAnchor, constant: -170),
-            warningLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor), warningLabel.topAnchor.constraint(equalTo: numeralLabel.bottomAnchor, constant: 8),
+            progressBar.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
+            progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            progressBar.topAnchor.constraint(equalTo: paper.topAnchor),
+            progressBar.heightAnchor.constraint(equalToConstant: 2),
+            meter.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
+            meter.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            meter.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
+            meter.heightAnchor.constraint(equalToConstant: 3),
+            tagView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
+            tagView.topAnchor.constraint(equalTo: paper.topAnchor, constant: 18),
+            timerLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 18),
+            timerLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -22),
+            countLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -18),
+            countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -22),
+            exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
+            exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
+            warningHint.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -18),
+            warningHint.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 22),
+            reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            reportLabel.centerYAnchor.constraint(equalTo: paper.centerYAnchor),
+            reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -80),
+            placeholderLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 24),
+            placeholderLabel.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -24),
+            placeholderAnchor,
+            numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            numeralLabel.centerYAnchor.constraint(equalTo: paper.bottomAnchor, constant: -170),
         ])
     }
 
@@ -322,8 +379,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func sizeKeptDocument() {
-        guard let container = keptText.textContainer, let layout = keptText.layoutManager else { return }
-        let size = keptScrollView.contentSize
+        guard let container = keptText?.textContainer, let layout = keptText?.layoutManager,
+              let scroll = keptScrollView else { return }
+        let size = scroll.contentSize
         guard size.width > 0, size.height > 0 else { return }
         keptText.minSize = NSSize(width: 0, height: size.height)
         keptText.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
@@ -388,9 +446,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if phase == .failure, lastPhase != .failure { showCut() }
         if phase == .success, lastPhase != .success {
             keptText.string = engine.text
-            receiptLabel.stringValue = RoomPresentation.keptReceipt(words: engine.wordCount)
-            copyButton.title = "COPY TEXT"
+            primaryKeptTypography()
+            receiptStatus.setText("Not saved. Copy it before you leave.")
+            copyButton.title = "Copy text"
             DispatchQueue.main.async { [weak self] in
+                self?.applyKeptTypography(force: true)
                 self?.sizeKeptDocument()
                 self?.focusForPhase()
             }
@@ -407,7 +467,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         lastPhase = phase
         let isKept = phase == .success
-        keptView.isHidden = !isKept
+        keptScrollView.isHidden = !isKept
+        keptFooter.isHidden = !isKept
         scrollView.isHidden = isKept
         textView.isEditable = !isKept
         if sessionChanged, phase == .writing {
@@ -423,32 +484,61 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
         countLabel.setAccessibilityLabel("\(countLabel.stringValue) written")
+        tagView.setText(RoomPresentation.sessionTag(duration: engine.duration, phase: phase))
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
-        warningLabel.isHidden = !warning
         if warning { numeralLabel.stringValue = "\(engine.secondsUntilDeletion)" }
+        warningHint.isHidden = !warning
+        exitButton.isHidden = warning || isKept
+        countLabel.isHidden = isKept
+        progressBar.isHidden = phase == .failure || phase == .success
+        meter.isHidden = phase == .failure || phase == .success
+        if engine.duration > 0 {
+            progressBar.fraction = min(max(engine.remaining / engine.duration, 0), 1)
+        }
+        meter.fraction = warning ? min(max(engine.idleSeconds / Double(engine.silenceLimit.rawValue), 0), 1) : 0
         let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion, limit: engine.silenceLimit) : 0
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
-        placeholderLabel.isHidden = (phase != .writing && phase != .failure) || !engine.text.isEmpty || !textView.string.isEmpty
+        placeholderLabel.isHidden = phase != .writing || !engine.text.isEmpty || !textView.string.isEmpty
         if !textView.hasMarkedText() { prepareViewport() }
+    }
+
+    private func primaryKeptTypography() {
+        applyKeptTypography(force: true)
+    }
+
+    private func applyKeptTypography(force: Bool = false) {
+        let settings = appState.settings
+        let size = settings.writingFontSize.points
+        // The kept screen is a reading/copy surface: left aligned like the approved After screen,
+        // independent of the writing paper's narrow/wide alignment.
+        let alignment: NSTextAlignment = .left
+        guard force || keptText.font?.pointSize != size || keptText.alignment != alignment else { return }
+        let font = FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
+        keptText.font = font
+        keptText.alignment = alignment
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineHeightMultiple = 1.6
+        keptText.defaultParagraphStyle = paragraph
+        guard let storage = keptText.textStorage, storage.length > 0 else { return }
+        storage.addAttributes([.font: font, .foregroundColor: FirstLineColors.inkNSColor, .paragraphStyle: paragraph],
+                              range: NSRange(location: 0, length: storage.length))
     }
 
     private func applyVisualSettings() {
         let settings = appState.settings
-        let width: CGFloat = settings.writingAlignment == .centered ? 720 : 920
+        let width: CGFloat = settings.writingAlignment == .centered ? 720 : 880
         if paperWidth.constant != width { paperWidth.constant = width }
         textView.configureSessionTypography(size: settings.writingFontSize.points, alignment: settings.writingAlignment)
-        if keptText.font?.pointSize != settings.writingFontSize.points {
-            keptText.font = BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderUprightPostScript,
-                                                        size: settings.writingFontSize.points)
-                ?? NSFont.systemFont(ofSize: settings.writingFontSize.points)
-        }
-        let alignment: NSTextAlignment = settings.writingAlignment == .centered ? .center : .left
-        if keptText.alignment != alignment { keptText.alignment = alignment }
+        applyKeptTypography()
+        placeholderLabel.font = FirstLineTypography.writingItalicNSFont(size: settings.writingFontSize.points)
+        placeholderLabel.alignment = settings.writingAlignment == .centered ? .center : .left
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0
+        tagView.alphaValue = showChrome ? 1 : 0
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -465,14 +555,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private func setWash(_ opacity: CGFloat, cut: Bool) {
         if washIsCut != cut {
             washIsCut = cut
-            wallWash.fillColor = cut ? FirstLineColors.deepWallNSColor : FirstLineColors.washWallNSColor
-            paperWash.fillColor = cut ? FirstLineColors.deepPaperNSColor : FirstLineColors.washPaperNSColor
+            paperWash.fillColor = cut ? FirstLineColors.redDeepNSColor : FirstLineColors.redSoftNSColor
         }
-        if wallWash.alphaValue != opacity { wallWash.alphaValue = opacity }
         if paperWash.alphaValue != opacity { paperWash.alphaValue = opacity }
     }
 
     private func showCut() {
+        guard cutFlashDuration > 0 else {
+            setWash(0, cut: false)
+            return
+        }
         setWash(1, cut: true)
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -480,7 +572,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             self.setWash(0, cut: false)
         }
         cutWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + cutFlashDuration, execute: work)
+    }
+
+    /// Ends the transient <=200 ms cut without leaving a stale tint on the sheet.
+    /// The room calls this on disappear; snapshot/state restoration can settle it too.
+    func endCutAnimation() {
+        cutWork?.cancel()
+        cutWork = nil
+        setWash(0, cut: false)
     }
 
     private func announce(_ text: String) {
@@ -520,7 +620,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     @objc private func copyText() {
-        copyButton.title = RoomPresentation.copy(engine.text, to: pasteboard) ? "COPIED" : "TRY COPY AGAIN"
+        copyButton.title = RoomPresentation.copy(engine.text, to: pasteboard) ? "Copied" : "Try copy again"
         focusForPhase()
     }
 

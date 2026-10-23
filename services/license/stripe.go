@@ -23,12 +23,29 @@ import (
 const stripeReturnURL = "https://writeitdown.app/mac.html"
 const stripeSuccessURL = stripeReturnURL + "?session_id={CHECKOUT_SESSION_ID}"
 
+// stripeKeyMode derives the key's mode from an accepted prefix: standard and
+// restricted keys, each bound to the mode encoded in its prefix. A bare prefix
+// with no key body is not a key, so it is refused like an unknown prefix.
+func stripeKeyMode(key string) (string, bool) {
+	for _, accepted := range [...]struct{ prefix, mode string }{
+		{"sk_test_", "test"},
+		{"rk_test_", "test"},
+		{"sk_live_", "live"},
+		{"rk_live_", "live"},
+	} {
+		if strings.HasPrefix(key, accepted.prefix) && len(key) > len(accepted.prefix) {
+			return accepted.mode, true
+		}
+	}
+	return "", false
+}
+
 func configureStripe(c *Config) error {
 	if (c.Environment != "test" && c.Environment != "live") || c.StripeWebhookSecret == "" || c.StripePriceID == "" || c.ProductID == "" {
 		return errors.New("Stripe requires test/live mode, webhook secret, price and license product")
 	}
-	if !strings.HasPrefix(c.StripeSecretKey, "sk_"+c.Environment+"_") {
-		return errors.New("Stripe secret key must match the configured environment")
+	if mode, ok := stripeKeyMode(c.StripeSecretKey); !ok || mode != c.Environment {
+		return errors.New("Stripe secret key must be sk_test_ or rk_test_ in test mode, or sk_live_ or rk_live_ in live mode; a key from the other mode is never accepted")
 	}
 	if c.StripeAPIBase == "" {
 		c.StripeAPIBase = "https://api.stripe.com"

@@ -41,6 +41,12 @@ private final class CheckoutHTTPStub: URLProtocol, @unchecked Sendable {
         var fields = headers
         fields["Content-Type"] = fields["Content-Type"] ?? "application/json"
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: fields)!
+        if [301, 302, 303, 307, 308].contains(status),
+           let location = headers["Location"], let destination = URL(string: location) {
+            var redirected = request
+            redirected.url = destination
+            client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
+        }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -115,14 +121,36 @@ struct CheckoutClientTests {
         }
     }
 
-    @Test func redirectsAreNotFollowed() async {
-        CheckoutHTTPStub.handler.set { _ in
-            (302, ["Location": "https://evil.example/pay"], Data())
+    @Test(arguments: [301, 302, 303, 307, 308])
+    func redirectsAreNotFollowed(status: Int) async {
+        CheckoutHTTPStub.handler.set { request in
+            if request.url?.host == "license.invalid" {
+                return (status, ["Location": "https://redirect.invalid/pay"], Data())
+            }
+            return (200, [:], Data(#"{"url":"https://checkout.stripe.com/c/pay/test"}"#.utf8))
         }
         await #expect(throws: CheckoutError.unavailable) {
             try await checkoutClient().createCheckoutSession()
         }
-        #expect(CheckoutHTTPStub.handler.recorded.count == 1)
+        #expect(CheckoutHTTPStub.handler.recorded.map(\.url?.absoluteString) ==
+            ["https://license.invalid/api/v1/checkout"])
+    }
+
+    @Test(arguments: [301, 302, 303, 307, 308])
+    func defaultSessionFollowsTheRedirectFixture(status: Int) async throws {
+        CheckoutHTTPStub.handler.set { request in
+            if request.url?.host == "license.invalid" {
+                return (status, ["Location": "https://redirect.invalid/pay"], Data())
+            }
+            return (200, [:], Data("redirect target reached".utf8))
+        }
+        let session = checkoutSession()
+        defer { session.invalidateAndCancel() }
+        let (data, response) = try await session.data(from: URL(string: "https://license.invalid/api/v1/checkout")!)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(String(decoding: data, as: UTF8.self) == "redirect target reached")
+        #expect(CheckoutHTTPStub.handler.recorded.map(\.url?.absoluteString) ==
+            ["https://license.invalid/api/v1/checkout", "https://redirect.invalid/pay"])
     }
 
     @Test @MainActor func appStateOpensHostedCheckoutAndUsesFallbackOnlyOnError() async throws {

@@ -26,7 +26,7 @@ verify_token_key
 test "$(sudo stat -c '%a' "$TOKEN_KEY")" = 600
 ```
 
-This is the host's existing authoritative Ed25519 key. Its raw public key above is public, and the Mac app pins it. **Never regenerate or replace the private key.** That silently invalidates every installed app. Never paste, print, commit or copy it into a deployment bundle. Verify the public key before and after every deployment and mode switch. Keep `LICENSE_TOKEN_PRIVATE_KEY_FILE` pointed at this existing file.
+This is the host's existing authoritative Ed25519 key. Its raw public key above is public and must be pinned in the Mac release configuration before genuine activation acceptance; the source `Info.plist` still leaves that configuration empty. **Never regenerate or replace the private key.** That silently invalidates every installed app. Never paste, print, commit or copy it into a deployment bundle. Verify the public key before and after every deployment and mode switch. Keep `LICENSE_TOKEN_PRIVATE_KEY_FILE` pointed at this existing file.
 
 ## 2. Preserve the current deployment
 
@@ -99,7 +99,7 @@ The listener must remain loopback-only and health must return `ok`. The health r
 
 ## 5. Verify the permanent proxy and buyer route
 
-`Caddyfile.stripe` contains only the permanent site's stanza, with `/api/v1/*` routed to `127.0.0.1:8060`. Keep the host's existing broader `/api/*` route if already correct. Do not append a duplicate hostname or replace other sites. Use `handle`, not `handle_path`, so the path survives. Overwrite `X-Real-IP` with the direct client address.
+The permanent-site stanza in [`Caddyfile.example`](Caddyfile.example) routes `/api/v1/*` to `127.0.0.1:8060`. A prepared bundle may extract it as `Caddyfile.stripe`. Keep the host's existing broader `/api/*` route if already correct. Do not append a duplicate hostname or replace other sites. Use `handle`, not `handle_path`, so the path survives. Overwrite `X-Real-IP` with the direct client address.
 
 Never enable request-body, Checkout URL, session-ID, query-string, licence-key or buyer-address logging. `session_id` is the only bearer protection for buyer key retrieval. The success page must also suppress analytics/referrer/query leakage and remove the credential from its visible URL when no longer needed. Only the exact `https://writeitdown.app` origin receives browser CORS permission for checkout/retrieval; there are no cookies or credentialed CORS.
 
@@ -111,9 +111,7 @@ sudo systemctl reload caddy
 curl --fail --silent --show-error https://licenses.writeitdown.app/api/v1/health
 ```
 
-Checkout now uses `https://writeitdown.app/mac.html?session_id={CHECKOUT_SESSION_ID}` as its success URL; Stripe substitutes the session ID. Cancel returns to `https://writeitdown.app/mac.html`.
-
-`GET /api/v1/license?session_id=<id>` returns `{"licenseKey":"<exact Checkout session id>"}` only after a completed, paid session has an active licence. Unknown, unpaid, expired or revoked sessions return the same neutral 404. One session issues one stable key; repeat reads return that same key, not a new key or a one-time consumption flag. This allows receipt-page retries without losing the purchase. The key is submitted unchanged as `orderId` to `/api/v1/licenses/activate`. Activate, validate and deactivate contracts are unchanged. There is no email sender, email lookup, listing endpoint or extra tracker.
+The Checkout return URLs, buyer retrieval response and activation credential are defined in [`../README.md`](../README.md#stripe-adapter). The current `writeitdown/mac.html` has not yet implemented the buyer receipt flow; complete that integration before the genuine purchase acceptance below.
 
 ## 6. Prove the genuine TEST purchase before LIVE
 
@@ -158,7 +156,7 @@ Only after the genuine TEST loop and required reviews are green, the maintainer 
 | `STRIPE_WEBHOOK_SECRET` | TEST endpoint signing secret | LIVE endpoint's own signing secret |
 | `STRIPE_PRICE_ID` | TEST $4.99 one-time price | Verified LIVE $4.99 one-time price |
 
-The webhook URL stays `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. The LIVE endpoint has its own signing secret; never reuse the TEST endpoint secret. Do not change `LICENSE_PRODUCT_ID`, `LICENSE_TOKEN_PRIVATE_KEY_FILE`, the database, API base, token format or claims. TEST and LIVE use **one Ed25519 key, one pinned public key and one app product ID**. The same DMG accepts either mode's issued token. There is no rebuild, code edit or mode-specific migration.
+The webhook URL stays `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. The LIVE endpoint has its own signing secret; never reuse the TEST endpoint secret. Do not change `LICENSE_PRODUCT_ID`, `LICENSE_TOKEN_PRIVATE_KEY_FILE`, the database, API base, token format or claims. TEST and LIVE use **one Ed25519 key, one pinned public key and one app product ID**. A DMG configured with that public key and product can verify either mode's issued token. There is no rebuild, code edit or mode-specific migration.
 
 Keep the four TEST values privately for rollback, edit the existing environment file through the secret channel, then restart:
 

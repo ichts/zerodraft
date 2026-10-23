@@ -2,13 +2,11 @@
 
 ## Stripe replacement and environment switch
 
-The permanent receiver is `https://licenses.writeitdown.app/api/v1/webhooks/stripe`, on the existing maintainer-managed host, which already runs build `dc2dff5`. [`DEPLOY.md`](DEPLOY.md) owns the full replacement, buyer key retrieval, TEST-first acceptance, four-value TEST/LIVE switch and rollback commands. No temporary tunnel or worker-hosted public receiver is part of the deployment. The bundle contains no secrets or private signing key. The host's existing signing key is authoritative and must never be regenerated or replaced. A genuine TEST Checkout, buyer receipt-page integration, native activation and refund remain acceptance gates before any LIVE execution.
-
-Set `LICENSE_PROVIDER=stripe` and keep the populated environment file mode 0600. Startup requires the webhook secret, API key, exact price and stable app product. API-key prefix and callback `livemode` must match `LICENSE_ENVIRONMENT=test|live`. Change only environment, API secret, webhook secret and price to switch modes; the key, token format, app product and database stay fixed so the DMG does not change. The health route needs no database access. The backup service now reads `LICENSE_DB` from the protected environment file; `backup.sh` defaults to the existing Waffo database if unset and uses separate dated backup prefixes for each database. The Waffo-only preparation below remains its existing unverified deployment posture.
+[`DEPLOY.md`](DEPLOY.md) owns the permanent receiver configuration, full replacement, TEST-first acceptance, environment switch and rollback commands. The HTTP and token contracts live in [`../README.md`](../README.md#stripe-adapter). The Waffo-only preparation below does not govern the Stripe deployment.
 
 ## Waffo preparation (unchanged TEST-only posture)
 
-These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
+All remaining sections apply only to Waffo. These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment
 

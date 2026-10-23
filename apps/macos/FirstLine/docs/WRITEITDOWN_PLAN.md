@@ -211,9 +211,9 @@ The following code inside kept files is also deleted:
 The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收费的", and then set the price: "4.99".
 
 - Distribution is a Developer ID signed, hardened-runtime, notarized, stapled DMG downloaded from writeitdown.app. There is no Mac App Store build. This matches the existing `docs/RELEASE_CHECKLIST.md`.
-- The app uses a Waffo one-time purchase and the Waffo-backed license service. The earlier Dodo and Polar implementations are retired; historical batch records below are not the current provider contract. `docs/LICENSE_PAYMENT_SPEC.md` owns order-number activation, signed seven-day tokens, two installations and native access after the three-session trial. A genuine Waffo test purchase, receipt identifier and app activation remain required before public sale.
+- `LICENSE_PAYMENT_SPEC.md` owns current Mac licensing and purchase acceptance; `services/license/README.md` owns provider readiness. Historical batch records below are not the current provider contract.
 - The price is USD $4.99, paid once. Every piece of copy that names a price reads `$4.99`.
-- In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the Waffo product. Once checkout is live, price changes must update the Waffo product, app configuration, and the site's Mac copy together.
+- In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the selected payment adapter. Once checkout is live, price changes must update its billing configuration, app configuration, and the site's Mac copy together.
 - The 2026-10-21 Mole-model decision supersedes the 2026-10-18 activation-first policy: free download, three native sessions, then USD $4.99 once for two Macs with a 14-day refund. A session is spent on its first nonempty input, including IME activity. Exhaustion uses the existing activation screen; existing license records and refunds never fall back to trial access. `LICENSE_PAYMENT_SPEC.md` owns the persisted-counter and signature boundaries. The site remains coming-soon plus waitlist until checkout is live; this Mac change does not release a DMG or change the site.
 
 ### 8.1 Owner-account steps (needed at the release batch)
@@ -223,7 +223,7 @@ These are the captain's account actions. They are needed at batch 7 and do not b
 - [x] Confirm the Apple Developer Program membership (App Store Connect API access and validated notary credentials on the release Mac).
 - [x] Account Holder installed `Developer ID Application: Ziying WANG (4BNUMV44F8)` in the release Mac's login keychain. The earlier certificates API returned `403 FORBIDDEN_ERROR: This operation can only be performed by the Account Holder.` The staging signing and notarization run later succeeded on 2026-09-29; see the correction in `docs/MANUAL_QA.md`. A production DMG remains pending.
 - [x] Store notarization credentials using the existing App Store Connect API key in the login keychain under profile `writeitdown-notary`; validation succeeded. No app-specific password is needed.
-- [ ] Verify a genuine Waffo test-mode $4.99 one-time order, its signed callback, buyer-visible order number, real app activation and refund rejection. Synthetic HTTP/window fixtures do not satisfy this gate.
+- [ ] Complete genuine TEST purchase acceptance from `LICENSE_PAYMENT_SPEC.md`; synthetic HTTP/window fixtures do not satisfy that gate.
 - [ ] After merchant onboarding and test acceptance, supply the verified live checkout URL and service origin/product/Ed25519 public key described in `LICENSE_PAYMENT_SPEC.md`. No live checkout is configured before approval.
 - [ ] Confirm a working support email and legal copyright holder. Proposed `support@writeitdown.app` only if the mailbox exists; Info.plist copyright now says Trefoil Studio, while `LICENSE` still has a `Your Company` placeholder. Do not publish an unverified address or change legal attribution without confirmation.
 - [ ] Approve the final app icon. The current AppIcon set is in `Sources/FirstLine/Assets.xcassets/AppIcon.appiconset/`.
@@ -231,7 +231,7 @@ These are the captain's account actions. They are needed at batch 7 and do not b
 
 ## 9. Batches
 
-The completed batch records below are historical. Section 8 and `LICENSE_PAYMENT_SPEC.md` own the current three-session trial, Waffo provider and license acceptance, not the old provider-specific requirements below.
+The completed batch records below are historical. Section 8 and `LICENSE_PAYMENT_SPEC.md` own the current three-session trial and license acceptance, not the old provider-specific requirements below.
 
 Every batch follows the same flow:
 
@@ -437,6 +437,6 @@ All ten findings are incorporated into the affected batch or acceptance sections
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
 - The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
-- Notarization, the Waffo product and checkout URL depend on owner-account steps. `release-dmg.sh` ships the three-session trial when checkout and license configuration are all empty; partial or invalid fields still block. `--staging` accepts only that empty configuration. A paid live build still needs the verified configuration in `LICENSE_PAYMENT_SPEC.md`; neither debug nor release silently chooses a provider environment.
+- Notarization, billing configuration and checkout URL depend on owner-account steps. `release-dmg.sh` ships the three-session trial when checkout and license configuration are all empty; partial or invalid fields still block. `--staging` accepts only that empty configuration. A paid live build still needs the verified configuration in `LICENSE_PAYMENT_SPEC.md`; neither debug nor release silently chooses a provider environment.
 - Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. The app does not delete user folders on its own; migration guidance belongs in the release instructions at batch 7.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

@@ -42,9 +42,11 @@ Expect `text/plain`. If a future proxy change serves another type, add this insi
 header @llmstxt Content-Type "text/plain; charset=utf-8"
 ```
 
-The six answer pages (`what-is-write-it-down.html`, `write-it-down-mac-vs-web.html`, `write-it-down-free-trial.html`, `write-it-down-price.html`, `delete-a-draft.html`, `is-my-writing-saved.html`) answer one question each, are self-canonical, listed in `sitemap.xml`, and linked from `support.html`. Their visible FAQ, `Article` and `BreadcrumbList` text must match the JSON-LD exactly; `qa/seo.spec.mjs` enforces that, plus the `llms.txt` content type, the sitemap order, and the named crawlers in `robots.txt`.
+The six answer pages (`what-is-write-it-down.html`, `write-it-down-mac-vs-web.html`, `write-it-down-free-trial.html`, `write-it-down-price.html`, `delete-a-draft.html`, `is-my-writing-saved.html`) answer one question each, are self-canonical, listed in `sitemap.xml`, and linked from `support.html`. Each names Write It Down in the title, H1 and first body sentence, has at least 120 visible words and a visible FAQ, and carries an Ask ChatGPT self-description line, also present on `support.html`.
 
-Attribution stays on the existing Cloudflare Web Analytics beacon, which already reports referrers, so chatgpt.com arrivals appear there without new code. There is no custom tracker, no server-side attribution, and ChatGPT-referred visitors get no extra trial sessions.
+Each answer page's `Article.headline` matches its H1 and `Article.description` matches its entire first paragraph, not just the first sentence. Its `BreadcrumbList` names match the visible breadcrumb, and its `FAQPage` questions and answers match the visible FAQ word for word. `qa/seo.spec.mjs` enforces these contracts, the landing FAQ equality, the `llms.txt` content type and URL coverage, and sitemap order and canonicals. `robots.txt` allows OAI-SearchBot, ChatGPT-User, GPTBot, PerplexityBot and ClaudeBot and lists the sitemap. Add a new answer page to the sitemap, `install.sh`, the `llms.txt` link list and the spec together.
+
+Attribution stays on the existing Cloudflare Web Analytics beacon's referrer reporting. A chatgpt.com arrival is attributable only when the browser supplies that referrer; the beacon does not establish ChatGPT-User crawler attribution. There is no custom tracker or server-side attribution, and ChatGPT-referred visitors get no extra trial sessions. Actual analytics records have not been independently verified.
 
 ### Mac download release
 

@@ -8,13 +8,13 @@ Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unver
 
 # GEO acceptance (historical)
 
-GEO pass, October 23, 2026. `llms.txt` ships as a real plain-text file, `robots.txt` names OAI-SearchBot, ChatGPT-User, GPTBot, PerplexityBot and ClaudeBot, and six answer pages join the sitemap and the support page. The change is additive: landing, trial and Mac visuals are untouched.
+GEO pass, October 23, 2026. The discovery and answer-page contracts are owned by [README.md](README.md#discovery-files-and-answer-pages). Landing, trial and Mac visuals were untouched.
 
-`cd writeitdown && npm ci && npx playwright test` passes 222 tests with the 18 expected skips across the eight viewport/theme/motion projects. The new `qa/seo.spec.mjs` checks that every JSON-LD block parses, that each `FAQPage` question and answer equals the visible FAQ text on the landing and the six answer pages, that `Article` and `BreadcrumbList` match the visible H1, first sentence and breadcrumb, that each answer page has at least 120 visible words plus the self-description line, that sitemap order and canonicals match, that robots names the five crawlers, and that `/llms.txt` is served as `text/plain`, covers every public page and names no AI provider. `node --test session.test.mjs` passes 10 tests. `npm run release-check -- --download` reports STATIC CHECK PASSED. A local static serve of `writeitdown/` returns `Content-type: text/plain` for `/llms.txt`. `qa/test-install.py` installs the 30 exact production files, including `llms.txt` and the answer pages.
+The recorded run of `cd writeitdown && npm ci && npx playwright test` passed 222 tests with 18 expected skips across the eight viewport/theme/motion projects, including `qa/seo.spec.mjs`. `node --test session.test.mjs` passed 10 tests. `npm run release-check -- --download` reported STATIC CHECK PASSED. A local static serve of `writeitdown/` returned `Content-type: text/plain` for `/llms.txt`. `qa/test-install.py` installed the production files listed in `install.sh`, including `llms.txt` and the answer pages.
 
 Screenshots of all six answer pages at 1440x900 in light and dark and at 390x844 in light, plus `support.html` at 390x844 in light and dark, were inspected: no horizontal overflow, the breadcrumb wraps inline, and the FAQ headings separate cleanly from body copy.
 
-ChatGPT attribution stays on the existing Cloudflare Web Analytics beacon, which reports referrers. No custom tracker was added, and ChatGPT-referred visitors get no extra trial sessions. The live deploy and the real `curl -I https://writeitdown.app/llms.txt` stay unverified until the operator installs the bundle.
+Analytics records were not independently verified. The live deploy and the real `curl -I https://writeitdown.app/llms.txt` remained unverified pending the operator's bundle installation.
 
 # Centered-aperture acceptance (historical)
 

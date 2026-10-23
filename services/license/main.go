@@ -114,6 +114,19 @@ func environmentConfig(dbPath string) (Config, error) {
 		return cfg, errors.New("Ed25519 private key required")
 	}
 	cfg.TokenKey = key
+	cfg.Provider = os.Getenv("LICENSE_PROVIDER")
+	if cfg.Provider == "stripe" {
+		cfg.StripeWebhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET")
+		cfg.StripeSecretKey = os.Getenv("STRIPE_SECRET_KEY")
+		cfg.StripePriceID = os.Getenv("STRIPE_PRICE_ID")
+		cfg.StripeProductID = os.Getenv("STRIPE_PRODUCT_ID")
+		cfg.StripeAPIBase = os.Getenv("STRIPE_API_BASE")
+		if cfg.ProductID == "" {
+			cfg.ProductID = cfg.StripeProductID
+		}
+		err = configureStripe(&cfg)
+		return cfg, err
+	}
 	cfg.TestPublicKey, err = readKey(os.Getenv("WAFFO_TEST_PUBLIC_KEY_FILE"), false)
 	return cfg, err
 }

@@ -5,6 +5,7 @@ Description=Back up Write It Down test license database
 Type=oneshot
 User=writeitdown-license
 Group=writeitdown-license
+EnvironmentFile=/etc/writeitdown-license/service.env
 ExecStart=/bin/sh /opt/writeitdown-license/backup.sh
 UMask=0077
 NoNewPrivileges=true

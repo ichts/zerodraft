@@ -14,3 +14,19 @@ license-test.example.invalid {
 	}
 	# Do not enable request body, query string, token or order-ID logging.
 }
+
+# Permanent Stripe TEST receiver. Merge this stanza, never replace other sites.
+licenses.writeitdown.app {
+	request_body {
+		max_size 64KB
+	}
+	handle /api/v1/* {
+		reverse_proxy 127.0.0.1:8060 {
+			header_up X-Real-IP {http.request.remote.host}
+		}
+	}
+	handle {
+		respond 404
+	}
+	# No access logging of callback bodies, checkout URLs or bearer credentials.
+}

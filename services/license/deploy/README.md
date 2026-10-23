@@ -1,5 +1,11 @@
 # Test deployment preparation
 
+## Stripe TEST adapter
+
+The permanent receiver is `https://licenses.writeitdown.app/api/v1/webhooks/stripe`, on the existing maintainer-managed host. [`DEPLOY.md`](DEPLOY.md) owns the ordered Stripe bundle installation, secret provisioning, systemd/Caddy validation, genuine TEST acceptance and rollback commands. No temporary tunnel or worker-hosted public receiver is part of the deployment. The bundle contains no secrets. A real TEST Checkout, native activation and refund remain unproven until the maintainer records them; LIVE remains forbidden.
+
+Set `LICENSE_PROVIDER=stripe` only with the exact TEST price/product in `service.env.example`, and keep the populated environment file mode 0600. Startup requires the webhook secret and price/product. The API key must be TEST and is needed for Checkout and normal callback line-item lookup. The health route needs no database access. The backup service now reads `LICENSE_DB` from the protected environment file; `backup.sh` defaults to the existing Waffo database if unset and uses separate dated backup prefixes for each database. The Waffo-only preparation below remains its existing unverified deployment posture.
+
 These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment

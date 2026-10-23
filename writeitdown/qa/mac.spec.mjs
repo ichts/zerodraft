@@ -252,6 +252,40 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
   });
 }
 
+// The Mac page keeps the document shell but sits on the approved background A (tokens.css page colour), so the
+// purchase page and the landing share one canvas and the legacy beige wall cannot come back.
+test('the Mac page wears the approved background A canvas, not the legacy beige wall', async ({ page }) => {
+  const read = () => page.evaluate(() => {
+    const probe = (name) => {
+      const raw = getComputedStyle(document.body).getPropertyValue(name).trim();
+      const i = document.createElement('i');
+      i.style.color = raw;
+      document.body.append(i);
+      const color = getComputedStyle(i).color;
+      i.remove();
+      return { raw, color };
+    };
+    return {
+      theme: document.documentElement.dataset.theme,
+      stage: getComputedStyle(document.querySelector('.stage')).backgroundColor,
+      canvas: getComputedStyle(document.body).backgroundColor,
+      door: getComputedStyle(document.querySelector('.door')).color,
+      page: probe('--page'),
+      wall: probe('--wall'),
+    };
+  });
+  await page.goto('mac.html');
+  const mac = await read();
+  expect(mac.page.raw, 'tokens.css page colour is in force on the Mac page').not.toBe('');
+  expect(mac.stage, 'the Mac page canvas is background A').toBe(mac.page.color);
+  expect(mac.canvas, 'the document canvas matches, so overscroll never shows beige').toBe(mac.page.color);
+  expect(mac.wall.color, 'the legacy wall name resolves to the page colour on this page').toBe(mac.page.color);
+  expect(mac.door, 'the primary button label is the page colour, not beige').toBe(mac.page.color);
+  await page.goto('index.html');
+  const landing = await page.evaluate(() => getComputedStyle(document.querySelector('#landing')).backgroundColor);
+  expect(mac.stage, `${mac.theme}: the purchase page and the landing share one canvas`).toBe(landing);
+});
+
 test('landing sections: heading tree, honest facts, FAQ matches its schema, call-back enters the room', async ({ page }) => {
   await page.goto('index.html');
   await expect(page.locator('#landing h1')).toHaveCount(1);

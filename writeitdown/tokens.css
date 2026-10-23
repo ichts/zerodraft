@@ -1,13 +1,14 @@
 /* Write It Down design tokens v2 (design system 2026-10-22 with the captain's background option A: near-white
    page, no beige desk, depth from the white sheet's shadow).
    Source of truth for colour, type, space, shape, depth and motion on the landing and trial room; the Mac app mirrors the
-   same names. Values match the design-system tokens.css; scoped to .home until the other pages adopt the
-   system. Faces: Newsreader (what you write, headlines), Reenie Beanie (the pen), and the system UI stack for
-   the tool (no webfont). Newsreader loads with the site's existing font link. Dark keeps the same names. */
+   same names. Values match the design-system tokens.css. The page colour (background A) and its --stage-a/--stage-b aliases
+   sit on :root, so a page that links this sheet can adopt the canvas alone (mac.html, via .page-a on <body>
+   in site.css, which maps --wall to --page). All remaining roles stay scoped to .home. Faces: Newsreader (what you write, headlines),
+   Reenie Beanie (the pen), and the system UI stack for the tool (no webfont). Newsreader loads with the site's
+   existing font link. Dark keeps the same names. */
+:root{--page:#f7f7f5;--stage-a:var(--page);--stage-b:var(--page)}
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
-  --page:#f7f7f5;
-  --stage-a:var(--page);--stage-b:var(--page);
   --sheet:#ffffff;
   --ink:#1c1917;
   --mute:#6b655c;
@@ -39,9 +40,8 @@
   --ease-out:cubic-bezier(.22,1,.36,1);
   --d-feedback:.16s;--d-enter:.6s;--d-write:.9s;
 }
+:root:not([data-theme="light"]){--page:#15140f}
 :root:not([data-theme="light"]) .home{
-  --page:#15140f;
-  --stage-a:var(--page);--stage-b:var(--page);
   --sheet:#26231c;
   --ink:#ece7d9;
   --mute:#a39d8e;

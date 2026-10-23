@@ -41,7 +41,7 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   await page.route(`${service}/license?session_id=cs_test_paid_fixture`, async route => {
     expect(route.request().method()).toBe('GET');
     expect(route.request().headers().referer).toBeUndefined();
-    await route.fulfill({ json: { license_key: key } });
+    await route.fulfill({ json: { licenseKey: key } });
   });
   await page.goto('mac.html?session_id=cs_test_paid_fixture');
   await expect(page.locator('#license-key')).toHaveText(key);
@@ -72,9 +72,9 @@ for (const failure of ['network', 'http', 'empty', 'malformed', 'non-string']) {
   test(`no license is shown after ${failure} fetch failure`, async ({ page }) => {
     await page.route(`${service}/license?session_id=cs_test_failure_fixture`, route => {
       if (failure === 'network') return route.abort();
-      if (failure === 'http') return route.fulfill({ status: 500, json: { license_key: key } });
+      if (failure === 'http') return route.fulfill({ status: 500, json: { licenseKey: key } });
       if (failure === 'malformed') return route.fulfill({ contentType: 'application/json', body: '{' });
-      return route.fulfill({ json: { license_key: failure === 'empty' ? '' : 42 } });
+      return route.fulfill({ json: { licenseKey: failure === 'empty' ? '' : 42 } });
     });
     await page.goto('mac.html?session_id=cs_test_failure_fixture');
     await expect(page.locator('#license-status')).toHaveText(neutral);
@@ -87,7 +87,7 @@ test('no key or copy control appears while license fetch is still pending', asyn
   const ready = new Promise(resolve => { finish = resolve; });
   await page.route(`${service}/license?session_id=cs_test_waiting_fixture`, async route => {
     await ready;
-    await route.fulfill({ json: { license_key: key } });
+    await route.fulfill({ json: { licenseKey: key } });
   });
   await page.goto('mac.html?session_id=cs_test_waiting_fixture');
   await expect(page.locator('#license-status')).toHaveText('Checking your license...');
@@ -100,7 +100,7 @@ test('no session never requests a license or shows a key', async ({ page }) => {
   const calls = [];
   await page.route(`${service}/license**`, route => {
     calls.push(route.request().url());
-    return route.fulfill({ json: { license_key: key } });
+    return route.fulfill({ json: { licenseKey: key } });
   });
   await page.goto('mac.html');
   await noKey(page);

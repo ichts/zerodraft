@@ -39,9 +39,9 @@
       url.searchParams.set('session_id', session);
       const response = await fetch(url, { ...options, headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('License unavailable');
-      const { license_key } = await response.json();
-      if (typeof license_key !== 'string' || !license_key.trim()) throw new Error('License unavailable');
-      key.textContent = license_key;
+      const { licenseKey } = await response.json();
+      if (typeof licenseKey !== 'string' || !licenseKey.trim()) throw new Error('License unavailable');
+      key.textContent = licenseKey;
       status.textContent = 'Your license key is ready.';
       document.getElementById('license-result').hidden = false;
     } catch {

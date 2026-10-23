@@ -29,13 +29,13 @@ These commands assume the existing service account, binary and configuration are
 
 ## 2. Provision secrets outside the bundle
 
-Use the approved secret channel for GB's TEST API secret key and TEST webhook signing secret. Never echo them, pass them on the command line, use `set -x`, put them in shell history, or include populated files in the bundle. Register only these events in TEST mode:
+GB has created TEST webhook endpoint `we_1UTg3oRs8qwanmEvF0C457ya`. Its TEST API secret key and TEST webhook signing secret stay on the maintainer machine and go directly into the server environment at deployment. They never reach the build worker or bundle. Never echo them, pass them on the command line, use `set -x`, put them in shell history, or include populated files in the bundle. The TEST endpoint subscribes only to these events:
 
 - `checkout.session.completed`
 - `checkout.session.expired`
 - `charge.refunded`
 
-The exact endpoint is `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. Confirm that URL with GB. A random local fixture secret is not the Stripe endpoint secret.
+The confirmed endpoint URL is `https://licenses.writeitdown.app/api/v1/webhooks/stripe`. A random local fixture secret is not the Stripe endpoint secret.
 
 Create a separate Stripe token signing key without replacing a prior key:
 
@@ -48,7 +48,7 @@ sudo install -m 0600 -o root -g root "$BUNDLE/service.env.example" /etc/writeitd
 sudoedit /etc/writeitdown-license/service.env
 ```
 
-Set these nonsecret values in the editor and fill only the two secret fields through the secret channel:
+Set these nonsecret values in the editor. The maintainer fills `STRIPE_WEBHOOK_SECRET` and `STRIPE_SECRET_KEY` locally from the already-provisioned secret channel:
 
 ```text
 LICENSE_PROVIDER=stripe

@@ -6,6 +6,11 @@
   const service = new URL(form.action).origin;
   const options = { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' };
 
+  window.addEventListener('pageshow', () => {
+    buy.disabled = false;
+    checkoutStatus.textContent = '';
+  });
+
   form.addEventListener('submit', async event => {
     event.preventDefault();
     if (buy.disabled) return;
@@ -44,6 +49,9 @@
       key.textContent = licenseKey;
       status.textContent = 'Your license key is ready.';
       document.getElementById('license-result').hidden = false;
+      const clean = new URL(location.href);
+      clean.searchParams.delete('session_id');
+      history.replaceState(history.state, '', clean.href);
     } catch {
       status.textContent = 'Your licence is not ready yet. Reload in a moment.';
     }

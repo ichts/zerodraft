@@ -70,6 +70,8 @@ function releaseCheck({ mac, support, download = readFileSync('download/index.ht
   const site = join(root, 'writeitdown');
   const plistDir = join(root, 'apps/macos/FirstLine/Sources/FirstLine');
   mkdirSync(join(site, 'download'), { recursive: true }); mkdirSync(plistDir, { recursive: true });
+  mkdirSync(join(site, 'journey'), { recursive: true });
+  writeFileSync(join(site, 'journey/waivers.json'), readFileSync('journey/waivers.json'));
   writeFileSync(join(site, 'mac.html'), mac);
   writeFileSync(join(site, 'download/index.html'), download);
   writeFileSync(join(site, 'support.html'), support);
@@ -95,6 +97,9 @@ test('release gate rejects missing or invalid purchase and download configuratio
   expect(output).toContain('Not verified live');
   expect(output).toContain('real test order');
   expect(releaseCheck(inputs, '--download')[0]).toBe(0);
+  const [live, liveOutput] = releaseCheck(inputs, '--live-sales');
+  expect(live).toBe(1);
+  expect(liveOutput).toContain('LIVE sales blocked: maintainer installed-DMG TEST acceptance is pending');
 
   const cases = [
     [{ mac: mac.replace('data-launch="checkout"', 'data-launch-pending="checkout"') }, 'Checkout URL: not confirmed'],

@@ -11,7 +11,7 @@ import { chromium, webkit, devices } from '@playwright/test';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { validateWaivers, waivedOffers, assertNoWaivedOffers } from './waivers.mjs';
+import { validateWaivers, waivedOffers, assertNoWaivedOffers, assertLiveSalesAllowed } from './waivers.mjs';
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i < 0 ? d : process.argv[i + 1]; };
 const base = (arg('base') || '').replace(/\/+$/, '');
@@ -19,8 +19,8 @@ if (!/^https?:\/\//.test(base)) { console.error('usage: npm run journey -- --bas
 const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const expectSha = arg('expect-sha', null);
 const scenarios = arg('scenarios', null)?.split(',');
-if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe'].includes(name))) {
-  console.error('--scenarios accepts full-session,silence-wipe'); process.exit(2);
+if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe', 'mac-purchase'].includes(name))) {
+  console.error('--scenarios accepts full-session,silence-wipe,mac-purchase'); process.exit(2);
 }
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
@@ -28,10 +28,11 @@ const results = [];
 let waivers;
 try {
   waivers = validateWaivers(JSON.parse(fs.readFileSync(new URL('./waivers.json', import.meta.url), 'utf8')));
+  if (process.argv.includes('--live-sales')) assertLiveSalesAllowed(waivers);
 } catch (error) {
   console.error(`FAIL release waivers: ${error.message}`); process.exit(1);
 }
-console.log('\nWAIVED (feature does not exist yet)');
+console.log('\nWAIVED (absent feature or pending maintainer acceptance)');
 for (const waiver of waivers) {
   results.push({ ...waiver, tag: 'release', status: 'WAIVED', name: waiver.step });
   console.log(`  ${waiver.step}: ${waiver.reason} Approved by ${waiver.approved_by}; unwaive when ${waiver.unwaive_when}.`);
@@ -107,7 +108,7 @@ async function run(size, browser) {
       ok(/8 seconds/.test(await page.locator('.deck').innerText()), 'deck text');
       ok(await page.getByRole('link', { name: 'Give it 60 seconds' }).count() >= 1, 'CTA missing');
     });
-    await step('no price/buy/sign-in button offered (checkout does not exist yet)', async () => {
+    await step('no waived sign-in feature offered', async () => {
       const bad = await waivedOffers(page); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
     });
   });
@@ -158,16 +159,16 @@ async function run(size, browser) {
     });
   });
   await block('landing/mac-block', async () => {
-    await step('USD 4.99 / 2 Macs / 14 days / macOS 14 and honest "buying opens soon"', async () => {
+    await step('USD 4.99 / 2 Macs / 14 days / macOS 14 and free updates', async () => {
       await show('#mac'); const t = await page.locator('#mac').innerText();
-      ok(/3 sessions/i.test(t) && /\$4\.99/.test(t) && /2 Macs/.test(t) && /14 days/.test(t) && /macOS 14/.test(t), 'facts missing'); ok(/buying opens soon/i.test(t), '"buying opens soon" missing');
+      ok(/3 sessions/i.test(t) && /\$4\.99/.test(t) && /2 Macs/.test(t) && /14 days/.test(t) && /macOS 14/.test(t), 'facts missing'); ok(/free updates/i.test(t), 'free updates missing');
     });
     await step('Download free trial link reaches /download/ (200, real page)', async () => {
       const h = await page.locator('#mac a', { hasText: /^download free trial$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
       const r = await ctx.request.get(url('/download/')); ok(r.status() === 200 && /<h1>Write It Down for Mac<\/h1>/.test(await r.text()), 'download page is not the real page');
     });
-    await step('waitlist link points at mac.html#waitlist', async () => {
-      ok(await page.locator('#mac a[href="mac.html#waitlist"]').count() === 1, 'waitlist link missing');
+    await step('Buy link points at mac.html#buy', async () => {
+      ok(await page.locator('#mac a[href="mac.html#buy"]').count() === 1, 'Buy link missing');
     });
   });
   await block('landing/faq', async () => {
@@ -196,7 +197,7 @@ async function run(size, browser) {
     await step('Trefoil Studio, Product/Help/Legal links all resolve', async () => {
       await show('footer'); const t = await page.locator('footer').innerText(); ok(/Trefoil Studio/.test(t), 'Trefoil Studio missing');
       const hrefs = await page.locator('footer a').evaluateAll(els => els.map(e => e.getAttribute('href')));
-      for (const n of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#waitlist']) ok(hrefs.includes(n), `footer link ${n} missing`);
+      for (const n of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#buy']) ok(hrefs.includes(n), `footer link ${n} missing`);
       for (const h of hrefs.filter(h => !/^(mailto:|#)/.test(h))) { const r = await ctx.request.get(url('/' + h.split('#')[0])); ok(r.status() === 200, `${h} -> ${r.status()}`); }
     });
   });
@@ -207,11 +208,11 @@ async function run(size, browser) {
       await page.waitForURL(/\/download\/?$/);
       ok((await page.locator('h1').first().innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may serve the landing as fallback)');
     });
-    await step('trial terms: 3 sessions, USD 4.99 one-time, buying opens soon', async () => {
+    await step('trial terms: 3 sessions, USD 4.99 one-time, 2 Macs, 14-day refund', async () => {
       const t = (await page.locator('#trial-terms').innerText()).toUpperCase();
-      ok(/3 SESSIONS/.test(t) && /USD 4\.99 ONE-TIME/.test(t) && /BUYING OPENS SOON/.test(t), `terms read "${t}"`);
+      ok(/3 SESSIONS/.test(t) && /USD 4\.99 ONE-TIME/.test(t) && /2 MACS/.test(t) && /14-DAY REFUND/.test(t), `terms read "${t}"`);
     });
-    await step('no buy/checkout offered', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
+    await step('no waived sign-in feature offered on download page', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
     await step('DMG link is the canonical URL', async () => {
       const h = await page.locator('a[data-launch="dmg"]').getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
@@ -299,10 +300,47 @@ async function run(size, browser) {
       await page.goto(url(`/${p}.html`)); const h = (await page.locator('h1').first().innerText()).trim(); ok(h.toLowerCase() === p, `H1 is "${h}"`);
     });
   });
-  await block('waitlist', async () => {
-    await step('waitlist form reachable', async () => {
-      await page.goto(url('/mac.html#waitlist')); await page.locator('#waitlist-form').waitFor({ state: 'visible' });
-      for (const s of ['#waitlist-email', 'input[name=consent]']) ok(await page.locator(s).count() === 1, `${s} missing`);
+  await block('mac-purchase', async () => {
+    const service = 'https://licenses.writeitdown.app/api/v1';
+    const hosted = 'https://checkout.stripe.com/c/pay/cs_test_journey_fixture';
+    const licenseKey = 'WID-JOURNEY-FIXTURE-NOT-A-LICENSE';
+    let posts = 0;
+    await ctx.route('https://licenses.writeitdown.app/**', route => route.abort());
+    await ctx.route('https://checkout.stripe.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Hosted checkout fixture</h1>' }));
+    await ctx.route(`${service}/checkout`, route => {
+      ok(route.request().method() === 'POST', 'checkout must POST');
+      posts++;
+      return route.fulfill({ json: { url: hosted } });
+    });
+    await step('Buy follows harness checkout and Back permits another checkout', async () => {
+      await page.goto(url('/mac.html#buy'));
+      const buy = page.getByRole('button', { name: 'BUY - $4.99', exact: true });
+      await buy.click();
+      await page.waitForURL(hosted);
+      ok(posts === 1, 'expected one checkout POST');
+      await page.goBack();
+      ok(await buy.isEnabled(), 'Buy remains disabled after Back');
+      ok(await page.locator('#checkout-status').textContent() === '', 'stale checkout status');
+      await buy.click();
+      await page.waitForURL(hosted);
+      ok(posts === 2, 'Back did not permit retry');
+    });
+    await ctx.route(`${service}/license?session_id=cs_test_paid_fixture`, route => route.fulfill({ json: { licenseKey } }));
+    await step('paid fixture delivers key, copy control and activation sentence, cleans URL', async () => {
+      await page.goto(url('/mac.html?session_id=cs_test_paid_fixture'));
+      await page.locator('#license-result').waitFor({ state: 'visible' });
+      ok(await page.locator('#license-key').textContent() === licenseKey, 'fixture key missing');
+      ok(await page.getByRole('button', { name: 'COPY LICENSE KEY', exact: true }).isVisible(), 'copy control missing');
+      ok((await page.locator('#license-result').innerText()).includes("Paste this key into the app's activation field."), 'activation sentence missing');
+      ok(!new URL(page.url()).searchParams.has('session_id'), 'credential retained after delivery');
+    });
+    await ctx.route(`${service}/license?session_id=cs_test_pending_fixture`, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
+    await step('unpaid fixture shows neutral notice, no key, and retains retry URL', async () => {
+      await page.goto(url('/mac.html?session_id=cs_test_pending_fixture'));
+      await page.getByText('Your licence is not ready yet. Reload in a moment.', { exact: true }).waitFor();
+      ok(!await page.locator('#license-key').isVisible(), 'unpaid key visible');
+      ok(!await page.locator('#copy-license').isVisible(), 'unpaid copy visible');
+      ok(new URL(page.url()).searchParams.get('session_id') === 'cs_test_pending_fixture', 'retry credential lost');
     });
   });
   await block('console', async () => { await step('no console errors across the journey', async () => ok(errors.length === 0, errors.slice(0, 3).join(' | '))); });
@@ -319,5 +357,5 @@ for (const s of sizes) await run(s, s.engine === 'webkit' ? wk : chrome);
 await wk.close(); await chrome.close();
 const fails = results.filter(r => r.status === 'FAIL');
 fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ base, scenarios: scenarios ?? null, results }, null, 1));
-console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${waivers.length} WAIVED (feature does not exist yet)`);
+console.log(`\nSUMMARY base=${base}: ${results.filter(r => r.status === 'PASS').length} pass, ${fails.length} fail; ${waivers.length} WAIVED (absent feature or pending maintainer acceptance)`);
 process.exit(fails.length ? 1 : 0);

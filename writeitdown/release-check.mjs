@@ -17,6 +17,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateWaivers, assertLiveSalesAllowed } from './journey/waivers.mjs';
 
 const PLACEHOLDER_HOST = /(^|\.)(example\.(com|net|org)|test|invalid|localhost|local)$|^[\d.]+$|^\[/i;
 const PLACEHOLDER_TEXT = /\b(todo|tbd|placeholder|lorem|example)\b/i;
@@ -117,7 +118,16 @@ export function readInputs(root = fileURLToPath(new URL('.', import.meta.url))) 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const rootAt = args.indexOf('--root');
-  const inputs = readInputs(rootAt >= 0 ? args[rootAt + 1] : undefined);
+  const root = rootAt >= 0 ? args[rootAt + 1] : fileURLToPath(new URL('.', import.meta.url));
+  if (args.includes('--live-sales')) {
+    try {
+      assertLiveSalesAllowed(validateWaivers(JSON.parse(readFileSync(join(root, 'journey/waivers.json'), 'utf8'))));
+    } catch (error) {
+      console.error(`BLOCKED: ${error.message}`);
+      process.exit(1);
+    }
+  }
+  const inputs = readInputs(root);
   const sale = !args.includes('--download');
   let found = [...downloadBlockers(inputs), ...(sale ? blockers(inputs) : [])];
   if (!found.length && args.includes('--live')) found = await liveBlockers(inputs, { sale });

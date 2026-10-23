@@ -34,6 +34,25 @@ test('Buy posts once and follows the hosted checkout URL', async ({ page }) => {
   await page.getByRole('button', { name: 'BUY - $4.99', exact: true }).click();
   await expect(page).toHaveURL(hosted);
   expect(posts).toBe(1);
+  await page.goBack();
+  const buy = page.getByRole('button', { name: 'BUY - $4.99', exact: true });
+  await expect(buy).toBeEnabled();
+  await expect(page.locator('#checkout-status')).toBeEmpty();
+  await buy.click();
+  await expect(page).toHaveURL(hosted);
+  expect(posts).toBe(2);
+});
+
+test('persisted pageshow restores Buy without reloading the document', async ({ page }) => {
+  await page.route(`${service}/checkout`, () => {});
+  await page.goto('mac.html');
+  const buy = page.getByRole('button', { name: 'BUY - $4.99', exact: true });
+  await buy.click();
+  await expect(buy).toBeDisabled();
+  await expect(page.locator('#checkout-status')).toHaveText('Opening checkout...');
+  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })));
+  await expect(buy).toBeEnabled();
+  await expect(page.locator('#checkout-status')).toBeEmpty();
 });
 
 test('paid session shows only the fetched key and copies it', async ({ page, context }, info) => {
@@ -43,7 +62,9 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
     expect(route.request().headers().referer).toBeUndefined();
     await route.fulfill({ json: { licenseKey: key } });
   });
-  await page.goto('mac.html?session_id=cs_test_paid_fixture');
+  await page.goto('index.html');
+  await page.goto('mac.html?campaign=fixture&session_id=cs_test_paid_fixture#license-heading');
+  await expect(page).toHaveURL(/\/mac\.html\?campaign=fixture#license-heading$/);
   await expect(page.locator('#license-key')).toHaveText(key);
   await expect(page.locator('#license-key')).toBeInViewport();
   expect(await page.evaluate(() => [...document.scripts].some(script => script.src.includes('cloudflareinsights')))).toBe(false);
@@ -56,6 +77,8 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(key);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('paid-license.png'), fullPage: true });
+  await page.goBack();
+  await expect(page).toHaveURL(/\/index\.html$/);
 });
 
 for (const state of ['pending', 'unknown']) {
@@ -64,6 +87,9 @@ for (const state of ['pending', 'unknown']) {
     await page.goto(`mac.html?session_id=cs_test_${state}_fixture`);
     await expect(page.locator('#license-status')).toHaveText(neutral);
     await noKey(page);
+    await expect(page).toHaveURL(new RegExp(`session_id=cs_test_${state}_fixture$`));
+    await page.reload();
+    await expect(page.locator('#license-status')).toHaveText(neutral);
     await page.screenshot({ path: info.outputPath(`${state}-license.png`), fullPage: true });
   });
 }
@@ -79,6 +105,12 @@ for (const failure of ['network', 'http', 'empty', 'malformed', 'non-string']) {
     await page.goto('mac.html?session_id=cs_test_failure_fixture');
     await expect(page.locator('#license-status')).toHaveText(neutral);
     await noKey(page);
+    await expect(page).toHaveURL(/session_id=cs_test_failure_fixture$/);
+    await page.unroute(`${service}/license?session_id=cs_test_failure_fixture`);
+    await page.route(`${service}/license?session_id=cs_test_failure_fixture`, route => route.fulfill({ json: { licenseKey: key } }));
+    await page.reload();
+    await expect(page.locator('#license-key')).toHaveText(key);
+    await expect(page).toHaveURL(/\/mac\.html$/);
   });
 }
 

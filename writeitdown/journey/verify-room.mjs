@@ -9,8 +9,16 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const out = path.resolve(root, '../tmp/journey-controls', String(Date.now()));
 await fs.mkdir(out, { recursive: true });
-const original = await fs.readFile(path.join(root, 'room.js'), 'utf8');
-const cases = [
+const purchase = process.argv.includes('--purchase');
+const source = purchase ? 'buy.js' : 'room.js';
+const original = await fs.readFile(path.join(root, source), 'utf8');
+const cases = purchase ? [
+  { name: 'no-checkout', scenarios: 'mac-purchase', from: 'location.assign(hosted.href);', to: 'buy.disabled = false;', failure: 'mac-purchase: Buy follows harness checkout and Back permits another checkout' },
+  { name: 'no-url-cleanup', scenarios: 'mac-purchase', from: "history.replaceState(history.state, '', clean.href);", to: '', failure: 'mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', message: 'credential retained after delivery' },
+  { name: 'no-key', scenarios: 'mac-purchase', from: 'key.textContent = licenseKey;', to: "key.textContent = '';", failure: 'mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', message: 'fixture key missing' },
+  { name: 'unpaid-key', scenarios: 'mac-purchase', from: "status.textContent = 'Your licence is not ready yet. Reload in a moment.';", to: "status.textContent = 'Your licence is not ready yet. Reload in a moment.'; key.textContent = 'INVALID-UNPAID-FIXTURE'; document.getElementById('license-result').hidden = false;", failure: 'mac-purchase: unpaid fixture shows neutral notice, no key, and retains retry URL', message: 'unpaid key visible' },
+  { name: 'good', scenarios: 'mac-purchase' },
+] : [
   { name: 'no-finish', scenarios: 'full-session', from: 'state = advance(state, now);', to: "const next = advance(state, now); state = next.phase === 'kept' ? state : next;", failure: 'full-session: finished draft and real clipboard equal typed text' },
   { name: 'no-wipe', scenarios: 'silence-wipe', from: 'state = advance(state, now);', to: "const next = advance(state, now); state = next.phase === 'wipe' ? state : next;", failure: 'silence-wipe: draft is deleted after eight seconds of silence' },
   { name: 'no-copy', scenarios: 'full-session', from: 'await navigator.clipboard.writeText(text);', to: 'await Promise.resolve();', failure: 'full-session: finished draft and real clipboard equal typed text', message: 'clipboard differs from the finished draft' },
@@ -29,7 +37,7 @@ for (const control of cases) {
   }
   if (control.from) {
     assert.equal(original.split(control.from).length, 2, `mutation boundary for ${control.name}`);
-    await fs.writeFile(path.join(site, 'room.js'), original.replace(control.from, control.to));
+    await fs.writeFile(path.join(site, source), original.replace(control.from, control.to));
   }
   const listener = net.createServer();
   listener.listen(0, '127.0.0.1');
@@ -64,7 +72,7 @@ for (const control of cases) {
       }
     } else {
       for (const tag of ['phone', 'desktop']) {
-        for (const scenario of ['full-session', 'silence-wipe']) {
+        for (const scenario of control.scenarios.split(',')) {
           assert(data.results.some(result => result.tag === tag && result.status === 'PASS' && result.name.startsWith(`${scenario}:`)), `${tag} ${scenario} did not pass`);
         }
       }
@@ -74,4 +82,4 @@ for (const control of cases) {
     await serverExit;
   }
 }
-console.log(`PASS room negative controls and intact build; evidence: ${out}`);
+console.log(`PASS ${purchase ? 'purchase' : 'room'} negative controls and intact build; evidence: ${out}`);

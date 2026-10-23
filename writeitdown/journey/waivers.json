@@ -6,21 +6,9 @@
     "unwaive_when": "feature ships"
   },
   {
-    "step": "checkout",
-    "reason": "This release offers a free Mac download; buying opens soon.",
-    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
-    "unwaive_when": "feature ships"
-  },
-  {
     "step": "test-payment",
-    "reason": "No payment feature exists in this release.",
-    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
-    "unwaive_when": "feature ships"
-  },
-  {
-    "step": "post-payment-output",
-    "reason": "There is no paid journey or post-payment output in this release.",
-    "approved_by": "captain release decision 2026-10-22 (relayed by main)",
-    "unwaive_when": "feature ships"
+    "reason": "Integration delivery only. The maintainer deploys from another machine, then runs the real TEST card journey on the live site with a real installed DMG before LIVE. Installed-DMG TEST acceptance is pending; intercepted browser responses do not prove a payment or activation.",
+    "approved_by": "captain integration-only decision 2026-10-23",
+    "unwaive_when": "maintainer installed-DMG TEST acceptance passes"
   }
 ]

@@ -5,7 +5,7 @@
     "test": "playwright test",
     "release-check": "node release-check.mjs",
     "journey": "node journey/journey.mjs",
-    "journey:live": "node journey/journey.mjs --base https://writeitdown.app --expect-sha 714822ee9a5a80807c6ca42461fc12100e04892bf7a821c59c7bb011534f819a"
+    "journey:live": "node journey/journey.mjs --base https://writeitdown.app --expect-sha 0c69512b4b144f4bc61bec88507a4c446a3b5e237083af8016b88f7067d8a7a6"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

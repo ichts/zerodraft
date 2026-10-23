@@ -38,6 +38,15 @@ for (const waiver of waivers) {
   console.log(`  ${waiver.step}: ${waiver.reason} Approved by ${waiver.approved_by}; unwaive when ${waiver.unwaive_when}.`);
 }
 const NOISE = /cloudflareinsights|favicon|Access-Control-Allow-Origin|access control checks/i; // third-party beacon / local-server noise
+// The unpaid-licence fixture answers 404 on purpose. That console entry is the harness's own
+// probe, not a missing site resource, so exactly that URL and status is expected; every other
+// console error still fails the gate.
+const LICENSE_SERVICE = 'https://licenses.writeitdown.app/api/v1';
+const PENDING_SESSION = 'cs_test_pending_fixture';
+const EXPECTED_404_URL = `${LICENSE_SERVICE}/license?session_id=${PENDING_SESSION}`;
+const isExpected404 = m => m.type() === 'error'
+  && /^Failed to load resource: the server responded with a status of 404/.test(m.text())
+  && m.location().url === EXPECTED_404_URL;
 const ok = (c, m) => { if (!c) throw new Error(m); };
 
 async function run(size, browser) {
@@ -53,7 +62,7 @@ async function run(size, browser) {
   const page = await ctx.newPage();
   page.setDefaultTimeout(5000);
   const errors = [];
-  page.on('console', m => { if (m.type() === 'error' && !NOISE.test(m.text() + (m.location().url || ''))) errors.push(m.text()); });
+  page.on('console', m => { if (m.type() === 'error' && !isExpected404(m) && !NOISE.test(m.text() + (m.location().url || ''))) errors.push(`${m.text()} @ ${m.location().url}`); });
   page.on('pageerror', e => { if (!NOISE.test(String(e))) errors.push(String(e)); });
   const url = p => `${base}${p}`;
   const log = (status, name, msg = '') => { results.push({ tag, status, name, msg }); console.log(`${status.padEnd(4)} [${tag}] ${name}${msg ? ' - ' + msg : ''}`); };
@@ -72,13 +81,19 @@ async function run(size, browser) {
     current = name; await fn();
   };
   const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));
+  // The room stage repeats the landing header inside the hidden #room section, so the landing
+  // nav and entrance locators are anchored to the visible #landing stage.
+  const landingNav = page.locator('#landing nav[aria-label=Main]');
+  const landingDoor = page.locator('#landing > .cta a[href="#trial"]');
   let sha = null;
   const ldGraph = async () => (JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent()))['@graph'];
 
   await block('landing/hero', async () => {
     await step('page loads', async () => { const r = await page.goto(url('/')); ok(r.ok(), `status ${r.status()}`); });
     await step('H1 "We force you to" + "write it down", no final period', async () => {
-      const t = (await page.locator('h1.h1').first().innerText()).replace(/\s+/g, ' ').trim();
+      const h1 = page.locator('h1.h1');
+      ok(await h1.count() === 1, `${await h1.count()} h1 elements`);
+      const t = (await h1.innerText()).replace(/\s+/g, ' ').trim();
       ok(t.toLowerCase() === 'we force you to write it down', `H1 is "${t}"`);
     });
     await step('second line is the red handwritten one', async () => {
@@ -88,8 +103,10 @@ async function run(size, browser) {
       const [r, g, b] = c.match(/\d+/g).map(Number);
       ok(r > 150 && g < 100 && b < 100, `colour ${c} is not red`);
     });
-    await step('top bar: Download for Mac pill present', async () => {
-      ok(await page.locator('nav[aria-label=Main] a', { hasText: /^download for mac$/i }).count() === 1, 'pill missing');
+    await step('top bar: one Download for Mac pill routed to /download/', async () => {
+      const pill = landingNav.locator('a', { hasText: /^download for mac$/i });
+      ok(await pill.count() === 1, `${await pill.count()} pills in the visible landing nav`);
+      ok(await pill.getAttribute('href') === 'download/', `pill href is ${await pill.getAttribute('href')}`);
     });
   });
   await block('landing/demo', async () => {
@@ -102,11 +119,15 @@ async function run(size, browser) {
       ok(/^\d:\d\d$/.test((await page.locator('#clock').innerText()).trim()), 'clock');
       ok(await page.locator('#demo .paper').isVisible(), 'sheet hidden');
     });
-    await step('deck line sits under the demo; CTA "Give it 60 seconds" present', async () => {
-      const d = await page.locator('.deck').boundingBox(), p = await page.locator('#demo').boundingBox();
-      ok(d.y >= p.y + p.height - 2, 'deck is not below the demo');
-      ok(/8 seconds/.test(await page.locator('.deck').innerText()), 'deck text');
-      ok(await page.getByRole('link', { name: 'Give it 60 seconds' }).count() >= 1, 'CTA missing');
+    await step('the only entrance under the demo is the 60-second door', async () => {
+      const cta = page.locator('#landing > .cta'), demo = page.locator('#demo');
+      ok(await cta.count() === 1, `${await cta.count()} entrance bands under the demo`);
+      const c = await cta.boundingBox(), d = await demo.boundingBox();
+      ok(c.y >= d.y + d.height - 2, 'the entrance band is not below the demo');
+      ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
+      ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
+      ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
+      ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
     await step('no waived sign-in feature offered', async () => {
       const bad = await waivedOffers(page); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
@@ -203,10 +224,12 @@ async function run(size, browser) {
   });
   await block('download', async () => {
     await step('top-bar pill goes to /download/', async () => {
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.locator('nav[aria-label=Main] a', { hasText: /^download for mac$/i }).click();
+      await page.goto(url('/'));
+      await landingNav.locator('a', { hasText: /^download for mac$/i }).click();
       await page.waitForURL(/\/download\/?$/);
-      ok((await page.locator('h1').first().innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may serve the landing as fallback)');
+      const h1 = page.locator('main h1');
+      ok(await h1.count() === 1, `${await h1.count()} h1 elements on the download page`);
+      ok((await h1.innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may serve the landing as fallback)');
     });
     await step('trial terms: 3 sessions, USD 4.99 one-time, 2 Macs, 14-day refund', async () => {
       const t = (await page.locator('#trial-terms').innerText()).toUpperCase();
@@ -214,14 +237,19 @@ async function run(size, browser) {
     });
     await step('no waived sign-in feature offered on download page', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
     await step('DMG link is the canonical URL', async () => {
-      const h = await page.locator('a[data-launch="dmg"]').getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
+      const link = page.locator('main a[data-launch="dmg"]');
+      ok(await link.count() === 1, `${await link.count()} DMG links on the download page`);
+      const h = await link.getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
     await step('published SHA-256 present; terms, button, DMG link, sha all on screen', async () => {
       await page.evaluate(() => { const t = document.querySelector('#trial-terms').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
-      sha = (await page.locator('#sha256 code').first().innerText({ timeout: 2000 })).trim().toLowerCase();
+      const checksum = page.locator('#sha256 code');
+      ok(await checksum.count() === 1, `${await checksum.count()} published checksums`);
+      sha = (await checksum.innerText({ timeout: 2000 })).trim().toLowerCase();
       ok(/^[0-9a-f]{64}$/.test(sha), 'no published 64-hex SHA-256 (page still says pending)');
       if (expectSha) ok(sha === expectSha.toLowerCase(), `published ${sha} != expected ${expectSha}`);
-      for (const sel of ['#trial-terms', 'a[data-launch="dmg"]', '#sha256']) {
+      for (const sel of ['#trial-terms', 'main a[data-launch="dmg"]', '#sha256']) {
+        ok(await page.locator(sel).count() === 1, `${sel} matches ${await page.locator(sel).count()} elements`);
         const bx = await page.locator(sel).boundingBox(); ok(bx && bx.y >= 0 && bx.y + bx.height <= size.height, `${sel} is not fully on screen`);
       }
     });
@@ -230,7 +258,8 @@ async function run(size, browser) {
       ok(m.c === 'https://writeitdown.app/download/' && m.u === 'https://writeitdown.app/download/' && m.t && m.d, `meta ${JSON.stringify(m)}`);
     });
     await step('download page: Install / Activate / Refunds sections', async () => {
-      const t = await page.locator('.steps3 h2, .steps3 h3, #install h2, #trial h2, #refunds h2').allInnerTexts(); ok(['Install', 'Activate', 'Refunds'].every(k => t.includes(k)), `sections ${JSON.stringify(t)}`);
+      const t = await page.locator('.steps3 .card > h2').allInnerTexts();
+      ok(t.join('|') === 'Install|Activate|Refunds', `sections ${JSON.stringify(t)}`);
     });
     await step('DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published', async () => {
       const r = await ctx.request.get(url(new URL(DMG_URL).pathname));
@@ -252,7 +281,7 @@ async function run(size, browser) {
   await block('full-session', async () => {
     await step('finished draft and real clipboard equal typed text', async () => {
       await page.goto(url('/'));
-      await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
+      await landingDoor.click();
       await page.locator('#room').waitFor({ state: 'visible' });
       await page.locator('#editor').click();
       const prose = 'I walked to the station this morning and watched the sun rise over the roofs. The next train was late, so I had time to think about the letter I wanted to write. I am putting those thoughts on paper now, one sentence at a time. ';
@@ -282,7 +311,7 @@ async function run(size, browser) {
   await block('silence-wipe', async () => {
     await step('draft is deleted after eight seconds of silence', async () => {
       await page.goto(url('/'));
-      await page.getByRole('link', { name: 'Give it 60 seconds' }).first().click();
+      await landingDoor.click();
       await page.locator('#room').waitFor({ state: 'visible' });
       ok(await page.locator('#editor').inputValue() === '', 'restart retained text');
       await page.locator('#editor').click();
@@ -297,11 +326,14 @@ async function run(size, browser) {
   });
   await block('legal', async () => {
     for (const p of ['support', 'privacy', 'terms']) await step(`${p} reachable`, async () => {
-      await page.goto(url(`/${p}.html`)); const h = (await page.locator('h1').first().innerText()).trim(); ok(h.toLowerCase() === p, `H1 is "${h}"`);
+      await page.goto(url(`/${p}.html`));
+      const h1 = page.locator('main h1');
+      ok(await h1.count() === 1, `${await h1.count()} h1 elements on ${p}.html`);
+      const h = (await h1.innerText()).trim(); ok(h.toLowerCase() === p, `H1 is "${h}"`);
     });
   });
   await block('mac-purchase', async () => {
-    const service = 'https://licenses.writeitdown.app/api/v1';
+    const service = LICENSE_SERVICE;
     const hosted = 'https://checkout.stripe.com/c/pay/cs_test_journey_fixture';
     const licenseKey = 'WID-JOURNEY-FIXTURE-NOT-A-LICENSE';
     let posts = 0;
@@ -334,16 +366,16 @@ async function run(size, browser) {
       ok((await page.locator('#license-result').innerText()).includes("Paste this key into the app's activation field."), 'activation sentence missing');
       ok(!new URL(page.url()).searchParams.has('session_id'), 'credential retained after delivery');
     });
-    await ctx.route(`${service}/license?session_id=cs_test_pending_fixture`, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
+    await ctx.route(EXPECTED_404_URL, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
     await step('unpaid fixture shows neutral notice, no key, and retains retry URL', async () => {
-      await page.goto(url('/mac.html?session_id=cs_test_pending_fixture'));
+      await page.goto(url(`/mac.html?session_id=${PENDING_SESSION}`));
       await page.getByText('Your licence is not ready yet. Reload in a moment.', { exact: true }).waitFor();
       ok(!await page.locator('#license-key').isVisible(), 'unpaid key visible');
       ok(!await page.locator('#copy-license').isVisible(), 'unpaid copy visible');
-      ok(new URL(page.url()).searchParams.get('session_id') === 'cs_test_pending_fixture', 'retry credential lost');
+      ok(new URL(page.url()).searchParams.get('session_id') === PENDING_SESSION, 'retry credential lost');
     });
   });
-  await block('console', async () => { await step('no console errors across the journey', async () => ok(errors.length === 0, errors.slice(0, 3).join(' | '))); });
+  await block('console', async () => { await step('no unexpected console errors across the journey', async () => ok(errors.length === 0, errors.slice(0, 3).join(' | '))); });
 
   const vid = page.video(); await ctx.close();
   if (vid) { const dest = path.join(dir, `journey-${tag}.webm`); fs.renameSync(await vid.path(), dest); console.log(`video [${tag}]: ${dest}`); }

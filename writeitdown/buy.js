@@ -1,4 +1,4 @@
-// Hosted checkout and buyer-key delivery. Neither keys nor session credentials are persisted.
+// Keys stay in page memory; clear the return URL credential only after successful delivery.
 (() => {
   const form = document.getElementById('buy');
   const buy = form.querySelector('button');

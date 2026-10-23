@@ -26,7 +26,7 @@ verify_token_key
 test "$(sudo stat -c '%a' "$TOKEN_KEY")" = 600
 ```
 
-This is the host's existing authoritative Ed25519 key. Its raw public key above is public and must be pinned in the Mac release configuration before genuine activation acceptance; the source `Info.plist` still leaves that configuration empty. **Never regenerate or replace the private key.** That silently invalidates every installed app. Never paste, print, commit or copy it into a deployment bundle. Verify the public key before and after every deployment and mode switch. Keep `LICENSE_TOKEN_PRIVATE_KEY_FILE` pointed at this existing file.
+This is the host's existing authoritative Ed25519 key. Its raw public key above is public and is pinned in the Mac release `Info.plist`; verify the packaged app matches it before genuine activation acceptance. **Never regenerate or replace the private key.** That silently invalidates every installed app. Never paste, print, commit or copy it into a deployment bundle. Verify the public key before and after every deployment and mode switch. Keep `LICENSE_TOKEN_PRIVATE_KEY_FILE` pointed at this existing file.
 
 ## 2. Preserve the current deployment
 

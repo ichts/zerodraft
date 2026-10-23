@@ -25,11 +25,11 @@ Demo and trial sheets use dynamic viewport minimum heights in `site.css`, with `
 
 Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the production files listed in `install.sh` under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
 
-The legal pages disclose Google Fonts requests, possible hosting access logs, and the Mac waitlist. The public contact is contact@trefoilstudio.com (Trefoil Studio).
+The legal pages disclose Google Fonts requests, possible hosting access logs, payment data handling, and retention of previously collected Mac waitlist addresses. The public contact is contact@trefoilstudio.com (Trefoil Studio).
 
 ### Discovery files and answer pages
 
-`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, the closed USD 4.99 sale, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the host page handler (`try_files {path} {path}/index.html /index.html`) returns the homepage HTML with HTTP 200 for any missing path, which is why `/llms.txt` used to answer with the landing page. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
+`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, a pointer to current Mac purchase details, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the host page handler (`try_files {path} {path}/index.html /index.html`) returns the homepage HTML with HTTP 200 for any missing path, which is why `/llms.txt` used to answer with the landing page. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
 
 ```sh
 curl -sI https://writeitdown.app/llms.txt | grep -i '^content-type:'

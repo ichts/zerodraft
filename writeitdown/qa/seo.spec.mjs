@@ -119,10 +119,13 @@ test('answer pages answer one question with matching Article, breadcrumb and pro
         });
       const article = nodes.find(node => node['@type'] === 'Article');
       const breadcrumb = nodes.find(node => node['@type'] === 'BreadcrumbList');
+      const firstParagraph = document.querySelector('main h1 + p')?.innerText.trim();
+      const firstSentence = [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(firstParagraph || '')][0]?.segment.trim();
       return {
         title: document.title,
         h1: document.querySelector('main h1')?.textContent.trim(),
-        first: document.querySelector('main h1 + p')?.textContent.trim(),
+        firstParagraph,
+        firstSentence,
         canonical: document.querySelector('link[rel="canonical"]')?.getAttribute('href'),
         article: article && { headline: article.headline, description: article.description },
         crumbNames: [...document.querySelectorAll('nav[aria-label="Breadcrumb"] a, nav[aria-label="Breadcrumb"] [aria-current="page"]')]
@@ -135,9 +138,9 @@ test('answer pages answer one question with matching Article, breadcrumb and pro
     expect(data.canonical, path).toBe(origin + path);
     expect(data.title, `${path}: title names the product`).toContain('Write It Down');
     expect(data.h1, `${path}: H1 names the product`).toContain('Write It Down');
-    expect(data.first, `${path}: first sentence names the product`).toContain('Write It Down');
+    expect(data.firstSentence, `${path}: first sentence names the product`).toContain('Write It Down');
     expect(data.words, `${path}: visible body copy`).toBeGreaterThanOrEqual(120);
-    expect(data.article, `${path}: Article schema`).toEqual({ headline: data.h1, description: data.first });
+    expect(data.article, `${path}: Article schema`).toEqual({ headline: data.h1, description: data.firstParagraph });
     expect(data.crumbNames[0], `${path}: breadcrumb starts at home`).toBe('Home');
     expect(data.schemaCrumbs, `${path}: BreadcrumbList matches the visible breadcrumb`).toEqual(data.crumbNames);
     expect(data.selfMention, `${path}: self-mention line`).toBe(true);

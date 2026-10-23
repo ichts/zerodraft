@@ -1,5 +1,5 @@
-// [INPUT] Raw Stripe TEST callbacks, configured price/product, API secrets and clock.
-// [OUTPUT] Authenticated event receipts, session/payment-intent bindings and licenses.
+// [INPUT] Raw Stripe callbacks, selected mode/price, stable license product, secrets and clock.
+// [OUTPUT] Authenticated receipts, purchase bindings, licenses and buyer credential responses.
 // [POS] Stripe-only adapter beside the unchanged Waffo verifier and business mapping.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
@@ -21,13 +21,14 @@ import (
 )
 
 const stripeReturnURL = "https://writeitdown.app/mac.html"
+const stripeSuccessURL = stripeReturnURL + "?session_id={CHECKOUT_SESSION_ID}"
 
 func configureStripe(c *Config) error {
-	if c.Environment != "test" || c.StripeWebhookSecret == "" || c.StripePriceID == "" || c.StripeProductID == "" || c.ProductID != c.StripeProductID {
-		return errors.New("Stripe TEST webhook secret, price and matching product required")
+	if (c.Environment != "test" && c.Environment != "live") || c.StripeWebhookSecret == "" || c.StripePriceID == "" || c.ProductID == "" {
+		return errors.New("Stripe requires test/live mode, webhook secret, price and license product")
 	}
-	if c.StripeSecretKey != "" && !strings.HasPrefix(c.StripeSecretKey, "sk_test_") {
-		return errors.New("Stripe requires a TEST secret key")
+	if !strings.HasPrefix(c.StripeSecretKey, "sk_"+c.Environment+"_") {
+		return errors.New("Stripe secret key must match the configured environment")
 	}
 	if c.StripeAPIBase == "" {
 		c.StripeAPIBase = "https://api.stripe.com"
@@ -40,16 +41,19 @@ func configureStripe(c *Config) error {
 }
 
 func verifyStripeSignature(secret string, headers []string, body []byte, now time.Time) bool {
-	if secret == "" || len(headers) != 1 {
+	if secret == "" || len(headers) == 0 {
 		return false
 	}
 	var timestamp string
 	var timestampSeen bool
 	var signatures [][]byte
-	for _, part := range strings.Split(headers[0], ",") {
+	for _, part := range strings.Split(strings.Join(headers, ","), ",") {
 		pair := strings.SplitN(strings.TrimSpace(part), "=", 2)
 		if len(pair) != 2 {
-			return false
+			if pair[0] == "t" || pair[0] == "v1" {
+				return false
+			}
+			continue
 		}
 		switch pair[0] {
 		case "t":
@@ -59,7 +63,7 @@ func verifyStripeSignature(secret string, headers []string, body []byte, now tim
 			timestampSeen = true
 			timestamp = pair[1]
 		case "v1":
-			if len(pair[1]) != 64 || strings.ToLower(pair[1]) != pair[1] {
+			if len(pair[1]) != 64 {
 				return false
 			}
 			sig, err := hex.DecodeString(pair[1])
@@ -68,11 +72,17 @@ func verifyStripeSignature(secret string, headers []string, body []byte, now tim
 			}
 			signatures = append(signatures, sig)
 		default:
+			// Stripe may include legacy or future schemes alongside v1.
+			continue
+		}
+	}
+	for _, digit := range timestamp {
+		if digit < '0' || digit > '9' {
 			return false
 		}
 	}
 	seconds, err := strconv.ParseInt(timestamp, 10, 64)
-	if err != nil || seconds <= 0 || strconv.FormatInt(seconds, 10) != timestamp || len(signatures) == 0 {
+	if err != nil || seconds <= 0 || len(signatures) == 0 {
 		return false
 	}
 	signedAt := time.Unix(seconds, 0)
@@ -137,7 +147,9 @@ type stripeEvent struct {
 	} `json:"data"`
 }
 
-func stripeTest(mode *bool) bool { return mode != nil && !*mode }
+func stripeModeAllowed(mode *bool, environment string) bool {
+	return mode != nil && *mode == (environment == "live")
+}
 func stripeID(id, prefix string) bool {
 	return strings.HasPrefix(id, prefix) && len(id) >= 8 && len(id) <= 100
 }
@@ -157,7 +169,7 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var e stripeEvent
-	if json.Unmarshal(body, &e) != nil || !stripeTest(e.Livemode) || !stripeTest(e.Data.Object.Livemode) {
+	if json.Unmarshal(body, &e) != nil || !stripeModeAllowed(e.Livemode, s.cfg.Environment) || !stripeModeAllowed(e.Data.Object.Livemode, s.cfg.Environment) {
 		http.Error(w, "invalid environment or event", 401)
 		return
 	}
@@ -203,7 +215,7 @@ func (s *Server) stripeSessionAllowed(ctx context.Context, o stripeObject, compl
 			return false
 		}
 	}
-	return !lines.HasMore && len(lines.Data) == 1 && lines.Data[0].Quantity == 1 && lines.Data[0].Price.ID == s.cfg.StripePriceID && lines.Data[0].Price.Product == s.cfg.StripeProductID
+	return !lines.HasMore && len(lines.Data) == 1 && lines.Data[0].Quantity == 1 && lines.Data[0].Price.ID == s.cfg.StripePriceID && stripeID(lines.Data[0].Price.Product, "prod_")
 }
 
 func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {
@@ -232,7 +244,7 @@ func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {
 		err = s.stripeIssue(tx, o)
 	case "charge.refunded":
 		var license string
-		err = tx.QueryRow(`SELECT license_id FROM stripe_purchases WHERE payment_intent=? AND price_id=? AND product_id=? AND amount=499 AND currency='usd' AND mode='payment'`, o.PaymentIntent, s.cfg.StripePriceID, s.cfg.StripeProductID).Scan(&license)
+		err = tx.QueryRow(`SELECT license_id FROM stripe_purchases WHERE payment_intent=? AND price_id=? AND product_id=? AND amount=499 AND currency='usd' AND mode='payment'`, o.PaymentIntent, s.cfg.StripePriceID, s.cfg.ProductID).Scan(&license)
 		if errors.Is(err, sql.ErrNoRows) {
 			return 400
 		}
@@ -270,7 +282,7 @@ func (s *Server) stripeIssue(tx *sql.Tx, o stripeObject) error {
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(`INSERT INTO stripe_purchases(session_id,payment_intent,license_id,price_id,product_id,amount,currency,mode) VALUES(?,?,?,?,?,499,'usd','payment')`, o.ID, o.PaymentIntent, license, s.cfg.StripePriceID, s.cfg.StripeProductID)
+	_, err = tx.Exec(`INSERT INTO stripe_purchases(session_id,payment_intent,license_id,price_id,product_id,amount,currency,mode) VALUES(?,?,?,?,?,499,'usd','payment')`, o.ID, o.PaymentIntent, license, s.cfg.StripePriceID, s.cfg.ProductID)
 	return err
 }
 
@@ -303,17 +315,38 @@ func (s *Server) stripeAPI(ctx context.Context, method, path string, form url.Va
 	return nil
 }
 
+func (s *Server) stripeLicense(w http.ResponseWriter, r *http.Request) {
+	ids := r.URL.Query()["session_id"]
+	if s.cfg.Provider != "stripe" || len(ids) != 1 || !stripeID(ids[0], "cs_") {
+		http.Error(w, "license unavailable", 404)
+		return
+	}
+	var credential string
+	err := s.db.QueryRow(`SELECT l.order_id FROM stripe_purchases p
+		JOIN licenses l ON l.id=p.license_id
+		WHERE p.session_id=? AND p.product_id=? AND l.status='active'`, ids[0], s.cfg.ProductID).Scan(&credential)
+	if errors.Is(err, sql.ErrNoRows) {
+		http.Error(w, "license unavailable", 404)
+		return
+	}
+	if err != nil {
+		http.Error(w, "storage error", 500)
+		return
+	}
+	respond(w, 200, map[string]string{"licenseKey": credential})
+}
+
 func (s *Server) stripeCheckout(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.StripeSecretKey == "" {
 		respond(w, 503, map[string]string{"error": "checkout_not_configured"})
 		return
 	}
-	form := url.Values{"mode": {"payment"}, "line_items[0][price]": {s.cfg.StripePriceID}, "line_items[0][quantity]": {"1"}, "success_url": {stripeReturnURL}, "cancel_url": {stripeReturnURL}, "payment_method_types[0]": {"card"}}
+	form := url.Values{"mode": {"payment"}, "line_items[0][price]": {s.cfg.StripePriceID}, "line_items[0][quantity]": {"1"}, "success_url": {stripeSuccessURL}, "cancel_url": {stripeReturnURL}, "payment_method_types[0]": {"card"}}
 	var session struct {
 		URL      string `json:"url"`
 		Livemode *bool  `json:"livemode"`
 	}
-	if s.stripeAPI(r.Context(), http.MethodPost, "/v1/checkout/sessions", form, &session) != nil || !stripeTest(session.Livemode) {
+	if s.stripeAPI(r.Context(), http.MethodPost, "/v1/checkout/sessions", form, &session) != nil || !stripeModeAllowed(session.Livemode, s.cfg.Environment) {
 		respond(w, 502, map[string]string{"error": "checkout_unavailable"})
 		return
 	}

@@ -1,5 +1,5 @@
 // [INPUT] Environment, restricted key files, optional capture directory and shutdown signals.
-// [OUTPUT] A test-only loopback HTTP server or offline administrative revocation.
+// [OUTPUT] A mode-gated loopback HTTP server or offline administrative revocation.
 // [POS] Process entry point; deployment configuration stays outside source.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
@@ -87,8 +87,9 @@ func run(args []string) error {
 
 func environmentConfig(dbPath string) (Config, error) {
 	cfg := Config{Database: dbPath, ProductID: os.Getenv("LICENSE_PRODUCT_ID"), Environment: os.Getenv("LICENSE_ENVIRONMENT"), CaptureDirectory: os.Getenv("LICENSE_CALLBACK_CAPTURE_DIR")}
-	if cfg.Environment != "test" {
-		return cfg, errors.New("LICENSE_ENVIRONMENT must be test")
+	cfg.Provider = os.Getenv("LICENSE_PROVIDER")
+	if cfg.Environment != "test" && !(cfg.Provider == "stripe" && cfg.Environment == "live") {
+		return cfg, errors.New("LICENSE_ENVIRONMENT must be test, or live with Stripe")
 	}
 	if value := os.Getenv("LICENSE_TRUST_LOOPBACK_PROXY"); value != "" {
 		var err error
@@ -114,15 +115,13 @@ func environmentConfig(dbPath string) (Config, error) {
 		return cfg, errors.New("Ed25519 private key required")
 	}
 	cfg.TokenKey = key
-	cfg.Provider = os.Getenv("LICENSE_PROVIDER")
 	if cfg.Provider == "stripe" {
 		cfg.StripeWebhookSecret = os.Getenv("STRIPE_WEBHOOK_SECRET")
 		cfg.StripeSecretKey = os.Getenv("STRIPE_SECRET_KEY")
 		cfg.StripePriceID = os.Getenv("STRIPE_PRICE_ID")
-		cfg.StripeProductID = os.Getenv("STRIPE_PRODUCT_ID")
 		cfg.StripeAPIBase = os.Getenv("STRIPE_API_BASE")
 		if cfg.ProductID == "" {
-			cfg.ProductID = cfg.StripeProductID
+			cfg.ProductID = os.Getenv("STRIPE_PRODUCT_ID")
 		}
 		err = configureStripe(&cfg)
 		return cfg, err

@@ -46,12 +46,14 @@ func TestStripeSignature(t *testing.T) {
 		{"duplicate empty t", "t=," + header, stripeFixtureSecret, body, false},
 		{"multiple v1", header + ",v1=" + strings.Repeat("0", 64), stripeFixtureSecret, body, true},
 		{"second v1 matches", "t=1800000000,v1=" + strings.Repeat("0", 64) + "," + strings.Split(header, ",")[1], stripeFixtureSecret, body, true},
-		{"unknown scheme", header + ",v0=" + strings.Repeat("0", 64), stripeFixtureSecret, body, false},
+		{"legacy scheme ignored", header + ",v0=" + strings.Repeat("0", 64), stripeFixtureSecret, body, true},
 		{"missing header", "", stripeFixtureSecret, body, false},
 		{"missing t", strings.Split(header, ",")[1], stripeFixtureSecret, body, false},
 		{"missing v1", "t=1800000000", stripeFixtureSecret, body, false},
 		{"malformed hex", header + ",v1=" + strings.Repeat("z", 64), stripeFixtureSecret, body, false},
-		{"uppercase hex", "t=1800000000,v1=" + strings.Repeat("A", 64), stripeFixtureSecret, body, false},
+		{"uppercase wrong hex", "t=1800000000,v1=" + strings.Repeat("A", 64), stripeFixtureSecret, body, false},
+		{"uppercase valid hex", strings.Split(header, ",v1=")[0] + ",v1=" + strings.ToUpper(strings.Split(header, ",v1=")[1]), stripeFixtureSecret, body, true},
+		{"non-numeric timestamp", "t=not-a-time,v1=" + strings.Repeat("0", 64), stripeFixtureSecret, body, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -61,7 +63,10 @@ func TestStripeSignature(t *testing.T) {
 		})
 	}
 	if verifyStripeSignature(stripeFixtureSecret, []string{header, header}, body, now) {
-		t.Fatal("duplicate headers accepted")
+		t.Fatal("duplicate timestamps across headers accepted")
+	}
+	if !verifyStripeSignature(stripeFixtureSecret, []string{header, "v1=" + strings.Repeat("0", 64) + ",v0=legacy"}, body, now) {
+		t.Fatal("additional signature header rejected")
 	}
 }
 
@@ -71,7 +76,9 @@ func stripeServer(t *testing.T) *Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	s, err := Open(Config{Database: filepath.Join(t.TempDir(), "stripe.db"), ProductID: "prod_fixture", Environment: "test", TokenKey: key, Provider: "stripe", StripeWebhookSecret: stripeFixtureSecret, StripePriceID: "price_fixture", StripeProductID: "prod_fixture"}, func() time.Time { return time.Unix(1800000000, 0) })
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { http.Error(w, "fixture API unavailable", 503) }))
+	t.Cleanup(api.Close)
+	s, err := Open(Config{Database: filepath.Join(t.TempDir(), "stripe.db"), ProductID: "prod_fixture", Environment: "test", TokenKey: key, Provider: "stripe", StripeWebhookSecret: stripeFixtureSecret, StripeSecretKey: "sk_test_local_fixture", StripePriceID: "price_fixture", StripeAPIBase: api.URL}, func() time.Time { return time.Unix(1800000000, 0) })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,8 +126,8 @@ func TestStripeBusinessGates(t *testing.T) {
 		}},
 		{"wrong amount", func(e map[string]any) { stripeFixtureObject(e)["amount_total"] = 500 }},
 		{"missing amount", func(e map[string]any) { delete(stripeFixtureObject(e), "amount_total") }},
-		{"wrong product", func(e map[string]any) {
-			stripeFixtureObject(e)["line_items"] = map[string]any{"data": []any{map[string]any{"quantity": 1, "price": map[string]string{"id": "price_fixture", "product": "prod_wrong"}}}}
+		{"missing billing product", func(e map[string]any) {
+			stripeFixtureObject(e)["line_items"] = map[string]any{"data": []any{map[string]any{"quantity": 1, "price": map[string]string{"id": "price_fixture", "product": ""}}}}
 		}},
 		{"paginated items", func(e map[string]any) { stripeFixtureObject(e)["line_items"].(map[string]any)["has_more"] = true }},
 		{"multiple units", func(e map[string]any) {
@@ -224,7 +231,7 @@ func TestStripeRejectedRefundDoesNotRevoke(t *testing.T) {
 }
 
 func TestStripeWebhookSignatureRejections(t *testing.T) {
-	for _, name := range []string{"missing", "wrong secret", "tampered", "stale", "duplicate timestamp", "unknown scheme"} {
+	for _, name := range []string{"missing", "wrong secret", "tampered", "stale", "duplicate timestamp", "missing v1"} {
 		t.Run(name, func(t *testing.T) {
 			s := stripeServer(t)
 			body, _ := json.Marshal(stripeFixture("checkout.session.completed"))
@@ -240,8 +247,8 @@ func TestStripeWebhookSignatureRejections(t *testing.T) {
 				header = stripeHeader(s.cfg.StripeWebhookSecret, body, s.now().Add(-301*time.Second))
 			case "duplicate timestamp":
 				header += ",t=1800000000"
-			case "unknown scheme":
-				header += ",v2=unsupported"
+			case "missing v1":
+				header = strings.Split(header, ",")[0] + ",v0=unsupported"
 			}
 			w := stripeRawRequest(s, body, header)
 			expect(t, w, 401)
@@ -292,7 +299,7 @@ func TestStripeCheckoutAndLineItemLookup(t *testing.T) {
 				t.Error("wrong method")
 			}
 			r.ParseForm()
-			for k, v := range map[string]string{"mode": "payment", "line_items[0][price]": "price_fixture", "line_items[0][quantity]": "1", "success_url": stripeReturnURL, "cancel_url": stripeReturnURL, "payment_method_types[0]": "card"} {
+			for k, v := range map[string]string{"mode": "payment", "line_items[0][price]": "price_fixture", "line_items[0][quantity]": "1", "success_url": stripeSuccessURL, "cancel_url": stripeReturnURL, "payment_method_types[0]": "card"} {
 				if r.Form.Get(k) != v {
 					t.Errorf("wrong %s", k)
 				}
@@ -402,20 +409,22 @@ func TestStripeHealthDoesNotUseDatabase(t *testing.T) {
 func TestStripeConfiguration(t *testing.T) {
 	s := stripeServer(t)
 	base := s.cfg
-	for _, field := range []string{"secret", "price", "product", "live key", "environment", "base"} {
+	for _, field := range []string{"secret", "api key", "price", "product", "live key", "environment", "base"} {
 		t.Run(field, func(t *testing.T) {
 			c := base
 			switch field {
 			case "secret":
 				c.StripeWebhookSecret = ""
+			case "api key":
+				c.StripeSecretKey = ""
 			case "price":
 				c.StripePriceID = ""
 			case "product":
-				c.StripeProductID = ""
+				c.ProductID = ""
 			case "live key":
 				c.StripeSecretKey = "sk_live_not_a_key"
 			case "environment":
-				c.Environment = "live"
+				c.Environment = "production"
 			case "base":
 				c.StripeAPIBase = "https://user:password@example.com"
 			}

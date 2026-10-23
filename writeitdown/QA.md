@@ -6,6 +6,16 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# GEO acceptance (historical)
+
+GEO pass, October 23, 2026. The discovery and answer-page contracts are owned by [README.md](README.md#discovery-files-and-answer-pages). Landing, trial and Mac visuals were untouched.
+
+The recorded run of `cd writeitdown && npm ci && npx playwright test` passed 222 tests with 18 expected skips across the eight viewport/theme/motion projects, including `qa/seo.spec.mjs`. `node --test session.test.mjs` passed 10 tests. `npm run release-check -- --download` reported STATIC CHECK PASSED. A local static serve of `writeitdown/` returned `Content-type: text/plain` for `/llms.txt`. `qa/test-install.py` installed the production files listed in `install.sh`, including `llms.txt` and the answer pages.
+
+Screenshots of all six answer pages at 1440x900 in light and dark and at 390x844 in light, plus `support.html` at 390x844 in light and dark, were inspected: no horizontal overflow, the breadcrumb wraps inline, and the FAQ headings separate cleanly from body copy.
+
+Analytics records were not independently verified. The live deploy and the real `curl -I https://writeitdown.app/llms.txt` remained unverified pending the operator's bundle installation.
+
 # Centered-aperture acceptance (historical)
 
 This pass centers the trial writing aperture on the paper instead of pinning it to the upper third. The active-line center is y=450 at 1440x900 and y=422 at 390x844, matching the paper center at both widths. The editor's computed mask keeps mirrored alpha stops around the 40%-60% clear band in both themes.

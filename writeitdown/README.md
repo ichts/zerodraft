@@ -27,6 +27,27 @@ Transfer and extract the tested deployment bundle on the target host, then run `
 
 The legal pages disclose Google Fonts requests, possible hosting access logs, and the Mac waitlist. The public contact is contact@trefoilstudio.com (Trefoil Studio).
 
+### Discovery files and answer pages
+
+`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, the closed USD 4.99 sale, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the host page handler (`try_files {path} {path}/index.html /index.html`) returns the homepage HTML with HTTP 200 for any missing path, which is why `/llms.txt` used to answer with the landing page. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
+
+```sh
+curl -sI https://writeitdown.app/llms.txt | grep -i '^content-type:'
+```
+
+Expect `text/plain`. If a future proxy change serves another type, add this inside the site block and reload Caddy:
+
+```caddyfile
+@llmstxt path /llms.txt
+header @llmstxt Content-Type "text/plain; charset=utf-8"
+```
+
+The six answer pages (`what-is-write-it-down.html`, `write-it-down-mac-vs-web.html`, `write-it-down-free-trial.html`, `write-it-down-price.html`, `delete-a-draft.html`, `is-my-writing-saved.html`) answer one question each, are self-canonical, listed in `sitemap.xml`, and linked from `support.html`. Each names Write It Down in the title, H1 and first body sentence, has at least 120 visible words and a visible FAQ, and carries an Ask ChatGPT self-description line, also present on `support.html`.
+
+Each answer page's `Article.headline` matches its H1 and `Article.description` matches its entire first paragraph, not just the first sentence. Its `BreadcrumbList` names match the visible breadcrumb, and its `FAQPage` questions and answers match the visible FAQ word for word. `qa/seo.spec.mjs` enforces these contracts, the landing FAQ equality, the `llms.txt` content type and URL coverage, and sitemap order and canonicals. `robots.txt` allows OAI-SearchBot, ChatGPT-User, GPTBot, PerplexityBot and ClaudeBot and lists the sitemap. Add a new answer page to the sitemap, `install.sh`, the `llms.txt` link list and the spec together.
+
+Attribution stays on the existing Cloudflare Web Analytics beacon's referrer reporting. A chatgpt.com arrival is attributable only when the browser supplies that referrer; the beacon does not establish ChatGPT-User crawler attribution. There is no custom tracker or server-side attribution, and ChatGPT-referred visitors get no extra trial sessions. Actual analytics records have not been independently verified.
+
 ### Mac download release
 
 `download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Checkout stays closed; that gate is below.

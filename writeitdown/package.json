@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "test": "playwright test",
-    "release-check": "node release-check.mjs"
+    "release-check": "node release-check.mjs",
+    "journey": "node journey/journey.mjs",
+    "journey:live": "node journey/journey.mjs --base https://writeitdown.app --expect-sha 96c0c0a34733f92c1b47b1231c3243612c71614074dd6179ac3d61c80d5462cd"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

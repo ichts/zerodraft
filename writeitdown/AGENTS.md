@@ -24,6 +24,9 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `qa/phase4.spec.mjs`, `playwright.config.mjs`: executable eight-project browser acceptance, accelerated clocks, screenshots, and console/network checks. Playwright is test-only; the deployed site has no package runtime.
 - `og.png`: 1200×630 light-theme social share card referenced by landing metadata.
 - `robots.txt`, `sitemap.xml`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Keep the sitemap aligned with the indexed canonical pages.
+- `journey/journey.mjs`, `journey/serve-local.mjs`: release journey gate and local artifact server, separate from `npm test`. Execution and acceptance requirements live in `README.md`, "Host routing (Caddy) and the release journey gate".
+- `journey/waivers.json`: authoritative absent-feature exemptions and captain approval source, revocable by the captain. `journey/waivers.mjs` enforces them; `journey/waivers.test.mjs` covers validation. See `README.md` for the release procedure.
+- `journey/verify-room.mjs`: room negative-control runner. Procedure and evidence requirements live in `README.md`.
 - `install.sh`: fixed-target, backed-up deployment inside `/var/www/writeitdown.app/` only. Refuses to install until the waitlist collector's health URL answers `ok`. Creates `download/` and installs only its `index.html`; the DMG is placed there separately.
 - `QA.md`: browser acceptance and remaining limits.
 

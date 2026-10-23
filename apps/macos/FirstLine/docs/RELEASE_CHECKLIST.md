@@ -3,6 +3,9 @@
 This checklist is for the signed and notarized DMG. Current product and pricing decisions live in `WRITEITDOWN_PLAN.md`; license implementation details live in `LICENSE_PAYMENT_SPEC.md`. `LAUNCH_PLAN.md` is historical.
 
 ## Commercial readiness
+
+Required before opening sales, not before releasing the free trial. Current absent-feature waivers and their approval source are recorded in [`writeitdown/journey/waivers.json`](../../../../writeitdown/journey/waivers.json).
+
 - [ ] Confirm purchase copy matches the price in `WRITEITDOWN_PLAN.md`
 - [ ] Confirm 2 Macs per license
 - [ ] Confirm 14-day refund policy
@@ -40,10 +43,11 @@ This checklist is for the signed and notarized DMG. Current product and pricing 
 - [ ] Publish checksum alongside DMG
 
 ## Final ship gate
+- [ ] Pass the live-site and shipped-DMG journeys, including negative controls and required manual evidence, following [`writeitdown/README.md`](../../../../writeitdown/README.md#host-routing-caddy-and-the-release-journey-gate). Local checks below do not replace them.
 - [ ] No known blocker remains for English keyboard input
 - [ ] No known blocker remains for Chinese IME
 - [ ] `WID_QA_LICENSE_ONLY=1 scripts/qa-window.sh` passes real-window three-session trial, exhaustion across restart, signed-token activation, offline restart and refund denial, with the exhausted trial counter unchanged. This is synthetic evidence only; menu/legacy-state denial and animation timing are covered by their focused Swift tests.
-- [ ] A genuine Waffo test order activates in the real app through AppState + WaffoLicenseClient; refund then refuses access. Record redacted evidence in `MANUAL_QA.md`, never the order number or token. Wrong-product/device/signature and seven-day boundaries must also pass `swift test`.
-- [ ] No known blocker remains for license activation or purchase
+- [ ] Before opening sales, a genuine Waffo test order activates in the real app through AppState + WaffoLicenseClient; refund then refuses access. Record redacted evidence in `MANUAL_QA.md`, never the order number or token. Wrong-product/device/signature and seven-day boundaries must also pass `swift test`.
+- [ ] Before opening sales, no known blocker remains for license activation or purchase
 - [ ] Confirm support mailbox and copyright holder before publishing; `support@writeitdown.app` is proposed, not verified. Info.plist copyright is Trefoil Studio; `LICENSE` still has a `Your Company` placeholder.
 - [ ] Upload the DMG and install the tested site bundle separately; neither release script deploys.

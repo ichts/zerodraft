@@ -131,6 +131,7 @@ Do not introduce unrelated SaaS or Mole-style cards, pill buttons, cool gray pal
 
 ## Testing gate
 
+- User-visible releases require a deterministic journey gate on the real target, with a known-broken-state proof for new or changed gates; each user-visible bug found becomes an assertion. Web journeys use WebKit with an iPhone device profile plus Chromium desktop and continuous video. For writeitdown.app and the shipped Mac DMG, the release procedure and evidence requirements are owned by `writeitdown/README.md`; local regression checks alone do not establish release acceptance.
 - Regression is proven only by deterministic commands: for the web surface, the repository-root `npm test` (the minimal landing/trial Playwright harness; it is not full root coverage) and `cd writeitdown && npm test` (the acceptance suite for the writeitdown.app sibling site, not for the root page); `swift build` and `swift test` (from `apps/macos/FirstLine/`) for the macOS app.
 - Agents write and modify tests, scripts, and fixtures; never use Sol, Fable, Grok, or any model-driven MCP clicking as a regression run.
 - Exploration may use real clicking (AXe, Jev, a human); once the same path is stable twice, it must be scripted.

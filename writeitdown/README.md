@@ -29,6 +29,56 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, an
 
 `download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Checkout stays closed; that gate is below.
 
+### Host routing (Caddy) and the release journey gate
+
+Use mutually exclusive download and page handlers. Do not put a site-level `try_files` before these handlers: it would rewrite missing downloads into the home page before the DMG matcher runs. Preserve the host's existing API routes separately.
+
+```caddyfile
+writeitdown.app {
+	root * /var/www/writeitdown.app
+	@dmg path *.dmg
+	handle @dmg {
+		header Content-Type application/x-apple-diskimage
+		file_server
+	}
+	handle {
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+}
+```
+
+The DMG branch has no fallback: `file_server` returns 404 when the image is absent. The page branch resolves `/download/` to `download/index.html` before trying the home page.
+
+After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The gate plays a brand-new visitor with one continuous video per viewport on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900). Its single fixed pace uses a two-second reading pause after every step and 90 ms keystrokes; there is no fast mode. The named `full-session` scenario completes a real sixty-second session and verifies the exact kept draft, COPY TEXT/COPIED action and real clipboard contents. The independent `silence-wipe` scenario enters a fresh room and verifies deletion after eight seconds of silence (100 ms scheduling allowance). Chromium grants clipboard read/write permissions; WebKit grants clipboard read permission and uses its gesture-authorized write path because Playwright WebKit does not accept a clipboard-write permission. The browser's deletion receipt is `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` It also checks the DMG content type, size and SHA-256 against the page and a random missing DMG's 404. Sign-in, checkout, test payment and post-payment output do not exist in this release. `journey/waivers.json` records each exemption, its reason and the approval source: captain release decision 2026-10-22 (relayed by main). The captain can revoke it. The gate requires every unasserted step to have a valid waiver, prints them under `WAIVED (feature does not exist yet)`, and records WAIVED rather than PASS. A missing or invalid approval fails the gate before browser work. After every executed step, a shared guard rejects checkout, buy, payment or sign-in controls and links, including accessible roles, input controls and form targets. When a feature ships, remove its waiver and replace its unasserted-step declaration with real journey assertions; a waiver cannot hide a newly offered feature. A gate pass still does not itself authorize deployment.
+
+Pre-deploy, serve the tree plus the real DMG with `node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025` and run `npm run journey -- --base http://127.0.0.1:8025 --expect-sha <sha>`. The server does not generate installers or rewrite the published checksum; use the release artifact matching the page. The assertions are one `block()` per page section in `journey/journey.mjs`.
+
+Prove the room assertions reject broken behavior before accepting them. From `writeitdown/`, run:
+
+```sh
+node journey/verify-room.mjs
+```
+
+It copies production assets into disposable sites under the worktree's `tmp/journey-controls/`, leaving production source unchanged. Three `room.js` mutations disable completion, disable the silence wipe, or show COPIED without writing anything. It executes the same named journey scenarios headlessly against each local site on WebKit iPhone and Chromium desktop, requires exit 1 and the expected failing assertion on both viewports, then requires both scenarios to pass on the intact site with exit 0. Each run retains continuous videos, `results.json` and a log; `report.json` records exit codes and failing assertion names. A missing browser or unrelated failure does not count as a successful negative control.
+
+Run `node --test journey/waivers.test.mjs` for focused waiver validation: it revokes each approval through the real CLI and checks forbidden controls in headless WebKit iPhone and Chromium. It does not exercise the Mac GUI.
+
+For a focused reproduction against a running local site, use `npm run journey -- --base http://127.0.0.1:8025 --scenarios full-session,silence-wipe`. Omitting `--scenarios` runs the complete release journey. Focused room checks do not validate downloads or the remaining marketing/support journey, and never replace the full gate against the live domain.
+
+### Shipped Mac journey
+
+From the repository root, run `bash apps/macos/FirstLine/scripts/dmg-journey.sh <real-dmg> <worktree-evidence-directory>` on an approved GUI test machine. It exercises the shipped image and verifies each free session's full sentence through the editor AX value. Session 1 exits to the remaining-trial count. Session 2 goes silent for nine seconds and requires an empty editor and the `DRAFT DELETED AT… TYPE TO START AGAIN.` receipt. Session 3 writes through the real one-minute deadline, requires the exact kept draft, kept receipt and COPY TEXT affordance, then clicks COPY TEXT and checks COPIED and the exact clipboard contents. RUN IT AGAIN must then reach activation after the exhausted free sessions. This run's nonempty `screen.mov` is mandatory: recorder startup failure, early exit, unsuccessful stop or missing output fails the gate. Do not run GUI journeys on the Mini screen.
+
+The Mac journey has not been executed; static checks do not establish GUI acceptance. A deliberately broken build proof for completion, deletion and copy remains pending a permitted GUI run, followed by the intact shipped-DMG journey. No Mac release acceptance is claimed.
+
+The automated isolated home does not prove Finder installation and first launch under a physically clean macOS login. Until that manual evidence is supplied, successful automation exits 2. Set `WID_DMG_CLEAN_USER_EVIDENCE` to a directory containing both:
+
+- A nonempty `.mov` or `.mp4` screen recording of Safari download, Finder drag to Applications, eject, first launch and Gatekeeper approval, and the three-session trial reaching activation.
+- A nonempty `notes.md` or `notes.txt` identifying the clean login, date, macOS version, DMG SHA-256, steps and observed outcomes, including the Developer ID identity and absence of a damaged-app warning.
+
+The script checks the directory, recording and notes before allowing exit 0. Their presence is an evidence prerequisite, not an automated judgment of their contents; captain review is still required.
+
 ### Mac page release order
 
 `mac.html` describes the Mac app (3 free sessions, then a USD 4.99 one-time license for 2 Macs with a 14-day refund, whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.

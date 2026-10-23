@@ -43,7 +43,7 @@ func TestPrivateKeyPermissions(t *testing.T) {
 
 func TestEnvironmentConfigRejectsProductionBeforeReadingKeys(t *testing.T) {
 	t.Setenv("LICENSE_ENVIRONMENT", "production")
-	if _, err := environmentConfig("unused.db"); err == nil || err.Error() != "LICENSE_ENVIRONMENT must be test" {
+	if _, err := environmentConfig("unused.db"); err == nil || err.Error() != "LICENSE_ENVIRONMENT must be test, or live with Stripe" {
 		t.Fatal("production configuration was not rejected", err)
 	}
 }

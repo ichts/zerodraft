@@ -1,6 +1,12 @@
 # Test deployment preparation
 
-These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
+## Stripe replacement and environment switch
+
+[`DEPLOY.md`](DEPLOY.md) owns the permanent receiver configuration, full replacement, TEST-first acceptance, environment switch and rollback commands. The HTTP and token contracts live in [`../README.md`](../README.md#stripe-adapter). The Waffo-only preparation below does not govern the Stripe deployment.
+
+## Waffo preparation (unchanged TEST-only posture)
+
+All remaining sections apply only to Waffo. These are review templates, not a deployed service or an installer. The dedicated merchant product and reported TEST callback target are recorded in `../README.md`; neither proves a deployed receiver. No host or credential is selected by these templates. Paid-release priority does not authorize production deployment. Do not run these templates against a TEST VPS without the specifically approved host and verified configuration through a safe channel. Production mode is not implemented.
 
 ## Gates before deployment
 

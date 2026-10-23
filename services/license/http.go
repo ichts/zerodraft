@@ -1,6 +1,6 @@
 // [INPUT] HTTP requests, peer addresses and the configured clock/proxy boundary.
-// [OUTPUT] Bounded request admission and a fail-closed checkout response.
-// [POS] HTTP safeguards shared by license routes; no checkout provider adapter yet.
+// [OUTPUT] Bounded admission, buyer-origin CORS, provider routing and database-free health.
+// [POS] HTTP safeguards for license routes and the selected checkout adapter.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
 
@@ -10,6 +10,43 @@ import (
 	"sync"
 	"time"
 )
+
+func (s *Server) Handler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok\n")) })
+	mux.HandleFunc("POST /api/v1/checkout", s.checkout)
+	mux.HandleFunc("GET /api/v1/license", s.stripeLicense)
+	mux.HandleFunc("OPTIONS /api/v1/checkout", s.browserPreflight)
+	mux.HandleFunc("OPTIONS /api/v1/license", s.browserPreflight)
+	mux.HandleFunc("POST /api/v1/webhooks/waffo", func(w http.ResponseWriter, r *http.Request) {
+		if s.cfg.Provider != "waffo" {
+			http.Error(w, "provider unavailable", 503)
+			return
+		}
+		s.webhook(w, r)
+	})
+	mux.HandleFunc("POST /api/v1/webhooks/stripe", s.stripeWebhook)
+	mux.HandleFunc("POST /api/v1/licenses/activate", s.activate)
+	mux.HandleFunc("POST /api/v1/licenses/validate", s.validate)
+	mux.HandleFunc("POST /api/v1/licenses/deactivate", s.deactivate)
+	return s.protect(mux)
+}
+
+const buyerOrigin = "https://writeitdown.app"
+
+func (s *Server) browserPreflight(w http.ResponseWriter, r *http.Request) {
+	method := "GET"
+	if r.URL.Path == "/api/v1/checkout" {
+		method = "POST"
+	}
+	if r.Header.Get("Origin") != buyerOrigin || r.Header.Get("Access-Control-Request-Method") != method {
+		http.Error(w, "origin or method unavailable", http.StatusForbidden)
+		return
+	}
+	w.Header().Set("Access-Control-Allow-Methods", method)
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.WriteHeader(http.StatusNoContent)
+}
 
 const maxRateClients = 4096
 
@@ -84,8 +121,14 @@ func (s *Server) protect(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
+		if r.URL.Path == "/api/v1/checkout" || r.URL.Path == "/api/v1/license" {
+			w.Header().Add("Vary", "Origin")
+			if r.Header.Get("Origin") == buyerOrigin {
+				w.Header().Set("Access-Control-Allow-Origin", buyerOrigin)
+			}
+		}
 		limits := s.clientLimits
-		if r.URL.Path == "/api/v1/webhooks/waffo" {
+		if r.URL.Path == "/api/v1/webhooks/waffo" || r.URL.Path == "/api/v1/webhooks/stripe" {
 			limits = s.webhookLimits
 		}
 		if !limits.allow(requestIP(r, s.cfg.TrustLoopbackProxy), s.now()) {
@@ -105,6 +148,10 @@ func (s *Server) protect(next http.Handler) http.Handler {
 }
 
 func (s *Server) checkout(w http.ResponseWriter, r *http.Request) {
-	// No provider call is safe until the checkout wire contract and product are verified.
+	if s.cfg.Provider == "stripe" {
+		s.stripeCheckout(w, r)
+		return
+	}
+	// Waffo checkout remains unavailable until its business contract is verified.
 	respond(w, http.StatusServiceUnavailable, map[string]string{"error": "checkout_not_configured"})
 }

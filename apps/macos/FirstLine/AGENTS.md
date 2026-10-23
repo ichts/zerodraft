@@ -11,8 +11,8 @@ scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用�
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
-docs/LICENSE_PAYMENT_SPEC.md: Waffo-backed service、签名 token、Mac 激活及真实订单发布门槛。
-docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前 Waffo 许可。
+docs/LICENSE_PAYMENT_SPEC.md: 签名许可服务、Mac 激活及真实订单发布门槛；支付适配器契约见 `services/license/README.md`。
+docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前签名许可服务。
 docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；当前验收项目以 `docs/WRITEITDOWN_PLAN.md` 为准。
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
 Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppState、构建菜单和窗口、激活应用；桥接新篇、整篇复制、关闭窗口等菜单动作与验证。
@@ -62,6 +62,6 @@ Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mo
 对外暴露
 可执行目标 `WriteItDown`
 
-法则: 草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 Waffo-backed license service，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；真实 Waffo 测试订单和真实窗口激活通过前不得公开售卖；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
+法则: 草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 `docs/LICENSE_PAYMENT_SPEC.md` 定义的签名许可服务，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；所选适配器的真实 TEST 订单和真实窗口激活通过前不得公开售卖；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。

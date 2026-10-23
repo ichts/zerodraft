@@ -1,6 +1,6 @@
-// [INPUT] Test-only configuration, pinned callback key, SQLite, optional private capture and HTTP requests.
+// [INPUT] Provider/mode configuration, callback keys, SQLite and HTTP requests.
 // [OUTPUT] Transactional licenses/activations and signed tokens, independent of capture IO.
-// [POS] License domain and provisional event mapping; waffo.go authenticates transport.
+// [POS] License domain and provisional Waffo mapping; stripe.go owns the Stripe adapter.
 // [PROTOCOL] Keep this header and AGENTS.md aligned with README.md.
 package main
 
@@ -29,11 +29,14 @@ import (
 const grace = 7 * 24 * time.Hour
 
 type Config struct {
-	Database, ProductID, Environment string
-	CaptureDirectory                 string
-	TestPublicKey                    []byte
-	TokenKey                         ed25519.PrivateKey
-	TrustLoopbackProxy               bool
+	Database, ProductID, Environment     string
+	CaptureDirectory                     string
+	TestPublicKey                        []byte
+	TokenKey                             ed25519.PrivateKey
+	TrustLoopbackProxy                   bool
+	Provider                             string
+	StripeWebhookSecret, StripeSecretKey string
+	StripePriceID, StripeAPIBase         string
 }
 type Server struct {
 	db                          *sql.DB
@@ -64,10 +67,25 @@ type claim struct {
 }
 
 func Open(cfg Config, now func() time.Time) (*Server, error) {
-	if cfg.Database == "" || cfg.ProductID == "" || cfg.Environment != "test" || len(cfg.TokenKey) != ed25519.PrivateKeySize {
+	if cfg.Database == "" || cfg.ProductID == "" || (cfg.Environment != "test" && cfg.Environment != "live") || len(cfg.TokenKey) != ed25519.PrivateKeySize {
 		return nil, errors.New("incomplete license configuration")
 	}
-	key, err := webhookKey(cfg)
+	if cfg.Provider == "" {
+		cfg.Provider = "waffo"
+	}
+	var key *rsa.PublicKey
+	var err error
+	switch cfg.Provider {
+	case "waffo":
+		if cfg.Environment != "test" {
+			return nil, errors.New("Waffo requires test environment")
+		}
+		key, err = webhookKey(cfg)
+	case "stripe":
+		err = configureStripe(&cfg)
+	default:
+		err = errors.New("unsupported license provider")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +106,12 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 	if err := migrateEventHash(db); err != nil {
 		db.Close()
 		return nil, err
+	}
+	if cfg.Provider == "stripe" {
+		if err := migrateStripe(db); err != nil {
+			db.Close()
+			return nil, err
+		}
 	}
 	capture, err := openCallbackCapture(cfg.CaptureDirectory, now)
 	if err != nil {
@@ -117,15 +141,6 @@ func webhookKey(c Config) (*rsa.PublicKey, error) {
 		return nil, errors.New("webhook key must be RSA with at least 2048 bits")
 	}
 	return rsaKey, nil
-}
-func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/checkout", s.checkout)
-	mux.HandleFunc("POST /api/v1/webhooks/waffo", s.webhook)
-	mux.HandleFunc("POST /api/v1/licenses/activate", s.activate)
-	mux.HandleFunc("POST /api/v1/licenses/validate", s.validate)
-	mux.HandleFunc("POST /api/v1/licenses/deactivate", s.deactivate)
-	return s.protect(mux)
 }
 func jsonInput(w http.ResponseWriter, r *http.Request, v any) bool {
 	mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))

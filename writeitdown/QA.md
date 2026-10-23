@@ -6,6 +6,16 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# GEO acceptance (historical)
+
+GEO pass, October 23, 2026. `llms.txt` ships as a real plain-text file, `robots.txt` names OAI-SearchBot, ChatGPT-User, GPTBot, PerplexityBot and ClaudeBot, and six answer pages join the sitemap and the support page. The change is additive: landing, trial and Mac visuals are untouched.
+
+`cd writeitdown && npm ci && npx playwright test` passes 222 tests with the 18 expected skips across the eight viewport/theme/motion projects. The new `qa/seo.spec.mjs` checks that every JSON-LD block parses, that each `FAQPage` question and answer equals the visible FAQ text on the landing and the six answer pages, that `Article` and `BreadcrumbList` match the visible H1, first sentence and breadcrumb, that each answer page has at least 120 visible words plus the self-description line, that sitemap order and canonicals match, that robots names the five crawlers, and that `/llms.txt` is served as `text/plain`, covers every public page and names no AI provider. `node --test session.test.mjs` passes 10 tests. `npm run release-check -- --download` reports STATIC CHECK PASSED. A local static serve of `writeitdown/` returns `Content-type: text/plain` for `/llms.txt`. `qa/test-install.py` installs the 30 exact production files, including `llms.txt` and the answer pages.
+
+Screenshots of all six answer pages at 1440x900 in light and dark and at 390x844 in light, plus `support.html` at 390x844 in light and dark, were inspected: no horizontal overflow, the breadcrumb wraps inline, and the FAQ headings separate cleanly from body copy.
+
+ChatGPT attribution stays on the existing Cloudflare Web Analytics beacon, which reports referrers. No custom tracker was added, and ChatGPT-referred visitors get no extra trial sessions. The live deploy and the real `curl -I https://writeitdown.app/llms.txt` stay unverified until the operator installs the bundle.
+
 # Centered-aperture acceptance (historical)
 
 This pass centers the trial writing aperture on the paper instead of pinning it to the upper third. The active-line center is y=450 at 1440x900 and y=422 at 390x844, matching the paper center at both widths. The editor's computed mask keeps mirrored alpha stops around the 40%-60% clear band in both themes.

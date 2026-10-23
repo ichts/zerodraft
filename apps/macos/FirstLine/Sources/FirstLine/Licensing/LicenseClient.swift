@@ -8,7 +8,8 @@ import Foundation
 
 protocol LicenseClient: Sendable {
     var isConfigured: Bool { get }
-    /// licenseKey is the opaque orderId credential; preserve its entered UTF-8 bytes.
+    /// licenseKey is the opaque orderId credential already trimmed of surrounding whitespace;
+    /// preserve its received UTF-8 bytes on the wire.
     func activate(licenseKey: String, instanceName: String) async throws -> LicenseActivation
     /// Nil is explicit revocation. Transport failures must throw, not revoke.
     func validate(token: String) async throws -> String?

@@ -292,7 +292,10 @@ final class AppState {
 
     func activateLicense(key: String) async {
         guard !licenseActivationInFlight else { return }
-        guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        // Surrounding whitespace is paste noise, never part of the credential. Trim once at the
+        // entry point so the empty check, cache comparison, request body and stored key agree.
+        let licenseKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !licenseKey.isEmpty else {
             licenseActivationError = .emptyKey
             return
         }
@@ -305,7 +308,7 @@ final class AppState {
             licenseActivationError = .productNotConfigured
             return
         }
-        if settings.licenseKey?.utf8.elementsEqual(key.utf8) == true, settings.licenseInstanceID != nil,
+        if settings.licenseKey?.utf8.elementsEqual(licenseKey.utf8) == true, settings.licenseInstanceID != nil,
            settings.licenseToken != nil, settings.licenseProductID == productID {
             switch await validateLicenseIfNeeded(allowInactive: true) {
             case true: return
@@ -318,7 +321,7 @@ final class AppState {
             }
         }
         do {
-            let activation = try await licenseClient.activate(licenseKey: key, instanceName: installLabel)
+            let activation = try await licenseClient.activate(licenseKey: licenseKey, instanceName: installLabel)
             guard activation.productID == productID else {
                 await rejectActivation(activation, reason: .wrongProduct)
                 return
@@ -331,7 +334,7 @@ final class AppState {
             // Snapshot the pre-activation state so a failed persist cannot leave the
             // app granting access that is not durable on disk.
             let preActivation = settings
-            settings.licenseKey = key
+            settings.licenseKey = licenseKey
             settings.licenseStatus = .active
             settings.licenseInstanceID = activation.instanceID
             settings.licenseProductID = productID

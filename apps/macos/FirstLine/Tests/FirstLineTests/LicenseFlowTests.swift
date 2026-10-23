@@ -140,16 +140,20 @@ struct LicenseFlowTests {
         #expect(reloaded.licenseProductID == "prod_mock")
     }
 
-    @Test
-    func activateLicensePreservesOpaqueCredentialBytes() async throws {
-        let (appState, mock, _, fm, tempRoot) = try makeAppState()
+    @Test(arguments: ["PRO-AAAA-BBBB-CCCC-DDDD\n", "  PRO-AAAA-BBBB-CCCC-DDDD",
+                      "PRO-AAAA-BBBB-CCCC-DDDD\r", "\tPRO-AAAA-BBBB-CCCC-DDDD \r\n"])
+    func activateLicenseTrimsSurroundingWhitespace(pasted: String) async throws {
+        let (appState, mock, store, fm, tempRoot) = try makeAppState()
         defer { try? fm.removeItem(at: tempRoot) }
 
-        await appState.activateLicense(key: "  PRO-TRIM-ME  \n")
+        await appState.activateLicense(key: pasted)
 
-        let args = await mock.lastActivateArguments
-        #expect(args?.licenseKey == "  PRO-TRIM-ME  \n")
-        #expect(appState.settings.licenseKey == "  PRO-TRIM-ME  \n")
+        #expect(await mock.lastActivateArguments?.licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(appState.licenseActivationError == nil)
+        #expect(appState.settings.licenseStatus == .active)
+        #expect(appState.settings.licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(try store.load().licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(appState.hasFullAccess)
     }
 
     @Test func cachedCredentialDoesNotAliasUnicodeEquivalentInput() async throws {
@@ -256,16 +260,17 @@ struct LicenseFlowTests {
         #expect(appState.licenseActivationError == .networkFailure)
     }
 
-    @Test
-    func activateLicenseEmptyTriggersEmptyKeyErrorWithoutCallingClient() async throws {
+    @Test(arguments: ["", "   ", "\n", "\t\r\n "])
+    func activateLicenseEmptyTriggersEmptyKeyErrorWithoutCallingClient(blank: String) async throws {
         let (appState, mock, _, fm, tempRoot) = try makeAppState()
         defer { try? fm.removeItem(at: tempRoot) }
 
-        await appState.activateLicense(key: "   ")
+        await appState.activateLicense(key: blank)
 
         #expect(appState.licenseActivationError == .emptyKey)
         let args = await mock.lastActivateArguments
         #expect(args == nil)
+        #expect(appState.settings.licenseKey == nil)
     }
 
     @Test

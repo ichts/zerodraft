@@ -5,6 +5,9 @@
 html,body{margin:0;padding:0}
 html.in-trial,html.in-trial body{height:100%;overflow:hidden}
 body{background:var(--wall);color:var(--ink)}
+/* A document page on the approved design-system page colour: it links tokens.css and carries .page-a on <body>,
+   where the legacy shell's canvas name --wall resolves to the page (background A) instead of the retired beige. */
+.page-a{--wall:var(--page)}
 ::selection{background:color-mix(in oklab,var(--ink) 18%,transparent)}
 a{color:var(--mute);text-decoration:none}
 a:hover{color:var(--ink)}

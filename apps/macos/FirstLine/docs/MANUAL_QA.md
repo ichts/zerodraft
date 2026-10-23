@@ -2,6 +2,13 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-23: Configured purchase build, no real-window acceptance
+
+- `swift build && swift test`: exit 0, 198 tests in 16 suites. Existing signed Ed25519 fixtures exercise activation, product/device binding, expiry, persistence and revocation through the unchanged token verifier and HTTP client. The exhausted-trial Buy test now clicks the enabled control through an injected URL opener and verifies the public purchase page; it never opens a real checkout.
+- `scripts/release-dmg.sh`: exit 0. The app and DMG are Developer ID signed, notarized, stapled and accepted by `spctl`. A read-only mount confirms the service URL, product ID, deployed public key, purchase URL and $4.99 price inside the image. DMG SHA-256: `714822ee9a5a80807c6ca42461fc12100e04892bf7a821c59c7bb011534f819a`.
+- `python3 scripts/test-release-config.py`: exit 0; executes the packager in a sandbox, proving empty/incomplete/unsafe release configuration is refused before building or signing.
+- No GUI capture, screen-recording permission change, Finder installation, real payment or deployment was attempted. Maintainer acceptance remains pending: TEST card checkout on the live site, returned key, clean-login Finder install/first launch, three-session exhaustion, real-window activation, second/third-Mac limits and refund revocation. Local signed-token tests do not establish that purchase loop. Keep LIVE disabled until it passes. TEST and LIVE must keep the same signing key and signed-token product ID so no new DMG is needed.
+
 ## 2026-10-22: Last-trial abandon, idle editor clear, and full-tree wipe wait
 
 This revalidates the three-session native trial after review closed the last-trial activation gate. Exhausted or revoked restart now abandons the charged session before Upgrade, so Settings and writing menus stay locked. The room editor clears on idle or denied prepare, so a late keystroke cannot keep the wiped draft. Wipe waits in `scripts/qa-window.sh` poll the full AX tree; a no-match driver query had returned an empty tree and stalled the last-trial snapshot even though the room had already deleted the draft. The site, checkout configuration, and signed-license predicates are unchanged.

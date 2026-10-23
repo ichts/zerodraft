@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# [INPUT] Mode: (none) release or --staging. Empty checkout/license configuration is the
-#         three-session free trial; a non-empty one must be a complete Waffo configuration
-#         (--staging accepts only the empty one).
+# [INPUT] Mode: (none) configured release or --staging (empty checkout/license config only).
+#         Release requires the complete HTTPS license service, product and raw Ed25519
+#         public key in Info.plist. TEST and LIVE use the same app configuration.
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
 #          The app is notarized and stapled on its own before the DMG, so it keeps a ticket
@@ -44,8 +44,8 @@ if sys.argv[2] == '--staging':
     if any(values):
         sys.exit('Staging requires empty checkout and license configuration; this DMG cannot be sold.')
     sys.exit(0)
-if not any(values):
-    sys.exit(0)  # free trial: three local sessions, no checkout or license configuration
+if not all(values):
+    sys.exit('Release blocked: configure checkout, license service, product and public key in Info.plist.')
 try:
     checkout, service = map(urlsplit, values[:2])
     for url in (checkout, service):
@@ -57,7 +57,7 @@ try:
     if not values[2].strip() or len(base64.b64decode(values[3], validate=True)) != 32:
         raise ValueError('product and raw Ed25519 public key required')
 except (ValueError, TypeError) as error:
-    sys.exit(f'Release blocked: configure Waffo checkout and license service in Info.plist: {error}')
+    sys.exit(f'Release blocked: configure checkout and license service in Info.plist: {error}')
 PY
 
 WID_APP_OUTPUT="$app" scripts/package-app.sh --unsigned

@@ -5,14 +5,14 @@
 //                                      placeholder input.
 //   node release-check.mjs --download  only the free-trial download page: the DMG link and
 //                                      its published SHA-256.
-//   --live                             after a static pass, fetch the URLs: the checkout must
-//                                      answer, the DMG must be a disk image whose SHA-256
-//                                      matches the published one.
+//   --live                             after a static pass, fetch the public buy page (never
+//                                      create a checkout or payment) and verify the hosted
+//                                      DMG against its published SHA-256.
 //   --root <dir>                       check another site copy (tests use fixtures).
 //
 // Passing proves the inputs are present and reachable, not that a purchase works.
-// Opening sales still needs a real test order (checkout, license email, activation,
-// refund) and an explicit go from the owner.
+// Opening LIVE sales still needs a real TEST checkout, returned license key, installed
+// DMG activation and refund verification. Static fixtures do not prove a purchase.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -49,8 +49,10 @@ export function blockers({ mac, support, plist }) {
   const found = [];
   const checkout = slot(mac, 'checkout');
   if (!checkout) found.push('Checkout URL: not confirmed in mac.html');
-  else if (!/^<a\s/i.test(checkout.tag)) found.push('Checkout URL: not a clickable link');
-  else if (!realURL(attr(checkout.tag, 'href'))) found.push('Checkout URL: not a real https destination');
+  else if (!/^<form\s/i.test(checkout.tag) || attr(checkout.tag, 'method') !== 'post')
+    found.push('Checkout URL: not a POST form');
+  else if (attr(checkout.tag, 'action') !== 'https://licenses.writeitdown.app/api/v1/checkout')
+    found.push('Checkout URL: not the license service checkout endpoint');
   const license = slot(mac, 'license');
   if (!license) found.push('License delivery and activation steps: not confirmed in mac.html');
   else if (license.text.length < 40 || PLACEHOLDER_TEXT.test(license.text)) found.push('License delivery and activation steps: placeholder copy');
@@ -59,7 +61,8 @@ export function blockers({ mac, support, plist }) {
   if (!mail || PLACEHOLDER_HOST.test(mail.split('@')[1] || '')) found.push('Support address: not listed in support.html#contact');
   const price = plistValue(plist, 'WIDDisplayPrice');
   if (!price || !mac.includes(`${price} ONCE.`)) found.push(`Price: mac.html does not show the app price ${price || '(empty)'}`);
-  if (checkout && plistValue(plist, 'WIDCheckoutURL') !== attr(checkout.tag, 'href'))
+  const canonical = mac.match(/<link\s+rel="canonical"\s+href="([^"]+)"/)?.[1];
+  if (!realURL(canonical) || plistValue(plist, 'WIDCheckoutURL') !== canonical)
     found.push('Checkout URL: Info.plist WIDCheckoutURL differs from mac.html');
   return found;
 }
@@ -94,7 +97,7 @@ async function fetchFailure(name, href, method) {
 
 async function liveBlockers({ mac, download }, { sale }) {
   const found = [];
-  if (sale) found.push(...await fetchFailure('checkout', attr(slot(stripComments(mac), 'checkout').tag, 'href'), 'GET'));
+  if (sale) found.push(...await fetchFailure('checkout', mac.match(/<link\s+rel="canonical"\s+href="([^"]+)"/)[1], 'GET'));
   const page = stripComments(download);
   const [result] = await fetchFailure('DMG', attr(slot(page, 'dmg').tag, 'href'), 'GET');
   if (!/^[0-9a-f]{64}$/.test(result)) found.push(result);
@@ -126,6 +129,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(args.includes('--live')
     ? 'LIVE CHECK PASSED: inputs present and reachable.'
     : 'STATIC CHECK PASSED: inputs present. Not verified live; run with --live.');
-  if (sale) console.log('Still required before opening sales: a real test order through checkout, license email, activation and refund, a delivered test email to the support address, and an explicit go.');
+  if (sale) console.log('Still required before LIVE sales: a real test order through checkout, returned license key, installed DMG activation and refund verification. No live payment was attempted.');
   else console.log('Download page ready: the DMG link and its published SHA-256 are in place.');
 }

@@ -5,7 +5,8 @@ Parent instructions: `../AGENTS.md`
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
-scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
+scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
+scripts/test-release-config.py: 沙箱执行 release-dmg.sh 的配置门槛，验证正式包拒绝缺项、非 HTTPS 地址和无效公钥；不构建、不签名，供网页 QA 单次调用。
 scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
 scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用、末次擦除报告及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
@@ -62,6 +63,10 @@ Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mo
 对外暴露
 可执行目标 `WriteItDown`
 
-法则: 草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 `docs/LICENSE_PAYMENT_SPEC.md` 定义的签名许可服务，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；所选适配器的真实 TEST 订单和真实窗口激活通过前不得公开售卖；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
+法则: 草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；license 激活只走 `docs/LICENSE_PAYMENT_SPEC.md` 定义的签名许可服务，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；真实 TEST 订单和已安装发布 DMG 的窗口激活通过前不得开启 LIVE 收款；购买页、密钥交付和 TEST-to-LIVE 门槛见 `../../../writeitdown/README.md`；checkout URL 在外部浏览器打开，不内嵌 WebView；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/site.css` 的 alarm token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。
+
+## Maintaining this file
+
+只保留未来会话普遍需要的模块知识。优先指向权威文件和验收命令，不复制代码细节；更新时优先改写或删减既有条目，保持简洁。

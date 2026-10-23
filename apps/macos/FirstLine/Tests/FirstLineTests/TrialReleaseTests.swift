@@ -19,9 +19,11 @@ private struct OfflineSignedClient: LicenseClient {
 @MainActor
 struct TrialReleaseTests {
     private func makeState(at root: URL, now: @escaping () -> TimeInterval = { 0 },
-                           client: MockLicenseClient = MockLicenseClient()) -> AppState {
+                           client: MockLicenseClient = MockLicenseClient(),
+                           openURL: @escaping (URL) -> Void = { _ in }) -> AppState {
         AppState(sessionEngine: SessionEngine(now: now), settingsStore: SettingsStore(configDirectory: root),
-                 licenseClient: client, installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock")
+                 licenseClient: client, installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock",
+                 openExternalURL: openURL)
     }
 
     private func tempRoot() -> URL {
@@ -104,7 +106,8 @@ struct TrialReleaseTests {
         let state = makeState(at: root)
         for _ in 0..<3 { try writeSession(state) }
         #expect(state.selectedSurface == .upgrade)
-        let restarted = makeState(at: root)
+        var checkout: URL?
+        let restarted = makeState(at: root, openURL: { checkout = $0 })
         #expect(restarted.trialSessionsRemaining == 0)
         #expect(!restarted.canStartSession)
         #expect(!restarted.hasFullAccess)
@@ -121,7 +124,9 @@ struct TrialReleaseTests {
         #expect(fields.contains { $0.stringValue == "After 3 free sessions, a license is required to keep writing." })
         #expect(fields.contains { $0.placeholderString == "Order number or activation code" })
         let buy = try #require(descendants(screen.view, of: NSButton.self).first { $0.title.hasPrefix("Buy a license") })
-        #expect(!buy.isEnabled)
+        #expect(buy.isEnabled)
+        buy.performClick(nil)
+        #expect(checkout?.absoluteString == "https://writeitdown.app/mac.html")
     }
 
     @Test func wipedSessionRestartSpendsAnotherButLastWipeDoesNotSellImmediately() throws {

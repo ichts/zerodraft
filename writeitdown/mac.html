@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
 <title>Write It Down for Mac - WRITE_IT_DOWN</title>
 <link rel="canonical" href="https://writeitdown.app/mac.html">
-<meta name="description" content="A native Mac writing room. Write forward or lose the draft. 3 free sessions, then $4.99 once for two Macs. Buying opens soon.">
+<meta name="description" content="A native Mac writing room. Write forward or lose the draft. 3 free sessions, then USD 4.99 once for two Macs. Free updates and a 14-day refund.">
 <script src="theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,50 +18,51 @@
 <nav class="row nav" aria-label="Main"><a class="logotype" href="index.html">WRITE_IT_DOWN</a><button class="theme-btn" type="button" data-theme-toggle aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></nav>
 <main class="legal">
 <h1>Write It Down for Mac</h1>
+<section id="license-delivery" hidden aria-labelledby="license-heading">
+<h2 id="license-heading">Your license</h2>
+<p id="license-status" role="status"></p>
+<div id="license-result" hidden>
+<p><code id="license-key"></code></p>
+<p>Paste this key into the app's activation field.</p>
+<button class="door" id="copy-license" type="button">COPY LICENSE KEY</button>
+<p id="copy-status" role="status"></p>
+</div>
+</section>
 <p>A native Mac writing room. Pick a session from one to thirty minutes and write forward. Deleting, pasting, cutting, and undo are blocked. Stop typing for too long and the draft is deleted. Reach the end of the clock and the text is yours to copy. Nothing is saved to disk or uploaded.</p>
 <p class="report" id="price">$4.99 ONCE. TWO MACS. NO SUBSCRIPTION.</p>
-<p>Your first 3 writing sessions are free. After that, a single $4.99 payment covers 2 Macs and comes with a 14-day refund. Buying opens soon. The web version stays free, no sign-up.</p>
+<p>Your first 3 writing sessions are free. After that, a single USD $4.99 payment to Trefoil Studio covers 2 Macs, free updates, and a 14-day refund. The web version stays free, no sign-up.</p>
 <div class="actions">
 <a class="door" href="download/">DOWNLOAD FREE TRIAL FOR MAC</a>
 <a class="door door-ghost" href="index.html#trial">TRY IT IN YOUR BROWSER</a>
-<!-- Launch inputs. Replace each pending line only after the destination is verified
-     end to end (a real test order: checkout, license delivery, activation, refund):
-     <a class="door" data-launch="checkout" href="https://(verified checkout URL)">BUY - $4.99</a>
-     Run `npm run release-check -- --live` before installing the site. -->
-<p class="report" data-launch-pending="checkout">BUY - $4.99: COMING SOON. <a class="mini-link" href="#waitlist">GET ONE EMAIL WHEN IT OPENS</a></p>
+<form id="buy" data-launch="checkout" method="post" action="https://licenses.writeitdown.app/api/v1/checkout">
+<button class="door" type="submit">BUY - $4.99</button>
+</form>
+<p class="report" id="checkout-status" role="status"></p>
+<noscript><p>Buying requires JavaScript. Enable it and reload this page.</p></noscript>
 </div>
 <p>Requires macOS 14 Sonoma or later, on Apple silicon or Intel. The <a href="download/">download page</a> lists the disk image checksum and install steps.</p>
-<h2 id="waitlist">Purchase opens soon</h2>
-<p>Leave your email to be notified.</p>
-<form class="waitlist" id="waitlist-form" method="post" action="/api/waitlist">
-  <label class="mini-link" for="waitlist-email">EMAIL</label>
-  <input id="waitlist-email" name="email" type="email" required maxlength="254" autocomplete="email" inputmode="email" spellcheck="false" autocapitalize="off">
-  <div class="waitlist-trap" aria-hidden="true"><label>Leave empty <input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
-  <label class="waitlist-consent"><input name="consent" type="checkbox" value="yes" required>
-    <span>Send me one email when Write It Down for Mac can be bought. That is the only email. Unsubscribe anytime by writing to <a href="mailto:contact@trefoilstudio.com">contact@trefoilstudio.com</a>. Trefoil Studio stores only this address and the time you sent it, and never shares it with third parties.</span>
-  </label>
-  <p class="waitlist-zh" lang="zh-Hans">勾选即同意：Write It Down Mac 版开放购买时，我们只给你发一封通知邮件，仅此一封。随时可写信到 contact@trefoilstudio.com 退订。Trefoil Studio 只保存这个邮箱和提交时间，不与任何第三方共享。</p>
-  <button class="door" type="submit">NOTIFY ME</button>
-  <p class="report waitlist-status" id="waitlist-status" role="status" aria-live="polite"></p>
-  <p class="report waitlist-note" id="waitlist-joined">YOU ARE ON THE LIST. ONE EMAIL WHEN PURCHASE OPENS.</p>
-  <p class="report waitlist-note" id="waitlist-invalid">ENTER A VALID EMAIL AND TICK THE BOX.</p>
-  <p class="report waitlist-note" id="waitlist-limited">TOO MANY TRIES. WAIT TEN MINUTES.</p>
-  <p class="report waitlist-note" id="waitlist-error">NOT SAVED. TRY AGAIN LATER.</p>
-</form>
-<p>See the <a href="privacy.html#waitlist">privacy policy</a> for how the address is handled.</p>
 <h2 id="install">Install</h2>
 <p>Open the disk image, drag Write It Down to Applications, then eject the disk image.</p>
 <h2 id="activate">Activate</h2>
-<p>After your 3 free sessions, writing in the Mac app requires a license. Buying is not open yet. One license will work on two Macs. Activation will need an internet connection. <a href="support.html#mac">Activation help</a>.</p>
-<p class="report" data-launch-pending="license">LICENSE DELIVERY AND ACTIVATION STEPS ARE PUBLISHED WHEN SALES OPEN.</p>
+<p>After your 3 free sessions, writing in the Mac app requires a license. One license works on two Macs. Activation needs an internet connection. <a href="support.html#mac">Activation help</a>.</p>
+<p data-launch="license">After payment, return to this page to get your license key. Copy it and paste it into the app's activation field.</p>
 <h2 id="refund">Refunds</h2>
 <p>You have 14 days from purchase to ask for a refund. No reason needed. Contact <a href="support.html#contact">support</a> with the email address you used at checkout. The refund goes back to your original payment method, and the license stops working on every Mac.</p>
 <h2 id="privacy">Privacy and support</h2>
-<p>The Mac app keeps writing in memory on your Mac and never uploads it. It stores settings and a local trial session counter in its settings file on the Mac. That counter is not sent anywhere. License activation and checks will send license details and a random installation identifier to the license service, never your draft. See the <a href="privacy.html#mac">privacy policy</a>, the <a href="terms.html#mac">terms</a>, and <a href="support.html">support</a>.</p>
+<p>The Mac app keeps writing in memory on your Mac and never uploads it. It stores settings and a local trial session counter in its settings file on the Mac. That counter is not sent anywhere. License activation and checks send license details and a random installation identifier to the license service, never your draft. See the <a href="privacy.html#mac">privacy policy</a>, the <a href="terms.html#mac">terms</a>, and <a href="support.html">support</a>.</p>
 </main>
 <footer class="row foot"><a class="mini-link" href="index.html">BACK TO THE ROOM</a><div class="foot-links"><a class="mini-link" href="mac.html">MAC APP</a><a class="mini-link" href="support.html">SUPPORT</a><a class="mini-link" href="privacy.html">PRIVACY</a><a class="mini-link" href="terms.html">TERMS</a></div></footer>
 </div>
-<script src="waitlist.js"></script>
-<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "df0c43279d154d5eb9ee4ef8a7d92fec"}'></script><!-- End Cloudflare Web Analytics -->
+<script src="buy.js"></script>
+<!-- Never send checkout session credentials to analytics. -->
+<script>
+if (!new URLSearchParams(location.search).has('session_id')) {
+  const beacon = document.createElement('script');
+  beacon.type = 'module';
+  beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+  beacon.dataset.cfBeacon = '{"token":"df0c43279d154d5eb9ee4ef8a7d92fec"}';
+  document.body.append(beacon);
+}
+</script>
 </body>
 </html>

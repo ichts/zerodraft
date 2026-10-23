@@ -16,6 +16,14 @@ Screenshots of all six answer pages at 1440x900 in light and dark and at 390x844
 
 Analytics records were not independently verified. The live deploy and the real `curl -I https://writeitdown.app/llms.txt` remained unverified pending the operator's bundle installation.
 
+# 2026-10-23: Mac purchase and license delivery (local only)
+
+- `cd writeitdown && npm ci && npx playwright test`: exit 0, 339 passed and 29 expected skips across desktop/mobile, both themes and both motion preferences. Skips are duplicate filesystem checks and existing reduced-motion demo cases. Checkout HTTP is intercepted: the suite proves POST/navigation, paid key/copy, pending/unknown/error neutrality, no key before a successful response and no return-page analytics/referrer leak. It does not charge a card.
+- Before implementation, `npx playwright test qa/checkout.spec.mjs --project=1440-light-no-preference --grep 'Buy posts once'` exited 1 because the existing waitlist page had no Buy button. The same journey now passes. Installer acceptance also runs a deliberately broken installer without its symlink guard and requires rejection.
+- `npm run release-check -- --download`, `npm run release-check`, `node --test session.test.mjs`, `python3 qa/test-install.py`, shell syntax, ShellCheck and `git diff --check`: exit 0. Installer acceptance covers all 23 production files, preserved backup, repeat installation and refusal to follow destination symlinks. A pre-existing ShellCheck warning on the empty CDPATH assignment was corrected without changing its behavior.
+- Inspected desktop and mobile screenshots for Buy, paid/COPIED, neutral pending and the download page in the existing light/dark system. The paid key appears above the sales copy on return and is asserted to be in the viewport. No CSS, tokens, room input rules, demo timing or motion were changed.
+- The configured DMG is signed/notarized; native acceptance and pending installation/window checks are recorded in `../apps/macos/FirstLine/docs/MANUAL_QA.md`. Neither a real live-site TEST purchase, buyer-key route/CORS deployment, clean-user installation nor real-window activation was observed here. The older full release journey still blocks the newly offered payment feature; see the release-order section in `README.md`. Keep LIVE disabled until independent TEST acceptance passes.
+
 # Centered-aperture acceptance (historical)
 
 This pass centers the trial writing aperture on the paper instead of pinning it to the upper third. The active-line center is y=450 at 1440x900 and y=422 at 390x844, matching the paper center at both widths. The editor's computed mask keeps mirrored alpha stops around the 40%-60% clear band in both themes.

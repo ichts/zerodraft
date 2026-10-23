@@ -50,7 +50,7 @@ Attribution stays on the existing Cloudflare Web Analytics beacon's referrer rep
 
 ### Mac download release
 
-`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must be the Mac trial PR 42 build (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Checkout stays closed; that gate is below.
+`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must contain the configured license service origin, product ID and deployed Ed25519 public key from the app's `Info.plist` (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Payment acceptance and the TEST-to-LIVE gate are below.
 
 ### Host routing (Caddy) and the release journey gate
 
@@ -104,10 +104,18 @@ The script checks the directory, recording and notes before allowing exit 0. The
 
 ### Mac page release order
 
-`mac.html` describes the Mac app (3 free sessions, then a USD 4.99 one-time license for 2 Macs with a 14-day refund, whose purchase is not open yet): the free-trial download and the web room are its working CTAs, Buy is a visible "coming soon" notice, and the waitlist form posts to `/api/waitlist` (`services/waitlist/`). `waitlist.js` only enhances the form; without JavaScript the collector's 303 fragment is revealed by `:target`.
+`mac.html` and `/download/` offer the three-session free trial plus a USD 4.99 one-time license for 2 Macs, free updates and a 14-day refund. Public seller: Trefoil Studio. The waitlist form and its browser script are removed. The installer no longer depends on the waitlist collector; any existing waitlist data remains subject to the privacy policy.
 
-1. Deploy the Go collector using [`services/waitlist/README.md`](../services/waitlist/README.md) behind the site's reverse proxy. `install.sh` refuses to install the site until `https://writeitdown.app/api/waitlist/health` (override with `WAITLIST_HEALTH_URL`) answers `ok`. This is only a preflight: submit one real test address from the page, confirm its stored line, then remove it. Neither the collector's presence in this repository nor a local test proves deployment.
-2. Send a test email to and from contact@trefoilstudio.com: the consent text promises unsubscribe by email and refunds go through it.
-3. Keep the sale closed until paid checkout is integrated and independently verified. Then replace each `data-launch-pending` notice on `mac.html` (checkout, license steps) with its verified element, set the same checkout URL in the app's `Info.plist`, and pass `npm run release-check -- --live`. A pass does not replace the genuine TEST purchase, credential delivery, Mac activation and refund acceptance defined in [`LICENSE_PAYMENT_SPEC.md`](../apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md), or explicit approval to open.
+`buy.js` posts to `https://licenses.writeitdown.app/api/v1/checkout` and follows the successful JSON `url` to hosted checkout. On return to `mac.html?session_id=...`, it GETs `/api/v1/license?session_id=...` on the same service and renders only a nonempty string `licenseKey` from a successful response. No key is shown for pending, unknown, malformed or failed responses. The buyer copies the key into the app's activation field. The session credential is never sent to analytics or in referrers. Keys are not stored in the browser. JavaScript is required for buying and key delivery.
+
+Send a test email to and from contact@trefoilstudio.com to verify the support and refund contact.
+
+1. Deploy the license service in TEST mode, including the buyer-key route and CORS allowing the apex site. The buyer-key route is an external dependency: a missing route must show the neutral pending notice, not a successful purchase.
+2. Build the signed/notarized DMG with `apps/macos/FirstLine/scripts/release-dmg.sh`. Publish its exact SHA-256 in the download page and keep the tested website files and DMG in one deploy bundle. The script refuses an empty or incomplete release configuration. Keep the existing service signing key for TEST and LIVE.
+3. Run `npm run release-check -- --download` and `npm run release-check` locally. After an authorized bundle installation, run their `--live` variants to verify the actual hosted artifact. These commands never create checkout sessions or charges.
+4. On the live site, complete a real TEST checkout with a test card, retrieve the key, install this DMG via Finder, exhaust the three trial sessions and activate it. Check the second-Mac allowance, third-install denial and refund revocation. Real-window/clean-login steps and the full payment journey remain independent maintainer acceptance; mocked Playwright responses and signed-token unit fixtures do not prove this loop.
+5. Only after that TEST loop passes may the authorized maintainer switch the service environment to LIVE and restart it, following `services/license/deploy/DEPLOY.md` and the readiness gates in `services/license/README.md`. Keep the same signing key, service URL, product ID and website checkout URL: no new DMG or rebuild is required. Do not create a second payment account.
+
+The older full `journey:live` gate still declares checkout/payment absent and rejects newly offered Buy controls. It must not be reported as payment acceptance or bypassed with a waiver. Its focused room scenarios remain useful; extend the full gate with real TEST purchase evidence before accepting this paid release.
 
 See `QA.md` for validation evidence and limits.

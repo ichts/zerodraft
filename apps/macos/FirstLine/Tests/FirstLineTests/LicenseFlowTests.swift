@@ -72,6 +72,7 @@ struct LicenseFlowTests {
         let appState = AppState(
             settingsStore: store,
             licenseClient: mock,
+            checkoutClient: MockCheckoutClient(),
             installIDStore: installStore,
             clock: { clockNow },
             productID: "prod_mock"
@@ -94,7 +95,7 @@ struct LicenseFlowTests {
         func views(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(views) }
         let all = views(upgrade.view)
         let buy = try #require(all.compactMap { $0 as? NSButton }.first { $0.title.contains("Buy a license") })
-        #expect(buy.isEnabled == (AppState.checkoutURL != nil))
+        #expect(buy.isEnabled == (AppState.checkoutURL != nil && AppState.configuredCheckoutClient.isConfigured))
         if AppState.checkoutURL == nil {
             #expect(all.compactMap { $0 as? NSTextField }.contains { $0.stringValue == "Checkout is not available yet." && !$0.isHidden })
         }
@@ -140,16 +141,54 @@ struct LicenseFlowTests {
         #expect(reloaded.licenseProductID == "prod_mock")
     }
 
-    @Test
-    func activateLicensePreservesOpaqueCredentialBytes() async throws {
-        let (appState, mock, _, fm, tempRoot) = try makeAppState()
+    @Test(arguments: ["PRO-AAAA-BBBB-CCCC-DDDD\n", "  PRO-AAAA-BBBB-CCCC-DDDD",
+                      "PRO-AAAA-BBBB-CCCC-DDDD\r", "\tPRO-AAAA-BBBB-CCCC-DDDD \r\n"])
+    func activateLicenseTrimsSurroundingWhitespace(pasted: String) async throws {
+        let (appState, mock, store, fm, tempRoot) = try makeAppState()
         defer { try? fm.removeItem(at: tempRoot) }
 
-        await appState.activateLicense(key: "  PRO-TRIM-ME  \n")
+        await appState.activateLicense(key: pasted)
 
-        let args = await mock.lastActivateArguments
-        #expect(args?.licenseKey == "  PRO-TRIM-ME  \n")
-        #expect(appState.settings.licenseKey == "  PRO-TRIM-ME  \n")
+        #expect(await mock.lastActivateArguments?.licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(appState.licenseActivationError == nil)
+        #expect(appState.settings.licenseStatus == .active)
+        #expect(appState.settings.licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(try store.load().licenseKey == "PRO-AAAA-BBBB-CCCC-DDDD")
+        #expect(appState.hasFullAccess)
+    }
+
+    @Test(arguments: ["\u{a0}", "\u{2003}", "\u{2028}", "\u{b}", "\u{c}", "\u{a0}KEY\u{2003}", "K E\tY\r\n内"])
+    func activationPreservesNonPaddingCredentialBytes(credential: String) async throws {
+        let (state, client, store, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        await state.activateLicense(key: " \t\r\n" + credential + "\r\n\t ")
+        let sent = try #require(await client.lastActivateArguments?.licenseKey)
+        let saved = try #require(store.load().licenseKey)
+        #expect(sent.utf8.elementsEqual(credential.utf8))
+        #expect(saved.utf8.elementsEqual(credential.utf8))
+        #expect(state.settings.hasLicenseKey)
+        #expect(state.hasFullAccess)
+        await state.activateLicense(key: credential)
+        #expect(await client.lastValidatedToken == "mock-token")
+    }
+
+    @Test func upgradePrecheckAcceptsNonASCIISpaceCredential() async throws {
+        let (state, client, _, fm, root) = try makeAppState()
+        defer { try? fm.removeItem(at: root) }
+        let upgrade = UpgradeViewController(appState: state)
+        func descendants(_ view: NSView) -> [NSView] {
+            view.subviews.flatMap { [$0] + descendants($0) }
+        }
+        let views = descendants(upgrade.view)
+        let field = try #require(views.compactMap { $0 as? NSTextField }.first { $0.isEditable })
+        let activate = try #require(views.compactMap { $0 as? NSButton }.first { $0.title == "Activate" })
+        field.stringValue = " \t\u{a0}\r\n"
+        activate.performClick(nil)
+        for _ in 0..<100 where !state.licenseActivationJustSucceeded {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await client.lastActivateArguments?.licenseKey == "\u{a0}")
+        #expect(state.hasFullAccess)
     }
 
     @Test func cachedCredentialDoesNotAliasUnicodeEquivalentInput() async throws {
@@ -256,16 +295,17 @@ struct LicenseFlowTests {
         #expect(appState.licenseActivationError == .networkFailure)
     }
 
-    @Test
-    func activateLicenseEmptyTriggersEmptyKeyErrorWithoutCallingClient() async throws {
+    @Test(arguments: ["", "   ", "\n", "\t\r\n "])
+    func activateLicenseEmptyTriggersEmptyKeyErrorWithoutCallingClient(blank: String) async throws {
         let (appState, mock, _, fm, tempRoot) = try makeAppState()
         defer { try? fm.removeItem(at: tempRoot) }
 
-        await appState.activateLicense(key: "   ")
+        await appState.activateLicense(key: blank)
 
         #expect(appState.licenseActivationError == .emptyKey)
         let args = await mock.lastActivateArguments
         #expect(args == nil)
+        #expect(appState.settings.licenseKey == nil)
     }
 
     @Test
@@ -603,7 +643,7 @@ struct LicenseFlowTests {
         let upgradeView = upgrade.view
         let homeView = home.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Order number or activation code" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Order number or activation code" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "WID-XXXX-XXXX" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })
@@ -611,14 +651,15 @@ struct LicenseFlowTests {
 
         await state.validateLicenseIfNeeded()
         let status = valid ? "License active." : "License revoked. Enter a valid order number or activation code."
+        let upgradeStatus = valid ? "This Mac is licensed." : status
         for _ in 0..<50 {
             if fields(settingsView).contains(where: { $0.stringValue == status }) &&
-                fields(upgradeView).contains(where: { $0.stringValue == (valid ? "License active on this Mac." : status) }) &&
+                fields(upgradeView).contains(where: { $0.stringValue == upgradeStatus }) &&
                 fields(homeView).contains(where: { $0.stringValue == status }) { break }
             await Task.yield()
         }
         #expect(fields(settingsView).contains { $0.stringValue == status })
-        #expect(fields(upgradeView).contains { $0.stringValue == (valid ? "License active on this Mac." : status) })
+        #expect(fields(upgradeView).contains { $0.stringValue == upgradeStatus })
         #expect(fields(homeView).contains { $0.stringValue == status })
         #expect(settingsKey.stringValue == "unfinished key")
         #expect(upgradeKey.stringValue == "unfinished key")
@@ -882,6 +923,7 @@ struct LicenseFlowTests {
         let appState = AppState(
             settingsStore: store,
             licenseClient: mock,
+            checkoutClient: MockCheckoutClient(),
             installIDStore: installStore,
             clock: { Date(timeIntervalSince1970: 1_700_000_000) },
             productID: "prod_mock"

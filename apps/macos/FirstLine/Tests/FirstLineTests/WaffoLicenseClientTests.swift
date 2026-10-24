@@ -192,6 +192,25 @@ struct WaffoLicenseClientTests {
         }
     }
 
+    @Test func activationSendsTheTrimmedCredentialWithoutRewritingItsBytes() async throws {
+        let f = SignedLicenseFixture()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // Surrounding paste noise is dropped; internal bytes (a decomposed accent, an inner space) stay verbatim.
+        let canonical = "order-cafe\u{0301} 42"
+        let state = makeState(f, root: root, clock: { f.now })
+        LicenseHTTPStub.handler.set { request in
+            let body = try Self.body(request)
+            #expect(body["orderId"]?.utf8.elementsEqual(canonical.utf8) == true)
+            let label = try #require(body["installLabel"])
+            return try Self.reply(f.token(install: label))
+        }
+        await state.activateLicense(key: " \t\(canonical)\r\n")
+        #expect(state.licenseActivationError == nil)
+        #expect(state.settings.licenseKey?.utf8.elementsEqual(canonical.utf8) == true)
+        #expect(state.hasFullAccess)
+    }
+
     @Test func activationRefusesInvalidSignatureProductDeviceAndPayload() async throws {
         let f = SignedLicenseFixture()
         for token in try [SignedLicenseFixture().token(), f.token(product: "other"), f.token(install: "other"), "bad"] {

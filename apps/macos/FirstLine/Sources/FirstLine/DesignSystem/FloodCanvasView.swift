@@ -17,7 +17,7 @@ import AppKit
 @MainActor
 final class FloodCanvasView: NSView {
 
-    /// 填充色，默认 bone canvas。设为 paperNSColor 即可作为白纸背景。
+    /// 填充色，默认页面 page；设为 sheetNSColor 即可作为白纸背景。
     var fillColor: NSColor {
         didSet { needsDisplay = true }
     }
@@ -30,8 +30,16 @@ final class FloodCanvasView: NSView {
     var borderWidth: CGFloat = 0 {
         didSet { needsDisplay = true }
     }
+    /// 圆角。纸面 16，卡片 22；页面保持 0。
+    var cornerRadius: CGFloat = 0 {
+        didSet { needsDisplay = true }
+    }
+    /// 是否裁切子视图到圆角（纸面/卡片为 true，页面为 false）。
+    var clipsContent: Bool = false {
+        didSet { needsDisplay = true }
+    }
 
-    init(fillColor: NSColor = FirstLineColors.canvasNSColor) {
+    init(fillColor: NSColor = FirstLineColors.pageNSColor) {
         self.fillColor = fillColor
         super.init(frame: .zero)
         commonInit()
@@ -57,13 +65,17 @@ final class FloodCanvasView: NSView {
 
     override func updateLayer() {
         super.updateLayer()
-        layer?.backgroundColor = fillColor.cgColor
-        if let borderColor {
-            layer?.borderWidth = borderWidth
-            layer?.borderColor = borderColor.cgColor
-        } else {
-            layer?.borderWidth = 0
-            layer?.borderColor = nil
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = fillColor.cgColor
+            layer?.cornerRadius = cornerRadius
+            layer?.masksToBounds = clipsContent
+            if let borderColor {
+                layer?.borderWidth = borderWidth
+                layer?.borderColor = borderColor.cgColor
+            } else {
+                layer?.borderWidth = 0
+                layer?.borderColor = nil
+            }
         }
     }
 

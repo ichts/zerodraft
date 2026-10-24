@@ -4,29 +4,37 @@ import Testing
 
 @MainActor
 struct DesignTokenTests {
-    @Test func lightTokensResolveToSiteColors() {
+    @Test func lightTokensResolveToBackgroundA() {
         assertPalette(.aqua, expected: [
-            (FirstLineColors.canvasNSColor, 0xd8d2c3), (FirstLineColors.paperNSColor, 0xf7f4ea),
-            (FirstLineColors.inkNSColor, 0x1a1813), (FirstLineColors.dimNSColor, 0x6f6a5d),
-            (FirstLineColors.faintNSColor, 0xb3ada0), (FirstLineColors.washWallNSColor, 0xd1c1ac),
-            (FirstLineColors.washPaperNSColor, 0xebdfce), (FirstLineColors.deepWallNSColor, 0xc6b095),
-            (FirstLineColors.deepPaperNSColor, 0xdecab3),
+            (FirstLineColors.pageNSColor, 0xF7F7F5), (FirstLineColors.sheetNSColor, 0xFFFFFF),
+            (FirstLineColors.inkNSColor, 0x1C1917), (FirstLineColors.muteNSColor, 0x6B655C),
+            (FirstLineColors.chromeNSColor, 0x5C564D), (FirstLineColors.tagBackgroundNSColor, 0xF2F2F0),
+            (FirstLineColors.redNSColor, 0xB02A1E), (FirstLineColors.redSoftNSColor, 0xF6E2DC),
+            (FirstLineColors.redDeepNSColor, 0xEBC8BD), (FirstLineColors.onInkNSColor, 0xFFFFFF),
         ])
     }
 
-    @Test func darkTokensResolveToSiteColors() {
+    @Test func darkTokensResolveToLandingDarkTheme() {
         assertPalette(.darkAqua, expected: [
-            (FirstLineColors.canvasNSColor, 0x15140f), (FirstLineColors.paperNSColor, 0x211f18),
-            (FirstLineColors.inkNSColor, 0xece7d9), (FirstLineColors.dimNSColor, 0x8f897a),
-            (FirstLineColors.faintNSColor, 0x5c574c), (FirstLineColors.washWallNSColor, 0x2e1712),
-            (FirstLineColors.washPaperNSColor, 0x3a1c15), (FirstLineColors.deepWallNSColor, 0x3d1d15),
-            (FirstLineColors.deepPaperNSColor, 0x4a2318),
+            (FirstLineColors.pageNSColor, 0x15140F), (FirstLineColors.sheetNSColor, 0x26231C),
+            (FirstLineColors.inkNSColor, 0xECE7D9), (FirstLineColors.muteNSColor, 0xA39D8E),
+            (FirstLineColors.chromeNSColor, 0xA39D8E), (FirstLineColors.tagBackgroundNSColor, 0x2E2A22),
+            (FirstLineColors.redNSColor, 0xE4604A), (FirstLineColors.redSoftNSColor, 0x3A1C15),
+            (FirstLineColors.redDeepNSColor, 0x4A2318), (FirstLineColors.onInkNSColor, 0x15140F),
         ])
     }
 
-    @Test func alarmResolvesToSiteColorInBothAppearances() {
-        assertPalette(.aqua, expected: [(FirstLineColors.dangerNSColor, 0x8f4405)])
-        assertPalette(.darkAqua, expected: [(FirstLineColors.dangerNSColor, 0xf2a93b)])
+    @Test func uiIsSystemSansAndWritingIsNewsreader() throws {
+        let system = NSFont.systemFont(ofSize: 15)
+        #expect(FirstLineTypography.uiNSFont.familyName == system.familyName)
+        #expect(FirstLineTypography.displayNSFont().familyName == system.familyName)
+        let writing = try #require(FirstLineTypography.writingNSFont(size: 28))
+        #expect(writing.fontName.localizedCaseInsensitiveContains("Newsreader"))
+    }
+
+    @Test func redIsThePenInBothAppearances() {
+        assertPalette(.aqua, expected: [(FirstLineColors.redNSColor, 0xB02A1E)])
+        assertPalette(.darkAqua, expected: [(FirstLineColors.redNSColor, 0xE4604A)])
     }
 
     private func assertPalette(_ appearance: NSAppearance.Name, expected: [(NSColor, Int)]) {

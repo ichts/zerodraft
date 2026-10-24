@@ -1,0 +1,66 @@
+# UI quality checklist
+
+Status: standing acceptance checklist for every user-visible surface of Write It Down / Zero Draft:
+the web landing and trial, the writeitdown.app site, the native Mac app, and later iOS. It turns the
+captain's basic design, UI and UX expectations into rules an implementing agent applies without being
+asked. It is not a taste brief; taste decisions still belong to the captain.
+
+`design/DESIGN.md` owns the visual constitution, `docs/wid-decisions.md` owns product decisions, and
+`docs/wid-mac-behavior.md` owns per-case Mac behaviour. This file owns the cross-surface quality bar.
+
+## How to use it
+
+- Before the first `done:` of any task that changes something a person can see or touch, capture every
+  affected state at real size and record pass/fail for each rule below. The build under test must never
+  be the first place a basic defect appears.
+- A rule is checked only by its named measurement or its named capture. Layout, rendering and
+  accessibility numbers decide; screenshots are evidence that the numbers describe what a person sees.
+  A change that cannot name a check is not finished.
+- A defect found by anyone - captain, reviewer, or a different model family - becomes a rule here (or
+  an entry on an existing rule) and a regression assertion in the owning test suite. See D-015.
+- The builder does not grade its own captures for acceptance. After the implementing agent reports
+  done, a different model family reviews the captures and measurements against this file and may fail
+  the build. Its review is the gate before hands-on testing.
+
+## Rules
+
+| ID | Rule | Decided by |
+| --- | --- | --- |
+| Q-01 | Chrome carries only what the writer needs. No decorative, ambient or always-moving element competes with the writing line; a bar, meter or counter that repeats information already on screen is removed, not restyled. | `RoundThreeTests.roomBarRunsOneContinuousLinearAnimation`: exactly one 2 pt session bar, pinned to the paper top; no second bar. Evidence: `window-light-{empty,typing,warning}`, `full-light-{empty,typing,warning}`. |
+| Q-02 | Status and warning text sits where the eye already is: on the writing line's side of the paper, never on the window's lower edge, and never below the footer row. The group is placed by ink, not by label frames, so it stays together at tall sizes. | `RoundThreeTests.warningInkSitsUnderTheWritingLine` (numeral ink top 40-48 pt under the writing baseline; caption ink top 16-24 pt under the numeral ink, at 1040x720 and 1600x1000); `RoundThreeTests.wipeReceiptSitsUnderTheWritingLine` (receipt ink top 40-48 pt under the writing baseline, the first status slot, not under a hint). Evidence: `*-warning`, `*-deleted`. |
+| Q-03 | The caret, the first typed character and the empty-state instruction share one state transition. The empty writing line holds only the caret; no hint sits near the line. The first character (or IME composition) is drawn at the caret, the count prompt becomes the word count, and nothing on the line moves. | `RoundThreeTests.emptyCaretAndCountPromptShareTheInsertionColumnWithTheFirstGlyph`: empty caret = measure centre, the count slot reads `Type to start`, first glyph box centred on the caret, caret band identical before/after, the count becomes `1 word`; `ReviewRoundTests.emptyCaretAndCountPromptMatchAfterAWipe`: a wiped start matches a fresh start within 1 pt, the receipt and `0 words` carry the instruction. `compositionRendersOnTheWritingLineAndReplacesTheCountPrompt`: composition line centred, same baseline, the count prompt replaced. Evidence: `*-empty`, `*-first-char`, `empty-state-options`. |
+| Q-04 | The written line is centred in the *rendered* output at every window size, and the writing column is the view width minus both insets. Measuring the layout manager alone is not enough. | `EditorFocusTests.currentLineSitsAtTheSheetAnchorAndIsCentered` (35 % anchor, centre, column width invariant) and `EditorFocusTests.drawnWritingLineStaysCentredInWideWindows` (rendered ink centre within 2 pt at 1040x720 and 1600x1000). Evidence: `window-light-*` and `full-light-*`. |
+| Q-05 | One row shares one baseline; same-role text shares one type style (face, size, weight, tracking, line height). Sentence-case text does not inherit caps tracking. Equal frame centres are not enough if the line boxes differ. Actions that belong to the result stay reachable above a long draft. | `RoundThreeTests.exitHintSharesTheExitRowBaselineAndTypeStyle` (confirmation, `ESC - EXIT` and the count on one baseline within 1 pt; sentence-case confirmation has zero tracking, the caps link keeps its tracking); `ReviewRoundTests.keptActionsShareOneOpticalCentreAndThePillFitsItsLabel` (COPY TEXT and RUN IT AGAIN on one optical centre; the pill hugs its label); `ReviewRoundTests.keptActionsStayAboveALongDraftWithTheDefaultAcknowledgement`. Evidence: `*-exit-hint`, `*-kept`. |
+| Q-06 | Changing state never shifts unrelated elements: the clock, count, footer row and writing anchor stay fixed through rest, typing, warning, wipe and kept. | `RoundThreeTests.stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor`: element frames and the line baseline equal within 1 pt across rest/typed/warning. Evidence: all `window-light-*` states. |
+| Q-07 | No extra labels, subtitles, helper sentences or status captions (D-002). The primary action and the mechanism carry the screen. | `RoundThreeTests.licensedPickerHidesAccessLineAndTrialPickerKeepsIt`; `docs/wid-mac-behavior.md` cases 27-29; review of every `*-light` capture for secondary copy. |
+| Q-08 | Every surface matches in look, behaviour, copy and timing (D-001). An intended difference is written down with its reason before it ships. | Parity table in the task report plus one `docs/wid-decisions.md` entry per difference (D-014 for the one session bar, D-017/D-020 for the status slot, D-019 for the exit row, D-025 to D-027 for the anchor and line treatment, D-028 for the empty state, D-029/D-030 for the stopped and kept screens). |
+| Q-09 | Light theme first. Dark is a stored choice that gets equal treatment, never an afterthought; every state is captured in both at the default window size. | `SnapshotTests.everySurfaceRendersInLightAndDark`, `SnapshotTests.keptCopyFocusRendersInLightAndDark`; evidence `window-light-*` and `window-dark-*`. |
+| Q-10 | During writing nothing moves or changes except what the writer needs: the clock, count, caret and, while paused, the warning. Completed lines do not move or change when the current line grows; only a new line shifts them, exactly one pitch. No ambient loop, no decorative motion. | `RoundThreeTests.stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor`; `EditorFocusTests.completedLinesDoNotMoveWhenTheCurrentLineGrows`; `RoomTests` warn/cut/reduced-motion timings; evidence `*-typing` vs `*-warning`, `before-fade-typing` vs `window-light-typing`. |
+| Q-11 | Motion answers the writer's action or marks a deadline. Continuous progress is one display-synced linear animation, not per-tick frame steps; feedback is short, transform/opacity only, interruptible, and honours the platform's reduced-motion setting. | `RoomTests.washRecoveryFadesOnceAndWarningInterruptsImmediately`, `RoomTests.cutCleanupUsesTheSameWashFade`; `RoundThreeTests.roomBarRunsOneContinuousLinearAnimation` (one linear CA over the remaining time; a tick does not restart it), `RoundThreeTests.reducedMotionBarStepsWithoutAnimation`; `RoomTests.denyAnimationIsAShortTransformAndOpacityAnimation`, `RoomTests.reducedMotionDenyKeepsOnlyTheHairlineFlash`, `RoomTests.denyFeedbackIsInterruptible`; `EditorFocusTests.completedLinesDoNotMoveWhenTheCurrentLineGrows` (the new-line scroll animation; Reduce Motion snaps); web `npm test` reduced-motion project. |
+| Q-12 | An instruction signals emptiness without contradicting the caret: the writing line stays empty, and the existing chrome carries the instruction. The bottom-right count slot reads `Type to start` in the count's own style until the first keystroke, then shows the word count. After a wipe the red receipt carries `TYPE TO START AGAIN.`, the count shows `0 words`, and no hint is added near the line. | Q-03 tests; `ReviewRoundTests.emptyCaretAndCountPromptMatchAfterAWipe`; evidence `*-empty`, `*-first-char`, `empty-state-options` (A/B/C; C chosen). Follows the Vercel "Placeholders signal emptiness" rule without adding a second text near the line. |
+| Q-13 | Every visible control is interactive; there are no dead zones. Every button, link, segmented control, popup and checkbox shows the ink focus ring, never the system blue, and the focus target is not covered; text fields keep the standard system focus ring. Ink-filled pills focus with a single light inner ring, not a doubled outline. A purchase action is a control, not body text. | `RoundThreeTests.everyCardControlUsesTheInkFocusRingInLightAndDark`; `RoomTests.keptStateFocusesCopyText` (single light inner ring on the COPY pill); `ReviewRoundTests.homeRulesButtonIsMouseReachable` (the picker's `?` wins the card hit test); `ReviewRoundTests.settingsLicenseBlockIsOneAlignedBlockWithRealControls` (Buy is an enabled 48 pt outline control on the Activate row); `docs/wid-mac-behavior.md` cases 30/45; the tab-through recording. |
+| Q-14 | Alignment is deliberate: every element aligns to a grid, a baseline, an edge or an optical centre, and a ±1 pt optical adjustment is allowed only when it is recorded. | Every geometry test above (1 pt tolerances); the capture review. Follows the Vercel "Deliberate alignment" and "Optical alignment" rules. |
+| Q-15 | A new interaction detail follows the platform's own controls and at least two well-regarded products in the same class; the comparison is kept with the evidence. | `docs/wid-decisions.md` entry for the choice, plus the comparison captures or sources under the task evidence directory. Example: D-016 for the empty caret, D-025 for the 35% anchor, D-028 for the A/B/C empty-state choice. |
+| Q-16 | Basic design/UI/UX polish is the implementing agent's job. A reviewer must never be the first to point out a caret, baseline, alignment, attention or consistency defect. The contract, the assertions and the measurement dump use one coordinate convention. | `docs/wid-decisions.md` D-015; this checklist is applied and recorded before every `done:`; the independent review gate below; the measured table in `docs/wid-mac-behavior.md` and the regenerated `after-raw-v4` dump agree on room-top and paper-top labels. |
+| Q-17 | Type metrics are not accidentally regressed: a perceived spacing/size change is diagnosed against the previous build's constants and rendered pitch, and an intentional change is a recorded decision. Every script shares one rendered line pitch. | The type-metrics rows of the measured table in `docs/wid-mac-behavior.md` (the old build's CJK pitch 58.4 vs Latin 44.8; after D-026, Chinese/English/mixed 44.8; the kept body uses the fixed height); `EditorFocusTests.linePitchIsFixedForChineseEnglishAndMixed`; the handoff records the diagnosis when a report is about spacing. |
+
+## Evidence sets
+
+- Web: the acceptance command is the repository-root `npm test` for the landing/trial and
+  `cd writeitdown && npm test` for writeitdown.app; capture names follow the Playwright spec names.
+- Mac: `swift test` from `apps/macos/FirstLine/`, with `WID_SNAPSHOT_DIR` set for PNG evidence. The
+  geometry assertions are the truth; the PNGs are the record a second family reads.
+- Real window: `apps/macos/FirstLine/scripts/qa-window.sh` writes per-stage screenshots, AX snapshots
+  and a `geometry.jsonl` frame record. It is evidence for the shipped build, not a substitute for the
+  deterministic assertions; it must run on a permitted GUI machine without taking over the user's
+  screen. AX has no insertion-point frame, so caret/first-glyph equality stays bound to
+  `RoundThreeTests`; the room geometry check binds the `Type to start` prompt to the footer row.
+- Every task keeps its own capture set (`window-light-*`, `window-dark-*`, `full-light-*` for the Mac
+  room) and the before/after measurement table next to its report.
+
+## Review gate
+
+After the implementing agent's first `done:`, a different model family reads this file, the captures
+and the measurement table before the build goes to hands-on testing. It may fail the build on any
+rule it cannot tie to a measurement or a capture, or on any capture that contradicts a rule. A taste
+question with two defensible options is escalated with a capture of each option; basic polish is not.

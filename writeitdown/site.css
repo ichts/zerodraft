@@ -196,8 +196,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.5 var(--sans);color:var(--chrome)}
 .home .count{font:400 var(--t-small)/1.5 var(--sans);letter-spacing:0;text-transform:lowercase;color:var(--chrome)}
 .home .prev-band,.home .anchor-wrap{left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px)}
-/* The active line is centred at --write-anchor (39%) of the sheet, the same ratio as the trial room and the Mac
-   app (SessionViewController: view height * 0.39). */
+/* The active line is centred at --write-anchor (39%) of the sheet, the same ratio as the trial room. */
 .home .anchor-wrap{top:calc(var(--write-anchor) - var(--lh) / 2)}
 .home .prev-band{bottom:calc(100% - var(--write-anchor) + var(--lh) / 2);height:calc(2 * var(--lh))}
 .home .prev-line:first-child{opacity:.36}

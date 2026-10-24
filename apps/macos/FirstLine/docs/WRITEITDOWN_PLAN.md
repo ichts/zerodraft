@@ -1,6 +1,6 @@
 # writeitdown for macOS - Build Plan
 
-Status: batch 6 implementation is in progress; independent real-window acceptance remains pending. Written 2026-09-24. The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
+Written 2026-09-24. Current candidate provenance and acceptance exceptions are recorded in `MANUAL_QA.md`, under "Final release binding". The inventory and native-source comparisons below record the pre-batch-1 baseline; the last column assigns each change to its batch.
 
 This plan turns the existing native app in `apps/macos/FirstLine/` into the writeitdown macOS app. It is the governing document for every later batch. Each batch lands as one pull request through no-mistakes, merges only when its acceptance is green, and is then accepted again by a fresh session against this document.
 
@@ -26,7 +26,7 @@ The existing app is already pure AppKit: every source file under `apps/macos/Fir
 
 Observed on 2026-09-24 with a Playwright script against https://writeitdown.app in headless Chrome at 1440x900, light appearance. The full log is `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/wid-live-2026-09-24.log` and the screenshots are `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/shots/wid-*.png`. The live behavior matched the source in `writeitdown/`.
 
-- The CTA `Give it sixty seconds.` opens the `#trial` room and focuses the editor. The placeholder reads `Start typing.` and the clock reads `1:00`.
+- The CTA `Give it sixty seconds.` opens the `#trial` room and focuses the editor. The empty writing line holds only the caret; the bottom-right count slot reads `Type to start` until the first keystroke. The clock reads `1:00`.
 - The clock does not start on entry. After two idle seconds it still read `1:00`; it started on the first keystroke (`writeitdown/session.mjs`, `append`).
 - Backspace, Delete, ArrowLeft, ArrowUp, Home, Cmd+Z, Cmd+X, and Cmd+V all left the text unchanged, kept the caret at the end, and announced `BLOCKED. FORWARD ONLY.` in the live region. Cmd+A moved the selection, but the next typed characters still appended at the end.
 - Each blocked key ran two 280 ms animations on the paper: a horizontal shake of at most 2 px and a 1 px outline in the `--alarm` color (`writeitdown/feedback.js`). A repeated block does not restart a running shake. A 110 Hz tone plays only after a prior user gesture.
@@ -55,7 +55,7 @@ What the reference does:
 - After about five seconds of silence the screen turns red with `You failed...` and a `Try again!` button, and the draft is gone.
 - On success the progress bar turns green, the full text stays on screen, and the page offers `Download N words` and `Start Again`.
 
-The reference above is historical evidence, not the native picker specification. The captain superseded its duration set and popover with the direct-start row in section 4. Word-count goals, Hardcore mode, prompts, and the red failure screen remain out of scope.
+The reference above is historical evidence, not the native picker specification. The captain superseded its duration set and popover with the duration/silence segments and Begin in section 4. Word-count goals, Hardcore mode, prompts, and the red failure screen remain out of scope.
 
 ## 3. Product rules: web to native
 
@@ -67,20 +67,20 @@ The web column cites the file that owns each rule today. The native column recor
 | 2 | Only appending is allowed. Deletion, cut, paste, drop, undo, redo, arrow keys, Home, and Page Up or Down are blocked. IME composition still works. | `writeitdown/room.js` (`beforeinput`, `keydown`, paste/cut/drop listeners) | `Sources/Editor/AppendOnlyInputPolicy.swift` and `Sources/Editor/AppendOnlyTextView.swift`. Arrow and Home moves are caught by the selection redirect in `Sources/Session/SessionViewController.swift`. | Keep. Batch 2 adds explicit tests for the movement commands. |
 | 3 | A blocked action shakes the paper by 2 px, shows a 1 px alarm outline for 280 ms, announces `BLOCKED. FORWARD ONLY.`, and does not restart while running. Reduced motion keeps the outline and drops the shake. | `writeitdown/feedback.js`, `writeitdown/room.js` (`deny`) | `Sources/Session/SessionViewController.swift` (`triggerDenyFeedback`): a 90 ms red hairline, a 160 ms shake, and the narrator line `NO GOING BACK.` | Batch 4 matches the web timing, color, announcement, and no-restart rule. |
 | 4 | On the web, after 5 s of silence the wash ramps in, and the numeral counts 3, 2, 1 in the alarm color over `KEEP TYPING OR THE DRAFT IS DELETED.` | `writeitdown/room.js` (`render`), `writeitdown/site.css` | `Sources/Session/SessionEngine.swift` (`dangerAfterSeconds = 5`), with the veil and countdown in `SessionViewController.swift`. | Batch 4 restyles the web timing and numeral. Batch 5 makes the warning start three seconds before the selected wipe limit. |
-| 5 | After 8 s of silence the draft is wiped. The room stays open with `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.` and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 captures unused time and provides a minimal in-room wipe/restart route. Batch 4 removes the obsolete Failure screen and polishes the report. Batch 5 offers fixed 5/8/12-second wipe limits. |
+| 5 | After 8 s of silence the draft is wiped. The room stays open with the deletion report defined in section 4.3 and the next keystroke starts a new session. | `writeitdown/session.mjs` (`advance`), `writeitdown/room.js` | `SessionEngine.swift` (`wipeAfterSeconds = 8`) routes to a separate screen in `Sources/Session/FailureViewController.swift` with fossils. | Batch 2 captures unused time and provides a minimal in-room wipe/restart route. Batch 4 removes the obsolete Failure screen and polishes the report. Batch 5 offers fixed 5/8/12-second wipe limits. |
 | 6 | The earlier deadline wins, and a tie goes to the wipe. | `writeitdown/session.mjs` | `SessionEngine.swift` (`adjudicateDeadlines`) | Keep. |
 | 7 | A whitespace-only draft at the deadline is wiped, not kept. | `writeitdown/session.mjs` (`!state.text.trim()`) | `SessionEngine.swift` ends an empty draft as idle and keeps a whitespace-only draft. | Batch 2 adopts the web rule. |
-| 8 | When the clock runs out, the native kept view shows the full text, `0:00 - N WORDS KEPT.`, `COPY TEXT` (then `COPIED`), and `RUN IT AGAIN`. Focus goes to COPY TEXT. It needs no promotional heading. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. Batch 4 shipped the web copy and layout; batch 5 removes the native kept heading. |
+| 8 | When the clock runs out, the native kept view shows the live heading `You wrote it down.`, the quiet receipt `N MINUTES. N WORDS.` (real duration and count, no `KEPT`), `COPY TEXT` (then `COPIED`) and `RUN IT AGAIN` above a scrollable draft. Focus goes to COPY TEXT. | `writeitdown/index.html` (`#kept`), `writeitdown/room.js` | Before batch 1, `Sources/Session/SuccessViewController.swift` offered Copy full text, Copy for AI, Download .md, and Discard, and `Sources/App/AppState.swift` autosaved the draft to disk. | Batch 1 removed autosave, Copy for AI, and Download. The current kept presentation is defined in section 6. |
 | 9 | The count is Unicode words, and each Han character counts as one. Punctuation and emoji do not count. | `writeitdown/session.mjs` (`wordCount`) | `SessionEngine.swift` (`wordCount`) splits on whitespace only. | Batch 2 ports the web rule. |
-| 10 | ESC and the `ESC - EXIT` control leave the room right away. Nothing is saved. | `writeitdown/room.js` (`exit`) | `SessionViewController.swift` has the `Abandon - the text is lost` button. `Cmd+0` goes Home. | Batch 4 adds `ESC - EXIT` at the bottom left and handles Escape outside IME composition. |
+| 10 | ESC and the `ESC - EXIT` control leave the room right away. Nothing is saved. | `writeitdown/room.js` (`exit`) | The native room keeps `ESC - EXIT` in every phase and requires a second Esc/click within two seconds, with an inline hint, because the captain asked for accident protection. | Batch 4 added the bottom-left control; the current room adds the two-step confirmation as a deliberate native override of the live immediate exit. |
 | 11 | There is no early finish. A session ends only at the deadline or by exiting. | `writeitdown/room.js` | `SessionViewController.swift` has a `Finish` button and Cmd+Return. `SessionEngine.swift` has `finish()`. | Batch 2 removes the engine method, button, Cmd+Return paths, and tests together. |
-| 12 | The clock shows `M:SS` at the top right, and the count shows `N WORDS` at the bottom right. | `writeitdown/index.html`, `writeitdown/site.css` | `SessionViewController.swift` shows `MM:SS`, a progress bar, and lowercase `N words`. | Batch 4. |
+| 12 | The clock shows `M:SS` at the top right, and the count shows `N words` at the bottom right. | `writeitdown/index.html`, `writeitdown/site.css` | `SessionViewController.swift` shows `MM:SS`, a progress bar, and lowercase `N words`. | Batch 4. |
 | 13 | Appearance follows the system by default and can be switched between light and dark. | `writeitdown/theme.js`, `writeitdown/site.css` | `Sources/Infrastructure/SettingsStore.swift` (`AppTheme`), `Sources/DesignSystem/Colors.swift` (the Zero Draft bone palette with red `#c8392f`). | Batch 3 ports the site tokens for both appearances. |
 | 14 | No draft is stored. Only the appearance preference persists. | `writeitdown/theme.js` (`writeitdown-theme` is the only key) | Before batch 1, `Sources/Infrastructure/PersistenceService.swift` wrote kept drafts as Markdown and `Sources/Library/LibraryViewController.swift` browsed them. | Batch 1 deleted both. Settings keep only preferences and the license cache (section 7). |
-| 15 | The writing view shows the active line in an upper writing band with two fading lines above it and no scrollbar. | `writeitdown/site.css` (`#editor` mask), `writeitdown/room.js` (`fitEditor`) | `SessionViewController.swift` sets a window-content-relative anchor for the editor and empty placeholder; `AppendOnlyTextView.swift` keeps the current line at that anchor as earlier lines grow upward. | See the window-content-height contract in batch 4 below; the scroll viewport midpoint is not the anchor. |
-| 16 | The session length and silence limit are chosen before writing. | Fixed at 60 s and 8 s on the web | Fixed at 60 s and 8 s. `AppState.selectedDuration` and `AppSettings.defaultDuration` already exist but are pinned to 60. | Batch 5 adds the direct-start duration row and three silence choices. |
+| 15 | The writing view shows the active line in an upper writing band with two fading lines above it and no scrollbar. | `writeitdown/site.css` (`#editor` mask), `writeitdown/room.js` (`fitEditor`) | `SessionViewController.swift` places the current line at 35% of the sheet above the vertical middle; `AppendOnlyTextView.swift` keeps that anchor and applies one uniform opacity per completed line (100/22/7, older hidden). | The sheet midpoint is not the anchor; the live 22%/7% intent is per-line opacity, not a gradient through a line. |
+| 16 | The session length and silence limit are chosen before writing. | Fixed at 60 s and 8 s on the web | Fixed at 60 s and 8 s. `AppState.selectedDuration` and `AppSettings.defaultDuration` already exist but are pinned to 60. | Batch 5 adds the duration/silence segments and one Begin action. |
 
-The native start screen needs only the duration and silence choices; selecting a duration is the start action. The native kept view needs only the writing, receipt, and copy or restart actions. The site headline, deck, and `Give it sixty seconds.` style slogans belong to the site, not the app.
+The native start screen needs only the duration and silence choices plus one Begin action; selecting a duration remembers it, and Begin starts it. The native kept presentation follows section 6. The site headline, deck, and `Give it sixty seconds.` style slogans belong to the site, not the app.
 
 The session flow after batch 5, using the web's phase names:
 
@@ -96,14 +96,16 @@ stateDiagram-v2
     Typing --> Kept: clock reaches 0:00
     Warn --> Kept: clock reaches 0:00 before the wipe
     Kept --> Rest: RUN IT AGAIN
-    Rest --> Start: Esc or ESC - EXIT
-    Typing --> Start: Esc or ESC - EXIT
-    Warn --> Start: Esc or ESC - EXIT
-    Wipe --> Start: Esc or ESC - EXIT
-    Kept --> Start: Esc or ESC - EXIT
+    Rest --> Start: Esc/ESC - EXIT, twice within 2 s
+    Typing --> Start: Esc/ESC - EXIT, twice within 2 s
+    Warn --> Start: Esc/ESC - EXIT, twice within 2 s
+    Wipe --> Start: Esc/ESC - EXIT, twice within 2 s
+    Kept --> Start: Esc/ESC - EXIT, twice within 2 s
 ```
 
-`Start` is the cursor-ready pre-writing screen with direct-start duration buttons and silence choices. It replaces the Home screen in `Sources/App/HomeViewController.swift`.
+Every room phase keeps one exit control and one Escape path. The first request shows the inline hint `Press Esc again to leave and delete the draft.`; a second request within about two seconds leaves without saving, typing dismisses the hint, and nothing exits on one request.
+
+`Start` is the cursor-ready pre-writing screen with duration/silence segments and Begin. It replaces the Home screen in `Sources/App/HomeViewController.swift`.
 
 ## 4. Pre-writing choices and settings
 
@@ -111,22 +113,22 @@ stateDiagram-v2
 
 - The duration choices are exactly 1, 5, 10, 20, and 30 minutes. The last chosen duration is remembered in `settings.json` through `AppSettings.defaultDuration`; on first launch it is one minute.
 - The silence limits are exactly 5 seconds (Strict), 8 seconds (Standard), and 12 seconds (Relaxed). Standard is the default. These are fixed choices, not free-form input.
-- The warning starts during the final three seconds before the wipe: after 2, 5, or 9 seconds of silence respectively. Its wash and 3-2-1 numeral stop immediately when typing resumes.
+- The warning starts during the final three seconds before the wipe: after 2, 5, or 9 seconds of silence respectively. Its 3-2-1 numeral disappears immediately when typing resumes; the wash fades to zero over 120 ms linear, or immediately with reduced motion, matching the live trial. Warn and wipe-cut updates remain immediate.
 - The chosen limit governs the wipe deadline; the earlier session or wipe deadline still wins and a tie still wipes. A wipe restarts with the same duration and silence limit.
 - The captain's chosen settings replace the earlier recommendation to keep a fixed 5-second warning and 8-second wipe for every duration. Neither threshold scales with session length.
 
 ### 4.2 Start screen
 
-- The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows one row of five duration buttons and the three silence choices; activating a duration starts writing immediately with the cursor ready.
-- On opening the tool, the remembered duration button has keyboard focus. A keyboard-only writer can activate it without a mouse. Duration and silence choices are available on the start screen, not in Settings or the writing room; the clock starts on the first input after entering the room.
+- The native start screen has no site headline, deck, or `Give it sixty seconds.` slogan. It shows the After card with one row of five duration segments, the three silence choices, and one Begin action; selecting a duration remembers it, and Begin starts writing immediately with the cursor ready.
+- On opening the tool, Begin has keyboard focus. A keyboard-only writer can start the selected duration without a mouse. Duration and silence choices are available on the start screen, not in Settings or the writing room; the clock starts on the first input after entering the room.
 - The three silence choices are available before writing, with Standard selected by default. Keep them compact and visibly labeled; do not add a second promotional start action.
-- Before the first keystroke, the room clock shows the chosen duration. The clock starts with the first committed or marked text. After a kept session, `RUN IT AGAIN` uses the current choices, subject to the trial/license gate. Escape exits immediately; after the last trial it opens activation.
+- Before the first keystroke, the room clock shows the chosen duration. The clock starts with the first committed or marked text. After a kept session, `RUN IT AGAIN` uses the current choices, subject to the trial/license gate. Escape asks for confirmation first; after the last trial the next session opens activation.
 - The old MDWA-style picker, eight-choice duration menu, and Cmd+1 through Cmd+8 length shortcuts are superseded. The Navigate menu offers New Piece, Writing, and Home; Settings remains in the app menu. There is no resident menu-bar utility.
 
 ### 4.3 Settings and keyboard
 
 - Settings (`Cmd+,`) offers Focus Mode, alignment, font size, and appearance alongside the existing license and motion controls. Focus Mode is off by default; when on, the room fills the screen and hides the clock and word count until the pointer hovers over their chrome. Deadline announcements remain accessible without hover.
-- The Alignment control chooses Narrow paper by default or Wide paper. Both keep a fixed left text origin; the persisted `centered` and `left` values remain compatible with existing settings. The first line and empty hint share a fixed origin near 39% of the window height; short paragraphs grow down and scroll only near the lower edge. After a wipe the clock returns to the chosen duration, the hint returns and the report uses elapsed deletion time (`DRAFT DELETED AT M:SS. TYPE TO START AGAIN.`); after the last free trial it instead ends `ACTIVATE TO KEEP WRITING.`. Font size offers Small, Medium, and Large, with Medium as the default. Appearance follows the system by default, with the existing Light and Dark choices.
+- The paper fills the window (D-004): the live trial's 32 pt margin, 16 pt radius and sheet shadow, at every size including full screen; the fixed 720/880 sheet is retired. The Alignment control chooses the centred writing-column measure: Narrow column (62ch) by default or Wide column (70ch); the persisted `centered` and `left` values remain compatible with existing settings. The current line sits at 35% of the sheet, a little above the vertical middle; earlier lines step through uniform opacities (100/22/7, older hidden) and shift exactly one pitch when a new line begins. After a wipe the clock returns to the chosen duration and the report uses the session's unused time in the live uppercase sentence (`DRAFT DELETED AT M:SS. TYPE TO START AGAIN.`); after the last free trial it instead ends `ACTIVATE TO KEEP WRITING.`. The red receipt carries the instruction and no additional hint is added; the count slot shows the word count. Font size offers Small, Medium, and Large, with Medium as the default. Appearance follows the system by default, with the existing Light and Dark choices.
 - Settings preferences may persist without storing draft text. Settings may be viewed while writing and Done returns to the surface from which Settings opened. Duration and silence limits are selected only on the start screen and cannot change while writing; changing focus, alignment, font size, or appearance must not reset the session clock or draft. Native fullscreen exit turns focus mode off during writing; a programmatic exit for Settings navigation preserves the preference, including a quick Settings/Done round trip.
 - `Cmd+N` starts a new piece through the existing trial-or-signed-license gate, dropping any current unkept draft without saving it. On the kept view, `Cmd+C` copies the entire draft rather than a partial selection; `Cmd+W` closes the window. The full flow must work without a mouse.
 - Word-count goals and a resident menu-bar app are out of scope.
@@ -186,15 +188,12 @@ The following code inside kept files is also deleted:
 
 ## 6. Brand and visuals
 
-- The app name in Finder and the menu bar is `Write It Down`. The in-app start screen uses the split-W lockup; the app icon and DMG volume icon carry the mark, and the primary web header, footer, `mac.html` and social card use the split-W lockup. The window title is `Write It Down`.
+- The app name in Finder and the menu bar and the window title are `Write It Down`. The start card is headed `How long?` and carries the merged A split-W lockup above the heading; the app icon and DMG volume icon carry the mark, and the primary web header, footer, `mac.html` and social card use the split-W lockup.
 - The bundle identifier is `app.writeitdown.mac`. The Swift package product and executable target are renamed from `FirstLine` to `WriteItDown` in batch 3. The directory `apps/macos/FirstLine/` keeps its path; the app name and distribution do not depend on the source directory name.
 - `AppPaths` changes its folder from `~/Library/Application Support/First Line/` to `~/Library/Application Support/WriteItDown/`. Nothing is migrated. The old folder held drafts, which the new app must not read, and license data from a mock client that never sold a key.
-- Colors come from `writeitdown/site.css` for both appearances:
-  - Light: wall `#d8d2c3`, paper `#f7f4ea`, ink `#1a1813`, mute `#6f6a5d`, faint `#b3ada0`, and alarm `#8f4405`. The wash is `#d1c1ac` on the wall and `#ebdfce` on the paper, and the deeper cut is `#c6b095` and `#decab3`.
-  - Dark: wall `#15140f`, paper `#211f18`, ink `#ece7d9`, mute `#8f897a`, faint `#5c574c`, and alarm `#f2a93b`. The wash is `#2e1712` and `#3a1c15`, and the cut is `#3d1d15` and `#4a2318`.
-  - The Zero Draft red `#c8392f` and the bone canvas are removed. The alarm color is spent only on the warning numeral and the deny outline.
+- Every native surface follows the approved After screens with the 2026-10-22 background A update. `writeitdown/tokens.css` owns the shared role values; `Sources/FirstLine/DesignSystem/Colors.swift` adapts them to dynamic AppKit colors. The beige desk and cream paper are removed. `DesignTokenTests` checks the native palette and typography; `SnapshotTests` checks rendered page/sheet pixels in both appearances. The room also matches the live trial's visible contract: no top-left duration pill; the 2 px top session bar only (D-014 supersedes D-005's bottom silence bar); the live strings above; the warning numeral and wipe receipt under the writing line (D-017); and `ESC - EXIT` in the footer with the two-step confirmation on one shared baseline (D-006, D-019, case 37). The paper fills the window; every button, link, segmented control, popup and checkbox uses the ink focus ring, while text fields keep the system focus ring.
 - Light is the design and QA reference, and every QA record captures light first. Dark is supported and captured once per batch that changes visuals. The default follows the system appearance, the same as the site and as HIG expects. Settings offers System, Light, and Dark.
-- Typography follows the site: Newsreader for the human layer (the headline, the writing, and the kept text) and IBM Plex Mono for the machine layer (the clock, counts, reports, and buttons), with tracked uppercase mono for chrome. The paper has square corners and one soft lift shadow.
+- Typography uses system sans for UI, including display headings, and Newsreader for writing, the kept heading and the warning numeral, through `Typography.swift`. The room's writing is 28/1.6 at the Medium setting, centered in a 62-70ch measure inside the full-window sheet; the kept block uses the live 586 pt measure and a Newsreader 500 heading. The red pen, rounded sheet/card shapes and the approved `tokens.swift` sheet shadow (ink 7% ring, black 5% contact, ink 12%/20% layers) follow through `Spacing.swift` and `SurfaceViews.swift`. The titlebar remains native; every button, link, segmented control, popup and checkbox uses the ink focus ring (D-009), while text fields keep the system focus ring. The room COPY TEXT button is the primary ink pill: one light focus ring on the pill edge (D-024), 1 px hover lift and 0.97 press scale with 160 ms cubic-bezier(.22,1,.36,1) feedback; reduced motion disables the transition. COPIED survives refreshes until a new session, and long kept drafts scroll without a persistent scroller.
 - The icon is the captain-chosen A split-W mark, not the old `WID` placeholder. The app icon set and `packaging/VolumeIcon.icns` carry it; usage rules, palette and optical sizes are owned by `design/DESIGN.md` §11. The group is compiled to `.icns` by the batch 7 packaging script.
 - HIG: the app uses the standard menu bar, a resizable window with a sensible minimum size, `Cmd+,` for Settings, full keyboard access, VoiceOver announcements for deny, warn, wipe, and kept, and respects Reduce Motion and Increase Contrast.
 
@@ -202,7 +201,7 @@ The following code inside kept files is also deleted:
 
 - Writing stays in memory. It is never written to disk, never logged, and never sent anywhere. Batch 1 isolates both the configuration root and the former draft root in temporary directories for kept and wiped sessions, and observes that no draft text or draft file appears in either. Tests also check that these flows do not write to the real user root. Configuration and install ID persistence remain legitimate and are tested separately; an empty directory is not the criterion.
 - `settings.json` holds only appearance, the reduced-motion override, chosen duration and silence limit, focus mode, alignment, font size, the trial-session counter and the license cache described in `docs/LICENSE_PAYMENT_SPEC.md`. `install-id.json` holds a random install UUID.
-- The only network traffic is the license flow described in `docs/LICENSE_PAYMENT_SPEC.md`, plus opening the checkout page in the default browser. No analytics, no crash reporting, and no update checks are added.
+- The only network traffic is the license and in-app checkout flow described in `docs/LICENSE_PAYMENT_SPEC.md`, plus opening checkout or its fallback in the default browser. No analytics, no crash reporting, and no update checks are added.
 - The fonts are bundled, so the app makes no font requests, unlike the site.
 - The in-app About text and the site's privacy page state this in one sentence each. The site change ships with batch 7 as part of a normal writeitdown bundle install.
 
@@ -261,7 +260,7 @@ swift test             # must exit 0; the record states the test count
 scripts/qa-window.sh   # ad-hoc universal package + cua-driver window flow; screenshots under /tmp/wid-qa/cua-*/
 ```
 
-Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver daemon route (roadmap report section 6.9), which replaced the earlier batched `osascript`/`screencapture` flows. The script builds an ad-hoc universal app (`WID_APP_OUTPUT` or `dist/Write It Down.app`), copies it into a fresh `CFFIXED_USER_HOME` and activates that copy against a disposable signed loopback fixture. `WID_QA_LICENSE_ONLY=1` isolates trial/exhaustion/activation/offline/refund behavior from timing-sensitive animation checks. The fixture is not Waffo purchase evidence. It asserts the AX tree at every stage: fresh trial, empty-room exit without charge, three real-input sessions, exhaustion across restart, signed activation, paid Home duration buttons; Standard 8s, Strict 5s and Relaxed 12s selected on Home, each with a selected AX radio value, a first input, tier-bound warn and wipe timing, 3-2-1 warn numeral and KEEP TYPING line, recovery, literal DRAFT DELETED AT report and reset clock/input hint and Escape; blocked Backspace in Standard; offline restart and refund denial; `trialSessionsUsed` remains exhausted at three. It saves per-stage screenshots and observed warn/wipe delays in `timing.txt`, also printed in the final summary. Permissions belong to the cua-driver daemon (`cua-driver permissions status`), so background agents need no TCC grants of their own and no Computer Use approval. States that synthetic events cannot prove at CLI latency, such as physical IME candidate windows and the exact 280 ms deny frame, are listed as not verified instead of being claimed.
+Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver daemon route (roadmap report section 6.9), which replaced the earlier batched `osascript`/`screencapture` flows. The script builds an ad-hoc universal app (`WID_APP_OUTPUT` or `dist/Write It Down.app`), copies it into a fresh `CFFIXED_USER_HOME` and activates that copy against a disposable signed loopback fixture. `WID_QA_LICENSE_ONLY=1` isolates trial/exhaustion/activation/offline/refund behavior from timing-sensitive animation checks. The fixture is not Waffo purchase evidence. It asserts the AX tree at every stage: fresh trial, empty-room exit without charge, three real-input sessions, exhaustion across restart, signed activation, paid Home duration/silence radio selections followed by Begin; 8s, 5s and 12s selected on Home, each with a selected AX radio value, a first input, tier-bound warn and wipe timing, 3-2-1 warn numeral and `KEEP TYPING OR THE DRAFT IS DELETED.` line, recovery, the empty count slot reading `Type to start` before the first keystroke, the section 4.3 uppercase deletion report with `0 words` and the red receipt, the two-step Escape confirmation, and a first Escape that does not leave; blocked Backspace at 8s; offline restart and refund denial; `trialSessionsUsed` remains exhausted at three. It saves per-stage screenshots and observed warn/wipe delays in `timing.txt`, also printed in the final summary. Permissions belong to the cua-driver daemon (`cua-driver permissions status`), so background agents need no TCC grants of their own and no Computer Use approval. States that synthetic events cannot prove at CLI latency, such as physical IME candidate windows and the exact 280 ms deny frame, are listed as not verified instead of being claimed.
 
 ### Batch 1: Remove storage and leftovers
 
@@ -280,7 +279,7 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
 - Scope: in `SessionEngine`:
   - The clock starts on the first committed or marked text. `start(duration:)` only readies the room.
   - A whitespace-only draft at the deadline wipes.
-  - The engine captures `unusedSeconds = ceil((finishDeadline - wipeDeadline) / 1 second)` from absolute deadlines before clearing text, as `writeitdown/session.mjs` does. It clears that report when the next nonempty input starts a fresh session. The visible deletion report uses elapsed seconds at the wipe deadline, not unused seconds; a delayed tick must not change either number.
+  - The engine captures `unusedSeconds = ceil((finishDeadline - wipeDeadline) / 1 second)` from absolute deadlines before clearing text, as `writeitdown/session.mjs` does. It clears that report when the next nonempty input starts a fresh session. The current visible report is defined in section 4.3; a delayed tick must not change either captured number.
   - The web word count is ported: Unicode word segments, each Han character counted alone, punctuation and emoji not counted. Use `NSString.enumerateSubstrings(in:options: .byWords)` after splitting Han characters out, or an equivalent.
   - Remove `finish()` and every UI entry point that invokes it: Finish button, Cmd+Return monitor, `performKeyEquivalent`, and their early-finish tests. This is a minimum functional removal; visual room cleanup stays in batch 4.
   - Implement the minimum in-room wipe report and next-keystroke restart routing in `RootWindowController` and `SessionViewController` in this batch. Leave detailed layout and animation for batch 4; the intermediate state must be usable.
@@ -325,10 +324,10 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
 
 - Scope: one room view hosts all states.
   - The paper sits on the wall. The clock is at the top right in `M:SS`. `ESC - EXIT` is at the bottom left and `N WORDS` at the bottom right.
-  - The active writing line and empty `Start typing.` placeholder sit near 39% of the window content height at default and fullscreen sizes; new lines push earlier lines upward.
+  - The active writing line sits at 35% of the paper at default and fullscreen sizes; the empty count slot reads `Type to start`; new lines shift the history exactly one pitch.
   - Warn uses the wash ramp from 5 s to 8 s and the alarm numeral with `KEEP TYPING OR THE DRAFT IS DELETED.`.
   - The wipe is a 200 ms deeper cut followed by the in-room report `DRAFT WIPED - M:SS UNUSED. TYPE TO RESTART.`.
-  - The kept view shows `You wrote it down.`, the full text (scrollable), `0:00 - N WORDS KEPT.`, `COPY TEXT` (which becomes `COPIED`, or `TRY COPY AGAIN` on failure), and `RUN IT AGAIN`. Focus goes to COPY TEXT.
+  - The kept view shows `You wrote it down.`, the quiet receipt `N MINUTES. N WORDS.` (real duration and count, no `KEPT`), `COPY TEXT` (which becomes `COPIED`, or `TRY COPY AGAIN` on failure) and `RUN IT AGAIN` in a fixed top block, with the full text scrollable below. Focus goes to COPY TEXT.
   - Deny feedback is 280 ms with a 2 px shake, a 1 px alarm outline, no restart while running, and a VoiceOver announcement `Blocked. Forward only.`. Reduced motion drops the shake. The requirement's "red line" means this deny outline in the site's alarm color, not the old Zero Draft red.
   - Escape outside IME composition, and the ESC - EXIT control, return to the start screen.
   - Delete `FailureViewController.swift`, `FossilLayerView.swift`, the narrator, the already-unused Finish UI remnants, the Abandon button, and the progress bar. Keep batch 2's in-room wipe/restart semantics.
@@ -347,14 +346,14 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
 
 ### Batch 5: Pre-writing choices and settings
 
-- Scope: implement section 4's five direct-start duration buttons and three fixed silence limits. Remember the last duration, default the silence limit to Standard, and keep both locked during writing.
-- Remove the site headline, deck, and slogan shipped on the start screen in batch 3 and the promotional kept heading shipped in batch 4. Keep the clock, counts, wipe report, kept receipt, `COPY TEXT`, and `RUN IT AGAIN`.
-- Move the warning to the final three seconds before the chosen wipe limit; preserve deadline precedence, the wipe-on-tie rule, and immediate warning cancellation on resumed typing.
+- Scope: implement section 4's duration/silence segments and one Begin action from the After design, with three fixed silence limits. Remember the last duration, default the silence limit to Standard, and keep both locked during writing.
+- Remove the site headline, deck, and slogan shipped on the start screen in batch 3. The current kept layout is owned by section 6.
+- Move the warning to the final three seconds before the chosen wipe limit; preserve deadline precedence and the wipe-on-tie rule. Recovery timing is owned by section 4.1.
 - Add Settings controls for Focus Mode, alignment, font size, and system-following appearance. Focus Mode fills the screen and reveals hidden clock and count chrome on pointer hover; make their information accessible by keyboard and VoiceOver.
 - Wire `Cmd+N` to a new piece through the trial gate, `Cmd+C` on the kept view to copy the whole draft, and `Cmd+W` to close. Remove the old eight-length picker/menu shortcut specification, without adding a resident menu-bar app.
 - Update `VISION.md` as described in section 4.4.
 - Named tests:
-  - `DurationPickerTests/offersExactlyFiveDirectStartLengths` and `DurationPickerTests/selectionStartsWritingWithFocusedEditor`.
+  - `DurationPickerTests/offersExactlyFiveSessionLengths` and `DurationPickerTests/selectionThenBeginStartsWritingWithFocusedEditor`.
   - `DurationPickerTests/lastChoiceIsDefaultAcrossLaunches` and `DurationPickerTests/invalidStoredDurationFallsBackToOneMinute`.
   - `SilenceLimitTests/offersExactlyThreeFixedChoicesWithStandardDefault` and `SilenceLimitTests/strictWarnsAtTwoAndWipesAtFive`.
   - `SilenceLimitTests/standardWarnsAtFiveAndWipesAtEight` and `SilenceLimitTests/relaxedWarnsAtNineAndWipesAtTwelve`.
@@ -362,7 +361,7 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
   - `SettingsTests/durationAndSilenceLimitLockDuringWriting` and `SettingsTests/preWritingChoicesPersistWithoutDraftText`.
   - `SettingsTests/focusModeHidesChromeUntilHoverWithoutHidingAccessibility` and `SettingsTests/alignmentAndFontSizeDefaultsAndChoices`.
   - `SettingsTests/appearanceDefaultsToSystem` and `SettingsTests/liveVisualSettingsPreserveDraftAndDeadline`.
-  - `RoomTests/keptViewHasReceiptAndActionsWithoutPromotionalHeading` and `BrandTests/startScreenHasNoSiteHeadlineDeckOrSlogan`.
+  - `RoomTests/keptStateMatchesTheLiveCopyAndReceipt` and `BrandTests/startScreenHasNoSiteHeadlineDeckOrSlogan`.
   - `KeyboardFlowTests/commandNStartsNewPieceThroughTrialGate`, `KeyboardFlowTests/commandCCopiesEntireKeptDraft`, and `KeyboardFlowTests/commandWClosesWindow`.
   - `SessionEngineTests/chosenDurationDrivesCompletionDeadline`.
 - Window QA:
@@ -370,7 +369,7 @@ Batch 1 created `scripts/qa-window.sh`; 2026-10-05 rewrote it on the cua-driver 
   - Select another duration, relaunch, and confirm it is the default. Verify its clock holds until the first keystroke and that duration and silence choices cannot change during writing.
   - In separate real-time runs for Strict, Standard, and Relaxed, capture screenshots of the warning at 2, 5, and 9 seconds and the wiped state at 5, 8, and 12 seconds. Type once during each warning to confirm it clears.
   - Inspect start and kept screens in light and dark without slogans; copy the full kept text with `Cmd+C` and compare the pasteboard, start again with `Cmd+N`, and close with `Cmd+W`.
-  - Open Settings with `Cmd+,`; verify fullscreen Focus Mode hides clock and count until hover, and test keyboard and VoiceOver access to both. Check centered narrow and left wide alignment, all three font sizes, and system-following appearance without losing text or shifting the deadline.
+  - Open Settings with `Cmd+,`; verify fullscreen Focus Mode hides clock and count until hover, and test keyboard and VoiceOver access to both. Check both column widths against section 4.3, all three font sizes, full-screen and system-following appearance without losing text or shifting the deadline.
   - Seed a large draft by programmatic appends through the existing append-only input path in a test or QA harness and measure typing speed; add no app surface or input bypass.
 - Done when `swift build`, `swift test`, each named test, and independent real-window acceptance from a separate session pass. Record screenshots of warning and wipe for all three limits and the keyboard-only, focus, settings, light, and dark checks in `docs/MANUAL_QA.md`; mark physical IME or VoiceOver steps not verified if they cannot be performed.
 
@@ -436,7 +435,7 @@ All ten findings are incorporated into the affected batch or acceptance sections
 - The Swift package builds an executable, not an `.app` bundle. `scripts/qa-window.sh` packages and tests an ad-hoc universal app, but that does not prove Developer ID signature, notarization, or Gatekeeper acceptance; the signed release still needs batch 7's checks.
 - Synthetic input cannot prove physical IME candidate selection or the exact frames of a 280 ms animation. These stay not verified until a person checks them on real hardware, and the QA record must say so.
 - A 30-minute session can hold several thousand words. The zen typography pass in `AppendOnlyTextView.swift` restyles text on every keystroke. Batch 5 performance QA seeds a large draft by programmatic appends through the existing append-only input path inside a test or QA harness, then measures typing speed. It adds no app surface or input bypass. If typing lags, limit restyling to the last few paragraphs.
-- The deny outline uses the site's alarm color (`#8f4405` light, `#f2a93b` dark), which is what the requirement's "red line" refers to; the old Zero Draft red is intentionally removed to match writeitdown.app.
+- The deny outline uses the semantic red role owned by `writeitdown/tokens.css`; section 6 defines its native adaptation.
 - Notarization and billing configuration depend on owner-account steps. [Release configuration](LICENSE_PAYMENT_SPEC.md#release-configuration) owns the release and staging configuration requirements. Neither debug nor release silently chooses a provider environment.
 - Removing `Application Support/First Line/` handling leaves an orphaned folder on machines that ran the old app. The app does not delete user folders on its own; migration guidance belongs in the release instructions at batch 7.
 - This plan cites screenshots outside the repository under `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/`. A session on another machine cannot see them, and `wid-*.png` must then be recaptured from the live site with the same steps.

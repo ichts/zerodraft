@@ -61,7 +61,10 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
     }
     @objc func copyKept(_ sender: Any?) { rootWindowController?.copyKeptText() }
     @objc func closeWindow(_ sender: Any?) { rootWindowController?.window?.performClose(sender) }
-    @objc func openWriting(_ sender: Any?) { appState.openWritingMode() }
+    @objc func openWriting(_ sender: Any?) {
+        appState.openWritingMode()
+        rootWindowController?.refreshRoom()
+    }
     @objc func goHome(_ sender: Any?) { appState.goHome() }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
     @objc func terminateApp(_ sender: Any?) { NSApp.terminate(nil) }

@@ -9,12 +9,12 @@ struct DurationPickerTests {
         ((view as? NSButton).map { [$0] } ?? []) + view.subviews.flatMap(buttons)
     }
 
-    @Test func offersExactlyFiveDirectStartLengths() {
+    @Test func offersExactlyFiveSessionLengths() {
         let home = HomeViewController(appState: licensedTestState())
         #expect(buttons(home.view).filter { $0.tag >= 60 }.map(\.tag) == [60, 300, 600, 1200, 1800])
     }
 
-    @Test func selectionStartsWritingWithFocusedEditor() {
+    @Test func selectionThenBeginStartsWritingWithFocusedEditor() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root), installIDStore: InstallIDStore(configDirectory: root))
@@ -23,9 +23,14 @@ struct DurationPickerTests {
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.contentViewController = home
         home.viewDidAppear()
-        #expect((window.firstResponder as? NSButton)?.tag == 60)
+        #expect((window.firstResponder as? NSButton)?.title == "Begin")
         let five = buttons(home.view).first { $0.tag == 300 }!
         five.performClick(nil)
+        #expect(state.selectedSurface == .home)
+        #expect(state.selectedDuration == 300)
+        #expect(state.sessionEngine.phase == .idle)
+        let begin = buttons(home.view).first { $0.title == "Begin" }!
+        begin.performClick(nil)
         #expect(state.selectedSurface == .session)
         #expect(state.sessionEngine.remaining == 300)
         let room = SessionViewController(appState: state)
@@ -107,16 +112,18 @@ struct SettingsTests {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.contentView?.layoutSubtreeIfNeeded()
         room.viewDidAppear()
         defer { room.viewWillDisappear() }
         func fields(_ view: NSView) -> [NSTextField] {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         let clock = try #require(fields(room.view).first { $0.stringValue == "1:00" })
-        let count = try #require(fields(room.view).first { $0.stringValue == "0 WORDS" })
+        let count = try #require(fields(room.view).first { $0.stringValue == "Type to start" })
         #expect(clock.alphaValue == 0 && count.alphaValue == 0)
         #expect(clock.accessibilityLabel() == "Time remaining 1:00")
-        #expect(count.accessibilityLabel() == "0 WORDS written")
+        #expect(count.accessibilityLabel() == "Type to start")
         window.contentView?.layoutSubtreeIfNeeded()
         #expect(room.view.trackingAreas.contains { $0.options.contains([.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow]) })
         func move(to point: NSPoint) {
@@ -153,20 +160,20 @@ struct SettingsTests {
         window.contentViewController = room
         room.viewDidAppear()
         defer { room.viewWillDisappear() }
-        func textViews(_ view: NSView) -> [NSTextView] {
-            ((view as? NSTextView).map { [$0] } ?? []) + view.subviews.flatMap(textViews)
+        func fields(_ view: NSView) -> [NSTextField] {
+            ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
-        let kept = try #require(textViews(room.view).first { !$0.isEditable })
+        let kept = try #require(fields(room.view).first { $0.isSelectable && !$0.isEditable })
         #expect(kept.font?.pointSize == WritingFontSize.medium.points)
         #expect(kept.alignment == .center)
         state.updateFontSize(.large)
         state.updateAlignment(.left)
         room.tick()
         #expect(kept.font?.pointSize == WritingFontSize.large.points)
-        #expect(kept.alignment == .left)
+        #expect(kept.alignment == .center)
         room.tick()
         #expect(kept.font?.pointSize == WritingFontSize.large.points)
-        #expect(kept.alignment == .left)
+        #expect(kept.alignment == .center)
     }
 
     @Test func alignmentAndFontSizeDefaultsAndChoices() {
@@ -380,7 +387,7 @@ struct KeyboardFlowTests {
         #expect(input.string.isEmpty)
         #expect(input.accessibilityValue() as? String == "")
         #expect(fields(room.view).contains { $0.stringValue == "5:00" })
-        #expect(fields(room.view).contains { $0.stringValue == "0 WORDS" })
+        #expect(fields(room.view).contains { $0.stringValue == "Type to start" })
         input.insertText("fresh", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(input.string == "fresh")
         #expect(engine.text == "fresh")

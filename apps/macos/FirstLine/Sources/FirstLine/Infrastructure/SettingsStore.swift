@@ -35,16 +35,19 @@ enum SilenceLimit: Int, Codable, CaseIterable {
     case strict = 5, standard = 8, relaxed = 12
     var label: String {
         switch self {
-        case .strict: "Strict - 5s"
-        case .standard: "Standard - 8s"
-        case .relaxed: "Relaxed - 12s"
+        case .strict: "Strict 5 s"
+        case .standard: "Standard 8 s"
+        case .relaxed: "Relaxed 12 s"
         }
     }
 }
 
 enum WritingAlignment: String, Codable, CaseIterable {
     case centered, left
-    var label: String { self == .centered ? "Narrow paper" : "Wide paper" }
+    var label: String { self == .centered ? "Narrow column" : "Wide column" }
+    /// The live trial measures the editor at 62ch; the native sheet keeps the same
+    /// readable column, with the wider option at 70ch.
+    var measureCharacters: Int { self == .centered ? 62 : 70 }
 }
 
 enum WritingFontSize: String, Codable, CaseIterable {
@@ -80,8 +83,12 @@ struct AppSettings: Codable, Equatable {
     var licenseProductID: String?
     var licenseToken: String?
 
+    static func trimmedLicenseKey(_ key: String) -> String {
+        key.trimmingCharacters(in: CharacterSet(charactersIn: " \t\r\n"))
+    }
+
     var hasLicenseKey: Bool {
-        licenseKey?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        licenseKey.map { !Self.trimmedLicenseKey($0).isEmpty } == true
     }
 
     init(

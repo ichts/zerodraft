@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 安全、字号及窄/宽纸张的固定左起点、短段固定首行/临近下沿才滚动与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -11,17 +11,29 @@ import CoreText
 final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDelegate {
     /// The flag marks nonempty committed text or composition activity for trial reservation.
     var onPrepareInput: ((Bool) -> Bool)?
-    var onCommittedText: ((String) -> Void)?
+    var onCommittedText: ((String, NSRange?) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
 
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
     private(set) var pendingCompositionRefresh = true
+    private var lineOpacityMeasureWidth: CGFloat?
+    /// The room sets this from Reduce Motion; history scrolls then snap.
+    var animatesHistoryScroll = true
+    /// One uniform opacity per completed line, closest line first; older lines are gone.
+    static let historyLineOpacities: [CGFloat] = [1, 0.22, 0.07]
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
     private var isUpdatingMarkedText = false
+    /// Guards the text storage edits AppKit itself makes while a composition key
+    /// (delete/forward/selection) is being handed to the input context.
+    private var isCompositionEditing = false
+    /// The marked range the input method last handed us. Third-party IMEs may
+    /// replace that range through insertText after unmarkText, which is still a
+    /// composition commit, not a user edit.
+    private var compositionRange: NSRange?
     /// Guards replaceCharacters during a programmatic restore of an existing engine
     /// draft (loadRestoredText). The append-only user-input guards behave identically
     /// whenever this flag is false; it only allows the controlled restore path to write
@@ -29,16 +41,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// session surface (Home -> Writing). User input is never weakened.
     private var isRestoringProgrammatically = false
     private var sessionFontSize: CGFloat = 28
-    private var writingAlignment: WritingAlignment = .centered
     private var typographyConfigured = false
     private let punctuationFontScale: CGFloat = 0.84
     private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
     private let writingFont: WritingFontCandidate = .pitchLight
     private let chineseFont: ChineseFontCandidate = .zhuqueFangsong
     private var sessionFont: NSFont {
-        let baseFont = writingFont.font(size: sessionFontSize)
+        writingFont.fontWithCJKFallback(size: sessionFontSize)
             ?? NSFont.systemFont(ofSize: sessionFontSize, weight: .regular)
-        return fontByAddingCJKFallback(to: baseFont, size: sessionFontSize)
     }
     private var stableLineBaselineOffset: CGFloat {
         guard let cjk = chineseFont.font(size: sessionFontSize) else { return sessionFontSize }
@@ -54,7 +64,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override var frame: NSRect {
         didSet {
-            textContainer?.containerSize = NSSize(width: bounds.width, height: .greatestFiniteMagnitude)
+            // The writing column is narrowed by textContainerInset, so the container
+            // width is the view width minus both insets. Writing bounds.width here
+            // re-centred the column in the full view + inset, shifting the text right
+            // by the inset at wide window sizes.
+            if let textContainer {
+                let usable = max(bounds.width - 2 * textContainerInset.width, 0)
+                if abs(textContainer.containerSize.width - usable) > 0.5 {
+                    textContainer.containerSize = NSSize(width: usable, height: .greatestFiniteMagnitude)
+                }
+            }
             updateViewportInsetsIfNeeded()
         }
     }
@@ -68,14 +87,39 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let hadMarkedText = hasMarkedText()
         let isActivity = !plainString(from: string).isEmpty
         guard isRestoringProgrammatically || (onPrepareInput?(isActivity) ?? true) else { return }
+        let viewport = preservedCompositionViewport()
         if !isRestoringProgrammatically && isActivity {
             onMarkedTextActivity?()
         }
 
-        let range = hadMarkedText && !hasMarkedText() ? NSRange(location: NSNotFound, length: 0) : replacementRange
+        let targetRange: NSRange
+        if replacementRange.location != NSNotFound,
+           NSMaxRange(replacementRange) <= (textStorage?.length ?? 0) {
+            targetRange = replacementRange
+        } else if hadMarkedText, let compositionRange,
+                  compositionRange.location >= 0,
+                  NSMaxRange(compositionRange) <= (textStorage?.length ?? 0) {
+            targetRange = compositionRange
+        } else {
+            targetRange = self.selectedRange()
+        }
         isUpdatingMarkedText = true
         defer { isUpdatingMarkedText = false }
-        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: range)
+        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: targetRange)
+        compositionRange = hasMarkedText() ? markedRange() : nil
+        restoreCompositionViewport(viewport)
+    }
+
+    override func unmarkText() {
+        // Keep the last marked range until the following insertText commits it;
+        // third-party IMEs may unmark before they replace the composition.
+        let keptComposition = compositionRange
+        let viewport = preservedCompositionViewport()
+        isUpdatingMarkedText = true
+        super.unmarkText()
+        isUpdatingMarkedText = false
+        compositionRange = keptComposition
+        restoreCompositionViewport(viewport)
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
@@ -83,9 +127,15 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let previousEnd = NSRange(location: utf16Length, length: 0)
         let isDefaultRange = replacementRange.location == NSNotFound
         let isMarkedCommit = hasMarkedText()
+        let isCompositionReplacement: Bool = {
+            guard let compositionRange else { return false }
+            return replacementRange.location >= compositionRange.location
+                && NSMaxRange(replacementRange) <= NSMaxRange(compositionRange)
+        }()
 
-        guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd else {
-            onDeny?()
+        guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd
+                || isCompositionReplacement || isUpdatingMarkedText || isCompositionEditing else {
+            denyEdit()
             return
         }
 
@@ -93,7 +143,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             guard onPrepareInput?(!inserted.isEmpty) ?? true else { return }
         }
         let end = NSRange(location: utf16Length, length: 0)
-        if isMarkedCommit && hasMarkedText() {
+        if (isMarkedCommit && hasMarkedText()) || isCompositionReplacement {
             isPerformingInsertion = true
             defer { isPerformingInsertion = false }
             super.insertText(string, replacementRange: replacementRange)
@@ -104,65 +154,110 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             super.insertText(string, replacementRange: end)
         }
 
+        if isMarkedCommit || isCompositionReplacement { compositionRange = nil }
         guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
         pendingCompositionRefresh = true
-        applyFocusTypographyToExistingText()
-        onCommittedText?(inserted)
+        applySessionTypography()
+        onCommittedText?(inserted, isCompositionReplacement ? replacementRange : nil)
     }
 
     /// Clears a draft only after the engine has adjudicated a wipe.
     func clearWipedText() {
         isRestoringProgrammatically = true
         defer { isRestoringProgrammatically = false }
-        if hasMarkedText() { unmarkText() }
+        let hadComposition = hasMarkedText()
+        if hadComposition { unmarkText() }
+        // The input context keeps its own marked range. If the wipe happens while a
+        // composition is live, the next Pinyin key would otherwise replace that stale
+        // range in the now-empty editor and the first letter would vanish.
+        if hadComposition { inputContext?.discardMarkedText() }
+        compositionRange = nil
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
+        // A long draft leaves the scroll view at the bottom; the empty room's line
+        // must return to the same anchor as a fresh start.
+        pendingCompositionRefresh = true
+    }
+
+    /// A selection change that AppKit makes on the IME's behalf (setMarkedText,
+    /// unmark, delete, commit) is allowed even if it leaves the marked range.
+    var isCompositionEditingText: Bool {
+        isUpdatingMarkedText || isPerformingInsertion || isCompositionEditing
+    }
+
+    private func preservedCompositionViewport() -> NSPoint? {
+        enclosingScrollView?.contentView.bounds.origin
+    }
+
+    private func restoreCompositionViewport(_ origin: NSPoint?) {
+        guard let origin, let scrollView = enclosingScrollView,
+              scrollView.contentView.bounds.origin != origin else { return }
+        scrollView.contentView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
+    /// Every denied user edit invalidates an unmarked composition range so a
+    /// later input-method replacement cannot target stale text.
+    func denyEdit() {
+        if !hasMarkedText() { compositionRange = nil }
+        onDeny?()
     }
 
     override func replaceCharacters(in range: NSRange, with string: String) {
-        guard hasMarkedText() else {
-            if isPerformingInsertion == false && isRestoringProgrammatically == false {
-                onDeny?()
-            }
+        let compositionWrite = hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion
+            || isRestoringProgrammatically || isCompositionEditing
+        guard compositionWrite else {
+            denyEdit()
             return
         }
-
         super.replaceCharacters(in: range, with: string)
     }
 
     override func deleteBackward(_ sender: Any?) {
-        guard hasMarkedText() else {
-            onDeny?()
+        guard hasMarkedText() || isCompositionEditing else {
+            denyEdit()
             return
         }
-
+        // Hand the key to the active input method; it owns candidate editing and
+        // the marked range. Never rewrite the composition ourselves. A composition
+        // update is not allowed to move the viewport.
+        let viewport = preservedCompositionViewport()
+        isCompositionEditing = true
         super.deleteBackward(sender)
+        isCompositionEditing = false
+        if hasMarkedText() { compositionRange = markedRange() }
+        restoreCompositionViewport(viewport)
     }
 
     override func deleteForward(_ sender: Any?) {
-        guard hasMarkedText() else {
-            onDeny?()
+        guard hasMarkedText() || isCompositionEditing else {
+            denyEdit()
             return
         }
-
+        // Hand the key to the active input method, same as deleteBackward.
+        let viewport = preservedCompositionViewport()
+        isCompositionEditing = true
         super.deleteForward(sender)
+        isCompositionEditing = false
+        if hasMarkedText() { compositionRange = markedRange() }
+        restoreCompositionViewport(viewport)
     }
 
     override func cut(_ sender: Any?) {
-        onDeny?()
+        denyEdit()
     }
 
     override func paste(_ sender: Any?) {
-        onDeny?()
+        denyEdit()
     }
 
     override func readSelection(from pboard: NSPasteboard) -> Bool {
-        onDeny?()
+        denyEdit()
         return false
     }
 
     override func dragSelection(with event: NSEvent, offset: NSSize, slideBack: Bool) -> Bool {
-        onDeny?()
+        denyEdit()
         return false
     }
 
@@ -196,10 +291,69 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     private static let caretWidth: CGFloat = 1.5
-    private static let caretVerticalPadding: CGFloat = 1
+    /// The caret band is one em tall with its bottom 0.12 em below the baseline,
+    /// the same geometry the house `.caret` rule uses. One band for every glyph
+    /// keeps the caret from bobbing between scripts, and the empty caret and the
+    /// first typed character then share the exact same rect origin.
+    private static let caretDescenderEm: CGFloat = 0.12
 
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         super.drawInsertionPoint(in: adjustedCaretRectForCurrentInsertionPoint(from: rect), color: color, turnedOn: flag)
+    }
+
+    /// The caret rect the editor draws for the current insertion point. Used by the
+    /// room's geometry tests; the drawing path comes through drawInsertionPoint.
+    func caretRectForCurrentInsertionPoint() -> NSRect {
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        if let window {
+            let screen = firstRect(forCharacterRange: NSRange(location: insertion, length: 0), actualRange: nil)
+            let inView = convert(window.convertFromScreen(screen), from: nil)
+            if inView.height > 0 {
+                return adjustedCaretRectForCurrentInsertionPoint(from: inView)
+            }
+        }
+        return adjustedCaretRectForCurrentInsertionPoint(from: fallbackLineRect())
+    }
+
+    /// Baseline of the line the caret occupies, in view coordinates. Empty text uses
+    /// the extra line fragment, which shares the first typed line's baseline, so the
+    /// caret does not move vertically when the first character lands.
+    func currentInsertionBaseline() -> CGFloat? {
+        guard let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        if string.isEmpty || (insertion == utf16Length && string.hasSuffix("\n")) {
+            let extra = layoutManager.extraLineFragmentRect
+            return textContainerOrigin.y + extra.minY + stableLineBaselineOffset
+        }
+        let index = insertion < utf16Length ? insertion : max(insertion - 1, 0)
+        let glyph = layoutManager.glyphIndexForCharacter(at: index)
+        let line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil, withoutAdditionalLayout: true)
+        return textContainerOrigin.y + line.minY + layoutManager.location(forGlyphAt: glyph).y
+    }
+
+    /// Line box used only when the view has no window to ask for the insertion rect.
+    private func fallbackLineRect() -> NSRect {
+        guard let layoutManager, let textContainer else { return .zero }
+        layoutManager.ensureLayout(for: textContainer)
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        let line: NSRect
+        if string.isEmpty || (insertion == utf16Length && string.hasSuffix("\n")) {
+            line = layoutManager.extraLineFragmentRect
+        } else {
+            let index = insertion < utf16Length ? insertion : max(insertion - 1, 0)
+            let glyph = layoutManager.glyphIndexForCharacter(at: index)
+            line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil, withoutAdditionalLayout: true)
+        }
+        return NSRect(x: textContainerOrigin.x + line.minX, y: textContainerOrigin.y + line.minY,
+                      width: Self.caretWidth, height: line.height)
+    }
+
+    func adjustedCaretRectForCurrentInsertionPoint(from rect: NSRect) -> NSRect {
+        let baseline = currentInsertionBaseline() ?? (rect.minY + stableLineBaselineOffset)
+        let height = caretHeight
+        return NSRect(x: rect.minX, y: baseline - height * (1 - Self.caretDescenderEm),
+                      width: Self.caretWidth, height: height)
     }
 
     override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
@@ -221,6 +375,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         trimCaretLayers()
     }
 
+    /// One baseline offset for every real line, so mixed Latin/CJK lines keep the
+    /// same grid and the first typed line shares the empty room's inserted line.
     func layoutManager(_ layoutManager: NSLayoutManager,
                        shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
                        lineFragmentUsedRect: UnsafeMutablePointer<NSRect>,
@@ -236,105 +392,13 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         for sub in layer.sublayers ?? [] {
             guard sub.bounds.height > 10, sub.bounds.width < 10 else { continue }
             let adjusted = adjustedCaretRectForCurrentInsertionPoint(from: sub.frame)
+            sub.frame.origin.x = adjusted.origin.x
             sub.frame.origin.y = adjusted.origin.y
             sub.frame.size.width = Self.caretWidth
             sub.frame.size.height = adjusted.height
             sub.bounds.size.width = Self.caretWidth
             sub.bounds.size.height = adjusted.height
         }
-    }
-
-    func adjustedCaretRectForCurrentInsertionPoint(from rect: NSRect) -> NSRect {
-        let adjusted = defaultCaretRect(from: rect)
-        if let lineRect = trailingNewlineCaretLineRect(),
-           let font = chineseFont.font(size: sessionFontSize),
-           let bounds = caretInkBounds(for: "国", font: font) {
-            let baseline = textContainerOrigin.y + lineRect.minY + stableLineBaselineOffset
-            return caretRect(from: adjusted, baseline: baseline, bounds: bounds)
-        }
-
-        guard let character = previousCaretCharacter() else { return adjusted }
-        guard let layoutManager, let textContainer else { return adjusted }
-        guard let font = caretFont(for: character.value) else { return adjusted }
-        guard let bounds = caretInkBounds(for: character.value, font: font) else { return adjusted }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let glyphIndex = layoutManager.glyphIndexForCharacter(at: character.range.location)
-        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil, withoutAdditionalLayout: true)
-        let baseline = textContainerOrigin.y + lineRect.minY + layoutManager.location(forGlyphAt: glyphIndex).y
-        return caretRect(from: adjusted, baseline: baseline, bounds: bounds)
-    }
-
-    private func caretRect(from rect: NSRect, baseline: CGFloat, bounds: NSRect) -> NSRect {
-        var adjusted = rect
-        adjusted.size.width = Self.caretWidth
-        let inkTop = baseline - bounds.maxY
-        adjusted.origin.y = floor(inkTop + bounds.height / 2 - caretHeight / 2)
-        adjusted.size.height = caretHeight
-        return adjusted
-    }
-
-    private func trailingNewlineCaretLineRect() -> NSRect? {
-        let value = string as NSString
-        let insertionLocation = min(max(selectedRange().location, 0), value.length)
-        guard insertionLocation == value.length, insertionLocation > 0 else { return nil }
-        guard value.substring(with: NSRange(location: insertionLocation - 1, length: 1)) == "\n" else { return nil }
-        guard let layoutManager, let textContainer else { return nil }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let rect = layoutManager.extraLineFragmentRect
-        return rect.isEmpty ? nil : rect
-    }
-
-    private func caretFont(for character: String) -> NSFont? {
-        if character.unicodeScalars.contains(where: isWideCJKGlyph) {
-            return chineseFont.font(size: sessionFontSize)
-        }
-
-        return writingFont.font(size: sessionFontSize)
-    }
-
-    private func defaultCaretRect(from rect: NSRect) -> NSRect {
-        var adjusted = rect
-        adjusted.size.width = Self.caretWidth
-        let targetHeight = min(rect.height, sessionFontSize)
-        adjusted.origin.y += max((rect.height - targetHeight) / 2, 0)
-        adjusted.size.height = targetHeight
-        return adjusted
-    }
-
-    private func previousCaretCharacter() -> (value: String, range: NSRange)? {
-        let value = string as NSString
-        let insertionLocation = min(max(selectedRange().location, 0), value.length)
-        guard insertionLocation > 0 else { return nil }
-
-        let range = value.rangeOfComposedCharacterSequence(at: insertionLocation - 1)
-        return (value.substring(with: range), range)
-    }
-
-    private func inkBounds(for character: String, font: NSFont) -> NSRect? {
-        guard let scalar = character.unicodeScalars.first else { return nil }
-        guard scalar.value <= UInt16.max else { return nil }
-
-        let coreTextFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var codeUnit = UniChar(scalar.value)
-        var glyph = CGGlyph()
-        guard CTFontGetGlyphsForCharacters(coreTextFont, &codeUnit, &glyph, 1), glyph != 0 else { return nil }
-
-        var measuredGlyph = glyph
-        var bounds = CGRect.zero
-        CTFontGetBoundingRectsForGlyphs(coreTextFont, .horizontal, &measuredGlyph, &bounds, 1)
-        guard bounds.height > 0 else { return nil }
-        return bounds
-    }
-
-    private func caretInkBounds(for character: String, font: NSFont) -> NSRect? {
-        if let bounds = inkBounds(for: character, font: font) {
-            return bounds
-        }
-
-        let fallbackGlyph = character.unicodeScalars.contains(where: isWideCJKGlyph) ? "国" : "x"
-        return inkBounds(for: fallbackGlyph, font: font)
     }
 
     private func isWideCJKGlyph(_ scalar: Unicode.Scalar) -> Bool {
@@ -358,28 +422,26 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         NSRange(location: NSNotFound, length: 0)
     }
 
-    func configureSessionTypography(size: CGFloat = 28, alignment: WritingAlignment = .centered) {
-        guard !typographyConfigured || size != sessionFontSize || alignment != writingAlignment else { return }
+    func configureSessionTypography(size: CGFloat = 28) {
+        guard !typographyConfigured || size != sessionFontSize else { return }
         typographyConfigured = true
         sessionFontSize = size
-        writingAlignment = alignment
         let paragraph = sessionParagraphStyle()
         let attributes = activeTextAttributes(paragraph: paragraph)
 
         defaultParagraphStyle = paragraph
         typingAttributes = attributes
-        insertionPointColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
+        insertionPointColor = FirstLineColors.inkNSColor
         textColor = FirstLineColors.inkNSColor
         font = sessionFont
-        self.alignment = .left
+        alignment = .center
         layoutManager?.delegate = self
+        // The fixed 1.6 line box already includes the leading; the fallback font's
+        // own leading would add another 5.6 pt to CJK lines and break the pitch.
+        layoutManager?.usesFontLeading = false
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
-        applyFocusTypographyToExistingText()
-    }
-
-    func applySessionTypographyToExistingText() {
-        applyFocusTypographyToExistingText()
+        applySessionTypography()
     }
 
     /// Controlled restore of an existing engine draft when re-entering a live session
@@ -394,13 +456,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         defer { isRestoringProgrammatically = false }
         let whole = NSRange(location: 0, length: textStorage.length)
         textStorage.replaceCharacters(in: whole, with: text)
-        applyFocusTypographyToExistingText()
+        compositionRange = nil
         let end = NSRange(location: utf16Length, length: 0)
         if selectedRange() != end { setSelectedRange(end) }
+        applySessionTypography()
         pendingCompositionRefresh = true
     }
 
-    func applyFocusTypographyToExistingText() {
+    /// Base ink for the current line; completed lines are stepped by `applyLineOpacity`
+    /// to the live trial's 100/22/7 intent.
+    func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
 
@@ -409,22 +474,72 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard textStorage.length > 0 else { return }
 
         let range = NSRange(location: 0, length: textStorage.length)
-        let activeRange = currentThoughtRange(in: textStorage.string)
-        let previousRange = previousThoughtRange(before: activeRange, in: textStorage.string)
-
         textStorage.beginEditing()
         textStorage.removeAttribute(.shadow, range: range)
-        textStorage.addAttributes(hiddenTextAttributes(paragraph: paragraph), range: range)
-        if let previousRange, previousRange.length > 0 {
-            textStorage.addAttributes(inactiveTextAttributes(paragraph: paragraph), range: previousRange)
-        }
-        if activeRange.length > 0 {
-            textStorage.addAttributes(activeTextAttributes(paragraph: paragraph), range: activeRange)
-            textStorage.removeAttribute(.shadow, range: activeRange)
-        }
+        textStorage.addAttributes(activeTextAttributes(paragraph: paragraph), range: range)
         applyLightPunctuationTypography(in: range, textStorage: textStorage)
         applyScriptBoundaryKerning(in: range, textStorage: textStorage)
         textStorage.endEditing()
+        // Line opacities need a laid-out storage, so apply them after the edit block.
+        applyLineOpacity(in: range, textStorage: textStorage)
+    }
+
+    /// A width or measure change reflows line breaks without touching the text or
+    /// caret, so the per-line opacity must be recomputed against the new layout.
+    func refreshLineOpacityForMeasureChange() {
+        guard hasMarkedText() == false,
+              let textStorage, textStorage.length > 0,
+              let textContainer else { return }
+        let width = textContainer.containerSize.width
+        guard width > insetEpsilon, width != lineOpacityMeasureWidth else { return }
+        applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
+    }
+
+    /// Each completed line gets one uniform opacity; the current line is full. The
+    /// line's top and bottom always match, and older lines are gone. The opacities
+    /// follow the live trial's intent (100/22/7).
+    private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
+        guard textStorage.length > 0, let layoutManager, let textContainer else { return }
+        layoutManager.ensureLayout(for: textContainer)
+        lineOpacityMeasureWidth = textContainer.containerSize.width
+        var lines: [(index: Int, glyphRange: NSRange)] = []
+        var index = 0
+        layoutManager.enumerateLineFragments(
+            forGlyphRange: NSRange(location: 0, length: textStorage.length)
+        ) { _, _, _, glyphRange, _ in
+            lines.append((index, glyphRange))
+            index += 1
+        }
+        guard !lines.isEmpty else { return }
+        let length = textStorage.length
+        let insertion = min(max(selectedRange().location, 0), length)
+        let currentIndex: Int
+        if insertion == length, string.hasSuffix("\n") {
+            currentIndex = lines.count
+        } else if insertion < length {
+            let glyph = layoutManager.glyphIndexForCharacter(at: insertion)
+            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
+        } else {
+            let glyph = layoutManager.glyphIndexForCharacter(at: max(length - 1, 0))
+            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
+        }
+        for line in lines {
+            let distance = currentIndex - line.index
+            let alpha: CGFloat
+            if distance <= 0 {
+                alpha = 1
+            } else if distance < Self.historyLineOpacities.count {
+                alpha = Self.historyLineOpacities[distance]
+            } else {
+                alpha = 0
+            }
+            let characterRange = layoutManager.characterRange(forGlyphRange: line.glyphRange, actualGlyphRange: nil)
+            let clipped = NSIntersectionRange(characterRange, range)
+            guard clipped.length > 0 else { continue }
+            textStorage.addAttribute(.foregroundColor,
+                                      value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
+                                      range: clipped)
+        }
     }
 
     func setCompositionAnchor(_ y: CGFloat) {
@@ -438,14 +553,28 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
-        let initialY = round(textContainerOrigin.y + firstLineInkCenter() - compositionAnchorY)
+        // Zen: the current (last) line sits at the anchor; earlier lines move up and fade.
+        let initialY = round(textContainerOrigin.y + line.midY - compositionAnchorY)
         let targetY = max(
             -scrollView.contentInsets.top, initialY,
             ceil(textContainerOrigin.y + line.maxY - scrollView.contentView.bounds.height + 40)
         )
-        guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
-        scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
-        scrollView.reflectScrolledClipView(scrollView.contentView)
+        let currentY = scrollView.contentView.bounds.origin.y
+        let delta = abs(currentY - targetY)
+        guard delta > insetEpsilon else { return }
+        let lineHeight = sessionFontSize * 1.6
+        // A new line moves the history by one pitch; animate that, and snap on a
+        // session/resize jump. Reduce Motion snaps.
+        if animatesHistoryScroll, delta <= lineHeight * 2.5 {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: targetY))
+            }
+        } else {
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 
     private func compositionLineRect() -> NSRect? {
@@ -456,18 +585,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
         let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-    }
-
-    private func firstLineInkCenter() -> CGFloat {
-        guard !string.isEmpty, let layoutManager, let textContainer else {
-            return layoutManager?.extraLineFragmentRect.midY ?? 0
-        }
-        layoutManager.ensureLayout(for: textContainer)
-        let line = layoutManager.lineFragmentUsedRect(forGlyphAt: 0, effectiveRange: nil)
-        guard let scalar = string.unicodeScalars.first,
-              let font = font(for: scalar),
-              let ink = glyphMetrics(for: scalar, font: font)?.bounds else { return line.midY }
-        return line.minY + layoutManager.location(forGlyphAt: 0).y - ink.midY
     }
 
     func clearPendingCompositionRefresh() {
@@ -520,17 +637,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
 
         return value
-    }
-
-    private func fontByAddingCJKFallback(to baseFont: NSFont, size: CGFloat) -> NSFont {
-        guard let cjkFallback = chineseFont.font(size: size) else {
-            return baseFont
-        }
-
-        let descriptor = baseFont.fontDescriptor.addingAttributes([
-            .cascadeList: [cjkFallback.fontDescriptor],
-        ])
-        return NSFont(descriptor: descriptor, size: size) ?? baseFont
     }
 
     private func applyLightPunctuationTypography(in range: NSRange, textStorage: NSTextStorage) {
@@ -649,8 +755,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .left
-        paragraph.lineHeightMultiple = 1.45
+        paragraph.alignment = .center
+        // Fixed line pitch. lineHeightMultiple scales each font's natural line height,
+        // so the CJK fallback (a taller font) produced a 58.4 pt line next to the
+        // Latin 44.8 pt line. Min == max forces 1.6 x font size for every script.
+        let lineHeight = sessionFontSize * 1.6
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.lineHeightMultiple = 1
         paragraph.lineSpacing = 0
         return paragraph
     }
@@ -663,56 +775,4 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         ]
     }
 
-    private func inactiveTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
-        let shadow = NSShadow()
-        shadow.shadowBlurRadius = 3.5
-        shadow.shadowOffset = .zero
-        shadow.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.26)
-
-        return [
-            .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0.12),
-            .paragraphStyle: paragraph,
-            .shadow: shadow,
-        ]
-    }
-
-    private func hiddenTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
-        [
-            .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor.withAlphaComponent(0),
-            .paragraphStyle: paragraph,
-        ]
-    }
-
-    private func currentThoughtRange(in value: String) -> NSRange {
-        let nsString = value as NSString
-        guard nsString.length > 0 else { return NSRange(location: 0, length: 0) }
-
-        let insertionLocation = min(max(selectedRange().location, 0), nsString.length)
-        if insertionLocation == nsString.length,
-           nsString.length > 0,
-           nsString.substring(with: NSRange(location: nsString.length - 1, length: 1)) == "\n" {
-            return NSRange(location: nsString.length, length: 0)
-        }
-
-        let characterLocation = max(insertionLocation - 1, 0)
-        return nsString.paragraphRange(for: NSRange(location: characterLocation, length: 0))
-    }
-
-    private func previousThoughtRange(before currentRange: NSRange, in value: String) -> NSRange? {
-        let nsString = value as NSString
-        guard nsString.length > 0 else { return nil }
-
-        let boundary = min(max(currentRange.location, 0), nsString.length)
-        let probeLocation = boundary - 1
-        guard probeLocation >= 0 else { return nil }
-
-        let previousRange = nsString.paragraphRange(for: NSRange(location: probeLocation, length: 0))
-        guard previousRange.location != currentRange.location || previousRange.length != currentRange.length else {
-            return nil
-        }
-
-        return previousRange
-    }
 }

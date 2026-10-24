@@ -1,36 +1,68 @@
 /**
- * [INPUT]: BundledFonts (Newsreader human serif, IBM Plex Mono machine mono)
- * [OUTPUT]: FirstLineTypography font tokens for the writeitdown site (AppKit NSFont).
- * [POS]: writeitdown typography layer; titles/body in Newsreader, chrome in IBM Plex Mono
- * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
+ * [INPUT]: BundledFonts (Newsreader human serif) and the macOS system UI font.
+ * [OUTPUT]: FirstLineTypography tokens: Newsreader for writing, kept heading and warning numerals, system sans for UI and display headings.
+ * [POS]: Native typography layer; matches writeitdown/tokens.css (serif = what you write, sans = the tool).
+ * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  *
- * Site layers: Newsreader is the human layer (titles, body, tagline); IBM Plex Mono is the
- * machine layer (sidebar labels, microcopy/rules, clock/status, buttons). If a family is not
- * registered yet, each token falls back to the matching system font (serif / monospaced).
- *
- * Accessors are computed, because NSFont is not Sendable and the bundled font is cached by the
- * font registry.
+ * The machine mono layer is retired from the app chrome. UI labels, buttons, clock, counts, tags and
+ * field labels and display headings use the system font so controls stay native; written text and
+ * warning numerals use the bundled Newsreader. Accessors are computed because NSFont is not Sendable and fonts are cached.
  */
 
 import AppKit
 
 enum FirstLineTypography {
-    // Human layer: bundled Newsreader.
-    static var titleNSFont: NSFont? { humanSerifNSFont(size: 48) }
-    static var taglineNSFont: NSFont? { humanSerifNSFont(size: 24) }
-    static var bodyNSFont: NSFont? { humanSerifNSFont(size: 24) }
+    static func displayNSFont(size: CGFloat = 34) -> NSFont {
+        .systemFont(ofSize: size, weight: .semibold)
+    }
+    static func subtitleNSFont(size: CGFloat = 15) -> NSFont {
+        .systemFont(ofSize: size)
+    }
 
-    // Machine layer: bundled IBM Plex Mono.
-    static var sidebarNSFont: NSFont? { machineMonoNSFont(size: 11) }
-    static var microcopyNSFont: NSFont? { machineMonoNSFont(size: 13) }
-    static var buttonLabelNSFont: NSFont? { machineMonoNSFont(size: 13) }
-    static var sessionStatusNSFont: NSFont? { machineMonoNSFont(size: 11) }
-
-    private static func humanSerifNSFont(size: CGFloat) -> NSFont? {
+    static func writingNSFont(size: CGFloat) -> NSFont? {
         BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderUprightPostScript, size: size)
     }
 
-    private static func machineMonoNSFont(size: CGFloat) -> NSFont? {
-        BundledFonts.registeredFont(postScriptName: BundledFonts.plexMonoRegularPostScript, size: size)
+    static func writingItalicNSFont(size: CGFloat) -> NSFont? {
+        BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderItalicPostScript, size: size)
     }
+
+    /// Newsreader 500, the live kept heading weight.
+    static func writingMediumNSFont(size: CGFloat) -> NSFont? {
+        BundledFonts.registeredFont(postScriptName: BundledFonts.newsreaderMediumPostScript, size: size)
+    }
+
+    /// Machine-voice label text with the live trial's tracking (0.02-0.04 em).
+    static func trackedText(_ text: String, font: NSFont, color: NSColor, kernEm: CGFloat,
+                            lineHeightMultiple: CGFloat = 1.6,
+                            fixedLineHeight: Bool = false) -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        if fixedLineHeight {
+            // Multi-line writing surfaces must use one pitch for every script; a
+            // fallback font must not inflate its own lines.
+            let lineHeight = font.pointSize * lineHeightMultiple
+            paragraph.minimumLineHeight = lineHeight
+            paragraph.maximumLineHeight = lineHeight
+            paragraph.lineHeightMultiple = 1
+        } else {
+            paragraph.lineHeightMultiple = lineHeightMultiple
+        }
+        return NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: color,
+            .kern: font.pointSize * kernEm,
+            .paragraphStyle: paragraph,
+        ])
+    }
+
+    // Tool layer: macOS system sans.
+    static var uiNSFont: NSFont { .systemFont(ofSize: 15) }
+    static var uiSemiboldNSFont: NSFont { .systemFont(ofSize: 15, weight: .semibold) }
+    static var smallNSFont: NSFont { .systemFont(ofSize: 13) }
+    static var smallSemiboldNSFont: NSFont { .systemFont(ofSize: 13, weight: .semibold) }
+    /// The live trial's machine voice weight for captions, reports and quiet links.
+    static var smallMediumNSFont: NSFont { .systemFont(ofSize: 13, weight: .medium) }
+    static var fieldNSFont: NSFont { .systemFont(ofSize: 17) }
+    static var clockNSFont: NSFont { .monospacedDigitSystemFont(ofSize: 15, weight: .semibold) }
 }

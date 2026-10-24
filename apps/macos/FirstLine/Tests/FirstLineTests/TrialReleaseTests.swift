@@ -20,9 +20,11 @@ private struct OfflineSignedClient: LicenseClient {
 struct TrialReleaseTests {
     private func makeState(at root: URL, now: @escaping () -> TimeInterval = { 0 },
                            client: MockLicenseClient = MockLicenseClient(),
+                           checkoutClient: CheckoutClient = MockCheckoutClient(),
                            openURL: @escaping (URL) -> Void = { _ in }) -> AppState {
         AppState(sessionEngine: SessionEngine(now: now), settingsStore: SettingsStore(configDirectory: root),
-                 licenseClient: client, installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock",
+                 licenseClient: client, checkoutClient: checkoutClient,
+                 installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock",
                  openExternalURL: openURL)
     }
 
@@ -74,6 +76,47 @@ struct TrialReleaseTests {
         #expect(state.selectedSurface == .home)
     }
 
+    @Test(arguments: [false, true])
+    func exhaustedFailureRestartOpensActivation(byReturn: Bool) throws {
+        var now = 0.0
+        let root = tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = makeState(at: root, now: { now })
+        state.settings.trialSessionsUsed = 2
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidAppear()
+        let field = try editor(in: room)
+        field.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 3)
+        now = 9
+        room.tick()
+        #expect(state.sessionEngine.phase == .failure)
+
+        if byReturn {
+            let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
+                isARepeat: false, keyCode: 36))
+            #expect(window.performKeyEquivalent(with: ret), "Return did not reach Begin again")
+        } else {
+            let beginAgain = try #require(descendants(room.view, of: NSButton.self)
+                .first { $0.title == "Begin again" })
+            beginAgain.performClick(nil)
+        }
+
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.sessionEngine.phase == .idle)
+        #expect(!state.canStartSession)
+        window.orderOut(nil)
+    }
+
     @Test func firstNonemptyInputSpendsOnceIncludingComposition() throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -100,14 +143,15 @@ struct TrialReleaseTests {
         #expect(state.accessStatusText == "Free trial: 2 of 3 sessions left.")
     }
 
-    @Test func exhaustionPersistsAndRoutesToExistingActivationScreen() throws {
+    @Test func exhaustionPersistsAndRoutesToExistingActivationScreen() async throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let state = makeState(at: root)
         for _ in 0..<3 { try writeSession(state) }
         #expect(state.selectedSurface == .upgrade)
         var checkout: URL?
-        let restarted = makeState(at: root, openURL: { checkout = $0 })
+        let checkoutClient = MockCheckoutClient(result: .success(URL(string: "https://checkout.stripe.com/c/pay/test")!))
+        let restarted = makeState(at: root, checkoutClient: checkoutClient, openURL: { checkout = $0 })
         #expect(restarted.trialSessionsRemaining == 0)
         #expect(!restarted.canStartSession)
         #expect(!restarted.hasFullAccess)
@@ -122,11 +166,14 @@ struct TrialReleaseTests {
         let screen = UpgradeViewController(appState: restarted)
         let fields = descendants(screen.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "After 3 free sessions, a license is required to keep writing." })
-        #expect(fields.contains { $0.placeholderString == "Order number or activation code" })
+        #expect(fields.contains { $0.stringValue == "Order number or activation code" })
+        #expect(fields.contains { $0.placeholderString == "WID-XXXX-XXXX" })
         let buy = try #require(descendants(screen.view, of: NSButton.self).first { $0.title.hasPrefix("Buy a license") })
         #expect(buy.isEnabled)
         buy.performClick(nil)
-        #expect(checkout?.absoluteString == "https://writeitdown.app/mac.html")
+        for _ in 0..<50 where checkout == nil { await Task.yield() }
+        #expect(checkoutClient.calls == 1)
+        #expect(checkout?.absoluteString == "https://checkout.stripe.com/c/pay/test")
     }
 
     @Test func wipedSessionRestartSpendsAnotherButLastWipeDoesNotSellImmediately() throws {
@@ -154,8 +201,8 @@ struct TrialReleaseTests {
             #expect(state.selectedSurface == .session)
             #expect(field.string.isEmpty)
             #expect(state.settings.trialSessionsUsed == used)
-            let expected = used == 3 ? "DRAFT DELETED AT 0:08. ACTIVATE TO KEEP WRITING."
-                                     : "DRAFT DELETED AT 0:08. TYPE TO START AGAIN."
+            let expected = used == 3 ? "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING."
+                                     : "DRAFT DELETED AT 0:52. TYPE TO START AGAIN."
             #expect(descendants(room.view, of: NSTextField.self).contains { $0.stringValue == expected && !$0.isHidden })
         }
         field.insertText("fourth", replacementRange: NSRange(location: NSNotFound, length: 0))

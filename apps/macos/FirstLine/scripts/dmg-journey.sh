@@ -139,6 +139,11 @@ token() { jq -r --arg r "$1" --arg l "$2" '[.elements[] | select((.role|ascii_do
 wait_has() { local i; for i in {1..40}; do snap "$1"; has "$2" && return 0; sleep 0.5; done; return 1; }
 key() { local t; t="$(jq -r '[.elements[] | select(.role == "AXTextArea")][0].element_token // empty' "$snapf")"
   cua press_key "{\"pid\":$pid,\"window_id\":$window_id,\"element_token\":\"$t\",\"key\":\"$1\"}" >/dev/null; }
+exit_room() {
+  key escape
+  wait_has exit-hint 'Press Esc again to leave and delete the draft.' || { bad 'first Escape did not show the exit hint'; exit 1; }
+  key escape
+}
 type_text() {
   local i char
   for ((i = 0; i < ${#1}; i++)); do
@@ -153,9 +158,14 @@ clock_now() { python3 -c 'import time; print(time.monotonic())'; }
 wait_has home 'Free trial: 3 of 3 sessions left' && pass 'fresh Mac shows "Free trial: 3 of 3 sessions left."' \
   || { bad 'fresh launch does not show 3 of 3 free sessions'; exit 1; }
 for used in 1 2 3; do
-  tok="$(token button '1')"; [[ -n "$tok" ]] || { bad "no 1-minute button (session $used)"; exit 1; }
+  tok="$(token radio '1 minute')"; [[ -n "$tok" ]] || { bad "no 1-minute radio (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
-  wait_has "room-$used" 'Start typing' || wait_has "room-$used" 'WORDS' || { bad "session $used room did not open"; exit 1; }
+  snap "selected-minute-$used"
+  jq -e '[.elements[] | select(.role == "AXRadioButton" and .label == "1 minute" and (.value | tostring) == "1")] | length == 1' "$snapf" >/dev/null \
+    || { bad "session $used did not select 1 minute"; exit 1; }
+  tok="$(token button 'Begin writing')"; [[ -n "$tok" ]] || { bad "no Begin button (session $used)"; exit 1; }
+  cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
+  wait_has "room-$used" 'Type to start' || { bad "session $used room did not open"; exit 1; }
   sentence='I watched the rain cross the garden.'
   started="$(clock_now)" || { bad 'monotonic clock unavailable'; exit 1; }
   type_text "$sentence" || { bad "session $used key delivery failed"; exit 1; }
@@ -166,7 +176,7 @@ for used in 1 2 3; do
   if [[ "$used" -eq 2 ]]; then
     sleep 9
     snap wiped-second
-    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' \
+    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' && has '0 words' \
       && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
       && ! has 'COPY TEXT' \
       && pass 'session 2 silence deleted the draft with a restart receipt' \
@@ -181,11 +191,11 @@ for used in 1 2 3; do
       typed="$typed$char"
       i=$(((i + 1) % ${#continuation}))
     done
-    wait_has kept-third '0:00 - ' || { bad 'session 3 never reached the kept receipt'; exit 1; }
+    wait_has kept-third 'You wrote it down.' || { bad 'session 3 never reached the kept receipt'; exit 1; }
     python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
       || { bad 'session 3 completed before a full minute'; exit 1; }
-    has 'WORDS KEPT.' && ! has 'DRAFT DELETED AT ' \
-      && jq -e --arg text "$typed" '[.elements[] | select(.role == "AXTextArea" and .value == $text)] | length > 0' "$snapf" >/dev/null \
+    has '1 MINUTE. ' && has ' WORDS.' && ! has 'DRAFT DELETED AT ' \
+      && jq -e --arg text "$typed" '[.elements[] | select((.value // "") == $text)] | length > 0' "$snapf" >/dev/null \
       || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
     tok="$(token button 'COPY TEXT')"
     [[ -n "$tok" ]] || { bad 'session 3 COPY TEXT affordance missing'; exit 1; }
@@ -201,7 +211,7 @@ for used in 1 2 3; do
       || { bad 'session 3 restart affordance missing or failed'; exit 1; }
   fi
   if [[ "$used" -lt 3 ]]; then
-    key escape || { bad "session $used exit failed"; exit 1; }
+    exit_room || { bad "session $used exit failed"; exit 1; }
   fi
   left=$((3 - used))
   if [[ "$left" -gt 0 ]]; then
@@ -212,7 +222,7 @@ done
 # 5. After the third session, writing needs a license: the activation page.
 wait_has activation 'Activate Write It Down' && pass 'after 3 free sessions the activation page appears' \
   || bad 'activation page not shown after the third session'
-has 'Start typing.' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
+has 'Type to start' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
 
 # 6. Manual remainder.
 log "SUMMARY automated failures: $failures (artifacts: $out)"

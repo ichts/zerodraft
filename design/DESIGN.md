@@ -210,10 +210,10 @@ The test: if a frame would hang comfortably in any of these rooms, keep deleting
 
 This is the brand for writeitdown.app and the native Mac app. It is a sibling of the root Zero Draft landing: the
 `ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the root landing.
-The primary web header is the landing, the room, and `/download/`; those surfaces use the lockup, and the social
-card uses the same lockup. The document-style pages (`mac.html`, legal, support, and answer pages) keep the mono
-`WRITE_IT_DOWN` logotype and adopt the favicon. The Mac app's in-app start screen keeps the mono logotype; the Mac
-app carries the mark in its app icon and volume icon.
+The primary web header is the landing, the room, `/download/`, and `mac.html`; those surfaces use the lockup, and
+the social card uses the same lockup. The legal, support, and answer pages keep the mono `WRITE_IT_DOWN` logotype
+and adopt the favicon. The native Mac app's in-app start screen uses the lockup; the app icon and volume icon carry
+the mark.
 
 ### 11.1 The mark and the wordmark
 
@@ -229,6 +229,8 @@ mark, so the mark is never set beside the wordmark as a second object.
   bone square with the ink W. The ink plate with the bone W is the dark-appearance variant, used only where the
   platform supports an appearance switch (the favicon's `prefers-color-scheme: dark` links; the alternate app-icon
   source). A macOS `.icns` app icon has no appearance switch, so the shipped `.icns` is the light plate.
+- Mac start screen: `Sources/FirstLine/Resources/write-it-down-lockup.svg` at 21 px type (128x16.25), tinted with
+  the app ink token. The app icon and volume icon carry the mark.
 - The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
 - Social card: `writeitdown/og.png` at 1200x630 uses the lockup on the light page; it is the link preview for the
   landing and `/download/`.
@@ -260,10 +262,10 @@ mark, so the mark is never set beside the wordmark as a second object.
   all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the lockup.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, and `writeitdown/apple-touch-icon.png` for the
-  site; the app icon set and `packaging/VolumeIcon.icns` for the Mac. The document-style pages (`mac.html`, legal,
-  support, and answer pages) and the Mac app's in-app start screen use the mono `WRITE_IT_DOWN` logotype; the Mac
-  app's mark is its app icon and volume icon. The ink-plate/bone-W app-icon alternate is kept with the task
-  evidence; it is not compiled into the `.icns`.
+  site; the app icon set, `packaging/VolumeIcon.icns`, and `Sources/FirstLine/Resources/write-it-down-lockup.svg`
+  for the Mac. The legal, support, and answer pages use the mono `WRITE_IT_DOWN` logotype; the Mac start screen uses
+  the bundled lockup. The ink-plate/bone-W app-icon alternate is kept with the task evidence; it is not compiled
+  into the `.icns`.
 
 ### 11.4 Do not
 
@@ -280,11 +282,13 @@ mark, so the mark is never set beside the wordmark as a second object.
 - Browser tab: the 16 px favicon is the split-W mark on a bone tile by default, and the bone split-W mark on an
   ink tile when the `prefers-color-scheme: dark` links are selected; the 32 px, SVG, and apple-touch versions carry
   the same mark.
-- Plate decision: the light plate passes at 16 and 32 px. The light W reads on the bone tile in Finder, Dock and
-  both browser chromes; the dark plate remains the alternate. The side-by-side evidence is kept with the task.
+- Plate decision: the light plate passes at 16 and 32 px. The static 16/32 inspection and the light/dark
+  start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real Dock and Finder captures
+  remain pending. The dark plate remains the alternate.
 - Site header: 21 px desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
-- Mac: the app icon at 16/32 (optical), 128 (Dock), and 1024; the volume icon at 128 and 1024; the Dock and Finder
-  captures on light and dark. Static asset inspection is recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real
-  Dock and Finder captures remain separate independent acceptance.
+- Mac: the split-W lockup on the start screen in light and dark; the app icon at 16/32 (optical), 128 (Dock), and
+  1024; the volume icon at 128 and 1024. Static asset inspection, the deterministic view test and the light/dark
+  start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; Dock and Finder captures on light
+  and dark remain separate independent acceptance.
 - `grep` for the old `WID` icon, the red underscore, and the `.brand i` caret returns nothing in the shipped
   surfaces. The logo files contain no `<text>` and no red token.

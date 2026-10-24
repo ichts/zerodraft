@@ -1,6 +1,7 @@
 /*
- * [INPUT]: AppState choices, observable access status (free-trial count or license) and AppKit button focus.
- * [OUTPUT]: Cursor-ready, direct-start duration row and fixed silence choices.
+ * [INPUT]: AppState choices, observable access status (free-trial count or license), bundled split-W lockup and
+ *          AppKit button focus.
+ * [OUTPUT]: Cursor-ready, direct-start duration row, fixed silence choices and the split-W lockup.
  * [POS]: Pre-writing surface; selection persists before a session begins, no marketing copy.
  * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
  */
@@ -35,9 +36,18 @@ final class HomeViewController: NSViewController {
     }
 
     private func buildInterface() {
-        let title = NSTextField(labelWithString: "WRITE_IT_DOWN")
-        title.font = FirstLineTypography.logotypeNSFont
-        title.textColor = FirstLineColors.inkNSColor
+        let title = BrandLockupView()
+        title.image = Self.lockupImage()
+        title.image?.isTemplate = true
+        title.imageScaling = .scaleProportionallyUpOrDown
+        title.contentTintColor = FirstLineColors.inkNSColor
+        title.setAccessibilityLabel("Write It Down")
+        title.setAccessibilityRole(.image)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            title.widthAnchor.constraint(equalToConstant: 128),
+            title.heightAnchor.constraint(equalToConstant: 16.25),
+        ])
         let durationTitle = caption("MINUTES")
         let durationRow = row(SessionEngine.durationChoices.map { duration in
             let button = FirstLineButtons.primary(title: "\(Int(duration / 60))", target: self, action: #selector(start(_:)))
@@ -84,6 +94,18 @@ final class HomeViewController: NSViewController {
         }
     }
 
+    private static func lockupImage() -> NSImage? {
+        let bundle: Bundle
+        if let resources = Bundle.main.resourceURL,
+           let packaged = Bundle(url: resources.appendingPathComponent("WriteItDown_WriteItDown.bundle")) {
+            bundle = packaged
+        } else {
+            bundle = Bundle.module
+        }
+        guard let url = bundle.url(forResource: "write-it-down-lockup", withExtension: "svg") else { return nil }
+        return NSImage(contentsOf: url)
+    }
+
     private func caption(_ text: String) -> NSTextField {
         let field = NSTextField(labelWithString: text)
         field.font = FirstLineTypography.microcopyNSFont
@@ -107,5 +129,12 @@ final class HomeViewController: NSViewController {
     @objc private func start(_ sender: NSButton) {
         appState.updateDefaultDuration(TimeInterval(sender.tag))
         appState.startSession(duration: TimeInterval(sender.tag))
+    }
+}
+
+private final class BrandLockupView: NSImageView {
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 }

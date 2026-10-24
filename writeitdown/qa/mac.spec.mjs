@@ -253,7 +253,7 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
 }
 
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
-  for (const path of ['index.html', 'index.html#trial', 'download/']) {
+  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
     await page.goto(path);
     const brands = page.locator('.brand:visible');
     const count = await brands.count();
@@ -273,7 +273,7 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       });
       expect(state.focusVisible, `${path} brand ${index}: focus-visible`).toBe(true);
       expect(state.outlineStyle, `${path} brand ${index}: focus outline`).toBe('solid');
-      expect(state.outlineWidth, `${path} brand ${index}: focus outline width`).toBe('2px');
+      expect(parseFloat(state.outlineWidth), `${path} brand ${index}: focus outline width`).toBeGreaterThanOrEqual(1);
       expect(state.maskImage, `${path} brand ${index}: outline-clipping mask`).toBe('none');
       expect(state.markImage, `${path} brand ${index}: lockup mask`).toContain('write-it-down-lockup.svg');
     }

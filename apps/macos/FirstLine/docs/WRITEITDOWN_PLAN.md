@@ -186,7 +186,7 @@ The following code inside kept files is also deleted:
 
 ## 6. Brand and visuals
 
-- The app name in Finder and the menu bar is `Write It Down`. The in-app start screen keeps the mono `WRITE_IT_DOWN` logotype; the split-W mark is carried by the app icon and the DMG volume icon, and the primary web header, footer and social card use the split-W lockup. The window title is `Write It Down`.
+- The app name in Finder and the menu bar is `Write It Down`. The in-app start screen uses the split-W lockup; the app icon and DMG volume icon carry the mark, and the primary web header, footer, `mac.html` and social card use the split-W lockup. The window title is `Write It Down`.
 - The bundle identifier is `app.writeitdown.mac`. The Swift package product and executable target are renamed from `FirstLine` to `WriteItDown` in batch 3. The directory `apps/macos/FirstLine/` keeps its path; the app name and distribution do not depend on the source directory name.
 - `AppPaths` changes its folder from `~/Library/Application Support/First Line/` to `~/Library/Application Support/WriteItDown/`. Nothing is migrated. The old folder held drafts, which the new app must not read, and license data from a mock client that never sold a key.
 - Colors come from `writeitdown/site.css` for both appearances:

@@ -6,7 +6,7 @@
  *
  * Flood design-system fonts are bundled (SIL Open Font License, see Resources/OFL-*.txt):
  *   - Newsreader (variable upright + italic): human serif layer
- *   - IBM Plex Mono (Regular + Medium): machine mono layer
+ *   - IBM Plex Mono (Regular): machine mono layer
  *   - Zhuque Fangsong (Regular): CJK fangsong layer
  * The legacy `pitchLight` case name is kept source-compatible but now resolves to bundled
  * Newsreader (latin); `zhuqueFangsong` resolves to bundled Zhuque Fangsong (CJK).
@@ -25,7 +25,6 @@ enum BundledFonts {
     static let newsreaderUprightPostScript = "Newsreader16pt-Regular"
     static let newsreaderItalicPostScript = "Newsreader16pt-Italic"
     static let plexMonoRegularPostScript = "IBMPlexMono-Regular"
-    static let plexMonoMediumPostScript = "IBMPlexMono-Medium"
     static let zhuquePostScript = "ZhuqueFangsong-Regular"
 
     // Resource basenames (without extension) shipped under Resources/.
@@ -33,7 +32,6 @@ enum BundledFonts {
         "Newsreader-Variable",
         "Newsreader-Italic-Variable",
         "IBMPlexMono-Regular",
-        "IBMPlexMono-Medium",
         "ZhuqueFangsong-Regular",
     ]
 

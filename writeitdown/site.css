@@ -45,6 +45,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .row{width:100%;max-width:1120px;margin:0 auto}
 
 .nav{padding:var(--gut) var(--gut) 0;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+.mac-header{align-items:center}
 .logotype{font-family:var(--mono);font-weight:500;font-size:13px;line-height:1;letter-spacing:.14em;color:var(--ink)}
 .mini-link{font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;color:var(--mute)}
 

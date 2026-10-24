@@ -87,8 +87,10 @@ final class UpgradeViewController: NSViewController {
         feedbackLabel.maximumNumberOfLines = 0
         feedbackLabel.isHidden = true
 
+        // Same 48 pt height as Activate: the pair is one row, not a pill beside a
+        // smaller outline button.
         buyButton = FirstLineButtons.secondary(title: "Buy a license, \(AppState.displayPrice) once",
-                                              target: self, action: #selector(buyTapped))
+                                              target: self, action: #selector(buyTapped), height: 48)
         let buy = buyButton!
         // The action row spans the card content with two equal flexible spacers.
         // A hidden sibling (Buy) can therefore never push the remaining control

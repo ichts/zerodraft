@@ -87,7 +87,7 @@ struct RoomTests {
         #expect(fixture.state.selectedSurface == .session)
         let hint = try #require(hintLabel(in: room))
         #expect(!hint.isHidden)
-        #expect(hint.stringValue == "Press Esc again to leave. The draft is deleted.")
+        #expect(hint.stringValue == "Press Esc again to leave and delete the draft.")
         #expect(fixture.engine.text == "private draft")
         now = 101.5
         room.requestExit()
@@ -246,7 +246,8 @@ struct RoomTests {
         copy.performClick(nil)
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
-        #expect(copy.frame.width < originalWidth)
+        // F-07: the copy pill keeps its width, so RUN IT AGAIN and the row never move.
+        #expect(abs(copy.frame.width - originalWidth) <= 0.5)
         let copiedCenter = copy.convert(NSPoint(x: copy.bounds.midX, y: copy.bounds.midY), to: fixture.room.view)
         #expect(abs(copiedCenter.x - originalCenter.x) < 1)
         #expect(copy.title == "COPIED")
@@ -575,7 +576,7 @@ struct RoomTests {
 
     private func hintLabel(in room: SessionViewController) -> NSTextField? {
         descendants(room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Press Esc again to leave. The draft is deleted." }
+            .first { $0.stringValue == "Press Esc again to leave and delete the draft." }
     }
 
     private func exitButton(in room: SessionViewController) -> NSButton? {

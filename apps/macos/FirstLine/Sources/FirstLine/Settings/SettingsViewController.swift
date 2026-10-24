@@ -13,7 +13,7 @@ final class SettingsViewController: NSViewController {
     private let appState: AppState
     private var licenseField: NSTextField?
     private var activateButton: NSButton?
-    private var licenseStatus: FirstLineStatusView!
+    private var licenseStatusLabel: NSTextField!
     private var licenseCleanupWarningLabel: NSTextField!
     private var licenseEntryView: NSView?
     private var licenseExplanationLabel: NSTextField?
@@ -47,18 +47,24 @@ final class SettingsViewController: NSViewController {
         let headerRow = header()
         content.addArrangedSubview(headerRow)
         headerRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        content.addArrangedSubview(section("Appearance", rows: [
+        let appearance = section("Appearance", rows: [
             settingRow("Theme", control: themePopup()),
             settingRow("Reduced Motion", control: motionPopup()),
             settingRow("Focus Mode", control: focusSwitch()),
             settingRow("Alignment", control: alignmentPopup()),
             settingRow("Font Size", control: sizePopup()),
-        ]))
-        content.addArrangedSubview(section("License", rows: licenseRows()))
+        ])
+        content.addArrangedSubview(appearance)
+        appearance.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let license = licenseSection()
+        content.addArrangedSubview(license)
+        license.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
-        content.addArrangedSubview(section("About", rows: [
+        let about = section("About", rows: [
             settingRow("Write It Down", detail: "Version \(version)"),
-        ]))
+        ])
+        content.addArrangedSubview(about)
+        about.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         card.contentView.addSubview(content)
 
         let document = NSView()
@@ -108,43 +114,91 @@ final class SettingsViewController: NSViewController {
         return horizontal(views: [heading, spacer(), done])
     }
 
-    private func licenseRows() -> [NSView] {
-        licenseStatus = FirstLineStatusView(text: appState.accessStatusText)
-        licenseStatus.widthAnchor.constraint(equalToConstant: 616).isActive = true
+    private func licenseSection() -> NSView {
+        let title = NSTextField(labelWithString: "License")
+        title.translatesAutoresizingMaskIntoConstraints = false
+        title.font = FirstLineTypography.smallSemiboldNSFont
+        title.textColor = FirstLineColors.chromeNSColor
+
+        let block = NSStackView()
+        block.translatesAutoresizingMaskIntoConstraints = false
+        block.orientation = .vertical
+        block.alignment = .leading
+        block.spacing = 0
+        block.addArrangedSubview(title)
+        block.setCustomSpacing(10, after: title)
+
+        // The status and the details are one left-aligned block. No per-line hairlines:
+        // the old generic row separators touched the 13 pt text and read as a broken table.
+        licenseStatusLabel = muted("")
+        licenseStatusLabel.font = FirstLineTypography.smallNSFont
+        block.addArrangedSubview(licenseStatusLabel)
 
         licenseCleanupWarningLabel = muted("")
         licenseCleanupWarningLabel.textColor = FirstLineColors.redNSColor
-        licenseCleanupWarningLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 616).isActive = true
-        var rows: [NSView] = [licenseStatus, licenseCleanupWarningLabel]
+        block.addArrangedSubview(licenseCleanupWarningLabel)
 
-        licenseDetails = (0..<3).map { _ in muted("") }
-        rows.append(contentsOf: licenseDetails)
+        licenseDetails = (0..<2).map { _ in muted("") }
+        for detail in licenseDetails {
+            block.addArrangedSubview(detail)
+            block.setCustomSpacing(2, after: detail)
+        }
+
+        // The activation entry is one group, hidden as a unit for a licensed Mac.
+        let entry = NSStackView()
+        entry.translatesAutoresizingMaskIntoConstraints = false
+        entry.orientation = .vertical
+        entry.alignment = .leading
+        entry.spacing = 0
+        let topGap = NSView()
+        topGap.translatesAutoresizingMaskIntoConstraints = false
+        topGap.heightAnchor.constraint(equalToConstant: 14).isActive = true
+        entry.addArrangedSubview(topGap)
+        let divider = FloodCanvasView(fillColor: FirstLineColors.hairNSColor)
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        divider.heightAnchor.constraint(equalToConstant: 1).isActive = true
+        entry.addArrangedSubview(divider)
+        entry.setCustomSpacing(14, after: divider)
 
         let explanation = muted("Enter your order number or activation code to activate this Mac.")
         licenseExplanationLabel = explanation
+        entry.addArrangedSubview(explanation)
+        entry.setCustomSpacing(10, after: explanation)
 
         let field = NSTextField(string: "")
         field.placeholderString = "Order number or activation code"
         field.font = FirstLineTypography.uiNSFont
         field.focusRingType = .default
-        field.widthAnchor.constraint(greaterThanOrEqualToConstant: 360).isActive = true
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.heightAnchor.constraint(equalToConstant: 44).isActive = true
         licenseField = field
+        entry.addArrangedSubview(field)
+        entry.setCustomSpacing(12, after: field)
 
-        let button = primary("Activate", #selector(activateTapped))
-        activateButton = button
-        let entry = NSStackView(views: [field, button])
-        entry.translatesAutoresizingMaskIntoConstraints = false
-        entry.orientation = .horizontal
-        entry.alignment = .centerY
-        entry.spacing = 12
+        let activate = FirstLineButtons.primary(title: "Activate", target: self, action: #selector(activateTapped))
+        activateButton = activate
+        // Buy is a real control on the same 48 pt row as Activate, not body text.
+        let buy = FirstLineButtons.secondary(title: "Buy a license, \(AppState.displayPrice) once",
+                                             target: self, action: #selector(openBuyTapped), height: 48)
+        buyPageButton = buy
+        let actionRow = horizontal(views: [spacer(), activate, buy])
+        actionRow.translatesAutoresizingMaskIntoConstraints = false
+        entry.addArrangedSubview(actionRow)
+
+        checkoutStatusLabel = muted("Checkout is not available yet.")
+        entry.addArrangedSubview(checkoutStatusLabel!)
+        block.addArrangedSubview(entry)
         licenseEntryView = entry
 
-        let buy = FirstLineButtons.link(title: "Buy a license, \(AppState.displayPrice) once", target: self, action: #selector(openBuyTapped))
-        buy.alignment = .left
-        buyPageButton = buy
-        checkoutStatusLabel = muted("Checkout is not available yet.")
-        rows.append(contentsOf: [explanation, entry, buy, checkoutStatusLabel!])
-        return rows
+        NSLayoutConstraint.activate([
+            divider.widthAnchor.constraint(equalTo: block.widthAnchor),
+            entry.widthAnchor.constraint(equalTo: block.widthAnchor),
+            licenseStatusLabel.widthAnchor.constraint(lessThanOrEqualTo: block.widthAnchor),
+            field.widthAnchor.constraint(equalTo: block.widthAnchor),
+            actionRow.widthAnchor.constraint(equalTo: block.widthAnchor),
+            checkoutStatusLabel!.widthAnchor.constraint(lessThanOrEqualTo: block.widthAnchor),
+        ])
+        return block
     }
 
     private func refreshLicense() {
@@ -152,29 +206,31 @@ final class SettingsViewController: NSViewController {
         let checking = appState.licenseValidationInFlight || appState.licenseActivationInFlight
         let badStatus = appState.licenseActivationError != nil || appState.trialAccessError != nil ||
             appState.settings.licenseStatus == .revoked || appState.settings.licenseStatus == .invalid
-        licenseStatus.setText(active ? appState.licenseStatusText :
-            (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText),
-            tone: checking || active || !badStatus ? .neutral : .bad)
+        let statusText = active ? appState.licenseStatusText :
+            (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText)
+        licenseStatusLabel.stringValue = statusText
+        licenseStatusLabel.textColor = (checking || active || !badStatus)
+            ? FirstLineColors.chromeNSColor : FirstLineColors.redNSColor
         licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
         licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
+        // Activation dates only; the instance id is an implementation detail.
         let values = [
             appState.settings.licenseActivatedAt.map { "Activated \(formatted($0))" },
-            appState.settings.licenseInstanceID.map { "Instance: \($0)" },
             appState.settings.licenseLastValidatedAt.map { "Last validated \(formatted($0))" },
         ]
         for (label, value) in zip(licenseDetails, values) {
             label.stringValue = value ?? ""
             label.isHidden = !active || value == nil
         }
-        let showEntry = !active
-        licenseEntryView?.isHidden = !showEntry
-        licenseExplanationLabel?.isHidden = !showEntry
-        buyPageButton?.isHidden = !showEntry
+        licenseEntryView?.isHidden = active
+        licenseExplanationLabel?.isHidden = !active ? false : true
+        buyPageButton?.isHidden = active
         buyPageButton?.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight
         buyPageButton?.title = appState.checkoutInFlight
             ? "Opening checkout..."
             : "Buy a license, \(AppState.displayPrice) once"
-        checkoutStatusLabel?.isHidden = !showEntry || appState.checkoutAvailable
+        checkoutStatusLabel?.isHidden = !active && appState.checkoutAvailable
+        activateButton?.isEnabled = !checking
     }
 
     private func armLicenseObservation() {
@@ -340,7 +396,7 @@ final class SettingsViewController: NSViewController {
     @objc private func activateTapped() {
         guard let licenseField, let activateButton else { return }
         activateButton.isEnabled = false
-        licenseStatus.setText("Activating...")
+        licenseStatusLabel.stringValue = "Activating..."
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: licenseField.stringValue)

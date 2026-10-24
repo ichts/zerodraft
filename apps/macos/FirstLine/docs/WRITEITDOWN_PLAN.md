@@ -103,7 +103,7 @@ stateDiagram-v2
     Kept --> Start: Esc/ESC - EXIT, twice within 2 s
 ```
 
-Every room phase keeps one exit control and one Escape path. The first request shows the inline hint `Press Esc again to leave. The draft is deleted.`; a second request within about two seconds leaves without saving, typing dismisses the hint, and nothing exits on one request.
+Every room phase keeps one exit control and one Escape path. The first request shows the inline hint `Press Esc again to leave and delete the draft.`; a second request within about two seconds leaves without saving, typing dismisses the hint, and nothing exits on one request.
 
 `Start` is the cursor-ready pre-writing screen with duration/silence segments and Begin. It replaces the Home screen in `Sources/App/HomeViewController.swift`.
 

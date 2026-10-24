@@ -77,7 +77,9 @@ final class HomeViewController: NSViewController {
             self?.appState.updateDefaultDuration(TimeInterval(tag))
         }
 
-        let minutes = label("minutes", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
+        // Both picker groups use one label role: semibold, chrome, centred above
+        // its control with the same gap. The old "minutes" was regular and below.
+        let minutes = label("Minutes", font: FirstLineTypography.smallSemiboldNSFont, color: FirstLineColors.chromeNSColor)
 
         let silenceLabel = label("Delete after silence", font: FirstLineTypography.smallSemiboldNSFont, color: FirstLineColors.chromeNSColor)
         silenceControl = FirstLineSegmentedControl(
@@ -99,7 +101,7 @@ final class HomeViewController: NSViewController {
         // The picker keeps the trial/session line only; a licensed Mac shows no access line.
         statusView.isHidden = appState.hasFullAccess
 
-        let stack = NSStackView(views: [lockup, title, subtitle, durationControl, minutes,
+        let stack = NSStackView(views: [lockup, title, subtitle, minutes, durationControl,
                                         silenceLabel, silenceControl, beginButton, statusView])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
@@ -108,8 +110,8 @@ final class HomeViewController: NSViewController {
         stack.setCustomSpacing(20, after: lockup)
         stack.setCustomSpacing(8, after: title)
         stack.setCustomSpacing(26, after: subtitle)
-        stack.setCustomSpacing(6, after: durationControl)
-        stack.setCustomSpacing(14, after: minutes)
+        stack.setCustomSpacing(8, after: minutes)
+        stack.setCustomSpacing(20, after: durationControl)
         stack.setCustomSpacing(8, after: silenceLabel)
         stack.setCustomSpacing(26, after: silenceControl)
         stack.setCustomSpacing(18, after: beginButton)

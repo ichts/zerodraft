@@ -185,3 +185,25 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the layout data looked centred. The captain's full-screen screenshots show the shifted line.
 - Supersedes: none. This is a correction of the earlier column implementation, recorded because it
   changes the full-screen look and binds the regression test.
+
+## D-019: The exit confirmation says delete the draft
+
+- Date: 2026-10-24
+- Decision: The Mac inline confirmation reads `Press Esc again to leave and delete
+  the draft.` in sentence case with no caps letterspacing. `ESC - EXIT` keeps its caps tracking, and
+  the two runs share the footer row and baseline; the word count shares that baseline too.
+- Reason: `The draft is deleted.` read as already done while the first Escape changed nothing.
+  Sentence case is not a caps label, so the caps tracking made the lowercase run look wrong.
+- Supersedes: D-006's hint copy only; the two-act exit rule stands.
+
+## D-020: The warning is grouped and placed by ink
+
+- Date: 2026-10-24
+- Decision: The warning numeral's ink top sits 44 pt under the writing baseline (assertion band
+  40-48 pt), its caption's ink top 20 pt under the numeral ink (band 16-24 pt), and the wipe receipt's
+  ink top 44 pt under the writing baseline. The placement is computed from the drawn glyph ink and the
+  line baseline, not from the label's line-box frame, and holds at the default and tall window sizes.
+- Reason: The label frame top carried about 33 pt of empty descent, so the numeral read 26 pt under the
+  line and 65 pt above its own caption; a frame-based formula also drifted at tall sizes. Ink-based
+  placement keeps the numeral and its line together under the writing line.
+- Supersedes: D-017's geometry sentence; the under-the-writing-line placement decision stands.

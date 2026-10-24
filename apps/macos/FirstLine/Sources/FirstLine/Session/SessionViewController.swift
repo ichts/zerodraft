@@ -5,6 +5,7 @@
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
+import CoreText
 
 final class RoomWashView: NSView {
     var fillColor: NSColor { didSet { needsDisplay = true } }
@@ -53,7 +54,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The live trial's kept block is `max-width:62ch` resolved against its 15 pt UI font.
     private static let roomInset: CGFloat = 22
     private static let footerHeight: CGFloat = 44
-    private static let exitHintText = "Press Esc again to leave. The draft is deleted."
+    private static let exitHintText = "Press Esc again to leave and delete the draft."
 
     private let appState: AppState
     private let pasteboard: NSPasteboard
@@ -74,7 +75,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var placeholderLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!
-    private var warningStack: NSStackView!
     private var exitButton: NSButton!
     private var exitHintLabel: NSTextField!
     private var keptView: SessionKeptView!
@@ -93,10 +93,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyWork: DispatchWorkItem?
     private var placeholderWidth: NSLayoutConstraint!
     private var placeholderAnchor: NSLayoutConstraint!
-    private var warningTop: NSLayoutConstraint!
+    private var numeralTop: NSLayoutConstraint!
+    private var captionTop: NSLayoutConstraint!
     private var reportTop: NSLayoutConstraint!
-    private var writingAnchorFromPaperTop: CGFloat = 0
-    private var writingLineHeight: CGFloat = 0
     private var chromeHover = false
     /// Cadence for the session bar: every tick normally, twice a second under Reduce
     /// Motion, with no animation in either case.
@@ -252,23 +251,19 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                              color: FirstLineColors.redNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
         warningHint.maximumNumberOfLines = 0
-        warningStack = NSStackView(views: [numeralLabel, warningHint])
-        warningStack.translatesAutoresizingMaskIntoConstraints = false
-        warningStack.orientation = .vertical
-        warningStack.alignment = .centerX
-        warningStack.spacing = 20
-        warningStack.isHidden = true
+        numeralLabel.isHidden = true
+        warningHint.isHidden = true
 
         exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
         styleQuietLink(exitButton, title: "ESC - EXIT", muted: false)
         exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
         exitHintLabel.attributedStringValue = Self.quietRowText(Self.exitHintText,
-            color: FirstLineColors.redNSColor, truncates: true)
+            color: FirstLineColors.redNSColor, truncates: true, kernEm: 0)
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
 
-        for element in [timerLabel!, countLabel!, reportLabel!, placeholderLabel!, warningStack!, exitButton!, exitHintLabel!] {
+        for element in [timerLabel!, countLabel!, reportLabel!, placeholderLabel!, numeralLabel!, warningHint!, exitButton!, exitHintLabel!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -287,7 +282,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let safe = view.safeAreaLayoutGuide
         placeholderWidth = placeholderLabel.widthAnchor.constraint(equalToConstant: 896)
         placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
-        warningTop = warningStack.topAnchor.constraint(equalTo: paper.topAnchor)
+        numeralTop = numeralLabel.topAnchor.constraint(equalTo: paper.topAnchor)
+        captionTop = warningHint.topAnchor.constraint(equalTo: paper.topAnchor)
         reportTop = reportLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         NSLayoutConstraint.activate([
             paperShadow.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
@@ -322,11 +318,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             // baselines on one row. A mismatched line height is what broke this row.
             exitHintLabel.centerYAnchor.constraint(equalTo: exitButton.centerYAnchor),
             exitHintLabel.trailingAnchor.constraint(lessThanOrEqualTo: countLabel.leadingAnchor, constant: -12),
-            warningStack.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            warningTop,
-            reportTop,
-            warningStack.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
-            warningStack.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
+            numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            numeralTop,
+            warningHint.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            captionTop,
+            warningHint.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
+            warningHint.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportTop,
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
@@ -378,8 +375,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let scrollTopInPaper = paper.bounds.height - paper.convert(scrollView.bounds, from: scrollView).maxY
         let anchor = round(anchorFromPaperTop - scrollTopInPaper)
         textView.setCompositionAnchor(anchor)
-        writingAnchorFromPaperTop = anchorFromPaperTop
-        writingLineHeight = textView.currentLineHeight() ?? 0
         textView.minSize = NSSize(width: 0, height: size.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {
@@ -427,6 +422,24 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if abs(placeholderAnchor.constant - constant) > 0.5 { placeholderAnchor.constant = constant }
     }
 
+    /// Ink height of the drawn glyphs, used to place the warning by its ink rather
+    /// than by a line-box frame.
+    private func glyphInkHeight(_ text: String, font: NSFont) -> CGFloat? {
+        let coreText = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
+        var tallest: CGFloat = 0
+        for scalar in text.unicodeScalars {
+            guard scalar.value <= UInt16.max else { continue }
+            var codeUnit = UniChar(scalar.value)
+            var glyph = CGGlyph()
+            guard CTFontGetGlyphsForCharacters(coreText, &codeUnit, &glyph, 1), glyph != 0 else { continue }
+            var measured = glyph
+            var bounds = CGRect.zero
+            CTFontGetBoundingRectsForGlyphs(coreText, .horizontal, &measured, &bounds, 1)
+            tallest = max(tallest, bounds.height)
+        }
+        return tallest > 0 ? tallest : nil
+    }
+
     /// The live `#editor` mask, applied to the rendered line centres: solid on the current
     /// line, 22% one line up, 7% two lines up, gone beyond.
     private func layoutLineFade(centre: CGFloat) {
@@ -455,20 +468,36 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func layoutWarning() {
-        guard paper.bounds.height > 0 else { return }
-        // Directly below the writing line: the eye is already there, and the numeral
-        // belongs to the draft instead of reading as footer chrome.
-        let lineHeight = writingLineHeight > 0
-            ? writingLineHeight : appState.settings.writingFontSize.points * 1.6
-        let top = round(writingAnchorFromPaperTop + lineHeight / 2 + FirstLineSpacing.s5)
-        if abs(warningTop.constant - top) > 0.5 { warningTop.constant = top }
-        // The wipe receipt is the result the writer must see, so it takes the same
-        // place under the writing line the warning line uses, not the footer edge.
-        if abs(reportTop.constant - top) > 0.5 { reportTop.constant = top }
+        guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
+        // Place the warning by its ink, not by its label frames: the numeral's frame
+        // carries a large empty descent that used to read as a 65 pt gap to its line.
         let numeralSize = round(min(view.bounds.height * 0.18, 170))
         if numeralLabel.font?.pointSize != numeralSize {
             numeralLabel.font = FirstLineTypography.writingItalicNSFont(size: numeralSize)
         }
+        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
+        let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
+        let numeralFont = numeralLabel.font ?? FirstLineTypography.smallNSFont
+        // The room's Newsreader digits are taller than cap height (old-style figures),
+        // so use the drawn glyph's ink height; cap height understated the ink by ~8 pt.
+        let numeralInkHeight = glyphInkHeight(numeralLabel.stringValue, font: numeralFont) ?? numeralFont.capHeight
+        let numeralBearing = numeralLabel.firstBaselineOffsetFromTop - numeralInkHeight
+        let numeralInkTop = baselineFromTop + 44
+        let numeralTopConstant = round(numeralInkTop - numeralBearing)
+        if abs(numeralTop.constant - numeralTopConstant) > 0.5 { numeralTop.constant = numeralTopConstant }
+
+        let captionFont = warningHint.font ?? FirstLineTypography.smallNSFont
+        let captionBearing = warningHint.firstBaselineOffsetFromTop - captionFont.capHeight
+        let captionInkTop = numeralInkTop + numeralInkHeight + 20
+        let captionTopConstant = round(captionInkTop - captionBearing)
+        if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
+
+        // The wipe receipt is the result the writer must see, so it takes the numeral's
+        // ink slot under the writing line, not the footer edge.
+        let reportFont = reportLabel.font ?? FirstLineTypography.smallNSFont
+        let reportBearing = reportLabel.firstBaselineOffsetFromTop - reportFont.capHeight
+        let reportTopConstant = round(numeralInkTop - reportBearing)
+        if abs(reportTop.constant - reportTopConstant) > 0.5 { reportTop.constant = reportTopConstant }
     }
 
     // MARK: - State
@@ -525,7 +554,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             keptView.reset()
             dismissExitConfirmation()
         }
-        if phase == .failure, lastPhase != .failure { showCut() }
+        if phase == .failure, lastPhase != .failure {
+            showCut()
+            // The deleted state says TYPE TO START AGAIN; keep the editor first responder
+            // so the caret is visible there exactly as in the empty room.
+            focusForPhase()
+        }
         if phase == .success, lastPhase != .success {
             updateKeptContent()
             DispatchQueue.main.async { [weak self] in
@@ -571,7 +605,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             alignment: .right, kernEm: 0)
         refreshQuietLinks(muted: writing)
         let warning = phase == .danger
-        warningStack.isHidden = !warning
+        numeralLabel.isHidden = !warning
+        warningHint.isHidden = !warning
         if warning {
             numeralLabel.stringValue = "\(engine.secondsUntilDeletion)"
             warningHint.attributedStringValue = FirstLineTypography.trackedText(
@@ -620,10 +655,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     /// One type style for the footer row and its inline confirmation: same face,
     /// size, weight and tracking, so the two runs share a baseline and rhythm.
-    private static func quietRowText(_ text: String, color: NSColor, truncates: Bool = false) -> NSAttributedString {
+    private static func quietRowText(_ text: String, color: NSColor, truncates: Bool = false,
+                                     kernEm: CGFloat = 0.04) -> NSAttributedString {
         let font = FirstLineTypography.smallMediumNSFont
         let text = NSMutableAttributedString(attributedString: FirstLineTypography.trackedText(
-            text, font: font, color: color, kernEm: 0.04))
+            text, font: font, color: color, kernEm: kernEm))
         if truncates {
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
@@ -782,7 +818,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     @objc private func copyText() {
         let copied = RoomPresentation.copy(engine.text, to: pasteboard)
-        copyButton.title = copied ? "COPIED" : "TRY COPY AGAIN"
+        keptView.setCopyTitle(copied ? "COPIED" : "TRY COPY AGAIN")
         announce(copied ? "Copied." : "Copy failed. Select your kept text and copy it manually.")
         focusForPhase()
     }

@@ -270,7 +270,9 @@ struct SnapshotTests {
             try data.write(to: output.appendingPathComponent("\(name).png"))
         }
         try assertPixel(rep, at: NSPoint(x: 4, y: 4), equals: FirstLineColors.pageNSColor, in: appearance, name: name)
-        try assertPixel(rep, at: NSPoint(x: rep.pixelsWide - 5, y: 4),
+        // The right edge can carry a vertical scroller in a tall settings card;
+        // sample the other left-page corner instead of the scroller track.
+        try assertPixel(rep, at: NSPoint(x: 4, y: rep.pixelsHigh - 5),
                         equals: FirstLineColors.pageNSColor, in: appearance, name: name)
         if let sheetPoint {
             let scale = CGFloat(rep.pixelsWide) / size.width

@@ -33,7 +33,7 @@ struct BrandTests {
         #expect(images.filter { $0.accessibilityLabel() == "Write It Down" && $0.image != nil }.count == 1)
         #expect(labels.contains("How long?"))
         #expect(labels.contains("Forward only. Nothing is saved."))
-        #expect(labels.contains("minutes"))
+        #expect(labels.contains("Minutes"))
         #expect(labels.contains("Delete after silence"))
         #expect(allButtons(in: home.view).contains { $0.title == "1" })
         #expect(allButtons(in: home.view).contains { $0.title == "Begin" })

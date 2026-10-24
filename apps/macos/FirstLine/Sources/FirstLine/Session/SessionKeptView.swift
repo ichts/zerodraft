@@ -25,6 +25,7 @@ final class SessionKeptView: NSView {
     private let body = NSTextField(wrappingLabelWithString: "")
     private let receipt = NSTextField(labelWithString: "")
     private var bodyWidth: NSLayoutConstraint!
+    private var copyWidth: NSLayoutConstraint!
     private var selectedDraft = ""
     private var renderedWordCount: Int?
 
@@ -58,6 +59,9 @@ final class SessionKeptView: NSView {
         receipt.alignment = .center
         receipt.maximumNumberOfLines = 1
 
+        // Both actions share one 48 pt frame and one 1.6 line box, so centring the
+        // frames puts their first baselines on the same row instead of 4 pt apart.
+        restartButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         let actions = NSStackView(views: [copyButton, restartButton])
         actions.translatesAutoresizingMaskIntoConstraints = false
         actions.orientation = .horizontal
@@ -75,12 +79,22 @@ final class SessionKeptView: NSView {
         document.addSubview(stack)
 
         bodyWidth = body.widthAnchor.constraint(equalToConstant: Self.measure)
+        // Fixed copy-button width across COPY TEXT / COPIED / TRY COPY AGAIN: the
+        // title change must not resize the pill or slide RUN IT AGAIN.
+        var widest: CGFloat = 0
+        for title in ["COPY TEXT", "COPIED", "TRY COPY AGAIN"] {
+            setCopyTitle(title)
+            widest = max(widest, copyButton.intrinsicContentSize.width)
+        }
+        setCopyTitle("COPY TEXT")
+        copyWidth = copyButton.widthAnchor.constraint(equalToConstant: ceil(widest))
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
             bodyWidth,
+            copyWidth,
         ])
         styleQuietLink(restartButton, title: "RUN IT AGAIN", muted: false)
     }
@@ -112,7 +126,15 @@ final class SessionKeptView: NSView {
         selectedDraft = ""
         renderedWordCount = nil
         body.stringValue = ""
-        copyButton.title = "COPY TEXT"
+        setCopyTitle("COPY TEXT")
+    }
+
+    /// The copy label keeps the pill's 1.6 line box and a fixed width across states.
+    func setCopyTitle(_ title: String) {
+        copyButton.title = title
+        copyButton.attributedTitle = FirstLineTypography.trackedText(
+            title, font: .systemFont(ofSize: 15, weight: .medium),
+            color: FirstLineColors.onInkNSColor, kernEm: 0.04, lineHeightMultiple: 1.6)
     }
 
     /// Centres the block when it is shorter than the writing area and scrolls it when taller.
@@ -153,6 +175,6 @@ final class SessionKeptView: NSView {
         button.contentTintColor = color
         button.attributedTitle = FirstLineTypography.trackedText(
             title, font: .systemFont(ofSize: 13, weight: .medium), color: color,
-            kernEm: 0.04, lineHeightMultiple: 1.5)
+            kernEm: 0.04, lineHeightMultiple: 1.6)
     }
 }

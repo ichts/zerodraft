@@ -347,8 +347,9 @@ struct RoundThreeTests {
 
     // MARK: - Warning placement and the exit row
 
-    @Test func warningNumeralSitsDirectlyBelowTheWritingLine() throws {
-        for size in [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000)] {
+    @Test func warningInkSitsUnderTheWritingLine() throws {
+        for size in [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000),
+                     NSSize(width: 1728, height: 1117)] {
             let now = MutableRoundClock(0)
             let engine = SessionEngine(now: { now.now })
             let state = licensedTestState(sessionEngine: engine,
@@ -359,29 +360,84 @@ struct RoundThreeTests {
             let window = makeWindow(room, size: size)
             let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
             let paper = try #require(editor.enclosingScrollView?.superview)
-
-            editor.insertText("hello", replacementRange: NSRange(location: NSNotFound, length: 0))
-            now.now = 5.6
+            // No descenders, so the last ink row of the line is its baseline.
+            editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+            now.now = 6.5
             room.tick()
             room.view.layoutSubtreeIfNeeded()
             room.viewDidLayout()
             room.view.layoutSubtreeIfNeeded()
+            room.view.displayIfNeeded()
 
-            let numeral = try #require(descendants(of: room.view, of: NSTextField.self)
-                .first { ($0.font?.pointSize ?? 0) > 40 && !$0.isHiddenOrHasHiddenAncestor })
-            let hint = try #require(descendants(of: room.view, of: NSTextField.self)
-                .first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
-            let numeralInPaper = paper.convert(numeral.bounds, from: numeral)
-            let hintInPaper = paper.convert(hint.bounds, from: hint)
-            let lineHeight = try #require(editor.currentLineHeight())
-            let expectedTop = paper.bounds.height * 0.39 + lineHeight / 2 + 24
-            let numeralTopFromPaperTop = paper.bounds.height - numeralInPaper.maxY
-            #expect(abs(numeralTopFromPaperTop - expectedTop) <= 1.5,
-                    "warning numeral top \(numeralTopFromPaperTop) is not just under the writing line (\(expectedTop)) at \(size)")
-            #expect(numeralInPaper.minY > hintInPaper.maxY + 8, "the numeral sits above its line")
-            #expect(hintInPaper.minY > 16, "the warning line stays inside the paper at \(size)")
+            let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
+            room.view.cacheDisplay(in: room.view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
+            let paperTopFromRoomTop = room.view.bounds.height - paper.frame.maxY
+            let baseline = try #require(editor.currentInsertionBaseline())
+            let baselineFromTop = paperTopFromRoomTop
+                + (paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: baseline), from: editor).y)
+            let x = (room.view.bounds.midX - 250)...(room.view.bounds.midX + 250)
+            let y = (baselineFromTop - 60)...(paperTopFromRoomTop + paper.bounds.height - 40)
+            let runs = inkRowRuns(in: rep, scale: scale, x: x, y: y) { colour in
+                let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
+                return luma < 0.6
+            }
+            #expect(runs.count >= 3, "expected writing line, numeral and caption ink at \(size), got \(runs)")
+            guard runs.count >= 3 else { break }
+            let baselineRow = CGFloat(runs[0].max)
+            let numeralTop = CGFloat(runs[1].min)
+            let numeralBottom = CGFloat(runs[1].max)
+            let captionTop = CGFloat(runs[2].min)
+            let numeralDrop = (numeralTop - baselineRow) / scale
+            let captionDrop = (captionTop - numeralBottom) / scale
+            #expect(numeralDrop >= 40 && numeralDrop <= 48,
+                    "numeral ink top is \(numeralDrop) pt under the writing baseline at \(size)")
+            #expect(captionDrop >= 16 && captionDrop <= 24,
+                    "caption ink top is \(captionDrop) pt under the numeral ink at \(size)")
             window.orderOut(nil)
         }
+    }
+
+    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+        now.now = 9
+        room.tick()
+        room.endCutAnimation()
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        room.view.displayIfNeeded()
+
+        let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
+        room.view.cacheDisplay(in: room.view.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
+        let paperTopFromRoomTop = room.view.bounds.height - paper.frame.maxY
+        let baseline = try #require(editor.currentInsertionBaseline())
+        let baselineFromTop = paperTopFromRoomTop
+            + (paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: baseline), from: editor).y)
+        // Skip the placeholder ink; scan below it for the red receipt.
+        let x = (room.view.bounds.midX - 250)...(room.view.bounds.midX + 250)
+        let y = (baselineFromTop + 20)...(paperTopFromRoomTop + paper.bounds.height - 40)
+        let runs = inkRowRuns(in: rep, scale: scale, x: x, y: y) { colour in
+            let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
+            return luma < 0.6 && colour.redComponent > colour.greenComponent + 0.05
+        }
+        let receipt = try #require(runs.first, "no red wipe receipt ink found")
+        let receiptDrop = (CGFloat(receipt.min) - baselineFromTop * scale) / scale
+        #expect(receiptDrop >= 40 && receiptDrop <= 48,
+                "the wipe receipt ink top is \(receiptDrop) pt under the writing baseline")
+        #expect(receiptDrop < paper.bounds.height * 0.55, "the receipt is back at the lower edge")
+        window.orderOut(nil)
     }
 
     @Test func stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor() throws {
@@ -433,36 +489,6 @@ struct RoundThreeTests {
         window.orderOut(nil)
     }
 
-    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
-        let now = MutableRoundClock(0)
-        let engine = SessionEngine(now: { now.now })
-        let state = licensedTestState(sessionEngine: engine,
-                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
-                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
-        state.startSession(duration: 60)
-        let room = SessionViewController(appState: state)
-        let window = makeWindow(room)
-        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
-        let paper = try #require(editor.enclosingScrollView?.superview)
-        editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
-        now.now = 9
-        room.tick()
-        room.endCutAnimation()
-        room.view.layoutSubtreeIfNeeded()
-        room.viewDidLayout()
-        room.view.layoutSubtreeIfNeeded()
-        let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
-        let receiptInPaper = paper.convert(receipt.bounds, from: receipt)
-        let topFromPaperTop = paper.bounds.height - receiptInPaper.maxY
-        let lineHeight = try #require(editor.currentLineHeight())
-        let expected = paper.bounds.height * 0.39 + lineHeight / 2 + 24
-        #expect(abs(topFromPaperTop - expected) <= 1.5,
-                "the wipe receipt is not under the writing line (top \(topFromPaperTop), expected \(expected))")
-        #expect(topFromPaperTop < paper.bounds.height * 0.55, "the receipt is back at the lower edge")
-        window.orderOut(nil)
-    }
-
     @Test func exitHintSharesTheExitRowBaselineAndTypeStyle() throws {
         let state = licensedTestState()
         state.startSession()
@@ -474,7 +500,7 @@ struct RoundThreeTests {
 
         let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
         let hint = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.attributedStringValue.string == "Press Esc again to leave. The draft is deleted." })
+            .first { $0.attributedStringValue.string == "Press Esc again to leave and delete the draft." })
         #expect(!hint.isHidden)
 
         // Same role, same type style: face, size, weight and tracking.
@@ -487,7 +513,10 @@ struct RoundThreeTests {
         #expect(exitFont.fontDescriptor.symbolicTraits == hintFont.fontDescriptor.symbolicTraits)
         let exitKern = try #require(exitTitle.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
         let hintKern = try #require(hintText.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
-        #expect(abs(exitKern - hintKern) <= 0.01, "the exit row uses two tracking values")
+        // Caps keep their tracking; sentence case drops it, so its lowercase is not
+        // letterspaced. The row still shares one baseline and line box.
+        #expect(abs(exitKern - 0.52) <= 0.01, "ESC - EXIT lost its caps tracking")
+        #expect(abs(hintKern) <= 0.01, "the sentence-case confirmation still carries caps tracking")
 
         // Same baseline: read the first ink row of each run from one rendered frame.
         // The count shares the row too, with its own type role.
@@ -522,6 +551,38 @@ struct RoundThreeTests {
             }
             throw NoRenderedText(view: String(describing: type(of: view)))
         }
+    }
+
+    /// Contiguous ink row runs in one rendered frame; a gap of at most 4 pt keeps
+    /// glyph internals together and separates text lines.
+    private func inkRowRuns(in rep: NSBitmapImageRep, scale: CGFloat,
+                            x: ClosedRange<CGFloat>, y: ClosedRange<CGFloat>,
+                            isInk: (NSColor) -> Bool) -> [(min: Int, max: Int)] {
+        let x0 = max(Int(x.lowerBound * scale), 0)
+        let x1 = min(Int(x.upperBound * scale), rep.pixelsWide - 1)
+        let y0 = max(Int(y.lowerBound * scale), 0)
+        let y1 = min(Int(y.upperBound * scale), rep.pixelsHigh - 1)
+        guard x0 < x1, y0 < y1 else { return [] }
+        var rows: [Int] = []
+        for row in y0...y1 {
+            var hasInk = false
+            for column in x0...x1 {
+                guard let colour = rep.colorAt(x: column, y: row)?.usingColorSpace(.sRGB),
+                      colour.alphaComponent > 0.4 else { continue }
+                if isInk(colour) { hasInk = true; break }
+            }
+            if hasInk { rows.append(row) }
+        }
+        var runs: [(min: Int, max: Int)] = []
+        let gap = Int(ceil(8 * scale / 2))
+        for row in rows {
+            if let last = runs.last, row - last.max <= gap {
+                runs[runs.count - 1].max = row
+            } else {
+                runs.append((row, row))
+            }
+        }
+        return runs
     }
 
     // MARK: - Helpers

@@ -18,8 +18,11 @@ enum FirstLineButtons {
         styled(title: title, target: target, action: action, role: .primary, roomMotion: reducesMotion)
     }
 
-    static func secondary(title: String, target: AnyObject?, action: Selector) -> NSButton {
-        styled(title: title, target: target, action: action, role: .secondary)
+    /// `height` lets a secondary outline button sit in a row with a 48 pt primary
+    /// without a 4 pt height mismatch; the pill radius follows the actual height.
+    static func secondary(title: String, target: AnyObject?, action: Selector,
+                          height: CGFloat? = nil) -> NSButton {
+        styled(title: title, target: target, action: action, role: .secondary, height: height)
     }
 
     static func link(title: String, target: AnyObject?, action: Selector) -> NSButton {
@@ -31,7 +34,8 @@ enum FirstLineButtons {
         target: AnyObject?,
         action: Selector,
         role: FirstLineButton.Role,
-        roomMotion: (() -> Bool)? = nil
+        roomMotion: (() -> Bool)? = nil,
+        height: CGFloat? = nil
     ) -> NSButton {
         let button = FirstLineButton(title: title, target: target, action: action)
         button.inkFocusRingInset = 3
@@ -42,8 +46,9 @@ enum FirstLineButtons {
         button.font = FirstLineTypography.uiSemiboldNSFont
         button.roomMotion = roomMotion
         button.wantsLayer = true
-        button.layer?.cornerRadius = role.height / 2
-        button.heightAnchor.constraint(equalToConstant: role.height).isActive = true
+        let resolvedHeight = height ?? role.height
+        button.layer?.cornerRadius = resolvedHeight / 2
+        button.heightAnchor.constraint(equalToConstant: resolvedHeight).isActive = true
         return button
     }
 }

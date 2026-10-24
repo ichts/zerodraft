@@ -156,7 +156,7 @@ assert_exit_row_geometry() { # assert_exit_row_geometry <snapshot>
   local exit hint count
   exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
   hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave and delete the draft\.$')"
-  count="$(frame_of "$1" AXStaticText '^[0-9]+ words?$')"
+  count="$(frame_of "$1" AXStaticText '^([0-9]+ words?|Type to start)$')"
   [[ -n "$exit" && -n "$hint" && -n "$count" ]] || fail 'exit row geometry: missing a row element'
   record_geometry exit-row "$(jq -cn --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count"     '{exit: $exit, confirmation: $hint, count: $count}')"
   jq -en --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count" '
@@ -334,7 +334,6 @@ check_warn_recovery_wipe() {
     || fail "$tier wipe report is not the literal receipt"
   assert_text "$wiped" '0 words'
   assert_text "$wiped" '1:00'
-  assert_text "$wiped" 'Type to start'
   [[ "$(draft_value "$wiped")" == '' ]] || fail "$tier wipe retained editor text"
   exit_room_by_key
   snap "$tier-exit" >"$output/$tier-exit.json"

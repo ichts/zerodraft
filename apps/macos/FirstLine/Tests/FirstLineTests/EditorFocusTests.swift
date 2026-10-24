@@ -278,6 +278,38 @@ struct EditorFocusTests {
         #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - 0.07) < 0.001)
     }
 
+    @Test
+    func restoredDraftReappliesLineOpacityAfterLayoutAndResize() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine()
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: root))
+        state.startSession(duration: 60)
+        let draft = Array(repeating: "alpha beta gamma delta", count: 24).joined(separator: " ")
+        engine.registerCommittedText(draft)
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
+        RoomWindowKeeper.windows.append(window)
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        #expect(editor.string == draft)
+
+        let wideLines = try lineCount(in: editor)
+        #expect(wideLines >= 4)
+        try assertTailLineOpacities(in: editor, lineCount: wideLines)
+
+        window.setContentSize(NSSize(width: 520, height: 720))
+        room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
+        let narrowLines = try lineCount(in: editor)
+        #expect(narrowLines > wideLines)
+        try assertTailLineOpacities(in: editor, lineCount: narrowLines)
+        window.orderOut(nil)
+    }
+
     private func lineAlpha(in textView: AppendOnlyTextView, lineIndex: Int) throws -> CGFloat {
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
@@ -289,6 +321,24 @@ struct EditorFocusTests {
         let line = try #require(lines.indices.contains(lineIndex) ? lines[lineIndex] : nil)
         let colour = try #require(textView.textStorage?.attribute(.foregroundColor, at: line.location, effectiveRange: nil) as? NSColor)
         return colour.alphaComponent
+    }
+
+    private func lineCount(in textView: AppendOnlyTextView) throws -> Int {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        var count = 0
+        layout.enumerateLineFragments(
+            forGlyphRange: NSRange(location: 0, length: (textView.string as NSString).length)
+        ) { _, _, _, _, _ in count += 1 }
+        return count
+    }
+
+    private func assertTailLineOpacities(in textView: AppendOnlyTextView, lineCount: Int) throws {
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 1) - 1) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - 0.22) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 4)) < 0.001)
     }
 
     // MARK: - Geometry helpers

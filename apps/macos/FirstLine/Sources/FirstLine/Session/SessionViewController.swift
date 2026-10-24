@@ -426,6 +426,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.scrollCaretToCompositionAnchor()
             textView.clearPendingCompositionRefresh()
         }
+        textView.refreshLineOpacityForMeasureChange()
     }
 
     /// Keep the writing column at 62ch (70ch wide) centred in the full sheet, the

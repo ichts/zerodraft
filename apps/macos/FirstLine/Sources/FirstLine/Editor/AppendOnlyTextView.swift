@@ -18,6 +18,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
     private(set) var pendingCompositionRefresh = true
+    private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
     /// One uniform opacity per completed line, closest line first; older lines are gone.
@@ -477,12 +478,24 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLineOpacity(in: range, textStorage: textStorage)
     }
 
+    /// A width or measure change reflows line breaks without touching the text or
+    /// caret, so the per-line opacity must be recomputed against the new layout.
+    func refreshLineOpacityForMeasureChange() {
+        guard hasMarkedText() == false,
+              let textStorage, textStorage.length > 0,
+              let textContainer else { return }
+        let width = textContainer.containerSize.width
+        guard width > insetEpsilon, width != lineOpacityMeasureWidth else { return }
+        applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
+    }
+
     /// Each completed line gets one uniform opacity; the current line is full. The
     /// line's top and bottom always match, and older lines are gone. The opacities
     /// follow the live trial's intent (100/22/7).
     private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
         guard textStorage.length > 0, let layoutManager, let textContainer else { return }
         layoutManager.ensureLayout(for: textContainer)
+        lineOpacityMeasureWidth = textContainer.containerSize.width
         var lines: [(index: Int, glyphRange: NSRange)] = []
         var index = 0
         layoutManager.enumerateLineFragments(

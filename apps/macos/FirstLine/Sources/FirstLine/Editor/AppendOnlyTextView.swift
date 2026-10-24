@@ -11,7 +11,7 @@ import CoreText
 final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDelegate {
     /// The flag marks nonempty committed text or composition activity for trial reservation.
     var onPrepareInput: ((Bool) -> Bool)?
-    var onCommittedText: ((String) -> Void)?
+    var onCommittedText: ((String, NSRange?) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
 
@@ -156,7 +156,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
         pendingCompositionRefresh = true
         applySessionTypography()
-        onCommittedText?(inserted)
+        onCommittedText?(inserted, isCompositionReplacement ? replacementRange : nil)
     }
 
     /// Clears a draft only after the engine has adjudicated a wipe.

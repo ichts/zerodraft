@@ -397,3 +397,14 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: The earlier tolerance kept the unmarked range live for the rest of the view, so deleting
   visible `ni` bypassed append-only without the engine ever receiving it.
 - Supersedes: case 13's post-unmark deletion tolerance. D-032's wipe context reset stands.
+
+## D-034: A composition replacement updates the engine draft
+
+- Date: 2026-10-24
+- Decision: When an IME commits a replacement over a range the editor already committed (the
+  unmark-then-replace path), the engine replaces that range in its draft; a marked commit whose range
+  is not yet in the engine appends. Engine text, copy text and word count stay identical to the editor.
+- Reason: The unmark step committed the romanization to the engine, then the replacement commit
+  appended the final text, so a WeType-style commit kept `nihao` beside `你好` and inflated the count.
+- Supersedes: the append-only commit callback for composition replacements. The append-only user guard
+  stands.

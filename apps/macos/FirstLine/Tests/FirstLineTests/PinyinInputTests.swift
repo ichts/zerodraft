@@ -135,6 +135,8 @@ struct PinyinInputTests {
         fixture.editor.insertText("你好", replacementRange: marked)
         #expect(fixture.engine.lastDenyAt == nil, "a commit targeting the composing range is not a deletion")
         #expect(fixture.editor.string == "你好")
+        #expect(fixture.engine.text == "你好", "the engine must record the final composition, not the romanization")
+        #expect(fixture.engine.wordCount == 2)
     }
 
     @Test func shuangpinSequenceStaysCompositionSafe() throws {

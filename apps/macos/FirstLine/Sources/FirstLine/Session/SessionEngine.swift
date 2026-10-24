@@ -101,12 +101,18 @@ final class SessionEngine {
         emitStateChange()
     }
 
-    func registerCommittedText(_ inserted: String) {
+    func registerCommittedText(_ inserted: String, replacing replacementRange: NSRange? = nil) {
         guard !inserted.isEmpty else { return }
         guard phase == .writing || phase == .danger, !adjudicateDeadlines() else { return }
         let current = now()
         if startedAt == nil { startedAt = current }
-        text += inserted
+        let source = text as NSString
+        if let replacementRange, replacementRange.location != NSNotFound,
+           replacementRange.location >= 0, NSMaxRange(replacementRange) <= source.length {
+            text = source.replacingCharacters(in: replacementRange, with: inserted)
+        } else {
+            text += inserted
+        }
         wordCount = Self.countWords(in: text)
         lastActivityAt = current
         idleSeconds = 0

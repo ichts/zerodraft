@@ -100,6 +100,26 @@ struct ReviewRoundTests {
         fixture.window.orderOut(nil)
     }
 
+    @Test func keptRestartEntersTheWritingRoomWithoutATick() throws {
+        let fixture = keptRoom()
+        let restart = try #require(descendants(of: fixture.room.view, of: NSButton.self)
+            .first { $0.title == "RUN IT AGAIN" })
+        let editor = try #require(descendants(of: fixture.room.view, of: AppendOnlyTextView.self).first)
+        let scroll = try #require(editor.enclosingScrollView)
+        #expect(fixture.engine.phase == .success)
+        #expect(scroll.isHidden)
+
+        restart.performClick(nil)
+
+        #expect(fixture.engine.phase == .writing)
+        #expect(!scroll.isHidden)
+        #expect(editor.isEditable)
+        #expect(fixture.window.firstResponder === editor)
+        editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(fixture.engine.text == "x")
+        fixture.window.orderOut(nil)
+    }
+
     @Test func keptDraftRecentersAfterEveryWindowResize() throws {
         let fixture = keptRoom(text: "第一行\n这是一段较长的草稿，用来检查窗口尺寸变化后的居中。\nshort latin line")
         let body = try #require(descendants(of: fixture.room.view, of: NSTextField.self)

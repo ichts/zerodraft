@@ -391,10 +391,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             }
             return allowed
         }
-        textView.onCommittedText = { [weak self] text in
+        textView.onCommittedText = { [weak self] text, replacementRange in
             guard let self else { return }
             self.dismissExitConfirmation()
-            self.engine.registerCommittedText(text)
+            self.engine.registerCommittedText(text, replacing: replacementRange)
             self.applyPhase()
         }
         textView.onMarkedTextActivity = { [weak self] in
@@ -888,6 +888,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         dismissExitConfirmation()
         appState.abandonSession()
         appState.startSession(duration: engine.duration)
+        refreshRoom()
+        focusForPhase()
     }
 
     func copyKeptText() {

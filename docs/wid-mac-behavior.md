@@ -41,7 +41,7 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 13 | Delete/forward after the IME has cleared its marked range but before it commits is a user edit and must deny without moving the draft; a commit that belongs to the composition still passes through. | `PinyinInputTests.clearedMarkedRangeDeletionDenies` | signed-build recording |
 | 14 | `setMarkedText` with `.notFound` while a composition exists replaces the current composition, not the committed draft. | `PinyinInputTests.notFoundMarkedReplacementStaysInComposition` | signed-build recording |
 | 15 | Internal `replaceCharacters` during a composition is composition bookkeeping, not a denied user edit. | `PinyinInputTests.replaceCharactersDuringCompositionIsAllowed` | signed-build recording |
-| 16 | A commit that targets a range inside the composing text after the marked range was cleared is a commit, not a deletion. | `PinyinInputTests.commitAfterUnmarkInsideCompositionIsAllowed` | signed-build recording |
+| 16 | A commit that targets a range inside the composing text after the marked range was cleared is a commit, not a deletion, and the engine records only the final committed text rather than the intermediate romanization. | `PinyinInputTests.commitAfterUnmarkInsideCompositionIsAllowed` | signed-build recording |
 | 17 | Pinyin candidacy under Shuangpin follows the same rules. | `PinyinInputTests.shuangpinSequenceStaysCompositionSafe` | signed-build recording |
 
 ## 2. Caret and the writing line

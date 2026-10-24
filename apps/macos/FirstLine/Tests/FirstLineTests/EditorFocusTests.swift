@@ -823,7 +823,7 @@ struct EditorFocusTests {
         #expect(textView.hasMarkedText())
 
         var committed: String?
-        textView.onCommittedText = { committed = $0 }
+        textView.onCommittedText = { text, _ in committed = text }
         textView.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
 
         #expect(textView.hasMarkedText() == false)
@@ -843,7 +843,7 @@ struct EditorFocusTests {
 
         var committed: String?
         var denied = false
-        textView.onCommittedText = { committed = $0 }
+        textView.onCommittedText = { text, _ in committed = text }
         textView.onDeny = { denied = true }
 
         // insertText at the end via the default NSNotFound range (non-marked-commit path).
@@ -864,7 +864,7 @@ struct EditorFocusTests {
         var markedActivity = 0
         var committed: String?
         textView.onMarkedTextActivity = { markedActivity += 1 }
-        textView.onCommittedText = { committed = $0 }
+        textView.onCommittedText = { text, _ in committed = text }
 
         // IME composition phase.
         textView.setMarkedText(

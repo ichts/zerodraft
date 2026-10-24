@@ -165,7 +165,7 @@ for used in 1 2 3; do
     || { bad "session $used did not select 1 minute"; exit 1; }
   tok="$(token button 'Begin writing')"; [[ -n "$tok" ]] || { bad "no Begin button (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
-  wait_has "room-$used" 'Start typing.' || { bad "session $used room did not open"; exit 1; }
+  wait_has "room-$used" 'Type to start' || { bad "session $used room did not open"; exit 1; }
   sentence='I watched the rain cross the garden.'
   started="$(clock_now)" || { bad 'monotonic clock unavailable'; exit 1; }
   type_text "$sentence" || { bad "session $used key delivery failed"; exit 1; }
@@ -176,7 +176,7 @@ for used in 1 2 3; do
   if [[ "$used" -eq 2 ]]; then
     sleep 9
     snap wiped-second
-    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' && has 'Start typing.' \
+    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' && has '0 words' \
       && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
       && ! has 'COPY TEXT' \
       && pass 'session 2 silence deleted the draft with a restart receipt' \
@@ -222,7 +222,7 @@ done
 # 5. After the third session, writing needs a license: the activation page.
 wait_has activation 'Activate Write It Down' && pass 'after 3 free sessions the activation page appears' \
   || bad 'activation page not shown after the third session'
-has 'Start typing.' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
+has 'Type to start' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
 
 # 6. Manual remainder.
 log "SUMMARY automated failures: $failures (artifacts: $out)"

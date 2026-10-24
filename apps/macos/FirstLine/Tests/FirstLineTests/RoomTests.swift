@@ -217,7 +217,7 @@ struct RoomTests {
         #expect(!exit.isHiddenOrHasHiddenAncestor)
     }
 
-    @Test func deletedStateShowsUnusedSentenceAndInputHint() throws {
+    @Test func deletedStateShowsUnusedSentenceAndCountWithoutAHint() throws {
         let fixture = try roomFixture()
         fixture.editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.clock.now = 8.1
@@ -227,8 +227,8 @@ struct RoomTests {
         let report = try #require(fields.first { $0.stringValue == "DRAFT DELETED AT 0:52. TYPE TO START AGAIN." })
         #expect(!report.isHiddenOrHasHiddenAncestor)
         #expect(sameColor(report.textColor, FirstLineColors.redNSColor))
-        let hint = try #require(fields.first { $0.stringValue == "Start typing." })
-        #expect(!hint.isHiddenOrHasHiddenAncestor)
+        #expect(!fields.contains { $0.stringValue == "Start typing." },
+                "the wiped room must not add an under-line hint")
         #expect(fields.contains { $0.stringValue == "1:00" })
         #expect(fields.contains { $0.stringValue == "0 words" })
     }

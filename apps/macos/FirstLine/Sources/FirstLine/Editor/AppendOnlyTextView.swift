@@ -18,6 +18,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
     private(set) var pendingCompositionRefresh = true
+    /// The room sets this from Reduce Motion; history scrolls then snap.
+    var animatesHistoryScroll = true
+    /// One uniform opacity per completed line, closest line first; older lines are gone.
+    static let historyLineOpacities: [CGFloat] = [1, 0.22, 0.07]
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
@@ -435,6 +439,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         font = sessionFont
         alignment = .center
         layoutManager?.delegate = self
+        // The fixed 1.6 line box already includes the leading; the fallback font's
+        // own leading would add another 5.6 pt to CJK lines and break the pitch.
+        layoutManager?.usesFontLeading = false
 
         markedTextAttributes = activeTextAttributes(paragraph: paragraph)
         applySessionTypography()
@@ -459,8 +466,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         pendingCompositionRefresh = true
     }
 
-    /// One ink colour for every line. The room's gradient mask, not per-paragraph alpha,
-    /// fades earlier lines exactly like the live trial's `#editor` mask.
+    /// Base ink for the current line; completed lines are stepped by `applyLineOpacity`
+    /// to the live trial's 100/22/7 intent.
     func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
@@ -476,6 +483,54 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLightPunctuationTypography(in: range, textStorage: textStorage)
         applyScriptBoundaryKerning(in: range, textStorage: textStorage)
         textStorage.endEditing()
+        // Line opacities need a laid-out storage, so apply them after the edit block.
+        applyLineOpacity(in: range, textStorage: textStorage)
+    }
+
+    /// Each completed line gets one uniform opacity; the current line is full. The
+    /// line's top and bottom always match, and older lines are gone. The opacities
+    /// follow the live trial's intent (100/22/7).
+    private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
+        guard textStorage.length > 0, let layoutManager, let textContainer else { return }
+        layoutManager.ensureLayout(for: textContainer)
+        var lines: [(index: Int, glyphRange: NSRange)] = []
+        var index = 0
+        layoutManager.enumerateLineFragments(
+            forGlyphRange: NSRange(location: 0, length: textStorage.length)
+        ) { _, _, _, glyphRange, _ in
+            lines.append((index, glyphRange))
+            index += 1
+        }
+        guard !lines.isEmpty else { return }
+        let length = textStorage.length
+        let insertion = min(max(selectedRange().location, 0), length)
+        let currentIndex: Int
+        if insertion == length, string.hasSuffix("\n") {
+            currentIndex = lines.count
+        } else if insertion < length {
+            let glyph = layoutManager.glyphIndexForCharacter(at: insertion)
+            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
+        } else {
+            let glyph = layoutManager.glyphIndexForCharacter(at: max(length - 1, 0))
+            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
+        }
+        for line in lines {
+            let distance = currentIndex - line.index
+            let alpha: CGFloat
+            if distance <= 0 {
+                alpha = 1
+            } else if distance < Self.historyLineOpacities.count {
+                alpha = Self.historyLineOpacities[distance]
+            } else {
+                alpha = 0
+            }
+            let characterRange = layoutManager.characterRange(forGlyphRange: line.glyphRange, actualGlyphRange: nil)
+            let clipped = NSIntersectionRange(characterRange, range)
+            guard clipped.length > 0 else { continue }
+            textStorage.addAttribute(.foregroundColor,
+                                      value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
+                                      range: clipped)
+        }
     }
 
     func setCompositionAnchor(_ y: CGFloat) {
@@ -495,9 +550,22 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             -scrollView.contentInsets.top, initialY,
             ceil(textContainerOrigin.y + line.maxY - scrollView.contentView.bounds.height + 40)
         )
-        guard abs(scrollView.contentView.bounds.origin.y - targetY) > insetEpsilon else { return }
-        scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
-        scrollView.reflectScrolledClipView(scrollView.contentView)
+        let currentY = scrollView.contentView.bounds.origin.y
+        let delta = abs(currentY - targetY)
+        guard delta > insetEpsilon else { return }
+        let lineHeight = sessionFontSize * 1.6
+        // A new line moves the history by one pitch; animate that, and snap on a
+        // session/resize jump. Reduce Motion snaps.
+        if animatesHistoryScroll, delta <= lineHeight * 2.5 {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.18
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: targetY))
+            }
+        } else {
+            scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
     }
 
     private func compositionLineRect() -> NSRect? {
@@ -508,26 +576,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
         let glyph = layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0))
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
-    }
-
-    /// Offset from the line box centre to the rendered ink centre of the caret line.
-    /// TextKit puts its baseline lower in the 1.6 line box than CSS does; the room's
-    /// live gradient fade is applied to the rendered line centres.
-    func currentLineInkOffsetY() -> CGFloat? {
-        guard let layoutManager, let textContainer else { return nil }
-        layoutManager.ensureLayout(for: textContainer)
-        guard !string.isEmpty else { return 0 }
-        let length = (string as NSString).length
-        let location = min(max(selectedRange().location - 1, 0), max(length - 1, 0))
-        let glyph = layoutManager.glyphIndexForCharacter(at: location)
-        let line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil)
-        let baseline = line.minY + layoutManager.location(forGlyphAt: glyph).y
-        let character = (string as NSString).character(at: location)
-        let fontForGlyph = font(for: UnicodeScalar(character) ?? "x")
-        guard let fontForGlyph, let ink = glyphMetrics(for: UnicodeScalar(character) ?? "x", font: fontForGlyph)?.bounds else {
-            return 0
-        }
-        return baseline - ink.midY - line.midY
     }
 
     func clearPendingCompositionRefresh() {
@@ -699,7 +747,13 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        paragraph.lineHeightMultiple = 1.6
+        // Fixed line pitch. lineHeightMultiple scales each font's natural line height,
+        // so the CJK fallback (a taller font) produced a 58.4 pt line next to the
+        // Latin 44.8 pt line. Min == max forces 1.6 x font size for every script.
+        let lineHeight = sessionFontSize * 1.6
+        paragraph.minimumLineHeight = lineHeight
+        paragraph.maximumLineHeight = lineHeight
+        paragraph.lineHeightMultiple = 1
         paragraph.lineSpacing = 0
         return paragraph
     }

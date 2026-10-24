@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
- * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with the live gradient line fade, wash and numeral, live deletion sentence, kept heading/copy receipt, two-step exit.
- * [POS]: Centered writing at 39% of the sheet, the warning numeral and its line just under the writing line, one insert origin shared by the placeholder, the caret and the first typed glyph, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, wash and numeral, live deletion sentence, kept heading/copy receipt, two-step exit.
+ * [POS]: Centered writing above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -63,7 +63,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var copyButton: NSButton { keptView.copyButton }
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
-    private let lineFadeMask = CAGradientLayer()
     private var paper: FloodCanvasView!
     private var paperShadow: FirstLineShadowView!
     private var paperWash: RoomWashView!
@@ -72,7 +71,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var timerLabel: NSTextField!
     private var countLabel: NSTextField!
     private var reportLabel: NSTextField!
-    private var placeholderLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!
     private var exitButton: NSButton!
@@ -91,7 +89,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
-    private var placeholderTop: NSLayoutConstraint!
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
     private var reportTop: NSLayoutConstraint!
@@ -210,10 +207,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.drawsBackground = false
         scrollView.wantsLayer = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.layer?.mask = lineFadeMask
-        // NSScrollView is flipped, so its layer geometry is flipped too: location 0 is the top.
-        lineFadeMask.startPoint = CGPoint(x: 0.5, y: 0)
-        lineFadeMask.endPoint = CGPoint(x: 0.5, y: 1)
         paper.addSubview(scrollView)
 
         paperWash = RoomWashView(fillColor: FirstLineColors.redSoftNSColor)
@@ -249,15 +242,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         reportLabel = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
         reportLabel.maximumNumberOfLines = 0
         reportLabel.isHidden = true
-        // The empty line holds only the caret; "Start typing." lives in the status
-        // slot under the line, the same slot the wipe receipt uses.
-        placeholderLabel = label("Start typing.",
-                                 font: FirstLineTypography.smallMediumNSFont,
-                                 color: FirstLineColors.muteNSColor)
-        placeholderLabel.attributedStringValue = FirstLineTypography.trackedText(
-            "Start typing.", font: FirstLineTypography.smallMediumNSFont,
-            color: FirstLineColors.muteNSColor, kernEm: 0.04)
-        placeholderLabel.maximumNumberOfLines = 1
         numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
                              color: FirstLineColors.redNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
@@ -274,7 +258,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
 
-        for element in [timerLabel!, countLabel!, reportLabel!, placeholderLabel!, numeralLabel!, warningHint!, exitButton!, exitHintLabel!] {
+        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningHint!, exitButton!, exitHintLabel!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -291,7 +275,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func installConstraints() {
         let safe = view.safeAreaLayoutGuide
-        placeholderTop = placeholderLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         numeralTop = numeralLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         captionTop = warningHint.topAnchor.constraint(equalTo: paper.topAnchor)
         reportTop = reportLabel.topAnchor.constraint(equalTo: paper.topAnchor)
@@ -337,8 +320,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportTop,
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
-            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            placeholderTop,
             keptView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             keptView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
             keptView.topAnchor.constraint(equalTo: paper.topAnchor, constant: SessionKeptView.verticalInset),
@@ -379,8 +360,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         updateTextMeasure()
         let size = scrollView.contentSize
         guard size.width > 0, size.height > 0, paper.bounds.height > 0, view.bounds.height > 0 else { return }
-        // The live trial centres the current line at 39% of the sheet.
-        let anchorFromPaperTop = round(paper.bounds.height * 0.39)
+        // The active line sits at the room's anchor, above the vertical middle.
+        let anchorFromPaperTop = round(paper.bounds.height * RoomPresentation.writingAnchorFraction)
         let scrollTopInPaper = paper.bounds.height - paper.convert(scrollView.bounds, from: scrollView).maxY
         let anchor = round(anchorFromPaperTop - scrollTopInPaper)
         textView.setCompositionAnchor(anchor)
@@ -393,8 +374,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.scrollCaretToCompositionAnchor()
             textView.clearPendingCompositionRefresh()
         }
-        layoutEmptyHint()
-        layoutLineFade(centre: anchor + (textView.currentLineInkOffsetY() ?? 0))
     }
 
     /// Keep the writing column at 62ch (70ch wide) centred in the full sheet, the
@@ -410,19 +389,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if abs(textView.textContainerInset.width - inset) > 0.5 {
             textView.textContainerInset = NSSize(width: inset, height: 0)
         }
-    }
-
-    /// The empty line holds only the caret. "Start typing." sits in the status slot
-    /// under the line, with its ink top where the wipe receipt's ink top sits, so the
-    /// line and the caption never compete.
-    private func layoutEmptyHint() {
-        guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
-        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
-        let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
-        let font = placeholderLabel.font ?? FirstLineTypography.smallNSFont
-        let bearing = placeholderLabel.firstBaselineOffsetFromTop - font.capHeight
-        let top = round(baselineFromTop + 44 - bearing)
-        if abs(placeholderTop.constant - top) > 0.5 { placeholderTop.constant = top }
     }
 
     /// Ink height of the drawn glyphs, used to place the warning by its ink rather
@@ -441,33 +407,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             tallest = max(tallest, bounds.height)
         }
         return tallest > 0 ? tallest : nil
-    }
-
-    /// The live `#editor` mask, applied to the rendered line centres: solid on the current
-    /// line, 22% one line up, 7% two lines up, gone beyond.
-    private func layoutLineFade(centre: CGFloat) {
-        let height = scrollView.bounds.height
-        guard height > 1 else { return }
-        lineFadeMask.frame = scrollView.bounds
-        let line = CGFloat(appState.settings.writingFontSize.points) * 1.6
-        var stops: [(position: CGFloat, alpha: CGFloat)] = []
-        func add(_ y: CGFloat, _ alpha: CGFloat) {
-            let position = min(max(y / height, 0), 1)
-            if let last = stops.last, position <= last.position { return }
-            stops.append((position, alpha))
-        }
-        add(centre - 2.5 * line, 0)
-        add(centre - 2 * line, 0.07)
-        add(centre - line, 0.22)
-        add(centre - 0.5 * line, 1)
-        add(centre + 0.5 * line, 1)
-        add(centre + line, 0.22)
-        add(centre + 2 * line, 0.07)
-        add(centre + 2.5 * line, 0)
-        add(height, 0)
-        guard stops.count >= 2 else { return }
-        lineFadeMask.colors = stops.map { NSColor.black.withAlphaComponent($0.alpha).cgColor }
-        lineFadeMask.locations = stops.map { NSNumber(value: Double($0.position)) }
     }
 
     private func layoutWarning() {
@@ -495,14 +434,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let captionTopConstant = round(captionInkTop - captionBearing)
         if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
 
-        // The wipe receipt is the result the writer must see. In the wiped room the
-        // "Start typing." hint takes the first status line, so the receipt sits one
-        // caption-line below it (the same 16-24 pt gap as the warning caption).
-        let hintFont = placeholderLabel.font ?? FirstLineTypography.smallNSFont
-        let hintBaseline = baselineFromTop + 44 + hintFont.capHeight
+        // The wipe receipt is the result the writer must see; with no hint on the line
+        // it takes the first status slot under the writing line.
         let reportFont = reportLabel.font ?? FirstLineTypography.smallNSFont
         let reportBearing = reportLabel.firstBaselineOffsetFromTop - reportFont.capHeight
-        let reportTopConstant = round(hintBaseline + 20 - reportBearing)
+        let reportTopConstant = round(numeralInkTop - reportBearing)
         if abs(reportTop.constant - reportTopConstant) > 0.5 { reportTop.constant = reportTopConstant }
     }
 
@@ -605,14 +541,20 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
-        countLabel.setAccessibilityLabel("\(wordLabel) written")
         let writing = phase == .writing
         let chrome = writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
+        // Empty room: the bottom-right count slot itself carries the instruction.
+        // After the first keystroke it becomes the word count; after a wipe the red
+        // receipt carries the instruction and the slot shows the count.
+        let typePrompt = !engine.hasStarted && phase != .failure
+        countLabel.setAccessibilityLabel(typePrompt ? "Type to start" : "\(wordLabel) written")
+        countLabel.toolTip = typePrompt ? nil : RoomPresentation.countRule
+        countLabel.setAccessibilityHelp(typePrompt ? "Type to start." : RoomPresentation.countRule)
         // The count shares the footer row's 1.6 line box, so its baseline meets the
         // ESC - EXIT title baseline instead of sitting about 5 pt lower.
         countLabel.attributedStringValue = Self.rowText(
-            wordLabel, font: FirstLineTypography.smallNSFont, color: chrome,
-            alignment: .right, kernEm: 0)
+            typePrompt ? "Type to start" : wordLabel, font: FirstLineTypography.smallNSFont,
+            color: chrome, alignment: .right, kernEm: 0)
         refreshQuietLinks(muted: writing)
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
@@ -626,7 +568,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion, limit: engine.silenceLimit) : 0
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
-        placeholderLabel.isHidden = isKept || !engine.text.isEmpty || !textView.string.isEmpty
         syncProgressBar(phase: phase)
         if !textView.hasMarkedText() { prepareViewport() }
     }
@@ -736,12 +677,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let settings = appState.settings
         textView.configureSessionTypography(size: settings.writingFontSize.points)
         updateTextMeasure()
-        placeholderLabel.font = FirstLineTypography.writingItalicNSFont(size: settings.writingFontSize.points)
-        placeholderLabel.alignment = .center
         updateKeptContent()
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0
+        textView.animatesHistoryScroll = !reducesMotion
     }
 
     override func mouseMoved(with event: NSEvent) {

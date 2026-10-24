@@ -34,10 +34,20 @@ enum FirstLineTypography {
 
     /// Machine-voice label text with the live trial's tracking (0.02-0.04 em).
     static func trackedText(_ text: String, font: NSFont, color: NSColor, kernEm: CGFloat,
-                            lineHeightMultiple: CGFloat = 1.6) -> NSAttributedString {
+                            lineHeightMultiple: CGFloat = 1.6,
+                            fixedLineHeight: Bool = false) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
-        paragraph.lineHeightMultiple = lineHeightMultiple
+        if fixedLineHeight {
+            // Multi-line writing surfaces must use one pitch for every script; a
+            // fallback font must not inflate its own lines.
+            let lineHeight = font.pointSize * lineHeightMultiple
+            paragraph.minimumLineHeight = lineHeight
+            paragraph.maximumLineHeight = lineHeight
+            paragraph.lineHeightMultiple = 1
+        } else {
+            paragraph.lineHeightMultiple = lineHeightMultiple
+        }
         return NSAttributedString(string: text, attributes: [
             .font: font,
             .foregroundColor: color,

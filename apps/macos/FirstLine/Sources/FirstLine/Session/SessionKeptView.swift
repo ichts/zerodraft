@@ -118,7 +118,7 @@ final class SessionKeptView: NSView {
         body.font = writingFont
         body.attributedStringValue = FirstLineTypography.trackedText(
             text.isEmpty ? " " : text, font: writingFont, color: FirstLineColors.inkNSColor,
-            kernEm: 0, lineHeightMultiple: 1.6)
+            kernEm: 0, lineHeightMultiple: 1.6, fixedLineHeight: true)
         updateHeadingFont()
         receipt.font = FirstLineTypography.smallMediumNSFont
         receipt.attributedStringValue = FirstLineTypography.trackedText(

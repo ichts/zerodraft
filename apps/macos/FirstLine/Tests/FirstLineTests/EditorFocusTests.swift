@@ -32,8 +32,6 @@ struct EditorFocusTests {
         let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
         let scroll = try #require(editor.enclosingScrollView)
         let paper = try #require(scroll.superview)
-        let placeholder = try #require(descendants(of: room.view, as: NSTextField.self)
-            .first(where: { $0.stringValue == "Start typing." }))
         let lineHeight = CGFloat(WritingFontSize.medium.points) * 1.6
         let container = try #require(editor.textContainer)
         // The centred column is the view width minus both insets. A frame reassignment
@@ -46,32 +44,27 @@ struct EditorFocusTests {
         }
         expectColumnWidth()
 
-        // Empty sheet: the writing line holds only the caret at 39% of the sheet;
-        // "Start typing." is a caption in the status slot under the line.
+        // Empty sheet: the writing line holds only the caret at the room anchor; the
+        // bottom-right count slot carries "Type to start" until the first keystroke.
         let emptyY = try currentLineTop(in: editor, paper: paper)
-        #expect(abs(emptyY / paper.bounds.height - 0.39) < 0.01)
-        let placeholderX = paper.convert(NSPoint(x: placeholder.bounds.midX, y: 0), from: placeholder).x
-        #expect(abs(placeholderX - paper.bounds.midX) <= 1)
-        let placeholderBaseline = topInPaper(placeholder.firstBaselineOffsetFromTop,
-                                             of: placeholder, paper: paper)
-        let hintInkTop = placeholderBaseline - (placeholder.font?.capHeight ?? 0)
+        #expect(abs(emptyY / paper.bounds.height - RoomPresentation.writingAnchorFraction) < 0.01)
+        let prompt = try #require(descendants(of: room.view, as: NSTextField.self)
+            .first { $0.stringValue == "Type to start" })
+        #expect(!prompt.isHiddenOrHasHiddenAncestor)
         let emptyBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
-        let hintDrop = hintInkTop - emptyBaseline
-        #expect(hintDrop >= 40 && hintDrop <= 48,
-                "the hint ink top is \(hintDrop) pt under the writing baseline")
-        #expect(!placeholder.isHidden)
         #expect(editor.alignment == .center)
+        #expect(!descendants(of: room.view, as: NSTextField.self).contains { $0.stringValue == "Start typing." })
 
-        // One line: the typed line keeps that anchor and baseline; the hint hides.
+        // One line: the typed line keeps that anchor and baseline; the count returns.
         editor.insertText("One", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
         expectColumnWidth()
         let firstY = try currentLineTop(in: editor, paper: paper)
-        #expect(abs(firstY / paper.bounds.height - 0.39) < 0.01)
+        #expect(abs(firstY / paper.bounds.height - RoomPresentation.writingAnchorFraction) < 0.01)
         let firstBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
         #expect(abs(firstBaseline - emptyBaseline) <= 1)
-        #expect(placeholder.isHidden)
+        #expect(prompt.stringValue == "1 word")
         let firstLineX = try lineCentreX(in: editor, paper: paper)
         #expect(abs(firstLineX - paper.bounds.midX) <= 2)
 
@@ -140,7 +133,103 @@ struct EditorFocusTests {
     }
 
     @Test
-    func lineFadeMaskMatchesTheLiveTrialGradient() throws {
+    func linePitchIsFixedForChineseEnglishAndMixed() throws {
+        for (name, text) in [("chinese", "中\n中\n中"), ("english", "o\no\no"), ("mixed", "中\no\n中")] {
+            let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+            editor.configureSessionTypography(size: 28)
+            editor.textStorage?.setAttributedString(NSAttributedString(string: text))
+            editor.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+            editor.applySessionTypography()
+            let layout = try #require(editor.layoutManager)
+            let container = try #require(editor.textContainer)
+            layout.ensureLayout(for: container)
+            var origins: [CGFloat] = []
+            layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: (text as NSString).length)) { rect, _, _, _, _ in
+                origins.append(rect.minY)
+            }
+            #expect(origins.count == 3)
+            for index in 1..<origins.count {
+                let pitch = origins[index] - origins[index - 1]
+                #expect(abs(pitch - 44.8) <= 0.5, "\(name) line pitch \(pitch) is not 1.6 x 28")
+            }
+            // The rendered lines (the layout that draws the bitmap) are the pitch that
+            // matters: Chinese, English and mixed all share 44.8. Same-glyph lines also
+            // show the 45 pt ink pitch; mixed ink heights differ, so their layout pitch
+            // above is the rendered pitch.
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            let host = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+            window.contentView = host
+            editor.frame = host.bounds
+            host.addSubview(editor)
+            window.contentView?.layoutSubtreeIfNeeded()
+            editor.layoutSubtreeIfNeeded()
+            editor.displayIfNeeded()
+            let rep = try #require(editor.bitmapImageRepForCachingDisplay(in: editor.bounds))
+            editor.cacheDisplay(in: editor.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / editor.bounds.width
+            var rows: [Int] = []
+            for row in 0..<rep.pixelsHigh {
+                for column in 0..<rep.pixelsWide {
+                    guard let colour = rep.colorAt(x: column, y: row)?.usingColorSpace(.sRGB),
+                          colour.alphaComponent > 0.4 else { continue }
+                    let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
+                    if luma < 0.99 { rows.append(row); break }
+                }
+            }
+            var runs: [[Int]] = []
+            for row in rows {
+                if runs.last != nil, row - runs[runs.count - 1].last! <= 4 { runs[runs.count - 1].append(row) }
+                else { runs.append([row]) }
+            }
+            if name != "mixed" {
+                #expect(runs.count == 3, "\(name) ink runs \(runs.count)")
+                for index in 1..<runs.count {
+                    let pitch = CGFloat(runs[index].first! - runs[index - 1].first!) / scale
+                    #expect(abs(pitch - 44.8) <= 1, "\(name) rendered ink pitch \(pitch)")
+                }
+            }
+            window.orderOut(nil)
+        }
+    }
+
+    @Test
+    func completedLineOpacityIsUniformAndStepped() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.textStorage?.setAttributedString(NSAttributedString(string: "one\ntwo\nthree\nfour"))
+        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
+        textView.applySessionTypography()
+        let storage = try #require(textView.textStorage)
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        var lines: [NSRange] = []
+        layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: storage.length)) { _, _, _, glyphRange, _ in
+            lines.append(layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil))
+        }
+        #expect(lines.count == 4)
+        var alphas: [Set<CGFloat>] = []
+        for line in lines {
+            var lineAlphas: Set<CGFloat> = []
+            storage.enumerateAttribute(.foregroundColor, in: line, options: []) { value, _, _ in
+                if let colour = value as? NSColor { lineAlphas.insert(colour.alphaComponent) }
+            }
+            alphas.append(lineAlphas)
+        }
+        // One uniform opacity per completed line; the current line full; older lines gone.
+        #expect(alphas[3].allSatisfy { abs($0 - 1) < 0.001 })
+        #expect(alphas[2].allSatisfy { abs($0 - 0.22) < 0.001 })
+        #expect(alphas[1].allSatisfy { abs($0 - 0.07) < 0.001 })
+        #expect(alphas[0].allSatisfy { $0 == 0 })
+        #expect(textView.alignment == .center)
+        let paragraph = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
+        #expect(abs(paragraph.maximumLineHeight - 44.8) <= 0.001)
+        #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
+    }
+
+    @Test
+    func completedLinesDoNotMoveWhenTheCurrentLineGrows() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let clock = FocusClock(0)
@@ -153,64 +242,52 @@ struct EditorFocusTests {
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.contentViewController = room
         window.setContentSize(NSSize(width: 1040, height: 720))
-        room.view.layoutSubtreeIfNeeded()
-        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
+        RoomWindowKeeper.windows.append(window)
         let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
-        let scroll = try #require(editor.enclosingScrollView)
-        let paper = try #require(scroll.superview)
-        editor.insertText("one\ntwo\nthree", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let paper = try #require(editor.enclosingScrollView?.superview)
+
+        editor.insertText("第一行\nsecond", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
-        RoomWindowKeeper.windows.append(window)
+        room.view.layoutSubtreeIfNeeded()
+        let firstTop = try firstLineTop(in: editor, paper: paper)
+        let firstAlpha = try lineAlpha(in: editor, lineIndex: 0)
+        #expect(abs(firstAlpha - 0.22) < 0.001)
 
-        let mask = try #require(scroll.layer?.mask as? CAGradientLayer)
-        #expect(scroll.layer?.isGeometryFlipped == true)
-        #expect(mask.startPoint == CGPoint(x: 0.5, y: 0))
-        let height = scroll.bounds.height
-        let locations = try #require(mask.locations).map { CGFloat(truncating: $0) }
-        let colors = try #require(mask.colors) as! [CGColor]
-        let scrollTop = paper.bounds.height - scroll.frame.maxY
-        let boxTop = try currentLineTop(in: editor, paper: paper) - scrollTop
-        let inkOffset = try #require(editor.currentLineInkOffsetY())
-        let renderedCentre = boxTop + inkOffset
-        let line = CGFloat(WritingFontSize.medium.points) * 1.6
-        #expect(inkOffset > 0)
-        #expect(inkOffset < line / 2)
-        func alpha(at offset: CGFloat) -> CGFloat? {
-            // The room rounds its zen anchor to a whole point, so the rendered line can
-            // sit up to half a point from the gradient's computed centre.
-            let target = (renderedCentre + offset) / height
-            guard let index = locations.firstIndex(where: { abs($0 - target) * height <= 1 }) else { return nil }
-            return colors[index].alpha
-        }
-        #expect(abs((alpha(at: -line) ?? -1) - 0.22) < 0.01)
-        #expect(abs((alpha(at: -2 * line) ?? -1) - 0.07) < 0.01)
-        #expect(abs((alpha(at: -0.5 * line) ?? -1) - 1) < 0.01)
-        #expect(abs((alpha(at: 0.5 * line) ?? -1) - 1) < 0.01)
-        #expect(abs((alpha(at: line) ?? -1) - 0.22) < 0.01)
-        #expect(abs((alpha(at: 2 * line) ?? -1) - 0.07) < 0.01)
-        let top = try #require(alpha(at: -2.5 * line))
-        #expect(top <= 0.001)
+        // A CJK character on the English current line used to inflate that line's
+        // fragment and push the completed line up. With the fixed pitch it must not.
+        editor.insertText(" 中", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        room.refreshRoom()
+        room.view.layoutSubtreeIfNeeded()
+        let firstTopAfterGrowth = try firstLineTop(in: editor, paper: paper)
+        #expect(abs(firstTopAfterGrowth - firstTop) <= 0.5, "a completed line moved when the current line grew")
+        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - firstAlpha) < 0.001,
+                "a completed line changed opacity when the current line grew")
+
+        // A new line is the only act that may shift the history: exactly one pitch.
+        editor.insertText("\n第三行", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        room.refreshRoom()
+        room.view.layoutSubtreeIfNeeded()
+        let firstTopAfterNewLine = try firstLineTop(in: editor, paper: paper)
+        #expect(abs((firstTop - firstTopAfterNewLine) - 44.8) <= 1,
+                "the history shifted \(firstTop - firstTopAfterNewLine) pt for a new line")
+        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - 0.07) < 0.001)
     }
 
-    @Test
-    func sessionTypographyUsesOneInkColourForEveryLine() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "first\nsecond\ncurrent"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applySessionTypography()
-
-        let storage = try #require(textView.textStorage)
-        for location in [0, 6, 13, textView.string.count - 1] {
-            let color = try #require(storage.attribute(.foregroundColor, at: location, effectiveRange: nil) as? NSColor)
-            #expect(abs(color.alphaComponent - 1) < 0.001)
-            #expect(storage.attribute(.shadow, at: location, effectiveRange: nil) == nil)
+    private func lineAlpha(in textView: AppendOnlyTextView, lineIndex: Int) throws -> CGFloat {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        layout.ensureLayout(for: container)
+        var lines: [NSRange] = []
+        layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: (textView.string as NSString).length)) { _, _, _, glyphRange, _ in
+            lines.append(layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil))
         }
-        #expect(textView.alignment == .center)
-        let paragraph = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
-        #expect(paragraph.alignment == .center)
+        let line = try #require(lines.indices.contains(lineIndex) ? lines[lineIndex] : nil)
+        let colour = try #require(textView.textStorage?.attribute(.foregroundColor, at: line.location, effectiveRange: nil) as? NSColor)
+        return colour.alphaComponent
     }
 
     // MARK: - Geometry helpers

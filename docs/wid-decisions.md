@@ -266,3 +266,68 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the duplicate.
 - Supersedes: D-009's "one outer ink ring for every control" for ink-filled primary pills only; the
   system accent-blue ring remains forbidden everywhere.
+
+## D-025: The active line sits at 35% of the paper
+
+- Date: 2026-10-24
+- Decision: The Mac room anchors the active writing line at 35% of the paper from the top (the web
+  trial uses 39%). The status slot stays under the line, so the warning, receipt and count follow the
+  line at every window size, including full screen and the empty, typing, warning and wiped states.
+- Research: monitor ergonomics place the comfortable gaze below the top of the screen (the top of the
+  monitor at or slightly below eye level and the screen centre 15-20 degrees below eye level; OSHA
+  computer-workstations eTool, https://www.osha.gov/etools/computer-workstations/components/monitors),
+  and typewriter-style writing modes keep the active line in the middle band: iA Writer's Typewriter
+  option keeps "the cursor ... vertically centered in the Editor"
+  (https://ia.net/writer/support/editor/focus-mode); Ulysses and Typora's Typewriter modes keep the
+  active line in the middle. The live web trial anchors at `--write-anchor:39%`
+  (`writeitdown/tokens.css`). The captain asked for the line higher than the vertical middle; 35% is a
+  little higher than the web's 39%, in the upper comfortable gaze band.
+- Reason: Ergonomics and the captain's "not in the middle" feedback; the previous 39% read as too close
+  to the middle on the tested window.
+- Supersedes: the 39% anchor from the live-trial parity work; the centred zen line and the status slot
+  under it stand. This is an intended Mac difference from the web's 39%.
+
+## D-026: One fixed line pitch for every script
+
+- Date: 2026-10-24
+- Decision: Writing lines use a fixed 1.6 x font-size pitch: paragraph `minimumLineHeight` and
+  `maximumLineHeight` both 44.8 at 28 pt, `lineHeightMultiple` 1, font leading disabled, and one
+  baseline derived from the tallest ascender plus half the spare space. The kept draft uses the same
+  fixed line height. Chinese, English and mixed lines share the pitch.
+- Cause: `lineHeightMultiple` scales each font's own natural line height. The Zhuque CJK fallback's
+  natural height plus leading produced a 58.4 pt Chinese line next to the 44.8 pt Latin line (and its
+  5.6 pt leading added to every CJK line); mixed lines alternated between the two. That is the line
+  spacing the captain saw, not a paragraph-constant change.
+- Comparison: the previous signed DMG 506f759f shares the same 1.6 constant and fallback, so it has
+  the same inflated CJK pitch; the live web trial's `--lh-write` is a fixed 44.8 pt; the older 45 pt
+  behaviour in the captain's screenshot matches the fixed pitch. The measured rendered pitches after
+  the fix are 44.8 pt for Chinese, English and mixed text.
+- Reason: One grid for every script, matching the web line height and the older behaviour.
+- Supersedes: the per-font line-height behaviour. The measured room pitch is asserted by
+  `EditorFocusTests.linePitchIsFixedForChineseEnglishAndMixed`.
+
+## D-027: Stepped per-line history opacity and a one-pitch animated shift
+
+- Date: 2026-10-24
+- Decision: Each completed line gets one uniform opacity: the current line 100%, one line up 22%, two
+  lines up 7%, older lines 0 (the live trial's intent). The continuous gradient mask is retired. A
+  completed line does not move or change when characters are added on the line below; only a new line
+  shifts the history, exactly one line pitch, animated over 0.18 s ease-out (instant under Reduce
+  Motion).
+- Reason: The gradient cut through a line's top and bottom halves, and the CJK line-height inflation
+  changed the scroll target while typing on the same line, pushing completed lines up.
+- Supersedes: the continuous `lineFadeMask` and the instant line jumps. The web trial keeps its own
+  mask until that surface follows; this is an intended Mac refinement of the same 100/22/7 intent.
+
+## D-028: The empty room carries the instruction in the count slot
+
+- Date: 2026-10-24
+- Decision: The empty writing line shows only the caret. The bottom-right count slot reads
+  `Type to start` in the count's own style until the first keystroke, then shows the word count. After
+  a wipe the red receipt carries `TYPE TO START AGAIN.`, the count shows `0 words`, and no hint is
+  added near the line. Option C was chosen by the captain after A (under-line hint) and B (caret alone)
+  were captured side by side.
+- Reason: The captain rejected any caret-plus-"Start typing" pairing near the line; existing chrome
+  carries the instruction without adding a second text near the writing.
+- Supersedes: D-021's under-line hint caption. The caret-only line and the shared insertion origin
+  stand.

@@ -113,17 +113,22 @@ record_geometry() { # record_geometry <stage> <json-object>
   jq -cn --arg stage "$1" --argjson g "$2" '{stage: $stage, geometry: $g}' >>"$output/geometry.jsonl"
 }
 
-# The placeholder is centred on the writing area (the AXTextArea frame).
+# The empty room has no hint near the line; its instruction is the bottom-right
+# count prompt ("Type to start"), which must share the footer row with ESC - EXIT.
+# AX has no caret frame, so the caret/line origin equality is bound to the
+# deterministic RoundThreeTests.
 assert_room_geometry() { # assert_room_geometry <room-snapshot>
-  local ta ph
+  local ta prompt exit
   ta="$(frame_of "$1" AXTextArea '')"
-  ph="$(frame_of "$1" AXStaticText '^Start typing\.$')"
-  [[ -n "$ta" && -n "$ph" ]] || fail 'room geometry: missing text area or placeholder frame'
-  record_geometry room "$(jq -cn --argjson ta "$ta" --argjson ph "$ph" '{textArea: $ta, placeholder: $ph}')"
-  jq -en --argjson ta "$ta" --argjson ph "$ph" '
+  prompt="$(frame_of "$1" AXStaticText '^Type to start$')"
+  exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
+  [[ -n "$ta" && -n "$prompt" && -n "$exit" ]] || fail 'room geometry: missing text area, count prompt or exit frame'
+  record_geometry room "$(jq -cn --argjson ta "$ta" --argjson prompt "$prompt" --argjson exit "$exit" \
+    '{textArea: $ta, countPrompt: $prompt, exit: $exit}')"
+  jq -en --argjson prompt "$prompt" --argjson exit "$exit" '
     def d(a; b): (a - b) | if . < 0 then -. else . end;
-    d(($ph.x + $ph.w / 2); ($ta.x + $ta.w / 2)) <= 2
-  ' >/dev/null || fail 'the placeholder is not centred on the writing area'
+    d(($prompt.y + $prompt.h / 2); ($exit.y + $exit.h / 2)) <= 1
+  ' >/dev/null || fail 'the Type to start prompt is not on the footer row'
 }
 
 # The numeral is directly under the writing line: its top is above the text
@@ -329,7 +334,7 @@ check_warn_recovery_wipe() {
     || fail "$tier wipe report is not the literal receipt"
   assert_text "$wiped" '0 words'
   assert_text "$wiped" '1:00'
-  assert_text "$wiped" 'Start typing.'
+  assert_text "$wiped" 'Type to start'
   [[ "$(draft_value "$wiped")" == '' ]] || fail "$tier wipe retained editor text"
   exit_room_by_key
   snap "$tier-exit" >"$output/$tier-exit.json"
@@ -371,7 +376,7 @@ assert_text "$output/upgrade.json" 'Activate Write It Down'
 assert_text "$output/upgrade.json" 'After 3 free sessions, a license is required to keep writing.'
 assert_text "$output/upgrade.json" 'Try the full web app at writeitdown.app'
 absent_text "$output/upgrade.json" 'Back to Home'
-absent_text "$output/upgrade.json" 'Start typing.'
+absent_text "$output/upgrade.json" 'Type to start'
 absent_text "$output/upgrade.json" 'Mac trial:'
 
 ### 2. Activate the real client against a disposable signed fixture.
@@ -401,7 +406,7 @@ done
 select_tier "$output/home.json" 'Standard 8 s' standard
 enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
-assert_text "$output/room.json" 'Start typing.'
+assert_text "$output/room.json" 'Type to start'
 assert_text "$output/room.json" '1:00'
 assert_text "$output/room.json" '0 words'
 assert_text "$output/room.json" 'ESC - EXIT'
@@ -440,7 +445,7 @@ for tier in strict relaxed; do
   select_tier "$home" "$label" "$tier"
   enter_room "$output/selected-$tier.json"
   snap "$tier-room" >"$output/$tier-room.json"
-  assert_text "$output/$tier-room.json" 'Start typing.'
+  assert_text "$output/$tier-room.json" 'Type to start'
   # The daemon confirms a key only after delivery; that round trip can exceed a
   # second. Bracket the input: Strict's 2s warn needs the early clock, while
   # Relaxed's 9s warn needs the late clock to avoid counting delivery latency.
@@ -474,10 +479,10 @@ for mode in offline refunded; do
   if [[ "$mode" == offline ]]; then
     enter_room "$output/$mode-result.json"
     snap offline-room >"$output/offline-room.json"
-    assert_text "$output/offline-room.json" 'Start typing.'
+    assert_text "$output/offline-room.json" 'Type to start'
   else
     assert_text "$output/$mode-result.json" 'Activate Write It Down'
-    absent_text "$output/$mode-result.json" 'Start typing.'
+    absent_text "$output/$mode-result.json" 'Type to start'
     absent_text "$output/$mode-result.json" 'Back to Home'
   fi
 done

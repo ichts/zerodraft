@@ -44,12 +44,12 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 16 | A commit that targets a range inside the composing text after the marked range was cleared is a commit, not a deletion. | `PinyinInputTests.commitAfterUnmarkInsideCompositionIsAllowed` | signed-build recording |
 | 17 | Pinyin candidacy under Shuangpin follows the same rules. | `PinyinInputTests.shuangpinSequenceStaysCompositionSafe` | signed-build recording |
 
-## 2. Caret, placeholder and the writing line
+## 2. Caret and the writing line
 
 | # | Case | Bound test | Recording |
-| 18 | The empty writing line holds only the caret at the centred insertion point. `Start typing.` is a status caption under the line (ink top 40-48 pt under the writing baseline, the wipe receipt slot), not on the line. The first typed character is drawn at the caret; the caption disappears; the line baseline does not move. A fresh start and a start after a wipe place the caret and the caption at the same points. The caret is one fixed band whether the room is empty or has text. The no-hint alternative (caret alone) was captured for comparison and is not the default. | `RoundThreeTests.emptyCaretAndHintShareTheInsertionColumnWithTheFirstGlyph`; `ReviewRoundTests.emptyHintAndCaretMatchAfterAWipe` | signed-build recording |
-| 19 | The hint disappears as soon as real or marked text exists. | same tests | signed-build recording |
-| 32 | An IME composition is laid into the writing line: the composed run is centred in the measure, on the same baseline, and the placeholder is hidden while the input method owns it. | `RoundThreeTests.compositionRendersOnTheWritingLineAndHidesThePlaceholder` | signed-build recording |
+| 18 | The empty writing line holds only the caret at the centred insertion point; there is no hint near the line. The bottom-right count slot reads `Type to start` in the count style until the first keystroke, then shows the word count. The first typed character is drawn at the caret; the line baseline does not move. A fresh start and a start after a wipe place the caret at the same point; after a wipe the red receipt carries `TYPE TO START AGAIN.`, the count shows `0 words`, and no hint is added. The caret is one fixed band whether the room is empty or has text. | `RoundThreeTests.emptyCaretAndCountPromptShareTheInsertionColumnWithTheFirstGlyph`; `ReviewRoundTests.emptyCaretAndCountPromptMatchAfterAWipe` | signed-build recording |
+| 19 | The count prompt becomes the word count as soon as real or marked text exists. | same tests; `RoundThreeTests.compositionRendersOnTheWritingLineAndReplacesTheCountPrompt` | signed-build recording |
+| 32 | An IME composition is laid into the writing line: the composed run is centred in the measure, on the same baseline, and the count prompt is replaced by the word count while the input method owns it. | `RoundThreeTests.compositionRendersOnTheWritingLineAndReplacesTheCountPrompt` | signed-build recording |
 | 33 | The written line is centred in the rendered output at every window size, not only in layout data: at 1040x720 and at a wide window the drawn ink centre equals the sheet centre. The writing column is the view width minus both text-container insets. | `EditorFocusTests.currentLineSitsAtTheSheetAnchorAndIsCentered`; `EditorFocusTests.drawnWritingLineStaysCentredInWideWindows` | signed-build recording |
 
 ## 3. Paper and window
@@ -71,7 +71,7 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 
 | # | Case | Bound test | Recording |
 | 34 | The warning is grouped and placed by ink, not by label frames: the numeral's ink top is 40-48 pt under the writing baseline and the caption's ink top is 16-24 pt under the numeral's ink, at 1040x720 and at a tall (1600x1000) window. The offset holds under the writing line at tall sizes instead of drifting down the sheet. | `RoundThreeTests.warningInkSitsUnderTheWritingLine` | signed-build recording |
-| 35 | The wipe receipt is the result the writer must see. In the wiped room `Start typing.` takes the first status line under the writing line, and `DRAFT DELETED AT … TYPE TO START AGAIN.` sits one caption line below it (ink top 16-24 pt under the hint's baseline), not at the paper's bottom edge. | `RoundThreeTests.wipeReceiptSitsUnderTheEmptyHint` | signed-build recording |
+| 35 | The wipe receipt is the result the writer must see: `DRAFT DELETED AT … TYPE TO START AGAIN.` takes the first status slot under the writing line (ink top 40-48 pt under the writing baseline), not under a hint and not at the paper's bottom edge. | `RoundThreeTests.wipeReceiptSitsUnderTheWritingLine` | signed-build recording |
 | 36 | A state change never moves unrelated elements: the clock's right edge, the count's right edge, the ESC - EXIT frame and the writing line baseline are unchanged from rest to typing to warning. | `RoundThreeTests.stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor` | signed-build recording |
 | 37 | `Press Esc again to leave and delete the draft.` shares one baseline with `ESC - EXIT` and the word count. The sentence-case confirmation carries no caps tracking; `ESC - EXIT` keeps its caps tracking; both use the same face, size, weight and line height. The rendered first-ink rows are equal within 1 pt for all three runs. | `RoundThreeTests.exitHintSharesTheExitRowBaselineAndTypeStyle` | signed-build recording |
 | 38 | The wiped state keeps the editor first responder with the caret at the insertion point, exactly as the empty room does, so `TYPE TO START AGAIN.` has a visible place to start. | `ReviewRoundTests.wipedStateKeepsTheEditorFocusedForTheNextDraft` | signed-build recording |
@@ -92,6 +92,15 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 41 | On the activation card Activate and Buy share one 48 pt height on one row. | `ReviewRoundTests.activationActionsShareOneHeightOnOneRow`; `RoundThreeTests.licensedCardCentresStartWritingAndPreLicenceGroup` | signed-build recording |
 | 42 | In the picker, the two control-group labels ("Minutes" and "Delete after silence") share one type style and one placement above their controls. | `ReviewRoundTests.pickerControlLabelsShareOneStyleAndPlacement` | signed-build recording |
 
+## 7. Layout grid
+
+| # | Case | Bound test | Recording |
+| --- | --- | --- | --- |
+| 46 | The active writing line sits at 35% of the paper from the top at 1040x720 and 1440x900 (both alignment settings), a little above the vertical middle (the web trial uses 39%). The anchor is a fraction of the paper, so the same formula applies at full screen; that real-window check is pending. The warning, receipt and count follow the line at every size. | `EditorFocusTests.currentLineSitsAtTheSheetAnchorAndIsCentered` | signed-build recording; full-screen check pending |
+| 47 | Chinese, English and mixed lines share one rendered line pitch: 1.6 x the font size (44.8 pt at 28 pt). CJK fallback height and leading cannot inflate a line; the kept draft uses the same fixed line height. | `EditorFocusTests.linePitchIsFixedForChineseEnglishAndMixed` | measured, `measurements/after-raw-v4.txt` |
+| 48 | Each completed line carries one uniform opacity (current 100%, one up 22%, two up 7%, older 0). Adding characters on the current line does not move or change a completed line; a new line shifts the history exactly one pitch, animated 0.18 s ease-out, instant under Reduce Motion. | `EditorFocusTests.completedLineOpacityIsUniformAndStepped`; `EditorFocusTests.completedLinesDoNotMoveWhenTheCurrentLineGrows` | measured, `measurements/after-raw-v4.txt` |
+| 49 | The empty room was captured as A (under-line hint), B (caret alone) and C (count slot prompt) at the 35% anchor; C is the default. | `captures/empty-state-options.png`; cases 18-19 | A/B/C capture |
+
 ## Measured changes
 
 Numbers below are frames/baselines from the layout or from the rendered frame, in points. "Paper top"
@@ -105,15 +114,17 @@ recorded frames only.
 | What | Before (`e792ac98`) | After | Bound by |
 | --- | --- | --- | --- |
 | Room bars at 1040x720 | 2 pt top bar + 3 pt bottom bar at y=0 | one 2 pt top bar only | case 24 |
-| Warning numeral frame top from the paper top, 1040x720 / 1600x1000 | 426 / 641 | 322 / 431 | case 34 |
+| Active writing line anchor from the paper top | 39% | 35% | cases 33, 46 |
 | Warning numeral ink top under the writing baseline | 26 (pixel review of the old captures) | 46 (band 40-48) | case 34 |
 | Warning caption ink top under the numeral ink | 65 (pixel review) | 19 (band 16-24) | case 34 |
 | Empty caret x, 1040x720 | 452.9 (67.1 left of centre) | 520.75 | case 18 |
-| Empty hint | 28 pt italic on the writing line, caret inside it | caption style in the status slot, ink top 44 pt under the writing baseline | case 18 |
-| Hint and caret after a wipe vs a fresh start | caret/hint 512 pt away from the fresh position (old build) | 0 pt difference | case 18 |
+| Empty room instruction | 28 pt italic on the writing line, caret inside it, then a `Start typing.` caption in the status slot | count slot `Type to start` in the count style until the first keystroke; no hint near the line | cases 18-19 |
+| Empty caret after a wipe vs a fresh start | 512 pt away from the fresh position (old build) | 0 pt difference | case 18 |
 | Rendered writing-line centre, 1040x720 | +7.25 | within 1 of centre | case 33 |
 | Rendered writing-line centre, 1600x1000 | +249.25 | within 1 of centre | case 33 |
-| Wipe receipt position | bottom of the paper (554 pt from the paper top) | one caption line under the Start typing hint | case 35 |
+| Wipe receipt position | bottom of the paper (554 pt from the paper top) | first status slot under the line (ink top 44 pt under the baseline) | case 35 |
+| Rendered line pitch, Chinese / English / mixed at 28 pt | 58.4 / 44.8 / alternating (CJK height plus leading) | 44.8 / 44.8 / 44.8 | case 47 |
+| Completed-line fade and scroll | continuous gradient mask through each line; the scroll target moved while typing on one line | one uniform opacity per line (100/22/7/0); same-line typing moves nothing; a new line shifts 44.5 pt, animated 0.18 s | case 48 |
 | Exit confirmation baseline vs ESC - EXIT title baseline | 33.0 vs 28.4 | 28.4 vs 28.4 | case 37 |
 | Exit confirmation copy and tracking | `Press Esc again to leave. The draft is deleted.` with caps tracking | `Press Esc again to leave and delete the draft.` with zero tracking | cases 26, 37 |
 | Kept COPY vs RUN IT AGAIN ink-top difference | 4 (pixel review) | 0.5 | case 39 |

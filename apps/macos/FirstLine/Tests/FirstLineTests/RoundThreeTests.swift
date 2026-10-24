@@ -112,38 +112,34 @@ struct RoundThreeTests {
 
     // MARK: - Empty caret and placeholder
 
-    @Test func emptyCaretAndHintShareTheInsertionColumnWithTheFirstGlyph() throws {
+    @Test func emptyCaretAndCountPromptShareTheInsertionColumnWithTheFirstGlyph() throws {
         let state = licensedTestState()
         state.startSession()
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
-        let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Start typing." })
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
         let container = try #require(editor.textContainer)
         room.view.layoutSubtreeIfNeeded()
 
-        // The writing line holds only the caret at the centred insertion point; the
-        // hint is a caption in the status slot under the line (ink top 40-48 pt down).
+        // No hint near the line. The bottom-right count slot carries the instruction
+        // in the count's own style until the first keystroke.
+        #expect(!descendants(of: room.view, of: NSTextField.self).contains { $0.stringValue == "Start typing." },
+                "the empty room still shows an under-line hint")
+        let prompt = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue == "Type to start" })
+        #expect(!prompt.isHiddenOrHasHiddenAncestor)
+        #expect(prompt.font?.pointSize == 13, "the prompt does not use the count style")
+
+        // The writing line holds only the caret at the centred insertion point.
         let emptyCaret = editor.caretRectForCurrentInsertionPoint()
-        let emptyCaretInPaper = paper.convert(emptyCaret, from: editor)
         let insertionX = editor.textContainerOrigin.x + container.containerSize.width / 2
         #expect(abs(emptyCaret.midX - insertionX) <= 1, "empty caret is not on the centred insertion point")
-        let labelRect = paper.convert(placeholder.bounds, from: placeholder)
-        #expect(abs(labelRect.midX - emptyCaretInPaper.midX) <= 1,
-                "the hint is not centred on the writing column")
         let lineBaseline = try #require(editor.currentInsertionBaseline())
         let lineBaselineInPaper = paper.convert(NSPoint(x: 0, y: lineBaseline), from: editor).y
-        let hintInkTop = labelRect.maxY - placeholder.firstBaselineOffsetFromTop
-            + (placeholder.font?.capHeight ?? 0)
-        let hintDrop = lineBaselineInPaper - hintInkTop
-        #expect(hintDrop >= 40 && hintDrop <= 48,
-                "the hint ink top is \(hintDrop) pt under the writing baseline, outside the status slot")
-        #expect(!placeholder.isHidden)
 
-        // The first typed character is rendered at the caret, the hint disappears,
-        // and the line baseline does not move.
+        // The first typed character is rendered at the caret; the count becomes the
+        // word count; the line baseline does not move.
         editor.insertText("A", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.view.layoutSubtreeIfNeeded()
         let layout = try #require(editor.layoutManager)
@@ -153,32 +149,30 @@ struct RoundThreeTests {
                 "the first glyph appears away from the empty caret")
         let typedBaseline = try #require(editor.currentInsertionBaseline())
         let typedBaselineInPaper = paper.convert(NSPoint(x: 0, y: typedBaseline), from: editor).y
-        #expect(abs(typedBaselineInPaper - lineBaselineInPaper) <= 1,
-                "the writing line moved on the first key")
+        #expect(abs(typedBaselineInPaper - lineBaselineInPaper) <= 1, "the writing line moved on the first key")
         let typedCaret = editor.caretRectForCurrentInsertionPoint()
         #expect(abs(typedCaret.minY - emptyCaret.minY) <= 1, "the caret jumped vertically on the first key")
-        #expect(abs(typedCaret.height - emptyCaret.height) <= 1)
-        #expect(placeholder.isHidden, "the hint must disappear once text exists")
+        #expect(prompt.stringValue == "1 word", "the count did not replace the prompt on the first key")
         window.orderOut(nil)
     }
 
-    @Test func compositionRendersOnTheWritingLineAndHidesThePlaceholder() throws {
+    @Test func compositionRendersOnTheWritingLineAndReplacesTheCountPrompt() throws {
         let state = licensedTestState()
         state.startSession()
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
-        let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Start typing." })
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let container = try #require(editor.textContainer)
         let emptyBaseline = try #require(editor.currentInsertionBaseline())
+        let prompt = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue == "Type to start" })
 
         editor.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: 0))
         room.refreshRoom()
         room.view.layoutSubtreeIfNeeded()
         #expect(editor.hasMarkedText())
-        #expect(placeholder.isHidden, "the placeholder must hide while the IME owns a composition")
+        #expect(prompt.stringValue == "0 words", "the composition did not replace the count prompt")
 
         // The composition is laid into the writing line: centred in the measure and
         // on the same baseline, not in a separate position.
@@ -451,7 +445,7 @@ struct RoundThreeTests {
         }
     }
 
-    @Test func wipeReceiptSitsUnderTheEmptyHint() throws {
+    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })
         let state = licensedTestState(sessionEngine: engine,
@@ -462,8 +456,6 @@ struct RoundThreeTests {
         let window = makeWindow(room)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
-        let hint = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Start typing." })
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
         now.now = 9
         room.tick()
@@ -473,17 +465,15 @@ struct RoundThreeTests {
         room.view.layoutSubtreeIfNeeded()
         let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
             .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
-        #expect(!hint.isHiddenOrHasHiddenAncestor, "the wiped room lost its Start typing hint")
-        let hintRect = paper.convert(hint.bounds, from: hint)
+        #expect(!descendants(of: room.view, of: NSTextField.self).contains { $0.stringValue == "Start typing." })
         let receiptRect = paper.convert(receipt.bounds, from: receipt)
-        let hintFont = try #require(hint.font)
         let receiptFont = try #require(receipt.font)
-        let hintBaseline = hintRect.maxY - hint.firstBaselineOffsetFromTop
+        let baseline = try #require(editor.currentInsertionBaseline())
+        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: editor).y
         let receiptInkTop = receiptRect.maxY - receipt.firstBaselineOffsetFromTop + receiptFont.capHeight
-        let drop = hintBaseline - receiptInkTop
-        #expect(drop >= 16 && drop <= 24,
-                "the receipt ink top is \(drop) pt under the hint baseline, outside the caption slot")
-        #expect(!receipt.isHiddenOrHasHiddenAncestor)
+        let drop = baselineInPaper - receiptInkTop
+        #expect(drop >= 40 && drop <= 48,
+                "the receipt ink top is \(drop) pt under the writing baseline, outside the status slot")
         window.orderOut(nil)
     }
 
@@ -499,7 +489,7 @@ struct RoundThreeTests {
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
         let timer = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "1:00" })
-        let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "0 words" })
+        let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "Type to start" })
         let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
 
         // Fixed edges only: the clock's text width changes, its right edge must not.
@@ -568,7 +558,8 @@ struct RoundThreeTests {
         // Same baseline: read the first ink row of each run from one rendered frame.
         // The count shares the row too, with its own type role.
         let count = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue.hasSuffix("words") && !$0.isHiddenOrHasHiddenAncestor })
+            .first { ($0.stringValue == "Type to start" || $0.stringValue.hasSuffix("words"))
+                && !$0.isHiddenOrHasHiddenAncestor })
         let rows = try firstInkRows(of: [exit, hint, count], in: room.view)
         #expect(abs(rows[0] - rows[1]) <= 1,
                 "ESC - EXIT and its confirmation are not on one baseline (\(rows))")

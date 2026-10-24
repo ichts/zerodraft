@@ -120,10 +120,10 @@ struct SettingsTests {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         let clock = try #require(fields(room.view).first { $0.stringValue == "1:00" })
-        let count = try #require(fields(room.view).first { $0.stringValue == "0 words" })
+        let count = try #require(fields(room.view).first { $0.stringValue == "Type to start" })
         #expect(clock.alphaValue == 0 && count.alphaValue == 0)
         #expect(clock.accessibilityLabel() == "Time remaining 1:00")
-        #expect(count.accessibilityLabel() == "0 words written")
+        #expect(count.accessibilityLabel() == "Type to start")
         window.contentView?.layoutSubtreeIfNeeded()
         #expect(room.view.trackingAreas.contains { $0.options.contains([.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow]) })
         func move(to point: NSPoint) {
@@ -387,7 +387,7 @@ struct KeyboardFlowTests {
         #expect(input.string.isEmpty)
         #expect(input.accessibilityValue() as? String == "")
         #expect(fields(room.view).contains { $0.stringValue == "5:00" })
-        #expect(fields(room.view).contains { $0.stringValue == "0 words" })
+        #expect(fields(room.view).contains { $0.stringValue == "Type to start" })
         input.insertText("fresh", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(input.string == "fresh")
         #expect(engine.text == "fresh")

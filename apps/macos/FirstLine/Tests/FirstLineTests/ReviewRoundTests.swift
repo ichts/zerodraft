@@ -22,8 +22,6 @@ struct ReviewRoundTests {
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
-        let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Start typing." })
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
         now.now = 9
         room.tick()
@@ -33,7 +31,8 @@ struct ReviewRoundTests {
         #expect(engine.phase == .failure)
         #expect(window.firstResponder === editor, "the deleted state lost the editor focus")
         #expect(editor.isEditable)
-        #expect(!placeholder.isHidden)
+        #expect(!descendants(of: room.view, of: NSTextField.self)
+            .contains { $0.stringValue == "Start typing." })
         let container = try #require(editor.textContainer)
         let caret = editor.caretRectForCurrentInsertionPoint()
         let insertionX = editor.textContainerOrigin.x + container.containerSize.width / 2
@@ -233,8 +232,8 @@ struct ReviewRoundTests {
 
     // MARK: - Second hands-on round: empty state, kept layout, count
 
-    @Test func emptyHintAndCaretMatchAfterAWipe() throws {
-        func measure(wiped: Bool) -> (hint: NSRect, caret: NSRect) {
+    @Test func emptyCaretAndCountPromptMatchAfterAWipe() throws {
+        func measure(wiped: Bool) -> (caret: NSRect, count: String, receipt: NSRect?) {
             let now = Clock()
             let engine = SessionEngine(now: { now.now })
             let state = licensedTestState(sessionEngine: engine,
@@ -245,8 +244,6 @@ struct ReviewRoundTests {
             let window = makeWindow(room)
             let editor = descendants(of: room.view, of: AppendOnlyTextView.self).first!
             let paper = editor.enclosingScrollView!.superview!
-            let hint = descendants(of: room.view, of: NSTextField.self)
-                .first { $0.stringValue == "Start typing." }!
             if wiped {
                 editor.insertText(Array(repeating: "a long line of draft text\n", count: 12).joined(),
                                   replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -256,17 +253,25 @@ struct ReviewRoundTests {
                 room.endCutAnimation()
                 room.view.layoutSubtreeIfNeeded(); room.viewDidLayout(); room.view.layoutSubtreeIfNeeded()
             }
-            let hintFrame = paper.convert(hint.bounds, from: hint)
             let caret = paper.convert(editor.caretRectForCurrentInsertionPoint(), from: editor)
+            let count = descendants(of: room.view, of: NSTextField.self)
+                .first { $0.stringValue == "Type to start" || $0.stringValue == "0 words" }!
+            let receipt = descendants(of: room.view, of: NSTextField.self)
+                .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor }
+                .map { paper.convert($0.bounds, from: $0) }
+            #expect(!descendants(of: room.view, of: NSTextField.self)
+                .contains { $0.stringValue == "Start typing." })
             window.orderOut(nil)
-            return (hintFrame, caret)
+            return (caret, count.stringValue, receipt)
         }
         let fresh = measure(wiped: false)
         let afterWipe = measure(wiped: true)
-        #expect(abs(afterWipe.hint.minY - fresh.hint.minY) <= 1, "the hint moved after a wipe")
-        #expect(abs(afterWipe.hint.midX - fresh.hint.midX) <= 1)
         #expect(abs(afterWipe.caret.minY - fresh.caret.minY) <= 1, "the caret moved after a wipe")
         #expect(abs(afterWipe.caret.midX - fresh.caret.midX) <= 1)
+        #expect(fresh.count == "Type to start")
+        #expect(afterWipe.count == "0 words")
+        #expect(fresh.receipt == nil)
+        #expect(afterWipe.receipt != nil)
     }
 
     @Test func keptActionsStayAboveALongDraftAndTheReceiptNamesTheDuration() throws {

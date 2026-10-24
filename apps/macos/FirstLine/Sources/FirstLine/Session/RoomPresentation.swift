@@ -7,6 +7,11 @@
 import AppKit
 
 enum RoomPresentation {
+    /// The active line's anchor from the paper top. The live web trial uses 39%;
+    /// the Mac uses 35% so the active line sits a little higher, in the comfortable
+    /// ergonomic gaze band (D-025).
+    static let writingAnchorFraction: CGFloat = 0.35
+
     static func clock(_ seconds: Int) -> String {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
     }

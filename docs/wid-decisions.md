@@ -420,3 +420,14 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the Chinese character never reached the editor or engine.
 - Supersedes: D-033's blanket clear on a denied edit for the live-marked case; D-033's unmarked-stale
   rule and D-034's replacement accounting stand.
+
+## D-036: The picker lockup sits inside the "How long?" card
+
+- Date: 2026-10-25
+- Decision: The start screen's merged A split-W lockup is the first item in the "How long?" card's
+  content block, centred above the heading. No lockup sits outside the card.
+- Reason: The After card layout moved the lockup into the card. Case 55 of
+  `docs/wid-mac-behavior.md` and section 6 of
+  `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` carry the accepted placement.
+- Supersedes: D-031's "above the 'How long?' card" placement only; its rules-page copy, question-mark
+  control and dismissal rules stand.

@@ -31,10 +31,12 @@ for (const control of cases) {
   const site = path.join(dir, 'site');
   await fs.mkdir(site, { recursive: true });
   for (const entry of await fs.readdir(root, { withFileTypes: true })) {
-    if (entry.isFile() && /\.(html|css|js|mjs|woff2|png|txt|xml)$/.test(entry.name)) {
+    if (entry.isFile() && /\.(html|css|js|mjs|woff2|png|svg|txt|xml)$/.test(entry.name)) {
       await fs.copyFile(path.join(root, entry.name), path.join(site, entry.name));
     }
   }
+  await fs.mkdir(path.join(site, 'logo'), { recursive: true });
+  await fs.copyFile(path.join(root, 'logo/write-it-down-lockup.svg'), path.join(site, 'logo/write-it-down-lockup.svg'));
   if (control.from) {
     assert.equal(original.split(control.from).length, 2, `mutation boundary for ${control.name}`);
     await fs.writeFile(path.join(site, source), original.replace(control.from, control.to));

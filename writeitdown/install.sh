@@ -13,6 +13,7 @@ for file in $FILES; do
   [ ! -L "$TARGET/$file" ] || { echo "Refusing symlink: $file" >&2; exit 1; }
 done
 [ ! -L "$TARGET/download" ] || { echo 'Refusing a symlink download directory.' >&2; exit 1; }
+[ ! -L "$TARGET/logo" ] || { echo 'Refusing a symlink logo directory.' >&2; exit 1; }
 [ ! -L "$TARGET/index.html.dc-bak2" ] || { echo 'Refusing a symlink backup.' >&2; exit 1; }
 mkdir -p "$TARGET"
 # download/ also holds the DMG, uploaded separately; only its index.html comes from here.

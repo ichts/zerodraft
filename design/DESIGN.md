@@ -208,10 +208,12 @@ The test: if a frame would hang comfortably in any of these rooms, keep deleting
 
 ## 11. Write It Down logo
 
-This is the brand for the writeitdown.app trial and the native Mac app. It is a sibling of the root Zero Draft
-landing: the `ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the
-root landing. The legacy static legal/support pages keep their existing mono `WRITE_IT_DOWN` logotype and adopt the
-favicon; the primary web header is the landing, the room, and `/download/`.
+This is the brand for writeitdown.app and the native Mac app. It is a sibling of the root Zero Draft landing: the
+`ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the root landing.
+The primary web header is the landing, the room, and `/download/`; those surfaces use the lockup, and the social
+card uses the same lockup. The document-style pages (`mac.html`, legal, support, and answer pages) keep the mono
+`WRITE_IT_DOWN` logotype and adopt the favicon. The Mac app's in-app start screen keeps the mono logotype; the Mac
+app carries the mark in its app icon and volume icon.
 
 ### 11.1 The mark and the wordmark
 
@@ -228,6 +230,8 @@ mark, so the mark is never set beside the wordmark as a second object.
   platform supports an appearance switch (the favicon's `prefers-color-scheme: dark` links; the alternate app-icon
   source). A macOS `.icns` app icon has no appearance switch, so the shipped `.icns` is the light plate.
 - The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
+- Social card: `writeitdown/og.png` at 1200x630 uses the lockup on the light page; it is the link preview for the
+  landing and `/download/`.
 
 ### 11.2 Palette and type
 
@@ -248,15 +252,18 @@ mark, so the mark is never set beside the wordmark as a second object.
   `AppIcon.appiconset` uses the opticals for the 16/16@2x and 32/32@2x entries and the master for 128 and above.
   The plate is the 824/1024 macOS squircle on a 1024 canvas. The 16 and 32 app icons keep the optical drawing, not
   a downscaled master.
-- Favicon: `favicon.svg` plus 16 and 32 PNG on the bone plate; `favicon-dark.svg` and the dark 16/32 PNG as the
-  `prefers-color-scheme: dark` links; `apple-touch-icon.png` at 180 on the bone plate. The favicon is the
-  full-bleed square, not the app icon's transparent-margin squircle.
+- Favicon: `favicon.svg` and `apple-touch-icon.png` use the master split W; `favicon-16.png` and `favicon-32.png`
+  use the same optical split drawings as the small app icons on the bone plate. `favicon-dark.svg` and the dark
+  16/32 PNG are the `prefers-color-scheme: dark` links; `apple-touch-icon.png` is 180 on the bone plate. The
+  favicon is the full-bleed square, not the app icon's transparent-margin squircle.
 - Site header: 21 px desktop, 19 px mobile; the lockup's clear space is at least a quarter of the cap height on
   all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the lockup.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
-- The source set is `writeitdown/logo/` and `writeitdown/favicon*` for the site; the app icon set and
-  `packaging/VolumeIcon.icns` for the Mac. The legal/support pages use the mono `WRITE_IT_DOWN` logotype. The
-  ink-plate/bone-W app-icon alternate is kept with the task evidence; it is not compiled into the `.icns`.
+- The source set is `writeitdown/logo/`, `writeitdown/favicon*`, and `writeitdown/apple-touch-icon.png` for the
+  site; the app icon set and `packaging/VolumeIcon.icns` for the Mac. The document-style pages (`mac.html`, legal,
+  support, and answer pages) and the Mac app's in-app start screen use the mono `WRITE_IT_DOWN` logotype; the Mac
+  app's mark is its app icon and volume icon. The ink-plate/bone-W app-icon alternate is kept with the task
+  evidence; it is not compiled into the `.icns`.
 
 ### 11.4 Do not
 
@@ -270,12 +277,14 @@ mark, so the mark is never set beside the wordmark as a second object.
 
 ### 11.5 Verification
 
-- Browser tab: the 16 px favicon is an ink W on a bone tile by default, and a bone W on an ink tile when the
-  `prefers-color-scheme: dark` links are selected; the 32 px and SVG versions match.
+- Browser tab: the 16 px favicon is the split-W mark on a bone tile by default, and the bone split-W mark on an
+  ink tile when the `prefers-color-scheme: dark` links are selected; the 32 px, SVG, and apple-touch versions carry
+  the same mark.
 - Plate decision: the light plate passes at 16 and 32 px. The light W reads on the bone tile in Finder, Dock and
   both browser chromes; the dark plate remains the alternate. The side-by-side evidence is kept with the task.
 - Site header: 21 px desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
 - Mac: the app icon at 16/32 (optical), 128 (Dock), and 1024; the volume icon at 128 and 1024; the Dock and Finder
-  captures on light and dark.
+  captures on light and dark. Static asset inspection is recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real
+  Dock and Finder captures remain separate independent acceptance.
 - `grep` for the old `WID` icon, the red underscore, and the `.brand i` caret returns nothing in the shipped
   surfaces. The logo files contain no `<text>` and no red token.

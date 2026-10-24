@@ -252,6 +252,34 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
   });
 }
 
+test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
+  for (const path of ['index.html', 'index.html#trial', 'download/']) {
+    await page.goto(path);
+    const brands = page.locator('.brand:visible');
+    const count = await brands.count();
+    expect(count, `${path}: no visible lockup link`).toBeGreaterThan(0);
+    for (let index = 0; index < count; index += 1) {
+      const brand = brands.nth(index);
+      await brand.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      await expect(brand, `${path} brand ${index}: keyboard focus`).toBeFocused();
+      const state = await brand.evaluate(el => {
+        const style = getComputedStyle(el);
+        const mark = getComputedStyle(el, '::before');
+        return { focusVisible: el.matches(':focus-visible'), outlineStyle: style.outlineStyle,
+          outlineWidth: style.outlineWidth, maskImage: style.maskImage || style.webkitMaskImage,
+          markImage: mark.maskImage || mark.webkitMaskImage };
+      });
+      expect(state.focusVisible, `${path} brand ${index}: focus-visible`).toBe(true);
+      expect(state.outlineStyle, `${path} brand ${index}: focus outline`).toBe('solid');
+      expect(state.outlineWidth, `${path} brand ${index}: focus outline width`).toBe('2px');
+      expect(state.maskImage, `${path} brand ${index}: outline-clipping mask`).toBe('none');
+      expect(state.markImage, `${path} brand ${index}: lockup mask`).toContain('write-it-down-lockup.svg');
+    }
+  }
+});
+
 // The Mac page keeps the document shell but sits on the approved background A (tokens.css page colour), so the
 // purchase page and the landing share one canvas and the legacy beige wall cannot come back.
 test('the Mac page wears the approved background A canvas, not the legacy beige wall', async ({ page }) => {
@@ -396,6 +424,19 @@ test('installer acceptance rejects an installer missing its symlink guard', () =
     const broken = join(root, 'install.sh');
     writeFileSync(broken, readFileSync('install.sh', 'utf8')
       .replace('  [ ! -L "$TARGET/$file" ] || { echo "Refusing symlink: $file" >&2; exit 1; }', ''));
+    expect(() => execFileSync('python3', ['qa/test-install.py', broken], { stdio: 'pipe' })).toThrow();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('installer acceptance rejects an installer missing its logo-directory guard', () => {
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'negative control, one project is enough');
+  const root = mkdtempSync(join(tmpdir(), 'wid-broken-logo-install-'));
+  try {
+    const broken = join(root, 'install.sh');
+    writeFileSync(broken, readFileSync('install.sh', 'utf8')
+      .replace(`[ ! -L "$TARGET/logo" ] || { echo 'Refusing a symlink logo directory.' >&2; exit 1; }`, ''));
     expect(() => execFileSync('python3', ['qa/test-install.py', broken], { stdio: 'pipe' })).toThrow();
   } finally {
     rmSync(root, { recursive: true, force: true });

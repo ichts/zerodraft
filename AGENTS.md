@@ -67,6 +67,8 @@ captain decisions, not chat history:
   supersedes. Never edit an old entry; add a new entry that supersedes it by name.
 - `docs/wid-mac-behavior.md` - outside-in numbered behaviour contract, with every case bound to a test
   and to the real-window recording that proves it.
+- `docs/ui-quality.md` - the cross-surface quality bar every user-visible change is measured against
+  before hands-on testing; each rule names its measurement or capture.
 
 These records sit at L1 because they bind both surfaces. Module detail stays in
 `apps/macos/FirstLine/AGENTS.md`, `apps/macos/FirstLine/docs/`, `design/DESIGN.md` and the web

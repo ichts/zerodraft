@@ -164,9 +164,10 @@ final class SessionKeptView: NSView {
         setCopyTitle("COPY TEXT")
     }
 
-    /// The copy label keeps the pill's 1.6 line box and a fixed width across states.
-    /// The visible text is a pass-through label so it can sit on the pill's optical
-    /// centre while the button's own transparent title keeps its width and AX name.
+    /// The copy label keeps the pill's 1.6 line box and sits on the pill's optical
+    /// centre. It is a pass-through label so it can sit there while the button's own
+    /// transparent title keeps its width and AX name; the pill hugs the label, so the
+    /// row re-centres when the title changes.
     func setCopyTitle(_ title: String) {
         copyButton.title = title
         let font = NSFont.systemFont(ofSize: 15, weight: .medium)

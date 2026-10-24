@@ -15,7 +15,7 @@ docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
 docs/LICENSE_PAYMENT_SPEC.md: 签名许可服务、Mac 激活及真实订单发布门槛；支付适配器契约见 `services/license/README.md`。
 docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前签名许可服务。
-docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；当前验收项目以 `docs/WRITEITDOWN_PLAN.md` 为准。
+docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；行为验收以 `../../../docs/wid-mac-behavior.md` 为准，视觉验收以 `docs/WRITEITDOWN_PLAN.md` 第 6 节为准。
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
 Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppState、构建菜单和窗口、激活应用；桥接新篇、整篇复制、关闭窗口等菜单动作与验证。
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cmd+,、新篇 Cmd+N、成稿复制 Cmd+C、关窗 Cmd+W）。
@@ -36,8 +36,8 @@ Sources/FirstLine/Licensing/LicenseTokenVerifier.swift: CryptoKit Ed25519 签名
 Sources/FirstLine/Licensing/WaffoLicenseClient.swift: 无状态 URLSession service 客户端，拒绝 redirect；请求及响应见 `docs/LICENSE_PAYMENT_SPEC.md`。
 Sources/FirstLine/Licensing/CheckoutClient.swift: 无状态 POST /api/v1/checkout 客户端，只接受 https checkout.stripe.com 目标，拒绝 redirect；错误交给 AppState 回退；不记录 URL/买家凭据。
 Sources/FirstLine/Session/SessionEngine.swift: 可选时长和静默阈值的 danger / failure / success 状态机与单调时间规则；首输入启动时钟、绝对截止裁决、按 deadline 计算 unusedSeconds 和删除时已过秒数、Unicode 词数（纯 Foundation）；失败后重启须由 AppState 授权。
-Sources/FirstLine/Session/RoomPresentation.swift: 时钟、按未用尽时间与剩余试用/许可分流的擦除句（live 原文）、字数与 `N MINUTES. N WORDS.` kept 小写大写收据（与失败收据同格式）、wash 强度、复制、两步退出确认计时及拒绝反馈状态规则。
-Sources/FirstLine/Session/SessionKeptView.swift: 成稿布局：`You wrote it down.` 标题 + 小写大写 `5 MINUTES. 63 WORDS.` 收据 + COPY TEXT（贴标签宽度的 ink pill）/ RUN IT AGAIN（48 pt 细描边次按钮），两标签在行的光学中心；正文可滚动、固定顶部动作，每次尺寸变化自重排居中。
+Sources/FirstLine/Session/RoomPresentation.swift: 时钟、按未用尽时间与剩余试用/许可分流的擦除句（live 原文）、字数与 `N MINUTES. N WORDS.` kept 小型大写收据（与失败收据同格式）、wash 强度、复制、两步退出确认计时及拒绝反馈状态规则。
+Sources/FirstLine/Session/SessionKeptView.swift: 成稿布局：`You wrote it down.` 标题 + 小型大写 `5 MINUTES. 63 WORDS.` 收据 + COPY TEXT（贴标签宽度的 ink pill）/ RUN IT AGAIN（48 pt 细描边次按钮），两标签在行的光学中心；正文可滚动、固定顶部动作，每次尺寸变化自重排居中。
 Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（AppKit）的 After 白纸：page/sheet、clock/count、居中 zen 书写（当前行固定在纸张 35%，逐行不透明度 100/22/7，更早隐藏）、wash/numeral、空态 C（光标只在书写线，count 槽 `Type to start`）；失败屏为成稿屏的对应面：`You stopped.` 标题、48 pt 细描边 `Begin again`（Return 触发）、下方红色 DRAFT DELETED 收据，输入仍可重开；成稿屏 `You wrote it down.` + `N MINUTES. N WORDS.`；无顶部 pill、仅顶部 2pt 会话条（无底部静默条）；两步 Esc/点击退出提示（2 秒窗口，输入即取消）；托管 AppendOnlyTextView、首响应者、100ms tick、新 session ID / wipe / 拒绝重启时清空编辑器；NSTextViewDelegate 守卫用 AppendOnlyInputPolicy。
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: After 白卡片激活面；订单号/激活码、Activate、Buy、价格/网页试用；Buy 通过 AppState 调用 CheckoutClient，契约见 `docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`；观察异步许可与 checkoutInFlight 并原位更新；active 状态显示 Start writing。
 Sources/FirstLine/Settings/SettingsViewController.swift: After 白卡片 Settings，含 appearance、motion、focus、alignment、font size、License；popup 与 focus switch 使用 FirstLineInkPopUpButton/FirstLineInkFocusButton，文本字段保留系统焦点环；观察异步许可与 checkout 变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
@@ -49,7 +49,7 @@ Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/pape
 Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
 Sources/FirstLine/DesignSystem/Spacing.swift: 4-pt 间距与 ctl/sheet/card/stage 圆角 token。
 Sources/FirstLine/DesignSystem/SurfaceViews.swift: FirstLineShadowView（sheet-shadow 的 ring + 多层 ink/black 阴影）与 FirstLineCardView（白/暗 sheet + shadow + content insets）。
-Sources/FirstLine/DesignSystem/Controls.swift: After 语言 seg control、tag、status 和 fill bar；原生可聚焦按钮与 appearance-aware 颜色。
+Sources/FirstLine/DesignSystem/Controls.swift: After 语言 seg control、status 和 fill bar；原生可聚焦按钮与 appearance-aware 颜色。
 Sources/FirstLine/DesignSystem/BundledResources.swift: 统一的 SwiftPM/打包应用资源 bundle 入口；字体注册与 split-W lockup 共用，避免重复 bundle 名与回退逻辑。
 Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用的 split-W lockup，与 `writeitdown/logo/write-it-down-lockup.svg` 同一矢量；模板着色为应用 ink token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
@@ -58,8 +58,13 @@ Tests/FirstLineTests/BatchFiveTests.swift: 时长选择、设置持久化和键�
 Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash 恢复/cut 收尾/减少动态效果、deny、复制状态跨 tick/hover/字体刷新与新会话重置、居中 kept 与两步退出（含 2 秒过期和输入取消）、真实 NSTextInputClient 组合/删除序列、wipe 后用真实 Apple Pinyin input context 验证首键、失败屏标题/Begin again/Return/红收据、kept 无滚动条但可滚动、复制按钮焦点/反馈测试。
 Tests/FirstLineTests/BrandTests.swift: 开始屏 split-W lockup、“?”规则页的 landing 文案/顺序/Done/Return/Esc，开始屏无副标题。
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
+Tests/FirstLineTests/CheckoutFixtures.swift: CheckoutClientTests 的测试替身（MockCheckoutClient）；仅测试目标，不建真实会话、不扣款。
+Tests/FirstLineTests/DesignTokenTests.swift: background A 与暗色 role 的颜色解析、system-sans 界面与 Newsreader 书写字体断言。
 Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。
+Tests/FirstLineTests/PinyinInputTests.swift: NSTextInputClient 入口的 Apple Pinyin/WeType/双拼组合、候选键、unmark-then-replace 记账与拒绝边界测试。
+Tests/FirstLineTests/ReviewRoundTests.swift: 评审回归：空态与擦除后光标、kept 动作光学中心与长稿、窗口 resize 重排、规则页鼠标命中、kept 重启、设置/激活卡布局与警告 wash 像素。
+Tests/FirstLineTests/RoundThreeTests.swift: 第三轮 hands-on 回归：卡片对齐、空态 caret/count、纸张几何、单条会话条动画（含 wipe 后重开）、警告/收据 ink 位置、退出行基线与组合安全。
 Tests/FirstLineTests/SettingsStoreTests.swift: 设置持久化、默认值与 legacy 字段迁移测试。
 Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功与失败不落盘、菜单无 Library、已激活导航、退款后的 restart 拒绝与无 key 拦截。
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入许可 gate 交互。

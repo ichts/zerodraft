@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing, DesignSystem/SurfaceViews.
- * [OUTPUT]: Segmented control and status line used by the picker, activation, settings and kept sheet.
- * [POS]: Shared After-language controls; native focus rings and keyboard reachability stay AppKit's.
+ * [OUTPUT]: After-language segmented control, fill bar and status line used by the picker, room, activation, settings and kept sheet.
+ * [POS]: Shared After-language controls; keyboard reachability stays AppKit's, focus rings come from InkFocus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
 

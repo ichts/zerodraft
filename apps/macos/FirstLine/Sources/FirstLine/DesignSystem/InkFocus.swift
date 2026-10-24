@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors.
  * [OUTPUT]: Shared ink focus ring for every button, popup and segmented control.
- * [POS]: One focus treatment for all cards; the system accent ring is never used.
+ * [POS]: One ink focus treatment for card controls; text fields keep the standard system focus ring.
  * [PROTOCOL]: Change this header and the focus-ring tests when the treatment changes.
  */
 import AppKit

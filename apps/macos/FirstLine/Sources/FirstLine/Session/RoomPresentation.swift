@@ -1,8 +1,8 @@
 /*
  * [INPUT]: Deadline and idle values from SessionEngine, plus whether the next session may restart.
  * [OUTPUT]: Room clock, unused-time deletion sentence with restart/activation copy, word count, kept receipt, chosen-limit wash strength, copy, exit-confirmation timing, and deny state.
- * [POS]: Stateless presentation rules shared by the AppKit room and its tests; the visible sentences match writeitdown/room.js.
- * [PROTOCOL]: Keep the strings and wash timing aligned with writeitdown/room.js and the consistency table; check nearest AGENTS.md.
+ * [POS]: Stateless presentation rules shared by the AppKit room and its tests; the live room sentences match writeitdown/room.js, while the kept receipt is the Mac's own quiet counterpart (D-030).
+ * [PROTOCOL]: Keep the live strings and wash timing aligned with writeitdown/room.js and the consistency table; check nearest AGENTS.md.
  */
 import AppKit
 

@@ -91,6 +91,19 @@ enum WritingFontCandidate: String, CaseIterable, Identifiable, Hashable {
     func punctuationFont(size: CGFloat) -> NSFont? {
         font(size: size)
     }
+
+    /// The writing face plus the bundled CJK cascade. The room and the kept sheet
+    /// must use the same fallback, or Chinese glyphs change face and apparent
+    /// leading between the two surfaces.
+    @MainActor
+    func fontWithCJKFallback(size: CGFloat) -> NSFont? {
+        guard let base = font(size: size) else { return nil }
+        guard let cjk = ChineseFontCandidate.zhuqueFangsong.font(size: size) else { return base }
+        let descriptor = base.fontDescriptor.addingAttributes([
+            .cascadeList: [cjk.fontDescriptor],
+        ])
+        return NSFont(descriptor: descriptor, size: size) ?? base
+    }
 }
 
 /// CJK writing font for the session editor (fangsong, used as a cascade fallback).

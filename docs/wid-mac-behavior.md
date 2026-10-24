@@ -47,8 +47,8 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 ## 2. Caret, placeholder and the writing line
 
 | # | Case | Bound test | Recording |
-| 18 | The empty room has one insertion origin: the caret sits at the centred text origin (the measure centre), the placeholder is centred on that same x and on the writing line's baseline, and the first typed character is drawn centred on that point with no jump on the first key. The caret is one fixed band whether the room is empty or has text, so it never bobs between glyphs. | `RoundThreeTests.emptyCaretAndPlaceholderShareTheInsertionOriginWithTheFirstGlyphAndComposition` | signed-build recording |
-| 19 | The placeholder disappears as soon as real or marked text exists. | same test | signed-build recording |
+| 18 | The empty writing line holds only the caret at the centred insertion point. `Start typing.` is a status caption under the line (ink top 40-48 pt under the writing baseline, the wipe receipt slot), not on the line. The first typed character is drawn at the caret; the caption disappears; the line baseline does not move. A fresh start and a start after a wipe place the caret and the caption at the same points. The caret is one fixed band whether the room is empty or has text. The no-hint alternative (caret alone) was captured for comparison and is not the default. | `RoundThreeTests.emptyCaretAndHintShareTheInsertionColumnWithTheFirstGlyph`; `ReviewRoundTests.emptyHintAndCaretMatchAfterAWipe` | signed-build recording |
+| 19 | The hint disappears as soon as real or marked text exists. | same tests | signed-build recording |
 | 32 | An IME composition is laid into the writing line: the composed run is centred in the measure, on the same baseline, and the placeholder is hidden while the input method owns it. | `RoundThreeTests.compositionRendersOnTheWritingLineAndHidesThePlaceholder` | signed-build recording |
 | 33 | The written line is centred in the rendered output at every window size, not only in layout data: at 1040x720 and at a wide window the drawn ink centre equals the sheet centre. The writing column is the view width minus both text-container insets. | `EditorFocusTests.currentLineSitsAtTheSheetAnchorAndIsCentered`; `EditorFocusTests.drawnWritingLineStaysCentredInWideWindows` | signed-build recording |
 
@@ -62,15 +62,16 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 ## 4. Room bar
 
 | # | Case | Bound test | Recording |
-| 23 | Top bar: 2 pt, ink, pinned to the paper top, full width, full at session start and empty at session end. No label, no tooltip. | `RoundThreeTests.roomBarsFollowLiveTrialSemantics` | signed-build recording |
-| 24 | The room carries no second bar: the 3 pt bottom silence meter is removed because it pulled the eye away from the writing line. The deadline is carried by the numeral and its line (case 34) instead. | same test (`bars.count == 1`) | signed-build recording |
-| 25 | Reduce Motion: the remaining bar changes in steps, with no animated drain. | `RoundThreeTests.roomBarsFollowLiveTrialSemantics` (fraction is set, never animated); `RoomTests.washRecoveryFadesOnceAndWarningInterruptsImmediately`; real-window Reduce Motion recording | signed-build recording |
+| 23 | Top bar: 2 pt, ink, pinned to the paper top, full width, full at session start and empty at session end. No label, no tooltip. It runs as one continuous linear animation over the remaining session time, started on the first input and re-anchored only on a real state change (new session, resize, window key, Reduce Motion); ticks never step it. | `RoundThreeTests.roomBarRunsOneContinuousLinearAnimation` | signed-build recording |
+| 24 | The room carries no second bar: the 3 pt bottom silence meter is removed because it pulled the eye away from the writing line. The deadline is carried by the numeral and its line (case 34) instead. | `RoundThreeTests.roomBarRunsOneContinuousLinearAnimation` (`bars.count == 1`) | signed-build recording |
+| 25 | Reduce Motion: the remaining bar changes in steps (0.5 s cadence), with no animated drain. | `RoundThreeTests.reducedMotionBarStepsWithoutAnimation`; `RoomTests.washRecoveryFadesOnceAndWarningInterruptsImmediately`; real-window Reduce Motion recording | signed-build recording |
+| 44 | A blocked edit plays a 200 ms transform-only paper shake and a 220 ms opacity-only red-hairline flash. A repeated blocked key restarts it (interruptible); the model transform stays identity; no layout runs per frame. Reduce Motion omits the translation and keeps only the hairline flash. | `RoomTests.denyAnimationIsAShortTransformAndOpacityAnimation`; `RoomTests.reducedMotionDenyKeepsOnlyTheHairlineFlash`; `RoomTests.denyFeedbackIsInterruptible` | signed-build recording |
 
 ## 5. Status, warning and the exit row
 
 | # | Case | Bound test | Recording |
 | 34 | The warning is grouped and placed by ink, not by label frames: the numeral's ink top is 40-48 pt under the writing baseline and the caption's ink top is 16-24 pt under the numeral's ink, at 1040x720 and at a tall (1600x1000) window. The offset holds under the writing line at tall sizes instead of drifting down the sheet. | `RoundThreeTests.warningInkSitsUnderTheWritingLine` | signed-build recording |
-| 35 | The wipe receipt is the result the writer must see, so `DRAFT DELETED AT … TYPE TO START AGAIN.` has its ink top 40-48 pt under the writing baseline, in the same status slot, not at the paper's bottom edge. | `RoundThreeTests.wipeReceiptSitsUnderTheWritingLine` | signed-build recording |
+| 35 | The wipe receipt is the result the writer must see. In the wiped room `Start typing.` takes the first status line under the writing line, and `DRAFT DELETED AT … TYPE TO START AGAIN.` sits one caption line below it (ink top 16-24 pt under the hint's baseline), not at the paper's bottom edge. | `RoundThreeTests.wipeReceiptSitsUnderTheEmptyHint` | signed-build recording |
 | 36 | A state change never moves unrelated elements: the clock's right edge, the count's right edge, the ESC - EXIT frame and the writing line baseline are unchanged from rest to typing to warning. | `RoundThreeTests.stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor` | signed-build recording |
 | 37 | `Press Esc again to leave and delete the draft.` shares one baseline with `ESC - EXIT` and the word count. The sentence-case confirmation carries no caps tracking; `ESC - EXIT` keeps its caps tracking; both use the same face, size, weight and line height. The rendered first-ink rows are equal within 1 pt for all three runs. | `RoundThreeTests.exitHintSharesTheExitRowBaselineAndTypeStyle` | signed-build recording |
 | 38 | The wiped state keeps the editor first responder with the caret at the insertion point, exactly as the empty room does, so `TYPE TO START AGAIN.` has a visible place to start. | `ReviewRoundTests.wipedStateKeepsTheEditorFocusedForTheNextDraft` | signed-build recording |
@@ -85,7 +86,8 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 29 | A licensed picker does not show `License active.`; an unlicensed picker still shows its trial sessions line. | `RoundThreeTests.licensedPickerHidesAccessLineAndTrialPickerKeepsIt` | signed-build recording |
 | 30 | Every button, link, segmented control, popup and checkbox in every card uses the ink focus ring in light and dark. The system accent-blue ring never appears. | `RoundThreeTests.everyCardControlUsesTheInkFocusRingInLightAndDark`; `RoomTests.keptStateFocusesCopyText` | signed-build tab-through recording |
 | 31 | Buy opens the LIVE hosted checkout in the default browser. | `CheckoutClientTests.appStateOpensHostedCheckoutAndUsesFallbackOnlyOnError`, `successPostsToTheServiceAndReturnsTheHostedURL`, `checkoutAvailabilityRequiresTheServiceAndTheFallback`; `LicenseFlowTests.checkoutURLComesFromInfoPlist` | signed-build recording |
-| 39 | COPY TEXT and RUN IT AGAIN share one baseline; the copy pill keeps one fixed width across COPY TEXT and COPIED, so nothing on the kept row moves. | `ReviewRoundTests.keptActionsShareOneBaselineAndCopyKeepsItsWidth`; `RoomTests.copyButtonSwitchesToCopied` | signed-build recording |
+| 39 | The kept screen puts the heading, receipt and COPY TEXT / RUN IT AGAIN in a fixed top block; a long draft scrolls below and never hides the actions. The actions share one baseline and the copy pill keeps one fixed width across COPY TEXT and COPIED. The receipt is `N WORDS WRITTEN DOWN IN M MINUTES.` with the session's real duration; the count rule (each Chinese character counts as one; punctuation and emoji do not count) is stated in the receipt/count tooltip and accessibility help. | `ReviewRoundTests.keptActionsShareOneBaselineAndCopyKeepsItsWidth`; `ReviewRoundTests.keptActionsStayAboveALongDraftAndTheReceiptNamesTheDuration`; `RoomTests.copyButtonSwitchesToCopied`; `SessionEngineTests.wordCountMatchesWebCases` | signed-build recording |
+| 45 | A primary ink-filled pill (Begin, Activate, COPY TEXT) shows focus as one light ring just inside the pill; the outer ink ring is not drawn on it, so no doubled outline appears. Other controls keep the outer ink ring. | `RoomTests.keptStateFocusesCopyText`; `RoundThreeTests.everyCardControlUsesTheInkFocusRingInLightAndDark` | signed-build recording |
 | 40 | The Settings license block is one left-aligned block with no per-line hairlines and no stray bullet; the instance id is gone, the activation dates remain. In the unlicensed state the Buy action is a real 48 pt outline control on the Activate row, and the license controls reach the card content edge with Done. | `ReviewRoundTests.settingsLicenseBlockIsOneAlignedBlockWithRealControls`; `ReviewRoundTests.licensedSettingsShowDatesWithoutImplementationDetails` | signed-build recording |
 | 41 | On the activation card Activate and Buy share one 48 pt height on one row. | `ReviewRoundTests.activationActionsShareOneHeightOnOneRow`; `RoundThreeTests.licensedCardCentresStartWritingAndPreLicenceGroup` | signed-build recording |
 | 42 | In the picker, the two control-group labels ("Minutes" and "Delete after silence") share one type style and one placement above their controls. | `ReviewRoundTests.pickerControlLabelsShareOneStyleAndPlacement` | signed-build recording |
@@ -94,8 +96,9 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 
 Numbers below are frames/baselines from the layout or from the rendered frame, in points. "Paper top"
 means distance below the paper's top edge; "room top" means distance below the window content's top.
-The post-review dump (`after-raw-v2`) uses the room-top convention for ink rows and prints the
-paper-top equivalents; this table uses the same labels. The before ink values marked "pixel review"
+The post-review dumps (`after-raw-v2` for the review round, `after-raw-v3` for the second hands-on
+round) use the room-top convention for ink rows and print the paper-top equivalents; this table uses
+the same labels. The before ink values marked "pixel review"
 come from the reviewers' measurements of the previous capture set, because the original before dump
 recorded frames only.
 
@@ -106,15 +109,22 @@ recorded frames only.
 | Warning numeral ink top under the writing baseline | 26 (pixel review of the old captures) | 46 (band 40-48) | case 34 |
 | Warning caption ink top under the numeral ink | 65 (pixel review) | 19 (band 16-24) | case 34 |
 | Empty caret x, 1040x720 | 452.9 (67.1 left of centre) | 520.75 | case 18 |
-| Placeholder baseline vs first glyph baseline, 1040x720 | 295 vs 310 (15 apart) | 310 vs 310 | case 18 |
+| Empty hint | 28 pt italic on the writing line, caret inside it | caption style in the status slot, ink top 44 pt under the writing baseline | case 18 |
+| Hint and caret after a wipe vs a fresh start | caret/hint 512 pt away from the fresh position (old build) | 0 pt difference | case 18 |
 | Rendered writing-line centre, 1040x720 | +7.25 | within 1 of centre | case 33 |
 | Rendered writing-line centre, 1600x1000 | +249.25 | within 1 of centre | case 33 |
-| Wipe receipt ink top from the paper top, 1040x720 | 554 (frame top) | 322.5 | case 35 |
+| Wipe receipt position | bottom of the paper (554 pt from the paper top) | one caption line under the Start typing hint | case 35 |
 | Exit confirmation baseline vs ESC - EXIT title baseline | 33.0 vs 28.4 | 28.4 vs 28.4 | case 37 |
 | Exit confirmation copy and tracking | `Press Esc again to leave. The draft is deleted.` with caps tracking | `Press Esc again to leave and delete the draft.` with zero tracking | cases 26, 37 |
 | Kept COPY vs RUN IT AGAIN ink-top difference | 4 (pixel review) | 0.5 | case 39 |
 | Kept COPY pill width, COPY TEXT vs COPIED | 19 pt narrower on COPIED (pixel review) | 184 pt in both | case 39 |
 | Deleted-state caret | none in the still set | editor first responder, caret at the insertion point | case 38 |
+| Top session bar | fraction updated from the 100 ms tick (10 steps/s) | one continuous linear CA over the remaining time; no per-tick writes | case 23 |
+| Deny feedback | two timer steps (0/0.14/0.28 s) with a static outline | 200 ms transform keyframe + 220 ms opacity flash; interruptible | case 44 |
+| Kept actions / receipt | actions below a scrolling draft; `0:00 - N WORDS KEPT.` | actions in a fixed top block; `N WORDS WRITTEN DOWN IN M MINUTES.` | case 39 |
+| Kept copy focus ring | outer ink ring + ink pill (doubled outline) | one light ring inside the pill | case 45 |
+| Writing line pitch | 1.6 x font size in e792ac9 (`sessionParagraphStyle`) | 1.6 x font size, unchanged; measured 44.8 pt at 28 pt | type-metrics check |
+| Kept draft CJK face | kept body used the system CJK fallback while the room used Zhuque Fangsong | both use the room's `fontWithCJKFallback` cascade; line pitch stays 1.6 | case 39 |
 
 The caret band is now one geometry for every state: 1.5 pt wide, one font size tall, its bottom
 0.12 em below the line baseline (the house `.caret` geometry). Before, the empty caret used the

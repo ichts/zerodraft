@@ -46,22 +46,23 @@ struct EditorFocusTests {
         }
         expectColumnWidth()
 
-        // Empty sheet: the writing line sits at 39% of the sheet, and the placeholder
-        // shares that line's centre and baseline (not its own centred box).
+        // Empty sheet: the writing line holds only the caret at 39% of the sheet;
+        // "Start typing." is a caption in the status slot under the line.
         let emptyY = try currentLineTop(in: editor, paper: paper)
         #expect(abs(emptyY / paper.bounds.height - 0.39) < 0.01)
         let placeholderX = paper.convert(NSPoint(x: placeholder.bounds.midX, y: 0), from: placeholder).x
         #expect(abs(placeholderX - paper.bounds.midX) <= 1)
-        // NSTextField is flipped, so its baseline is firstBaselineOffsetFromTop from
-        // the field's top (y = 0 in its own coordinates).
         let placeholderBaseline = topInPaper(placeholder.firstBaselineOffsetFromTop,
                                              of: placeholder, paper: paper)
+        let hintInkTop = placeholderBaseline - (placeholder.font?.capHeight ?? 0)
         let emptyBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
-        #expect(abs(placeholderBaseline - emptyBaseline) <= 1)
+        let hintDrop = hintInkTop - emptyBaseline
+        #expect(hintDrop >= 40 && hintDrop <= 48,
+                "the hint ink top is \(hintDrop) pt under the writing baseline")
         #expect(!placeholder.isHidden)
         #expect(editor.alignment == .center)
 
-        // One line: the typed line keeps that anchor and the same baseline.
+        // One line: the typed line keeps that anchor and baseline; the hint hides.
         editor.insertText("One", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
@@ -69,7 +70,7 @@ struct EditorFocusTests {
         let firstY = try currentLineTop(in: editor, paper: paper)
         #expect(abs(firstY / paper.bounds.height - 0.39) < 0.01)
         let firstBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
-        #expect(abs(firstBaseline - placeholderBaseline) <= 1)
+        #expect(abs(firstBaseline - emptyBaseline) <= 1)
         #expect(placeholder.isHidden)
         let firstLineX = try lineCentreX(in: editor, paper: paper)
         #expect(abs(firstLineX - paper.bounds.midX) <= 2)

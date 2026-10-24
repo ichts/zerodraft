@@ -1,8 +1,8 @@
 /*
- * [INPUT]: Engine text and word count, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet block: centred selectable draft and receipt, ink-focused COPY TEXT with live motion, RUN IT AGAIN; long drafts scroll without a persistent scroller.
- * [POS]: One cohesive AppKit view for the room's completed state, matching the live trial's kept layout; the room owns phase routing and copy actions.
- * [PROTOCOL]: Keep strings, measure and centring aligned with writeitdown/index.html (#kept) and the consistency table; check nearest AGENTS.md.
+ * [INPUT]: Engine text, word count and real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
+ * [OUTPUT]: The kept sheet: a fixed top block (heading, duration receipt, copy/restart actions) and a scrollable draft below; ink-focused COPY TEXT with live motion.
+ * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
+ * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */
 import AppKit
 
@@ -19,15 +19,15 @@ final class SessionKeptView: NSView {
     let scrollView = NSScrollView()
     let copyButton: NSButton
     let restartButton: NSButton
+    private let header = NSStackView()
     private let document = DocumentView(frame: .zero)
-    private let stack = NSStackView()
     private let heading = NSTextField(labelWithString: "You wrote it down.")
     private let body = NSTextField(wrappingLabelWithString: "")
     private let receipt = NSTextField(labelWithString: "")
-    private var bodyWidth: NSLayoutConstraint!
     private var copyWidth: NSLayoutConstraint!
     private var selectedDraft = ""
     private var renderedWordCount: Int?
+    private var renderedDuration: TimeInterval?
 
     init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector,
          reducesMotion: @escaping () -> Bool) {
@@ -38,16 +38,10 @@ final class SessionKeptView: NSView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
-        scrollView.translatesAutoresizingMaskIntoConstraints = false
-        scrollView.hasVerticalScroller = false
-        scrollView.drawsBackground = false
-        scrollView.documentView = document
-        addSubview(scrollView)
-
         heading.translatesAutoresizingMaskIntoConstraints = false
         heading.alignment = .center
         heading.maximumNumberOfLines = 1
-        body.translatesAutoresizingMaskIntoConstraints = false
+        body.translatesAutoresizingMaskIntoConstraints = true
         body.isSelectable = true
         body.isEditable = false
         body.isBezeled = false
@@ -58,9 +52,10 @@ final class SessionKeptView: NSView {
         receipt.translatesAutoresizingMaskIntoConstraints = false
         receipt.alignment = .center
         receipt.maximumNumberOfLines = 1
+        receipt.toolTip = RoomPresentation.countRule
+        receipt.setAccessibilityHelp(RoomPresentation.countRule)
 
-        // Both actions share one 48 pt frame and one 1.6 line box, so centring the
-        // frames puts their first baselines on the same row instead of 4 pt apart.
+        // The action row is fixed at the top so a long draft never hides COPY TEXT.
         restartButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         let actions = NSStackView(views: [copyButton, restartButton])
         actions.translatesAutoresizingMaskIntoConstraints = false
@@ -68,19 +63,26 @@ final class SessionKeptView: NSView {
         actions.alignment = .centerY
         actions.spacing = 24
 
-        stack.translatesAutoresizingMaskIntoConstraints = true
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 0
-        [heading, body, receipt, actions].forEach(stack.addArrangedSubview)
-        stack.setCustomSpacing(24, after: heading)
-        stack.setCustomSpacing(20, after: body)
-        stack.setCustomSpacing(20, after: receipt)
-        document.addSubview(stack)
+        header.translatesAutoresizingMaskIntoConstraints = false
+        header.orientation = .vertical
+        header.alignment = .centerX
+        header.spacing = 0
+        header.addArrangedSubview(heading)
+        header.setCustomSpacing(12, after: heading)
+        header.addArrangedSubview(receipt)
+        header.setCustomSpacing(20, after: receipt)
+        header.addArrangedSubview(actions)
+        addSubview(header)
 
-        bodyWidth = body.widthAnchor.constraint(equalToConstant: Self.measure)
-        // Fixed copy-button width across COPY TEXT / COPIED / TRY COPY AGAIN: the
-        // title change must not resize the pill or slide RUN IT AGAIN.
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = false
+        scrollView.drawsBackground = false
+        scrollView.documentView = document
+        addSubview(scrollView)
+        document.addSubview(body)
+
+        // Fixed copy width across COPY TEXT / COPIED / TRY COPY AGAIN: the title
+        // change must not resize the pill or slide RUN IT AGAIN.
         var widest: CGFloat = 0
         for title in ["COPY TEXT", "COPIED", "TRY COPY AGAIN"] {
             setCopyTitle(title)
@@ -89,11 +91,14 @@ final class SessionKeptView: NSView {
         setCopyTitle("COPY TEXT")
         copyWidth = copyButton.widthAnchor.constraint(equalToConstant: ceil(widest))
         NSLayoutConstraint.activate([
+            header.topAnchor.constraint(equalTo: topAnchor),
+            header.centerXAnchor.constraint(equalTo: centerXAnchor),
+            header.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
+            header.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 24),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            bodyWidth,
             copyWidth,
         ])
         styleQuietLink(restartButton, title: "RUN IT AGAIN", muted: false)
@@ -104,27 +109,30 @@ final class SessionKeptView: NSView {
 
     var draft: String { selectedDraft }
 
-    func setContent(text: String, wordCount: Int, writingFont: NSFont) {
-        guard selectedDraft != text || renderedWordCount != wordCount || body.font != writingFont else { return }
+    func setContent(text: String, wordCount: Int, duration: TimeInterval, writingFont: NSFont) {
+        guard selectedDraft != text || renderedWordCount != wordCount || renderedDuration != duration
+                || body.font != writingFont else { return }
         selectedDraft = text
         renderedWordCount = wordCount
+        renderedDuration = duration
         body.font = writingFont
-        body.preferredMaxLayoutWidth = bodyWidth.constant
         body.attributedStringValue = FirstLineTypography.trackedText(
             text.isEmpty ? " " : text, font: writingFont, color: FirstLineColors.inkNSColor,
             kernEm: 0, lineHeightMultiple: 1.6)
-        body.invalidateIntrinsicContentSize()
         updateHeadingFont()
         receipt.font = FirstLineTypography.smallMediumNSFont
         receipt.attributedStringValue = FirstLineTypography.trackedText(
-            RoomPresentation.keptReceipt(wordCount: wordCount), font: FirstLineTypography.smallMediumNSFont,
+            RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration),
+            font: FirstLineTypography.smallMediumNSFont,
             color: FirstLineColors.muteNSColor, kernEm: 0.02)
-        stack.needsLayout = true
+        header.needsLayout = true
+        needsLayout = true
     }
 
     func reset() {
         selectedDraft = ""
         renderedWordCount = nil
+        renderedDuration = nil
         body.stringValue = ""
         setCopyTitle("COPY TEXT")
     }
@@ -137,26 +145,23 @@ final class SessionKeptView: NSView {
             color: FirstLineColors.onInkNSColor, kernEm: 0.04, lineHeightMultiple: 1.6)
     }
 
-    /// Centres the block when it is shorter than the writing area and scrolls it when taller.
+    /// Lays the draft in a scrollable document under the fixed action block. A short
+    /// draft is centred; a long one starts at the top and scrolls.
     func layoutContent() {
         updateHeadingFont()
         let clip = scrollView.contentSize
         guard clip.width > 0, clip.height > 0 else { return }
         let width = round(min(Self.measure, clip.width - 48))
-        if bodyWidth.constant != width {
-            bodyWidth.constant = width
-            body.preferredMaxLayoutWidth = width
-            body.invalidateIntrinsicContentSize()
-        }
-        stack.layoutSubtreeIfNeeded()
-        let fitting = stack.fittingSize
-        let stackHeight = max(fitting.height, 1)
-        let stackWidth = max(fitting.width, 1)
-        let documentHeight = max(clip.height, stackHeight + 48)
+        body.preferredMaxLayoutWidth = width
+        body.frame.size.width = width
+        body.invalidateIntrinsicContentSize()
+        body.layoutSubtreeIfNeeded()
+        let fitting = body.fittingSize
+        let bodyHeight = max(fitting.height, 1)
+        let documentHeight = max(clip.height, bodyHeight + 48)
         document.frame = NSRect(x: 0, y: 0, width: clip.width, height: documentHeight)
-        stack.frame = NSRect(x: round((clip.width - stackWidth) / 2),
-                             y: round((documentHeight - stackHeight) / 2),
-                             width: stackWidth, height: stackHeight)
+        let y = round(max((documentHeight - bodyHeight) / 2, 24))
+        body.frame = NSRect(x: round((clip.width - width) / 2), y: y, width: width, height: bodyHeight)
     }
 
     /// The live heading is `clamp(32px, 5vw, 48px)` against the window viewport.

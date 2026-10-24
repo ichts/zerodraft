@@ -194,7 +194,7 @@ for used in 1 2 3; do
     wait_has kept-third 'You wrote it down.' || { bad 'session 3 never reached the kept receipt'; exit 1; }
     python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
       || { bad 'session 3 completed before a full minute'; exit 1; }
-    has '0:00' && has 'ESC - EXIT' && has 'WORDS KEPT.' && ! has 'DRAFT DELETED AT ' \
+    has '0:00' && has 'ESC - EXIT' && has 'WORDS WRITTEN DOWN IN 1 MINUTE.' && ! has 'DRAFT DELETED AT ' \
       && jq -e --arg text "$typed" '[.elements[] | select((.value // "") == $text)] | length > 0' "$snapf" >/dev/null \
       || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
     tok="$(token button 'COPY TEXT')"

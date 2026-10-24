@@ -110,8 +110,16 @@ private final class FirstLineButton: FirstLineInkFocusButton {
     // ink/sheet 是 dynamic NSColor，自动随明暗适配，无需在 updateLayer 里重设。
     var role: Role = .secondary {
         didSet {
+            // An ink-filled pill cannot carry an ink ring outside itself: the light
+            // gap plus the dark ring reads as a doubled outline. Draw the focus as a
+            // single light ring just inside the pill instead.
+            inkFocusRingInset = role == .primary ? -3 : 3
             refreshAppearance()
         }
+    }
+
+    override var inkFocusRingColor: NSColor {
+        role == .primary ? FirstLineColors.onInkNSColor : FirstLineColors.inkNSColor
     }
 
     var roomMotion: (() -> Bool)?

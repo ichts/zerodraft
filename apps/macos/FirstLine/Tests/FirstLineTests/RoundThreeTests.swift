@@ -98,7 +98,12 @@ struct RoundThreeTests {
                     #expect(ringing.showsInkFocusRing, "\(name) control \(control.title) did not show the ink ring")
                     let ringColor = resolved(ringing.inkFocusRingColor, appearance)
                     let ink = resolved(FirstLineColors.inkNSColor, appearance)
-                    #expect(ringColor == ink, "\(name) control \(control.title) ring is not the ink token")
+                    // Ink-filled pills use the light inner ring (single outline); every
+                    // other control uses the ink ring.
+                    let fill = control.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }
+                    let isInkPill = fill.map { resolved($0, appearance) == ink } ?? false
+                    let expected = isInkPill ? resolved(FirstLineColors.onInkNSColor, appearance) : ink
+                    #expect(ringColor == expected, "\(name) control \(control.title) ring is not the expected token")
                 }
                 window.orderOut(nil)
             }
@@ -107,7 +112,7 @@ struct RoundThreeTests {
 
     // MARK: - Empty caret and placeholder
 
-    @Test func emptyCaretAndPlaceholderShareTheInsertionOriginWithTheFirstGlyphAndComposition() throws {
+    @Test func emptyCaretAndHintShareTheInsertionColumnWithTheFirstGlyph() throws {
         let state = licensedTestState()
         state.startSession()
         let room = SessionViewController(appState: state)
@@ -119,24 +124,26 @@ struct RoundThreeTests {
         let container = try #require(editor.textContainer)
         room.view.layoutSubtreeIfNeeded()
 
-        // One insertion origin: the centred text origin, the placeholder centre and
-        // the empty caret all sit on the same x and the same baseline.
+        // The writing line holds only the caret at the centred insertion point; the
+        // hint is a caption in the status slot under the line (ink top 40-48 pt down).
         let emptyCaret = editor.caretRectForCurrentInsertionPoint()
         let emptyCaretInPaper = paper.convert(emptyCaret, from: editor)
         let insertionX = editor.textContainerOrigin.x + container.containerSize.width / 2
         #expect(abs(emptyCaret.midX - insertionX) <= 1, "empty caret is not on the centred insertion point")
         let labelRect = paper.convert(placeholder.bounds, from: placeholder)
         #expect(abs(labelRect.midX - emptyCaretInPaper.midX) <= 1,
-                "placeholder is not centred on the insertion point")
-        let emptyBaseline = try #require(editor.currentInsertionBaseline())
-        let emptyBaselineInPaper = paper.convert(NSPoint(x: 0, y: emptyBaseline), from: editor).y
-        let placeholderBaseline = labelRect.maxY - placeholder.firstBaselineOffsetFromTop
-        #expect(abs(placeholderBaseline - emptyBaselineInPaper) <= 1,
-                "placeholder baseline \(placeholderBaseline) is not the writing line baseline \(emptyBaselineInPaper)")
+                "the hint is not centred on the writing column")
+        let lineBaseline = try #require(editor.currentInsertionBaseline())
+        let lineBaselineInPaper = paper.convert(NSPoint(x: 0, y: lineBaseline), from: editor).y
+        let hintInkTop = labelRect.maxY - placeholder.firstBaselineOffsetFromTop
+            + (placeholder.font?.capHeight ?? 0)
+        let hintDrop = lineBaselineInPaper - hintInkTop
+        #expect(hintDrop >= 40 && hintDrop <= 48,
+                "the hint ink top is \(hintDrop) pt under the writing baseline, outside the status slot")
         #expect(!placeholder.isHidden)
 
-        // The first typed character is rendered at the caret: centred on the same x
-        // and on the same baseline, and the caret band does not move.
+        // The first typed character is rendered at the caret, the hint disappears,
+        // and the line baseline does not move.
         editor.insertText("A", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.view.layoutSubtreeIfNeeded()
         let layout = try #require(editor.layoutManager)
@@ -146,12 +153,12 @@ struct RoundThreeTests {
                 "the first glyph appears away from the empty caret")
         let typedBaseline = try #require(editor.currentInsertionBaseline())
         let typedBaselineInPaper = paper.convert(NSPoint(x: 0, y: typedBaseline), from: editor).y
-        #expect(abs(typedBaselineInPaper - placeholderBaseline) <= 1,
-                "the first glyph baseline moved from the placeholder baseline")
+        #expect(abs(typedBaselineInPaper - lineBaselineInPaper) <= 1,
+                "the writing line moved on the first key")
         let typedCaret = editor.caretRectForCurrentInsertionPoint()
         #expect(abs(typedCaret.minY - emptyCaret.minY) <= 1, "the caret jumped vertically on the first key")
         #expect(abs(typedCaret.height - emptyCaret.height) <= 1)
-        #expect(placeholder.isHidden, "the placeholder must disappear once text exists")
+        #expect(placeholder.isHidden, "the hint must disappear once text exists")
         window.orderOut(nil)
     }
 
@@ -213,14 +220,11 @@ struct RoundThreeTests {
             #expect(abs(measured - expected) <= 6, "writing column is \(measured), expected \(expected)")
             #expect(measured / character >= 55 && measured / character <= 70,
                     "column must stay a readable 60-70 characters (the 62ch cap fits the sheet)")
-            let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
-                .first { $0.stringValue == "Start typing." })
-            #expect(abs(placeholder.frame.width - measured) <= 6)
             window.orderOut(nil)
         }
     }
 
-    @Test func roomBarsFollowLiveTrialSemantics() throws {
+    @Test func roomBarRunsOneContinuousLinearAnimation() throws {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })
         let state = licensedTestState(sessionEngine: engine,
@@ -230,14 +234,12 @@ struct RoundThreeTests {
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
-        let scroll = try #require(editor.enclosingScrollView)
-        let paper = try #require(scroll.superview)
+        let paper = try #require(editor.enclosingScrollView?.superview)
         paper.needsDisplay = true
         paper.displayIfNeeded()
-
+        let bars = descendants(of: room.view, of: FirstLineFillBar.self)
         // One bar only: the bottom silence bar was removed because it pulled the eye
         // away from the writing line.
-        let bars = descendants(of: room.view, of: FirstLineFillBar.self)
         #expect(bars.count == 1, "the room must not carry a second (bottom) bar")
         let top = try #require(bars.first)
         #expect(abs(top.frame.height - 2) <= 0.5)
@@ -248,22 +250,73 @@ struct RoundThreeTests {
         #expect(top.toolTip == nil)
         #expect(top.accessibilityLabel() == nil, "the bar is the only indicator: no label")
         #expect(abs(top.fraction - 1) <= 0.01, "the bar starts full")
+        #expect(top.fractionAnimation == nil, "an idle bar has no animation")
         #expect(resolved(top.fillColor, .aqua) == resolved(FirstLineColors.inkNSColor, .aqua))
 
-        for second in stride(from: 4.0, through: 28.0, by: 4.0) {
+        now.now = 4
+        engine.registerCommittedText("a")
+        room.tick()
+        for second in stride(from: 8.0, through: 28.0, by: 4.0) {
+            now.now = second
+            engine.registerCommittedText("a")
+        }
+        let animation = try #require(top.fractionAnimation,
+                                     "the first input must start one continuous bar animation")
+        #expect(abs((animation.duration) - 60) <= 0.01, "the animation spans the remaining session time")
+        var start: [Float] = [0, 0]
+        var end: [Float] = [0, 0]
+        animation.timingFunction?.getControlPoint(at: 0, values: &start)
+        animation.timingFunction?.getControlPoint(at: 1, values: &end)
+        print("BARDBG timing start=\(start) end=\(end)")
+        #expect(animation.timingFunction === CAMediaTimingFunction(name: .linear) ||
+                (start == [0, 0] && end == [1, 1]), "the bar animation is linear")
+        #expect(top.fraction == 0, "the model target is empty while the layer animates")
+
+        now.now = 30
+        engine.registerCommittedText("a")
+        room.tick()
+        #expect(top.fractionAnimation === animation, "a tick must not restart the bar animation")
+
+        now.now = 60
+        room.tick()
+        #expect(top.fraction == 0, "the bar empties at the session end")
+        #expect(top.fractionAnimation == nil, "the bar animation ends with the session")
+        window.orderOut(nil)
+    }
+
+    @Test func reducedMotionBarStepsWithoutAnimation() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.settings.reducedMotion = .always
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        room.barNow = { now.now }
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let top = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
+        #expect(abs(top.fraction - 1) <= 0.01)
+
+        now.now = 4
+        engine.registerCommittedText("a")
+        room.tick()
+        #expect(top.fractionAnimation == nil, "Reduce Motion must not animate the bar")
+        for second in stride(from: 8.0, through: 28.0, by: 4.0) {
             now.now = second
             engine.registerCommittedText("a")
         }
         now.now = 30
         engine.registerCommittedText("a")
         room.tick()
+        print("BARDBG frac=\(top.fraction) remaining=\(engine.remaining) duration=\(engine.duration) phase=\(engine.phase)")
+        #expect(top.fractionAnimation == nil)
         #expect(abs(top.fraction - engine.remaining / engine.duration) <= 0.02,
-                "the bar tracks the remaining session time")
-        #expect(top.fraction < 1)
-
+                "the reduced-motion bar steps with the remaining time")
         now.now = 60
         room.tick()
-        #expect(top.fraction == 0, "the bar empties at the session end")
+        #expect(top.fraction == 0)
         window.orderOut(nil)
     }
 
@@ -398,7 +451,7 @@ struct RoundThreeTests {
         }
     }
 
-    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
+    @Test func wipeReceiptSitsUnderTheEmptyHint() throws {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })
         let state = licensedTestState(sessionEngine: engine,
@@ -409,6 +462,8 @@ struct RoundThreeTests {
         let window = makeWindow(room)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
+        let hint = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue == "Start typing." })
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
         now.now = 9
         room.tick()
@@ -416,27 +471,19 @@ struct RoundThreeTests {
         room.view.layoutSubtreeIfNeeded()
         room.viewDidLayout()
         room.view.layoutSubtreeIfNeeded()
-        room.view.displayIfNeeded()
-
-        let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
-        room.view.cacheDisplay(in: room.view.bounds, to: rep)
-        let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
-        let paperTopFromRoomTop = room.view.bounds.height - paper.frame.maxY
-        let baseline = try #require(editor.currentInsertionBaseline())
-        let baselineFromTop = paperTopFromRoomTop
-            + (paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: baseline), from: editor).y)
-        // Skip the placeholder ink; scan below it for the red receipt.
-        let x = (room.view.bounds.midX - 250)...(room.view.bounds.midX + 250)
-        let y = (baselineFromTop + 20)...(paperTopFromRoomTop + paper.bounds.height - 40)
-        let runs = inkRowRuns(in: rep, scale: scale, x: x, y: y) { colour in
-            let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
-            return luma < 0.6 && colour.redComponent > colour.greenComponent + 0.05
-        }
-        let receipt = try #require(runs.first, "no red wipe receipt ink found")
-        let receiptDrop = (CGFloat(receipt.min) - baselineFromTop * scale) / scale
-        #expect(receiptDrop >= 40 && receiptDrop <= 48,
-                "the wipe receipt ink top is \(receiptDrop) pt under the writing baseline")
-        #expect(receiptDrop < paper.bounds.height * 0.55, "the receipt is back at the lower edge")
+        let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(!hint.isHiddenOrHasHiddenAncestor, "the wiped room lost its Start typing hint")
+        let hintRect = paper.convert(hint.bounds, from: hint)
+        let receiptRect = paper.convert(receipt.bounds, from: receipt)
+        let hintFont = try #require(hint.font)
+        let receiptFont = try #require(receipt.font)
+        let hintBaseline = hintRect.maxY - hint.firstBaselineOffsetFromTop
+        let receiptInkTop = receiptRect.maxY - receipt.firstBaselineOffsetFromTop + receiptFont.capHeight
+        let drop = hintBaseline - receiptInkTop
+        #expect(drop >= 16 && drop <= 24,
+                "the receipt ink top is \(drop) pt under the hint baseline, outside the caption slot")
+        #expect(!receipt.isHiddenOrHasHiddenAncestor)
         window.orderOut(nil)
     }
 

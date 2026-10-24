@@ -42,9 +42,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private let writingFont: WritingFontCandidate = .pitchLight
     private let chineseFont: ChineseFontCandidate = .zhuqueFangsong
     private var sessionFont: NSFont {
-        let baseFont = writingFont.font(size: sessionFontSize)
+        writingFont.fontWithCJKFallback(size: sessionFontSize)
             ?? NSFont.systemFont(ofSize: sessionFontSize, weight: .regular)
-        return fontByAddingCJKFallback(to: baseFont, size: sessionFontSize)
     }
     private var stableLineBaselineOffset: CGFloat {
         guard let cjk = chineseFont.font(size: sessionFontSize) else { return sessionFontSize }
@@ -162,6 +161,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         compositionRange = nil
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
+        // A long draft leaves the scroll view at the bottom; the empty room's line
+        // must return to the same anchor as a fresh start.
+        pendingCompositionRefresh = true
     }
 
     /// While the IME is updating or editing its composition, selection changes are
@@ -578,17 +580,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
 
         return value
-    }
-
-    private func fontByAddingCJKFallback(to baseFont: NSFont, size: CGFloat) -> NSFont {
-        guard let cjkFallback = chineseFont.font(size: size) else {
-            return baseFont
-        }
-
-        let descriptor = baseFont.fontDescriptor.addingAttributes([
-            .cascadeList: [cjkFallback.fontDescriptor],
-        ])
-        return NSFont(descriptor: descriptor, size: size) ?? baseFont
     }
 
     private func applyLightPunctuationTypography(in range: NSRange, textStorage: NSTextStorage) {

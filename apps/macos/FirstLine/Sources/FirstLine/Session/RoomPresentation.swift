@@ -24,9 +24,15 @@ enum RoomPresentation {
         "\(count) \(count == 1 ? "WORD" : "WORDS")"
     }
 
-    /// `0:00 - N WORDS KEPT.` The wall-clock receipt on the kept sheet; the web hardcodes 0:00.
-    static func keptReceipt(wordCount: Int) -> String {
-        "0:00 - \(wordCountLabel(wordCount)) KEPT."
+    /// Count rule shared by the room count and the kept receipt.
+    static let countRule = "Counts words. Each Chinese character counts as one. Punctuation and emoji do not count."
+
+    /// `N WORDS WRITTEN DOWN IN M MINUTES.` The kept receipt names the real session
+    /// duration instead of a meaningless 0:00.
+    static func keptReceipt(wordCount: Int, duration: TimeInterval) -> String {
+        let minutes = max(Int((duration / 60).rounded()), 1)
+        let unit = minutes == 1 ? "MINUTE" : "MINUTES"
+        return "\(wordCountLabel(wordCount)) WRITTEN DOWN IN \(minutes) \(unit)."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {
@@ -73,17 +79,16 @@ struct ExitConfirmation: Equatable {
 
 struct DenyFeedbackState {
     private(set) var outlineVisible = false
-    private(set) var shakeOffset: CGFloat = 0
 
+    /// Every blocked key restarts the short feedback, so the animation is
+    /// interruptible instead of dropping repeats while the previous one runs.
     mutating func begin(reducesMotion: Bool) -> Bool {
-        guard !outlineVisible else { return false }
+        _ = reducesMotion
         outlineVisible = true
-        shakeOffset = reducesMotion ? 0 : -2
         return true
     }
 
     mutating func end() {
         outlineVisible = false
-        shakeOffset = 0
     }
 }

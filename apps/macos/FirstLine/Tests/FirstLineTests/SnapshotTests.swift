@@ -187,6 +187,16 @@ struct SnapshotTests {
         fixture.clock.now = 0.4
         fixture.engine.registerMarkedTextActivity()
         fixture.room.tick()
+        settleBar(fixture)
+    }
+
+    /// Static PNGs show the bar's model; the live room runs a CA animation.
+    private func settleBar(_ fixture: RoomFixture) {
+        let fraction: CGFloat = (fixture.engine.phase == .failure || fixture.engine.phase == .success) ? 0
+            : (fixture.engine.hasStarted ? CGFloat(fixture.engine.remaining / max(fixture.engine.duration, 1)) : 1)
+        for bar in allViews(in: fixture.room.view, of: FirstLineFillBar.self) {
+            bar.settleForRendering(fraction)
+        }
     }
 
     private func warningState(reducesMotion: Bool, appearance: NSAppearance.Name = .aqua) -> RoomFixture {
@@ -207,7 +217,9 @@ struct SnapshotTests {
         clock.now = 5.6
         engine.tick()
         room.tick()
-        return RoomFixture(room: room, clock: clock, engine: engine)
+        let fixture = RoomFixture(room: room, clock: clock, engine: engine)
+        settleBar(fixture)
+        return fixture
     }
 
     private func deletedState(appearance: NSAppearance.Name) -> SessionViewController {
@@ -217,6 +229,7 @@ struct SnapshotTests {
         editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.clock.now = 8.1
         fixture.room.tick()
+        settleBar(fixture)
         return fixture.room
     }
 
@@ -233,6 +246,7 @@ struct SnapshotTests {
         fixture.clock.now = 60
         engine.tick()
         fixture.room.tick()
+        settleBar(fixture)
         if copy { fixture.room.copyKeptText() }
         return fixture.room
     }
@@ -305,6 +319,10 @@ struct SnapshotTests {
 
     private func allTextViews(in view: NSView) -> [NSTextView] {
         ((view as? NSTextView).map { [$0] } ?? []) + view.subviews.flatMap(allTextViews)
+    }
+
+    private func allViews<T: NSView>(in view: NSView, of type: T.Type) -> [T] {
+        ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap { allViews(in: $0, of: type) }
     }
 }
 

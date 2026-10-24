@@ -91,16 +91,18 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
-    private var placeholderWidth: NSLayoutConstraint!
-    private var placeholderAnchor: NSLayoutConstraint!
+    private var placeholderTop: NSLayoutConstraint!
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
     private var reportTop: NSLayoutConstraint!
     private var chromeHover = false
-    /// Cadence for the session bar: every tick normally, twice a second under Reduce
-    /// Motion, with no animation in either case.
+    /// Cadence for the stepped Reduce Motion bar; the normal bar is one continuous
+    /// Core Animation over the remaining time.
     var barNow: () -> TimeInterval = { SessionEngine.continuousNowSeconds() }
     private var lastBarUpdate: TimeInterval = -.infinity
+    private var barSessionID: UUID?
+    private var barRunning = false
+    private var barBounds: CGSize = .zero
     var exitConfirmation = ExitConfirmation()
     private var exitHintWork: DispatchWorkItem?
     private var quietLinkMuted: Bool?
@@ -146,6 +148,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         super.viewDidLayout()
         prepareViewport()
         layoutWarning()
+        syncProgressBar(phase: engine.phase)
         keptView?.layoutContent()
     }
 
@@ -238,15 +241,23 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         timerLabel.setAccessibilityHidden(false)
         countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.muteNSColor)
         countLabel.alignment = .right
+        countLabel.toolTip = RoomPresentation.countRule
+        countLabel.setAccessibilityHelp(RoomPresentation.countRule)
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
         reportLabel = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
         reportLabel.maximumNumberOfLines = 0
         reportLabel.isHidden = true
+        // The empty line holds only the caret; "Start typing." lives in the status
+        // slot under the line, the same slot the wipe receipt uses.
         placeholderLabel = label("Start typing.",
-                                 font: FirstLineTypography.writingItalicNSFont(size: appState.settings.writingFontSize.points),
+                                 font: FirstLineTypography.smallMediumNSFont,
                                  color: FirstLineColors.muteNSColor)
+        placeholderLabel.attributedStringValue = FirstLineTypography.trackedText(
+            "Start typing.", font: FirstLineTypography.smallMediumNSFont,
+            color: FirstLineColors.muteNSColor, kernEm: 0.04)
+        placeholderLabel.maximumNumberOfLines = 1
         numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
                              color: FirstLineColors.redNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
@@ -280,8 +291,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func installConstraints() {
         let safe = view.safeAreaLayoutGuide
-        placeholderWidth = placeholderLabel.widthAnchor.constraint(equalToConstant: 896)
-        placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
+        placeholderTop = placeholderLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         numeralTop = numeralLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         captionTop = warningHint.topAnchor.constraint(equalTo: paper.topAnchor)
         reportTop = reportLabel.topAnchor.constraint(equalTo: paper.topAnchor)
@@ -327,9 +337,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportTop,
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
-            placeholderLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
-            placeholderWidth,
-            placeholderAnchor,
+            placeholderLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            placeholderTop,
             keptView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             keptView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
             keptView.topAnchor.constraint(equalTo: paper.topAnchor, constant: SessionKeptView.verticalInset),
@@ -384,7 +393,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.scrollCaretToCompositionAnchor()
             textView.clearPendingCompositionRefresh()
         }
-        layoutPlaceholder()
+        layoutEmptyHint()
         layoutLineFade(centre: anchor + (textView.currentLineInkOffsetY() ?? 0))
     }
 
@@ -401,25 +410,19 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if abs(textView.textContainerInset.width - inset) > 0.5 {
             textView.textContainerInset = NSSize(width: inset, height: 0)
         }
-        if abs(placeholderWidth.constant - measure) > 0.5 {
-            placeholderWidth.constant = measure
-        }
     }
 
-    /// Put the placeholder's baseline on the empty line's baseline and its centre on
-    /// the insertion point. The caret, the placeholder and the first typed glyph then
-    /// share one origin: the label's own font metrics find its baseline, and the
-    /// editor owns the line baseline.
-    private func layoutPlaceholder() {
+    /// The empty line holds only the caret. "Start typing." sits in the status slot
+    /// under the line, with its ink top where the wipe receipt's ink top sits, so the
+    /// line and the caption never compete.
+    private func layoutEmptyHint() {
         guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
         let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
-        let height = placeholderLabel.bounds.height > 0
-            ? placeholderLabel.bounds.height : placeholderLabel.intrinsicContentSize.height
-        let centerFromPaperTop = (paper.bounds.maxY - baselineInPaper.y)
-            - placeholderLabel.firstBaselineOffsetFromTop + height / 2
-        let scrollTopFromPaperTop = paper.bounds.maxY - paper.convert(scrollView.bounds, from: scrollView).maxY
-        let constant = round(centerFromPaperTop - scrollTopFromPaperTop)
-        if abs(placeholderAnchor.constant - constant) > 0.5 { placeholderAnchor.constant = constant }
+        let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
+        let font = placeholderLabel.font ?? FirstLineTypography.smallNSFont
+        let bearing = placeholderLabel.firstBaselineOffsetFromTop - font.capHeight
+        let top = round(baselineFromTop + 44 - bearing)
+        if abs(placeholderTop.constant - top) > 0.5 { placeholderTop.constant = top }
     }
 
     /// Ink height of the drawn glyphs, used to place the warning by its ink rather
@@ -492,11 +495,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let captionTopConstant = round(captionInkTop - captionBearing)
         if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
 
-        // The wipe receipt is the result the writer must see, so it takes the numeral's
-        // ink slot under the writing line, not the footer edge.
+        // The wipe receipt is the result the writer must see. In the wiped room the
+        // "Start typing." hint takes the first status line, so the receipt sits one
+        // caption-line below it (the same 16-24 pt gap as the warning caption).
+        let hintFont = placeholderLabel.font ?? FirstLineTypography.smallNSFont
+        let hintBaseline = baselineFromTop + 44 + hintFont.capHeight
         let reportFont = reportLabel.font ?? FirstLineTypography.smallNSFont
         let reportBearing = reportLabel.firstBaselineOffsetFromTop - reportFont.capHeight
-        let reportTopConstant = round(numeralInkTop - reportBearing)
+        let reportTopConstant = round(hintBaseline + 20 - reportBearing)
         if abs(reportTop.constant - reportTopConstant) > 0.5 { reportTop.constant = reportTopConstant }
     }
 
@@ -511,7 +517,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
                                                                object: view.window, queue: .main) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.focusForPhase() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.focusForPhase()
+                self.syncProgressBar(phase: self.engine.phase, force: true)
+            }
         }
     }
 
@@ -617,14 +627,49 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         placeholderLabel.isHidden = isKept || !engine.text.isEmpty || !textView.string.isEmpty
-        let sessionEnded = phase == .failure || phase == .success
-        let barInterval: TimeInterval = reducesMotion ? 0.5 : 0
-        let barTime = barNow()
-        if barInterval == 0 || barTime - lastBarUpdate >= barInterval {
-            progressBar.fraction = sessionEnded ? 0 : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
-            lastBarUpdate = barTime
-        }
+        syncProgressBar(phase: phase)
         if !textView.hasMarkedText() { prepareViewport() }
+    }
+
+    /// One linear fill animation runs over the remaining session time and is only
+    /// re-anchored on a real state change (first input, new session, resize, window
+    /// key, Reduce Motion change). Ticks never step the bar.
+    private func syncProgressBar(phase: SessionPhase, force: Bool = false) {
+        let sessionEnded = phase == .failure || phase == .success
+        let running = phase == .writing || phase == .danger
+        let sessionChanged = barSessionID != engine.sessionID
+        barSessionID = engine.sessionID
+        let bounds = progressBar.bounds.size
+        let resized = barBounds != bounds
+        barBounds = bounds
+        let target = sessionEnded ? 0
+            : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
+
+        if reducesMotion {
+            let now = barNow()
+            if force || sessionChanged || lastBarUpdate == -.infinity || now - lastBarUpdate >= 0.5 {
+                progressBar.setFraction(target, reducesMotion: true)
+                lastBarUpdate = now
+            }
+            barRunning = false
+            return
+        }
+        if sessionEnded {
+            progressBar.setFraction(0)
+            barRunning = false
+            return
+        }
+        guard engine.hasStarted, running else {
+            progressBar.setFraction(target)
+            barRunning = false
+            return
+        }
+        if force || sessionChanged || resized || !barRunning {
+            // Snap to the current fraction, then run the one linear animation to empty.
+            progressBar.setFraction(target)
+            progressBar.setFraction(0, animatedOver: engine.remaining)
+            barRunning = true
+        }
     }
 
     private var wipeReport: String {
@@ -633,8 +678,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func updateKeptContent() {
         let size = appState.settings.writingFontSize.points
-        let writingFont = FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
-        keptView.setContent(text: engine.text, wordCount: engine.wordCount, writingFont: writingFont)
+        let writingFont = WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size)
+            ?? FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
+        keptView.setContent(text: engine.text, wordCount: engine.wordCount,
+                            duration: engine.duration, writingFont: writingFont)
     }
 
     /// A footer-row run with the row's shared 1.6 line box. The count and the inline
@@ -744,26 +791,47 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                              userInfo: [.announcement: text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
     }
 
+    /// A short, display-synced refusal: transform-only paper shake and an
+    /// opacity-only red hairline. Core Animation runs both off the main thread, a
+    /// repeated blocked key restarts them from the current presentation state, and
+    /// Reduce Motion keeps only the opacity flash. See D-022.
     private func showDeny() {
         guard deny.begin(reducesMotion: reducesMotion) else { return }
-        outline.alphaValue = 1
         announce("Blocked. Forward only.")
-        if deny.shakeOffset != 0 {
-            paper.layer?.setAffineTransform(CGAffineTransform(translationX: deny.shakeOffset, y: 0))
+        denyWork?.cancel()
+
+        let currentShake = paper.layer?.presentation()?.transform.m41 ?? 0
+        paper.layer?.removeAnimation(forKey: "deny-shake")
+        if !reducesMotion {
+            let shake = CAKeyframeAnimation(keyPath: "transform.translation.x")
+            shake.values = [currentShake, -3, 2.5, -1, 0]
+            shake.keyTimes = [0, 0.18, 0.42, 0.7, 1]
+            shake.duration = 0.2
+            shake.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            shake.isRemovedOnCompletion = true
+            paper.layer?.add(shake, forKey: "deny-shake")
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) { [weak self] in
-            guard let self, self.deny.outlineVisible, self.deny.shakeOffset != 0 else { return }
-            self.paper.layer?.setAffineTransform(CGAffineTransform(translationX: -self.deny.shakeOffset, y: 0))
-        }
+
+        let currentOpacity = outline.layer?.presentation()?.opacity ?? 0
+        outline.alphaValue = 0
+        outline.layer?.removeAnimation(forKey: "deny-hairline")
+        let flash = CAKeyframeAnimation(keyPath: "opacity")
+        flash.values = [currentOpacity, 1, 1, 0]
+        flash.keyTimes = [0, 0.08, 0.55, 1]
+        flash.duration = 0.22
+        flash.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        flash.isRemovedOnCompletion = true
+        outline.layer?.add(flash, forKey: "deny-hairline")
 
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.deny.end()
             self.outline.alphaValue = 0
-            self.paper.layer?.setAffineTransform(.identity)
+            self.paper.layer?.removeAnimation(forKey: "deny-shake")
+            self.outline.layer?.removeAnimation(forKey: "deny-hairline")
         }
         denyWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: work)
     }
 
     // MARK: - Two-step exit

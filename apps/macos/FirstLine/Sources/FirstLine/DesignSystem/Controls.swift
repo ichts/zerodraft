@@ -175,20 +175,36 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
 // MARK: - Status
 
 @MainActor
-/// A hairline room bar: the fraction fills from the leading edge, no label, no animation.
+/// A hairline room bar drawn by one fill layer. The caller can animate the fill
+/// width over the remaining session time; the layer runs off the main thread, so
+/// the bar stays smooth even when the room is re-laying out.
 final class FirstLineFillBar: NSView {
-    var fraction: CGFloat = 0 {
-        didSet { needsDisplay = true }
-    }
+    private static let fractionAnimationKey = "fraction"
+    private let fillLayer = CALayer()
+
+    /// The model target, readable by tests and snapshot fixtures. While a live
+    /// session animates, the presentation layer shows the current fraction.
+    private(set) var fraction: CGFloat = 0
 
     var fillColor: NSColor = FirstLineColors.inkNSColor {
-        didSet { needsDisplay = true }
+        didSet { applyFillColor() }
+    }
+
+    /// Test-facing: the running fraction animation, if any.
+    var fractionAnimation: CABasicAnimation? {
+        fillLayer.animation(forKey: Self.fractionAnimationKey) as? CABasicAnimation
     }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         translatesAutoresizingMaskIntoConstraints = false
+        wantsLayer = true
         setAccessibilityElement(false)
+        fillLayer.anchorPoint = .zero
+        fillLayer.position = .zero
+        fillLayer.masksToBounds = true
+        layer?.addSublayer(fillLayer)
+        applyFillColor()
     }
 
     @available(*, unavailable)
@@ -196,16 +212,49 @@ final class FirstLineFillBar: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let width = bounds.width * min(max(fraction, 0), 1)
-        guard width > 0 else { return }
-        fillColor.setFill()
-        NSBezierPath(rect: NSRect(x: 0, y: 0, width: width, height: bounds.height)).fill()
+    override func layout() {
+        super.layout()
+        fillLayer.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+    }
+
+    /// Set the target fraction. With a duration and motion enabled, one linear
+    /// animation runs from the current presentation width to the target; repeated
+    /// calls from a tick do not restart it.
+    func setFraction(_ value: CGFloat, animatedOver duration: TimeInterval? = nil, reducesMotion: Bool = false) {
+        let target = min(max(value, 0), 1)
+        let targetWidth = bounds.width * target
+        let currentWidth = fillLayer.presentation()?.bounds.width ?? fillLayer.bounds.width
+        let hadAnimation = fillLayer.animation(forKey: Self.fractionAnimationKey) != nil
+        fraction = target
+        fillLayer.removeAnimation(forKey: Self.fractionAnimationKey)
+        fillLayer.frame = CGRect(x: 0, y: 0, width: targetWidth, height: bounds.height)
+        guard let duration, duration > 0.01, !reducesMotion,
+              bounds.width > 0, (!hadAnimation || abs(currentWidth - targetWidth) > 0.5) else { return }
+        let animation = CABasicAnimation(keyPath: "bounds.size.width")
+        animation.fromValue = hadAnimation ? currentWidth : targetWidth
+        animation.toValue = targetWidth
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(name: .linear)
+        animation.isRemovedOnCompletion = true
+        fillLayer.add(animation, forKey: Self.fractionAnimationKey)
+    }
+
+    /// Snaps the fill to a fraction for a static capture without starting an animation.
+    func settleForRendering(_ value: CGFloat) {
+        fillLayer.removeAllAnimations()
+        fraction = min(max(value, 0), 1)
+        fillLayer.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+    }
+
+    private func applyFillColor() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            fillLayer.backgroundColor = fillColor.cgColor
+        }
     }
 
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
-        needsDisplay = true
+        applyFillColor()
     }
 }
 

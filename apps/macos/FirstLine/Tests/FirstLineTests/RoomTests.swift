@@ -19,9 +19,11 @@ struct RoomTests {
             "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.")
     }
 
-    @Test func keptReceiptMatchesLiveCountText() {
-        #expect(RoomPresentation.keptReceipt(wordCount: 33) == "0:00 - 33 WORDS KEPT.")
-        #expect(RoomPresentation.keptReceipt(wordCount: 1) == "0:00 - 1 WORD KEPT.")
+    @Test func keptReceiptNamesWordCountAndDuration() {
+        #expect(RoomPresentation.keptReceipt(wordCount: 33, duration: 60)
+                == "33 WORDS WRITTEN DOWN IN 1 MINUTE.")
+        #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 300)
+                == "1 WORD WRITTEN DOWN IN 5 MINUTES.")
         #expect(RoomPresentation.wordLabel(0) == "0 words")
         #expect(RoomPresentation.wordLabel(1) == "1 word")
     }
@@ -33,24 +35,55 @@ struct RoomTests {
         #expect(board.string(forType: .string) == "First line\n第二行")
     }
 
-    @Test func denyFeedbackDoesNotRestartWhileRunning() {
+    @Test func denyFeedbackIsInterruptible() {
         var feedback = DenyFeedbackState()
         let first = feedback.begin(reducesMotion: false)
         #expect(first)
-        #expect(feedback.shakeOffset == -2)
+        // A repeated blocked key restarts the short animation instead of being ignored.
         let repeated = feedback.begin(reducesMotion: false)
-        #expect(!repeated)
+        #expect(repeated)
+        #expect(feedback.outlineVisible)
         feedback.end()
+        #expect(!feedback.outlineVisible)
         let next = feedback.begin(reducesMotion: false)
         #expect(next)
     }
 
-    @Test func reducedMotionDenyHasNoShake() {
-        var feedback = DenyFeedbackState()
-        let began = feedback.begin(reducesMotion: true)
-        #expect(began)
-        #expect(feedback.shakeOffset == 0)
-        #expect(feedback.outlineVisible)
+    @Test func denyAnimationIsAShortTransformAndOpacityAnimation() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        fixture.editor.deleteBackward(nil)
+        fixture.room.tick()
+        let paper = try #require(fixture.editor.enclosingScrollView?.superview)
+        let shake = try #require(paper.layer?.animation(forKey: "deny-shake") as? CAKeyframeAnimation)
+        #expect(shake.keyPath == "transform.translation.x")
+        #expect(shake.duration <= 0.25)
+        #expect(CATransform3DIsIdentity(paper.layer?.transform ?? CATransform3DIdentity))
+        let outline = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+            .first { $0.fillColor == .clear })
+        let flash = try #require(outline.layer?.animation(forKey: "deny-hairline") as? CAKeyframeAnimation)
+        #expect(flash.keyPath == "opacity")
+        #expect(flash.duration <= 0.25)
+
+        // Interruptible: a second blocked key replaces the animation, not ignores it.
+        let firstShake = shake
+        fixture.clock.now += 0.05
+        fixture.editor.deleteBackward(nil)
+        fixture.room.tick()
+        let nextShake = try #require(paper.layer?.animation(forKey: "deny-shake") as? CAKeyframeAnimation)
+        #expect(nextShake !== firstShake)
+    }
+
+    @Test func reducedMotionDenyKeepsOnlyTheHairlineFlash() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .always
+        fixture.editor.deleteBackward(nil)
+        fixture.room.tick()
+        let paper = try #require(fixture.editor.enclosingScrollView?.superview)
+        #expect(paper.layer?.animation(forKey: "deny-shake") == nil, "Reduce Motion must not shake the paper")
+        let outline = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+            .first { $0.fillColor == .clear })
+        #expect(outline.layer?.animation(forKey: "deny-hairline") != nil)
     }
 
     @Test func escapeIsIgnoredWhileComposing() {
@@ -214,7 +247,7 @@ struct RoomTests {
         #expect(fixture.engine.phase == .success)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "You wrote it down." && !$0.isHidden })
-        let receipt = try #require(fields.first { $0.stringValue == "0:00 - 15 WORDS KEPT." })
+        let receipt = try #require(fields.first { $0.stringValue == "15 WORDS WRITTEN DOWN IN 1 MINUTE." })
         #expect(!receipt.isHiddenOrHasHiddenAncestor)
         let body = try #require(fields.first { $0.isSelectable && !$0.isEditable && $0.stringValue.contains("promotion") })
         #expect(body.alignment == .center)
@@ -361,11 +394,13 @@ struct RoomTests {
         let outline = try #require(copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }.first)
         #expect(!outline.isHidden)
         #expect(outline.lineWidth == 2)
-        #expect(outline.frame == copy.bounds.insetBy(dx: -3, dy: -3))
+        // The primary ink pill draws one light ring just inside the pill; no doubled
+        // dark outline outside it.
+        #expect(outline.frame == copy.bounds.insetBy(dx: 3, dy: 3))
         #expect(outline.path?.boundingBox == CGRect(origin: .zero, size: outline.bounds.size))
         let stroke = try #require(outline.strokeColor)
-        let ink = try #require(NSColor(cgColor: stroke))
-        #expect(sameColor(ink, FirstLineColors.inkNSColor, appearance: appearance))
+        let ring = try #require(NSColor(cgColor: stroke))
+        #expect(sameColor(ring, FirstLineColors.onInkNSColor, appearance: appearance))
         window.makeFirstResponder(nil)
         #expect(outline.isHidden)
         window.orderOut(nil)
@@ -411,8 +446,8 @@ struct RoomTests {
         fixture.room.tick()
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
-        let scroll = try #require(descendants(fixture.room.view, of: NSScrollView.self)
-            .first { $0.documentView?.subviews.contains { $0 is NSStackView } == true })
+        let kept = try #require(descendants(fixture.room.view, of: SessionKeptView.self).first)
+        let scroll = kept.scrollView
         #expect(scroll.documentView!.frame.height > scroll.contentSize.height)
         #expect(scroll.documentView!.frame.height > 1000)
         #expect(!scroll.hasVerticalScroller)

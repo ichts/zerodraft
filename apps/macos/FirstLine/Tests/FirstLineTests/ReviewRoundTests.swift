@@ -231,6 +231,71 @@ struct ReviewRoundTests {
         window.orderOut(nil)
     }
 
+    // MARK: - Second hands-on round: empty state, kept layout, count
+
+    @Test func emptyHintAndCaretMatchAfterAWipe() throws {
+        func measure(wiped: Bool) -> (hint: NSRect, caret: NSRect) {
+            let now = Clock()
+            let engine = SessionEngine(now: { now.now })
+            let state = licensedTestState(sessionEngine: engine,
+                                          settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                          installIDStore: InstallIDStore(configDirectory: tempRoot()))
+            state.startSession(duration: 60)
+            let room = SessionViewController(appState: state)
+            let window = makeWindow(room)
+            let editor = descendants(of: room.view, of: AppendOnlyTextView.self).first!
+            let paper = editor.enclosingScrollView!.superview!
+            let hint = descendants(of: room.view, of: NSTextField.self)
+                .first { $0.stringValue == "Start typing." }!
+            if wiped {
+                editor.insertText(Array(repeating: "a long line of draft text\n", count: 12).joined(),
+                                  replacementRange: NSRange(location: NSNotFound, length: 0))
+                room.view.layoutSubtreeIfNeeded()
+                now.now = 9
+                room.tick()
+                room.endCutAnimation()
+                room.view.layoutSubtreeIfNeeded(); room.viewDidLayout(); room.view.layoutSubtreeIfNeeded()
+            }
+            let hintFrame = paper.convert(hint.bounds, from: hint)
+            let caret = paper.convert(editor.caretRectForCurrentInsertionPoint(), from: editor)
+            window.orderOut(nil)
+            return (hintFrame, caret)
+        }
+        let fresh = measure(wiped: false)
+        let afterWipe = measure(wiped: true)
+        #expect(abs(afterWipe.hint.minY - fresh.hint.minY) <= 1, "the hint moved after a wipe")
+        #expect(abs(afterWipe.hint.midX - fresh.hint.midX) <= 1)
+        #expect(abs(afterWipe.caret.minY - fresh.caret.minY) <= 1, "the caret moved after a wipe")
+        #expect(abs(afterWipe.caret.midX - fresh.caret.midX) <= 1)
+    }
+
+    @Test func keptActionsStayAboveALongDraftAndTheReceiptNamesTheDuration() throws {
+        let longDraft = (1...120).map { "line \($0) of the kept draft" }.joined(separator: "\n")
+        let fixture = keptRoom(text: longDraft)
+        let kept = try #require(descendants(of: fixture.room.view, of: SessionKeptView.self).first)
+        let copy = kept.copyButton
+        let restart = kept.restartButton
+        let search = try #require(descendants(of: fixture.room.view, of: NSScrollView.self)
+            .first { $0 === kept.scrollView })
+        let copyFrame = fixture.room.view.convert(copy.bounds, from: copy)
+        let restartFrame = fixture.room.view.convert(restart.bounds, from: restart)
+        let scrollFrame = fixture.room.view.convert(search.bounds, from: search)
+        #expect(copyFrame.minY > scrollFrame.maxY, "COPY TEXT is not above the draft area")
+        #expect(restartFrame.minY > scrollFrame.maxY, "RUN IT AGAIN is not above the draft area")
+        #expect(!copy.isHiddenOrHasHiddenAncestor)
+        #expect(search.documentView!.frame.height > search.contentSize.height,
+                "the long draft does not scroll under the fixed actions")
+
+        let receipt = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.") })
+        #expect(receipt.stringValue.hasPrefix("\(fixture.engine.wordCount) WORDS WRITTEN DOWN IN 1 MINUTE."))
+        #expect(receipt.toolTip == RoomPresentation.countRule)
+        let count = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasSuffix("words") })
+        #expect(count.toolTip == RoomPresentation.countRule)
+        fixture.window.orderOut(nil)
+    }
+
     // MARK: - Helpers
 
     private struct KeptFixture {
@@ -241,7 +306,7 @@ struct ReviewRoundTests {
         let now: Clock
     }
 
-    private func keptRoom() -> KeptFixture {
+    private func keptRoom(text: String = "hello there. this draft is kept.") -> KeptFixture {
         let root = tempRoot()
         let now = Clock()
         let engine = SessionEngine(now: { now.now })
@@ -252,8 +317,7 @@ struct ReviewRoundTests {
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
         let editor = descendants(of: room.view, of: AppendOnlyTextView.self).first!
-        editor.insertText("hello there. this draft is kept.",
-                          replacementRange: NSRange(location: NSNotFound, length: 0))
+        editor.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         for second in stride(from: 4.0, to: 60.0, by: 4.0) {
             now.now = second
             engine.registerMarkedTextActivity()

@@ -207,3 +207,62 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   line and 65 pt above its own caption; a frame-based formula also drifted at tall sizes. Ink-based
   placement keeps the numeral and its line together under the writing line.
 - Supersedes: D-017's geometry sentence; the under-the-writing-line placement decision stands.
+
+## D-021: The empty room shows the caret alone; the hint is a status caption
+
+- Date: 2026-10-24
+- Decision: On an empty Mac room the writing line holds only the caret at the centred
+  insertion point. `Start typing.` moves to the status slot under the line (the same slot the wipe
+  receipt uses: ink top 44 pt under the writing baseline), in the caption's machine type. It disappears
+  on the first keystroke; nothing on the line moves. A no-hint variant (caret alone) was captured for
+  comparison but is not the default. This supersedes the caret-through-the-placeholder treatment.
+- Reason: The captain rejected the caret inside `Start typing.` as ugly. Keeping the writing line empty
+  and putting the instruction under it preserves the single insertion origin (the first glyph appears at
+  the caret) without overlaying two texts. It also keeps the hint near the eye, with the warning and
+  wipe receipt.
+- Supersedes: D-016's empty-caret/placeholder placement; the shared insertion origin and the first
+  glyph at the caret stand. The web trial still overlays the native caret on its centred placeholder;
+  that is a separate web follow-up.
+
+## D-022: Continuous bar motion and a short interruptible refusal
+
+- Date: 2026-10-24
+- Decision: The top session bar is one linear Core Animation over the remaining session time,
+  re-anchored only on real state changes (first input, new session, resize, window key, Reduce Motion
+  change). Ticks never step it. A blocked edit plays a 200 ms paper shake and a 220 ms red-hairline
+  flash: transform and opacity only, display-synced, interruptible by the next blocked key, and under
+  Reduce Motion the translation is omitted and only the hairline flash remains. No layout runs per
+  frame. The principles followed are Emil Kowalski's *Great Animations* (fast, ease-out, purposeful,
+  transform/opacity for compositing, interruptible, accessible):
+  https://emilkowal.ski/ui/great-animations.
+- Reason: The captain found both the progress bar and the Backspace refusal choppy. Per-tick view
+  updates and a two-step timer shake were the cause; Core Animation moves both off the main thread.
+- Supersedes: the per-tick bar fill and the timer-driven two-step deny shake. The web's "repeated keys
+  do not restart the feedback" rule remains web-only; the Mac refusal is deliberately interruptible.
+
+## D-023: Kept screen actions first, and the receipt names the duration
+
+- Date: 2026-10-24
+- Decision: On the Mac kept screen the heading, the receipt and the COPY TEXT / RUN IT AGAIN
+  actions form a fixed block at the top; the draft scrolls below, so the actions never require
+  scrolling. The receipt is `N WORDS WRITTEN DOWN IN M MINUTES.` using the session's real configured
+  duration; the old `0:00 - N WORDS KEPT.` is retired on Mac. The count rule is stated in the receipt
+  and count tooltips and accessibility help: each Chinese character counts as one, punctuation and
+  emoji do not count (the engine already splits Han characters individually). The web kept screen keeps
+  its 0:00 receipt and bottom actions; this is an intended Mac difference.
+- Reason: The captain's screenshot showed a long draft hiding the copy action at the bottom and a
+  meaningless `0:00`; the receipt should say what happened and for how long, and the count needs its
+  CJK rule stated.
+- Supersedes: the Mac kept layout with the actions below the draft and the wall-clock `0:00` receipt.
+
+## D-024: Ink pills focus with one inner light ring
+
+- Date: 2026-10-24
+- Decision: A primary ink-filled pill (Begin, Activate, COPY TEXT) shows keyboard focus as a
+  single 2 pt light (on-ink) ring just inside the pill. Outline, quiet and other controls keep the
+  outer 2 pt ink focus ring at a 3 pt offset. No control draws both an outer and an inner ring.
+- Reason: The captain's kept screenshot showed the COPIED pill with a doubled outline: the ink pill
+  plus an outer ink ring separated by a light gap. The light inner ring keeps the focus visible without
+  the duplicate.
+- Supersedes: D-009's "one outer ink ring for every control" for ink-filled primary pills only; the
+  system accent-blue ring remains forbidden everywhere.

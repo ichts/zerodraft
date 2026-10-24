@@ -16,7 +16,8 @@ protocol FirstLineInkFocusRinging: AnyObject {
 
 /// The ink outline drawn three points outside a pill/control, matching the live
 /// web's 2px ink outline at 3px offset. The control's own focusRingType is none.
-@MainActor
+/// The geometry lives in plain stored properties so CALayer's nonisolated copy
+/// initializer can read them; only drawing is main-actor work.
 private final class FirstLineInkFocusOutline: CAShapeLayer {
     var inset: CGFloat = 4
     var inkCornerRadius: CGFloat?
@@ -39,6 +40,7 @@ private final class FirstLineInkFocusOutline: CAShapeLayer {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
+    @MainActor
     func update(for control: NSControl, color: NSColor, visible: Bool) {
         let rect = control.bounds.insetBy(dx: -inset, dy: -inset)
         if frame != rect {

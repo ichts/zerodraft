@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
- * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, clock/count, centered zen writing with the live gradient line fade, wash and numeral, live deletion sentence, kept heading/copy receipt, two-step exit.
- * [POS]: Centered writing at 39% of the sheet, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with the live gradient line fade, wash and numeral, live deletion sentence, kept heading/copy receipt, two-step exit.
+ * [POS]: Centered writing at 39% of the sheet, the warning numeral and its line just under the writing line, one insert origin shared by the placeholder, the caret and the first typed glyph, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -68,7 +68,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var paperWash: RoomWashView!
     private var outline: RoomWashView!
     private var progressBar: FirstLineFillBar!
-    private var meter: FirstLineFillBar!
     private var timerLabel: NSTextField!
     private var countLabel: NSTextField!
     private var reportLabel: NSTextField!
@@ -94,9 +93,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyWork: DispatchWorkItem?
     private var placeholderWidth: NSLayoutConstraint!
     private var placeholderAnchor: NSLayoutConstraint!
-    private var warningCenter: NSLayoutConstraint!
+    private var warningTop: NSLayoutConstraint!
+    private var reportTop: NSLayoutConstraint!
+    private var writingAnchorFromPaperTop: CGFloat = 0
+    private var writingLineHeight: CGFloat = 0
     private var chromeHover = false
-    /// Cadence for the two bars: every tick normally, twice a second under Reduce
+    /// Cadence for the session bar: every tick normally, twice a second under Reduce
     /// Motion, with no animation in either case.
     var barNow: () -> TimeInterval = { SessionEngine.continuousNowSeconds() }
     private var lastBarUpdate: TimeInterval = -.infinity
@@ -230,10 +232,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         progressBar.fillColor = FirstLineColors.inkNSColor
         paper.addSubview(progressBar)
 
-        meter = FirstLineFillBar(frame: .zero)
-        meter.fillColor = FirstLineColors.inkNSColor
-        paper.addSubview(meter)
-
         timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.inkNSColor)
         timerLabel.alignment = .right
         timerLabel.setAccessibilityRole(.staticText)
@@ -263,7 +261,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
         styleQuietLink(exitButton, title: "ESC - EXIT", muted: false)
-        exitHintLabel = label(Self.exitHintText, font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
+        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
+        exitHintLabel.attributedStringValue = Self.quietRowText(Self.exitHintText,
+            color: FirstLineColors.redNSColor, truncates: true)
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
@@ -287,7 +287,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let safe = view.safeAreaLayoutGuide
         placeholderWidth = placeholderLabel.widthAnchor.constraint(equalToConstant: 896)
         placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
-        warningCenter = warningStack.centerYAnchor.constraint(equalTo: paper.topAnchor)
+        warningTop = warningStack.topAnchor.constraint(equalTo: paper.topAnchor)
+        reportTop = reportLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         NSLayoutConstraint.activate([
             paperShadow.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
             paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
@@ -301,10 +302,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             progressBar.topAnchor.constraint(equalTo: paper.topAnchor),
             progressBar.heightAnchor.constraint(equalToConstant: 2),
-            meter.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
-            meter.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
-            meter.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
-            meter.heightAnchor.constraint(equalToConstant: 3),
             scrollView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 32),
             scrollView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -32),
             scrollView.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
@@ -321,14 +318,17 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             countLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -Self.roomInset),
             countLabel.centerYAnchor.constraint(equalTo: exitButton.centerYAnchor),
             exitHintLabel.leadingAnchor.constraint(equalTo: exitButton.trailingAnchor, constant: 12),
+            // Shared 1.6 line box, so centring the two frames lands both first
+            // baselines on one row. A mismatched line height is what broke this row.
             exitHintLabel.centerYAnchor.constraint(equalTo: exitButton.centerYAnchor),
             exitHintLabel.trailingAnchor.constraint(lessThanOrEqualTo: countLabel.leadingAnchor, constant: -12),
             warningStack.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            warningCenter,
+            warningTop,
+            reportTop,
             warningStack.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
             warningStack.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -76),
+            reportTop,
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
             placeholderLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
             placeholderWidth,
@@ -378,7 +378,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let scrollTopInPaper = paper.bounds.height - paper.convert(scrollView.bounds, from: scrollView).maxY
         let anchor = round(anchorFromPaperTop - scrollTopInPaper)
         textView.setCompositionAnchor(anchor)
-        placeholderAnchor.constant = anchor
+        writingAnchorFromPaperTop = anchorFromPaperTop
+        writingLineHeight = textView.currentLineHeight() ?? 0
         textView.minSize = NSSize(width: 0, height: size.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {
@@ -388,7 +389,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.scrollCaretToCompositionAnchor()
             textView.clearPendingCompositionRefresh()
         }
-        updateEmptyCaretOrigin()
+        layoutPlaceholder()
         layoutLineFade(centre: anchor + (textView.currentLineInkOffsetY() ?? 0))
     }
 
@@ -410,16 +411,20 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    /// Place the empty caret on the first glyph of the centred placeholder, never
-    /// inside the placeholder text.
-    private func updateEmptyCaretOrigin() {
-        guard let placeholder = placeholderLabel, let font = placeholder.font,
-              !placeholder.bounds.isEmpty else { return }
-        let text = placeholder.stringValue as NSString
-        let width = text.size(withAttributes: [.font: font]).width
-        let x = placeholder.bounds.minX + max((placeholder.bounds.width - width) / 2, 0)
-        let baseline = placeholder.bounds.maxY - placeholder.firstBaselineOffsetFromTop
-        textView.emptyCaretOrigin = textView.convert(NSPoint(x: x, y: baseline), from: placeholder)
+    /// Put the placeholder's baseline on the empty line's baseline and its centre on
+    /// the insertion point. The caret, the placeholder and the first typed glyph then
+    /// share one origin: the label's own font metrics find its baseline, and the
+    /// editor owns the line baseline.
+    private func layoutPlaceholder() {
+        guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
+        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
+        let height = placeholderLabel.bounds.height > 0
+            ? placeholderLabel.bounds.height : placeholderLabel.intrinsicContentSize.height
+        let centerFromPaperTop = (paper.bounds.maxY - baselineInPaper.y)
+            - placeholderLabel.firstBaselineOffsetFromTop + height / 2
+        let scrollTopFromPaperTop = paper.bounds.maxY - paper.convert(scrollView.bounds, from: scrollView).maxY
+        let constant = round(centerFromPaperTop - scrollTopFromPaperTop)
+        if abs(placeholderAnchor.constant - constant) > 0.5 { placeholderAnchor.constant = constant }
     }
 
     /// The live `#editor` mask, applied to the rendered line centres: solid on the current
@@ -451,8 +456,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func layoutWarning() {
         guard paper.bounds.height > 0 else { return }
-        // The live numeral/caption group is centred between 68% of the sheet and 76 pt above its bottom.
-        warningCenter.constant = round(paper.bounds.height * 0.84 - 38)
+        // Directly below the writing line: the eye is already there, and the numeral
+        // belongs to the draft instead of reading as footer chrome.
+        let lineHeight = writingLineHeight > 0
+            ? writingLineHeight : appState.settings.writingFontSize.points * 1.6
+        let top = round(writingAnchorFromPaperTop + lineHeight / 2 + FirstLineSpacing.s5)
+        if abs(warningTop.constant - top) > 0.5 { warningTop.constant = top }
+        // The wipe receipt is the result the writer must see, so it takes the same
+        // place under the writing line the warning line uses, not the footer edge.
+        if abs(reportTop.constant - top) > 0.5 { reportTop.constant = top }
         let numeralSize = round(min(view.bounds.height * 0.18, 170))
         if numeralLabel.font?.pointSize != numeralSize {
             numeralLabel.font = FirstLineTypography.writingItalicNSFont(size: numeralSize)
@@ -547,12 +559,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
-        countLabel.stringValue = RoomPresentation.wordLabel(engine.wordCount)
+        let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
-        countLabel.setAccessibilityLabel("\(countLabel.stringValue) written")
+        countLabel.setAccessibilityLabel("\(wordLabel) written")
         let writing = phase == .writing
         let chrome = writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
-        countLabel.textColor = chrome
+        // The count shares the footer row's 1.6 line box, so its baseline meets the
+        // ESC - EXIT title baseline instead of sitting about 5 pt lower.
+        countLabel.attributedStringValue = Self.rowText(
+            wordLabel, font: FirstLineTypography.smallNSFont, color: chrome,
+            alignment: .right, kernEm: 0)
         refreshQuietLinks(muted: writing)
         let warning = phase == .danger
         warningStack.isHidden = !warning
@@ -571,9 +587,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let barTime = barNow()
         if barInterval == 0 || barTime - lastBarUpdate >= barInterval {
             progressBar.fraction = sessionEnded ? 0 : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
-            let idleFraction = min(max(engine.idleSeconds / Double(engine.silenceLimit.rawValue), 0), 1)
-            meter.fraction = sessionEnded ? 0 : 1 - idleFraction
-            meter.fillColor = (warning || phase == .failure) ? FirstLineColors.redNSColor : FirstLineColors.inkNSColor
             lastBarUpdate = barTime
         }
         if !textView.hasMarkedText() { prepareViewport() }
@@ -589,14 +602,45 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         keptView.setContent(text: engine.text, wordCount: engine.wordCount, writingFont: writingFont)
     }
 
+    /// A footer-row run with the row's shared 1.6 line box. The count and the inline
+    /// confirmation use it so centring their frames lands their baselines on the
+    /// ESC - EXIT title baseline instead of a few points below it.
+    private static func rowText(_ text: String, font: NSFont, color: NSColor,
+                                alignment: NSTextAlignment, kernEm: CGFloat) -> NSAttributedString {
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = alignment
+        paragraph.lineHeightMultiple = 1.6
+        return NSAttributedString(string: text, attributes: [
+            .font: font,
+            .foregroundColor: color,
+            .kern: font.pointSize * kernEm,
+            .paragraphStyle: paragraph,
+        ])
+    }
+
+    /// One type style for the footer row and its inline confirmation: same face,
+    /// size, weight and tracking, so the two runs share a baseline and rhythm.
+    private static func quietRowText(_ text: String, color: NSColor, truncates: Bool = false) -> NSAttributedString {
+        let font = FirstLineTypography.smallMediumNSFont
+        let text = NSMutableAttributedString(attributedString: FirstLineTypography.trackedText(
+            text, font: font, color: color, kernEm: 0.04))
+        if truncates {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            paragraph.lineHeightMultiple = 1.6
+            paragraph.lineBreakMode = .byTruncatingTail
+            text.addAttribute(.paragraphStyle, value: paragraph,
+                              range: NSRange(location: 0, length: text.length))
+        }
+        return text
+    }
+
     private func styleQuietLink(_ button: NSButton, title: String, muted: Bool) {
         let color = muted ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
         button.title = title
-        button.font = .systemFont(ofSize: 13, weight: .medium)
+        button.font = FirstLineTypography.smallMediumNSFont
         button.contentTintColor = color
-        button.attributedTitle = FirstLineTypography.trackedText(
-            title, font: .systemFont(ofSize: 13, weight: .medium), color: color,
-            kernEm: 0.04, lineHeightMultiple: 1.5)
+        button.attributedTitle = Self.quietRowText(title, color: color)
     }
 
     private func refreshQuietLinks(muted: Bool) {

@@ -117,3 +117,71 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: Record the current mechanism and keep the open question explicit instead of inventing a
   hidden policy.
 - Supersedes: none. This entry records an open boundary.
+
+## D-014: One session bar, no bottom silence meter
+
+- Date: 2026-10-24
+- Decision: The Mac room keeps the 2 pt top session bar and removes the 3 pt bottom silence
+  meter. The silence deadline is carried by the warning numeral and its line under the writing
+  line, not by a second bar. The web trial has no bottom bar either; the unmerged web branch
+  `fm/wid-web-room-bars` is out of scope and would revisit this entry.
+- Reason: The captain's hands-on feedback: the bottom bar pulls too much attention and is not
+  needed. One bar and one warning line keep the room quieter and the eye on the draft.
+- Supersedes: D-005's bottom-bar half; the top session bar in D-005 stands.
+
+## D-015: Basic UI polish is the implementing agent's job
+
+- Date: 2026-10-24
+- Decision: Basic design, UI and UX polish is the implementing agent's responsibility, not a
+  review finding to be forwarded. Every defect a person or reviewer finds becomes a rule in
+  `docs/ui-quality.md` and a regression assertion in the owning suite. Every checklist rule names
+  the measurement or capture that decides it. A different model family reviews the captures and
+  measurements against that file after the implementing agent reports done, before hands-on
+  testing.
+- Reason: The captain's follow-up: these are basic points and should not need to be pointed out
+  every time; a standing constraint with measured checks prevents the recurrence.
+- Supersedes: none.
+
+## D-016: The empty caret, the placeholder and the first glyph share the centred insertion origin
+
+- Date: 2026-10-24
+- Decision: In the Mac room the empty caret sits at the centred text origin, not at the first
+  glyph of the placeholder. The placeholder is centred on that same x and placed on the writing
+  line's baseline, so the first typed character (and an IME composition) is drawn exactly where
+  the caret was, with no jump. The caret is one fixed band in every state: 1.5 pt wide, one font
+  size tall, its bottom 0.12 em below the line baseline (the house `.caret` rule in
+  `writeitdown/site.css`). This matches Apple's centred
+  `NSTextView`/`NSTextField` (measured on macOS 15: the empty insertion point is at the line
+  centre and the first glyph is centred on it) and the web trial's centred textarea (the empty
+  caret is at the content centre). The caret therefore sits inside the centred placeholder words
+  while the room is empty, exactly as those controls do.
+- Reason: The captain's point 3: the caret was drawn at the placeholder's first glyph while the
+  first typed character appeared at the centre, which looked unprofessional. The convention
+  above removes the jump and keeps one product language across web and Mac.
+- Supersedes: the empty-caret-at-placeholder-first-glyph placement introduced for case 18 in PR
+  #58; no earlier D entry recorded it.
+
+## D-017: Mac status text sits under the writing line, not at the paper edge
+
+- Date: 2026-10-24
+- Decision: On the Mac, the warning numeral and its line, and the wipe receipt, sit directly under
+  the writing line: the numeral top is the writing anchor plus half a line plus 24 pt, and the
+  receipt takes the same top. This is an intended Mac difference from the web trial, whose
+  `.room-danger` band starts at 68 % of the sheet and whose wipe receipt sits 76 px above the
+  paper bottom. Everything else about those strings (copy, colour, timing) stays aligned with the
+  web.
+- Reason: The captain's point 2: the countdown text appears too low and should move up. The same
+  reason applies to the wipe receipt, which is the result the writer must read.
+- Supersedes: none.
+
+## D-018: The written line is centred in the rendered output at every window size
+
+- Date: 2026-10-24
+- Decision: The writing column is the text view's width minus both text-container insets, and the
+  rendered line must be centred in the sheet at the default window and at any wide or full-screen
+  size. A layout-manager-only centre check is not enough evidence: the rendered frame is checked.
+- Reason: A frame reassignment reset the text container to the full view width, so the drawn line
+  sat one inset to the right (7-8 pt at the default window, up to ~250 pt at a wide window) while
+  the layout data looked centred. The captain's full-screen screenshots show the shifted line.
+- Supersedes: none. This is a correction of the earlier column implementation, recorded because it
+  changes the full-screen look and binds the regression test.

@@ -3,7 +3,8 @@
 Status: acceptance spec for PR #58, branch `fm/wid-mac-consistency`. This file is the contract the
 independent audit reads against the code. A case is done only when the code implements it, the bound
 test drives the real path, and the signed DMG has a real-window recording of the same behaviour.
-Case numbers are stable; cite them in review.
+Case numbers are stable; cite them in review. Every case must also keep the cross-surface bar in
+`docs/ui-quality.md`, which names the measurement each rule is decided by.
 
 The room is the native AppKit writing surface (`SessionViewController`, `AppendOnlyTextView`). Input
 methods installed on this machine: Apple Pinyin (`com.apple.inputmethod.SCIM.ITABC`, simplified and
@@ -43,11 +44,13 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 16 | A commit that targets a range inside the composing text after the marked range was cleared is a commit, not a deletion. | `PinyinInputTests.commitAfterUnmarkInsideCompositionIsAllowed` | signed-build recording |
 | 17 | Pinyin candidacy under Shuangpin follows the same rules. | `PinyinInputTests.shuangpinSequenceStaysCompositionSafe` | signed-build recording |
 
-## 2. Caret and placeholder
+## 2. Caret, placeholder and the writing line
 
 | # | Case | Bound test | Recording |
-| 18 | In the empty room the caret sits at the first glyph origin and baseline of the centred placeholder; it is never drawn inside the words "Start typing." | `RoundThreeTests.emptyCaretSitsOnThePlaceholderFirstGlyphAndMarkedTextHidesIt` | signed-build recording |
+| 18 | The empty room has one insertion origin: the caret sits at the centred text origin (the measure centre), the placeholder is centred on that same x and on the writing line's baseline, and the first typed character is drawn centred on that point with no jump on the first key. The caret is one fixed band whether the room is empty or has text, so it never bobs between glyphs. | `RoundThreeTests.emptyCaretAndPlaceholderShareTheInsertionOriginWithTheFirstGlyphAndComposition` | signed-build recording |
 | 19 | The placeholder disappears as soon as real or marked text exists. | same test | signed-build recording |
+| 32 | An IME composition is laid into the writing line: the composed run is centred in the measure, on the same baseline, and the placeholder is hidden while the input method owns it. | `RoundThreeTests.compositionRendersOnTheWritingLineAndHidesThePlaceholder` | signed-build recording |
+| 33 | The written line is centred in the rendered output at every window size, not only in layout data: at 1040x720 and at a wide window the drawn ink centre equals the sheet centre. The writing column is the view width minus both text-container insets. | `EditorFocusTests.currentLineSitsAtTheSheetAnchorAndIsCentered`; `EditorFocusTests.drawnWritingLineStaysCentredInWideWindows` | signed-build recording |
 
 ## 3. Paper and window
 
@@ -56,14 +59,22 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 21 | Full screen keeps the same paper, margin, radius, shadow, and a centred readable column. | same geometry plus the full-screen recording | signed-build recording |
 | 22 | The writing column stays a centred 62-70 character measure; the Alignment setting maps to that measure (Narrow column 62ch, Wide column 70ch), not to a fixed 720/880 paper. | `RoundThreeTests.sheetFillsTheWindowAndKeepsTheReadableColumn`; `RoundThreeTests.writingAlignmentNamesTheColumnMeasure` | signed-build recording |
 
-## 4. Room bars
+## 4. Room bar
 
 | # | Case | Bound test | Recording |
-| 23 | Top bar: 2 pt, ink, pinned to the paper top, anchored left, full at session start and empty at session end. No label. | `RoundThreeTests.roomBarsFollowLiveTrialSemantics` | signed-build recording |
-| 24 | Bottom bar: 3 pt, pinned to the paper bottom; full while typing, drains as silence accumulates, ink before the warning, red from the warning on, empty exactly at the wipe. No label. | same test | signed-build recording |
-| 25 | Reduce Motion: the bars change in steps on the 100 ms tick; no animated drain. | same test (no animation exists); real-window Reduce Motion recording | signed-build recording |
+| 23 | Top bar: 2 pt, ink, pinned to the paper top, full width, full at session start and empty at session end. No label, no tooltip. | `RoundThreeTests.roomBarsFollowLiveTrialSemantics` | signed-build recording |
+| 24 | The room carries no second bar: the 3 pt bottom silence meter is removed because it pulled the eye away from the writing line. The deadline is carried by the numeral and its line (case 34) instead. | same test (`bars.count == 1`) | signed-build recording |
+| 25 | Reduce Motion: the remaining bar changes in steps, with no animated drain. | `RoundThreeTests.roomBarsFollowLiveTrialSemantics` (fraction is set, never animated); `RoomTests.washRecoveryFadesOnceAndWarningInterruptsImmediately`; real-window Reduce Motion recording | signed-build recording |
 
-## 5. Exit, copy, cards
+## 5. Status, warning and the exit row
+
+| # | Case | Bound test | Recording |
+| 34 | The warning numeral and its line sit directly under the writing line: the numeral top is the writing anchor plus half a line plus 24 pt, at the default window and at a wide window. They are not a footer element and never sit at the window's lower edge. | `RoundThreeTests.warningNumeralSitsDirectlyBelowTheWritingLine` | signed-build recording |
+| 35 | The wipe receipt is the result the writer must see, so `DRAFT DELETED AT … TYPE TO START AGAIN.` takes the same place under the writing line the warning line uses, not the paper's bottom edge. | `RoundThreeTests.wipeReceiptSitsUnderTheWritingLine` | signed-build recording |
+| 36 | A state change never moves unrelated elements: the clock's right edge, the count's right edge, the ESC - EXIT frame and the writing line baseline are unchanged from rest to typing to warning. | `RoundThreeTests.stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor` | signed-build recording |
+| 37 | `Press Esc again to leave. The draft is deleted.` shares one baseline and one type style with `ESC - EXIT`: same face, size, weight, tracking and line height. The word count shares that row baseline in its own (regular, mute) type role. The rendered first-ink rows are equal within 1 pt for all three runs. | `RoundThreeTests.exitHintSharesTheExitRowBaselineAndTypeStyle` | signed-build recording |
+
+## 6. Exit, copy, cards
 
 | # | Case | Bound test | Recording |
 | 26 | Exit requires two acts: the first Escape or click shows `Press Esc again to leave. The draft is deleted.`; a second within 2 s leaves; typing cancels; after the window it re-arms. | `RoomTests.firstEscapeShowsHintAndSecondEscapeLeaves`, `exitConfirmationRequiresTwoRequestsInsideTheWindow`, `typingDismissesTheExitHint`, `exitHintExpiresAfterTheConfirmationWindow`, `clickExitAlsoNeedsConfirmation` | signed-build recording |
@@ -72,6 +83,30 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 29 | A licensed picker does not show `License active.`; an unlicensed picker still shows its trial sessions line. | `RoundThreeTests.licensedPickerHidesAccessLineAndTrialPickerKeepsIt` | signed-build recording |
 | 30 | Every button, link, segmented control, popup and checkbox in every card uses the ink focus ring in light and dark. The system accent-blue ring never appears. | `RoundThreeTests.everyCardControlUsesTheInkFocusRingInLightAndDark`; `RoomTests.keptStateFocusesCopyText` | signed-build tab-through recording |
 | 31 | Buy opens the LIVE hosted checkout in the default browser. | `CheckoutClientTests.appStateOpensHostedCheckoutAndUsesFallbackOnlyOnError`, `successPostsToTheServiceAndReturnsTheHostedURL`, `checkoutAvailabilityRequiresTheServiceAndTheFallback`; `LicenseFlowTests.checkoutURLComesFromInfoPlist` | signed-build recording |
+
+## Measured changes
+
+Numbers below are frames/baselines from the layout or from the rendered frame, in points. "Paper top"
+means distance below the paper's top edge. The raw before/after runs are kept with the task evidence.
+
+| What | Before (`e792ac98`) | After | Bound by |
+| --- | --- | --- | --- |
+| Room bars at 1040x720 | 2 pt top bar + 3 pt bottom bar at y=0 | one 2 pt top bar only | case 24 |
+| Warning numeral top, paper top, 1040x720 | 426 | 302 | case 34 |
+| Warning numeral top, paper top, 1600x1000 | 641 | 411 | case 34 |
+| Warning line baseline, paper top, 1040x720 | 597 | 473 | case 34 |
+| Warning line baseline, paper top, 1600x1000 | 852 | 622 | case 34 |
+| Empty caret x, 1040x720 | 452.9 (67.1 left of centre) | 520.75 | case 18 |
+| Placeholder baseline vs first glyph baseline, 1040x720 | 295 vs 310 (15 apart) | 310 vs 310 | case 18 |
+| Rendered writing-line centre, 1040x720 | +7.25 | within 1 of centre | case 33 |
+| Rendered writing-line centre, 1600x1000 | +249.25 | within 1 of centre | case 33 |
+| Wipe receipt top, paper top, 1040x720 | 554 | 302 | case 35 |
+| Exit confirmation baseline vs ESC - EXIT title baseline | 33.0 vs 28.4 | 28.4 vs 28.4 | case 37 |
+
+The caret band is now one geometry for every state: 1.5 pt wide, one font size tall, its bottom
+0.12 em below the line baseline (the house `.caret` geometry). Before, the empty caret used the
+placeholder's first glyph and the placeholder's own font ascender, and the typed caret changed height
+per glyph.
 
 ## Method boundaries
 

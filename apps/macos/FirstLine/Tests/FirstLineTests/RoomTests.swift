@@ -333,7 +333,8 @@ struct RoomTests {
             let exit = try #require(exitButton(in: fixture.room))
             let exitColor = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
             let expected = phase == .writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
-            #expect(sameColor(count.textColor, expected))
+            let countColor = count.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+            #expect(sameColor(countColor, expected))
             #expect(sameColor(exitColor, expected))
         }
     }

@@ -4,8 +4,11 @@
 #         Spends three native trial sessions, then activates a copied app through a disposable loopback fixture,
 #         never a Waffo purchase. WID_QA_LICENSE_ONLY=1 skips motion timing checks.
 #         WID_QA_THEME=light|dark presets appearance only, never entitlement.
-# [OUTPUT] Per-stage screenshots, AX snapshots, app.log, and timing.txt in the
+# [OUTPUT] Per-stage screenshots, AX snapshots, geometry.jsonl (element frames and
+#          the cross-element frame comparisons), app.log, and timing.txt in the
 #          output directory; exit 0 only when every assertion below holds.
+#          AX exposes no insertion-point frame, so caret/placeholder/first-glyph
+#          equality is bound to RoundThreeTests in the deterministic suite.
 # [POS] apps/macos/FirstLine/scripts/qa-window.sh — real-window acceptance driven
 #       through the cua-driver daemon (roadmap report section 6.9).
 # [PROTOCOL] Accessibility/screen-recording permission belongs to the running
@@ -95,6 +98,70 @@ fail() {
 }
 
 
+# Frame of the first element with this role whose text matches (regex, jq syntax).
+frame_of() { # frame_of <snapshot-file> <role> <regex>
+  jq -c --arg r "$2" --arg re "$3" '
+    [.elements[] | select(.role == $r)
+      | select((((.value // .label) // "") | tostring) | test($re))][0]
+    | if . == null then empty
+      else {role: $r, text: (((.value // .label) // "") | tostring),
+            x: .frame.x, y: .frame.y, w: .frame.w, h: .frame.h} end
+  ' "$1"
+}
+
+record_geometry() { # record_geometry <stage> <json-object>
+  jq -cn --arg stage "$1" --argjson g "$2" '{stage: $stage, geometry: $g}' >>"$output/geometry.jsonl"
+}
+
+# The placeholder is centred on the writing area (the AXTextArea frame).
+assert_room_geometry() { # assert_room_geometry <room-snapshot>
+  local ta ph
+  ta="$(frame_of "$1" AXTextArea '')"
+  ph="$(frame_of "$1" AXStaticText '^Start typing\.$')"
+  [[ -n "$ta" && -n "$ph" ]] || fail 'room geometry: missing text area or placeholder frame'
+  record_geometry room "$(jq -cn --argjson ta "$ta" --argjson ph "$ph" '{textArea: $ta, placeholder: $ph}')"
+  jq -en --argjson ta "$ta" --argjson ph "$ph" '
+    def d(a; b): (a - b) | if . < 0 then -. else . end;
+    d(($ph.x + $ph.w / 2); ($ta.x + $ta.w / 2)) <= 2
+  ' >/dev/null || fail 'the placeholder is not centred on the writing area'
+}
+
+# The numeral is directly under the writing line: its top is above the text
+# area's vertical centre, and the caption sits below the numeral but inside the
+# text area (never at the paper's bottom edge).
+assert_warn_geometry() { # assert_warn_geometry <warn-snapshot>
+  local ta num hint
+  ta="$(frame_of "$1" AXTextArea '')"
+  num="$(frame_of "$1" AXStaticText '^[123]$')"
+  hint="$(frame_of "$1" AXStaticText '^KEEP TYPING OR THE DRAFT IS DELETED\.$')"
+  [[ -n "$ta" && -n "$num" && -n "$hint" ]] || fail 'warn geometry: missing text area, numeral or caption frame'
+  record_geometry warn "$(jq -cn --argjson ta "$ta" --argjson num "$num" --argjson hint "$hint"     '{textArea: $ta, numeral: $num, caption: $hint}')"
+  jq -en --argjson ta "$ta" --argjson num "$num" --argjson hint "$hint" '
+    def d(a; b): (a - b) | if . < 0 then -. else . end;
+    (($num.y + $num.h) > ($ta.y + $ta.h / 2))
+    and (($hint.y + $hint.h) < ($num.y + 1))
+    and ($hint.y > ($ta.y + 16))
+  ' >/dev/null || fail 'the warning numeral/caption is not under the writing line'
+}
+
+# The inline confirmation, the ESC - EXIT link and the count share one row.
+# Equal centres plus the shared 13 pt 1.6 line box put all three on one baseline;
+# the caption's exact baseline equality is measured in RoundThreeTests.
+assert_exit_row_geometry() { # assert_exit_row_geometry <snapshot>
+  local exit hint count
+  exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
+  hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave\.')"
+  count="$(frame_of "$1" AXStaticText '^[0-9]+ words$')"
+  [[ -n "$exit" && -n "$hint" && -n "$count" ]] || fail 'exit row geometry: missing a row element'
+  record_geometry exit-row "$(jq -cn --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count"     '{exit: $exit, confirmation: $hint, count: $count}')"
+  jq -en --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count" '
+    def d(a; b): (a - b) | if . < 0 then -. else . end;
+    d(($hint.y + $hint.h / 2); ($exit.y + $exit.h / 2)) <= 1
+    and d(($count.y + $count.h / 2); ($exit.y + $exit.h / 2)) <= 1
+    and ($hint.h >= 20) and ($count.h >= 20)
+  ' >/dev/null || fail 'the exit row is not on one baseline'
+}
+
 # The daemon reports actionable elements separately from static AX tree text.
 normalize() {
   jq '{
@@ -167,6 +234,7 @@ type_text() {
 assert_exit_hint() { # first Escape/click must arm the inline confirmation, not leave
   poll exit-hint
   assert_text "$output/last-poll.json" 'Press Esc again to leave. The draft is deleted.'
+  assert_exit_row_geometry "$output/last-poll.json"
 }
 
 exit_room_by_key() {
@@ -248,6 +316,7 @@ check_warn_recovery_wipe() {
   assert_text "$warn" 'ESC - EXIT'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
+  assert_warn_geometry "$warn"
   wipe_start="$(clock_now)"
   press k
   snap "$tier-recovered-state" >"$recovered"
@@ -338,6 +407,7 @@ assert_text "$output/room.json" '0 words'
 assert_text "$output/room.json" 'ESC - EXIT'
 jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$output/room.json" \
   || fail 'no text area in the room'
+assert_room_geometry "$output/room.json"
 
 ### 3. Type; forward-only contract blocks delete
 type_text 'hello world'

@@ -35,24 +35,41 @@ struct EditorFocusTests {
         let placeholder = try #require(descendants(of: room.view, as: NSTextField.self)
             .first(where: { $0.stringValue == "Start typing." }))
         let lineHeight = CGFloat(WritingFontSize.medium.points) * 1.6
+        let container = try #require(editor.textContainer)
+        // The centred column is the view width minus both insets. A frame reassignment
+        // must not reset the container to the full view width: that drew the writing
+        // line one inset to the right (8 pt at 1040, 314 pt at full screen).
+        func expectColumnWidth() {
+            let usable = editor.bounds.width - 2 * editor.textContainerInset.width
+            #expect(abs(container.containerSize.width - usable) <= 1,
+                    "writing column is \(container.containerSize.width), expected \(usable) at \(size)")
+        }
+        expectColumnWidth()
 
-        // Empty sheet: the placeholder sits at 39% of the sheet and is horizontally centred.
-        let placeholderY = topInPaper(placeholder.bounds.midY, of: placeholder, paper: paper)
-        #expect(abs(placeholderY / paper.bounds.height - 0.39) < 0.01)
+        // Empty sheet: the writing line sits at 39% of the sheet, and the placeholder
+        // shares that line's centre and baseline (not its own centred box).
+        let emptyY = try currentLineTop(in: editor, paper: paper)
+        #expect(abs(emptyY / paper.bounds.height - 0.39) < 0.01)
         let placeholderX = paper.convert(NSPoint(x: placeholder.bounds.midX, y: 0), from: placeholder).x
         #expect(abs(placeholderX - paper.bounds.midX) <= 1)
+        // NSTextField is flipped, so its baseline is firstBaselineOffsetFromTop from
+        // the field's top (y = 0 in its own coordinates).
+        let placeholderBaseline = topInPaper(placeholder.firstBaselineOffsetFromTop,
+                                             of: placeholder, paper: paper)
+        let emptyBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
+        #expect(abs(placeholderBaseline - emptyBaseline) <= 1)
         #expect(!placeholder.isHidden)
         #expect(editor.alignment == .center)
-        let emptyY = try currentLineTop(in: editor, paper: paper)
-        #expect(abs(emptyY - placeholderY) < 3)
 
-        // One line: the current line replaces the hint at the same anchor, centred.
+        // One line: the typed line keeps that anchor and the same baseline.
         editor.insertText("One", replacementRange: NSRange(location: NSNotFound, length: 0))
         room.viewDidLayout()
         room.refreshRoom()
+        expectColumnWidth()
         let firstY = try currentLineTop(in: editor, paper: paper)
         #expect(abs(firstY / paper.bounds.height - 0.39) < 0.01)
-        #expect(abs(firstY - placeholderY) < 3)
+        let firstBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
+        #expect(abs(firstBaseline - placeholderBaseline) <= 1)
         #expect(placeholder.isHidden)
         let firstLineX = try lineCentreX(in: editor, paper: paper)
         #expect(abs(firstLineX - paper.bounds.midX) <= 2)
@@ -72,6 +89,53 @@ struct EditorFocusTests {
         #expect(abs(try currentLineTop(in: editor, paper: paper) - firstY) <= 2)
         #expect(try firstLineTop(in: editor, paper: paper) < 0)
         #expect(abs(try lineCentreX(in: editor, paper: paper) - paper.bounds.midX) <= 2)
+    }
+
+    @Test(arguments: [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000)])
+    func drawnWritingLineStaysCentredInWideWindows(size: NSSize) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = licensedTestState(settingsStore: SettingsStore(configDirectory: root))
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(size)
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        RoomWindowKeeper.windows.append(window)
+
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.viewDidLayout()
+        room.refreshRoom()
+        room.view.layoutSubtreeIfNeeded()
+        room.view.displayIfNeeded()
+
+        // Render the real view hierarchy: layout numbers alone missed the old bug
+        // where the drawn column sat one inset to the right of the sheet centre.
+        let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
+        room.view.cacheDisplay(in: room.view.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
+        let lineCentreFromPaperTop = try currentLineTop(in: editor, paper: paper)
+        let paperTopFromRoomTop = room.view.bounds.height - paper.frame.maxY
+        let y0 = Int((paperTopFromRoomTop + lineCentreFromPaperTop - 30) * scale)
+        let y1 = Int((paperTopFromRoomTop + lineCentreFromPaperTop + 30) * scale)
+        var minX = Int.max, maxX = Int.min
+        for y in max(y0, 0)..<min(y1, rep.pixelsHigh) {
+            for x in 0..<rep.pixelsWide {
+                guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB), colour.alphaComponent > 0.4 else { continue }
+                let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
+                if luma < 0.5 { minX = min(minX, x); maxX = max(maxX, x) }
+            }
+        }
+        #expect(minX < maxX, "no writing ink rendered at \(size)")
+        let centre = CGFloat(minX + maxX) / 2 / scale
+        #expect(abs(centre - room.view.bounds.midX) <= 2,
+                "drawn writing line centre \(centre) is not the sheet centre \(room.view.bounds.midX) at \(size)")
     }
 
     @Test
@@ -112,8 +176,10 @@ struct EditorFocusTests {
         #expect(inkOffset > 0)
         #expect(inkOffset < line / 2)
         func alpha(at offset: CGFloat) -> CGFloat? {
+            // The room rounds its zen anchor to a whole point, so the rendered line can
+            // sit up to half a point from the gradient's computed centre.
             let target = (renderedCentre + offset) / height
-            guard let index = locations.firstIndex(where: { abs($0 - target) < 0.0005 }) else { return nil }
+            guard let index = locations.firstIndex(where: { abs($0 - target) * height <= 1 }) else { return nil }
             return colors[index].alpha
         }
         #expect(abs((alpha(at: -line) ?? -1) - 0.22) < 0.01)

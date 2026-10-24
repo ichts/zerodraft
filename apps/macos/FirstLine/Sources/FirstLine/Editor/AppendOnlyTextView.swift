@@ -29,11 +29,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// replace that range through insertText after unmarkText, which is still a
     /// composition commit, not a user edit.
     private var compositionRange: NSRange?
-    /// Baseline and x of the first real glyph, supplied by the room so the empty
-    /// caret sits at the start of the centered placeholder instead of inside it.
-    var emptyCaretOrigin: NSPoint? {
-        didSet { needsDisplay = true }
-    }
     /// Guards replaceCharacters during a programmatic restore of an existing engine
     /// draft (loadRestoredText). The append-only user-input guards behave identically
     /// whenever this flag is false; it only allows the controlled restore path to write
@@ -65,7 +60,16 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override var frame: NSRect {
         didSet {
-            textContainer?.containerSize = NSSize(width: bounds.width, height: .greatestFiniteMagnitude)
+            // The writing column is narrowed by textContainerInset, so the container
+            // width is the view width minus both insets. Writing bounds.width here
+            // re-centred the column in the full view + inset, shifting the text right
+            // by the inset at wide window sizes.
+            if let textContainer {
+                let usable = max(bounds.width - 2 * textContainerInset.width, 0)
+                if abs(textContainer.containerSize.width - usable) > 0.5 {
+                    textContainer.containerSize = NSSize(width: usable, height: .greatestFiniteMagnitude)
+                }
+            }
             updateViewportInsetsIfNeeded()
         }
     }
@@ -274,21 +278,79 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     private static let caretWidth: CGFloat = 1.5
-    private static let caretVerticalPadding: CGFloat = 1
+    /// The caret band is one em tall with its bottom 0.12 em below the baseline,
+    /// the same geometry the house `.caret` rule uses. One band for every glyph
+    /// keeps the caret from bobbing between scripts, and the empty caret and the
+    /// first typed character then share the exact same rect origin.
+    private static let caretDescenderEm: CGFloat = 0.12
 
     override func drawInsertionPoint(in rect: NSRect, color: NSColor, turnedOn flag: Bool) {
         super.drawInsertionPoint(in: adjustedCaretRectForCurrentInsertionPoint(from: rect), color: color, turnedOn: flag)
     }
 
-    /// The caret rect for the current insertion point; empty text uses the
-    /// placeholder's first-glyph origin.
+    /// The caret rect the editor draws for the current insertion point. Used by the
+    /// room's geometry tests; the drawing path comes through drawInsertionPoint.
     func caretRectForCurrentInsertionPoint() -> NSRect {
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        if let window {
+            let screen = firstRect(forCharacterRange: NSRange(location: insertion, length: 0), actualRange: nil)
+            let inView = convert(window.convertFromScreen(screen), from: nil)
+            if inView.height > 0 {
+                return adjustedCaretRectForCurrentInsertionPoint(from: inView)
+            }
+        }
+        return adjustedCaretRectForCurrentInsertionPoint(from: fallbackLineRect())
+    }
+
+    /// Baseline of the line the caret occupies, in view coordinates. Empty text uses
+    /// the extra line fragment, which shares the first typed line's baseline, so the
+    /// caret does not move vertically when the first character lands.
+    func currentInsertionBaseline() -> CGFloat? {
+        guard let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        if string.isEmpty || (insertion == utf16Length && string.hasSuffix("\n")) {
+            let extra = layoutManager.extraLineFragmentRect
+            return textContainerOrigin.y + extra.minY + stableLineBaselineOffset
+        }
+        let index = insertion < utf16Length ? insertion : max(insertion - 1, 0)
+        let glyph = layoutManager.glyphIndexForCharacter(at: index)
+        let line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil, withoutAdditionalLayout: true)
+        return textContainerOrigin.y + line.minY + layoutManager.location(forGlyphAt: glyph).y
+    }
+
+    /// Height of the current line box, used by the room to place the warning group a
+    /// fixed distance below the writing line.
+    func currentLineHeight() -> CGFloat? {
+        guard let layoutManager, let textContainer else { return nil }
+        layoutManager.ensureLayout(for: textContainer)
+        if string.isEmpty { return layoutManager.extraLineFragmentRect.height }
+        let glyph = layoutManager.glyphIndexForCharacter(at: max(utf16Length - 1, 0))
+        return layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).height
+    }
+
+    /// Line box used only when the view has no window to ask for the insertion rect.
+    private func fallbackLineRect() -> NSRect {
         guard let layoutManager, let textContainer else { return .zero }
         layoutManager.ensureLayout(for: textContainer)
-        let line: NSRect = string.isEmpty ? layoutManager.extraLineFragmentRect
-            : layoutManager.lineFragmentUsedRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0)), effectiveRange: nil)
-        let rect = NSRect(x: line.minX, y: line.minY, width: Self.caretWidth, height: line.height)
-        return adjustedCaretRectForCurrentInsertionPoint(from: rect)
+        let insertion = min(max(selectedRange().location, 0), utf16Length)
+        let line: NSRect
+        if string.isEmpty || (insertion == utf16Length && string.hasSuffix("\n")) {
+            line = layoutManager.extraLineFragmentRect
+        } else {
+            let index = insertion < utf16Length ? insertion : max(insertion - 1, 0)
+            let glyph = layoutManager.glyphIndexForCharacter(at: index)
+            line = layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil, withoutAdditionalLayout: true)
+        }
+        return NSRect(x: textContainerOrigin.x + line.minX, y: textContainerOrigin.y + line.minY,
+                      width: Self.caretWidth, height: line.height)
+    }
+
+    func adjustedCaretRectForCurrentInsertionPoint(from rect: NSRect) -> NSRect {
+        let baseline = currentInsertionBaseline() ?? (rect.minY + stableLineBaselineOffset)
+        let height = caretHeight
+        return NSRect(x: rect.minX, y: baseline - height * (1 - Self.caretDescenderEm),
+                      width: Self.caretWidth, height: height)
     }
 
     override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
@@ -310,6 +372,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         trimCaretLayers()
     }
 
+    /// One baseline offset for every real line, so mixed Latin/CJK lines keep the
+    /// same grid and the first typed line shares the empty room's inserted line.
     func layoutManager(_ layoutManager: NSLayoutManager,
                        shouldSetLineFragmentRect lineFragmentRect: UnsafeMutablePointer<NSRect>,
                        lineFragmentUsedRect: UnsafeMutablePointer<NSRect>,
@@ -332,108 +396,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             sub.bounds.size.width = Self.caretWidth
             sub.bounds.size.height = adjusted.height
         }
-    }
-
-    func adjustedCaretRectForCurrentInsertionPoint(from rect: NSRect) -> NSRect {
-        if string.isEmpty, let origin = emptyCaretOrigin {
-            var empty = defaultCaretRect(from: rect)
-            empty.origin.x = origin.x
-            empty.origin.y = origin.y - sessionFont.ascender
-            empty.size.width = Self.caretWidth
-            empty.size.height = caretHeight
-            return empty
-        }
-
-        let adjusted = defaultCaretRect(from: rect)
-        if let lineRect = trailingNewlineCaretLineRect(),
-           let font = chineseFont.font(size: sessionFontSize),
-           let bounds = caretInkBounds(for: "国", font: font) {
-            let baseline = textContainerOrigin.y + lineRect.minY + stableLineBaselineOffset
-            return caretRect(from: adjusted, baseline: baseline, bounds: bounds)
-        }
-
-        guard let character = previousCaretCharacter() else { return adjusted }
-        guard let layoutManager, let textContainer else { return adjusted }
-        guard let font = caretFont(for: character.value) else { return adjusted }
-        guard let bounds = caretInkBounds(for: character.value, font: font) else { return adjusted }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let glyphIndex = layoutManager.glyphIndexForCharacter(at: character.range.location)
-        let lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: nil, withoutAdditionalLayout: true)
-        let baseline = textContainerOrigin.y + lineRect.minY + layoutManager.location(forGlyphAt: glyphIndex).y
-        return caretRect(from: adjusted, baseline: baseline, bounds: bounds)
-    }
-
-    private func caretRect(from rect: NSRect, baseline: CGFloat, bounds: NSRect) -> NSRect {
-        var adjusted = rect
-        adjusted.size.width = Self.caretWidth
-        let inkTop = baseline - bounds.maxY
-        adjusted.origin.y = floor(inkTop + bounds.height / 2 - caretHeight / 2)
-        adjusted.size.height = caretHeight
-        return adjusted
-    }
-
-    private func trailingNewlineCaretLineRect() -> NSRect? {
-        let value = string as NSString
-        let insertionLocation = min(max(selectedRange().location, 0), value.length)
-        guard insertionLocation == value.length, insertionLocation > 0 else { return nil }
-        guard value.substring(with: NSRange(location: insertionLocation - 1, length: 1)) == "\n" else { return nil }
-        guard let layoutManager, let textContainer else { return nil }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let rect = layoutManager.extraLineFragmentRect
-        return rect.isEmpty ? nil : rect
-    }
-
-    private func caretFont(for character: String) -> NSFont? {
-        if character.unicodeScalars.contains(where: isWideCJKGlyph) {
-            return chineseFont.font(size: sessionFontSize)
-        }
-
-        return writingFont.font(size: sessionFontSize)
-    }
-
-    private func defaultCaretRect(from rect: NSRect) -> NSRect {
-        var adjusted = rect
-        adjusted.size.width = Self.caretWidth
-        let targetHeight = min(rect.height, sessionFontSize)
-        adjusted.origin.y += max((rect.height - targetHeight) / 2, 0)
-        adjusted.size.height = targetHeight
-        return adjusted
-    }
-
-    private func previousCaretCharacter() -> (value: String, range: NSRange)? {
-        let value = string as NSString
-        let insertionLocation = min(max(selectedRange().location, 0), value.length)
-        guard insertionLocation > 0 else { return nil }
-
-        let range = value.rangeOfComposedCharacterSequence(at: insertionLocation - 1)
-        return (value.substring(with: range), range)
-    }
-
-    private func inkBounds(for character: String, font: NSFont) -> NSRect? {
-        guard let scalar = character.unicodeScalars.first else { return nil }
-        guard scalar.value <= UInt16.max else { return nil }
-
-        let coreTextFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var codeUnit = UniChar(scalar.value)
-        var glyph = CGGlyph()
-        guard CTFontGetGlyphsForCharacters(coreTextFont, &codeUnit, &glyph, 1), glyph != 0 else { return nil }
-
-        var measuredGlyph = glyph
-        var bounds = CGRect.zero
-        CTFontGetBoundingRectsForGlyphs(coreTextFont, .horizontal, &measuredGlyph, &bounds, 1)
-        guard bounds.height > 0 else { return nil }
-        return bounds
-    }
-
-    private func caretInkBounds(for character: String, font: NSFont) -> NSRect? {
-        if let bounds = inkBounds(for: character, font: font) {
-            return bounds
-        }
-
-        let fallbackGlyph = character.unicodeScalars.contains(where: isWideCJKGlyph) ? "国" : "x"
-        return inkBounds(for: fallbackGlyph, font: font)
     }
 
     private func isWideCJKGlyph(_ scalar: Unicode.Scalar) -> Bool {

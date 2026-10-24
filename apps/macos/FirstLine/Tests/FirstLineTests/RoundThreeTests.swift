@@ -107,7 +107,7 @@ struct RoundThreeTests {
 
     // MARK: - Empty caret and placeholder
 
-    @Test func emptyCaretSitsOnThePlaceholderFirstGlyphAndMarkedTextHidesIt() throws {
+    @Test func emptyCaretAndPlaceholderShareTheInsertionOriginWithTheFirstGlyphAndComposition() throws {
         let state = licensedTestState()
         state.startSession()
         let room = SessionViewController(appState: state)
@@ -115,25 +115,76 @@ struct RoundThreeTests {
         let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
             .first { $0.stringValue == "Start typing." })
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
-        let font = try #require(placeholder.font)
-        let text = placeholder.stringValue as NSString
-        let width = text.size(withAttributes: [.font: font]).width
-        let x = placeholder.bounds.minX + max((placeholder.bounds.width - width) / 2, 0)
-        let baseline = placeholder.bounds.maxY - placeholder.firstBaselineOffsetFromTop
-        let expected = editor.convert(NSPoint(x: x, y: baseline), from: placeholder)
-        let origin = try #require(editor.emptyCaretOrigin)
-        #expect(abs(origin.x - expected.x) <= 1)
-        #expect(abs(origin.y - expected.y) <= 1)
-        let caret = editor.caretRectForCurrentInsertionPoint()
-        #expect(abs(caret.minX - origin.x) <= 1)
-        #expect(abs((caret.minY + (editor.font?.ascender ?? 0)) - origin.y) <= 1)
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        let container = try #require(editor.textContainer)
+        room.view.layoutSubtreeIfNeeded()
+
+        // One insertion origin: the centred text origin, the placeholder centre and
+        // the empty caret all sit on the same x and the same baseline.
+        let emptyCaret = editor.caretRectForCurrentInsertionPoint()
+        let emptyCaretInPaper = paper.convert(emptyCaret, from: editor)
+        let insertionX = editor.textContainerOrigin.x + container.containerSize.width / 2
+        #expect(abs(emptyCaret.midX - insertionX) <= 1, "empty caret is not on the centred insertion point")
+        let labelRect = paper.convert(placeholder.bounds, from: placeholder)
+        #expect(abs(labelRect.midX - emptyCaretInPaper.midX) <= 1,
+                "placeholder is not centred on the insertion point")
+        let emptyBaseline = try #require(editor.currentInsertionBaseline())
+        let emptyBaselineInPaper = paper.convert(NSPoint(x: 0, y: emptyBaseline), from: editor).y
+        let placeholderBaseline = labelRect.maxY - placeholder.firstBaselineOffsetFromTop
+        #expect(abs(placeholderBaseline - emptyBaselineInPaper) <= 1,
+                "placeholder baseline \(placeholderBaseline) is not the writing line baseline \(emptyBaselineInPaper)")
         #expect(!placeholder.isHidden)
 
-        editor.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+        // The first typed character is rendered at the caret: centred on the same x
+        // and on the same baseline, and the caret band does not move.
+        editor.insertText("A", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.view.layoutSubtreeIfNeeded()
+        let layout = try #require(editor.layoutManager)
+        layout.ensureLayout(for: container)
+        let glyphBox = layout.boundingRect(forGlyphRange: NSRange(location: 0, length: 1), in: container)
+        #expect(abs(editor.textContainerOrigin.x + glyphBox.midX - emptyCaret.midX) <= 1,
+                "the first glyph appears away from the empty caret")
+        let typedBaseline = try #require(editor.currentInsertionBaseline())
+        let typedBaselineInPaper = paper.convert(NSPoint(x: 0, y: typedBaseline), from: editor).y
+        #expect(abs(typedBaselineInPaper - placeholderBaseline) <= 1,
+                "the first glyph baseline moved from the placeholder baseline")
+        let typedCaret = editor.caretRectForCurrentInsertionPoint()
+        #expect(abs(typedCaret.minY - emptyCaret.minY) <= 1, "the caret jumped vertically on the first key")
+        #expect(abs(typedCaret.height - emptyCaret.height) <= 1)
+        #expect(placeholder.isHidden, "the placeholder must disappear once text exists")
+        window.orderOut(nil)
+    }
+
+    @Test func compositionRendersOnTheWritingLineAndHidesThePlaceholder() throws {
+        let state = licensedTestState()
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let placeholder = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue == "Start typing." })
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let container = try #require(editor.textContainer)
+        let emptyBaseline = try #require(editor.currentInsertionBaseline())
+
+        editor.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: 0))
         room.refreshRoom()
+        room.view.layoutSubtreeIfNeeded()
         #expect(editor.hasMarkedText())
-        #expect(placeholder.isHidden)
+        #expect(placeholder.isHidden, "the placeholder must hide while the IME owns a composition")
+
+        // The composition is laid into the writing line: centred in the measure and
+        // on the same baseline, not in a separate position.
+        let layout = try #require(editor.layoutManager)
+        layout.ensureLayout(for: container)
+        let marked = editor.markedRange()
+        let line = layout.lineFragmentUsedRect(forGlyphAt: layout.glyphIndexForCharacter(at: marked.location),
+                                               effectiveRange: nil)
+        let lineCentre = editor.textContainerOrigin.x + line.midX
+        let measureCentre = editor.textContainerOrigin.x + container.containerSize.width / 2
+        #expect(abs(lineCentre - measureCentre) <= 1, "the composition is not centred on the writing line")
+        #expect(abs(try #require(editor.currentInsertionBaseline()) - emptyBaseline) <= 1,
+                "the composition baseline differs from the writing line baseline")
         window.orderOut(nil)
     }
 
@@ -183,21 +234,20 @@ struct RoundThreeTests {
         let paper = try #require(scroll.superview)
         paper.needsDisplay = true
         paper.displayIfNeeded()
+
+        // One bar only: the bottom silence bar was removed because it pulled the eye
+        // away from the writing line.
         let bars = descendants(of: room.view, of: FirstLineFillBar.self)
-        #expect(bars.count == 2)
-        let top = try #require(bars.first { abs($0.frame.height - 2) <= 0.5 })
-        let bottom = try #require(bars.first { abs($0.frame.height - 3) <= 0.5 })
-        #expect(abs(top.frame.maxY - paper.bounds.maxY) <= 1, "top bar pinned to the paper top")
-        #expect(abs(bottom.frame.minY) <= 1, "bottom bar pinned to the paper bottom")
+        #expect(bars.count == 1, "the room must not carry a second (bottom) bar")
+        let top = try #require(bars.first)
+        #expect(abs(top.frame.height - 2) <= 0.5)
+        #expect(abs(top.frame.maxY - paper.bounds.maxY) <= 1, "the session bar is pinned to the paper top")
         #expect(abs(top.frame.width - paper.bounds.width) <= 1)
-        #expect(abs(bottom.frame.width - paper.bounds.width) <= 1)
-        #expect(paper.layer?.masksToBounds == true, "bars are clipped by the sheet's rounded rect")
+        #expect(paper.layer?.masksToBounds == true, "the bar is clipped by the sheet's rounded rect")
         #expect(paper.layer?.cornerRadius == FirstLineRadius.sheet)
         #expect(top.toolTip == nil)
-        #expect(bottom.toolTip == nil)
-        #expect(top.accessibilityLabel() == nil, "bars are the only indicator: no label")
-        #expect(abs(top.fraction - 1) <= 0.01, "top bar starts full")
-        #expect(abs(bottom.fraction - 1) <= 0.01, "bottom bar starts full while typing")
+        #expect(top.accessibilityLabel() == nil, "the bar is the only indicator: no label")
+        #expect(abs(top.fraction - 1) <= 0.01, "the bar starts full")
         #expect(resolved(top.fillColor, .aqua) == resolved(FirstLineColors.inkNSColor, .aqua))
 
         for second in stride(from: 4.0, through: 28.0, by: 4.0) {
@@ -208,24 +258,12 @@ struct RoundThreeTests {
         engine.registerCommittedText("a")
         room.tick()
         #expect(abs(top.fraction - engine.remaining / engine.duration) <= 0.02,
-                "top bar tracks the remaining session time")
+                "the bar tracks the remaining session time")
         #expect(top.fraction < 1)
-        #expect(abs(bottom.fraction - 1) <= 0.02)
 
-        now.now = 32
+        now.now = 60
         room.tick()
-        #expect(abs(bottom.fraction - 0.75) <= 0.02)
-        #expect(resolved(bottom.fillColor, .aqua) == resolved(FirstLineColors.inkNSColor, .aqua))
-
-        now.now = 35
-        room.tick()
-        #expect(abs(bottom.fraction - 0.375) <= 0.02)
-        #expect(resolved(bottom.fillColor, .aqua) == resolved(FirstLineColors.redNSColor, .aqua))
-
-        now.now = 38
-        room.tick()
-        #expect(top.fraction == 0)
-        #expect(bottom.fraction == 0)
+        #expect(top.fraction == 0, "the bar empties at the session end")
         window.orderOut(nil)
     }
 
@@ -307,6 +345,185 @@ struct RoundThreeTests {
         }
     }
 
+    // MARK: - Warning placement and the exit row
+
+    @Test func warningNumeralSitsDirectlyBelowTheWritingLine() throws {
+        for size in [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000)] {
+            let now = MutableRoundClock(0)
+            let engine = SessionEngine(now: { now.now })
+            let state = licensedTestState(sessionEngine: engine,
+                                          settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                          installIDStore: InstallIDStore(configDirectory: tempRoot()))
+            state.startSession(duration: 60)
+            let room = SessionViewController(appState: state)
+            let window = makeWindow(room, size: size)
+            let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+            let paper = try #require(editor.enclosingScrollView?.superview)
+
+            editor.insertText("hello", replacementRange: NSRange(location: NSNotFound, length: 0))
+            now.now = 5.6
+            room.tick()
+            room.view.layoutSubtreeIfNeeded()
+            room.viewDidLayout()
+            room.view.layoutSubtreeIfNeeded()
+
+            let numeral = try #require(descendants(of: room.view, of: NSTextField.self)
+                .first { ($0.font?.pointSize ?? 0) > 40 && !$0.isHiddenOrHasHiddenAncestor })
+            let hint = try #require(descendants(of: room.view, of: NSTextField.self)
+                .first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
+            let numeralInPaper = paper.convert(numeral.bounds, from: numeral)
+            let hintInPaper = paper.convert(hint.bounds, from: hint)
+            let lineHeight = try #require(editor.currentLineHeight())
+            let expectedTop = paper.bounds.height * 0.39 + lineHeight / 2 + 24
+            let numeralTopFromPaperTop = paper.bounds.height - numeralInPaper.maxY
+            #expect(abs(numeralTopFromPaperTop - expectedTop) <= 1.5,
+                    "warning numeral top \(numeralTopFromPaperTop) is not just under the writing line (\(expectedTop)) at \(size)")
+            #expect(numeralInPaper.minY > hintInPaper.maxY + 8, "the numeral sits above its line")
+            #expect(hintInPaper.minY > 16, "the warning line stays inside the paper at \(size)")
+            window.orderOut(nil)
+        }
+    }
+
+    @Test func stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        let timer = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "1:00" })
+        let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "0 words" })
+        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
+
+        // Fixed edges only: the clock's text width changes, its right edge must not.
+        func chrome() -> [CGFloat] {
+            [timer.frame.maxX, timer.frame.midY, count.frame.maxX, count.frame.midY,
+             exit.frame.minX, exit.frame.maxY, exit.frame.midY]
+        }
+        func baseline() throws -> CGFloat {
+            let y = try #require(editor.currentInsertionBaseline())
+            return paper.convert(NSPoint(x: 0, y: y), from: editor).y
+        }
+        let restChrome = chrome()
+        let restBaseline = try baseline()
+
+        editor.insertText("hello", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.tick()
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        for (index, value) in chrome().enumerated() {
+            #expect(abs(value - restChrome[index]) <= 0.5, "chrome edge \(index) moved after typing")
+        }
+        #expect(abs(try baseline() - restBaseline) <= 1, "the writing baseline moved after typing")
+
+        now.now = 5.6
+        room.tick()
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        for (index, value) in chrome().enumerated() {
+            #expect(abs(value - restChrome[index]) <= 0.5, "chrome edge \(index) moved into the warning")
+        }
+        #expect(abs(try baseline() - restBaseline) <= 1, "the writing baseline moved into the warning")
+        window.orderOut(nil)
+    }
+
+    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+        now.now = 9
+        room.tick()
+        room.endCutAnimation()
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
+        let receiptInPaper = paper.convert(receipt.bounds, from: receipt)
+        let topFromPaperTop = paper.bounds.height - receiptInPaper.maxY
+        let lineHeight = try #require(editor.currentLineHeight())
+        let expected = paper.bounds.height * 0.39 + lineHeight / 2 + 24
+        #expect(abs(topFromPaperTop - expected) <= 1.5,
+                "the wipe receipt is not under the writing line (top \(topFromPaperTop), expected \(expected))")
+        #expect(topFromPaperTop < paper.bounds.height * 0.55, "the receipt is back at the lower edge")
+        window.orderOut(nil)
+    }
+
+    @Test func exitHintSharesTheExitRowBaselineAndTypeStyle() throws {
+        let state = licensedTestState()
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        room.exitConfirmation = ExitConfirmation(window: 60)
+        room.requestExit()
+        room.view.layoutSubtreeIfNeeded()
+
+        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
+        let hint = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.attributedStringValue.string == "Press Esc again to leave. The draft is deleted." })
+        #expect(!hint.isHidden)
+
+        // Same role, same type style: face, size, weight and tracking.
+        let exitTitle = try #require(exit.attributedTitle)
+        let hintText = hint.attributedStringValue
+        let exitFont = try #require(exitTitle.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        let hintFont = try #require(hintText.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(exitFont.fontName == hintFont.fontName)
+        #expect(exitFont.pointSize == hintFont.pointSize)
+        #expect(exitFont.fontDescriptor.symbolicTraits == hintFont.fontDescriptor.symbolicTraits)
+        let exitKern = try #require(exitTitle.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
+        let hintKern = try #require(hintText.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
+        #expect(abs(exitKern - hintKern) <= 0.01, "the exit row uses two tracking values")
+
+        // Same baseline: read the first ink row of each run from one rendered frame.
+        // The count shares the row too, with its own type role.
+        let count = try #require(descendants(of: room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasSuffix("words") && !$0.isHiddenOrHasHiddenAncestor })
+        let rows = try firstInkRows(of: [exit, hint, count], in: room.view)
+        #expect(abs(rows[0] - rows[1]) <= 1,
+                "ESC - EXIT and its confirmation are not on one baseline (\(rows))")
+        #expect(abs(rows[0] - rows[2]) <= 1,
+                "the word count is not on the ESC - EXIT baseline (\(rows))")
+        window.orderOut(nil)
+    }
+
+    /// Topmost ink row of each view's text, in one rendered frame.
+    private func firstInkRows(of views: [NSView], in root: NSView) throws -> [Int] {
+        root.layoutSubtreeIfNeeded()
+        let rep = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
+        root.cacheDisplay(in: root.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / max(root.bounds.width, 1)
+        return try views.map { view in
+            let frame = root.convert(view.bounds, from: view)
+            let x0 = Int(frame.minX * scale) + 1
+            let x1 = min(Int(frame.maxX * scale) - 1, rep.pixelsWide - 1)
+            let y0 = max(Int((root.bounds.height - frame.maxY) * scale) - 1, 0)
+            let y1 = min(Int((root.bounds.height - frame.minY) * scale) + 1, rep.pixelsHigh - 1)
+            for y in y0...y1 {
+                for x in x0...x1 {
+                    guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                    let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
+                    if luma < 0.6 { return y }
+                }
+            }
+            throw NoRenderedText(view: String(describing: type(of: view)))
+        }
+    }
+
     // MARK: - Helpers
 
     private func assertCentred(_ control: NSControl, in content: NSView, _ label: String) {
@@ -377,6 +594,11 @@ private enum WindowKeeper {
 private final class MutableRoundClock {
     var now: TimeInterval
     init(_ now: TimeInterval) { self.now = now }
+}
+
+private struct NoRenderedText: Error, CustomStringConvertible {
+    let view: String
+    var description: String { "no rendered text found in \(view)" }
 }
 
 private final class DenyCounter {

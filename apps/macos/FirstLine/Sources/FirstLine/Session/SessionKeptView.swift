@@ -1,6 +1,6 @@
 /*
- * [INPUT]: Engine text, word count and real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet: a fixed top block (heading, duration receipt, copy/restart actions) and a scrollable draft below; ink-focused COPY TEXT with live motion.
+ * [INPUT]: Engine text, word count, writing/heading fonts, the acknowledgement variant, copied state callbacks, and the live kept-measure constant.
+ * [OUTPUT]: The kept sheet: a fixed top block (heading, one restrained acknowledgement, copy/restart controls) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
  * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
  * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */
@@ -24,9 +24,8 @@ final class SessionKeptView: NSView {
     private let heading = NSTextField(labelWithString: "You wrote it down.")
     private let body = NSTextField(wrappingLabelWithString: "")
     private let receipt = NSTextField(labelWithString: "")
-    private var copyWidth: NSLayoutConstraint!
     /// The kept action labels sit on the row's optical centre, not on the lower
-    /// 1.6 line-box baseline; 15 pt and 13 pt titles share the same lift.
+    /// 1.6 line-box baseline; both 15 pt titles share the same lift.
     private static let actionOpticalLift: CGFloat = 5.25
 
     private final class PassThroughLabel: NSTextField {
@@ -37,14 +36,17 @@ final class SessionKeptView: NSView {
     private let restartTitleLabel = PassThroughLabel(labelWithString: "")
     private var selectedDraft = ""
     private var renderedWordCount: Int?
-    private var renderedDuration: TimeInterval?
+    private var renderedAcknowledgement: RoomPresentation.KeptAcknowledgement?
+    private let reducesMotion: () -> Bool
 
     init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector,
          reducesMotion: @escaping () -> Bool) {
         copyButton = FirstLineButtons.roomPrimary(title: "COPY TEXT", target: copyTarget, action: copyAction,
                                                   reducesMotion: reducesMotion)
         copyButton.font = .systemFont(ofSize: 15, weight: .medium)
-        restartButton = FirstLineButtons.link(title: "RUN IT AGAIN", target: restartTarget, action: restartAction)
+        restartButton = FirstLineButtons.secondary(title: "RUN IT AGAIN", target: restartTarget,
+                                                   action: restartAction, height: 48)
+        self.reducesMotion = reducesMotion
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
 
@@ -68,7 +70,8 @@ final class SessionKeptView: NSView {
 
         heading.translatesAutoresizingMaskIntoConstraints = false
         heading.alignment = .center
-        heading.maximumNumberOfLines = 1
+        heading.maximumNumberOfLines = 2
+        heading.lineBreakMode = .byWordWrapping
         body.translatesAutoresizingMaskIntoConstraints = true
         body.isSelectable = true
         body.isEditable = false
@@ -84,7 +87,6 @@ final class SessionKeptView: NSView {
         receipt.setAccessibilityHelp(RoomPresentation.countRule)
 
         // The action row is fixed at the top so a long draft never hides COPY TEXT.
-        restartButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         let actions = NSStackView(views: [copyButton, restartButton])
         actions.translatesAutoresizingMaskIntoConstraints = false
         actions.orientation = .horizontal
@@ -109,15 +111,8 @@ final class SessionKeptView: NSView {
         addSubview(scrollView)
         document.addSubview(body)
 
-        // Fixed copy width across COPY TEXT / COPIED / TRY COPY AGAIN: the title
-        // change must not resize the pill or slide RUN IT AGAIN.
-        var widest: CGFloat = 0
-        for title in ["COPY TEXT", "COPIED", "TRY COPY AGAIN"] {
-            setCopyTitle(title)
-            widest = max(widest, copyButton.intrinsicContentSize.width)
-        }
+        // The pill hugs its label; the title change may resize it (the row re-centres).
         setCopyTitle("COPY TEXT")
-        copyWidth = copyButton.widthAnchor.constraint(equalToConstant: ceil(widest))
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: topAnchor),
             header.centerXAnchor.constraint(equalTo: centerXAnchor),
@@ -127,9 +122,8 @@ final class SessionKeptView: NSView {
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            copyWidth,
         ])
-        styleQuietLink(restartButton, title: "RUN IT AGAIN", muted: false)
+        styleRestart()
     }
 
     @available(*, unavailable)
@@ -137,31 +131,78 @@ final class SessionKeptView: NSView {
 
     var draft: String { selectedDraft }
 
-    func setContent(text: String, wordCount: Int, duration: TimeInterval, writingFont: NSFont) {
-        guard selectedDraft != text || renderedWordCount != wordCount || renderedDuration != duration
-                || body.font != writingFont else { return }
+    func setContent(text: String, wordCount: Int, writingFont: NSFont,
+                    acknowledgement: RoomPresentation.KeptAcknowledgement) {
+        guard selectedDraft != text || renderedWordCount != wordCount
+                || body.font != writingFont || renderedAcknowledgement != acknowledgement else { return }
         selectedDraft = text
         renderedWordCount = wordCount
-        renderedDuration = duration
+        renderedAcknowledgement = acknowledgement
         body.font = writingFont
         body.attributedStringValue = FirstLineTypography.trackedText(
             text.isEmpty ? " " : text, font: writingFont, color: FirstLineColors.inkNSColor,
             kernEm: 0, lineHeightMultiple: 1.6, fixedLineHeight: true)
         updateHeadingFont()
-        receipt.font = FirstLineTypography.smallMediumNSFont
-        receipt.attributedStringValue = FirstLineTypography.trackedText(
-            RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration),
-            font: FirstLineTypography.smallMediumNSFont,
-            color: FirstLineColors.muteNSColor, kernEm: 0.02)
+        applyAcknowledgement(acknowledgement, wordCount: wordCount, writingFont: writingFont)
         header.needsLayout = true
         needsLayout = true
+    }
+
+    /// One restrained acknowledgement: the count inside the headline (default),
+    /// one quiet line in the writer's own type, or a one-time ink settle with no
+    /// text change. No exclamation marks, no scores.
+    private func applyAcknowledgement(_ acknowledgement: RoomPresentation.KeptAcknowledgement,
+                                      wordCount: Int, writingFont: NSFont) {
+        switch acknowledgement {
+        case .headlineCount:
+            heading.stringValue = RoomPresentation.keptHeadline(wordCount: wordCount)
+            receipt.isHidden = true
+            header.setCustomSpacing(20, after: heading)
+        case .quietLine:
+            heading.stringValue = "You wrote it down."
+            receipt.isHidden = false
+            let quietFont = NSFont(descriptor: writingFont.fontDescriptor, size: 18) ?? writingFont
+            receipt.font = quietFont
+            receipt.attributedStringValue = FirstLineTypography.trackedText(
+                RoomPresentation.keptQuietLine(wordCount: wordCount),
+                font: quietFont, color: FirstLineColors.inkNSColor, kernEm: 0,
+                lineHeightMultiple: 1.6)
+            header.setCustomSpacing(12, after: heading)
+        case .inkSettle:
+            heading.stringValue = "You wrote it down."
+            receipt.isHidden = true
+            header.setCustomSpacing(20, after: heading)
+            applyInkSettle()
+        }
+    }
+
+    /// A single 240 ms settle of the headline ink: a short fade and a 1.5 pt rise,
+    /// then the text is still. Reduce Motion lands on the settled state.
+    private func applyInkSettle() {
+        guard !reducesMotion() else { return }
+        heading.wantsLayer = true
+        guard let layer = heading.layer else { return }
+        layer.removeAnimation(forKey: "ink-settle")
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.62
+        fade.toValue = 1
+        let rise = CABasicAnimation(keyPath: "transform.translation.y")
+        rise.fromValue = -1.5
+        rise.toValue = 0
+        let settle = CAAnimationGroup()
+        settle.animations = [fade, rise]
+        settle.duration = 0.24
+        settle.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        layer.add(settle, forKey: "ink-settle")
     }
 
     func reset() {
         selectedDraft = ""
         renderedWordCount = nil
-        renderedDuration = nil
+        renderedAcknowledgement = nil
         body.stringValue = ""
+        heading.stringValue = "You wrote it down."
+        heading.layer?.removeAnimation(forKey: "ink-settle")
         setCopyTitle("COPY TEXT")
     }
 
@@ -175,6 +216,8 @@ final class SessionKeptView: NSView {
         copyTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
             title, font: font, color: FirstLineColors.onInkNSColor, kernEm: 0.04,
             lineHeightMultiple: 1.6)
+        copyButton.invalidateIntrinsicContentSize()
+        copyTitleLabel.invalidateIntrinsicContentSize()
     }
 
     private func transparentTitle(_ title: String, font: NSFont, kernEm: CGFloat) -> NSAttributedString {
@@ -212,19 +255,20 @@ final class SessionKeptView: NSView {
     private func updateHeadingFont() {
         let width = window?.contentView?.bounds.width ?? superview?.bounds.width ?? 720
         let size = round(min(max(width * 0.05, 32), 48))
+        heading.preferredMaxLayoutWidth = max(bounds.width - 16, 0)
         guard heading.font?.pointSize != size,
               let font = FirstLineTypography.writingMediumNSFont(size: size) else { return }
         heading.font = font
     }
 
-    private func styleQuietLink(_ button: NSButton, title: String, muted: Bool) {
-        let color = muted ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
-        button.title = title
-        button.font = .systemFont(ofSize: 13, weight: .medium)
-        button.contentTintColor = color
-        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
-        button.attributedTitle = transparentTitle(title, font: font, kernEm: 0.04)
+    private func styleRestart() {
+        let font = NSFont.systemFont(ofSize: 15, weight: .medium)
+        restartButton.title = "RUN IT AGAIN"
+        restartButton.font = font
+        restartButton.attributedTitle = transparentTitle("RUN IT AGAIN", font: font, kernEm: 0.04)
         restartTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
-            title, font: font, color: color, kernEm: 0.04, lineHeightMultiple: 1.6)
+            "RUN IT AGAIN", font: font, color: FirstLineColors.inkNSColor, kernEm: 0.04,
+            lineHeightMultiple: 1.6)
+        restartButton.invalidateIntrinsicContentSize()
     }
 }

@@ -19,13 +19,18 @@ struct RoomTests {
             "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.")
     }
 
-    @Test func keptReceiptNamesWordCountAndDuration() {
-        #expect(RoomPresentation.keptReceipt(wordCount: 33, duration: 60)
-                == "33 WORDS WRITTEN DOWN IN 1 MINUTE.")
-        #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 300)
-                == "1 WORD WRITTEN DOWN IN 5 MINUTES.")
+    @Test func keptAcknowledgementStringsStayRestrained() {
+        #expect(RoomPresentation.KeptAcknowledgement.shippedDefault == .headlineCount)
+        #expect(RoomPresentation.keptHeadline(wordCount: 33) == "You wrote 33 words down.")
+        #expect(RoomPresentation.keptHeadline(wordCount: 1) == "You wrote 1 word down.")
+        #expect(RoomPresentation.keptQuietLine(wordCount: 33) == "33 words, kept.")
+        #expect(RoomPresentation.keptQuietLine(wordCount: 1) == "1 word, kept.")
         #expect(RoomPresentation.wordLabel(0) == "0 words")
         #expect(RoomPresentation.wordLabel(1) == "1 word")
+        for text in [RoomPresentation.keptHeadline(wordCount: 33),
+                     RoomPresentation.keptQuietLine(wordCount: 33)] {
+            #expect(!text.contains("!"), "an acknowledgement must not exclaim")
+        }
     }
 
     @Test func copyPutsExactDraftOnPasteboard() {
@@ -246,9 +251,9 @@ struct RoomTests {
         fixture.room.tick()
         #expect(fixture.engine.phase == .success)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        #expect(fields.contains { $0.stringValue == "You wrote it down." && !$0.isHidden })
-        let receipt = try #require(fields.first { $0.stringValue == "15 WORDS WRITTEN DOWN IN 1 MINUTE." })
-        #expect(!receipt.isHiddenOrHasHiddenAncestor)
+        #expect(fields.contains { $0.stringValue == "You wrote 15 words down." && !$0.isHidden })
+        #expect(!fields.contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.")
+            && !$0.isHiddenOrHasHiddenAncestor })
         let body = try #require(fields.first { $0.isSelectable && !$0.isEditable && $0.stringValue.contains("promotion") })
         #expect(body.alignment == .center)
         #expect(body.isHiddenOrHasHiddenAncestor == false)
@@ -275,15 +280,20 @@ struct RoomTests {
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
         let originalWidth = copy.frame.width
-        let originalCenter = copy.convert(NSPoint(x: copy.bounds.midX, y: copy.bounds.midY), to: fixture.room.view)
+        let copyLabel = try #require(descendants(copy, of: NSTextField.self).first { $0.stringValue == "COPY TEXT" })
+        let originalPadding = copy.frame.width - copyLabel.intrinsicContentSize.width
+        #expect(originalPadding >= 40 && originalPadding <= 56,
+                "the pill carries \(originalPadding) pt of padding around COPY TEXT")
         copy.performClick(nil)
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
-        // F-07: the copy pill keeps its width, so RUN IT AGAIN and the row never move.
-        #expect(abs(copy.frame.width - originalWidth) <= 0.5)
-        let copiedCenter = copy.convert(NSPoint(x: copy.bounds.midX, y: copy.bounds.midY), to: fixture.room.view)
-        #expect(abs(copiedCenter.x - originalCenter.x) < 1)
+        // The pill hugs its label, so COPIED is narrower; the row stays centred.
         #expect(copy.title == "COPIED")
+        #expect(copy.frame.width < originalWidth, "the COPIED pill kept the widest label width")
+        let copiedLabel = try #require(descendants(copy, of: NSTextField.self).first { $0.stringValue == "COPIED" })
+        let copiedPadding = copy.frame.width - copiedLabel.intrinsicContentSize.width
+        #expect(abs(copiedPadding - originalPadding) <= 2,
+                "the pill padding changed from \(originalPadding) to \(copiedPadding) on COPIED")
         fixture.room.tick()
         let move = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: .zero,
             modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,

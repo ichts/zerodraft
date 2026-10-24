@@ -29,15 +29,34 @@ enum RoomPresentation {
         "\(count) \(count == 1 ? "WORD" : "WORDS")"
     }
 
-    /// Count rule shared by the room count and the kept receipt.
+    /// Count rule shared by the room count and the kept acknowledgement.
     static let countRule = "Counts words. Each Chinese character counts as one. Punctuation and emoji do not count."
 
-    /// `N WORDS WRITTEN DOWN IN M MINUTES.` The kept receipt names the real session
-    /// duration instead of a meaningless 0:00.
-    static func keptReceipt(wordCount: Int, duration: TimeInterval) -> String {
-        let minutes = max(Int((duration / 60).rounded()), 1)
-        let unit = minutes == 1 ? "MINUTE" : "MINUTES"
-        return "\(wordCountLabel(wordCount)) WRITTEN DOWN IN \(minutes) \(unit)."
+    /// The restrained kept acknowledgements. The machine receipt was retired after
+    /// the fifth hands-on round; the default puts the count in the headline sentence.
+    enum KeptAcknowledgement: String, CaseIterable {
+        case quietLine = "quiet-line"
+        case headlineCount = "headline-count"
+        case inkSettle = "ink-settle"
+
+        static let shippedDefault: KeptAcknowledgement = .headlineCount
+
+        /// Debug switch for comparisons; the shipped app uses `shippedDefault`.
+        static func fromEnvironment(_ environment: [String: String] = ProcessInfo.processInfo.environment)
+            -> KeptAcknowledgement {
+            environment["WID_KEPT_ACKNOWLEDGEMENT"]
+                .flatMap(KeptAcknowledgement.init(rawValue:)) ?? shippedDefault
+        }
+    }
+
+    /// The default: the count as part of the headline sentence.
+    static func keptHeadline(wordCount: Int) -> String {
+        "You wrote \(wordLabel(wordCount)) down."
+    }
+
+    /// The quiet alternative: one line in the writer's own type.
+    static func keptQuietLine(wordCount: Int) -> String {
+        "\(wordLabel(wordCount)), kept."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {

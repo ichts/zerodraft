@@ -43,7 +43,7 @@ struct ReviewRoundTests {
 
     // MARK: - F-06 / F-07: the kept actions share one baseline; copy width is fixed
 
-    @Test func keptActionsShareOneBaselineAndCopyKeepsItsWidth() throws {
+    @Test func keptActionsShareOneOpticalCentreAndThePillFitsItsLabel() throws {
         let fixture = keptRoom()
         let copy = try #require(descendants(of: fixture.room.view, of: NSButton.self)
             .first { $0.title == "COPY TEXT" })
@@ -66,10 +66,13 @@ struct ReviewRoundTests {
             let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
             return luma < 0.5
         }
-        let copyBaseline = copyInk.upperBound
-        let restartBaseline = restartInk.upperBound
-        let baselineDelta = abs(CGFloat(copyBaseline) - CGFloat(restartBaseline)) / scale
-        #expect(baselineDelta <= 1, "COPY TEXT and RUN IT AGAIN baselines are \(baselineDelta) pt apart")
+        let copyInkCentre = (CGFloat(copyInk.lowerBound) + CGFloat(copyInk.upperBound)) / 2
+        let restartInkCentre = (CGFloat(restartInk.lowerBound) + CGFloat(restartInk.upperBound)) / 2
+        let centreDelta = abs(copyInkCentre - restartInkCentre) / scale
+        #expect(centreDelta <= 1, "COPY TEXT and RUN IT AGAIN ink centres are \(centreDelta) pt apart")
+        #expect(abs(copy.frame.height - 48) <= 0.5)
+        #expect(abs(restart.frame.height - 48) <= 0.5, "RUN IT AGAIN is not the primary height")
+        #expect(restart.layer?.borderWidth == 1, "RUN IT AGAIN is not a quiet outlined control")
         // The pill label must be optically centred: the ink gaps above and below
         // are equal within 1 pt (the fourth hands-on report: it sat low).
         let height = CGFloat(rep.pixelsHigh) / scale
@@ -80,13 +83,20 @@ struct ReviewRoundTests {
         #expect(abs(topGap - bottomGap) <= 1,
                 "COPY TEXT ink sits \(topGap) pt from the top and \(bottomGap) pt from the bottom")
 
-        let copyWidth = copy.frame.width
-        let restartX = restart.frame.minX
+        let copyLabel = try #require(descendants(of: copy, of: NSTextField.self)
+            .first { $0.stringValue == "COPY TEXT" })
+        let padding = copy.frame.width - copyLabel.intrinsicContentSize.width
+        #expect(padding >= 40 && padding <= 56,
+                "the copy pill carries \(padding) pt around its label")
+        let originalWidth = copy.frame.width
         fixture.room.copyKeptText()
         fixture.room.view.layoutSubtreeIfNeeded()
         #expect(copy.title == "COPIED")
-        #expect(abs(copy.frame.width - copyWidth) <= 0.5, "the copy pill resized on COPIED")
-        #expect(abs(restart.frame.minX - restartX) <= 0.5, "RUN IT AGAIN moved when the copy label changed")
+        #expect(copy.frame.width < originalWidth, "the COPIED pill kept the widest label width")
+        let actions = try #require(copy.superview)
+        let rowCentre = fixture.room.view.convert(actions.bounds, from: actions).midX
+        #expect(abs(rowCentre - fixture.room.view.bounds.midX) <= 1,
+                "the action row is not centred after the pill shrank")
         fixture.window.orderOut(nil)
     }
 
@@ -300,7 +310,7 @@ struct ReviewRoundTests {
         #expect(afterWipe.receipt != nil)
     }
 
-    @Test func keptActionsStayAboveALongDraftAndTheReceiptNamesTheDuration() throws {
+    @Test func keptActionsStayAboveALongDraftWithTheDefaultAcknowledgement() throws {
         let longDraft = (1...120).map { "line \($0) of the kept draft" }.joined(separator: "\n")
         let fixture = keptRoom(text: longDraft)
         let kept = try #require(descendants(of: fixture.room.view, of: SessionKeptView.self).first)
@@ -317,14 +327,53 @@ struct ReviewRoundTests {
         #expect(search.documentView!.frame.height > search.contentSize.height,
                 "the long draft does not scroll under the fixed actions")
 
-        let receipt = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
-            .first { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.") })
-        #expect(receipt.stringValue.hasPrefix("\(fixture.engine.wordCount) WORDS WRITTEN DOWN IN 1 MINUTE."))
-        #expect(receipt.toolTip == RoomPresentation.countRule)
+        let heading = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue == RoomPresentation.keptHeadline(wordCount: fixture.engine.wordCount) })
+        #expect(!heading.isHiddenOrHasHiddenAncestor)
+        #expect(!descendants(of: fixture.room.view, of: NSTextField.self)
+            .contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.")
+                && !$0.isHiddenOrHasHiddenAncestor })
         let count = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
             .first { $0.stringValue.hasSuffix("words") })
         #expect(count.toolTip == RoomPresentation.countRule)
         fixture.window.orderOut(nil)
+    }
+
+    @Test func keptAcknowledgementCandidatesStayRestrained() throws {
+        #expect(RoomPresentation.KeptAcknowledgement.shippedDefault == .headlineCount)
+        for candidate in RoomPresentation.KeptAcknowledgement.allCases {
+            let fixture = keptRoom(text: "one two three", acknowledgement: candidate)
+            let labels = descendants(of: fixture.room.view, of: NSTextField.self)
+            let body = try #require(labels.first { $0.isSelectable && !$0.isEditable })
+            switch candidate {
+            case .headlineCount:
+                let heading = try #require(labels.first { $0.stringValue == "You wrote 3 words down." })
+                #expect(!heading.isHiddenOrHasHiddenAncestor)
+                #expect(!labels.contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.") })
+            case .quietLine:
+                let heading = try #require(labels.first { $0.stringValue == "You wrote it down." })
+                let quiet = try #require(labels.first { $0.stringValue == "3 words, kept." })
+                #expect(!heading.isHiddenOrHasHiddenAncestor)
+                #expect(!quiet.isHiddenOrHasHiddenAncestor)
+                #expect(quiet.font?.familyName == body.font?.familyName,
+                        "the quiet line is not in the writer's own type")
+            case .inkSettle:
+                let heading = try #require(labels.first { $0.stringValue == "You wrote it down." })
+                #expect(!heading.isHiddenOrHasHiddenAncestor)
+                #expect(heading.layer?.animation(forKey: "ink-settle") != nil,
+                        "the one-time ink settle did not run")
+                let still = keptRoom(text: "one two three", acknowledgement: .inkSettle, reducedMotion: true)
+                let stillHeading = try #require(descendants(of: still.room.view, of: NSTextField.self)
+                    .first { $0.stringValue == "You wrote it down." })
+                #expect(stillHeading.layer?.animation(forKey: "ink-settle") == nil,
+                        "Reduce Motion must land on the settled state")
+                still.window.orderOut(nil)
+            }
+            for label in labels where !label.isHiddenOrHasHiddenAncestor {
+                #expect(!label.stringValue.contains("!"), "an acknowledgement must not exclaim")
+            }
+            fixture.window.orderOut(nil)
+        }
     }
 
     // MARK: - Helpers
@@ -337,7 +386,9 @@ struct ReviewRoundTests {
         let now: Clock
     }
 
-    private func keptRoom(text: String = "hello there. this draft is kept.") -> KeptFixture {
+    private func keptRoom(text: String = "hello there. this draft is kept.",
+                          acknowledgement: RoomPresentation.KeptAcknowledgement = .shippedDefault,
+                          reducedMotion: Bool = false) -> KeptFixture {
         let root = tempRoot()
         let now = Clock()
         let engine = SessionEngine(now: { now.now })
@@ -345,7 +396,9 @@ struct ReviewRoundTests {
                                       settingsStore: SettingsStore(configDirectory: root),
                                       installIDStore: InstallIDStore(configDirectory: root))
         state.startSession(duration: 60)
+        if reducedMotion { state.settings.reducedMotion = .always }
         let room = SessionViewController(appState: state)
+        room.keptAcknowledgement = acknowledgement
         let window = makeWindow(room)
         let editor = descendants(of: room.view, of: AppendOnlyTextView.self).first!
         editor.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))

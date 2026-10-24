@@ -88,6 +88,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var washIsCut = false
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
+    /// The kept acknowledgement variant; the shipped default comes from the
+    /// `WID_KEPT_ACKNOWLEDGEMENT` debug switch (headline count when unset).
+    var keptAcknowledgement: RoomPresentation.KeptAcknowledgement =
+        RoomPresentation.KeptAcknowledgement.fromEnvironment()
     private var denyWork: DispatchWorkItem?
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
@@ -622,7 +626,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let writingFont = WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size)
             ?? FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
         keptView.setContent(text: engine.text, wordCount: engine.wordCount,
-                            duration: engine.duration, writingFont: writingFont)
+                            writingFont: writingFont, acknowledgement: keptAcknowledgement)
     }
 
     /// A footer-row run with the row's shared 1.6 line box. The count and the inline

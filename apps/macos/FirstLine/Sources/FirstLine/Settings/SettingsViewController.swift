@@ -195,7 +195,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func themePopup() -> NSPopUpButton {
-        let popup = NSPopUpButton()
+        let popup = FirstLineInkPopUpButton(frame: .zero, pullsDown: false)
         popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: AppTheme.allCases.map(\.label))
         popup.selectItem(at: AppTheme.allCases.firstIndex(of: appState.settings.theme) ?? 0)
@@ -205,7 +205,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func motionPopup() -> NSPopUpButton {
-        let popup = NSPopUpButton()
+        let popup = FirstLineInkPopUpButton(frame: .zero, pullsDown: false)
         popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: ReducedMotionOverride.allCases.map(\.label))
         popup.selectItem(at: ReducedMotionOverride.allCases.firstIndex(of: appState.settings.reducedMotion) ?? 0)
@@ -215,14 +215,14 @@ final class SettingsViewController: NSViewController {
     }
 
     private func focusSwitch() -> NSButton {
-        let button = NSButton(checkboxWithTitle: "Fullscreen focus", target: self, action: #selector(focusChanged(_:)))
+        let button = FirstLineInkFocusButton(checkboxWithTitle: "Fullscreen focus", target: self, action: #selector(focusChanged(_:)))
         button.font = FirstLineTypography.smallNSFont
         button.state = appState.settings.focusMode ? .on : .off
         return button
     }
 
     private func alignmentPopup() -> NSPopUpButton {
-        let popup = NSPopUpButton()
+        let popup = FirstLineInkPopUpButton(frame: .zero, pullsDown: false)
         popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: WritingAlignment.allCases.map(\.label))
         popup.selectItem(at: WritingAlignment.allCases.firstIndex(of: appState.settings.writingAlignment) ?? 0)
@@ -232,7 +232,7 @@ final class SettingsViewController: NSViewController {
     }
 
     private func sizePopup() -> NSPopUpButton {
-        let popup = NSPopUpButton()
+        let popup = FirstLineInkPopUpButton(frame: .zero, pullsDown: false)
         popup.font = FirstLineTypography.smallNSFont
         popup.addItems(withTitles: WritingFontSize.allCases.map(\.label))
         popup.selectItem(at: WritingFontSize.allCases.firstIndex(of: appState.settings.writingFontSize) ?? 1)

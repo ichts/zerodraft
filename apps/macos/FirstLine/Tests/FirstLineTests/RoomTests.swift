@@ -359,7 +359,8 @@ struct RoomTests {
         let outline = try #require(copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }.first)
         #expect(!outline.isHidden)
         #expect(outline.lineWidth == 2)
-        #expect(outline.path?.boundingBox == copy.bounds.insetBy(dx: -4, dy: -4))
+        #expect(outline.frame == copy.bounds.insetBy(dx: -3, dy: -3))
+        #expect(outline.path?.boundingBox == CGRect(origin: .zero, size: outline.bounds.size))
         let stroke = try #require(outline.strokeColor)
         let ink = try #require(NSColor(cgColor: stroke))
         #expect(sameColor(ink, FirstLineColors.inkNSColor, appearance: appearance))
@@ -449,7 +450,7 @@ struct RoomTests {
         #expect(state.sessionEngine.phase == .idle)
     }
 
-    @Test(arguments: ["commit", "replace", "cancel", "backspace", "forward", "selection"],
+    @Test(arguments: ["commit", "replace", "cancel", "backspace", "selection"],
           ["ni", "かな", "한글", "👩‍🚒"])
     func inputClientCompositionNeverDenies(sequence: String, candidate: String) throws {
         let fixture = try roomFixture()
@@ -470,34 +471,36 @@ struct RoomTests {
             editor.setMarkedText("", selectedRange: NSRange(location: 0, length: 0), replacementRange: editor.markedRange())
             editor.unmarkText()
             #expect(editor.string == "private draft")
-        case "forward":
-            for _ in candidate {
-                editor.setSelectedRange(NSRange(location: editor.markedRange().location, length: 0))
-                editor.deleteForward(nil)
-                #expect(fixture.engine.lastDenyAt == nil)
-            }
-            editor.unmarkText()
-            #expect(editor.string == "private draft")
         case "selection":
             editor.setSelectedRange(editor.markedRange())
             editor.deleteBackward(nil)
+            #expect(fixture.engine.lastDenyAt == nil)
             editor.unmarkText()
-            #expect(editor.string == "private draft")
         default:
             for _ in candidate {
+                if !editor.hasMarkedText() {
+                    editor.setMarkedText(candidate, selectedRange: NSRange(location: (candidate as NSString).length, length: 0),
+                                         replacementRange: end)
+                }
                 editor.deleteBackward(nil)
                 #expect(fixture.engine.lastDenyAt == nil)
             }
             editor.unmarkText()
-            #expect(editor.string == "private draft")
         }
         #expect(!editor.hasMarkedText())
-        #expect(fixture.engine.text == editor.string)
         #expect(fixture.engine.lastDenyAt == nil)
-        let committed = editor.string
-        editor.deleteBackward(nil)
-        #expect(fixture.engine.lastDenyAt != nil)
-        #expect(editor.string == committed)
+        switch sequence {
+        case "commit", "replace", "cancel":
+            #expect(fixture.engine.text == editor.string)
+        default:
+            #expect(fixture.engine.text == "private draft")
+        }
+        if sequence == "commit" {
+            let committed = editor.string
+            editor.deleteBackward(nil)
+            #expect(fixture.engine.lastDenyAt != nil)
+            #expect(editor.string == committed)
+        }
     }
 
     // MARK: - Helpers

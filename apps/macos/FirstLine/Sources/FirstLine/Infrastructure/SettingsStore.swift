@@ -44,7 +44,10 @@ enum SilenceLimit: Int, Codable, CaseIterable {
 
 enum WritingAlignment: String, Codable, CaseIterable {
     case centered, left
-    var label: String { self == .centered ? "Narrow paper" : "Wide paper" }
+    var label: String { self == .centered ? "Narrow column" : "Wide column" }
+    /// The live trial measures the editor at 62ch; the native sheet keeps the same
+    /// readable column, with the wider option at 70ch.
+    var measureCharacters: Int { self == .centered ? 62 : 70 }
 }
 
 enum WritingFontSize: String, Codable, CaseIterable {

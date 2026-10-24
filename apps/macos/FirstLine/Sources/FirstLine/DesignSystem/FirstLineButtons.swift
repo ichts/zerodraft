@@ -1,7 +1,7 @@
 /**
- * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories.
- * [POS]: Shared native button specs; room primary opts into live hover/press motion and ink focus, other surfaces retain native focus rings.
+ * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing, InkFocus.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring.
+ * [POS]: Shared native button specs; room primary opts into live hover/press motion, all controls use the design-system ink focus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
 
@@ -23,15 +23,7 @@ enum FirstLineButtons {
     }
 
     static func link(title: String, target: AnyObject?, action: Selector) -> NSButton {
-        let button = NSButton(title: title, target: target, action: action)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.isBordered = false
-        button.bezelStyle = .inline
-        button.font = .systemFont(ofSize: 13, weight: .medium)
-        button.contentTintColor = FirstLineColors.chromeNSColor
-        button.focusRingType = .default
-        button.setAccessibilityRole(.button)
-        return button
+        FirstLineLinkButton(title: title, target: target, action: action)
     }
 
     private static func styled(
@@ -42,12 +34,12 @@ enum FirstLineButtons {
         roomMotion: (() -> Bool)? = nil
     ) -> NSButton {
         let button = FirstLineButton(title: title, target: target, action: action)
+        button.inkFocusRingInset = 3
         button.translatesAutoresizingMaskIntoConstraints = false
         button.role = role
         button.isBordered = false
         button.bezelStyle = .inline
         button.font = FirstLineTypography.uiSemiboldNSFont
-        button.focusRingType = roomMotion == nil ? .default : .none
         button.roomMotion = roomMotion
         button.wantsLayer = true
         button.layer?.cornerRadius = role.height / 2
@@ -56,7 +48,40 @@ enum FirstLineButtons {
     }
 }
 
-private final class FirstLineButton: NSButton {
+private final class FirstLineLinkButton: FirstLineInkFocusButton {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        style()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        style()
+    }
+
+    private func style() {
+        translatesAutoresizingMaskIntoConstraints = false
+        isBordered = false
+        bezelStyle = .inline
+        font = .systemFont(ofSize: 13, weight: .medium)
+        contentTintColor = FirstLineColors.chromeNSColor
+        inkFocusRingInset = 3
+        inkFocusRingCornerRadius = 4
+        setAccessibilityRole(.button)
+    }
+}
+
+private final class FirstLineButton: FirstLineInkFocusButton {
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        inkFocusRingInset = 3
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        inkFocusRingInset = 3
+    }
+
     enum Role {
         case primary, secondary
 
@@ -85,7 +110,6 @@ private final class FirstLineButton: NSButton {
     }
 
     var roomMotion: (() -> Bool)?
-    private let focusOutline = CAShapeLayer()
     private var hover = false
     private var pressing = false
     private var tracking: NSTrackingArea?
@@ -146,18 +170,6 @@ private final class FirstLineButton: NSButton {
         layer.add(motion, forKey: "transform")
     }
 
-    override func becomeFirstResponder() -> Bool {
-        let accepted = super.becomeFirstResponder()
-        needsDisplay = true
-        return accepted
-    }
-
-    override func resignFirstResponder() -> Bool {
-        let accepted = super.resignFirstResponder()
-        focusOutline.isHidden = true
-        return accepted
-    }
-
     override var isEnabled: Bool {
         didSet { refreshAppearance() }
     }
@@ -191,19 +203,6 @@ private final class FirstLineButton: NSButton {
     override func updateLayer() {
         super.updateLayer()
         layer?.cornerRadius = bounds.height > 0 ? bounds.height / 2 : role.height / 2
-        if roomMotion != nil {
-            layer?.masksToBounds = false
-            if focusOutline.superlayer == nil { layer?.addSublayer(focusOutline) }
-            let outlineBounds = bounds.insetBy(dx: -4, dy: -4)
-            focusOutline.path = CGPath(roundedRect: outlineBounds, cornerWidth: outlineBounds.height / 2,
-                                       cornerHeight: outlineBounds.height / 2, transform: nil)
-            focusOutline.fillColor = nil
-            focusOutline.lineWidth = 2
-            focusOutline.isHidden = window?.firstResponder !== self
-            effectiveAppearance.performAsCurrentDrawingAppearance {
-                focusOutline.strokeColor = FirstLineColors.inkNSColor.cgColor
-            }
-        }
         effectiveAppearance.performAsCurrentDrawingAppearance {
             guard isEnabled else {
                 layer?.borderWidth = 0
@@ -223,10 +222,4 @@ private final class FirstLineButton: NSButton {
             }
         }
     }
-
-    override func drawFocusRingMask() {
-        NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill()
-    }
-
-    override var focusRingMaskBounds: NSRect { bounds }
 }

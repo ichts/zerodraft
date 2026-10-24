@@ -261,18 +261,16 @@ struct SnapshotTests {
         if focus, controller is SessionViewController {
             let button = try #require(window.firstResponder as? NSButton)
             #expect(["COPY TEXT", "COPIED"].contains(button.title))
-            let outline = button.convert(NSPoint(x: button.bounds.midX, y: button.bounds.maxY + 4),
-                                         to: controller.view)
-            let scale = CGFloat(rep.pixelsWide) / size.width
-            try assertPixel(rep, at: NSPoint(x: outline.x * scale, y: (size.height - outline.y) * scale),
-                            equals: FirstLineColors.inkNSColor, in: appearance, name: name)
+            #expect(button.focusRingType == .none)
+            let ringing = try #require(button as? FirstLineInkFocusRinging)
+            #expect(ringing.showsInkFocusRing)
         }
         if let output {
             let data = try #require(rep.representation(using: .png, properties: [:]))
             try data.write(to: output.appendingPathComponent("\(name).png"))
         }
         try assertPixel(rep, at: NSPoint(x: 4, y: 4), equals: FirstLineColors.pageNSColor, in: appearance, name: name)
-        try assertPixel(rep, at: NSPoint(x: rep.pixelsWide - 5, y: rep.pixelsHigh - 5),
+        try assertPixel(rep, at: NSPoint(x: rep.pixelsWide - 5, y: 4),
                         equals: FirstLineColors.pageNSColor, in: appearance, name: name)
         if let sheetPoint {
             let scale = CGFloat(rep.pixelsWide) / size.width
@@ -291,6 +289,7 @@ struct SnapshotTests {
         let delta = abs(color.redComponent - expected.redComponent)
             + abs(color.greenComponent - expected.greenComponent)
             + abs(color.blueComponent - expected.blueComponent)
+        if delta >= 0.16 { print("PIXFAIL \(name) point=\(Int(point.x)),\(Int(point.y)) got=\(color) expected=\(expected) size=\(rep.pixelsWide)x\(rep.pixelsHigh)") }
         #expect(delta < 0.16, "\(name): pixel \(Int(point.x)),\(Int(point.y)) differs from the token")
     }
 

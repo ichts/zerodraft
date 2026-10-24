@@ -67,6 +67,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var paperShadow: FirstLineShadowView!
     private var paperWash: RoomWashView!
     private var outline: RoomWashView!
+    private var progressBar: FirstLineFillBar!
+    private var meter: FirstLineFillBar!
     private var timerLabel: NSTextField!
     private var countLabel: NSTextField!
     private var reportLabel: NSTextField!
@@ -90,7 +92,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
-    private var paperWidth: NSLayoutConstraint!
+    private var placeholderWidth: NSLayoutConstraint!
     private var placeholderAnchor: NSLayoutConstraint!
     private var warningCenter: NSLayoutConstraint!
     private var chromeHover = false
@@ -220,6 +222,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         outline.alphaValue = 0
         paper.addSubview(outline)
 
+        progressBar = FirstLineFillBar(frame: .zero)
+        progressBar.fillColor = FirstLineColors.inkNSColor
+        paper.addSubview(progressBar)
+
+        meter = FirstLineFillBar(frame: .zero)
+        meter.fillColor = FirstLineColors.inkNSColor
+        paper.addSubview(meter)
+
         timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.inkNSColor)
         timerLabel.alignment = .right
         timerLabel.setAccessibilityRole(.staticText)
@@ -271,8 +281,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func installConstraints() {
         let safe = view.safeAreaLayoutGuide
-        paperWidth = paper.widthAnchor.constraint(equalToConstant: appState.settings.writingAlignment == .centered ? 720 : 880)
-        paperWidth.priority = .defaultHigh
+        placeholderWidth = placeholderLabel.widthAnchor.constraint(equalToConstant: 896)
         placeholderAnchor = placeholderLabel.centerYAnchor.constraint(equalTo: scrollView.topAnchor)
         warningCenter = warningStack.centerYAnchor.constraint(equalTo: paper.topAnchor)
         NSLayoutConstraint.activate([
@@ -280,15 +289,22 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             paperShadow.topAnchor.constraint(equalTo: paper.topAnchor),
             paperShadow.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
-            paper.centerXAnchor.constraint(equalTo: safe.centerXAnchor), paperWidth,
-            paper.leadingAnchor.constraint(greaterThanOrEqualTo: safe.leadingAnchor, constant: 32),
-            paper.trailingAnchor.constraint(lessThanOrEqualTo: safe.trailingAnchor, constant: -32),
-            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 36),
-            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -28),
-            scrollView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
-            scrollView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
+            paper.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 32),
+            paper.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -32),
+            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 32),
+            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -32),
+            progressBar.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
+            progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            progressBar.topAnchor.constraint(equalTo: paper.topAnchor),
+            progressBar.heightAnchor.constraint(equalToConstant: 2),
+            meter.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
+            meter.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
+            meter.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
+            meter.heightAnchor.constraint(equalToConstant: 3),
+            scrollView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 32),
+            scrollView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -32),
             scrollView.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
-            scrollView.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -76),
+            scrollView.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -72),
             paperWash.leadingAnchor.constraint(equalTo: paper.leadingAnchor), paperWash.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             paperWash.topAnchor.constraint(equalTo: paper.topAnchor), paperWash.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             outline.leadingAnchor.constraint(equalTo: paper.leadingAnchor), outline.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
@@ -310,8 +326,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportLabel.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -76),
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
-            placeholderLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 24),
-            placeholderLabel.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -24),
+            placeholderLabel.centerXAnchor.constraint(equalTo: scrollView.centerXAnchor),
+            placeholderWidth,
             placeholderAnchor,
             keptView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             keptView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
@@ -350,6 +366,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     // MARK: - Writing geometry
 
     private func prepareViewport() {
+        updateTextMeasure()
         let size = scrollView.contentSize
         guard size.width > 0, size.height > 0, paper.bounds.height > 0, view.bounds.height > 0 else { return }
         // The live trial centres the current line at 39% of the sheet.
@@ -367,7 +384,38 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.scrollCaretToCompositionAnchor()
             textView.clearPendingCompositionRefresh()
         }
+        updateEmptyCaretOrigin()
         layoutLineFade(centre: anchor + (textView.currentLineInkOffsetY() ?? 0))
+    }
+
+    /// Keep the writing column at 62ch (70ch wide) centred in the full sheet, the
+    /// same readable measure the live trial uses.
+    private func updateTextMeasure() {
+        let scrollWidth = scrollView.bounds.width
+        guard scrollWidth > 1 else { return }
+        let font = FirstLineTypography.writingNSFont(size: appState.settings.writingFontSize.points)
+        let character = ("0" as NSString).size(withAttributes: [.font: font]).width
+        let cap = CGFloat(appState.settings.writingAlignment.measureCharacters) * character
+        let measure = min(cap, max(scrollWidth - 16, 160))
+        let inset = max((scrollWidth - measure) / 2, 8)
+        if abs(textView.textContainerInset.width - inset) > 0.5 {
+            textView.textContainerInset = NSSize(width: inset, height: 0)
+        }
+        if abs(placeholderWidth.constant - measure) > 0.5 {
+            placeholderWidth.constant = measure
+        }
+    }
+
+    /// Place the empty caret on the first glyph of the centred placeholder, never
+    /// inside the placeholder text.
+    private func updateEmptyCaretOrigin() {
+        guard let placeholder = placeholderLabel, let font = placeholder.font,
+              !placeholder.bounds.isEmpty else { return }
+        let text = placeholder.stringValue as NSString
+        let width = text.size(withAttributes: [.font: font]).width
+        let x = placeholder.bounds.minX + max((placeholder.bounds.width - width) / 2, 0)
+        let baseline = placeholder.bounds.maxY - placeholder.firstBaselineOffsetFromTop
+        textView.emptyCaretOrigin = textView.convert(NSPoint(x: x, y: baseline), from: placeholder)
     }
 
     /// The live `#editor` mask, applied to the rendered line centres: solid on the current
@@ -514,6 +562,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if cutWork == nil { setWash(strength, cut: false) }
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         placeholderLabel.isHidden = isKept || !engine.text.isEmpty || !textView.string.isEmpty
+        let sessionEnded = phase == .failure || phase == .success
+        progressBar.fraction = sessionEnded ? 0 : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
+        let idleFraction = min(max(engine.idleSeconds / Double(engine.silenceLimit.rawValue), 0), 1)
+        meter.fraction = sessionEnded ? 0 : 1 - idleFraction
+        meter.fillColor = (warning || phase == .failure) ? FirstLineColors.redNSColor : FirstLineColors.inkNSColor
         if !textView.hasMarkedText() { prepareViewport() }
     }
 
@@ -545,14 +598,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func applyVisualSettings() {
         let settings = appState.settings
-        let width: CGFloat = settings.writingAlignment == .centered ? 720 : 880
-        if paperWidth.constant != width { paperWidth.constant = width }
         textView.configureSessionTypography(size: settings.writingFontSize.points)
+        updateTextMeasure()
         placeholderLabel.font = FirstLineTypography.writingItalicNSFont(size: settings.writingFontSize.points)
         placeholderLabel.alignment = .center
-        if engine.phase == .success {
-            updateKeptContent()
-        }
+        updateKeptContent()
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
         countLabel.alphaValue = showChrome ? 1 : 0
@@ -692,6 +742,17 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange,
                   toCharacterRange proposed: NSRange) -> NSRange {
+        if let editor = textView as? AppendOnlyTextView {
+            if editor.isCompositionEditingText {
+                return proposed
+            }
+            if textView.hasMarkedText() {
+                let marked = textView.markedRange()
+                if proposed.location >= marked.location && NSMaxRange(proposed) <= NSMaxRange(marked) {
+                    return proposed
+                }
+            }
+        }
         if let end = AppendOnlyInputPolicy.redirectedSelection(proposed: proposed,
             fullLength: (textView.string as NSString).length,
             markedRange: textView.hasMarkedText() ? textView.markedRange() : nil) {

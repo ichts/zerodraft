@@ -58,12 +58,26 @@ The goal is that code from ten contributors reads as one design language.
 
 Design authority: the web surface answers to `design/DESIGN.md` (constitution v2); the macOS app answers to Apple HIG first and the After design tokens in `FirstLineColors`/`Typography` (see `apps/macos/FirstLine/AGENTS.md`). Generic design and motion skills are transferable methodology only and never override the platform constitution.
 
+## Binding product records
+
+Read these before changing a user-visible surface on either web or Mac. They are the durable record of
+captain decisions, not chat history:
+
+- `docs/wid-decisions.md` - append-only, dated decision log with the reason and what each decision
+  supersedes. Never edit an old entry; add a new entry that supersedes it by name.
+- `docs/wid-mac-behavior.md` - outside-in numbered behaviour contract, with every case bound to a test
+  and to the real-window recording that proves it.
+
+These records sit at L1 because they bind both surfaces. Module detail stays in
+`apps/macos/FirstLine/AGENTS.md`, `apps/macos/FirstLine/docs/`, `design/DESIGN.md` and the web
+architecture boundary below.
+
 ## Current product and scope
 
 - Zero Draft is the current product and its outward-facing name; the First Line name is retired for outward use. The root web surface is its public landing site and browser trial.
 - `writeitdown/` is the separate writeitdown.app static deployment. Its approved LAMPLIGHT/DAYLIGHT and vanilla-browser contracts are scoped in `writeitdown/AGENTS.md`; they do not change the root landing's Datastar or bone-only rules.
 - writeitdown.app releases stay bundle installs, never a deploy from this repository: the source lives here, but a release still means transferring a tested bundle to the Hetzner host and running `sh writeitdown/install.sh` there (it copies exactly the production files listed in `install.sh` into `/var/www/writeitdown.app`). Nothing in this repository - no workflow, hook, or credential - deploys anything.
-- `apps/macos/FirstLine/` is the native AppKit writeitdown implementation (historical source path). Its After visual contract is owned by section 6 of `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`. The writing room mirrors the live writeitdown.app trial: centered zen current line at 39% of the sheet with the live gradient fade, the live room strings, and a two-step Esc/click exit confirmation. Mac offers three local writing sessions, then requires a USD $4.99 one-time license for two Macs with a 14-day refund. The first nonempty input spends each session on a locally persisted counter; exhausted trials use the existing signed-license activation screen and full web-trial link. A valid signed license stays valid independent of that counter. The in-app Buy and fallback contract is owned by `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`. The purchase page targets the license service; LIVE money remains gated on a real TEST checkout and installed-DMG activation. Website/DMG bundle and TEST-to-LIVE procedure: `writeitdown/README.md`. The license contract is `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md`; the batch plan is `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`. It shares no browser runtime with either web surface.
+- `apps/macos/FirstLine/` is the native AppKit writeitdown implementation (historical source path). Its After visual contract is owned by section 6 of `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`. The writing room mirrors the live writeitdown.app trial: centered zen current line at 39% of the full-window sheet with the live gradient fade, the live room strings, the 2 px top session bar and 3 px bottom silence bar, and the two-act Esc/click exit confirmation. `docs/wid-mac-behavior.md` owns the numbered behaviour contract and `docs/wid-decisions.md` owns the decisions behind it. Mac offers three local writing sessions, then requires a USD $4.99 one-time license for two Macs with a 14-day refund. The first nonempty input spends each session on a locally persisted counter; exhausted trials use the existing signed-license activation screen and full web-trial link. A valid signed license stays valid independent of that counter. The in-app Buy and fallback contract is owned by `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`. The purchase page targets the license service; LIVE money remains gated on a real TEST checkout and installed-DMG activation. Website/DMG bundle and TEST-to-LIVE procedure: `writeitdown/README.md`. The license contract is `apps/macos/FirstLine/docs/LICENSE_PAYMENT_SPEC.md`; the batch plan is `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md`. It shares no browser runtime with either web surface.
 - `services/license/` is the independent Go + SQLite license service. Its HTTP, security, and operational contract is in `services/license/README.md`; its module map is `services/license/AGENTS.md`. The service README owns provider readiness and payment acceptance gates; `services/license/deploy/DEPLOY.md` owns the maintainer-only Stripe deployment and environment switch procedure.
 - The historical Zero Draft prototype (see "Historical material") is the product origin; historical files are not requirements for current work unless the task explicitly targets them.
 - Current code and tests override historical PRDs, plans, screenshots, and prototypes when they disagree.

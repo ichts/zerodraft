@@ -96,6 +96,8 @@ final class HomeViewController: NSViewController {
         beginButton.setAccessibilityLabel("Begin writing")
         statusView = FirstLineStatusView(text: appState.accessStatusText,
                                          tone: appState.trialAccessError == nil ? .neutral : .bad)
+        // The picker keeps the trial/session line only; a licensed Mac shows no access line.
+        statusView.isHidden = appState.hasFullAccess
 
         let stack = NSStackView(views: [lockup, title, subtitle, durationControl, minutes,
                                         silenceLabel, silenceControl, beginButton, statusView])
@@ -132,6 +134,7 @@ final class HomeViewController: NSViewController {
                 guard let self else { return }
                 self.statusView.setText(self.appState.accessStatusText,
                                         tone: self.appState.trialAccessError == nil ? .neutral : .bad)
+                self.statusView.isHidden = self.appState.hasFullAccess
                 self.armLicenseObservation()
             }
         }

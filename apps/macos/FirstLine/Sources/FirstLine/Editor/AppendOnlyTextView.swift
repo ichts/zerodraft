@@ -22,6 +22,18 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
     private var isUpdatingMarkedText = false
+    /// Guards the text storage edits AppKit itself makes while a composition key
+    /// (delete/forward/selection) is being handed to the input context.
+    private var isCompositionEditing = false
+    /// The marked range the input method last handed us. Third-party IMEs may
+    /// replace that range through insertText after unmarkText, which is still a
+    /// composition commit, not a user edit.
+    private var compositionRange: NSRange?
+    /// Baseline and x of the first real glyph, supplied by the room so the empty
+    /// caret sits at the start of the centered placeholder instead of inside it.
+    var emptyCaretOrigin: NSPoint? {
+        didSet { needsDisplay = true }
+    }
     /// Guards replaceCharacters during a programmatic restore of an existing engine
     /// draft (loadRestoredText). The append-only user-input guards behave identically
     /// whenever this flag is false; it only allows the controlled restore path to write
@@ -67,14 +79,36 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let hadMarkedText = hasMarkedText()
         let isActivity = !plainString(from: string).isEmpty
         guard isRestoringProgrammatically || (onPrepareInput?(isActivity) ?? true) else { return }
+        let viewport = preservedCompositionViewport()
         if !isRestoringProgrammatically && isActivity {
             onMarkedTextActivity?()
         }
 
-        let range = hadMarkedText && !hasMarkedText() ? NSRange(location: NSNotFound, length: 0) : replacementRange
+        let targetRange: NSRange
+        if replacementRange.location != NSNotFound {
+            targetRange = replacementRange
+        } else if hadMarkedText {
+            targetRange = compositionRange ?? self.selectedRange()
+        } else {
+            targetRange = self.selectedRange()
+        }
         isUpdatingMarkedText = true
         defer { isUpdatingMarkedText = false }
-        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: range)
+        super.setMarkedText(normalizedMarkedText(string), selectedRange: selectedRange, replacementRange: targetRange)
+        compositionRange = hasMarkedText() ? markedRange() : nil
+        restoreCompositionViewport(viewport)
+    }
+
+    override func unmarkText() {
+        // Keep the last marked range until the following insertText commits it;
+        // third-party IMEs may unmark before they replace the composition.
+        let keptComposition = compositionRange
+        let viewport = preservedCompositionViewport()
+        isUpdatingMarkedText = true
+        super.unmarkText()
+        isUpdatingMarkedText = false
+        compositionRange = keptComposition
+        restoreCompositionViewport(viewport)
     }
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
@@ -82,8 +116,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let previousEnd = NSRange(location: utf16Length, length: 0)
         let isDefaultRange = replacementRange.location == NSNotFound
         let isMarkedCommit = hasMarkedText()
+        let isCompositionReplacement: Bool = {
+            guard let compositionRange else { return false }
+            return replacementRange.location >= compositionRange.location
+                && NSMaxRange(replacementRange) <= NSMaxRange(compositionRange)
+        }()
 
-        guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd else {
+        guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd
+                || isCompositionReplacement || isUpdatingMarkedText || isCompositionEditing else {
             onDeny?()
             return
         }
@@ -92,7 +132,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             guard onPrepareInput?(!inserted.isEmpty) ?? true else { return }
         }
         let end = NSRange(location: utf16Length, length: 0)
-        if isMarkedCommit && hasMarkedText() {
+        if (isMarkedCommit && hasMarkedText()) || isCompositionReplacement {
             isPerformingInsertion = true
             defer { isPerformingInsertion = false }
             super.insertText(string, replacementRange: replacementRange)
@@ -103,6 +143,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             super.insertText(string, replacementRange: end)
         }
 
+        if isMarkedCommit || isCompositionReplacement { compositionRange = nil }
         guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
         pendingCompositionRefresh = true
         applySessionTypography()
@@ -114,53 +155,75 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         isRestoringProgrammatically = true
         defer { isRestoringProgrammatically = false }
         if hasMarkedText() { unmarkText() }
+        compositionRange = nil
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
     }
 
+    /// While the IME is updating or editing its composition, selection changes are
+    /// the input method's business, not a user attempt to move the caret backwards.
+    var isCompositionUpdate: Bool {
+        hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion || isCompositionEditing
+    }
+
+    /// A selection change that AppKit makes on the IME's behalf (setMarkedText,
+    /// unmark, delete, commit) is allowed even if it leaves the marked range.
+    var isCompositionEditingText: Bool {
+        isUpdatingMarkedText || isPerformingInsertion || isCompositionEditing
+    }
+
+    private var isCompositionSessionLive: Bool {
+        guard let compositionRange else { return false }
+        return NSMaxRange(compositionRange) <= utf16Length
+    }
+
+    private func preservedCompositionViewport() -> NSPoint? {
+        enclosingScrollView?.contentView.bounds.origin
+    }
+
+    private func restoreCompositionViewport(_ origin: NSPoint?) {
+        guard let origin, let scrollView = enclosingScrollView,
+              scrollView.contentView.bounds.origin != origin else { return }
+        scrollView.contentView.scroll(to: origin)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+    }
+
     override func replaceCharacters(in range: NSRange, with string: String) {
-        guard hasMarkedText() else {
-            if isPerformingInsertion == false && isRestoringProgrammatically == false {
-                onDeny?()
-            }
+        let compositionWrite = hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion
+            || isRestoringProgrammatically || isCompositionEditing || isCompositionSessionLive
+        guard compositionWrite else {
+            onDeny?()
             return
         }
-
         super.replaceCharacters(in: range, with: string)
     }
 
     override func deleteBackward(_ sender: Any?) {
-        guard hasMarkedText() else {
+        guard hasMarkedText() || isCompositionEditing || isCompositionSessionLive else {
             onDeny?()
             return
         }
-
-        deleteMarkedCharacter(backward: true)
+        // Hand the key to the active input method; it owns candidate editing and
+        // the marked range. Never rewrite the composition ourselves. A composition
+        // update is not allowed to move the viewport.
+        let viewport = preservedCompositionViewport()
+        isCompositionEditing = true
+        super.deleteBackward(sender)
+        isCompositionEditing = false
+        restoreCompositionViewport(viewport)
     }
 
     override func deleteForward(_ sender: Any?) {
-        guard hasMarkedText() else {
+        guard hasMarkedText() || isCompositionEditing || isCompositionSessionLive else {
             onDeny?()
             return
         }
-
-        deleteMarkedCharacter(backward: false)
-    }
-
-    private func deleteMarkedCharacter(backward: Bool) {
-        let marked = markedRange()
-        let candidate = (string as NSString).substring(with: marked) as NSString
-        let selection = selectedRange()
-        var deletion = NSRange(location: selection.location - marked.location, length: selection.length)
-        if deletion.length == 0 {
-            let index = backward ? deletion.location - 1 : deletion.location
-            guard index >= 0, index < candidate.length else { return }
-            deletion = candidate.rangeOfComposedCharacterSequence(at: index)
-        }
-        guard deletion.location >= 0, NSMaxRange(deletion) <= candidate.length else { return }
-        let remaining = candidate.replacingCharacters(in: deletion, with: "")
-        setMarkedText(remaining, selectedRange: NSRange(location: deletion.location, length: 0),
-                      replacementRange: marked)
+        // Hand the key to the active input method, same as deleteBackward.
+        let viewport = preservedCompositionViewport()
+        isCompositionEditing = true
+        super.deleteForward(sender)
+        isCompositionEditing = false
+        restoreCompositionViewport(viewport)
     }
 
     override func cut(_ sender: Any?) {
@@ -217,6 +280,17 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         super.drawInsertionPoint(in: adjustedCaretRectForCurrentInsertionPoint(from: rect), color: color, turnedOn: flag)
     }
 
+    /// The caret rect for the current insertion point; empty text uses the
+    /// placeholder's first-glyph origin.
+    func caretRectForCurrentInsertionPoint() -> NSRect {
+        guard let layoutManager, let textContainer else { return .zero }
+        layoutManager.ensureLayout(for: textContainer)
+        let line: NSRect = string.isEmpty ? layoutManager.extraLineFragmentRect
+            : layoutManager.lineFragmentUsedRect(forGlyphAt: layoutManager.glyphIndexForCharacter(at: max(selectedRange().location - 1, 0)), effectiveRange: nil)
+        let rect = NSRect(x: line.minX, y: line.minY, width: Self.caretWidth, height: line.height)
+        return adjustedCaretRectForCurrentInsertionPoint(from: rect)
+    }
+
     override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
         var adjusted = rect
         if rect.width < 10 {
@@ -251,6 +325,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         for sub in layer.sublayers ?? [] {
             guard sub.bounds.height > 10, sub.bounds.width < 10 else { continue }
             let adjusted = adjustedCaretRectForCurrentInsertionPoint(from: sub.frame)
+            sub.frame.origin.x = adjusted.origin.x
             sub.frame.origin.y = adjusted.origin.y
             sub.frame.size.width = Self.caretWidth
             sub.frame.size.height = adjusted.height
@@ -260,6 +335,15 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     func adjustedCaretRectForCurrentInsertionPoint(from rect: NSRect) -> NSRect {
+        if string.isEmpty, let origin = emptyCaretOrigin {
+            var empty = defaultCaretRect(from: rect)
+            empty.origin.x = origin.x
+            empty.origin.y = origin.y - sessionFont.ascender
+            empty.size.width = Self.caretWidth
+            empty.size.height = caretHeight
+            return empty
+        }
+
         let adjusted = defaultCaretRect(from: rect)
         if let lineRect = trailingNewlineCaretLineRect(),
            let font = chineseFont.font(size: sessionFontSize),
@@ -404,6 +488,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         defer { isRestoringProgrammatically = false }
         let whole = NSRange(location: 0, length: textStorage.length)
         textStorage.replaceCharacters(in: whole, with: text)
+        compositionRange = nil
         applySessionTypography()
         let end = NSRange(location: utf16Length, length: 0)
         if selectedRange() != end { setSelectedRange(end) }

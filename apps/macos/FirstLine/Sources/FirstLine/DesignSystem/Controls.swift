@@ -96,7 +96,7 @@ final class FirstLineSegmentedControl: NSView {
 }
 
 @MainActor
-private final class FirstLineSegmentButton: NSButton {
+private final class FirstLineSegmentButton: FirstLineInkFocusButton {
     var isChosen = false {
         didSet {
             state = isChosen ? .on : .off
@@ -130,7 +130,8 @@ private final class FirstLineSegmentButton: NSButton {
         isBordered = false
         bezelStyle = .inline
         font = .systemFont(ofSize: 14, weight: .medium)
-        focusRingType = .default
+        inkFocusRingInset = 2
+        inkFocusRingCornerRadius = 19
         wantsLayer = true
         setAccessibilityRole(.radioButton)
     }
@@ -174,6 +175,40 @@ private final class FirstLineSegmentButton: NSButton {
 // MARK: - Status
 
 @MainActor
+/// A hairline room bar: the fraction fills from the leading edge, no label, no animation.
+final class FirstLineFillBar: NSView {
+    var fraction: CGFloat = 0 {
+        didSet { needsDisplay = true }
+    }
+
+    var fillColor: NSColor = FirstLineColors.inkNSColor {
+        didSet { needsDisplay = true }
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        translatesAutoresizingMaskIntoConstraints = false
+        setAccessibilityElement(false)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let width = bounds.width * min(max(fraction, 0), 1)
+        guard width > 0 else { return }
+        fillColor.setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: width, height: bounds.height)).fill()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+}
+
 final class FirstLineStatusView: NSView {
     enum Tone { case neutral, bad }
 

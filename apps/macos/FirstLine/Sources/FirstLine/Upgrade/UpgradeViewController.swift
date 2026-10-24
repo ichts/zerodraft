@@ -90,11 +90,22 @@ final class UpgradeViewController: NSViewController {
         buyButton = FirstLineButtons.secondary(title: "Buy a license, \(AppState.displayPrice) once",
                                               target: self, action: #selector(buyTapped))
         let buy = buyButton!
-        let actions = NSStackView(views: [activateButton, buy])
+        // The action row spans the card content with two equal flexible spacers.
+        // A hidden sibling (Buy) can therefore never push the remaining control
+        // to the leading edge; the visible group stays centred as a unit.
+        let leadingSpacer = NSView()
+        let trailingSpacer = NSView()
+        for spacer in [leadingSpacer, trailingSpacer] {
+            spacer.translatesAutoresizingMaskIntoConstraints = false
+            spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+        let actions = NSStackView(views: [leadingSpacer, activateButton, buy, trailingSpacer])
         actions.translatesAutoresizingMaskIntoConstraints = false
         actions.orientation = .horizontal
         actions.alignment = .centerY
         actions.spacing = 12
+        actions.distribution = .fill
 
         pricingView = FirstLineStatusView(text: "One payment. 2 Macs. 14-day refund.")
         checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
@@ -122,6 +133,8 @@ final class UpgradeViewController: NSViewController {
             stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: card.contentView.topAnchor),
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
+            actions.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            leadingSpacer.widthAnchor.constraint(equalTo: trailingSpacer.widthAnchor),
             licenseField.widthAnchor.constraint(equalTo: stack.widthAnchor),
             fieldLabel.widthAnchor.constraint(equalTo: stack.widthAnchor),
             subtitleLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 440),

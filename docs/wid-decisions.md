@@ -387,3 +387,13 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   Apple Pinyin source through `NSTextInputContext`.
 - Supersedes: the wipe's storage-only unmark. The append-only guards are unchanged.
 
+
+## D-033: An unmarked composition does not license deletion
+
+- Date: 2026-10-24
+- Decision: Delete, forward-delete or replace after the IME has cleared its marked range but before it
+  commits is a user edit and fires the deny treatment; a commit that belongs to the composition still
+  passes through. A denied edit clears the pending range so a later replacement cannot target stale text.
+- Reason: The earlier tolerance kept the unmarked range live for the rest of the view, so deleting
+  visible `ni` bypassed append-only without the engine ever receiving it.
+- Supersedes: case 13's post-unmark deletion tolerance. D-032's wipe context reset stands.

@@ -600,24 +600,21 @@ struct RoomTests {
                              windowNumber: window.windowNumber, context: nil, characters: chars,
                              charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
         }
-        let inputContextIsActive = NSApp.isActive && window.isKeyWindow
-        func firstKey() {
-            if inputContextIsActive {
-                _ = context.handleEvent(key("n", 45))
-            } else {
-                fixture.editor.setMarkedText(
-                    "n", selectedRange: NSRange(location: 1, length: 0),
-                    replacementRange: NSRange(location: NSNotFound, length: 0))
+        guard NSApp.isActive, window.isKeyWindow else {
+            withKnownIssue("case 53 is unverified: the test host cannot activate a window for the input context") {
+                #expect(NSApp.isActive && window.isKeyWindow, "the input context needs an active host window")
             }
+            window.orderOut(nil)
+            return
         }
         // A real marked composition, then the silence wipe, then the first key again.
-        firstKey()
+        _ = context.handleEvent(key("n", 45))
         #expect(fixture.editor.hasMarkedText(), "the first Pinyin key did not start a marked composition")
         fixture.clock.now = 9
         fixture.room.tick()
         #expect(fixture.engine.phase == .failure)
         #expect(fixture.editor.string.isEmpty)
-        firstKey()
+        _ = context.handleEvent(key("n", 45))
         #expect(fixture.editor.string.contains("n"),
                 "the first Pinyin letter after a wipe was swallowed")
         #expect(fixture.engine.phase == .writing)

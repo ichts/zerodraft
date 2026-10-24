@@ -84,7 +84,7 @@ struct PinyinInputTests {
         #expect(fixture.editor.string == committed)
     }
 
-    @Test func clearedMarkedRangeDeletionIsComposition() throws {
+    @Test func clearedMarkedRangeDeletionDenies() throws {
         let fixture = try makeFixture()
         defer { fixture.close() }
         let origin = fixture.origin
@@ -93,9 +93,11 @@ struct PinyinInputTests {
         fixture.editor.unmarkText()
         #expect(fixture.editor.string == "ni")
         fixture.editor.deleteBackward(nil)
-        #expect(fixture.engine.lastDenyAt == nil, "deletion after the IME cleared its marked range is composition")
+        #expect(fixture.engine.lastDenyAt != nil, "deletion after the IME cleared its marked range is a user edit")
         #expect(fixture.origin == origin)
-        #expect(fixture.editor.string != "ni", "the composition deletion must reach the text")
+        #expect(fixture.editor.string == "ni")
+        fixture.editor.insertText("n", replacementRange: NSRange(location: 0, length: 2))
+        #expect(fixture.editor.string == "ni", "a stale composition range must not outlive the denied edit")
     }
 
     @Test func notFoundMarkedReplacementStaysInComposition() throws {

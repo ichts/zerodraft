@@ -183,11 +183,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         isUpdatingMarkedText || isPerformingInsertion || isCompositionEditing
     }
 
-    private var isCompositionSessionLive: Bool {
-        guard let compositionRange else { return false }
-        return NSMaxRange(compositionRange) <= utf16Length
-    }
-
     private func preservedCompositionViewport() -> NSPoint? {
         enclosingScrollView?.contentView.bounds.origin
     }
@@ -201,8 +196,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func replaceCharacters(in range: NSRange, with string: String) {
         let compositionWrite = hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion
-            || isRestoringProgrammatically || isCompositionEditing || isCompositionSessionLive
+            || isRestoringProgrammatically || isCompositionEditing
         guard compositionWrite else {
+            compositionRange = nil
             onDeny?()
             return
         }
@@ -210,7 +206,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func deleteBackward(_ sender: Any?) {
-        guard hasMarkedText() || isCompositionEditing || isCompositionSessionLive else {
+        guard hasMarkedText() || isCompositionEditing else {
+            compositionRange = nil
             onDeny?()
             return
         }
@@ -225,7 +222,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func deleteForward(_ sender: Any?) {
-        guard hasMarkedText() || isCompositionEditing || isCompositionSessionLive else {
+        guard hasMarkedText() || isCompositionEditing else {
+            compositionRange = nil
             onDeny?()
             return
         }

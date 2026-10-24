@@ -75,6 +75,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var warningHint: NSTextField!
     private var exitButton: NSButton!
     private var exitHintLabel: NSTextField!
+    private var failureHeadlineLabel: NSTextField!
+    private var failureRestartButton: NSButton!
+    private var failureRestartLabel: FailureRestartLabel!
     private var keptView: SessionKeptView!
     private var keyMonitor: Any?
     private var keyObserver: NSObjectProtocol?
@@ -88,10 +91,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var washIsCut = false
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
-    /// The kept acknowledgement variant; the shipped default comes from the
-    /// `WID_KEPT_ACKNOWLEDGEMENT` debug switch (headline count when unset).
-    var keptAcknowledgement: RoomPresentation.KeptAcknowledgement =
-        RoomPresentation.KeptAcknowledgement.fromEnvironment()
     private var denyWork: DispatchWorkItem?
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
@@ -150,6 +149,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         prepareViewport()
         layoutWarning()
         syncProgressBar(phase: engine.phase)
+        updateFailureHeadingFont()
         keptView?.layoutContent()
     }
 
@@ -262,7 +262,44 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
 
-        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningHint!, exitButton!, exitHintLabel!] {
+        failureHeadlineLabel = label(font: FirstLineTypography.writingMediumNSFont(size: 44),
+                                     color: FirstLineColors.inkNSColor)
+        failureHeadlineLabel.maximumNumberOfLines = 2
+        failureHeadlineLabel.lineBreakMode = .byWordWrapping
+        failureHeadlineLabel.isHidden = true
+        failureHeadlineLabel.stringValue = "You stopped."
+        failureRestartButton = FirstLineButtons.secondary(title: "Begin again", target: self,
+                                                          action: #selector(restart), height: 48)
+        failureRestartButton.title = "Begin again"
+        failureRestartButton.keyEquivalent = "\r"
+        failureRestartButton.setAccessibilityLabel("Begin again")
+        failureRestartButton.isHidden = true
+        let restartFont = NSFont.systemFont(ofSize: 15, weight: .medium)
+        failureRestartButton.font = restartFont
+        failureRestartButton.attributedTitle = FirstLineTypography.trackedText(
+            "Begin again", font: restartFont, color: .clear, kernEm: 0.04, lineHeightMultiple: 1.6)
+        failureRestartLabel = FailureRestartLabel(labelWithString: "Begin again")
+        failureRestartLabel.translatesAutoresizingMaskIntoConstraints = false
+        failureRestartLabel.isEditable = false
+        failureRestartLabel.isSelectable = false
+        failureRestartLabel.isBezeled = false
+        failureRestartLabel.drawsBackground = false
+        failureRestartLabel.alignment = .center
+        failureRestartLabel.maximumNumberOfLines = 1
+        failureRestartLabel.lineBreakMode = .byClipping
+        failureRestartLabel.setAccessibilityElement(false)
+        failureRestartLabel.attributedStringValue = FirstLineTypography.trackedText(
+            "Begin again", font: restartFont, color: FirstLineColors.inkNSColor, kernEm: 0.04,
+            lineHeightMultiple: 1.6)
+        failureRestartButton.addSubview(failureRestartLabel)
+        NSLayoutConstraint.activate([
+            failureRestartLabel.centerXAnchor.constraint(equalTo: failureRestartButton.centerXAnchor),
+            failureRestartLabel.centerYAnchor.constraint(equalTo: failureRestartButton.centerYAnchor,
+                                                          constant: -5.25),
+        ])
+
+        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningHint!, exitButton!,
+                        exitHintLabel!, failureHeadlineLabel!, failureRestartButton!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -324,6 +361,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             reportTop,
             reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
+            failureHeadlineLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            failureHeadlineLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
+            failureHeadlineLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 32),
+            failureHeadlineLabel.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -32),
+            failureRestartButton.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            failureRestartButton.topAnchor.constraint(equalTo: failureHeadlineLabel.bottomAnchor, constant: 20),
             keptView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             keptView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
             keptView.topAnchor.constraint(equalTo: paper.topAnchor, constant: SessionKeptView.verticalInset),
@@ -339,7 +382,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             let sessionID = self.engine.sessionID
             let allowed = self.appState.prepareSessionInput(isActivity: isActivity)
             if !allowed || self.engine.sessionID != sessionID || self.engine.phase == .failure || self.engine.phase == .idle {
-                self.textView.clearWipedText()
+                // The wiped room is already empty. Clearing it again while the input
+                // method is delivering the first marked key makes the context discard
+                // that composition; only a real leftover draft needs the clear.
+                if !self.textView.string.isEmpty || self.textView.hasMarkedText() {
+                    self.textView.clearWipedText()
+                }
             }
             return allowed
         }
@@ -450,7 +498,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func installInputMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, event.window === self.view.window, event.keyCode == 53,
+            guard let self, event.window === self.view.window else { return event }
+            if self.engine.phase == .failure, event.keyCode == 36 || event.keyCode == 76 {
+                self.restart()
+                return nil
+            }
+            guard event.keyCode == 53,
                   RoomPresentation.handlesEscape(isComposing: self.textView.hasMarkedText()) else { return event }
             self.requestExit()
             return nil
@@ -463,6 +516,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                 self.syncProgressBar(phase: self.engine.phase, force: true)
             }
         }
+    }
+
+    private func updateFailureHeadingFont() {
+        let width = view.window?.contentView?.bounds.width ?? view.bounds.width
+        let size = round(min(max(width * 0.05, 32), 48))
+        failureHeadlineLabel.font = FirstLineTypography.writingMediumNSFont(size: size)
+            ?? .systemFont(ofSize: size, weight: .medium)
+        failureHeadlineLabel.preferredMaxLayoutWidth = max(paper.bounds.width - 96, 0)
     }
 
     private func focusForPhase() {
@@ -528,9 +589,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         lastPhase = phase
         let isKept = phase == .success
+        let showFailure = phase == .failure
         keptView.isHidden = !isKept
         scrollView.isHidden = isKept
         textView.isEditable = !isKept
+        failureHeadlineLabel.isHidden = !showFailure
+        failureRestartButton.isHidden = !showFailure
+        if showFailure { updateFailureHeadingFont() }
+        view.window?.defaultButtonCell = showFailure ? failureRestartButton.cell as? NSButtonCell : nil
         if sessionChanged, phase == .writing {
             DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
         }
@@ -626,7 +692,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let writingFont = WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size)
             ?? FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
         keptView.setContent(text: engine.text, wordCount: engine.wordCount,
-                            writingFont: writingFont, acknowledgement: keptAcknowledgement)
+                            duration: engine.duration, writingFont: writingFont)
     }
 
     /// A footer-row run with the row's shared 1.6 line box. The count and the inline
@@ -862,4 +928,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         return proposed
     }
+}
+
+private final class FailureRestartLabel: NSTextField {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

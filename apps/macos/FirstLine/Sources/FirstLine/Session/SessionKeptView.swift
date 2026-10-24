@@ -1,6 +1,6 @@
 /*
- * [INPUT]: Engine text, word count, writing/heading fonts, the acknowledgement variant, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet: a fixed top block (heading, one restrained acknowledgement, copy/restart controls) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
+ * [INPUT]: Engine text, word count, real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
+ * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
  * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
  * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */
@@ -36,7 +36,7 @@ final class SessionKeptView: NSView {
     private let restartTitleLabel = PassThroughLabel(labelWithString: "")
     private var selectedDraft = ""
     private var renderedWordCount: Int?
-    private var renderedAcknowledgement: RoomPresentation.KeptAcknowledgement?
+    private var renderedDuration: TimeInterval?
     private let reducesMotion: () -> Bool
 
     init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector,
@@ -131,78 +131,36 @@ final class SessionKeptView: NSView {
 
     var draft: String { selectedDraft }
 
-    func setContent(text: String, wordCount: Int, writingFont: NSFont,
-                    acknowledgement: RoomPresentation.KeptAcknowledgement) {
+    func setContent(text: String, wordCount: Int, duration: TimeInterval, writingFont: NSFont) {
         guard selectedDraft != text || renderedWordCount != wordCount
-                || body.font != writingFont || renderedAcknowledgement != acknowledgement else { return }
+                || renderedDuration != duration || body.font != writingFont else { return }
         selectedDraft = text
         renderedWordCount = wordCount
-        renderedAcknowledgement = acknowledgement
+        renderedDuration = duration
         body.font = writingFont
         body.attributedStringValue = FirstLineTypography.trackedText(
             text.isEmpty ? " " : text, font: writingFont, color: FirstLineColors.inkNSColor,
             kernEm: 0, lineHeightMultiple: 1.6, fixedLineHeight: true)
         updateHeadingFont()
-        applyAcknowledgement(acknowledgement, wordCount: wordCount, writingFont: writingFont)
+        heading.stringValue = "You wrote it down."
+        receipt.isHidden = false
+        receipt.font = FirstLineTypography.smallMediumNSFont
+        receipt.attributedStringValue = FirstLineTypography.trackedText(
+            RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration),
+            font: FirstLineTypography.smallMediumNSFont,
+            color: FirstLineColors.muteNSColor, kernEm: 0.02)
+        header.setCustomSpacing(12, after: heading)
+        header.setCustomSpacing(20, after: receipt)
         header.needsLayout = true
         needsLayout = true
-    }
-
-    /// One restrained acknowledgement: the count inside the headline (default),
-    /// one quiet line in the writer's own type, or a one-time ink settle with no
-    /// text change. No exclamation marks, no scores.
-    private func applyAcknowledgement(_ acknowledgement: RoomPresentation.KeptAcknowledgement,
-                                      wordCount: Int, writingFont: NSFont) {
-        switch acknowledgement {
-        case .headlineCount:
-            heading.stringValue = RoomPresentation.keptHeadline(wordCount: wordCount)
-            receipt.isHidden = true
-            header.setCustomSpacing(20, after: heading)
-        case .quietLine:
-            heading.stringValue = "You wrote it down."
-            receipt.isHidden = false
-            let quietFont = NSFont(descriptor: writingFont.fontDescriptor, size: 18) ?? writingFont
-            receipt.font = quietFont
-            receipt.attributedStringValue = FirstLineTypography.trackedText(
-                RoomPresentation.keptQuietLine(wordCount: wordCount),
-                font: quietFont, color: FirstLineColors.inkNSColor, kernEm: 0,
-                lineHeightMultiple: 1.6)
-            header.setCustomSpacing(12, after: heading)
-        case .inkSettle:
-            heading.stringValue = "You wrote it down."
-            receipt.isHidden = true
-            header.setCustomSpacing(20, after: heading)
-            applyInkSettle()
-        }
-    }
-
-    /// A single 240 ms settle of the headline ink: a short fade and a 1.5 pt rise,
-    /// then the text is still. Reduce Motion lands on the settled state.
-    private func applyInkSettle() {
-        guard !reducesMotion() else { return }
-        heading.wantsLayer = true
-        guard let layer = heading.layer else { return }
-        layer.removeAnimation(forKey: "ink-settle")
-        let fade = CABasicAnimation(keyPath: "opacity")
-        fade.fromValue = 0.62
-        fade.toValue = 1
-        let rise = CABasicAnimation(keyPath: "transform.translation.y")
-        rise.fromValue = -1.5
-        rise.toValue = 0
-        let settle = CAAnimationGroup()
-        settle.animations = [fade, rise]
-        settle.duration = 0.24
-        settle.timingFunction = CAMediaTimingFunction(name: .easeOut)
-        layer.add(settle, forKey: "ink-settle")
     }
 
     func reset() {
         selectedDraft = ""
         renderedWordCount = nil
-        renderedAcknowledgement = nil
+        renderedDuration = nil
         body.stringValue = ""
         heading.stringValue = "You wrote it down."
-        heading.layer?.removeAnimation(forKey: "ink-settle")
         setCopyTitle("COPY TEXT")
     }
 

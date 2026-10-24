@@ -255,7 +255,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   CJK rule stated.
 - Supersedes: the Mac kept layout with the actions below the draft and the wall-clock `0:00` receipt.
 
-## D-024: Ink pills focus with one inner light ring
+## D-024: Ink pills focus with one inner light ring (fourth round: the ring sits on the pill edge)
 
 - Date: 2026-10-24
 - Decision: A primary ink-filled pill (Begin, Activate, COPY TEXT) shows keyboard focus as a
@@ -331,3 +331,59 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   carries the instruction without adding a second text near the writing.
 - Supersedes: D-021's under-line hint caption. The caret-only line and the shared insertion origin
   stand.
+
+## D-029: The wiped screen is the kept screen's counterpart
+
+- Date: 2026-10-24
+- Decision: After a wipe the room shows the calm headline `You stopped.`, a real 48 pt outlined
+  `Begin again` secondary (Return triggers it, the editor stays first responder for typing), and the
+  red `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` receipt below the empty line. The button starts a
+  fresh session; typing still restarts. No alternative headline ships.
+- Reason: The fifth round's machine-only failure state had no counterpart to "You wrote it down." and no
+  pointer-friendly restart. The captain's final copy chose the calm headline and the button, and
+  dropped the alternative captures.
+- Supersedes: the plain caret-and-receipt failure screen; the alternative headlines. The receipt
+  position and empty-caret rule from D-028 stand.
+
+## D-030: The kept screen's final restrained feedback and controls
+
+- Date: 2026-10-24
+- Decision: The kept screen returns to the headline `You wrote it down.` and one quiet small-caps
+  receipt below it: `5 MINUTES. 63 WORDS.` with the real session duration and count (singular
+  `1 MINUTE. 1 WORD.`), no `KEPT`. It mirrors the failure receipt's format. COPY TEXT hugs its label
+  (24 pt padding; 141 pt for the label), COPIED is narrower, RUN IT AGAIN is a 48 pt quiet outlined
+  secondary, both labels sit on the row's optical centre, and the copy pill's focus ring is one light
+  ring on its edge.
+- Reason: The captain found the machine receipt and the fixed-width pill odd, asked for restrained
+  positive feedback, then chose the small-caps duration/count line and removed `KEPT`. The receipt is
+  the failure receipt's quiet counterpart.
+- Supersedes: D-023's fixed-width copy pill and `N WORDS WRITTEN DOWN IN M MINUTES.` receipt; the fifth
+  round's three candidate acknowledgement variants (quiet line, count-in-headline, ink settle). The
+  empty room's D-028 count prompt is unchanged.
+
+## D-031: The picker's rules live behind one quiet question mark
+
+- Date: 2026-10-24
+- Decision: The picker has no subtitle. A small quiet `?` control at the card's top-right is keyboard
+  reachable and opens a dedicated rules sheet that reuses the landing page's How it works wording and
+  order: No way back; Eight seconds of silence; Reach zero, keep it. Done or Return dismisses it,
+  Escape cancels it, and it renders in light and dark. The start screen keeps the merged A split-W
+  lockup above the "How long?" card.
+- Reason: The captain said the `Forward only. Nothing is saved.` subtitle was unnecessary, and asked
+  for the rules behind a question mark explained the same way as the landing. The landing's order keeps
+  web and Mac saying the same thing.
+- Supersedes: the picker subtitle; any separate rules copy on the picker.
+
+## D-032: A wipe resets the input context's composition
+
+- Date: 2026-10-24
+- Decision: When a wipe clears the editor while an input method owns a marked composition, the editor
+  discards the input context's marked text in addition to unmarking its storage. A stale replacement
+  range outside the current text is ignored, and an already-empty wiped room is not cleared again
+  while the first marked key is being delivered.
+- Reason: The captain reported that the first Pinyin key after a wipe was swallowed while English
+  letters were fine. The input context kept the cleared composition's marked range; the restart clear
+  then interfered with the first new composition. The real input-context regression test drives the
+  Apple Pinyin source through `NSTextInputContext`.
+- Supersedes: the wipe's storage-only unmark. The append-only guards are unchanged.
+

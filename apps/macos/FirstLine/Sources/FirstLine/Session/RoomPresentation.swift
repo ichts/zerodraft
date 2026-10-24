@@ -32,31 +32,13 @@ enum RoomPresentation {
     /// Count rule shared by the room count and the kept acknowledgement.
     static let countRule = "Counts words. Each Chinese character counts as one. Punctuation and emoji do not count."
 
-    /// The restrained kept acknowledgements. The machine receipt was retired after
-    /// the fifth hands-on round; the default puts the count in the headline sentence.
-    enum KeptAcknowledgement: String, CaseIterable {
-        case quietLine = "quiet-line"
-        case headlineCount = "headline-count"
-        case inkSettle = "ink-settle"
-
-        static let shippedDefault: KeptAcknowledgement = .headlineCount
-
-        /// Debug switch for comparisons; the shipped app uses `shippedDefault`.
-        static func fromEnvironment(_ environment: [String: String] = ProcessInfo.processInfo.environment)
-            -> KeptAcknowledgement {
-            environment["WID_KEPT_ACKNOWLEDGEMENT"]
-                .flatMap(KeptAcknowledgement.init(rawValue:)) ?? shippedDefault
-        }
-    }
-
-    /// The default: the count as part of the headline sentence.
-    static func keptHeadline(wordCount: Int) -> String {
-        "You wrote \(wordLabel(wordCount)) down."
-    }
-
-    /// The quiet alternative: one line in the writer's own type.
-    static func keptQuietLine(wordCount: Int) -> String {
-        "\(wordLabel(wordCount)), kept."
+    /// `5 MINUTES. 63 WORDS.` The quiet counterpart of the failure receipt, in
+    /// the same small-caps line: the real session duration, then the count.
+    static func keptReceipt(wordCount: Int, duration: TimeInterval) -> String {
+        let minutes = max(Int((duration / 60).rounded()), 1)
+        let minuteUnit = minutes == 1 ? "MINUTE" : "MINUTES"
+        let wordUnit = wordCount == 1 ? "WORD" : "WORDS"
+        return "\(minutes) \(minuteUnit). \(wordCount) \(wordUnit)."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {

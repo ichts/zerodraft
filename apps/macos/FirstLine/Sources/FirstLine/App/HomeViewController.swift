@@ -61,8 +61,16 @@ final class HomeViewController: NSViewController {
         ])
 
         let title = label("How long?", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
-        let subtitle = label("Forward only. Nothing is saved.", font: FirstLineTypography.subtitleNSFont(), color: FirstLineColors.muteNSColor)
-        subtitle.maximumNumberOfLines = 0
+        let rulesButton = FirstLineButtons.link(title: "?", target: self, action: #selector(showRules))
+        rulesButton.setAccessibilityLabel("How it works")
+        rulesButton.setAccessibilityHelp("How it works: no way back, eight seconds of silence, reach zero and keep it.")
+        card.contentView.addSubview(rulesButton)
+        NSLayoutConstraint.activate([
+            rulesButton.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -12),
+            rulesButton.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: -8),
+            rulesButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 28),
+            rulesButton.heightAnchor.constraint(equalToConstant: 28),
+        ])
 
         durationControl = FirstLineSegmentedControl(
             items: SessionEngine.durationChoices.map { duration in
@@ -101,15 +109,14 @@ final class HomeViewController: NSViewController {
         // The picker keeps the trial/session line only; a licensed Mac shows no access line.
         statusView.isHidden = appState.hasFullAccess
 
-        let stack = NSStackView(views: [lockup, title, subtitle, minutes, durationControl,
+        let stack = NSStackView(views: [lockup, title, minutes, durationControl,
                                         silenceLabel, silenceControl, beginButton, statusView])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 0
         stack.setCustomSpacing(20, after: lockup)
-        stack.setCustomSpacing(8, after: title)
-        stack.setCustomSpacing(26, after: subtitle)
+        stack.setCustomSpacing(24, after: title)
         stack.setCustomSpacing(8, after: minutes)
         stack.setCustomSpacing(20, after: durationControl)
         stack.setCustomSpacing(8, after: silenceLabel)
@@ -121,7 +128,6 @@ final class HomeViewController: NSViewController {
             stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor),
             stack.topAnchor.constraint(equalTo: card.contentView.topAnchor),
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
-            subtitle.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
             statusView.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
         ])
     }
@@ -161,6 +167,10 @@ final class HomeViewController: NSViewController {
 
     @objc private func beginTapped() {
         appState.startSession(duration: appState.selectedDuration)
+    }
+
+    @objc private func showRules() {
+        presentAsSheet(RulesViewController())
     }
 }
 

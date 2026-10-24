@@ -328,52 +328,17 @@ struct ReviewRoundTests {
                 "the long draft does not scroll under the fixed actions")
 
         let heading = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
-            .first { $0.stringValue == RoomPresentation.keptHeadline(wordCount: fixture.engine.wordCount) })
+            .first { $0.stringValue == "You wrote it down." })
         #expect(!heading.isHiddenOrHasHiddenAncestor)
-        #expect(!descendants(of: fixture.room.view, of: NSTextField.self)
-            .contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.")
-                && !$0.isHiddenOrHasHiddenAncestor })
+        let receipt = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue == RoomPresentation.keptReceipt(
+                wordCount: fixture.engine.wordCount, duration: fixture.engine.duration) })
+        #expect(!receipt.isHiddenOrHasHiddenAncestor)
+        #expect(receipt.toolTip == RoomPresentation.countRule)
         let count = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
             .first { $0.stringValue.hasSuffix("words") })
         #expect(count.toolTip == RoomPresentation.countRule)
         fixture.window.orderOut(nil)
-    }
-
-    @Test func keptAcknowledgementCandidatesStayRestrained() throws {
-        #expect(RoomPresentation.KeptAcknowledgement.shippedDefault == .headlineCount)
-        for candidate in RoomPresentation.KeptAcknowledgement.allCases {
-            let fixture = keptRoom(text: "one two three", acknowledgement: candidate)
-            let labels = descendants(of: fixture.room.view, of: NSTextField.self)
-            let body = try #require(labels.first { $0.isSelectable && !$0.isEditable })
-            switch candidate {
-            case .headlineCount:
-                let heading = try #require(labels.first { $0.stringValue == "You wrote 3 words down." })
-                #expect(!heading.isHiddenOrHasHiddenAncestor)
-                #expect(!labels.contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.") })
-            case .quietLine:
-                let heading = try #require(labels.first { $0.stringValue == "You wrote it down." })
-                let quiet = try #require(labels.first { $0.stringValue == "3 words, kept." })
-                #expect(!heading.isHiddenOrHasHiddenAncestor)
-                #expect(!quiet.isHiddenOrHasHiddenAncestor)
-                #expect(quiet.font?.familyName == body.font?.familyName,
-                        "the quiet line is not in the writer's own type")
-            case .inkSettle:
-                let heading = try #require(labels.first { $0.stringValue == "You wrote it down." })
-                #expect(!heading.isHiddenOrHasHiddenAncestor)
-                #expect(heading.layer?.animation(forKey: "ink-settle") != nil,
-                        "the one-time ink settle did not run")
-                let still = keptRoom(text: "one two three", acknowledgement: .inkSettle, reducedMotion: true)
-                let stillHeading = try #require(descendants(of: still.room.view, of: NSTextField.self)
-                    .first { $0.stringValue == "You wrote it down." })
-                #expect(stillHeading.layer?.animation(forKey: "ink-settle") == nil,
-                        "Reduce Motion must land on the settled state")
-                still.window.orderOut(nil)
-            }
-            for label in labels where !label.isHiddenOrHasHiddenAncestor {
-                #expect(!label.stringValue.contains("!"), "an acknowledgement must not exclaim")
-            }
-            fixture.window.orderOut(nil)
-        }
     }
 
     // MARK: - Helpers
@@ -386,9 +351,7 @@ struct ReviewRoundTests {
         let now: Clock
     }
 
-    private func keptRoom(text: String = "hello there. this draft is kept.",
-                          acknowledgement: RoomPresentation.KeptAcknowledgement = .shippedDefault,
-                          reducedMotion: Bool = false) -> KeptFixture {
+    private func keptRoom(text: String = "hello there. this draft is kept.") -> KeptFixture {
         let root = tempRoot()
         let now = Clock()
         let engine = SessionEngine(now: { now.now })
@@ -396,9 +359,7 @@ struct ReviewRoundTests {
                                       settingsStore: SettingsStore(configDirectory: root),
                                       installIDStore: InstallIDStore(configDirectory: root))
         state.startSession(duration: 60)
-        if reducedMotion { state.settings.reducedMotion = .always }
         let room = SessionViewController(appState: state)
-        room.keptAcknowledgement = acknowledgement
         let window = makeWindow(room)
         let editor = descendants(of: room.view, of: AppendOnlyTextView.self).first!
         editor.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))

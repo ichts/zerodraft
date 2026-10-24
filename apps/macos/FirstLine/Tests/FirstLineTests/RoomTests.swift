@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import Testing
 @testable import WriteItDown
 
@@ -19,18 +20,12 @@ struct RoomTests {
             "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.")
     }
 
-    @Test func keptAcknowledgementStringsStayRestrained() {
-        #expect(RoomPresentation.KeptAcknowledgement.shippedDefault == .headlineCount)
-        #expect(RoomPresentation.keptHeadline(wordCount: 33) == "You wrote 33 words down.")
-        #expect(RoomPresentation.keptHeadline(wordCount: 1) == "You wrote 1 word down.")
-        #expect(RoomPresentation.keptQuietLine(wordCount: 33) == "33 words, kept.")
-        #expect(RoomPresentation.keptQuietLine(wordCount: 1) == "1 word, kept.")
+    @Test func keptReceiptMirrorsTheFailureReceipt() {
+        #expect(RoomPresentation.keptReceipt(wordCount: 63, duration: 300) == "5 MINUTES. 63 WORDS.")
+        #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 60) == "1 MINUTE. 1 WORD.")
+        #expect(!RoomPresentation.keptReceipt(wordCount: 63, duration: 300).contains("KEPT"))
         #expect(RoomPresentation.wordLabel(0) == "0 words")
         #expect(RoomPresentation.wordLabel(1) == "1 word")
-        for text in [RoomPresentation.keptHeadline(wordCount: 33),
-                     RoomPresentation.keptQuietLine(wordCount: 33)] {
-            #expect(!text.contains("!"), "an acknowledgement must not exclaim")
-        }
     }
 
     @Test func copyPutsExactDraftOnPasteboard() {
@@ -236,6 +231,15 @@ struct RoomTests {
                 "the wiped room must not add an under-line hint")
         #expect(fields.contains { $0.stringValue == "1:00" })
         #expect(fields.contains { $0.stringValue == "0 words" })
+        // The wiped screen is the kept screen's counterpart: a headline, a real
+        // restart button and the red receipt as the detail.
+        let heading = try #require(fields.first { $0.stringValue == "You stopped." })
+        #expect(!heading.isHiddenOrHasHiddenAncestor)
+        let buttons = descendants(fixture.room.view, of: NSButton.self)
+        let beginAgain = try #require(buttons.first { $0.title == "Begin again" })
+        #expect(!beginAgain.isHiddenOrHasHiddenAncestor)
+        #expect(beginAgain.keyEquivalent == "\r")
+        #expect(report.stringValue.hasPrefix("DRAFT DELETED AT"))
     }
 
     @Test func keptStateMatchesTheLiveCopyAndReceipt() throws {
@@ -251,9 +255,9 @@ struct RoomTests {
         fixture.room.tick()
         #expect(fixture.engine.phase == .success)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        #expect(fields.contains { $0.stringValue == "You wrote 15 words down." && !$0.isHidden })
-        #expect(!fields.contains { $0.stringValue.hasSuffix("WRITTEN DOWN IN 1 MINUTE.")
-            && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(fields.contains { $0.stringValue == "You wrote it down." && !$0.isHidden })
+        let receipt = try #require(fields.first { $0.stringValue == "1 MINUTE. 15 WORDS." })
+        #expect(!receipt.isHiddenOrHasHiddenAncestor)
         let body = try #require(fields.first { $0.isSelectable && !$0.isEditable && $0.stringValue.contains("promotion") })
         #expect(body.alignment == .center)
         #expect(body.isHiddenOrHasHiddenAncestor == false)
@@ -263,6 +267,7 @@ struct RoomTests {
         #expect(buttons.contains { $0.title == "ESC - EXIT" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(fields.contains { $0.stringValue == "0:00" })
         #expect(fields.contains { $0.stringValue == "15 words" })
+
         #expect(!fields.contains { $0.stringValue.contains("Not saved") })
         #expect(!fields.contains { $0.stringValue.contains("forward only") })
     }
@@ -571,6 +576,66 @@ struct RoomTests {
             room.tick()
         }
         return (room, engine, state, editor, clock)
+    }
+
+    @Test func firstPinyinKeyAfterAWipeThroughTheInputContext() throws {
+        let fixture = try roomFixture(typed: false)
+        let previous = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue()
+        defer { if let previous { TISSelectInputSource(previous) } }
+        let sources = TISCreateInputSourceList(nil, false)?.takeRetainedValue() as? [TISInputSource] ?? []
+        let pinyin = sources.first { source in
+            guard let raw = TISGetInputSourceProperty(source, kTISPropertyInputSourceID) else { return false }
+            return (Unmanaged<CFString>.fromOpaque(raw).takeUnretainedValue() as String)
+                == "com.apple.inputmethod.SCIM.ITABC"
+        }
+        TISSelectInputSource(try #require(pinyin, "the Apple Pinyin input source is not enabled"))
+        let window = try #require(fixture.room.view.window)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        fixture.room.viewDidAppear()
+        window.makeFirstResponder(fixture.editor)
+        let context = try #require(fixture.editor.inputContext)
+
+        func key(_ chars: String, _ code: UInt16) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                             timestamp: ProcessInfo.processInfo.systemUptime,
+                             windowNumber: window.windowNumber, context: nil, characters: chars,
+                             charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
+        }
+        // A real marked composition, then the silence wipe, then the first key again.
+        _ = context.handleEvent(key("n", 45))
+        fixture.clock.now = 9
+        fixture.room.tick()
+        #expect(fixture.engine.phase == .failure)
+        #expect(fixture.editor.string.isEmpty)
+        _ = context.handleEvent(key("n", 45))
+        #expect(fixture.editor.string.contains("n"),
+                "the first Pinyin letter after a wipe was swallowed")
+        #expect(fixture.engine.phase == .writing)
+        window.orderOut(nil)
+    }
+
+    @Test func failureRestartWorksFromReturn() throws {
+        let fixture = try roomFixture(typed: false)
+        fixture.editor.insertText("abc", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.clock.now = 9
+        fixture.room.tick()
+        #expect(fixture.engine.phase == .failure)
+        let window = try #require(fixture.room.view.window)
+        window.makeKeyAndOrderFront(nil)
+        fixture.room.viewDidAppear()
+        let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+            context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+            keyCode: 36))
+        #expect(window.performKeyEquivalent(with: ret), "Return did not reach Begin again")
+        fixture.room.tick()
+        #expect(fixture.engine.phase == .writing)
+        #expect(fixture.editor.string.isEmpty)
+        let heading = descendants(fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue == "You stopped." }
+        #expect(heading?.isHiddenOrHasHiddenAncestor == true)
+        window.orderOut(nil)
     }
 
     private func window(_ room: SessionViewController) {

@@ -32,11 +32,13 @@ struct BrandTests {
         let images = allImages(in: home.view)
         #expect(images.filter { $0.accessibilityLabel() == "Write It Down" && $0.image != nil }.count == 1)
         #expect(labels.contains("How long?"))
-        #expect(labels.contains("Forward only. Nothing is saved."))
-        #expect(labels.contains("Minutes"))
+        #expect(!labels.contains("Forward only. Nothing is saved."))
+        #expect(labels.contains("Minutes") || labels.contains("minutes"))
         #expect(labels.contains("Delete after silence"))
         #expect(allButtons(in: home.view).contains { $0.title == "1" })
         #expect(allButtons(in: home.view).contains { $0.title == "Begin" })
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        #expect(help.accessibilityLabel() == "How it works")
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: FirstLineAppDelegate())
         #expect(menu.items.first?.title == "Write It Down")
         #expect(menu.items.first?.submenu?.items.first?.title == "About Write It Down")
@@ -60,6 +62,53 @@ struct BrandTests {
         upgrade.loadViewIfNeeded()
         let price = AppState.displayPrice
         #expect(allLabels(in: upgrade.view).contains { $0.contains(price) })
+    }
+
+    @Test func rulesViewReusesTheLandingExplanationAndDismisses() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        window.makeFirstResponder(help)
+        #expect(window.firstResponder === help, "the question mark is not keyboard reachable")
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        rules.view.layoutSubtreeIfNeeded()
+        let labels = allLabels(in: rules.view)
+        let ordered = ["How it works", "Forward only. Nothing kept.", "No way back",
+                       "Eight seconds of silence", "Reach zero, keep it"]
+        for text in ordered {
+            #expect(labels.contains(text), "missing rule text: \(text)")
+        }
+        let positions = ordered.compactMap { labels.firstIndex(of: $0) }
+        #expect(positions == positions.sorted(), "the rules are not in the landing page's order")
+        #expect(labels.contains("Open it, start typing, say the thing you have been avoiding. The only way out is through."))
+        #expect(!labels.contains { $0.contains("!") })
+        let done = try #require(allButtons(in: rules.view).first { $0.title == "Done" })
+        #expect(done.keyEquivalent == "\r")
+        let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: rules.view.window!.windowNumber,
+            context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36))
+        #expect(rules.view.window?.performKeyEquivalent(with: ret) == true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        #expect(home.presentedViewControllers?.isEmpty != false, "Return did not dismiss the rules")
+        window.orderOut(nil)
+    }
+
+    @Test func rulesViewCancelOperationDismisses() throws {
+        let rules = RulesViewController()
+        rules.loadViewIfNeeded()
+        rules.cancelOperation(nil)
+        #expect(rules.presentedViewControllers?.isEmpty != false)
     }
 
     private func allTextFields(in view: NSView) -> [NSTextField] {

@@ -92,7 +92,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
 
         let targetRange: NSRange
-        if replacementRange.location != NSNotFound {
+        if replacementRange.location != NSNotFound,
+           NSMaxRange(replacementRange) <= (textStorage?.length ?? 0) {
             targetRange = replacementRange
         } else if hadMarkedText {
             targetRange = compositionRange ?? self.selectedRange()
@@ -161,7 +162,12 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     func clearWipedText() {
         isRestoringProgrammatically = true
         defer { isRestoringProgrammatically = false }
-        if hasMarkedText() { unmarkText() }
+        let hadComposition = hasMarkedText()
+        if hadComposition { unmarkText() }
+        // The input context keeps its own marked range. If the wipe happens while a
+        // composition is live, the next Pinyin key would otherwise replace that stale
+        // range in the now-empty editor and the first letter would vanish.
+        if hadComposition { inputContext?.discardMarkedText() }
         compositionRange = nil
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))

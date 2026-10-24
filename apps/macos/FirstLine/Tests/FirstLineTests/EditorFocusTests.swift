@@ -158,6 +158,7 @@ struct EditorFocusTests {
             // above is the rendered pitch.
             let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
                                   styleMask: [.titled], backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: .aqua)
             let host = NSView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
             window.contentView = host
             editor.frame = host.bounds

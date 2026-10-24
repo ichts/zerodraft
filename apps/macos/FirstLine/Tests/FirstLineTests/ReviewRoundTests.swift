@@ -253,6 +253,19 @@ struct ReviewRoundTests {
         window.orderOut(nil)
     }
 
+    @Test func homeRulesButtonIsMouseReachable() throws {
+        let home = HomeViewController(appState: try trialState(used: 2))
+        let window = makeWindow(home)
+        let card = try #require(descendants(of: home.view, of: FirstLineCardView.self).first)
+        let content = card.contentView
+        let rules = try #require(descendants(of: content, of: NSButton.self).first { $0.title == "?" })
+        let frame = rules.convert(rules.bounds, to: content)
+        #expect(content.bounds.contains(frame))
+        let centre = rules.convert(NSPoint(x: rules.bounds.midX, y: rules.bounds.midY), to: content.superview)
+        #expect(content.hitTest(centre) === rules)
+        window.orderOut(nil)
+    }
+
     @Test func pickerRadiosExposeTheirFullNameAndSelectedValue() throws {
         let home = HomeViewController(appState: try trialState(used: 2))
         let window = makeWindow(home)

@@ -76,6 +76,47 @@ struct TrialReleaseTests {
         #expect(state.selectedSurface == .home)
     }
 
+    @Test(arguments: [false, true])
+    func exhaustedFailureRestartOpensActivation(byReturn: Bool) throws {
+        var now = 0.0
+        let root = tempRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = makeState(at: root, now: { now })
+        state.settings.trialSessionsUsed = 2
+        state.startSession()
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidAppear()
+        let field = try editor(in: room)
+        field.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 3)
+        now = 9
+        room.tick()
+        #expect(state.sessionEngine.phase == .failure)
+
+        if byReturn {
+            let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber,
+                context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
+                isARepeat: false, keyCode: 36))
+            #expect(window.performKeyEquivalent(with: ret), "Return did not reach Begin again")
+        } else {
+            let beginAgain = try #require(descendants(room.view, of: NSButton.self)
+                .first { $0.title == "Begin again" })
+            beginAgain.performClick(nil)
+        }
+
+        #expect(state.selectedSurface == .upgrade)
+        #expect(state.sessionEngine.phase == .idle)
+        #expect(!state.canStartSession)
+        window.orderOut(nil)
+    }
+
     @Test func firstNonemptyInputSpendsOnceIncludingComposition() throws {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }

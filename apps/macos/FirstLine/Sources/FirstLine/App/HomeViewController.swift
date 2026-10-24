@@ -64,14 +64,6 @@ final class HomeViewController: NSViewController {
         let rulesButton = FirstLineButtons.link(title: "?", target: self, action: #selector(showRules))
         rulesButton.setAccessibilityLabel("How it works")
         rulesButton.setAccessibilityHelp("How it works: no way back, eight seconds of silence, reach zero and keep it.")
-        card.contentView.addSubview(rulesButton)
-        NSLayoutConstraint.activate([
-            rulesButton.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -12),
-            rulesButton.topAnchor.constraint(equalTo: card.contentView.topAnchor, constant: -8),
-            rulesButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 28),
-            rulesButton.heightAnchor.constraint(equalToConstant: 28),
-        ])
-
         durationControl = FirstLineSegmentedControl(
             items: SessionEngine.durationChoices.map { duration in
                 let minutes = Int(duration / 60)
@@ -129,6 +121,13 @@ final class HomeViewController: NSViewController {
             stack.topAnchor.constraint(equalTo: card.contentView.topAnchor),
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
             statusView.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
+        ])
+        card.contentView.addSubview(rulesButton)
+        NSLayoutConstraint.activate([
+            rulesButton.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -12),
+            rulesButton.topAnchor.constraint(equalTo: card.contentView.topAnchor),
+            rulesButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 28),
+            rulesButton.heightAnchor.constraint(equalToConstant: 28),
         ])
     }
 

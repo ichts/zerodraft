@@ -176,12 +176,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         pendingCompositionRefresh = true
     }
 
-    /// While the IME is updating or editing its composition, selection changes are
-    /// the input method's business, not a user attempt to move the caret backwards.
-    var isCompositionUpdate: Bool {
-        hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion || isCompositionEditing
-    }
-
     /// A selection change that AppKit makes on the IME's behalf (setMarkedText,
     /// unmark, delete, commit) is allowed even if it leaves the marked range.
     var isCompositionEditingText: Bool {
@@ -331,16 +325,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return textContainerOrigin.y + line.minY + layoutManager.location(forGlyphAt: glyph).y
     }
 
-    /// Height of the current line box, used by the room to place the warning group a
-    /// fixed distance below the writing line.
-    func currentLineHeight() -> CGFloat? {
-        guard let layoutManager, let textContainer else { return nil }
-        layoutManager.ensureLayout(for: textContainer)
-        if string.isEmpty { return layoutManager.extraLineFragmentRect.height }
-        let glyph = layoutManager.glyphIndexForCharacter(at: max(utf16Length - 1, 0))
-        return layoutManager.lineFragmentRect(forGlyphAt: glyph, effectiveRange: nil).height
-    }
-
     /// Line box used only when the view has no window to ask for the insertion rect.
     private func fallbackLineRect() -> NSRect {
         guard let layoutManager, let textContainer else { return .zero }
@@ -466,9 +450,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let whole = NSRange(location: 0, length: textStorage.length)
         textStorage.replaceCharacters(in: whole, with: text)
         compositionRange = nil
-        applySessionTypography()
         let end = NSRange(location: utf16Length, length: 0)
         if selectedRange() != end { setSelectedRange(end) }
+        applySessionTypography()
         pendingCompositionRefresh = true
     }
 

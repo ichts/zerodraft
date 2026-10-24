@@ -37,6 +37,23 @@ struct RoundThreeTests {
         #expect(copy.frame == ring.frame)
     }
 
+    @Test func primaryPillsHugTheEdgeWhileOutlineAndQuietControlsKeepTheOuterRing() throws {
+        let action = #selector(NSResponder.selectAll(_:))
+        let primary = try #require(FirstLineButtons.primary(title: "Begin", target: nil, action: action)
+            as? FirstLineInkFocusButton)
+        let roomPrimary = try #require(FirstLineButtons.roomPrimary(title: "COPY TEXT", target: nil,
+                                                                   action: action, reducesMotion: { true })
+            as? FirstLineInkFocusButton)
+        let secondary = try #require(FirstLineButtons.secondary(title: "RUN IT AGAIN", target: nil, action: action)
+            as? FirstLineInkFocusButton)
+        let quiet = try #require(FirstLineButtons.link(title: "ESC - EXIT", target: nil, action: action)
+            as? FirstLineInkFocusButton)
+        #expect(primary.inkFocusRingInset == 0)
+        #expect(roomPrimary.inkFocusRingInset == 0)
+        #expect(secondary.inkFocusRingInset == 3)
+        #expect(quiet.inkFocusRingInset == 3)
+    }
+
     // MARK: - Picker access line
 
     @Test func licensedPickerHidesAccessLineAndTrialPickerKeepsIt() throws {
@@ -261,7 +278,6 @@ struct RoundThreeTests {
         var end: [Float] = [0, 0]
         animation.timingFunction?.getControlPoint(at: 0, values: &start)
         animation.timingFunction?.getControlPoint(at: 1, values: &end)
-        print("BARDBG timing start=\(start) end=\(end)")
         #expect(animation.timingFunction === CAMediaTimingFunction(name: .linear) ||
                 (start == [0, 0] && end == [1, 1]), "the bar animation is linear")
         #expect(top.fraction == 0, "the model target is empty while the layer animates")
@@ -302,7 +318,6 @@ struct RoundThreeTests {
         let room = SessionViewController(appState: state)
         room.barNow = { now.now }
         let window = makeWindow(room)
-        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let top = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
         #expect(abs(top.fraction - 1) <= 0.01)
 
@@ -317,7 +332,6 @@ struct RoundThreeTests {
         now.now = 30
         engine.registerCommittedText("a")
         room.tick()
-        print("BARDBG frac=\(top.fraction) remaining=\(engine.remaining) duration=\(engine.duration) phase=\(engine.phase)")
         #expect(top.fractionAnimation == nil)
         #expect(abs(top.fraction - engine.remaining / engine.duration) <= 0.02,
                 "the reduced-motion bar steps with the remaining time")

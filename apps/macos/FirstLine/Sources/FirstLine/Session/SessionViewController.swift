@@ -806,7 +806,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// repeated blocked key restarts them from the current presentation state, and
     /// Reduce Motion keeps only the opacity flash. See D-022.
     private func showDeny() {
-        guard deny.begin(reducesMotion: reducesMotion) else { return }
+        deny.begin()
         announce("Blocked. Forward only.")
         denyWork?.cancel()
 

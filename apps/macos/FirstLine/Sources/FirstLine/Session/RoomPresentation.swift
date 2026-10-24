@@ -25,10 +25,6 @@ enum RoomPresentation {
         "\(count) \(count == 1 ? "word" : "words")"
     }
 
-    static func wordCountLabel(_ count: Int) -> String {
-        "\(count) \(count == 1 ? "WORD" : "WORDS")"
-    }
-
     /// Count rule shared by the room count and the kept acknowledgement.
     static let countRule = "Counts words. Each Chinese character counts as one. Punctuation and emoji do not count."
 
@@ -88,10 +84,8 @@ struct DenyFeedbackState {
 
     /// Every blocked key restarts the short feedback, so the animation is
     /// interruptible instead of dropping repeats while the previous one runs.
-    mutating func begin(reducesMotion: Bool) -> Bool {
-        _ = reducesMotion
+    mutating func begin() {
         outlineVisible = true
-        return true
     }
 
     mutating func end() {

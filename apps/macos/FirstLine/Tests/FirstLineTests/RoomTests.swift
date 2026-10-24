@@ -37,16 +37,13 @@ struct RoomTests {
 
     @Test func denyFeedbackIsInterruptible() {
         var feedback = DenyFeedbackState()
-        let first = feedback.begin(reducesMotion: false)
-        #expect(first)
+        feedback.begin()
         // A repeated blocked key restarts the short animation instead of being ignored.
-        let repeated = feedback.begin(reducesMotion: false)
-        #expect(repeated)
+        feedback.begin()
         #expect(feedback.outlineVisible)
         feedback.end()
         #expect(!feedback.outlineVisible)
-        let next = feedback.begin(reducesMotion: false)
-        #expect(next)
+        feedback.begin()
     }
 
     @Test func denyAnimationIsAShortTransformAndOpacityAnimation() throws {

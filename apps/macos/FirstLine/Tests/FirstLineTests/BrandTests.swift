@@ -105,10 +105,33 @@ struct BrandTests {
     }
 
     @Test func rulesViewCancelOperationDismisses() throws {
-        let rules = RulesViewController()
-        rules.loadViewIfNeeded()
-        rules.cancelOperation(nil)
-        #expect(rules.presentedViewControllers?.isEmpty != false)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        window.makeFirstResponder(help)
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        rules.view.layoutSubtreeIfNeeded()
+        let sheet = try #require(rules.view.window)
+        let escape = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: sheet.windowNumber,
+            context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
+            isARepeat: false, keyCode: 53))
+        sheet.sendEvent(escape)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        #expect(home.presentedViewControllers?.isEmpty == true, "Escape did not dismiss the rules")
+        window.orderOut(nil)
     }
 
     private func allTextFields(in view: NSView) -> [NSTextField] {

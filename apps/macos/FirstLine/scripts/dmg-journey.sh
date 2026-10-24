@@ -141,7 +141,7 @@ key() { local t; t="$(jq -r '[.elements[] | select(.role == "AXTextArea")][0].el
   cua press_key "{\"pid\":$pid,\"window_id\":$window_id,\"element_token\":\"$t\",\"key\":\"$1\"}" >/dev/null; }
 exit_room() {
   key escape
-  wait_has exit-hint 'Press Esc again to leave. The draft is deleted.' || { bad 'first Escape did not show the exit hint'; exit 1; }
+  wait_has exit-hint 'Press Esc again to leave and delete the draft.' || { bad 'first Escape did not show the exit hint'; exit 1; }
   key escape
 }
 type_text() {
@@ -194,7 +194,7 @@ for used in 1 2 3; do
     wait_has kept-third 'You wrote it down.' || { bad 'session 3 never reached the kept receipt'; exit 1; }
     python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
       || { bad 'session 3 completed before a full minute'; exit 1; }
-    has '0:00' && has 'ESC - EXIT' && has 'WORDS WRITTEN DOWN IN 1 MINUTE.' && ! has 'DRAFT DELETED AT ' \
+    has '1 MINUTE. ' && has ' WORDS.' && ! has 'DRAFT DELETED AT ' \
       && jq -e --arg text "$typed" '[.elements[] | select((.value // "") == $text)] | length > 0' "$snapf" >/dev/null \
       || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
     tok="$(token button 'COPY TEXT')"

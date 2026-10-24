@@ -155,8 +155,8 @@ assert_warn_geometry() { # assert_warn_geometry <warn-snapshot>
 assert_exit_row_geometry() { # assert_exit_row_geometry <snapshot>
   local exit hint count
   exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
-  hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave\.')"
-  count="$(frame_of "$1" AXStaticText '^[0-9]+ words$')"
+  hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave and delete the draft\.$')"
+  count="$(frame_of "$1" AXStaticText '^[0-9]+ words?$')"
   [[ -n "$exit" && -n "$hint" && -n "$count" ]] || fail 'exit row geometry: missing a row element'
   record_geometry exit-row "$(jq -cn --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count"     '{exit: $exit, confirmation: $hint, count: $count}')"
   jq -en --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count" '
@@ -238,7 +238,7 @@ type_text() {
 
 assert_exit_hint() { # first Escape/click must arm the inline confirmation, not leave
   poll exit-hint
-  assert_text "$output/last-poll.json" 'Press Esc again to leave. The draft is deleted.'
+  assert_text "$output/last-poll.json" 'Press Esc again to leave and delete the draft.'
   assert_exit_row_geometry "$output/last-poll.json"
 }
 

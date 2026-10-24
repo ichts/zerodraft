@@ -901,18 +901,22 @@ struct EditorFocusTests {
     }
 
     @Test
-    func loadRestoredTextRestoresExistingDraftIntoEmptyEditor() {
+    func loadRestoredTextRestoresExistingDraftIntoEmptyEditor() throws {
         // 活动会话从 Home 返回 Writing 时，新 SessionVC 用 loadRestoredText 把 engine 草稿写回
-        // 空编辑器。它受控豁免 append-only 守卫（isRestoringProgrammatically），写后重应用 zen 排印
-        // 并把 caret 移到 UTF-16 末尾。
+        // 空编辑器。它受控豁免 append-only 守卫（isRestoringProgrammatically），写后把 caret 移到
+        // UTF-16 末尾并重应用 zen 排印。
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
 
-        textView.loadRestoredText("hello world")
+        textView.loadRestoredText("one\ntwo\nthree\nfour")
 
-        #expect(textView.string == "hello world")
+        #expect(textView.string == "one\ntwo\nthree\nfour")
         let end = NSRange(location: (textView.string as NSString).length, length: 0)
         #expect(textView.selectedRange() == end)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 3) - 1) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 0.22) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0)) < 0.001)
     }
 
     @Test

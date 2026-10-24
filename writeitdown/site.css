@@ -148,10 +148,12 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
 /* nav */
 .home-nav{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
-.brand{display:inline-flex;align-items:center;gap:10px;font:500 21px/1 var(--serif);letter-spacing:-.01em}
-/* The cursor block is centred on the cap height, not the line box: Newsreader's line box centre sits 0.12em below
-   the cap-height midpoint, so the block is lifted by that amount (measured at 21px and 19px). */
-.brand i{width:.43em;height:.9em;background:var(--red);border-radius:1.5px;display:block;transform:translateY(-.12em);animation:wid-caret 1.1s steps(1,end) infinite}
+/* The wordmark is the A split-W lockup, drawn as a mask so the site's own ink token colours it in both themes.
+   One vector asset, one colour, no duplicate light/dark markup. */
+.brand{position:relative;display:inline-block;flex:none;width:6.083em;height:.772em;font-size:21px;line-height:1;background:currentColor;
+  -webkit-mask:url(logo/write-it-down-lockup.svg) no-repeat left center/contain;
+  mask:url(logo/write-it-down-lockup.svg) no-repeat left center/contain}
+.brand::after{content:"";position:absolute;inset:-6px 0}
 /* header end: the page action plus the theme icon button */
 .nav-end{display:flex;align-items:center;gap:var(--s2,8px)}
 .theme-btn{flex:none;position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:999px;border:1px solid var(--hair-2,color-mix(in oklab,var(--ink) 18%,transparent));background:var(--sheet,transparent);color:var(--ink)}
@@ -302,7 +304,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .foot-grid{grid-template-columns:1fr 1fr}
   .home .callback h2{flex-direction:column;align-items:center}
 }
-@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.brand i,.deny-key{animation:none}.home .btn{transition:none}}
+@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .btn{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
 .dl-page .dlhead .sub{max-width:60ch}

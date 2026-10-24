@@ -205,3 +205,77 @@ The test: if a frame would hang comfortably in any of these rooms, keep deleting
 - `grep` for U+2014 and U+2013 returns nothing.
 - Focus ring (1px ink, 3px offset) on every interactive element; the numeral is announced via `aria-live`.
 - Reduced motion: fully static ramps, stepped wash, warn on time, wipe instant.
+
+## 11. Write It Down logo
+
+This is the brand for the writeitdown.app trial and the native Mac app. It is a sibling of the root Zero Draft
+landing: the `ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the
+root landing. The legacy static legal/support pages keep their existing mono `WRITE_IT_DOWN` logotype and adopt the
+favicon; the primary web header is the landing, the room, and `/download/`.
+
+### 11.1 The mark and the wordmark
+
+The mark is the split W: Newsreader's W with a vertical notch through its middle peak. The wordmark is
+`Write It Down` in Newsreader 500, with the same split W. The wordmark is the lockup; the W inside the name is the
+mark, so the mark is never set beside the wordmark as a second object.
+
+- Site header and footer: `writeitdown/logo/write-it-down-lockup.svg` at 21 px on desktop and 19 px on mobile.
+  The site draws it as a CSS mask over `currentColor`, so one vector serves the light and dark themes and the
+  brand follows the site's ink token. Minimum lockup width: 19 px type; the 16 px favicon is the smallest use of
+  the mark.
+- App icon and favicon: the mark alone on the bone plate with the ink W by default. The full-bleed favicon is the
+  bone square with the ink W. The ink plate with the bone W is the dark-appearance variant, used only where the
+  platform supports an appearance switch (the favicon's `prefers-color-scheme: dark` links; the alternate app-icon
+  source). A macOS `.icns` app icon has no appearance switch, so the shipped `.icns` is the light plate.
+- The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
+
+### 11.2 Palette and type
+
+- Ink `#17150f`, bone `#f1f0eb`, paper `#ffffff`. No red in the logo. Red stays the alarm for the pause and the
+  wipe, and the site's red hand word is not a logo colour.
+- The wordmark is Newsreader 500; the mark is the same W drawing. Do not re-typeset, track, stretch, or replace
+  the W.
+- The app icon plate is bone with the ink mark by default. The ink plate with the bone mark is the dark-appearance
+  alternate only. The favicon is the bone square with the ink mark, with dark links pointing at the ink square with
+  the bone mark. The volume icon is a bone sheet with the ink mark on a dark disc. The light icon is self-contained;
+  the dark plate is not the default, and it is never used in the light appearance.
+- The mark itself is flat: no gradient, outline, shadow, bevel, or second colour. The app icon's plate gets the
+  system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface.
+
+### 11.3 Sizes and clear space
+
+- App icon: 1024 master, with optical 16 and 32 drawings, all on the bone plate with the ink W. The
+  `AppIcon.appiconset` uses the opticals for the 16/16@2x and 32/32@2x entries and the master for 128 and above.
+  The plate is the 824/1024 macOS squircle on a 1024 canvas. The 16 and 32 app icons keep the optical drawing, not
+  a downscaled master.
+- Favicon: `favicon.svg` plus 16 and 32 PNG on the bone plate; `favicon-dark.svg` and the dark 16/32 PNG as the
+  `prefers-color-scheme: dark` links; `apple-touch-icon.png` at 180 on the bone plate. The favicon is the
+  full-bleed square, not the app icon's transparent-margin squircle.
+- Site header: 21 px desktop, 19 px mobile; the lockup's clear space is at least a quarter of the cap height on
+  all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the lockup.
+- Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
+- The source set is `writeitdown/logo/` and `writeitdown/favicon*` for the site; the app icon set and
+  `packaging/VolumeIcon.icns` for the Mac. The legal/support pages use the mono `WRITE_IT_DOWN` logotype. The
+  ink-plate/bone-W app-icon alternate is kept with the task evidence; it is not compiled into the `.icns`.
+
+### 11.4 Do not
+
+- Put red, the old red underscore, or the old `WID` sheet in the mark.
+- Use the ink plate as the default; it is the dark-appearance alternate only. Do not put the light plate behind a
+  dark-appearance link or the dark plate in the light header.
+- Put the split W beside the wordmark; the wordmark already contains it.
+- Round the favicon square, add a border to the app icon plate, or add a caption or tagline to the lockup.
+- Use the mark on a busy, photographic, or low-contrast surface, or below 16 px.
+- Replace the root `ZERO_DRAFT` logotype with this lockup.
+
+### 11.5 Verification
+
+- Browser tab: the 16 px favicon is an ink W on a bone tile by default, and a bone W on an ink tile when the
+  `prefers-color-scheme: dark` links are selected; the 32 px and SVG versions match.
+- Plate decision: the light plate passes at 16 and 32 px. The light W reads on the bone tile in Finder, Dock and
+  both browser chromes; the dark plate remains the alternate. The side-by-side evidence is kept with the task.
+- Site header: 21 px desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
+- Mac: the app icon at 16/32 (optical), 128 (Dock), and 1024; the volume icon at 128 and 1024; the Dock and Finder
+  captures on light and dark.
+- `grep` for the old `WID` icon, the red underscore, and the `.brand i` caret returns nothing in the shipped
+  surfaces. The logo files contain no `<text>` and no red token.

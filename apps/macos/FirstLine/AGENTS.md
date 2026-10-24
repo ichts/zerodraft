@@ -5,6 +5,7 @@ Parent instructions: `../AGENTS.md`
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
 scripts/test-release-config.py: 沙箱执行 release-dmg.sh 的配置门槛，验证正式包拒绝缺项、非 HTTPS 地址和无效公钥；不构建、不签名，供网页 QA 单次调用。
 scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
@@ -22,7 +23,7 @@ Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController�
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
 Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 产品/设备/实例/有效期门槛（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
 Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前选择面；五个时长按钮直接进入房间、三个静默时限单选；默认时长按钮获焦点；通过 Observation 更新异步许可状态，避免启动校验完成后仍显示 Checking license。
-Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
+Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；AppIcon 使用 A split-W 标记，默认骨白盘配墨色 W，16/32 为光学稿，128 起为主稿；墨盘配骨白 W 只作为 macOS 支持外观切换时的暗色替代稿，`.icns` 默认浅色。图标内不出现红色。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、非空输入前试用授权、窄/宽纸张固定左起点、短段首行固定及下沿滚动、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。

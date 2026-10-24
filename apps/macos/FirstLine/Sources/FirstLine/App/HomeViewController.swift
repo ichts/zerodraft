@@ -95,14 +95,9 @@ final class HomeViewController: NSViewController {
     }
 
     private static func lockupImage() -> NSImage? {
-        let bundle: Bundle
-        if let resources = Bundle.main.resourceURL,
-           let packaged = Bundle(url: resources.appendingPathComponent("WriteItDown_WriteItDown.bundle")) {
-            bundle = packaged
-        } else {
-            bundle = Bundle.module
+        guard let url = BundledResources.bundle.url(forResource: "write-it-down-lockup", withExtension: "svg") else {
+            return nil
         }
-        guard let url = bundle.url(forResource: "write-it-down-lockup", withExtension: "svg") else { return nil }
         return NSImage(contentsOf: url)
     }
 

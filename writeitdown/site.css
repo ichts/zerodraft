@@ -151,7 +151,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home-nav{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
 /* The wordmark is the A split-W lockup, drawn as a mask so the site's own ink token colours it in both themes.
    One vector asset, one colour, no duplicate light/dark markup. */
-.brand{position:relative;display:inline-block;flex:none;width:6.083em;height:.772em;font-size:21px;line-height:1}
+.brand{position:relative;display:inline-block;flex:none;width:6.083em;height:.772em;font-size:21px;line-height:1;color:var(--ink)}
+.brand:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl,8px)}
 .brand::before{content:"";position:absolute;inset:0;background:currentColor;
   -webkit-mask:url(logo/write-it-down-lockup.svg) no-repeat left center/contain;
   mask:url(logo/write-it-down-lockup.svg) no-repeat left center/contain}

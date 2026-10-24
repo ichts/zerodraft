@@ -314,7 +314,7 @@ Reviewer 复审 pure-AppKit 重写后接受 1 个 BLOCKER + 4 个 FIX-NOW。Debu
 
 - PASS deterministic: `swift build` exit 0; `swift test` exit 0 (198 tests across 16 suites). The new `BrandTests` assertion finds exactly one start-screen image with the `Write It Down` accessibility label and no mono `WRITE_IT_DOWN` label; the existing start-screen focus and trial tests pass.
 - PASS real-window start screen: `docs/logo-evidence/start-window-light.png` and `start-window-dark.png` captured from the debug executable with a fresh `CFFIXED_USER_HOME`; the split-W lockup is visible at 21 px type above the duration picker, tinted with the app ink token in both appearances. The capture used `screencapture -x -l <windowid>` on the debug window, not the packaged app.
-- PASS web: the `mac.html` header uses the same `.brand` lockup at 21 px desktop / 19 px mobile; `qa/mac.spec.mjs` covers its keyboard focus ring and theme toggle across all eight browser projects (16 checks passed).
+- PASS web: the `mac.html` header uses the same `.brand` lockup at 21 px desktop / 19 px mobile; `qa/mac.spec.mjs` covers its keyboard focus ring, computed ink colour and theme toggle across all eight browser projects (16 checks passed).
 - ACCEPTED: the real-window start-screen captures and the static icon inspection are the evidence for this change. Dock and Finder captures remain release-gate evidence and are not claimed here.
 - NOT VERIFIED: Dock and Finder captures on light and dark.
 - NOT VERIFIED: `scripts/package-app.sh --adhoc` exits 1 in this worktree because `/Library/Developer/SharedFrameworks/XCBuild.framework/Versions/A/Support/xcbuild` is unavailable; no universal release app was assembled here. The SwiftPM debug resource bundle contains `write-it-down-lockup.svg`.

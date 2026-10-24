@@ -267,13 +267,20 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       const state = await brand.evaluate(el => {
         const style = getComputedStyle(el);
         const mark = getComputedStyle(el, '::before');
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--ink)';
+        el.parentElement.appendChild(probe);
+        const ink = getComputedStyle(probe).color;
+        probe.remove();
         return { focusVisible: el.matches(':focus-visible'), outlineStyle: style.outlineStyle,
-          outlineWidth: style.outlineWidth, maskImage: style.maskImage || style.webkitMaskImage,
+          outlineWidth: style.outlineWidth, color: style.color, ink,
+          maskImage: style.maskImage || style.webkitMaskImage,
           markImage: mark.maskImage || mark.webkitMaskImage };
       });
       expect(state.focusVisible, `${path} brand ${index}: focus-visible`).toBe(true);
       expect(state.outlineStyle, `${path} brand ${index}: focus outline`).toBe('solid');
-      expect(parseFloat(state.outlineWidth), `${path} brand ${index}: focus outline width`).toBeGreaterThanOrEqual(1);
+      expect(state.outlineWidth, `${path} brand ${index}: focus outline width`).toBe('2px');
+      expect(state.color, `${path} brand ${index}: brand ink`).toBe(state.ink);
       expect(state.maskImage, `${path} brand ${index}: outline-clipping mask`).toBe('none');
       expect(state.markImage, `${path} brand ${index}: lockup mask`).toContain('write-it-down-lockup.svg');
     }

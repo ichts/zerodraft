@@ -42,7 +42,8 @@ Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 to
 Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
+Sources/FirstLine/DesignSystem/BundledResources.swift: 统一的 SwiftPM/打包应用资源 bundle 入口；字体注册与 split-W lockup 共用，避免重复 bundle 名与回退逻辑。
+Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；字体资源通过 BundledResources 读取。
 Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用的 split-W lockup，与 `writeitdown/logo/write-it-down-lockup.svg` 同一矢量；模板着色为应用 ink token。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。

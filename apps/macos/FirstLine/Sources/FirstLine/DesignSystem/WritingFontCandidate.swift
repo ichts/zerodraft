@@ -1,5 +1,5 @@
 /**
- * [INPUT]: SwiftPM Bundle.module fonts or packaged app's Contents/Resources bundle + OFL licenses
+ * [INPUT]: BundledResources bundle fonts + OFL licenses
  * [OUTPUT]: BundledFonts registration + WritingFontCandidate / ChineseFontCandidate writing fonts
  * [POS]: FirstLine writing-font layer; fonts register from the bundle and resolve by PostScript name
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -37,20 +37,12 @@ enum BundledFonts {
 
     private static let registrationLock = OSAllocatedUnfairLock(initialState: false)
 
-    private static var fontBundle: Bundle {
-        if let resources = Bundle.main.resourceURL,
-           let packaged = Bundle(url: resources.appendingPathComponent("WriteItDown_WriteItDown.bundle")) {
-            return packaged
-        }
-        return Bundle.module
-    }
-
     /// Registers every bundled font into the process exactly once. Idempotent.
     static func ensureRegistered() {
         registrationLock.withLock { done in
             guard !done else { return }
             for resource in fontResources {
-                guard let url = fontBundle.url(forResource: resource, withExtension: "ttf") else {
+                guard let url = BundledResources.bundle.url(forResource: resource, withExtension: "ttf") else {
                     continue
                 }
                 var error: Unmanaged<CFError>?

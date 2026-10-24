@@ -25,6 +25,16 @@ final class SessionKeptView: NSView {
     private let body = NSTextField(wrappingLabelWithString: "")
     private let receipt = NSTextField(labelWithString: "")
     private var copyWidth: NSLayoutConstraint!
+    /// The kept action labels sit on the row's optical centre, not on the lower
+    /// 1.6 line-box baseline; 15 pt and 13 pt titles share the same lift.
+    private static let actionOpticalLift: CGFloat = 5.25
+
+    private final class PassThroughLabel: NSTextField {
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    }
+
+    private let copyTitleLabel = PassThroughLabel(labelWithString: "")
+    private let restartTitleLabel = PassThroughLabel(labelWithString: "")
     private var selectedDraft = ""
     private var renderedWordCount: Int?
     private var renderedDuration: TimeInterval?
@@ -37,6 +47,24 @@ final class SessionKeptView: NSView {
         restartButton = FirstLineButtons.link(title: "RUN IT AGAIN", target: restartTarget, action: restartAction)
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
+
+        for (button, label) in [(copyButton, copyTitleLabel), (restartButton, restartTitleLabel)] {
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.isEditable = false
+            label.isSelectable = false
+            label.isBezeled = false
+            label.drawsBackground = false
+            label.alignment = .center
+            label.maximumNumberOfLines = 1
+            label.lineBreakMode = .byClipping
+            label.setAccessibilityElement(false)
+            button.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.centerXAnchor.constraint(equalTo: button.centerXAnchor),
+                label.centerYAnchor.constraint(equalTo: button.centerYAnchor,
+                                               constant: -Self.actionOpticalLift),
+            ])
+        }
 
         heading.translatesAutoresizingMaskIntoConstraints = false
         heading.alignment = .center
@@ -138,11 +166,27 @@ final class SessionKeptView: NSView {
     }
 
     /// The copy label keeps the pill's 1.6 line box and a fixed width across states.
+    /// The visible text is a pass-through label so it can sit on the pill's optical
+    /// centre while the button's own transparent title keeps its width and AX name.
     func setCopyTitle(_ title: String) {
         copyButton.title = title
-        copyButton.attributedTitle = FirstLineTypography.trackedText(
-            title, font: .systemFont(ofSize: 15, weight: .medium),
-            color: FirstLineColors.onInkNSColor, kernEm: 0.04, lineHeightMultiple: 1.6)
+        let font = NSFont.systemFont(ofSize: 15, weight: .medium)
+        copyButton.attributedTitle = transparentTitle(title, font: font, kernEm: 0.04)
+        copyTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
+            title, font: font, color: FirstLineColors.onInkNSColor, kernEm: 0.04,
+            lineHeightMultiple: 1.6)
+    }
+
+    private func transparentTitle(_ title: String, font: NSFont, kernEm: CGFloat) -> NSAttributedString {
+        FirstLineTypography.trackedText(
+            title, font: font, color: .clear, kernEm: kernEm, lineHeightMultiple: 1.6)
+    }
+
+    override func layout() {
+        super.layout()
+        // A window resize changes this view's bounds without necessarily re-running
+        // the room's viewDidLayout; re-lay the draft here so it stays centred.
+        layoutContent()
     }
 
     /// Lays the draft in a scrollable document under the fixed action block. A short
@@ -178,8 +222,9 @@ final class SessionKeptView: NSView {
         button.title = title
         button.font = .systemFont(ofSize: 13, weight: .medium)
         button.contentTintColor = color
-        button.attributedTitle = FirstLineTypography.trackedText(
-            title, font: .systemFont(ofSize: 13, weight: .medium), color: color,
-            kernEm: 0.04, lineHeightMultiple: 1.6)
+        let font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        button.attributedTitle = transparentTitle(title, font: font, kernEm: 0.04)
+        restartTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
+            title, font: font, color: color, kernEm: 0.04, lineHeightMultiple: 1.6)
     }
 }

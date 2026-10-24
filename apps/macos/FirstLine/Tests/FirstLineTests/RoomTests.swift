@@ -394,9 +394,11 @@ struct RoomTests {
         let outline = try #require(copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }.first)
         #expect(!outline.isHidden)
         #expect(outline.lineWidth == 2)
-        // The primary ink pill draws one light ring just inside the pill; no doubled
-        // dark outline outside it.
-        #expect(outline.frame == copy.bounds.insetBy(dx: 3, dy: 3))
+        // The primary ink pill draws one light ring on its edge: no dark margin
+        // outside the ring, so it cannot read as a doubled outline.
+        let outlines = copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer } ?? []
+        #expect(outlines.count == 1, "the pill draws more than one ring")
+        #expect(outline.frame == copy.bounds)
         #expect(outline.path?.boundingBox == CGRect(origin: .zero, size: outline.bounds.size))
         let stroke = try #require(outline.strokeColor)
         let ring = try #require(NSColor(cgColor: stroke))

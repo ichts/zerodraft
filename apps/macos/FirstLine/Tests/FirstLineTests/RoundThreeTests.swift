@@ -265,6 +265,19 @@ struct RoundThreeTests {
         #expect(animation.timingFunction === CAMediaTimingFunction(name: .linear) ||
                 (start == [0, 0] && end == [1, 1]), "the bar animation is linear")
         #expect(top.fraction == 0, "the model target is empty while the layer animates")
+        // The visible bar must start full and shrink; a model-only animation from 0 to 0
+        // draws no bar at all (the fourth hands-on report).
+        let from = try #require(animation.fromValue as? NSNumber).doubleValue
+        let to = try #require(animation.toValue as? NSNumber).doubleValue
+        #expect(abs(from - Double(top.bounds.width)) <= 0.5,
+                "the bar animation starts at \(from) pt, not the full \(top.bounds.width) pt")
+        #expect(abs(to) <= 0.5, "the bar animation must end empty")
+        // Visible and shrinking in the running window, not just in the model.
+        CATransaction.flush()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        let presented = try #require(top.presentedWidth, "the bar has no presentation layer")
+        #expect(presented > 0, "the bar is invisible in the running window")
+        #expect(presented < top.bounds.width, "the bar is not shrinking")
 
         now.now = 30
         engine.registerCommittedText("a")

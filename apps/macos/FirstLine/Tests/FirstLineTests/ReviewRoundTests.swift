@@ -70,6 +70,15 @@ struct ReviewRoundTests {
         let restartBaseline = restartInk.upperBound
         let baselineDelta = abs(CGFloat(copyBaseline) - CGFloat(restartBaseline)) / scale
         #expect(baselineDelta <= 1, "COPY TEXT and RUN IT AGAIN baselines are \(baselineDelta) pt apart")
+        // The pill label must be optically centred: the ink gaps above and below
+        // are equal within 1 pt (the fourth hands-on report: it sat low).
+        let height = CGFloat(rep.pixelsHigh) / scale
+        let pillTopRow = (height - copyFrame.maxY) * scale
+        let pillBottomRow = (height - copyFrame.minY) * scale
+        let topGap = (CGFloat(copyInk.lowerBound) - pillTopRow) / scale
+        let bottomGap = (pillBottomRow - CGFloat(copyInk.upperBound)) / scale
+        #expect(abs(topGap - bottomGap) <= 1,
+                "COPY TEXT ink sits \(topGap) pt from the top and \(bottomGap) pt from the bottom")
 
         let copyWidth = copy.frame.width
         let restartX = restart.frame.minX
@@ -78,6 +87,23 @@ struct ReviewRoundTests {
         #expect(copy.title == "COPIED")
         #expect(abs(copy.frame.width - copyWidth) <= 0.5, "the copy pill resized on COPIED")
         #expect(abs(restart.frame.minX - restartX) <= 0.5, "RUN IT AGAIN moved when the copy label changed")
+        fixture.window.orderOut(nil)
+    }
+
+    @Test func keptDraftRecentersAfterEveryWindowResize() throws {
+        let fixture = keptRoom(text: "第一行\n这是一段较长的草稿，用来检查窗口尺寸变化后的居中。\nshort latin line")
+        let body = try #require(descendants(of: fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasPrefix("第一行") })
+        for size in [NSSize(width: 1728, height: 1117), NSSize(width: 900, height: 700),
+                     NSSize(width: 1728, height: 1117)] {
+            fixture.window.setContentSize(size)
+            fixture.window.contentView?.layoutSubtreeIfNeeded()
+            fixture.room.view.layoutSubtreeIfNeeded()
+            let centre = fixture.room.view.convert(body.bounds, from: body).midX
+            let expected = fixture.room.view.bounds.midX
+            #expect(abs(centre - expected) <= 1,
+                    "kept draft centre \(centre) at \(size), expected \(expected)")
+        }
         fixture.window.orderOut(nil)
     }
 

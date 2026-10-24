@@ -195,6 +195,10 @@ final class FirstLineFillBar: NSView {
         fillLayer.animation(forKey: Self.fractionAnimationKey) as? CABasicAnimation
     }
 
+    /// Test-facing: the width the render tree is actually presenting, nil before
+    /// the first commit. This is the bar a person sees, not the model target.
+    var presentedWidth: CGFloat? { fillLayer.presentation()?.bounds.width }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         translatesAutoresizingMaskIntoConstraints = false
@@ -231,7 +235,10 @@ final class FirstLineFillBar: NSView {
         guard let duration, duration > 0.01, !reducesMotion,
               bounds.width > 0, (!hadAnimation || abs(currentWidth - targetWidth) > 0.5) else { return }
         let animation = CABasicAnimation(keyPath: "bounds.size.width")
-        animation.fromValue = hadAnimation ? currentWidth : targetWidth
+        // Start from what is on screen. A fresh run has no animation yet, so the
+        // current width is the model width set by the caller (the full bar); using
+        // targetWidth here animated 0 -> 0 and drew no bar at all.
+        animation.fromValue = currentWidth
         animation.toValue = targetWidth
         animation.duration = duration
         animation.timingFunction = CAMediaTimingFunction(name: .linear)

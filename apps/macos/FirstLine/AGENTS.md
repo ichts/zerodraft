@@ -5,6 +5,7 @@ Parent instructions: `../AGENTS.md`
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过。
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，具体契约见脚本头。
 scripts/test-release-config.py: 沙箱执行 release-dmg.sh 的配置门槛，验证正式包拒绝缺项、非 HTTPS 地址和无效公钥；不构建、不签名，供网页 QA 单次调用。
 scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
@@ -21,8 +22,8 @@ Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cm
 Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；启用鼠标移动事件供专注模式悬停显示计时/字数，原生退出全屏时同步关闭写作中的专注偏好，导航导致的退出则保留偏好；所有会话相位留在同一个房间。
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
 Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 产品/设备/实例/有效期门槛（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
-Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前选择面；五个时长按钮直接进入房间、三个静默时限单选；默认时长按钮获焦点；通过 Observation 更新异步许可状态，避免启动校验完成后仍显示 Checking license。
-Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源。
+Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前选择面；顶部为 split-W lockup，五个时长按钮直接进入房间、三个静默时限单选；默认时长按钮获焦点；通过 Observation 更新异步许可状态，避免启动校验完成后仍显示 Checking license。
+Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；AppIcon 使用 A split-W 标记，AppIcon `.icns` 只含浅色稿，图标内不出现红色；尺寸与配色规则见 `../../../design/DESIGN.md` §11。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全、非空输入前试用授权、窄/宽纸张固定左起点、短段首行固定及下沿滚动、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
@@ -38,10 +39,12 @@ Sources/FirstLine/Session/SessionViewController.swift: 单一 Session 房间（A
 Sources/FirstLine/Upgrade/UpgradeViewController.swift: 试用耗尽或许可失效后的原生入口；订单号/激活码、结账和完整 writeitdown.app 网页试用链接，价格来自 WIDDisplayPrice；仅配置有效 WIDCheckoutURL 时允许外部浏览器结账；观察异步许可变化并原位更新反馈。
 Sources/FirstLine/Settings/SettingsViewController.swift: Settings 界面，含 appearance、motion、focus、alignment、font size、License；观察异步许可变化并原位更新状态、不清除输入；时长和静默档只在 Home 选择，Done 返回进入前的 surface。
 Sources/FirstLine/DesignSystem/Colors.swift: `writeitdown/site.css` 明暗色 token（NSColor dynamic provider），含 wash/deep 与 alarm。
-Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 小号标识/机器文案）。
+Sources/FirstLine/DesignSystem/Typography.swift: 网站字号对应的字体 token（NSFont，Newsreader 主标题/正文 + IBM Plex Mono 机器文案）。
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: appearance-aware AppKit 主/次/链接按钮工厂；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
+Sources/FirstLine/DesignSystem/BundledResources.swift: 统一的 SwiftPM/打包应用资源 bundle 入口；字体注册与 split-W lockup 共用，避免重复 bundle 名与回退逻辑。
+Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；字体资源通过 BundledResources 读取。
+Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用的 split-W lockup，与 `writeitdown/logo/write-it-down-lockup.svg` 同一矢量；模板着色为应用 ink token。
 Sources/FirstLine/DesignSystem/Spacing.swift: 间距 token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。

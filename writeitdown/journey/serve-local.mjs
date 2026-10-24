@@ -8,7 +8,7 @@ const root = path.resolve(arg('root', '.'));
 const port = Number(arg('port', 8016));
 const dmgFile = arg('dmg-file', null);
 const dmg = dmgFile ? fs.readFileSync(path.resolve(dmgFile)) : null;
-const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png', '.txt': 'text/plain', '.xml': 'application/xml', '.dmg': 'application/x-apple-diskimage' };
+const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript', '.woff2': 'font/woff2', '.png': 'image/png', '.svg': 'image/svg+xml', '.txt': 'text/plain', '.xml': 'application/xml', '.dmg': 'application/x-apple-diskimage' };
 
 http.createServer((req, res) => {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);

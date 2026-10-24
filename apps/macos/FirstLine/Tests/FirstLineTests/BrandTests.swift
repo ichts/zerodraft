@@ -29,7 +29,9 @@ struct BrandTests {
         let home = HomeViewController(appState: state)
         home.loadViewIfNeeded()
         let labels = allLabels(in: home.view)
-        #expect(labels.contains("WRITE_IT_DOWN"))
+        let images = allImages(in: home.view)
+        #expect(images.filter { $0.accessibilityLabel() == "Write It Down" && $0.image != nil }.count == 1)
+        #expect(!labels.contains("WRITE_IT_DOWN"))
         #expect(labels.contains("MINUTES"))
         #expect(labels.contains("DELETE AFTER SILENCE"))
         #expect(allButtons(in: home.view).contains { $0.title == "1" })
@@ -71,5 +73,10 @@ struct BrandTests {
     private func allLabels(in view: NSView) -> [String] {
         let value = (view as? NSButton)?.title ?? (view as? NSControl)?.stringValue
         return (value.map { [$0] } ?? []) + view.subviews.flatMap(allLabels)
+    }
+
+    private func allImages(in view: NSView) -> [NSImageView] {
+        let current = (view as? NSImageView).map { [$0] } ?? []
+        return current + view.subviews.flatMap(allImages)
     }
 }

@@ -1,12 +1,12 @@
 /**
- * [INPUT]: SwiftPM Bundle.module fonts or packaged app's Contents/Resources bundle + OFL licenses
+ * [INPUT]: BundledResources bundle fonts + OFL licenses
  * [OUTPUT]: BundledFonts registration + WritingFontCandidate / ChineseFontCandidate writing fonts
  * [POS]: FirstLine writing-font layer; fonts register from the bundle and resolve by PostScript name
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Flood design-system fonts are bundled (SIL Open Font License, see Resources/OFL-*.txt):
  *   - Newsreader (variable upright + italic): human serif layer
- *   - IBM Plex Mono (Regular + Medium): machine mono layer
+ *   - IBM Plex Mono (Regular): machine mono layer
  *   - Zhuque Fangsong (Regular): CJK fangsong layer
  * The legacy `pitchLight` case name is kept source-compatible but now resolves to bundled
  * Newsreader (latin); `zhuqueFangsong` resolves to bundled Zhuque Fangsong (CJK).
@@ -25,7 +25,6 @@ enum BundledFonts {
     static let newsreaderUprightPostScript = "Newsreader16pt-Regular"
     static let newsreaderItalicPostScript = "Newsreader16pt-Italic"
     static let plexMonoRegularPostScript = "IBMPlexMono-Regular"
-    static let plexMonoMediumPostScript = "IBMPlexMono-Medium"
     static let zhuquePostScript = "ZhuqueFangsong-Regular"
 
     // Resource basenames (without extension) shipped under Resources/.
@@ -33,26 +32,17 @@ enum BundledFonts {
         "Newsreader-Variable",
         "Newsreader-Italic-Variable",
         "IBMPlexMono-Regular",
-        "IBMPlexMono-Medium",
         "ZhuqueFangsong-Regular",
     ]
 
     private static let registrationLock = OSAllocatedUnfairLock(initialState: false)
-
-    private static var fontBundle: Bundle {
-        if let resources = Bundle.main.resourceURL,
-           let packaged = Bundle(url: resources.appendingPathComponent("WriteItDown_WriteItDown.bundle")) {
-            return packaged
-        }
-        return Bundle.module
-    }
 
     /// Registers every bundled font into the process exactly once. Idempotent.
     static func ensureRegistered() {
         registrationLock.withLock { done in
             guard !done else { return }
             for resource in fontResources {
-                guard let url = fontBundle.url(forResource: resource, withExtension: "ttf") else {
+                guard let url = BundledResources.bundle.url(forResource: resource, withExtension: "ttf") else {
                     continue
                 }
                 var error: Unmanaged<CFError>?

@@ -19,6 +19,8 @@ files = {
     'delete-a-draft.html', 'is-my-writing-saved.html',
     'og.png', 'robots.txt', 'sitemap.xml', 'llms.txt', 'BingSiteAuth.xml',
     'google7787e5a0693832e8.html', '1bcb6b66144003eb070fe87774217f86.txt',
+    'logo/write-it-down-lockup.svg', 'favicon.svg', 'favicon-16.png', 'favicon-32.png',
+    'favicon-dark.svg', 'favicon-dark-16.png', 'favicon-dark-32.png', 'apple-touch-icon.png',
 }
 
 
@@ -81,4 +83,13 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source) as temp:
     assert rejected.returncode != 0
     assert 'Refusing symlink' in rejected.stderr
     assert victim.read_text() == 'protected'
-print(f'PASS: {len(files)} exact production files, preserved backup, repeat installation, rejected symlink.')
+    (target / 'room.js').unlink()
+    shutil.rmtree(target / 'logo')
+    victim_logo = base / 'untouched-logo'
+    victim_logo.mkdir()
+    (target / 'logo').symlink_to(victim_logo, target_is_directory=True)
+    rejected = subprocess.run(['sh', str(payload / 'install.sh')], capture_output=True, text=True)
+    assert rejected.returncode != 0
+    assert 'symlink logo directory' in rejected.stderr
+    assert not any(victim_logo.iterdir())
+print(f'PASS: {len(files)} exact production files, preserved backup, repeat installation, rejected symlinks.')

@@ -147,6 +147,13 @@ async function run(size, browser) {
     await step('og.png is served as an image', async () => {
       const r = await ctx.request.get(url('/og.png')); ok(r.status() === 200 && /image\/png/.test(r.headers()['content-type'] || ''), `og.png ${r.status()} ${r.headers()['content-type']}`);
     });
+    await step('lockup and favicon SVGs use the image content type', async () => {
+      for (const asset of ['/logo/write-it-down-lockup.svg', '/favicon.svg', '/favicon-dark.svg']) {
+        const r = await ctx.request.get(url(asset));
+        const type = (r.headers()['content-type'] || '').split(';')[0].trim();
+        ok(r.status() === 200 && type === 'image/svg+xml', `${asset} ${r.status()} ${r.headers()['content-type']}`);
+      }
+    });
     await step('SoftwareApplication JSON-LD parses: 4.99 USD, PreOrder, macOS 14+', async () => {
       const g = await ldGraph(); const a = g.find(x => x['@type'] === 'SoftwareApplication'); ok(a, 'no SoftwareApplication');
       ok(a.offers.price === '4.99' && a.offers.priceCurrency === 'USD', `offer ${JSON.stringify(a.offers)}`);

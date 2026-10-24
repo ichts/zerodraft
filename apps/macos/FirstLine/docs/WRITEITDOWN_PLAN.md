@@ -186,7 +186,7 @@ The following code inside kept files is also deleted:
 
 ## 6. Brand and visuals
 
-- The app name in Finder and the menu bar is `Write It Down`. The in-app logotype is `WRITE_IT_DOWN`, matching the site. The window title is `Write It Down`.
+- The app name in Finder and the menu bar is `Write It Down`. The in-app start screen uses the split-W lockup; the app icon and DMG volume icon carry the mark, and the primary web header, footer, `mac.html` and social card use the split-W lockup. The window title is `Write It Down`.
 - The bundle identifier is `app.writeitdown.mac`. The Swift package product and executable target are renamed from `FirstLine` to `WriteItDown` in batch 3. The directory `apps/macos/FirstLine/` keeps its path; the app name and distribution do not depend on the source directory name.
 - `AppPaths` changes its folder from `~/Library/Application Support/First Line/` to `~/Library/Application Support/WriteItDown/`. Nothing is migrated. The old folder held drafts, which the new app must not read, and license data from a mock client that never sold a key.
 - Colors come from `writeitdown/site.css` for both appearances:
@@ -195,7 +195,7 @@ The following code inside kept files is also deleted:
   - The Zero Draft red `#c8392f` and the bone canvas are removed. The alarm color is spent only on the warning numeral and the deny outline.
 - Light is the design and QA reference, and every QA record captures light first. Dark is supported and captured once per batch that changes visuals. The default follows the system appearance, the same as the site and as HIG expects. Settings offers System, Light, and Dark.
 - Typography follows the site: Newsreader for the human layer (the headline, the writing, and the kept text) and IBM Plex Mono for the machine layer (the clock, counts, reports, and buttons), with tracked uppercase mono for chrome. The paper has square corners and one soft lift shadow.
-- The icon is new: the `WRITE_IT_DOWN` mark or a cursor on paper in the light tokens. It is exported into `Sources/FirstLine/Assets.xcassets/AppIcon.appiconset/` in batch 3 and compiled to `.icns` by the batch 7 packaging script. The final artwork is a captain review item and does not block batch 3, which can ship a placeholder built from the site's logotype.
+- The icon is the captain-chosen A split-W mark, not the old `WID` placeholder. The app icon set and `packaging/VolumeIcon.icns` carry it; usage rules, palette and optical sizes are owned by `design/DESIGN.md` §11. The group is compiled to `.icns` by the batch 7 packaging script.
 - HIG: the app uses the standard menu bar, a resizable window with a sensible minimum size, `Cmd+,` for Settings, full keyboard access, VoiceOver announcements for deny, warn, wipe, and kept, and respects Reduce Motion and Increase Contrast.
 
 ## 7. Privacy

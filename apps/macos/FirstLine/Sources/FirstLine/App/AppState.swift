@@ -308,11 +308,11 @@ final class AppState {
         if settings.licenseKey?.utf8.elementsEqual(key.utf8) == true, settings.licenseInstanceID != nil,
            settings.licenseToken != nil, settings.licenseProductID == productID {
             switch await validateLicenseIfNeeded(allowInactive: true) {
-            case true: return
-            case nil:
+            case .some(true): return
+            case .none:
                 licenseActivationError = .networkFailure
                 return
-            case false:
+            case .some(false):
                 settings.licenseInstanceID = nil
                 persistSettings()
             }

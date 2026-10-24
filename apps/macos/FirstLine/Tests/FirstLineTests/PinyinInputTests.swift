@@ -92,7 +92,9 @@ struct PinyinInputTests {
                                      replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.editor.unmarkText()
         #expect(fixture.editor.string == "ni")
-        fixture.editor.deleteBackward(nil)
+        let denied = fixture.room.textView(fixture.editor,
+            doCommandBy: #selector(NSResponder.deleteBackward(_:)))
+        #expect(denied)
         #expect(fixture.engine.lastDenyAt != nil, "deletion after the IME cleared its marked range is a user edit")
         #expect(fixture.origin == origin)
         #expect(fixture.editor.string == "ni")

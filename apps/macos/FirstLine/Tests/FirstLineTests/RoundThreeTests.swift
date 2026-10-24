@@ -307,6 +307,40 @@ struct RoundThreeTests {
         window.orderOut(nil)
     }
 
+    @Test func newSessionBarRestartsFromFullAfterAWipe() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        let bar = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
+        editor.insertText("abc", replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        now.now = 9
+        room.tick()
+        #expect(engine.phase == .failure)
+        #expect(bar.fraction == 0)
+
+        editor.setMarkedText("n", selectedRange: NSRange(location: 1, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.tick()
+        #expect(engine.phase == .writing)
+        let animation = try #require(bar.fractionAnimation, "the new session has no bar animation")
+        let from = try #require(animation.fromValue as? NSNumber).doubleValue
+        #expect(abs(from - Double(bar.bounds.width)) <= 0.5,
+                "the new session bar starts at \(from) pt, not the full \(bar.bounds.width) pt")
+
+        CATransaction.flush()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+        let presented = try #require(bar.presentedWidth, "the new session bar has no presentation layer")
+        #expect(presented > 0, "the new session bar is invisible")
+        window.orderOut(nil)
+    }
+
     @Test func reducedMotionBarStepsWithoutAnimation() throws {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })

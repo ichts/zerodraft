@@ -133,7 +133,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         guard isMarkedCommit || isDefaultRange || replacementRange == previousEnd
                 || isCompositionReplacement || isUpdatingMarkedText || isCompositionEditing else {
-            onDeny?()
+            denyEdit()
             return
         }
 
@@ -194,12 +194,18 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
+    /// Every denied user edit invalidates an unmarked composition range so a
+    /// later input-method replacement cannot target stale text.
+    func denyEdit() {
+        compositionRange = nil
+        onDeny?()
+    }
+
     override func replaceCharacters(in range: NSRange, with string: String) {
         let compositionWrite = hasMarkedText() || isUpdatingMarkedText || isPerformingInsertion
             || isRestoringProgrammatically || isCompositionEditing
         guard compositionWrite else {
-            compositionRange = nil
-            onDeny?()
+            denyEdit()
             return
         }
         super.replaceCharacters(in: range, with: string)
@@ -207,8 +213,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteBackward(_ sender: Any?) {
         guard hasMarkedText() || isCompositionEditing else {
-            compositionRange = nil
-            onDeny?()
+            denyEdit()
             return
         }
         // Hand the key to the active input method; it owns candidate editing and
@@ -223,8 +228,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteForward(_ sender: Any?) {
         guard hasMarkedText() || isCompositionEditing else {
-            compositionRange = nil
-            onDeny?()
+            denyEdit()
             return
         }
         // Hand the key to the active input method, same as deleteBackward.
@@ -236,20 +240,20 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     override func cut(_ sender: Any?) {
-        onDeny?()
+        denyEdit()
     }
 
     override func paste(_ sender: Any?) {
-        onDeny?()
+        denyEdit()
     }
 
     override func readSelection(from pboard: NSPasteboard) -> Bool {
-        onDeny?()
+        denyEdit()
         return false
     }
 
     override func dragSelection(with event: NSEvent, offset: NSSize, slideBack: Bool) -> Bool {
-        onDeny?()
+        denyEdit()
         return false
     }
 

@@ -679,7 +679,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if force || sessionChanged || resized || !barRunning {
             // Snap to the current fraction, then run the one linear animation to empty.
             progressBar.setFraction(target)
-            progressBar.setFraction(0, animatedOver: engine.remaining)
+            progressBar.setFraction(0, animatedOver: engine.remaining, from: sessionChanged ? 1 : nil)
             barRunning = true
         }
     }
@@ -904,8 +904,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         let denied = AppendOnlyInputPolicy.shouldDenyCommand(selector, hasMarkedText: textView.hasMarkedText())
-        if denied { engine.registerDeny() }
+        if denied { denyEdit(in: textView) }
         return denied
+    }
+
+    private func denyEdit(in textView: NSTextView) {
+        if let editor = textView as? AppendOnlyTextView {
+            editor.denyEdit()
+        } else {
+            engine.registerDeny()
+        }
     }
 
     func textView(_ textView: NSTextView, willChangeSelectionFromCharacterRange old: NSRange,
@@ -924,7 +932,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if let end = AppendOnlyInputPolicy.redirectedSelection(proposed: proposed,
             fullLength: (textView.string as NSString).length,
             markedRange: textView.hasMarkedText() ? textView.markedRange() : nil) {
-            engine.registerDeny()
+            denyEdit(in: textView)
             return end
         }
         return proposed

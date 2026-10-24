@@ -19,6 +19,7 @@ import AppKit
 final class RootContainerViewController: NSViewController {
     private let appState: AppState
     private var current: NSViewController?
+    private var currentSurface: Surface?
 
     func copyKeptText() { (current as? SessionViewController)?.copyKeptText() }
     func refreshRoom() { (current as? SessionViewController)?.refreshRoom() }
@@ -40,6 +41,8 @@ final class RootContainerViewController: NSViewController {
     /// 切到某个 surface：先挂入新子 VC 的视图（填满容器、随之 autoresize），再摘除旧子 VC。
     /// 只操作子视图，不碰窗口尺寸、不 setFrame 窗口，因此无 resize 抖动、无递归 layout。
     func show(_ surface: Surface) {
+        guard surface != currentSurface else { return }
+        currentSurface = surface
         let incoming = SurfaceFactory.makeViewController(surface: surface, appState: appState)
         addChild(incoming)
         let incomingView = incoming.view

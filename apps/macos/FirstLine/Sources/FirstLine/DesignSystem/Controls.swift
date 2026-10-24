@@ -226,11 +226,14 @@ final class FirstLineFillBar: NSView {
     /// Set the target fraction. With a duration and motion enabled, one linear
     /// animation runs from the current presentation width to the target; repeated
     /// calls from a tick do not restart it.
-    func setFraction(_ value: CGFloat, animatedOver duration: TimeInterval? = nil, reducesMotion: Bool = false) {
+    func setFraction(_ value: CGFloat, animatedOver duration: TimeInterval? = nil,
+                     reducesMotion: Bool = false, from startFraction: CGFloat? = nil) {
         let target = min(max(value, 0), 1)
         let targetWidth = bounds.width * target
-        let currentWidth = fillLayer.presentation()?.bounds.width ?? fillLayer.bounds.width
         let hadAnimation = fillLayer.animation(forKey: Self.fractionAnimationKey) != nil
+        let currentWidth = startFraction.map { bounds.width * min(max($0, 0), 1) }
+            ?? fillLayer.presentation()?.bounds.width
+            ?? fillLayer.bounds.width
         fraction = target
         fillLayer.removeAnimation(forKey: Self.fractionAnimationKey)
         fillLayer.frame = CGRect(x: 0, y: 0, width: targetWidth, height: bounds.height)

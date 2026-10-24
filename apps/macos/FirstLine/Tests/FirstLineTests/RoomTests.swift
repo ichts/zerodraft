@@ -621,6 +621,37 @@ struct RoomTests {
         window.orderOut(nil)
     }
 
+    @Test func markedFirstKeyAfterAWipeKeepsTheSameRoom() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let clock = RoomClock(0)
+        let engine = SessionEngine(now: { clock.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: root),
+                                      installIDStore: InstallIDStore(configDirectory: root))
+        state.startSession(duration: 60)
+        let windowController = RootWindowController(appState: state)
+        let container = try #require(windowController.window?.contentViewController as? RootContainerViewController)
+        let room = try #require(container.children.first as? SessionViewController)
+        let editor = try #require(descendants(room.view, of: AppendOnlyTextView.self).first)
+        editor.insertText("abc", replacementRange: NSRange(location: NSNotFound, length: 0))
+        clock.now = 9
+        room.tick()
+        #expect(engine.phase == .failure)
+        #expect(editor.string.isEmpty)
+
+        editor.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+
+        #expect(engine.phase == .writing)
+        #expect(container.children.first === room, "the first marked key recreated the room")
+        #expect(descendants(room.view, of: AppendOnlyTextView.self).first === editor)
+        #expect(editor.hasMarkedText())
+        #expect(editor.string == "ni")
+        windowController.close()
+    }
+
     @Test func failureRestartWorksFromReturn() throws {
         let fixture = try roomFixture(typed: false)
         fixture.editor.insertText("abc", replacementRange: NSRange(location: NSNotFound, length: 0))

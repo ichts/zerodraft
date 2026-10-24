@@ -269,6 +269,26 @@ struct RoomTests {
         #expect(!fields.contains { $0.stringValue.contains("forward only") })
     }
 
+    @Test func copiedStateSurvivesRoomRecreation() throws {
+        let fixture = try roomFixture(typed: false)
+        fixture.editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        for second in stride(from: 4.0, to: 60.0, by: 4.0) {
+            fixture.clock.now = second
+            fixture.engine.registerMarkedTextActivity()
+        }
+        fixture.clock.now = 60
+        fixture.room.tick()
+        #expect(fixture.engine.phase == .success)
+        fixture.room.copyKeptText()
+        #expect(fixture.engine.copiedKeptText)
+
+        let recreated = SessionViewController(appState: fixture.state)
+        window(recreated)
+        let copy = try #require(descendants(recreated.view, of: NSButton.self).first { $0.title == "COPIED" })
+        #expect(descendants(copy, of: NSTextField.self).contains { $0.stringValue == "COPIED" })
+        recreated.view.window?.orderOut(nil)
+    }
+
     @Test func copyButtonSwitchesToCopied() throws {
         let fixture = try roomFixture(typed: false)
         fixture.editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))

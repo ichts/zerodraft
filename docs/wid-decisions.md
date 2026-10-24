@@ -408,3 +408,15 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   appended the final text, so a WeType-style commit kept `nihao` beside `你好` and inflated the count.
 - Supersedes: the append-only commit callback for composition replacements. The append-only user guard
   stands.
+
+## D-035: A live composition keeps its range through denied edits
+
+- Date: 2026-10-24
+- Decision: A denied selection or blocked command while marked text is live preserves the composition
+  range; the next IME commit still passes. Delete/forward refresh the range after candidate edits, and
+  `setMarkedText` falls back to the selection when the stored range is outside the current text. Only
+  an unmarked stale range is cleared.
+- Reason: Clearing the live range turned the IME's next unmark-replace commit into a denied edit, so
+  the Chinese character never reached the editor or engine.
+- Supersedes: D-033's blanket clear on a denied edit for the live-marked case; D-033's unmarked-stale
+  rule and D-034's replacement accounting stand.

@@ -574,6 +574,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         if phase == .success, lastPhase != .success {
             updateKeptContent()
+            keptView.setCopyTitle(engine.copiedKeptText ? "COPIED" : "COPY TEXT")
             DispatchQueue.main.async { [weak self] in
                 self?.keptView.layoutContent()
                 self?.focusForPhase()
@@ -899,6 +900,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     @objc private func copyText() {
         let copied = RoomPresentation.copy(engine.text, to: pasteboard)
+        engine.registerCopiedKeptText(copied)
         keptView.setCopyTitle(copied ? "COPIED" : "TRY COPY AGAIN")
         announce(copied ? "Copied." : "Copy failed. Select your kept text and copy it manually.")
         focusForPhase()

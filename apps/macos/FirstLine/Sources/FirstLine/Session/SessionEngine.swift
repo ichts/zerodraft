@@ -42,6 +42,7 @@ final class SessionEngine {
     private(set) var unusedSeconds: Int?
     private(set) var deletionElapsedSeconds: Int?
     private(set) var lastDenyAt: TimeInterval?
+    private(set) var copiedKeptText = false
     private(set) var sessionID = UUID()
     var onStateChange: ((SessionPhase) -> Void)?
     var hasStarted: Bool { startedAt != nil }
@@ -82,6 +83,7 @@ final class SessionEngine {
         unusedSeconds = nil
         deletionElapsedSeconds = nil
         lastDenyAt = nil
+        copiedKeptText = false
         text = ""
         wordCount = 0
         startedAt = nil
@@ -159,6 +161,7 @@ final class SessionEngine {
     }
 
     func registerDeny() { lastDenyAt = now() }
+    func registerCopiedKeptText(_ copied: Bool) { copiedKeptText = copied }
     func abandon() {
         phase = .idle
         elapsed = 0
@@ -168,6 +171,7 @@ final class SessionEngine {
         unusedSeconds = nil
         deletionElapsedSeconds = nil
         lastDenyAt = nil
+        copiedKeptText = false
         text = ""
         wordCount = 0
         startedAt = nil

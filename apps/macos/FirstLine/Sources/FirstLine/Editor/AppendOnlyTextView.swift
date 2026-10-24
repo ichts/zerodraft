@@ -96,8 +96,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         if replacementRange.location != NSNotFound,
            NSMaxRange(replacementRange) <= (textStorage?.length ?? 0) {
             targetRange = replacementRange
-        } else if hadMarkedText {
-            targetRange = compositionRange ?? self.selectedRange()
+        } else if hadMarkedText, let compositionRange,
+                  compositionRange.location >= 0,
+                  NSMaxRange(compositionRange) <= (textStorage?.length ?? 0) {
+            targetRange = compositionRange
         } else {
             targetRange = self.selectedRange()
         }
@@ -197,7 +199,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// Every denied user edit invalidates an unmarked composition range so a
     /// later input-method replacement cannot target stale text.
     func denyEdit() {
-        compositionRange = nil
+        if !hasMarkedText() { compositionRange = nil }
         onDeny?()
     }
 
@@ -223,6 +225,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         isCompositionEditing = true
         super.deleteBackward(sender)
         isCompositionEditing = false
+        if hasMarkedText() { compositionRange = markedRange() }
         restoreCompositionViewport(viewport)
     }
 
@@ -236,6 +239,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         isCompositionEditing = true
         super.deleteForward(sender)
         isCompositionEditing = false
+        if hasMarkedText() { compositionRange = markedRange() }
         restoreCompositionViewport(viewport)
     }
 

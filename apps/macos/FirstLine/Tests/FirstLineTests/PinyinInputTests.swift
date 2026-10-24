@@ -139,6 +139,28 @@ struct PinyinInputTests {
         #expect(fixture.engine.wordCount == 2)
     }
 
+    @Test func deniedCommandDuringCompositionKeepsTheCommit() throws {
+        let fixture = try makeFixture()
+        defer { fixture.close() }
+        fixture.editor.insertText("abc", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.editor.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                                     replacementRange: NSRange(location: NSNotFound, length: 0))
+        let marked = fixture.editor.markedRange()
+        #expect(marked.location == 3)
+
+        #expect(fixture.room.textView(fixture.editor, doCommandBy: #selector(NSText.cut(_:))))
+        let redirected = fixture.room.textView(fixture.editor,
+            willChangeSelectionFromCharacterRange: fixture.editor.selectedRange(),
+            toCharacterRange: NSRange(location: marked.location - 1, length: 0))
+        #expect(redirected == NSRange(location: NSMaxRange(marked), length: 0))
+        #expect(fixture.editor.hasMarkedText(), "a denied edit dropped the live composition")
+
+        fixture.editor.unmarkText()
+        fixture.editor.insertText("你好", replacementRange: marked)
+        #expect(fixture.editor.string == "abc你好")
+        #expect(fixture.engine.text == "abc你好")
+    }
+
     @Test func shuangpinSequenceStaysCompositionSafe() throws {
         let fixture = try makeFixture()
         defer { fixture.close() }

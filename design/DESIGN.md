@@ -225,10 +225,10 @@ mark, so the mark is never set beside the wordmark as a second object.
   The site draws it as a CSS mask over `currentColor`, so one vector serves the light and dark themes and the
   brand follows the site's ink token. Minimum lockup width: 19 px type; the 16 px favicon is the smallest use of
   the mark.
-- App icon and favicon: the mark alone on the bone plate with the ink W by default. The full-bleed favicon is the
-  bone square with the ink W. The ink plate with the bone W is the dark-appearance variant, used only where the
-  platform supports an appearance switch (the favicon's `prefers-color-scheme: dark` links; the alternate app-icon
-  source). A macOS `.icns` app icon has no appearance switch, so the shipped `.icns` is the light plate.
+- App icon and favicon: the mark alone on the bone plate with the ink W. The full-bleed favicon is the bone
+  square with the ink W. The ink plate with the bone W is the dark-appearance variant for the favicon's
+  `prefers-color-scheme: dark` links. A macOS `.icns` app icon has no appearance switch, so the shipped `.icns`
+  is the light plate.
 - Mac start screen: `Sources/FirstLine/Resources/write-it-down-lockup.svg` at 21 px type (128x16.25), tinted with
   the app ink token. The app icon and volume icon carry the mark.
 - The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
@@ -241,10 +241,10 @@ mark, so the mark is never set beside the wordmark as a second object.
   wipe, and the site's red hand word is not a logo colour.
 - The wordmark is Newsreader 500; the mark is the same W drawing. Do not re-typeset, track, stretch, or replace
   the W.
-- The app icon plate is bone with the ink mark by default. The ink plate with the bone mark is the dark-appearance
-  alternate only. The favicon is the bone square with the ink mark, with dark links pointing at the ink square with
-  the bone mark. The volume icon is a bone sheet with the ink mark on a dark disc. The light icon is self-contained;
-  the dark plate is not the default, and it is never used in the light appearance.
+- The app icon plate is bone with the ink mark. The favicon is the bone square with the ink mark, with dark links
+  pointing at the ink square with the bone mark. The volume icon is a bone sheet with the ink mark on a dark disc.
+  The light app icon and favicon are self-contained; the dark favicon is not the default, and it is never used in
+  the light appearance.
 - The mark itself is flat: no gradient, outline, shadow, bevel, or second colour. The app icon's plate gets the
   system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface.
 
@@ -261,17 +261,17 @@ mark, so the mark is never set beside the wordmark as a second object.
 - Site header: 21 px desktop, 19 px mobile; the lockup's clear space is at least a quarter of the cap height on
   all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the lockup.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
-- The source set is `writeitdown/logo/`, `writeitdown/favicon*`, and `writeitdown/apple-touch-icon.png` for the
-  site; the app icon set, `packaging/VolumeIcon.icns`, and `Sources/FirstLine/Resources/write-it-down-lockup.svg`
-  for the Mac. The legal, support, and answer pages use the mono `WRITE_IT_DOWN` logotype; the Mac start screen uses
-  the bundled lockup. The ink-plate/bone-W app-icon alternate is kept with the task evidence; it is not compiled
-  into the `.icns`.
+- The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
+  `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
+  `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The legal, support, and answer pages use the
+  mono `WRITE_IT_DOWN` logotype; the Mac start screen uses the bundled lockup. The app icon `.icns` is the light
+  plate; there is no dark app-icon alternate in the app icon set.
 
 ### 11.4 Do not
 
 - Put red, the old red underscore, or the old `WID` sheet in the mark.
-- Use the ink plate as the default; it is the dark-appearance alternate only. Do not put the light plate behind a
-  dark-appearance link or the dark plate in the light header.
+- Use the ink plate as the default; it is the dark-appearance favicon alternate only. Do not put the light plate
+  behind a dark-appearance link or the dark plate in the light header.
 - Put the split W beside the wordmark; the wordmark already contains it.
 - Round the favicon square, add a border to the app icon plate, or add a caption or tagline to the lockup.
 - Use the mark on a busy, photographic, or low-contrast surface, or below 16 px.
@@ -284,7 +284,7 @@ mark, so the mark is never set beside the wordmark as a second object.
   the same mark.
 - Plate decision: the light plate passes at 16 and 32 px. The static 16/32 inspection and the light/dark
   start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real Dock and Finder captures
-  remain pending. The dark plate remains the alternate.
+  remain pending. The dark plate remains the favicon alternate.
 - Site header: 21 px desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
 - Mac: the split-W lockup on the start screen in light and dark; the app icon at 16/32 (optical), 128 (Dock), and
   1024; the volume icon at 128 and 1024. Static asset inspection, the deterministic view test and the light/dark

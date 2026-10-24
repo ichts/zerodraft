@@ -305,7 +305,7 @@ Reviewer 复审 pure-AppKit 重写后接受 1 个 BLOCKER + 4 个 FIX-NOW。Debu
 
 ### Split-W logo assets (2026-10-24, 9854d18 + de37775)
 
-- PASS: static asset inspection of the shipped `AppIcon.appiconset`. The 16/16@2x and 32/32@2x entries are the optical split-W drawings on the bone plate; 128 and above use the master. The ink-plate/bone-W alternate remains the dark-appearance source and is not compiled into the `.icns`.
+- PASS: static asset inspection of the shipped `AppIcon.appiconset`. The 16/16@2x and 32/32@2x entries are the optical split-W drawings on the bone plate; 128 and above use the master. The `.icns` is the light plate; no dark app-icon alternate is shipped.
 - PASS: `packaging/VolumeIcon.icns` contains 16, 32, 64, 128, 256, 512, and 1024 px entries; the 128 and 1024 renders show the bone sheet and the ink split W on the dark disc.
 - PASS: the web favicon set uses the split W. `favicon-16.png` and `favicon-32.png` reuse the app optical drawing; `favicon.svg`, `favicon-dark.svg`, and `apple-touch-icon.png` use the master split W. The light and dark favicons were inspected at 16 and 32, the SVG masters, and the apple-touch icon at 180.
 - NOT VERIFIED: real Dock and Finder captures on light and dark. Static asset inspection is the evidence for the icon assets in this change. The start-screen brand change is recorded separately below; the Batch 3 "no visible old brand" record refers to the old WID/red mark, not the mono logotype.

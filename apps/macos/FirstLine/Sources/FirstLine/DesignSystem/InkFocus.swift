@@ -29,6 +29,14 @@ private final class FirstLineInkFocusOutline: CAShapeLayer {
         name = "firstline-ink-focus"
     }
 
+    override init(layer: Any) {
+        super.init(layer: layer)
+        if let source = layer as? FirstLineInkFocusOutline {
+            inset = source.inset
+            inkCornerRadius = source.inkCornerRadius
+        }
+    }
+
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     func update(for control: NSControl, color: NSColor, visible: Bool) {

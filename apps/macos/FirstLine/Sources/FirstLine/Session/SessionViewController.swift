@@ -96,6 +96,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var placeholderAnchor: NSLayoutConstraint!
     private var warningCenter: NSLayoutConstraint!
     private var chromeHover = false
+    /// Cadence for the two bars: every tick normally, twice a second under Reduce
+    /// Motion, with no animation in either case.
+    var barNow: () -> TimeInterval = { SessionEngine.continuousNowSeconds() }
+    private var lastBarUpdate: TimeInterval = -.infinity
     var exitConfirmation = ExitConfirmation()
     private var exitHintWork: DispatchWorkItem?
     private var quietLinkMuted: Bool?
@@ -563,10 +567,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         placeholderLabel.isHidden = isKept || !engine.text.isEmpty || !textView.string.isEmpty
         let sessionEnded = phase == .failure || phase == .success
-        progressBar.fraction = sessionEnded ? 0 : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
-        let idleFraction = min(max(engine.idleSeconds / Double(engine.silenceLimit.rawValue), 0), 1)
-        meter.fraction = sessionEnded ? 0 : 1 - idleFraction
-        meter.fillColor = (warning || phase == .failure) ? FirstLineColors.redNSColor : FirstLineColors.inkNSColor
+        let barInterval: TimeInterval = reducesMotion ? 0.5 : 0
+        let barTime = barNow()
+        if barInterval == 0 || barTime - lastBarUpdate >= barInterval {
+            progressBar.fraction = sessionEnded ? 0 : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
+            let idleFraction = min(max(engine.idleSeconds / Double(engine.silenceLimit.rawValue), 0), 1)
+            meter.fraction = sessionEnded ? 0 : 1 - idleFraction
+            meter.fillColor = (warning || phase == .failure) ? FirstLineColors.redNSColor : FirstLineColors.inkNSColor
+            lastBarUpdate = barTime
+        }
         if !textView.hasMarkedText() { prepareViewport() }
     }
 

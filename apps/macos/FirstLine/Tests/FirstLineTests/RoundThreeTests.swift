@@ -29,6 +29,14 @@ struct RoundThreeTests {
         inactiveWindow.orderOut(nil)
     }
 
+    @Test func inkFocusLayerSurvivesPresentationCopies() throws {
+        let button = FirstLineInkFocusButton(frame: NSRect(x: 0, y: 0, width: 140, height: 44))
+        let ring = try #require(button.layer?.sublayers?.first)
+        let copy = CALayer(layer: ring)
+        #expect(copy.bounds == ring.bounds)
+        #expect(copy.frame == ring.frame)
+    }
+
     // MARK: - Picker access line
 
     @Test func licensedPickerHidesAccessLineAndTrialPickerKeepsIt() throws {
@@ -173,12 +181,21 @@ struct RoundThreeTests {
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let scroll = try #require(editor.enclosingScrollView)
         let paper = try #require(scroll.superview)
+        paper.needsDisplay = true
+        paper.displayIfNeeded()
         let bars = descendants(of: room.view, of: FirstLineFillBar.self)
         #expect(bars.count == 2)
         let top = try #require(bars.first { abs($0.frame.height - 2) <= 0.5 })
         let bottom = try #require(bars.first { abs($0.frame.height - 3) <= 0.5 })
         #expect(abs(top.frame.maxY - paper.bounds.maxY) <= 1, "top bar pinned to the paper top")
         #expect(abs(bottom.frame.minY) <= 1, "bottom bar pinned to the paper bottom")
+        #expect(abs(top.frame.width - paper.bounds.width) <= 1)
+        #expect(abs(bottom.frame.width - paper.bounds.width) <= 1)
+        #expect(paper.layer?.masksToBounds == true, "bars are clipped by the sheet's rounded rect")
+        #expect(paper.layer?.cornerRadius == FirstLineRadius.sheet)
+        #expect(top.toolTip == nil)
+        #expect(bottom.toolTip == nil)
+        #expect(top.accessibilityLabel() == nil, "bars are the only indicator: no label")
         #expect(abs(top.fraction - 1) <= 0.01, "top bar starts full")
         #expect(abs(bottom.fraction - 1) <= 0.01, "bottom bar starts full while typing")
         #expect(resolved(top.fillColor, .aqua) == resolved(FirstLineColors.inkNSColor, .aqua))

@@ -4,6 +4,8 @@ import { denyFeedback } from './feedback.js';
 const $ = id => document.getElementById(id);
 const room = $('room');
 const editor = $('editor');
+const bar = $('room-bar');
+const meterFill = document.querySelector('#room-meter i');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const insertions = new Set(['insertText', 'insertParagraph', 'insertLineBreak']);
 let state = fresh();
@@ -12,6 +14,30 @@ let copyGeneration = 0;
 
 function announce(text) {
   if ($('status').textContent !== text) $('status').textContent = text;
+}
+
+function clamp(value) {
+  return Math.min(1, Math.max(0, value));
+}
+
+// Top bar: remaining session time. Bottom bar: silence remaining - full while
+// typing, red once the warning window starts (CSS reads data-phase), empty at
+// the wipe. Reduced motion updates both on whole seconds instead of continuously.
+function gauges(now, remaining) {
+  const stepped = reduced.matches;
+  let progress = 1;
+  if (state.phase === 'kept') progress = 0;
+  else if (state.started !== null) {
+    progress = stepped ? remaining / 60 : clamp((state.started + 60000 - now) / 60000);
+  }
+  let silence = 1;
+  if (state.phase === 'wipe' || state.phase === 'kept') silence = 0;
+  else if (state.phase !== 'rest') {
+    silence = stepped
+      ? Math.max(0, Math.ceil((state.lastInput + 8000 - now) / 1000)) / 8
+      : clamp((state.lastInput + 8000 - now) / 8000);
+  }
+  return { progress, silence };
 }
 
 function render(now = performance.now()) {
@@ -27,6 +53,9 @@ function render(now = performance.now()) {
   $('room-warning').textContent = warning ? 'KEEP TYPING OR THE DRAFT IS DELETED.' : '';
   const remaining = kept ? 0 : state.started === null ? 60 : Math.max(0, Math.ceil((state.started + 60000 - now) / 1000));
   $('room-clock').textContent = clock(remaining);
+  const { progress, silence } = gauges(now, remaining);
+  bar.style.transform = `scaleX(${progress.toFixed(3)})`;
+  meterFill.style.width = `${(silence * 100).toFixed(1)}%`;
   const count = wordCount(state.text);
   const words = `${count} ${count === 1 ? 'WORD' : 'WORDS'}`;
   $('room-count').textContent = words;

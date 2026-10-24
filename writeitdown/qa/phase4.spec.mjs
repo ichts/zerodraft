@@ -71,6 +71,41 @@ async function assertZen(page) {
   return geometry;
 }
 
+async function roomBars(page) {
+  return page.evaluate(() => {
+    const room = document.querySelector('#room');
+    const paper = room.querySelector('.room-paper');
+    const bar = document.getElementById('room-bar');
+    const meter = document.getElementById('room-meter');
+    const fill = meter.querySelector('i');
+    const rect = element => {
+      const bounds = element.getBoundingClientRect();
+      return { top: bounds.top, right: bounds.right, bottom: bounds.bottom, left: bounds.left, width: bounds.width, height: bounds.height };
+    };
+    const token = name => {
+      const probe = document.createElement('i');
+      probe.style.color = getComputedStyle(room).getPropertyValue(name);
+      room.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    };
+    return {
+      phase: room.dataset.phase,
+      paper: rect(paper), bar: rect(bar), meter: rect(meter),
+      progress: new DOMMatrixReadOnly(getComputedStyle(bar).transform).a,
+      silence: parseFloat(getComputedStyle(fill).width) / rect(meter).width,
+      barColor: getComputedStyle(bar).backgroundColor,
+      fillColor: getComputedStyle(fill).backgroundColor,
+      ink: token('--ink'), red: token('--red'),
+      barHeight: getComputedStyle(bar).height,
+      meterHeight: getComputedStyle(meter).height,
+      paperOverflow: getComputedStyle(paper).overflow,
+      ariaHidden: [bar.getAttribute('aria-hidden'), meter.getAttribute('aria-hidden')],
+    };
+  });
+}
+
 // Parse a computed linear-gradient into {pos, alpha} pairs; unpositioned
 // first/last stops are 0%/100%. Computed colors look like rgb(0, 0, 0),
 // rgba(0, 0, 0, 0.07).
@@ -424,4 +459,85 @@ test('the room wears the landing design system', async ({ page }) => {
   await expect(page.locator('#room .home-nav [data-theme-toggle]')).toBeVisible();
   await page.locator('#room [data-theme-toggle]').click();
   await expect(editor(page), 'switching theme hands focus back to the writing').toBeFocused();
+});
+
+test('trial room bars carry the session and the silence', async ({ page }, info) => {
+  const reduced = info.project.use.reducedMotion === 'reduce';
+  const demo = await page.evaluate(() => {
+    const bar = document.querySelector('#demo #bar');
+    const meter = document.querySelector('#demo #meter');
+    return {
+      barHeight: getComputedStyle(bar).height,
+      meterHeight: getComputedStyle(meter).height,
+      overflow: getComputedStyle(bar.closest('.paper')).overflow,
+    };
+  });
+  await enter(page);
+  await expect(page.locator('#room #room-bar')).toHaveCount(1);
+  await expect(page.locator('#room #room-meter i')).toHaveCount(1);
+  const rest = await roomBars(page);
+  // Same metrics as the demo bars: 2px ink rule at the top edge, 3px rule at the
+  // bottom edge, clipped by the sheet's radius. No labels, no descriptions.
+  expect(rest.barHeight).toBe('2px');
+  expect(rest.meterHeight).toBe('3px');
+  expect(rest.barHeight).toBe(demo.barHeight);
+  expect(rest.meterHeight).toBe(demo.meterHeight);
+  expect(demo.overflow).toBe('hidden');
+  expect(rest.paperOverflow, 'clip, not hidden: the sheet must not scroll when the editor takes focus').toBe('clip');
+  for (const [name, gap] of Object.entries({
+    barTop: rest.bar.top - rest.paper.top,
+    barLeft: rest.bar.left - rest.paper.left,
+    barRight: rest.paper.right - rest.bar.right,
+    meterBottom: rest.paper.bottom - rest.meter.bottom,
+    meterLeft: rest.meter.left - rest.paper.left,
+    meterRight: rest.paper.right - rest.meter.right,
+  })) expect(Math.abs(gap), name).toBeLessThan(0.5);
+  expect(rest.progress).toBeCloseTo(1, 3);
+  expect(rest.silence).toBeCloseTo(1, 2);
+  expect(rest.barColor).toBe(rest.ink);
+  expect(rest.fillColor).toBe(rest.ink);
+  expect(rest.ariaHidden).toEqual(['true', 'true']);
+  await capture(page, info, 'room-bars-rest');
+
+  await page.keyboard.insertText('A line of the draft.');
+  await page.clock.fastForward(4000);
+  const mid = await roomBars(page);
+  expect(mid.phase).toBe('typing');
+  expect(mid.progress).toBeLessThan(rest.progress);
+  expect(mid.silence).toBeCloseTo(0.5, 2);
+  expect(mid.fillColor).toBe(mid.ink);
+  await capture(page, info, 'room-bars-draining');
+
+  // Under reduced motion the bars step once per second; otherwise they drain
+  // continuously between the same absolute deadlines.
+  await page.clock.fastForward(400);
+  const held = await roomBars(page);
+  if (reduced) {
+    expect(held.progress).toBeCloseTo(mid.progress, 3);
+    expect(held.silence).toBeCloseTo(mid.silence, 2);
+  } else {
+    expect(held.progress).toBeLessThan(mid.progress);
+    expect(held.silence).toBeLessThan(mid.silence);
+  }
+
+  await page.clock.fastForward(600);
+  const warn = await roomBars(page);
+  expect(warn.phase).toBe('warn');
+  expect(warn.progress).toBeLessThan(mid.progress);
+  expect(warn.silence).toBeCloseTo(0.375, 2);
+  expect(warn.fillColor).toBe(warn.red);
+  await capture(page, info, 'room-bars-warn');
+
+  await page.keyboard.insertText(' Keep writing.');
+  const recovered = await roomBars(page);
+  expect(recovered.phase).toBe('typing');
+  expect(recovered.silence).toBeCloseTo(1, 2);
+  expect(recovered.fillColor).toBe(recovered.ink);
+
+  await page.clock.fastForward(8000);
+  const wiped = await roomBars(page);
+  expect(wiped.phase).toBe('wipe');
+  expect(wiped.silence).toBe(0);
+  await expect(page.locator('#room-report')).toContainText('DRAFT DELETED');
+  await capture(page, info, 'room-bars-wipe');
 });

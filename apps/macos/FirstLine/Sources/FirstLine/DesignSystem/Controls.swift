@@ -45,6 +45,7 @@ final class FirstLineSegmentedControl: NSView {
             let button = FirstLineSegmentButton(segmentTitle: item.title, target: self, action: #selector(select(_:)))
             button.tag = item.tag
             button.setAccessibilityLabel(item.accessibilityLabel)
+            button.setAccessibilityTitle(item.accessibilityLabel)
             stack.addArrangedSubview(button)
             buttons.append(button)
         }
@@ -100,6 +101,7 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
     var isChosen = false {
         didSet {
             state = isChosen ? .on : .off
+            setAccessibilityValue(isChosen ? 1 : 0)
             refreshAppearance()
         }
     }

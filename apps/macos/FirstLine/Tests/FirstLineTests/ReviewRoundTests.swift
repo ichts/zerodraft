@@ -233,8 +233,41 @@ struct ReviewRoundTests {
         window.orderOut(nil)
     }
 
-    // MARK: - F-15: the warning wash is in the rendered frame
+    @Test func pickerRadiosExposeTheirFullNameAndSelectedValue() throws {
+        let home = HomeViewController(appState: try trialState(used: 2))
+        let window = makeWindow(home)
+        let duration = try #require(descendants(of: home.view, of: FirstLineSegmentedControl.self)
+            .first { $0.accessibilityLabel() == "Session length" })
+        let silence = try #require(descendants(of: home.view, of: FirstLineSegmentedControl.self)
+            .first { $0.accessibilityLabel() == "Delete after silence" })
 
+        let oneMinute = try #require(duration.button(forTag: 60))
+        let fiveMinutes = try #require(duration.button(forTag: 300))
+        #expect(oneMinute.accessibilityRole() == .radioButton)
+        #expect(oneMinute.accessibilityTitle() == "1 minute")
+        #expect(oneMinute.accessibilityLabel() == "1 minute")
+        #expect((oneMinute.accessibilityValue() as? NSNumber)?.intValue == 1)
+        #expect((fiveMinutes.accessibilityValue() as? NSNumber)?.intValue == 0)
+
+        fiveMinutes.performClick(nil)
+        #expect(duration.selectedTag == 300)
+        #expect((oneMinute.accessibilityValue() as? NSNumber)?.intValue == 0)
+        #expect((fiveMinutes.accessibilityValue() as? NSNumber)?.intValue == 1)
+
+        let standard = try #require(silence.button(forTag: SilenceLimit.standard.rawValue))
+        let strict = try #require(silence.button(forTag: SilenceLimit.strict.rawValue))
+        #expect(standard.accessibilityTitle() == "Standard 8 s")
+        #expect((standard.accessibilityValue() as? NSNumber)?.intValue == 1)
+        #expect((strict.accessibilityValue() as? NSNumber)?.intValue == 0)
+
+        strict.performClick(nil)
+        #expect(silence.selectedTag == SilenceLimit.strict.rawValue)
+        #expect((standard.accessibilityValue() as? NSNumber)?.intValue == 0)
+        #expect((strict.accessibilityValue() as? NSNumber)?.intValue == 1)
+        window.orderOut(nil)
+    }
+
+    // MARK: - F-15: the warning wash is in the rendered frame
     @Test func warningWashTintsTheRenderedPaper() throws {
         let now = Clock()
         let engine = SessionEngine(now: { now.now })

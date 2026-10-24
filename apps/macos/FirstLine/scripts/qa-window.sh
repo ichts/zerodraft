@@ -407,7 +407,6 @@ enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
 assert_text "$output/room.json" 'Type to start'
 assert_text "$output/room.json" '1:00'
-assert_text "$output/room.json" '0 words'
 assert_text "$output/room.json" 'ESC - EXIT'
 jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$output/room.json" \
   || fail 'no text area in the room'

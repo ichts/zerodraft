@@ -22,9 +22,9 @@ final class RootWindowController: NSWindowController {
     func copyKeptText() { container.copyKeptText() }
     func refreshRoom() { container.refreshRoom() }
 
-    init(appState: AppState) {
+    init(appState: AppState, updateSettings: (any UpdateSettings)? = nil) {
         self.appState = appState
-        self.container = RootContainerViewController(appState: appState)
+        self.container = RootContainerViewController(appState: appState, updateSettings: updateSettings)
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
@@ -139,11 +139,12 @@ final class RootWindowController: NSWindowController {
 /// surface -> NSViewController 工厂。Phase 1 全部返回占位 VC；Phase 2+ 逐个分支替换为真实实现。
 enum SurfaceFactory {
     @MainActor
-    static func makeViewController(surface: Surface, appState: AppState) -> NSViewController {
+    static func makeViewController(surface: Surface, appState: AppState,
+                                   updateSettings: (any UpdateSettings)? = nil) -> NSViewController {
         switch surface {
         case .home:     return HomeViewController(appState: appState)
         case .session:  return SessionViewController(appState: appState)
-        case .settings: return SettingsViewController(appState: appState)
+        case .settings: return SettingsViewController(appState: appState, updateSettings: updateSettings)
         case .upgrade:  return UpgradeViewController(appState: appState)
         }
     }

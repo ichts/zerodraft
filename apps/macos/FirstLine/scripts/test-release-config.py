@@ -1,5 +1,6 @@
 """Execute the release packager's configuration gate without building or signing."""
 from pathlib import Path
+import base64
 import os
 import plistlib
 import shutil
@@ -9,6 +10,11 @@ import tempfile
 module = Path(__file__).resolve().parents[1]
 config = plistlib.loads((module / 'Sources/FirstLine/Info.plist').read_bytes())
 keys = ['WIDCheckoutURL', 'WIDLicenseServiceURL', 'WIDLicenseProductID', 'WIDLicensePublicKey']
+update_keys = ['SUFeedURL', 'SUPublicEDKey']
+PLACEHOLDER_UPDATE_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+# A well-formed 32-byte key that is not the shipped placeholder.
+real_update_key = base64.b64encode(bytes(range(32))).decode()
+assert config['SUPublicEDKey'] == PLACEHOLDER_UPDATE_KEY, 'the tracked Info.plist must keep the placeholder until the captain creates the key'
 
 with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as directory:
     root = Path(directory)
@@ -24,26 +30,48 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     security.chmod(0o755)
     env = {**os.environ, 'PATH': f"{root / 'bin'}:{os.environ['PATH']}",
            'WID_SIGNING_IDENTITY': 'Developer ID Application: Release Gate Fixture'}
+    signed = {**config, 'SUPublicEDKey': real_update_key}
 
     def run(values, *args):
         (root / 'Sources/FirstLine/Info.plist').write_bytes(plistlib.dumps(values))
         return subprocess.run(['bash', str(root / 'scripts/release-dmg.sh'), *args],
                               env=env, capture_output=True, text=True)
 
-    accepted = run(config)
+    accepted = run(signed)
     assert accepted.returncode == 42 and 'CONFIGURATION_ACCEPTED' in accepted.stdout, accepted.stderr
-    for missing in [keys, *[[key] for key in keys]]:
-        values = {**config, **dict.fromkeys(missing, '')}
+    for missing in [keys, *[[key] for key in keys], update_keys, *[[key] for key in update_keys]]:
+        values = {**signed, **dict.fromkeys(missing, '')}
         rejected = run(values)
         assert rejected.returncode == 1 and 'Release blocked:' in rejected.stderr, rejected.stderr
         assert 'CONFIGURATION_ACCEPTED' not in rejected.stdout
     for key, value in [('WIDLicenseServiceURL', 'http://licenses.writeitdown.app'),
                        ('WIDLicensePublicKey', 'invalid'),
-                       ('WIDCheckoutURL', 'https://localhost/mac.html')]:
-        rejected = run({**config, key: value})
+                       ('WIDCheckoutURL', 'https://localhost/mac.html'),
+                       ('SUFeedURL', 'http://writeitdown.app/download/appcast.xml'),
+                       ('SUFeedURL', 'https://writeitdown.app/download/appcast.xml#frag'),
+                       ('SUPublicEDKey', PLACEHOLDER_UPDATE_KEY),
+                       ('SUPublicEDKey', 'invalid'),
+                       ('SUEnableAutomaticChecks', True),
+                       ('CFBundleVersion', 'abc'),
+                       ('CFBundleVersion', '0')]:
+        rejected = run({**signed, key: value})
         assert rejected.returncode == 1 and 'Release blocked:' in rejected.stderr, rejected.stderr
+        assert 'CONFIGURATION_ACCEPTED' not in rejected.stdout
+    placeholder = run(config)
+    assert placeholder.returncode == 1 and 'placeholder' in placeholder.stderr, placeholder.stderr
     staging = run(config, '--staging')
     assert staging.returncode == 1 and 'Staging requires empty' in staging.stderr, staging.stderr
     staging = run({**config, **dict.fromkeys(keys, '')}, '--staging')
     assert staging.returncode == 42, staging.stderr
-print('PASS: release requires complete safe configuration; staging cannot carry checkout credentials.')
+
+    # A build number that is not greater than the last release reaches no installed copy.
+    updates = root / 'dist/updates'
+    updates.mkdir(parents=True)
+    (updates / 'last-build.txt').write_text('7\n')
+    repeated = run(signed)
+    assert repeated.returncode == 1 and 'not greater than the last release' in repeated.stderr, repeated.stderr
+    (updates / 'last-build.txt').write_text('1\n')
+    advanced = run(signed)
+    assert advanced.returncode == 42, advanced.stderr
+print('PASS: release requires complete license and update configuration; a placeholder update key,')
+print('      an unsafe feed, an unchecksummed build number, and staging with sale config are refused.')

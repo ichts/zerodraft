@@ -14,6 +14,27 @@ Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unver
 - `npm run release-check` and `npm run release-check -- --download`: static checks passed before the deploy.
 - Live deploy: the bundle built from merged commit `fa136cd` was installed on the host and the ten sampled production files match the tested tree byte for byte; the previous site copy and the previous DMG (SHA-256 `714822ee...`) are kept as backups. `npm run release-check -- --download --live` and `npm run release-check -- --live` both reported `LIVE CHECK PASSED`. `npm run journey:live`: 82 passed, 0 failed, 2 WAIVED, with one continuous video per viewport; live captures of the landing, download and Mac pages at 1440x900 and 390x844 show the split-W headers, the room, and the published `5b8483bd...` hash on one line on desktop and wrapped without clipping on mobile. The hosted DMG answers `application/x-apple-diskimage`, 8117026 bytes, and hashes to the published value; `/llms.txt` answers `text/plain; charset=utf-8`.
 
+# 2026-10-25: Download-page release note and update-feed hosting (local only)
+
+The Mac 1.1 release adds Sparkle auto-update (see `../docs/wid-decisions.md` D-040). The site change
+is small: one `#release-notes` line inside the download card, and one scoped spacing rule in
+`site.css`. No page was added to the sitemap; no other surface changed.
+
+- `cd writeitdown && npm ci && npx playwright test`: 460 passed, 36 skipped across the eight
+  viewport/theme/motion projects. The Install/Activate/Refunds structure, the single DMG link, the
+  published SHA-256 slot and the canonical/og metadata the journey asserts are unchanged.
+- `npm run release-check -- --download`: passes locally. The published SHA-256 still names the live
+  1.0 DMG, so the note, the DMG name and the checksum must flip together in the deploy that uploads
+  1.1 (see `README.md`, "Mac download release").
+- Captures: `download-desk.png` (1440x900, full page) and `download-mobile.png` (390x844, full page),
+  plus a crop of the card footer. Inspected: the note sits 16 px under the last requirement row, wraps
+  to three lines on desktop and four on mobile, stays inside the card, and neither eats the card's
+  bottom padding nor pushes the three step cards down. Light theme only; the note inherits the chrome
+  colour, so the dark theme needs no separate capture.
+- Not verified here: the live host's new Caddy handlers, the appcast content type, and the 404 for a
+  missing update file. Those are release-day checks in `README.md`; nothing in this repository
+  deploys.
+
 # GEO acceptance (historical)
 
 GEO pass, October 23, 2026. The discovery and answer-page contracts are owned by [README.md](README.md#discovery-files-and-answer-pages). Landing, trial and Mac visuals were untouched.

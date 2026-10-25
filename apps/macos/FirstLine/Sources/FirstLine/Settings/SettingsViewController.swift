@@ -1,6 +1,6 @@
 /**
- * [INPUT]: AppKit, AppState, DesignSystem tokens and FirstLineButtons.
- * [OUTPUT]: Settings white card: appearance, motion, focus, alignment, font size, license and about.
+ * [INPUT]: AppKit, AppState, Update/UpdateController (UpdateSettings), DesignSystem tokens and FirstLineButtons.
+ * [OUTPUT]: Settings white card: appearance, updates, motion, focus, alignment, font size, license and about.
  * [POS]: Native settings surface in the After language; changes stay live and Done restores the prior surface.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -11,6 +11,7 @@ import Observation
 @MainActor
 final class SettingsViewController: NSViewController {
     private let appState: AppState
+    private let updateSettings: (any UpdateSettings)?
     private var licenseField: NSTextField?
     private var activateButton: NSButton?
     private var licenseStatusLabel: NSTextField!
@@ -21,8 +22,9 @@ final class SettingsViewController: NSViewController {
     private var checkoutStatusLabel: NSTextField?
     private var licenseDetails: [NSTextField] = []
 
-    init(appState: AppState) {
+    init(appState: AppState, updateSettings: (any UpdateSettings)? = nil) {
         self.appState = appState
+        self.updateSettings = updateSettings
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -56,12 +58,17 @@ final class SettingsViewController: NSViewController {
         ])
         content.addArrangedSubview(appearance)
         appearance.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        // The updates section exists only when the app really has an updater (a .app bundle).
+        if let section = updatesSection() {
+            content.addArrangedSubview(section)
+            section.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
         let license = licenseSection()
         content.addArrangedSubview(license)
         license.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        let version = AppState.displayVersion
         let about = section("About", rows: [
-            settingRow("Write It Down", detail: "Version \(version)"),
+            settingRow("Write It Down", detail: version.isEmpty ? "Version unknown" : "Version \(version)"),
         ])
         content.addArrangedSubview(about)
         about.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -112,6 +119,22 @@ final class SettingsViewController: NSViewController {
         heading.textColor = FirstLineColors.inkNSColor
         let done = FirstLineButtons.link(title: "Done", target: self, action: #selector(doneTapped))
         return horizontal(views: [heading, spacer(), done])
+    }
+
+    private func updatesSection() -> NSView? {
+        guard updateSettings != nil else { return nil }
+        let button = FirstLineInkFocusButton(
+            checkboxWithTitle: "Check for updates automatically",
+            target: self,
+            action: #selector(automaticChecksChanged(_:))
+        )
+        button.font = FirstLineTypography.smallNSFont
+        button.state = updateSettings?.automaticallyChecksForUpdates == true ? .on : .off
+        // One labelled control, no duplicated row title (Q-07/D-002): the checkbox carries the words.
+        let row = horizontal(views: [button, spacer()])
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.heightAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
+        return section("Updates", rows: [row])
     }
 
     private func licenseSection() -> NSView {
@@ -381,6 +404,10 @@ final class SettingsViewController: NSViewController {
 
     @objc private func focusChanged(_ sender: NSButton) {
         appState.updateFocusMode(sender.state == .on)
+    }
+
+    @objc private func automaticChecksChanged(_ sender: NSButton) {
+        updateSettings?.automaticallyChecksForUpdates = sender.state == .on
     }
 
     @objc private func alignmentChanged(_ sender: NSPopUpButton) {

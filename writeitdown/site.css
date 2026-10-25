@@ -339,6 +339,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .dlbox .tag{height:auto;min-height:24px;padding:4px 10px;line-height:1.4;align-self:flex-start;margin:0}
 .dlbox .actions{display:flex;flex-wrap:wrap;gap:var(--s3)}
 .dlbox .sha{margin:0;font:400 var(--t-small)/1.6 var(--sans);color:var(--chrome)}
+.dlbox #release-notes{margin:16px 0 0;max-width:64ch}
 .dl-page code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.92em;overflow-wrap:anywhere;color:var(--ink)}
 .reqs{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,1fr);gap:0 24px}
 .reqs li{padding:12px 0;border-bottom:1px solid var(--hair);font-size:15px;color:var(--mute)}

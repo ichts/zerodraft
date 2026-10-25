@@ -12,9 +12,13 @@ config = plistlib.loads((module / 'Sources/FirstLine/Info.plist').read_bytes())
 keys = ['WIDCheckoutURL', 'WIDLicenseServiceURL', 'WIDLicenseProductID', 'WIDLicensePublicKey']
 update_keys = ['SUFeedURL', 'SUPublicEDKey']
 PLACEHOLDER_UPDATE_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
-# A well-formed 32-byte key that is not the shipped placeholder.
-real_update_key = base64.b64encode(bytes(range(32))).decode()
-assert config['SUPublicEDKey'] == PLACEHOLDER_UPDATE_KEY, 'the tracked Info.plist must keep the placeholder until the captain creates the key'
+# The tracked Info.plist holds the build placeholder until the captain creates the key and the real
+# public key afterwards (docs/RELEASE_KEY.md). Either value must be a raw 32-byte Ed25519 key, and the
+# release gate below must refuse the placeholder in both cases.
+tracked_update_key = config['SUPublicEDKey']
+assert len(base64.b64decode(tracked_update_key, validate=True)) == 32, 'SUPublicEDKey must be the raw 32-byte Ed25519 public key'
+real_update_key = (tracked_update_key if tracked_update_key != PLACEHOLDER_UPDATE_KEY
+                   else base64.b64encode(bytes(range(32))).decode())
 
 with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as directory:
     root = Path(directory)
@@ -57,7 +61,7 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         rejected = run({**signed, key: value})
         assert rejected.returncode == 1 and 'Release blocked:' in rejected.stderr, rejected.stderr
         assert 'CONFIGURATION_ACCEPTED' not in rejected.stdout
-    placeholder = run(config)
+    placeholder = run({**config, 'SUPublicEDKey': PLACEHOLDER_UPDATE_KEY})
     assert placeholder.returncode == 1 and 'placeholder' in placeholder.stderr, placeholder.stderr
     staging = run(config, '--staging')
     assert staging.returncode == 1 and 'Staging requires empty' in staging.stderr, staging.stderr

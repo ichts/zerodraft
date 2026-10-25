@@ -12,9 +12,11 @@
            observable output; nothing here greps the scripts' source. The known-broken
            cases feed the previous behaviour (a manifest whose first stamp is the
            pre-recording span, a dropped capture, the old jq content filter, one review
-           repeated for every lens, a bytecode cache tracked in any subtree) and must
-           fail, so a regression reopens the finding. The tracked-bytecode guard reads
-           the whole repository index, never only the rig's own subtree.
+           repeated for every lens, a bytecode cache tracked in any subtree, a host
+           entry point without its launchd shim) and must fail, so a regression reopens
+           the finding. The bytecode guard resolves the repository root and constructs
+           its failure case in a scratch repository, and both host entry points are
+           checked in a layout that has and lacks the shim.
 """
 
 import json
@@ -29,6 +31,7 @@ PANEL_LIB = os.path.join(HERE, "vm", "panel-lib.py")
 ANALYSER = os.path.join(HERE, "vm", "analyse-recording.py")
 DESIGN_PANEL = os.path.join(HERE, "design-panel.sh")
 PREPARE_GUEST = os.path.join(HERE, "vm", "prepare-guest.sh")
+VM_JOURNEY = os.path.join(HERE, "vm-journey.sh")
 # The acceptance contract's lens set, as vm-journey.sh states it.
 REQUIRED_LENSES = ["rams", "norman", "spiekermann", "kare", "matas", "vignelli"]
 
@@ -528,56 +531,98 @@ def repository_root(path):
     return result.stdout.strip()
 
 
-def check_prepare_guest_shim(workdir):
-    script = os.path.join(workdir, "prepare-guest.sh")
-    shutil.copy(PREPARE_GUEST, script)
-    environment = dict(os.environ, PATH="/usr/bin:/bin", WID_VM_NO_LAUNCHD="1")
-    missing = subprocess.run(["/bin/bash", script], capture_output=True, text=True,
-                             timeout=60, env=environment)
-    need(missing.returncode != 0,
-         "guest setup did not stop when the launchd shim was missing")
-    complaints = [line for line in missing.stderr.splitlines() if "launchd-host.sh" in line]
-    need(any(line.startswith("prepare-guest: ERROR:") for line in complaints),
-         f"the missing launchd shim was not reported as a setup failure: {missing.stderr[-400:]!r}")
-    need(not any("tart is not installed" in line for line in missing.stderr.splitlines()),
-         "guest setup went on to host work after the launchd shim failed to load")
-
-    beside = os.path.join(workdir, "with-shim")
-    os.makedirs(beside)
-    shutil.copy(PREPARE_GUEST, os.path.join(beside, "prepare-guest.sh"))
-    shutil.copy(os.path.join(HERE, "vm", "launchd-host.sh"),
-                os.path.join(beside, "launchd-host.sh"))
-    loaded = subprocess.run(["/bin/bash", os.path.join(beside, "prepare-guest.sh")],
-                            capture_output=True, text=True, timeout=60, env=environment)
-    need(loaded.returncode != 0 and "tart is not installed" in loaded.stderr,
-         f"the launchd shim beside the script did not load: {loaded.stderr[-400:]!r}")
-    need("could not load" not in loaded.stderr
-         and "wid_launchd_reexec is missing" not in loaded.stderr,
-         f"a shim beside the script was reported missing: {loaded.stderr[-400:]!r}")
-
-
-def check_tracked_bytecode(_workdir):
-    root = repository_root(HERE)
+def tracked_paths(start):
+    root = repository_root(start)
     listing = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True, text=True)
     need(listing.returncode == 0, f"git ls-files failed: {listing.stderr[:200]}")
-    tracked = [path for path in listing.stdout.split("\n") if path]
+    return root, [path for path in listing.stdout.split("\n") if path]
+
+
+def run_entry_point(workdir, name, script, arguments, shim):
+    layout = os.path.join(workdir, name)
+    os.makedirs(layout)
+    shutil.copy(script, os.path.join(layout, os.path.basename(script)))
+    if shim is not None:
+        target = os.path.join(layout, shim)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        shutil.copy(os.path.join(HERE, "vm", "launchd-host.sh"), target)
+    return subprocess.run(["/bin/bash", os.path.join(layout, os.path.basename(script))] + arguments,
+                          capture_output=True, text=True, timeout=60,
+                          env=dict(os.environ, PATH="/usr/bin:/bin", WID_VM_NO_LAUNCHD="1"))
+
+
+def assert_shim_contract(workdir, name, script, arguments, shim, prefix, next_work):
+    missing = run_entry_point(workdir, name + "-missing", script, arguments, None)
+    need(missing.returncode != 0,
+         f"{os.path.basename(script)} did not stop when the launchd shim was missing")
+    complaints = [line for line in missing.stderr.splitlines() if "launchd-host.sh" in line]
+    need(any(line.startswith(prefix) for line in complaints),
+         f"the missing launchd shim was not reported as a setup failure: {missing.stderr[-400:]!r}")
+    need(not any(next_work in line for line in missing.stderr.splitlines()),
+         f"{os.path.basename(script)} went on to its next step after the launchd shim failed")
+
+    loaded = run_entry_point(workdir, name + "-loaded", script, arguments, shim)
+    need(loaded.returncode != 0 and next_work in loaded.stderr,
+         f"the launchd shim at {shim} did not load: {loaded.stderr[-400:]!r}")
+    need("could not load" not in loaded.stderr
+         and "wid_launchd_reexec is missing" not in loaded.stderr,
+         f"a present launchd shim was reported missing: {loaded.stderr[-400:]!r}")
+
+
+def check_prepare_guest_shim(workdir):
+    assert_shim_contract(workdir, "prepare-guest", PREPARE_GUEST, [], "launchd-host.sh",
+                         "prepare-guest: ERROR:", "tart is not installed")
+
+
+def check_journey_shim(workdir):
+    artifact = os.path.join(workdir, "fixture.dmg")
+    with open(artifact, "w", encoding="utf-8") as handle:
+        handle.write("fixture\n")
+    assert_shim_contract(workdir, "vm-journey", VM_JOURNEY, [artifact], "vm/launchd-host.sh",
+                         "vm-journey: ERROR:", "tart is not installed")
+
+
+def check_tracked_bytecode(workdir):
+    root, tracked = tracked_paths(HERE)
     offenders = tracked_bytecode(tracked)
     need(not offenders,
          "generated bytecode is tracked: " + ", ".join(offenders[:5]))
-    need(any(not path.startswith("apps/") for path in tracked),
-         "the guard listed only the rig subtree instead of the whole repository index")
-    # Known-broken: the tree that prompted this guard listed both caches.
-    stale = ["apps/macos/FirstLine/scripts/vm/__pycache__/panel-lib.cpython-314.pyc",
-             "apps/macos/FirstLine/scripts/vm/analyse-recording.py",
-             "tools/x.pyc"]
-    need(tracked_bytecode(stale) == [stale[0], stale[2]],
-         "the tracked-bytecode guard does not catch a cache file: %r" % (tracked_bytecode(stale),))
+    need(os.path.relpath(os.path.abspath(__file__), root) in tracked,
+         "the guard did not list this test file from the repository root, so its listing is not repo-wide")
+
+    scratch = os.path.join(workdir, "scratch")
+    for relative in ("rig/tool.py", "other/tool.py",
+                     "other/__pycache__/helper.cpython-314.pyc", "other/legacy.pyo"):
+        target = os.path.join(scratch, relative)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8") as handle:
+            handle.write("# fixture\n")
+    for command in (["init", "-q"], ["add", "-A", "-f"]):
+        result = subprocess.run(["git", "-C", scratch] + command, capture_output=True, text=True)
+        need(result.returncode == 0,
+             f"could not build the scratch repository: {result.stderr[:300]}")
+    _, scratch_tracked = tracked_paths(os.path.join(scratch, "rig"))
+    need("other/__pycache__/helper.cpython-314.pyc" in scratch_tracked
+         and "other/legacy.pyo" in scratch_tracked,
+         "the guard read only the directory it was called from: %r" % (scratch_tracked,))
+    need(tracked_bytecode(scratch_tracked)
+         == ["other/__pycache__/helper.cpython-314.pyc", "other/legacy.pyo"],
+         "the guard did not flag the bytecode in a scratch repository: %r"
+         % (tracked_bytecode(scratch_tracked),))
+    scoped = subprocess.run(["git", "-C", os.path.join(scratch, "rig"), "ls-files"],
+                            capture_output=True, text=True)
+    scoped_paths = [path for path in scoped.stdout.split("\n") if path]
+    need(scoped.returncode == 0 and "tool.py" in scoped_paths
+         and not tracked_bytecode(scoped_paths),
+         "the subtree-scoped listing should hide the bytecode it does not look at: %r"
+         % (scoped_paths,))
 
 
 CHECKS = [
     ("model answers are validated before they count", check_answer_validation),
     ("generated bytecode is not tracked", check_tracked_bytecode),
     ("guest setup stops when the launchd shim is missing", check_prepare_guest_shim),
+    ("the recorded journey stops when the launchd shim is missing", check_journey_shim),
     ("flagged clip lands on the flagged second", check_clip_origin),
     ("analyser fails on a dropped capture", check_analyser_alignment),
     ("launch assertion ids are keyed to their stream", check_launch_assertion_ids),

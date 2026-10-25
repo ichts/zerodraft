@@ -98,7 +98,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
-  const withNote = attrs => download.replace('</section>', `<p id="release-notes" ${attrs}>1.1 is not released yet.</p></section>`);
+  const withNote = attrs => download.replace(/<p class="sha" id="release-notes"[^>]*>/, `<p class="sha" id="release-notes" ${attrs} hidden>`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
@@ -126,14 +126,14 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
     [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
     [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
-    [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note announces 1.1 but the download is 1.0'],
-    [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: the note is marked not yet released, but 1.0 is already the linked download'],
-    [{ download: withNote('data-launch-pending="release-notes"') }, 'Release notes: the note does not declare its version in data-release-note'],
+    [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note declares 1.1 but the download is 1.0'],
+    [{ download: download.replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note declares 1.0 but the download is 1.1'],
+    [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: data-launch-pending is retired'],
+    [{ download: withNote('') }, 'Release notes: the note does not declare its version in data-release-note'],
+    [{ download: download.replace(/<p class="sha" id="release-notes"[^>]*><\/p>/, '') }, 'Release notes: the download page does not declare a release note'],
   ];
-  // A release note is optional: before 1.1 ships the download page says nothing about it. The
-  // documented note is a pending one, which the gate accepts, and the note must fail once its
-  // version is the linked download.
-  expect(releaseCheck({ ...inputs, download: withNote('data-release-note="1.1" data-launch-pending="release-notes"') })[0]).toBe(0);
+  // The note always declares the artifact version it links; a visible note returns when there is
+  // a newer release to announce. A page whose note and linked DMG disagree is refused.
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
     expect(code, message).toBe(1);

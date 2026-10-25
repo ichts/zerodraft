@@ -1,6 +1,6 @@
-// Checkout and key delivery for mac.html. The session credential is read once, kept in page
-// memory, and removed from the address bar and history before any request, so neither a
-// successful nor a failed delivery leaves it behind. Keys stay in page memory only.
+// Checkout and key delivery for mac.html. The session credential is read once into page memory;
+// the address bar and history keep it only until the license response arrives, then drop it on
+// success and failure alike. Keys stay in page memory only.
 (() => {
   const form = document.getElementById('buy-form');
   const buy = form.querySelector('button');
@@ -43,9 +43,6 @@
 
   const session = new URLSearchParams(location.search).get('session_id');
   if (!session) return;
-  const clean = new URL(location.href);
-  clean.searchParams.delete('session_id');
-  history.replaceState(history.state, '', clean.href);
 
   const card = document.getElementById('license-delivery');
   const status = document.getElementById('license-status');
@@ -55,6 +52,7 @@
   const retryRow = document.getElementById('license-retry-row');
   const retry = document.getElementById('retry-license');
   let deliveredKey = '';
+  let latestRequest = 0;
 
   card.hidden = false;
   card.scrollIntoView({ block: 'start' });
@@ -65,22 +63,40 @@
     retryRow.hidden = true;
   }
 
+  function clearCredential() {
+    const clean = new URL(location.href);
+    clean.searchParams.delete('session_id');
+    history.replaceState(history.state, '', clean.href);
+  }
+
   async function loadLicense() {
+    const request = ++latestRequest;
     checking();
+    retry.disabled = true;
+    retry.setAttribute('aria-busy', 'true');
     try {
       const url = new URL('/api/v1/license', service);
       url.searchParams.set('session_id', session);
       const response = await fetch(url, { ...options, headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('License unavailable');
       const { licenseKey } = await response.json();
-      deliveredKey = typeof licenseKey === 'string' ? licenseKey.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '') : '';
-      if (!deliveredKey) throw new Error('License unavailable');
+      const candidate = typeof licenseKey === 'string' ? licenseKey.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '') : '';
+      if (!candidate) throw new Error('License unavailable');
+      if (request !== latestRequest) return;
+      deliveredKey = candidate;
       key.textContent = deliveredKey;
       status.textContent = 'Your license key is ready.';
       result.hidden = false;
     } catch {
+      if (request !== latestRequest) return;
       status.textContent = 'Your license is not ready yet.';
       retryRow.hidden = false;
+    } finally {
+      if (request === latestRequest) {
+        retry.disabled = false;
+        retry.removeAttribute('aria-busy');
+        clearCredential();
+      }
     }
   }
 

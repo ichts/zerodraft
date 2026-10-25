@@ -13,7 +13,8 @@ and `mac.html` now carry the A mark lockup with its plate, the theme button, the
 system-face body copy at the 62ch measure, the v2 pill and underlined-link treatments, and the same
 canvas. `mac.html#buy` is a section with its heading and `$4.99 once` price row in view, pending and
 error states, and a licence card for ready/copied/unpaid; `session_id` is cleared from the URL and
-history before any request, on success and failure, with `Check again` as the in-page retry. The 1.1
+history when the licence response arrives, on success and failure, with `Check again` as the in-page
+retry. The 1.1
 note left the download card. Evidence: `/Users/ichts/firstmate-homes/wid/data/wid-web-shell/`.
 
 ## Commands and results
@@ -40,8 +41,8 @@ note left the download card. Evidence: `/Users/ichts/firstmate-homes/wid/data/wi
 | `#buy` | scroll margin | 16 px |
 | pending | button label / opacity / cursor / aria-busy | `Opening checkout...` / 0.6 / progress / true |
 | error | button / status role | `Try again` / `alert` |
-| ready | URL | credential removed before the request (`.../mac.html#license-heading`) |
-| unpaid | URL / retry | credential removed / visible, key hidden |
+| ready | URL | credential removed when the response arrives (`.../mac.html#license-heading`) |
+| unpaid | URL / retry | credential removed on response / visible, key hidden |
 | phone room nav | visible controls | lockup + theme icon only |
 | phone room exit row | Mac link box | inside the footer row (772-816 px in a 751-816 px row) |
 
@@ -91,7 +92,7 @@ and theme.
 - Old failure path: `mac.html?session_id=...` with a 404 licence response kept `session_id` in the URL
   and offered no retry.
 - Old route server: `journey/serve-local.mjs` answered a missing page with the landing page and
-  HTTP 200; it now answers 404, and `shell.spec.mjs` and the release server test pin that.
+  HTTP 200; it now answers 404, and `shell.spec.mjs`'s release server test pins that.
 
 ## Remaining limits
 

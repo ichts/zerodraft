@@ -5,9 +5,8 @@
 //                                      placeholder input.
 //   node release-check.mjs --download  only the free-trial download page: the DMG link,
 //                                      the Install card's DMG filename and its published
-//                                      SHA-256, and the release note's declared version,
-//                                      which may only exceed the linked DMG while it is
-//                                      marked data-launch-pending.
+//                                      SHA-256, and the release note, which declares the
+//                                      version of the linked DMG.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -102,28 +101,23 @@ export function downloadBlockers({ download }) {
   else if (linkedFile && installFile !== linkedFile)
     found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
 
-  // The release note is the page's claim about a version, and it is optional: before a newer
-  // version is announced there is nothing honest to say beyond the DMG on offer. When a note is
-  // present, a version newer than the DMG is only honest while it is marked data-launch-pending,
-  // and a note that is still marked not released once its version is the download contradicts
-  // the card.
+  // The release note is the page's claim about the version it links. It always exists, declares
+  // that version in data-release-note, and may only be visible when there is a newer release to
+  // announce. A note ahead of or behind the linked DMG is a page and artifact that disagree.
+  const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
+  if (linkedFile && !linkedVersion) found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
   const noteTag = download.match(/<p[^>]*\sid="release-notes"[^>]*>/i)?.[0] ?? '';
-  if (noteTag) {
+  if (!noteTag) {
+    found.push('Release notes: the download page does not declare a release note');
+  } else {
     const noteVersion = attr(noteTag, 'data-release-note') ?? '';
-    const notePending = Boolean(attr(noteTag, 'data-launch-pending'));
-    const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
-    if (!linkedVersion) {
-      found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
-    } else if (!VERSION.test(noteVersion)) {
+    if (attr(noteTag, 'data-launch-pending') !== undefined)
+      found.push('Release notes: data-launch-pending is retired; the note declares the linked version');
+    if (!VERSION.test(noteVersion)) {
       found.push('Release notes: the note does not declare its version in data-release-note');
-    } else {
-      if (versionOrder(noteVersion, linkedVersion) > 0 && !notePending)
-        found.push(`Release notes: the note announces ${noteVersion} but the download is ${linkedVersion}; publish that DMG or mark the note data-launch-pending`);
-      else if (versionOrder(noteVersion, linkedVersion) === 0 && notePending)
-        found.push(`Release notes: the note is marked not yet released, but ${noteVersion} is already the linked download`);
+    } else if (linkedVersion && versionOrder(noteVersion, linkedVersion) !== 0) {
+      found.push(`Release notes: the note declares ${noteVersion} but the download is ${linkedVersion}`);
     }
-  } else if (!linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)) {
-    found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
   }
   return found;
 }

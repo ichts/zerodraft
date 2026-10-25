@@ -163,16 +163,6 @@ test('the purchase page states one price string', async ({ page }) => {
     expect(text, `stale price string "${stale}"`).not.toContain(stale);
 });
 
-test('a missing page is a 404, not the landing page with a 200', async ({ request }) => {
-  const missing = await request.get('/writeitdown/does-not-exist.html');
-  expect(missing.status(), 'missing page status').toBe(404);
-  expect(await missing.text(), 'the landing page is not served for a missing path').not.toContain('We force you to write it down');
-  const present = await request.get('/writeitdown/support.html');
-  expect(present.status()).toBe(200);
-  const dmg = await request.get('/writeitdown/download/absent.dmg');
-  expect(dmg.status(), 'a missing disk image is a 404').toBe(404);
-});
-
 test('the release route server answers a missing page with 404', async ({ request }, info) => {
   test.skip(info.project.name !== '1440-light-no-preference', 'one server run per suite');
   const port = await new Promise((resolve, reject) => {
@@ -196,6 +186,8 @@ test('the release route server answers a missing page with 404', async ({ reques
     const missing = await request.get(`http://127.0.0.1:${port}/does-not-exist.html`);
     expect(missing.status(), 'the release server must not fall back to the landing page').toBe(404);
     expect(await missing.text()).not.toContain('<html');
+    const absentDmg = await request.get(`http://127.0.0.1:${port}/download/absent-${Date.now()}.dmg`);
+    expect(absentDmg.status(), 'a missing disk image is a 404').toBe(404);
     expect((await request.get(`http://127.0.0.1:${port}/support.html`)).status()).toBe(200);
   } finally {
     server.kill();

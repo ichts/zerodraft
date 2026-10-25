@@ -258,13 +258,13 @@ async function run(size, browser) {
       const h = await link.getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
     await step('published SHA-256 present; terms, button, DMG link, sha all on screen', async () => {
-      await page.evaluate(() => { const t = document.querySelector('#trial-terms').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
+      await page.evaluate(() => { const t = document.querySelector('#requirements').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
       const checksum = page.locator('#sha256 code');
       ok(await checksum.count() === 1, `${await checksum.count()} published checksums`);
       sha = (await checksum.innerText({ timeout: 2000 })).trim().toLowerCase();
       ok(/^[0-9a-f]{64}$/.test(sha), 'no published 64-hex SHA-256 (page still says pending)');
       if (expectSha) ok(sha === expectSha.toLowerCase(), `published ${sha} != expected ${expectSha}`);
-      for (const sel of ['#trial-terms', 'main a[data-launch="dmg"]', '#sha256']) {
+      for (const sel of ['#requirements', 'main a[data-launch="dmg"]', '#sha256']) {
         ok(await page.locator(sel).count() === 1, `${sel} matches ${await page.locator(sel).count()} elements`);
         const bx = await page.locator(sel).boundingBox(); ok(bx && bx.y >= 0 && bx.y + bx.height <= size.height, `${sel} is not fully on screen`);
       }

@@ -20,9 +20,9 @@ async function noKey(page) {
   await expect(page.getByRole('button', { name: 'Copy license key', exact: true })).toBeHidden();
 }
 
-// The session credential is read once and removed from the address bar and history before any
-// request, on success and on failure alike; the retry control is the in-page replacement for a
-// reload, because a reload must not be able to replay the credential from the URL.
+// The session credential is read once and removed from the address bar and history when the
+// license response arrives, on success and on failure alike; the retry control is the in-page
+// replacement for a reload, and it keeps retrying from page memory.
 async function credentialCleared(page) {
   expect(new URL(page.url()).searchParams.has('session_id'), 'session_id left in the URL').toBe(false);
 }
@@ -174,6 +174,35 @@ test('no key or copy control appears while license fetch is still pending', asyn
   await noKey(page);
   finish();
   await expect(page.locator('#license-key')).toHaveText(key);
+});
+
+test('a late failure from an older license request cannot overwrite the newest success', async ({ page }) => {
+  let releaseOlder;
+  const older = new Promise(resolve => { releaseOlder = resolve; });
+  let calls = 0;
+  await page.route(`${service}/license?session_id=cs_test_race_fixture`, async route => {
+    calls += 1;
+    if (calls === 1) {
+      await older;
+      await route.fulfill({ status: 404, json: { error: 'not_found' } });
+      return;
+    }
+    await route.fulfill({ json: { licenseKey: key } });
+  });
+  await page.goto('mac.html?session_id=cs_test_race_fixture');
+  await expect(page.locator('#license-status')).toHaveText('Checking your license...');
+  await expect(page.locator('#retry-license')).toBeDisabled();
+  await page.evaluate(() => {
+    document.getElementById('retry-license').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await expect(page.locator('#license-key')).toHaveText(key);
+  await expect(page.locator('#license-status')).toHaveText('Your license key is ready.');
+  await expect(page.locator('#license-retry-row')).toBeHidden();
+  await credentialCleared(page);
+  releaseOlder();
+  await expect(page.locator('#license-status')).toHaveText('Your license key is ready.');
+  await expect(page.locator('#license-retry-row')).toBeHidden();
+  expect(calls).toBe(2);
 });
 
 test('no session never requests a license or shows a key', async ({ page }) => {

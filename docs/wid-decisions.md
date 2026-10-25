@@ -856,3 +856,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-045's room-nav clause (the nav row is still kept on the landing room at every width,
   but a phone shows only the lockup and the theme icon; the Mac link moves into the exit row). It also
   supersedes the canvas-only adoption recorded for `mac.html` in the `tokens.css` header.
+
+## D-054: The download card always declares the artifact version it links
+
+- Date: 2026-10-25
+- Decision: `download/index.html` always carries `#release-notes`, and that element declares the
+  version of the linked DMG in `data-release-note`. It stays empty and hidden while the linked
+  version is current, and becomes the visible one-line note when there is a newer release to
+  announce; its declared version must equal the linked DMG's version. The release gate refuses a
+  note that runs ahead of or behind the linked DMG, a missing note or declared version, and any
+  `data-launch-pending` mark. The DMG link name, the Install command's filename, the SHA-256 slot
+  and the note's declared version flip together in the deploy that publishes a version.
+- Reason: the design migration removed the 1.1 note from the card and relaxed the gate to accept a
+  page with no note, which reversed D-041's recorded commitment that 1.0 users learn about 1.1 from
+  the download page without recording a supersession. Keeping the note element as the page's
+  declaration of the artifact it links preserves one honest version fact in the markup while the
+  visible copy returns only when it has something new to say.
+- Supersedes: D-041's download-page release-note clause and the `data-launch-pending` gate. D-041's
+  opt-in update rules stand.

@@ -28,14 +28,15 @@ cpus="${WID_VM_CPUS:-4}"
 memory="${WID_VM_MEMORY:-8192}"
 display="${WID_VM_DISPLAY:-1440x900}"
 repo_scripts="$(cd "$(dirname "$0")" && pwd)"
+die() { printf '%s\n' "prepare-guest: ERROR: $*" >&2; exit 1; }
 # Same launchd transport as scripts/vm-journey.sh: guest setup also talks to the
 # VM's address, which macOS Local Network Privacy blocks for an ungranted app.
-# shellcheck source=vm/launchd-host.sh
-. "$repo_scripts/vm/launchd-host.sh"
+# shellcheck source=launchd-host.sh
+. "$repo_scripts/launchd-host.sh" || die "could not load $repo_scripts/launchd-host.sh"
+command -v wid_launchd_reexec >/dev/null || die "wid_launchd_reexec is missing from $repo_scripts/launchd-host.sh"
 wid_launchd_reexec "$0" "$@"
 
 log() { printf '%s\n' "prepare-guest: $*"; }
-die() { printf '%s\n' "prepare-guest: ERROR: $*" >&2; exit 1; }
 
 command -v tart >/dev/null || die 'tart is not installed (brew install cirruslabs/cli/tart)'
 command -v swiftc >/dev/null || die 'swiftc is missing (install Xcode command line tools)'

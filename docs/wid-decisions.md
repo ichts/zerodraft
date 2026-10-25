@@ -777,7 +777,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
   re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
   reviewer reads contradicted the artifact it sat next to.
-- Supersedes: D-051's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
+- Supersedes: D-047's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
   its declared-defect keying stand.
 ## D-049: A frozen screen fails the run, and no recorded step excuses it
 
@@ -792,7 +792,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   to distrust. A dead screen is either a hung app or a stalled recorder, and both must fail the run, so no
   evidence inside the bundle may downgrade them.
 - Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
-  implementation shortcut, never a recorded decision). D-051's assertion ownership, its six-lens gate and its
+  implementation shortcut, never a recorded decision). D-047's assertion ownership, its six-lens gate and its
   exit codes stand.
 
 ## D-050: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default

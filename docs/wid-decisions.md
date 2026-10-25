@@ -493,3 +493,14 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: D-039's closing sentence retained the earlier single-mask description and incorrectly said the mobile
   gap trade stopped at 380 px. Neither describes the shipped CSS.
 - Supersedes: D-039's "single mask file" and "12 px/6 px gap trade now stops at 380 px" wording only.
+
+### Correction to D-039: narrow-phone spacing across system fonts
+
+- Date: 2026-10-25
+- Decision: At 380 px and below, keep the 16 px lockup and use the existing 8 px spacing token between the
+  brand and action group. The internal action gap stays 6 px. All shared headers use the same rule.
+- Reason: Linux system-font metrics made the download action wider than on macOS, leaving only 3.125 px of
+  right gutter at 360 px in CI. The 8 px gap restores the 6 px minimum without shrinking the mark or changing
+  the action. Browser acceptance covers native metrics and a 164 px action width on both platforms.
+- Supersedes: The earlier D-039 correction's claim that the 12 px mobile header gap remains at 380 px and below.
+  The 16 px lockup, two mask layers, theme polarity and 6 px action-group gap stand.

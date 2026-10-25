@@ -264,10 +264,10 @@ the notch.
 - Site header, mobile: the lockup takes 141.9 px of the 19 px row, so the mobile header keeps 12 px between the
   brand and the page action and 6 px inside the action group; that is what puts the theme button back on the
   page's right gutter at 390 px.
-- Site header, narrow phones: at 380 px and below the lockup is 16 px type (119.5 px of row), which is what keeps
-  the widest header - `/download/`, with the brand, `Try it in your browser` and the theme button - off the right
-  edge: 10 px of gutter at 360 px, 17.6 at 375 px, 20 at 390 px. One rule for every page that uses `.brand`, so
-  `/download/` does not diverge from the landing and `mac.html`.
+- Site header, narrow phones: at 380 px and below the lockup is 16 px type (119.5 px of row) and the gap
+  between brand and action group is 8 px; the action group's internal gap stays 6 px. This leaves at least
+  6 px of right gutter at 360 px even with wider system-font metrics. One rule for every page that uses
+  `.brand`, so `/download/` does not diverge from the landing, trial room and `mac.html`.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and

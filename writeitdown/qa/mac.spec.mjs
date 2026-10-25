@@ -371,34 +371,39 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
 // Narrow phones: /download/ carries the widest header (brand, page action, theme button), so 360 px decides
 // the narrow lockup step, and landing and mac share that one rule instead of diverging. The chip also has to
 // stay legible at the step the narrowest phone gets.
-test('the header keeps its right gutter and a legible chip at 360 px', async ({ page }) => {
+for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const lockups = [];
-    for (const path of ['index.html', 'download/', 'mac.html']) {
+    for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
       await page.goto(path);
-      const header = await page.evaluate(() => {
-        const nav = document.querySelector('nav[aria-label="Main"]');
+      // Linux system fonts make the download action wider than macOS does. Exercise that layout on either OS.
+      if (actionWidth) await page.addStyleTag({ content: `nav .btn-quiet { min-width: ${actionWidth}px }` });
+      const nav = page.locator('nav[aria-label="Main"]:visible').first();
+      const header = await nav.evaluate(nav => {
         const brand = nav.querySelector('.brand');
         const button = nav.querySelector('.theme-btn');
         return {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
           gutter: window.innerWidth - button.getBoundingClientRect().right,
           lockup: parseFloat(getComputedStyle(brand).fontSize),
+          gap: nav.querySelector('.nav-end').getBoundingClientRect().left - brand.getBoundingClientRect().right,
         };
       });
       const at = `${path} at ${width}px:`;
       lockups.push(header.lockup);
       expect(header.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
+      expect(header.gap, `${at} the brand and controls never overlap`).toBeGreaterThanOrEqual(0);
       expect(header.gutter, `${at} the theme button keeps the 6 px right gutter`).toBeGreaterThanOrEqual(6);
       if (width !== 360) continue;
-      const mark = await measureHeaderMark(page.locator('nav[aria-label="Main"] .brand').first());
+      await page.screenshot({ path: info.outputPath(`header-360-${path.replace(/[^a-z0-9]/gi, '-')}.png`), clip: { x: 0, y: 0, width, height: 110 } });
+      const mark = await measureHeaderMark(nav.locator('.brand'));
       expect(mark.box.height, `${at} the chip is at least 16 px tall`).toBeGreaterThanOrEqual(16);
       expect(mark.chipInkShare, `${at} the smallest lockup is still a plate`).toBeGreaterThan(0.6);
       expect(mark.splitLength, `${at} the split survives at the smallest lockup`).toBeGreaterThanOrEqual(2);
       expect(mark.splitContrast, `${at} the split has a W stroke on each side`).toBeGreaterThan(0.05);
     }
-    expect(new Set(lockups).size, `${width}px: landing, download and mac share one lockup step`).toBe(1);
+    expect(new Set(lockups).size, `${width}px: landing, room, download and mac share one lockup step`).toBe(1);
   }
 });
 

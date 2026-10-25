@@ -36,7 +36,7 @@
 #            the panel's own count.
 set -uo pipefail
 
-artifact="${1:?usage: vm-journey.sh <dmg-or-app-path> [evidence-dir]}"
+artifact="${1:-}"
 artifact_kind=dmg
 [[ "$artifact" == *.app ]] && artifact_kind=app
 dmg="$artifact"
@@ -46,6 +46,7 @@ ssh_user="${WID_VM_SSH_USER:-admin}"
 keep="${WID_VM_KEEP:-0}"
 scripts="$(cd "$(dirname "$0")" && pwd)"
 die() { printf 'vm-journey: ERROR: %s\n' "$*" >&2; exit 2; }
+[[ -n "$artifact" ]] || die 'usage: vm-journey.sh <dmg-or-app-path> [evidence-dir]'
 # macOS Local Network Privacy blocks the guest address for an app that was never
 # granted local network access, and every connection then fails with EHOSTUNREACH
 # even though the VM is up. A launchd job is not blocked, so the run moves there.

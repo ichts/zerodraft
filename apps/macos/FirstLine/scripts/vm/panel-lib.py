@@ -6,9 +6,9 @@
         and, for a lens, the lens that was asked. `clip` reads the assembled
         recording plus the frame manifest. `status` and `record` read
         <evidence>/panel/stage-*.json, <evidence>/acceptance.txt and the lens names
-        their caller requires; `record` also writes the derived review lines, `gate`
-        reads only the review record, and `command` prints the one pasteable re-run
-        command.
+        their caller requires; `record` also reads <evidence>/journey.log for whether an
+        assertion actually failed, writes the derived review lines, `gate` reads only
+        the review record, and `command` prints the one pasteable re-run command.
         `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
         script wrote.
 [OUTPUT] The terminal state of a model turn, one JSON verdict per model turn (either
@@ -320,9 +320,13 @@ def lens_status(evidence, required):
     return 0
 
 
-def sign_off_text(verdict, state):
+def sign_off_text(verdict, state, record, failed_assertion):
     if verdict == "rejected":
-        return "not accepted - an assertion or the recording failed"
+        if record.get("declared_known_defect_state") == "did-not-reproduce":
+            return "not accepted - the declared known defect did not reproduce on this run"
+        if failed_assertion:
+            return "not accepted - an assertion or the recording failed"
+        return "not accepted - the run was rejected without a failed assertion"
     if state["blocked"]:
         return "blocked - the six-lens review did not run (%s)" % state["reason"]
     if verdict == "accepted-with-declared-defect":
@@ -366,8 +370,16 @@ def review_record(argv):
         lines = [line for line in handle.read().split("\n") if line]
     base = [line for line in lines if not line.startswith(DERIVED_RECORD_KEYS)]
     previous = any(line.startswith(("panel:", "sign_off:")) for line in lines)
-    verdict = next((line.split(":", 1)[1].strip() for line in lines
-                    if line.startswith("verdict:")), "")
+    record = {}
+    for line in lines:
+        key, _, value = line.partition(":")
+        record.setdefault(key.strip(), value.strip())
+    verdict = record.get("verdict", "")
+    journey = os.path.join(evidence, "journey.log")
+    failed_assertion = False
+    if os.path.exists(journey):
+        with open(journey, encoding="utf-8", errors="replace") as handle:
+            failed_assertion = any(line.startswith("FAIL ") for line in handle)
     required = list(options.require)
     if not required:
         required = next((line.split(":", 1)[1].split() for line in lines
@@ -387,7 +399,7 @@ def review_record(argv):
         len((lens.get("answer") or {}).get("findings") or [])) for lens in state["lenses"])
     if state["blocked"]:
         derived.append("panel_not_run: %s" % state["reason"])
-    derived.append("sign_off: %s" % sign_off_text(verdict, state))
+    derived.append("sign_off: %s" % sign_off_text(verdict, state, record, failed_assertion))
     timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     lens_results = " ".join("%s=%s:%s" % (
         lens.get("lens") or "?", lens.get("status") or "unavailable",

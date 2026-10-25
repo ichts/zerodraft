@@ -762,7 +762,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the separate-command panel procedure and the exit-0 `accepted-with-declared-defect` verdict;
   the declared-defect key and the strict launch assertion stand.
 
-## D-039: A standalone review re-run refreshes the acceptance record with provenance
+## D-048: A standalone review re-run refreshes the acceptance record with provenance
 
 - Date: 2026-10-25
 - Decision: `design-panel.sh` owns the derived lines of a bundle's `acceptance.txt` (the `analysis:` line,
@@ -777,5 +777,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
   re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
   reviewer reads contradicted the artifact it sat next to.
-- Supersedes: D-038's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
+- Supersedes: D-047's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
   its declared-defect keying stand.
+## D-049: A frozen screen fails the run, and no recorded step excuses it
+
+- Date: 2026-10-25
+- Decision: the analyser's `recording-stall` assertion fails any window in which the screen does not change at
+  all for 20 s or more. Nothing in the bundle can excuse that window: a `steps.tsv` stamp inside it is itself a
+  capture of the frozen screen, and the guest stamps steps on its own schedule whether or not the screen moved.
+  The finding names the stamp as no proof of progress instead of downgrading to informational. Frozen windows
+  under 20 s stay informational, so a settled dialog or a paused step does not fail an otherwise live run.
+- Reason: the previous rule excused a frozen window whenever a step stamp fell inside it, and a recorded
+  run whose every frame delta was 0.000 was therefore accepted as a working run - the capture the rig exists
+  to distrust. A dead screen is either a hung app or a stalled recorder, and both must fail the run, so no
+  evidence inside the bundle may downgrade them.
+- Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
+  implementation shortcut, never a recorded decision). D-047's assertion ownership, its six-lens gate and its
+  exit codes stand.

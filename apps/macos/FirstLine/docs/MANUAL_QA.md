@@ -2,6 +2,53 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: A frozen screen fails the run even when a step is stamped inside it, and a real recorded run on the mini under that rule
+
+Validation round for the recorded-acceptance rig, on the Mac mini (Mac16,10). The rig is unchanged in shape;
+this round closes two review findings against it and drives the real signed 1.0 artifact end to end.
+
+- The `recording-stall` assertion no longer has an escape hatch. The analyser used to excuse a frozen window
+  whenever any `steps.tsv` stamp fell inside it, and the guest stamps steps on its own schedule whether or not
+  the screen moved, so a 74.8 s stream whose every frame delta was 0.000 was accepted as a working run. A frozen
+  screen of 20 s or more now always fails, and a step stamped inside the window is named in the finding as a
+  capture of that same frozen screen. Shorter static stretches stay informational.
+- Executable proof, with its known-broken state: `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` added one
+  check (`a frozen screen fails even when a step is stamped inside it`), 15 of 15 checks pass. The check fails
+  on the pre-fix analyser - restoring the `and not covered` condition in a scratch copy of the scripts makes it
+  report `a recording whose screen never changed was accepted (steps-inside-the-window)` - so it reopens the
+  finding if the excuse comes back. The check runs the real analyser on a 75 s single-frame stream twice, with
+  three step stamps inside the window and with no `steps.tsv` at all, and requires the same rejecting verdict
+  from both.
+- Host-level proof: the same 74.8 s all-static bundle driven through the real `vm-journey.sh` with a simulated
+  guest (no VM, nothing on the mini's own screen) ended `verdict: rejected` and exit 1 with
+  `FAIL [recording-stall] the screen did not change at all for 74.8 s; a recorded step sits inside it, which is
+  a capture of the same frozen screen and no proof of progress`, against `verdict: accepted` from the pre-fix
+  analyser on the identical bundle.
+- Review report: a finding's window cell now prints offsets from the recording's first captured frame
+  (`+0.00 s -> +74.80 s`) instead of a raw epoch pair, and the arrow is no longer double-escaped into literal
+  `&rarr;` text. `test-vm-rig.py` asserts the rendered report carries the offsets and no double-escaped entity;
+  the rendered report was also captured and read at desktop width.
+- Real run, shipped `Write-It-Down-1.0.dmg`
+  (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`) on the mini: clean clone, DMG installed
+  inside the guest, real HID input, one continuous recording of 125.52 s over 367 captured frames (largest frame
+  gap 892 ms), 31 deterministic findings. Every product assertion passed except the artifact's declared known
+  defect, which reproduced (`licensed-launch-no-activation-page`, a 181 ms activation card during a licensed
+  launch). `recording-gap` and `recording-stall` both passed under the strict rule, so it does not misfire on a
+  real run. Verdict `accepted-with-declared-defect`, 0 failures outside the declaration, therefore not a pass.
+- Six-lens review on that run: not run. Every configured reviewer route failed on this host - the four
+  `anthropic/*` candidates answered `rate_limit_error` on all four attempts each, `openai-codex/gpt-5.5` is not
+  served for this account, `openai-codex/gpt-6-astra` reported its usage limit, and `openai/gpt-4o` and
+  `openai/gpt-5.1` returned WebSocket errors; `panel/model-probes.tsv` records each candidate with its exact
+  error. The bundle therefore records `panel_not_run: no reviewer model answered`, `sign_off: blocked`, the
+  exact re-run command, and the run exits 79 rather than signing off. Re-running the panel with the only route
+  that answers here (`deepseek/deepseek-flash`) reviewed all six flagged clips and 26 vision checks but could
+  not produce a lens answer: the route's own image loop exceeded the request-body limit (`413 ... length limit
+  exceeded`) and left hundreds of megabytes of stream per lens, so that attempt was stopped and the record
+  keeps "panel not run".
+- NOT RUN: a clean six-lens sign-off (no reviewer route on this host), the declared-defect exit-78 code (it
+  requires the completed review, so this run's 79 is correct), the `.app` licensed-launch mode, real purchase
+  and payment, and any Finder install or first launch outside the prepared VM image.
+
 ## 2026-10-25: Recorded VM run of the shipped 1.0 DMG (declared defect, not accepted), and the launch-flash fix proven live
 
 Recorded acceptance now runs on the Mac mini inside a Tart macOS virtual machine: the guest boots headless, the

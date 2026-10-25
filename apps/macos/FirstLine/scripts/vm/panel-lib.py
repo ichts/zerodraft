@@ -427,21 +427,40 @@ def severity_badge(severity):
             f'letter-spacing:.06em;text-transform:uppercase">{esc(severity or "info")}</span>')
 
 
-def render_findings(findings, panel_dir):
+def seconds_from_origin(origin, moment):
+    """A wall-clock stamp as seconds from the recording's first captured frame."""
+    if origin is None or moment in (None, ""):
+        return None
+    try:
+        return (int(moment) - origin) / 1000
+    except (TypeError, ValueError):
+        return None
+
+
+def window_text(origin, finding):
+    """The flagged window in recording time, which is what a reviewer can seek to."""
+    start = seconds_from_origin(origin, finding.get("t_start"))
+    if start is None:
+        return ""
+    end = seconds_from_origin(origin, finding.get("t_end"))
+    if end is None:
+        return "%+.2f s" % start
+    return "%+.2f s &rarr; %+.2f s" % (start, end)
+
+
+def render_findings(findings, panel_dir, origin=None):
     if not findings:
         return "<p class=muted>No deterministic findings were recorded for this run.</p>"
     rows = []
     ordered = sorted(findings, key=lambda f: (SEVERITY_ORDER.get((f.get("severity") or "").lower(), 9),
                                               f.get("t_start") or 0))
     for finding in ordered:
-        window = ""
-        if finding.get("t_start"):
-            window = f'{finding["t_start"]} &rarr; {finding.get("t_end", "")}'
+        window = window_text(origin, finding)
         thumbs = "".join(image(panel_dir, f'frame-{finding["t_start"]}-{index}.jpg')
                          for index in range(6))
         rows.append(f"""<tr><td>{severity_badge(finding.get('severity'))}</td>
 <td><code>{esc(finding.get('kind'))}</code><br><code>{esc(finding.get('assertion') or 'informational')}</code></td>
-<td>{esc(finding.get('note'))}<br><span class=muted>{esc(window)} &middot; {esc(finding.get('duration_ms'))} ms</span></td>
+<td>{esc(finding.get('note'))}<br><span class=muted>{window} &middot; {esc(finding.get('duration_ms'))} ms</span></td>
 <td class=shots>{thumbs}</td></tr>""")
     return ("<table><thead><tr><th>Severity</th><th>Kind / assertion</th><th>What the analysis saw</th>"
             "<th>Frames</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
@@ -570,12 +589,14 @@ def report():
         parts.append(f"<div class=banner><strong>Declared gaps in this review</strong><ul>{gaps}</ul></div>")
     parts.append("<h2>Capability matrix</h2>" + render_capabilities(panel.get("capabilities") or []))
     analysis = panel.get("recording_analysis") or {}
+    manifest = os.path.join(evidence, "frames.tsv")
+    origin = recording_origin_ms(manifest) if os.path.exists(manifest) else None
     analysis_sections = []
     if analysis.get("error"):
         analysis_sections.append(
             "<div class=banner><strong>The deterministic analysis did not complete.</strong>"
             f"<p>{esc(analysis['error'])}</p></div>")
-    analysis_sections.append(render_findings(panel.get("findings") or [], panel_dir))
+    analysis_sections.append(render_findings(panel.get("findings") or [], panel_dir, origin))
     parts.append("<h2>Deterministic analysis (primary detector)</h2>" + "".join(analysis_sections))
     cadence = ""
     if analysis.get("frames") and analysis.get("span_ms"):

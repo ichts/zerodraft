@@ -11,7 +11,8 @@
 [PROTOCOL] Every check runs the real executable or git on a fixture and asserts its
            observable output; nothing here greps the scripts' source. The known-broken
            cases feed the previous behaviour (a manifest whose first stamp is the
-           pre-recording span, a dropped capture, the old jq content filter, one review
+           pre-recording span, a dropped capture, a screen that never changes while the
+           guest's own step stamps fall inside it, the old jq content filter, one review
            repeated for every lens, a bytecode cache tracked in any subtree, a host
            entry point without its launchd shim) and must fail, so a regression reopens
            the finding. The bytecode guard resolves the repository root and constructs
@@ -284,6 +285,84 @@ def check_analyser_alignment(workdir):
          f"the bundle did not record why the analysis failed: {recorded!r}")
 
 
+def stamp_at(epoch_ms):
+    """steps.tsv carries UTC ISO seconds; the analyser parses exactly this shape."""
+    from datetime import datetime, timezone
+    return datetime.fromtimestamp(epoch_ms / 1000, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def build_frame_stream(evidence, origin_ms, tick_ms, colours):
+    """Write frames/<n>.jpg plus frames.tsv for one solid colour per tick."""
+    frames_dir = os.path.join(evidence, "frames")
+    os.makedirs(frames_dir)
+    with open(os.path.join(evidence, "frames.tsv"), "w", encoding="utf-8") as manifest:
+        for index, colour in enumerate(colours):
+            name = "%06d.jpg" % index
+            solid_png(os.path.join(frames_dir, name), colour)
+            manifest.write("%d\t%s\n" % (origin_ms + index * tick_ms, name))
+
+
+def write_steps(evidence, stamps_ms):
+    with open(os.path.join(evidence, "steps.tsv"), "w", encoding="utf-8") as handle:
+        for index, moment in enumerate(stamps_ms):
+            handle.write("%s\t%02d-step\n" % (stamp_at(moment), index))
+
+
+def frozen_finding(evidence):
+    with open(os.path.join(evidence, "findings.json"), encoding="utf-8") as handle:
+        findings = json.load(handle)["findings"]
+    return next((item for item in findings if item["kind"] == "frozen-screen"), None)
+
+
+def check_frozen_screen_is_not_excused(workdir):
+    """A screen that never changes is a stalled capture, whatever steps.tsv claims.
+
+    The guest stamps steps on its own schedule, so a step stamp inside a frozen window
+    is a capture of that same frozen screen. Accepting it (the previous behaviour)
+    signed off a 75 s dead stream as a working run.
+    """
+    origin = 1_700_000_000_000
+    tick, count = 200, 375  # 75 s at 5 fps, all of it one unchanged frame
+    verdicts = {}
+    for label, with_steps in (("steps-inside-the-window", True),
+                              ("no-steps-at-all", False)):
+        evidence = os.path.join(workdir, label)
+        build_frame_stream(evidence, origin, tick, [PALETTE[3]] * count)
+        if with_steps:
+            write_steps(evidence, [origin + index * tick for index in (5, 200, 370)])
+        result = run([sys.executable, ANALYSER, evidence])
+        need(result.returncode != 0,
+             f"a recording whose screen never changed was accepted ({label})")
+        need("FAIL [recording-stall]" in result.stdout,
+             f"the frozen stream produced no recording-stall failure ({label}): "
+             f"{result.stdout[-400:]}")
+        need("PASS [recording-stall]" not in result.stdout,
+             f"the analyser also passed the assertion it just failed ({label})")
+        window = frozen_finding(evidence)
+        need(window is not None, f"the frozen run recorded no frozen-screen finding ({label})")
+        need(window["assertion"] == "recording-stall" and window["severity"] == "high",
+             f"the frozen window was recorded as informational ({label}): {window}")
+        verdicts[label] = (result.returncode, window["duration_ms"], window["frames"])
+
+    need(verdicts["steps-inside-the-window"] == verdicts["no-steps-at-all"],
+         "steps.tsv still decides the frozen verdict: "
+         f"{verdicts['steps-inside-the-window']} vs {verdicts['no-steps-at-all']}")
+
+    # A short static stretch inside a live run stays informational: the fix must not
+    # turn every settled moment (a paused step, an idle dialog) into a failed run.
+    live = os.path.join(workdir, "short-freeze")
+    colours = ([PALETTE[index % 6] for index in range(25)]
+               + [PALETTE[7]] * 25
+               + [PALETTE[(index % 6) + 6] for index in range(30)])
+    build_frame_stream(live, origin, tick, colours)
+    short = run([sys.executable, ANALYSER, live])
+    need(short.returncode == 0,
+         f"a 5 s static stretch failed a live run: {short.stdout[-400:]}")
+    note = frozen_finding(live)
+    need(note is not None and note["assertion"] is None and note["severity"] == "info",
+         f"a 5 s static stretch was not recorded as an informational finding: {note}")
+
+
 def status_fields(evidence, required=REQUIRED_LENSES):
     result = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
     need(result.returncode == 0, f"status failed: {result.stderr[:200]}")
@@ -451,6 +530,12 @@ def check_panel_stages(workdir):
          f"design-panel.sh exited {result.returncode}: {result.stdout[-400:]} {result.stderr[-400:]}")
     need(os.path.exists(os.path.join(panel, "report.html")),
          "the panel wrote no report.html")
+    with open(os.path.join(panel, "report.html"), encoding="utf-8") as handle:
+        report_html = handle.read()
+    need("+8.40 s" in report_html and "+8.70 s" in report_html,
+         "the report does not place the finding on the recording's timeline")
+    need("&amp;rarr;" not in report_html,
+         "the report double-escapes the arrow, so it renders as literal entity text")
     with open(os.path.join(panel, "stage-00-run.json"), encoding="utf-8") as handle:
         run_metadata = json.load(handle)["run"]
     need(run_metadata.get("recording") ==
@@ -956,6 +1041,8 @@ CHECKS = [
     ("the recorded journey stops when the launchd shim is missing", check_journey_shim),
     ("flagged clip lands on the flagged second", check_clip_origin),
     ("analyser fails on a dropped capture", check_analyser_alignment),
+    ("a frozen screen fails even when a step is stamped inside it",
+     check_frozen_screen_is_not_excused),
     ("launch assertion ids are keyed to their stream", check_launch_assertion_ids),
     ("lens summary reports completeness and reason", check_lens_status),
     ("design panel writes its stages from a bundle", check_panel_stages),

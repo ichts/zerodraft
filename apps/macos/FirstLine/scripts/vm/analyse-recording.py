@@ -18,7 +18,11 @@
            only when the signal is unambiguous (a capture gap, a frozen screen for
            most of a minute, a forbidden surface that appears and vanishes during
            launch); everything else is recorded as an informational finding for the
-           review stage. Thresholds are named constants, not magic numbers.
+           review stage. Thresholds are named constants, not magic numbers. A
+           frozen screen always fails, whatever steps.tsv says: the guest stamps
+           steps on its own schedule, so a step inside the frozen window is a
+           picture of the frozen screen and proves nothing about the app moving.
+           Nothing in a bundle can talk the analysis out of a stalled capture.
 """
 
 import json
@@ -29,8 +33,10 @@ import sys
 
 # A capture gap this long means the recorder stopped covering the run.
 MAX_FRAME_GAP_MS = 2000
-# A screen that does not change at all for this long, with no recorded step inside
-# the window, is a frozen screen: the app hung or the capture stalled.
+# A screen that does not change at all for this long is a frozen screen: the app hung
+# or the capture stalled. Both are failures, and no recorded step excuses one - the
+# guest stamps steps on its own schedule whether or not the screen moved, so a step
+# inside the window is itself a capture of the frozen screen.
 FROZEN_MEAN_DELTA = 0.6
 FROZEN_ASSERT_MS = 20000
 FROZEN_NOTE_MS = 4000
@@ -284,7 +290,7 @@ def frozen_window(frames, steps, start_index, end_index):
     covered = step_in_window(steps, start_ms, end_ms)
     severity = "info"
     assertion = None
-    if span >= FROZEN_ASSERT_MS and not covered:
+    if span >= FROZEN_ASSERT_MS:
         severity = "high"
         assertion = "recording-stall"
     return [{
@@ -296,7 +302,9 @@ def frozen_window(frames, steps, start_index, end_index):
         "duration_ms": span,
         "frames": [start_index, end_index],
         "note": ("the screen did not change at all for %.1f s%s" % (
-            span / 1000, "; a recorded step covers it" if covered else "")),
+            span / 1000,
+            "; a recorded step sits inside it, which is a capture of the same frozen "
+            "screen and no proof of progress" if covered else "")),
     }]
 
 

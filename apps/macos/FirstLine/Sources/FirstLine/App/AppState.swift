@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
  * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
- * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；完整访问由磁盘上签名有效且未过期的 token 立即决定（启动即开写，后台校验不阻塞、不闪现激活页），只有撤回或无效 token 才进激活页；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
+ * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -94,10 +94,8 @@ final class AppState {
         return licenseStatusText
     }
 
-    /// Entitlement is decided by the stored token itself: it is verified locally (signature,
-    /// product, device, seven-day lifetime) and the last validation is inside the offline grace.
-    /// An in-flight online check is a revalidation, never a hold: blocking access while it runs
-    /// presented the activation card on every launch of a licensed Mac.
+    /// Revalidation must not withhold locally verified access while the network request runs.
+    /// Keep this predicate independent of licenseValidationInFlight so launch selects Home immediately.
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active, settings.hasLicenseKey else { return false }
         return settings.licenseInstanceID != nil && !productID.isEmpty &&

@@ -223,5 +223,21 @@ struct LicenseEntitlementTests {
         #expect(container.children.count == 1)
         #expect(container.children.contains { $0 is HomeViewController })
         #expect(container.children.contains { $0 is UpgradeViewController } == false)
+        if let directory = ProcessInfo.processInfo.environment["WID_SNAPSHOT_DIR"] {
+            let size = NSSize(width: 1040, height: 720)
+            let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: .aqua)
+            window.contentViewController = container
+            window.setContentSize(size)
+            container.view.layoutSubtreeIfNeeded()
+            container.view.displayIfNeeded()
+            let bitmap = try #require(container.view.bitmapImageRepForCachingDisplay(in: container.view.bounds))
+            container.view.cacheDisplay(in: container.view.bounds, to: bitmap)
+            let png = try #require(bitmap.representation(using: .png, properties: [:]))
+            let output = URL(fileURLWithPath: directory, isDirectory: true)
+            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+            try png.write(to: output.appendingPathComponent("licensed-launch-content.png"))
+        }
     }
 }

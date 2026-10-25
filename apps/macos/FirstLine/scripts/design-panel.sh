@@ -70,6 +70,8 @@ note "step captures: ${#step_names[@]}"
 # is one real call, and the exact command is written into the bundle.
 review_model=''
 model_notes=()
+probe_log="$panel/model-probes.tsv"
+: >"$probe_log"
 probe_model() { # probe_model <model>
   local candidate="$1" out attempt=1 delay="$backoff"
   out="$answers/probe-$(printf '%s' "$1" | tr '/.' '--').jsonl"
@@ -81,16 +83,16 @@ probe_model() { # probe_model <model>
       return 0
     fi
     if grep -q 'rate_limit_error' "$out" 2>/dev/null; then
-      model_notes+=("$candidate attempt $attempt: rate limited")
+      printf '%s\t%s\tsoft\n' "$candidate" "rate limited (advance=rate_limit_error)" >>"$probe_log"
       sleep "$delay"
       delay=$((delay * 2))
       attempt=$((attempt + 1))
       continue
     fi
-    model_notes+=("$candidate attempt $attempt: $(grep '^{' "$out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)")
+    printf '%s\t%s\tno\n' "$candidate" "$(grep '^{' "$out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)" >>"$probe_log"
     return 1
   done
-  model_notes+=("$candidate: gave up after $attempts attempts")
+  printf '%s\t%s\tno\n' "$candidate" "gave up after $attempts attempts" >>"$probe_log"
   return 1
 }
 
@@ -101,7 +103,7 @@ if [[ "$skip_models" != '1' ]]; then
     for candidate in "${fallback_list[@]}"; do
       [[ -n "$candidate" ]] || continue
       review_model="$(probe_model "$candidate")"
-      [[ -n "$review_model" ]] && { model_notes+=("primary $model unavailable; using $review_model"); break; }
+      [[ -n "$review_model" ]] && break
     done
   fi
 fi
@@ -317,8 +319,13 @@ jq -n --argjson lenses "$lens_stage" '{lenses: $lenses}' >"$panel/stage-04-lense
 # --- capability matrix and declared gaps ----------------------------------------
 gaps=()
 capabilities='[]'
-capabilities="$(jq -c --arg model "$review_model" --arg detail "${model_notes[*]:-answered on the first attempt}" \
-  '. + [{stage: "reviewer model", status: ($model | if . == "" then "declared gap" else "complete" end), model: $model, detail: $detail}]' <<<"$capabilities")"
+capabilities="$(jq -c --arg model "$review_model" \
+  '. + [{stage: "reviewer model", status: ($model | if . == "" then "declared gap" else "complete" end), model: $model, detail: (if $model == "" then "no candidate route answered; see panel/model-probes.tsv" else "answered the readiness probe" end)}]' <<<"$capabilities")"
+while IFS=$'\t' read -r probed_model probed_detail _probed_soft; do
+  [[ -n "${probed_model:-}" ]] || continue
+  capabilities="$(jq -c --arg model "$probed_model" --arg detail "$probed_detail" \
+    '. + [{stage: "reviewer candidate", status: "declared gap", route: $model, detail: $detail}]' <<<"$capabilities")"
+done <"$probe_log"
 capabilities="$(jq -c '. + [{stage: "deterministic analysis", status: "complete", model: "", detail: "scripts/vm/analyse-recording.py, no model"}]' <<<"$capabilities")"
 for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
   probe_out="$answers/probe-$(printf '%s' "$route" | tr '/' '-').jsonl"
@@ -333,7 +340,7 @@ for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
   fi
 done
 if [[ -z "$review_model" ]]; then
-  gaps+=("No reviewer model answered: ${model_notes[*]:-no detail}. The deterministic analysis and the report were still produced.")
+  gaps+=("No reviewer model answered from this lane. Every candidate is listed with its exact error in panel/model-probes.tsv and in the capability matrix; the deterministic analysis and the report were still produced. Re-run: bash apps/macos/FirstLine/scripts/design-panel.sh $(printf '%s' "$evidence")")
 fi
 [[ "$skip_models" == '1' ]] && gaps+=("Model stages were disabled by WID_PANEL_SKIP_MODELS=1; only the deterministic analysis ran.")
 jq -n --argjson capabilities "$capabilities" --argjson gaps "$(printf '%s\n' "${gaps[@]:-}" | jq -R . | jq -sc '[.[] | select(. != "")]')" \

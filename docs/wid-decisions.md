@@ -662,7 +662,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 ## D-043: The web room and the landing demo follow the shipped Mac room
 
 - Date: 2026-10-25
-- Decision: writeitdown.app's `#room` trial and its landing demo (`#demo`) carry the Mac room's
+- Decision: writeitdown.app's `#trial` room and its landing demo (`#demo`) carry the Mac room's
   settled behaviour, not the pre-PR-58 web variant. The active line sits at 35% of the sheet; the
   empty room shows only the caret with `Type to start` in the count slot and `0 words` after a wipe;
   the history fade is stepped per rendered line (100/22/7/gone) with a one-pitch, 180 ms ease-out
@@ -680,7 +680,10 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   screen, the kept top block, the two-step exit) and the web room did not, so the same product showed
   two different rooms.
 - Supersedes: the web-only room values that D-014, D-020, D-021 and D-025 to D-030 set for the
-  trial where they differ from the list above. It does not change any Mac decision.
+  trial where they differ from the list above, and the web clauses of D-006 (one act left the room),
+  D-017 (the 68% danger band and the receipt 76 px above the paper bottom), D-022 (a repeated blocked
+  key does not restart the web refusal) and D-023 (the web kept screen keeps its `0:00` receipt with
+  the actions under the draft). It does not change any Mac decision.
 
 ## D-044: The landing demo shows the result screens without their controls
 

@@ -28,9 +28,8 @@ version.
 
 # 2026-10-25: Web room parity with the shipped Mac app (local, branch `fm/wid-parity-mini`)
 
-- Scope: `writeitdown/index.html`'s landing demo and `#room` trial brought to the Mac room's settled
-  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped
-  per-line history with a one-pitch 180 ms shift, ink-placed warning group and wipe receipt, one 2 pt
+- Scope: `writeitdown/index.html`'s landing demo and `#trial` room brought to the Mac room's settled
+  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped  per-line history with a one-pitch 180 ms shift, ink-placed warning group and wipe receipt, one 2 pt
   linear session bar and no bottom meter, `You stopped.` / `Begin again` failure screen, kept top block
   with `1 MINUTE. N WORDS.`, two-step exit with an inline confirmation, 200 ms/220 ms refusal. The root
   Zero Draft landing (`/index.html`) is out of scope: it is the separate outward brand.

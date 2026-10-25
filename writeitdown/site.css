@@ -339,7 +339,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media (max-width:379px){
   nav[aria-label="Main"] .btn-quiet{display:none}
 }
-@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .caret{animation:none;opacity:1}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
+@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.home .caret{animation:none;opacity:1}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
 .dl-page .dlhead .sub{max-width:60ch}

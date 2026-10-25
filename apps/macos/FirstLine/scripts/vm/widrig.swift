@@ -288,7 +288,7 @@ case "find", "wait":
             emit(nodeJSON(match))
             exit(0)
         }
-        if command == "find" || now() >= deadline { emit(["found": false]); exit(1) }
+        if now() >= deadline { emit(["found": false]); exit(1) }
         usleep(120_000)
     }
 
@@ -332,15 +332,16 @@ case "type":
 case "key":
     let name = requiredOption("name").lowercased()
     let count = Int(option("count") ?? "1")!
-    let flags: CGEventFlags = flag("shift") ? .maskShift : (flag("command") ? .maskCommand : [])
+    var flags: CGEventFlags = []
+    if flag("shift") { flags.insert(.maskShift) }
+    if flag("command") { flags.insert(.maskCommand) }
+    if flag("option") { flags.insert(.maskAlternate) }
     let code: CGKeyCode
     if let known = keyCodes[name] {
         code = known
     } else if name.count == 1, let character = name.first, let (mapped, shifted) = characterKeys[character] {
         code = mapped
-        postKey(code, flags: (shifted || flag("shift")) ? .maskShift : [])
-        emit(["key": name, "code": Int(code), "count": 1])
-        exit(0)
+        if shifted { flags.insert(.maskShift) }
     } else if let numeric = UInt16(name) {
         code = CGKeyCode(numeric)
     } else {

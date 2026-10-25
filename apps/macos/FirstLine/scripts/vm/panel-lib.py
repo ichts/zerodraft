@@ -6,14 +6,16 @@
         and, for a lens, the lens that was asked. `clip` reads the assembled
         recording plus the frame manifest. `status` and `record` read
         <evidence>/panel/stage-*.json, <evidence>/acceptance.txt and the lens names
-        their caller requires; `record` also writes the derived review lines, and
-        `command` prints the one pasteable re-run command.
+        their caller requires; `record` also writes the derived review lines, `gate`
+        reads only the review record, and `command` prints the one pasteable re-run
+        command.
         `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
         script wrote.
 [OUTPUT] The terminal state of a model turn, one JSON verdict per model turn (either
          `{"status": "complete", "answer": <validated answer>}` or `{"status":
          "unavailable", "error": "<reason>"}`); a JSON clip record (origin, seek and
-         the extracted frame names); the lens summary lines the host verdict reads;
+         the extracted frame names); the diagnostic summary `status` prints from the
+         panel stages and the panel gate exit code `gate` reads from the review record;
          the pasteable re-run command for a bundle; the derived review lines of
          acceptance.txt, with re-run provenance; or a self-contained static HTML report
          whose images are inlined so the bundle can be read on its own.
@@ -330,6 +332,18 @@ def panel_command_text(evidence):
     return "bash %s %s" % (shlex.quote(design_panel), shlex.quote(os.path.abspath(evidence)))
 
 
+def panel_gate(evidence):
+    """The panel gate's exit code, read only from the review record."""
+    acceptance = os.path.join(os.path.abspath(evidence), "acceptance.txt")
+    state = ""
+    if os.path.exists(acceptance):
+        with open(acceptance, encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith("panel: "):
+                    state = line.split(":", 1)[1].strip()
+    return 0 if state == "complete" else 79
+
+
 def review_record(argv):
     """Rewrite the derived review lines in acceptance.txt from the panel stages."""
     parser = argparse.ArgumentParser(prog="panel-lib.py record")
@@ -584,7 +598,7 @@ def report():
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: panel-lib.py turn|verdict|clip|status|record|command|report", file=sys.stderr)
+        print("usage: panel-lib.py turn|verdict|clip|status|record|command|gate|report", file=sys.stderr)
         return 2
     command = sys.argv[1]
     if command == "turn":
@@ -610,6 +624,12 @@ def main():
             print("usage: panel-lib.py command <evidence-dir>", file=sys.stderr)
             return 2
         print(panel_command_text(sys.argv[2]))
+        return 0
+    if command == "gate":
+        if len(sys.argv) < 3:
+            print("usage: panel-lib.py gate <evidence-dir>", file=sys.stderr)
+            return 2
+        print(panel_gate(sys.argv[2]))
         return 0
     if command == "report":
         return report()

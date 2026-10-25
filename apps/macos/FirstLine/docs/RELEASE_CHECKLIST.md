@@ -44,8 +44,8 @@ Owned by `scripts/release-dmg.sh` (payload and gates) and `scripts/publish-appca
 key procedure is `docs/RELEASE_KEY.md`; hosting and routing are owned by
 [`writeitdown/README.md`](../../../../writeitdown/README.md#mac-download-release).
 
-- [ ] `CFBundleVersion` is a positive integer greater than `dist/updates/last-build.txt`; `release-dmg.sh` refuses otherwise. Delete that file only for a deliberate rebuild of the same build number.
-- [ ] `Sources/FirstLine/Info.plist` sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` to true; `release-dmg.sh` refuses a release without both. The feed signature, not only the archive signature, is what stops a rewritten feed.
+- [ ] `CFBundleVersion` is a positive integer greater than `dist/updates/last-build.txt`; `release-dmg.sh` refuses otherwise, and refuses a record it cannot read as a build number. Delete that file only for a deliberate rebuild of the same build number.
+- [ ] `Sources/FirstLine/Info.plist` sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` to true and `SUSignedFeedFailureExpirationInterval` to 0; `release-dmg.sh` refuses a release without all three. The feed signature, not only the archive signature, is what stops a rewritten feed, and there is no grace period after a failed check.
 - [ ] `scripts/publish-appcast.sh` exits 0: it proves the signing key's public half equals `SUPublicEDKey` before generating, the feed carries exactly one item for the new build, names a minimum system version, carries no `sparkle:hardwareRequirements` (the release must stay one universal app), and both the enclosure signature and the embedded feed signature verify with `sign_update --verify`.
 - [ ] `dist/updates/WriteItDown-<version>.zip` exists and contains the stapled app (the script writes it after `stapler validate`). Staging runs must produce no ZIP and are not held to `last-build.txt`.
 - [ ] The archive and every `.delta` are uploaded before `appcast.xml`. A feed that points at a missing payload shows every user a failed update.

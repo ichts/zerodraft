@@ -21,6 +21,10 @@ version.
   note stays pending, missing `data-release-note`, current-tense 2.0 note). Those exact inputs were
   executed against `release-check.mjs` and each was blocked with its expected message. The full
   Playwright suite was not run in this round (`writeitdown/node_modules` is not installed here).
+- Follow-up: the version comparison no longer falls through when the DMG file name carries no version.
+  A page whose link is renamed to `Write-It-Down.dmg` passed the previous checker and is refused by
+  this one with `DMG URL: the file name does not carry the version`; `qa/mac.spec.mjs` gained that
+  rejection case and the current page still reports STATIC CHECK PASSED.
 
 # 2026-10-25: Aligned-room build and split-W logo (local)
 

@@ -55,6 +55,8 @@ struct UpdatePolicyTests {
         // Both keys together: Sparkle refuses a signed-feed updater that skips pre-extraction checks.
         #expect(values["SURequireSignedFeed"] as? Bool == true)
         #expect(values["SUVerifyUpdateBeforeExtraction"] as? Bool == true)
+        // Sparkle's 20-day default would accept an unverified feed after that long.
+        #expect(values["SUSignedFeedFailureExpirationInterval"] as? Int == 0)
         let build = try #require(values["CFBundleVersion"] as? String)
         #expect(Int(build).map { $0 > 0 } == true)
     }

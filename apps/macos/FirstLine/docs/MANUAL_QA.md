@@ -2,6 +2,37 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: Fail-closed release gates and library-backed key derivation
+
+Second review round on the same branch head. No window journey, DMG build, upload, deployment or
+merge was performed.
+
+- `release-dmg.sh` refuses a release whose `dist/updates/last-build.txt` exists but cannot be read as
+  a build number (empty, non-numeric or unreadable); only a missing file still means "first release".
+  `--staging` stays outside the comparison because it records no build, and its mode check is still
+  the only way to reach that branch.
+- `release-check.mjs` now refuses a DMG link whose file name does not carry its version as
+  `Write-It-Down-<version>.dmg`; previously that made the release-note version comparison fall
+  through and accept any newer note.
+- `Info.plist` sets `SUSignedFeedFailureExpirationInterval` to 0, so a failed feed-signature check is
+  never retried in Sparkle's 20-day "safe mode". `release-dmg.sh` requires exactly that value and
+  `UpdateTests` asserts it.
+- `scripts/sparkle-key.py` wraps an exported 32-byte seed as PKCS#8 and asks `openssl pkey` for the
+  public half, removing the hand-written Ed25519 arithmetic; the 96-byte Sparkle export still reads
+  its trailing public key directly.
+- `scripts/publish-appcast.sh` tool lookup is only `.build/artifacts/sparkle/Sparkle/bin` (after
+  `swift package resolve`) or `WID_SPARKLE_BIN`; the host `/Applications` candidate is gone.
+- `python3 scripts/test-release-config.py`: PASS (exit 0), now also covering a zero interval, a
+  missing interval, empty/non-numeric/unreadable `last-build.txt`, the first-release path with no
+  record, and the staging exemption with a record present. Known-broken proof: the same test fails on
+  commit `0dc0137` at the empty `last-build.txt` case (it exited 42 and packaged) and at the interval
+  case.
+- `node writeitdown/release-check.mjs --download`: PASS on the current page. Known-broken proof: a
+  page whose DMG link is renamed to `Write-It-Down.dmg` passes the previous checker and is refused by
+  this one with `DMG URL: the file name does not carry the version`.
+- Not run: `swift build`/`swift test` (the Swift changes are plist data plus two assertions),
+  notarization, real-key signing, and every real-window Sparkle behaviour below.
+
 ## 2026-10-25: Signed appcast feed, key-pair gate, staging and page-version gates
 
 Review round on `fm/wid-autoupdate-mini` (base `5964110`) that closes four release-path defects. No
@@ -12,9 +43,9 @@ window journey was run, and no DMG, upload, deployment or merge was performed.
 - Generator: `scripts/publish-appcast.sh` proves the signing key's public half equals
   `SUPublicEDKey` through the new `scripts/sparkle-key.py` before generating anything, and after
   generation verifies the embedded feed signature (`sign_update --verify appcast.xml`) as well as the
-  enclosure. The script self-locates the pinned Sparkle tools under
-  `.build/artifacts/sparkle/Sparkle/bin` (running `swift package resolve` when absent) and only
-  falls back to `WID_SPARKLE_BIN`/`/Applications/Sparkle-2.10.0/bin`.
+  enclosure. The script resolves the pinned Sparkle tools from
+  `.build/artifacts/sparkle/Sparkle/bin` (running `swift package resolve` when absent) or from
+  `WID_SPARKLE_BIN`; it uses no other copy.
 - Gates: `release-dmg.sh` refuses a release whose plist lacks the signed-feed policy and no longer
   applies the build-number increase to `--staging`; `release-check.mjs` refuses a release note that
   announces a version newer than the linked DMG unless it is marked `data-launch-pending`, and

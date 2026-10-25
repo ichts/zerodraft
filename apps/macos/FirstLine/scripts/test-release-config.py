@@ -64,6 +64,8 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
                        ('SUEnableAutomaticChecks', True),
                        ('SURequireSignedFeed', False),
                        ('SUVerifyUpdateBeforeExtraction', False),
+                       ('SUSignedFeedFailureExpirationInterval', 1728000),
+                       ('SUSignedFeedFailureExpirationInterval', True),
                        ('CFBundleVersion', 'abc'),
                        ('CFBundleVersion', '0')]:
         rejected = run({**signed, key: value})
@@ -71,6 +73,10 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         assert 'CONFIGURATION_ACCEPTED' not in rejected.stdout
     placeholder = run({**config, 'SUPublicEDKey': PLACEHOLDER_UPDATE_KEY})
     assert placeholder.returncode == 1 and 'placeholder' in placeholder.stderr, placeholder.stderr
+    without_interval = {**signed}
+    del without_interval['SUSignedFeedFailureExpirationInterval']
+    rejected = run(without_interval)
+    assert rejected.returncode == 1 and 'SUSignedFeedFailureExpirationInterval' in rejected.stderr, rejected.stderr
     staging = run(config, '--staging')
     assert staging.returncode == 1 and 'Staging requires empty' in staging.stderr, staging.stderr
     staging = run({**config, **dict.fromkeys(keys, '')}, '--staging')
@@ -88,6 +94,20 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     (updates / 'last-build.txt').write_text('1\n')
     advanced = run(signed)
     assert advanced.returncode == 42, advanced.stderr
+    # The record either names the last released build or refuses the release; it never fails open.
+    for broken in ['', '\n', 'not-a-number\n']:
+        (updates / 'last-build.txt').write_text(broken)
+        refused = run(signed)
+        assert refused.returncode == 1 and 'last-build.txt does not hold' in refused.stderr, refused.stderr
+        assert 'CONFIGURATION_ACCEPTED' not in refused.stdout
+    (updates / 'last-build.txt').write_text('5\n')
+    (updates / 'last-build.txt').chmod(0)
+    unreadable = run(signed)
+    (updates / 'last-build.txt').chmod(0o644)
+    assert unreadable.returncode == 1 and 'last-build.txt does not hold' in unreadable.stderr, unreadable.stderr
+    (updates / 'last-build.txt').unlink()
+    first_release = run(signed)
+    assert first_release.returncode == 42, first_release.stderr
 
     # The feed gate: the signing key must be the pair the shipped bundle trusts, and it must be
     # proven before generate_appcast writes anything.

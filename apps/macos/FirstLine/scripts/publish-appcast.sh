@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# [INPUT] Environment overrides: WID_SPARKLE_BIN (Sparkle's bin directory; by default the pinned
-#         Sparkle 2.10.0 tools under .build/artifacts/sparkle/Sparkle/bin, materialised with
-#         `swift package resolve` when missing, then /Applications/Sparkle-2.10.0/bin),
+# [INPUT] Environment overrides: WID_SPARKLE_BIN (Sparkle 2.10.0 bin directory, for example from the
+#         release archive; by default the pinned tools under .build/artifacts/sparkle/Sparkle/bin,
+#         materialised with `swift package resolve` when missing),
 #         WID_SPARKLE_ACCOUNT (Keychain account for the update signing key; default writeitdown),
 #         WID_SPARKLE_KEY_FILE (use an exported private key file instead of the Keychain, for a
 #         disposable test feed), WID_UPDATES_DIR (archives directory; default dist/updates).
@@ -20,18 +20,9 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-sparkle_bin="${WID_SPARKLE_BIN:-}"
-if [[ -z "$sparkle_bin" ]]; then
-  pinned="$PWD/.build/artifacts/sparkle/Sparkle/bin"
-  if [[ ! -x "$pinned/generate_appcast" ]] && command -v swift >/dev/null 2>&1; then
-    swift package resolve >/dev/null 2>&1 || true
-  fi
-  for candidate in "$pinned" /Applications/Sparkle-2.10.0/bin; do
-    if [[ -x "$candidate/generate_appcast" && -x "$candidate/sign_update" ]]; then
-      sparkle_bin="$candidate"
-      break
-    fi
-  done
+sparkle_bin="${WID_SPARKLE_BIN:-$PWD/.build/artifacts/sparkle/Sparkle/bin}"
+if [[ -z "${WID_SPARKLE_BIN:-}" && ! -x "$sparkle_bin/generate_appcast" ]] && command -v swift >/dev/null 2>&1; then
+  swift package resolve >/dev/null 2>&1 || true
 fi
 account="${WID_SPARKLE_ACCOUNT:-writeitdown}"
 updates_dir="${WID_UPDATES_DIR:-$PWD/dist/updates}"
@@ -44,8 +35,8 @@ if [[ -z "${WID_SPARKLE_KEY_FILE:-}" ]]; then
   tools+=(generate_keys)
 fi
 for tool in "${tools[@]}"; do
-  if [[ ! -x "${sparkle_bin:-/nonexistent}/$tool" ]]; then
-    echo "Missing Sparkle tool $tool. Run 'swift package resolve' in this directory, or set WID_SPARKLE_BIN to a Sparkle 2.10.0 bin directory." >&2
+  if [[ ! -x "$sparkle_bin/$tool" ]]; then
+    echo "Missing Sparkle tool $tool in $sparkle_bin. Run 'swift package resolve' in this directory, or set WID_SPARKLE_BIN to a Sparkle 2.10.0 bin directory." >&2
     exit 1
   fi
 done

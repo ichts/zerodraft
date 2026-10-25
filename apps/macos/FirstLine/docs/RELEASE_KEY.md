@@ -8,9 +8,11 @@ the app checks both against `SUPublicEDKey` in `Sources/FirstLine/Info.plist`:
   cannot point at an older archive, a different release-notes page or a critical update.
 
 Sparkle 2.10.0 refuses to start an updater that sets `SURequireSignedFeed` without
-`SUVerifyUpdateBeforeExtraction`, so `Info.plist` enables both together. `scripts/release-dmg.sh`
-refuses a release where either one is missing or false, and `scripts/publish-appcast.sh` verifies
-the signed feed and the enclosure after generating them.
+`SUVerifyUpdateBeforeExtraction`, so `Info.plist` enables both together. It also sets
+`SUSignedFeedFailureExpirationInterval` to 0: Sparkle's 20-day default would otherwise start accepting
+an unverified feed after that long, and this product has no safe-mode window. `scripts/release-dmg.sh`
+refuses a release where any of the three is missing or has another value, and
+`scripts/publish-appcast.sh` verifies the signed feed and the enclosure after generating them.
 
 The private half of the key never exists in this repository, on the web host, or in CI: it lives in
 the login Keychain of the Mac mini release machine. This file is the exact, complete procedure.
@@ -73,8 +75,9 @@ cd apps/macos/FirstLine && python3 scripts/sparkle-key.py --plist Sources/FirstL
   --generate-keys .build/artifacts/sparkle/Sparkle/bin/generate_keys --account writeitdown
 ```
 
-`scripts/sparkle-key.py` derives the public half of the signing key (Keychain, or an exported seed
-file with `WID_SPARKLE_KEY_FILE`) and compares it byte for byte with `SUPublicEDKey`; it is the gate
+`scripts/sparkle-key.py` derives the public half of the signing key and compares it byte for byte
+with `SUPublicEDKey`: the Keychain path asks `generate_keys -p`, and an exported seed file is wrapped
+as PKCS#8 and exported by `openssl pkey` (no hand-written curve code). It is the gate
 `scripts/publish-appcast.sh` runs before generating a feed, because `generate_appcast` only prints a
 warning on a mismatch and `sign_update --verify` would confirm the key against itself. Then run
 `python3 scripts/test-release-config.py`, `scripts/release-dmg.sh` and `scripts/publish-appcast.sh`;

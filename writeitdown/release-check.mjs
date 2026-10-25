@@ -108,9 +108,11 @@ export function downloadBlockers({ download }) {
   const noteVersion = attr(noteTag, 'data-release-note') ?? '';
   const notePending = Boolean(attr(noteTag, 'data-launch-pending'));
   const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
-  if (!VERSION.test(noteVersion)) {
+  if (!linkedVersion) {
+    found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
+  } else if (!VERSION.test(noteVersion)) {
     found.push('Release notes: the note does not declare its version in data-release-note');
-  } else if (linkedVersion) {
+  } else {
     if (versionOrder(noteVersion, linkedVersion) > 0 && !notePending)
       found.push(`Release notes: the note announces ${noteVersion} but the download is ${linkedVersion}; publish that DMG or mark the note data-launch-pending`);
     else if (versionOrder(noteVersion, linkedVersion) === 0 && notePending)

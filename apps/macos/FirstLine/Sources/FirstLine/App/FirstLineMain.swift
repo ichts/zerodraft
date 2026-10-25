@@ -90,9 +90,9 @@ extension FirstLineAppDelegate: NSMenuItemValidation {
         case #selector(openSettings), #selector(newPiece):
             return appState.canUseApp
         case #selector(checkForUpdates):
-            // Available even when the trial is used up; never on the Session surface.
+            // Available even when the trial is used up; never while a writing session is active.
             return UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: updateController != nil,
-                                                         roomIsShown: appState.isShowingWritingRoom)
+                                                         isWritingSessionActive: appState.isWritingSessionActive)
         case #selector(closeWindow):
             return true
         case #selector(openWriting), #selector(goHome):

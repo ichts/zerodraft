@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、Sparkle 的 SPUUpdater、App/AppState、Update/UpdateUserDriver、Update/UpdatePolicy
  * [OUTPUT]: UpdateController（Sparkle 标准更新器）与 UpdateSettings（Settings 面需要的唯一可写开关）
- * [POS]: 更新功能的入口：自动检查默认关闭，只有 Settings 开关或「Check for Updates…」菜单动作才会发起检查；Session 房间显示期间不展示更新界面
+ * [POS]: 更新功能的入口：自动检查默认关闭，只有 Settings 开关或「Check for Updates…」菜单动作才会发起检查；写作会话活跃期间（房间任何阶段或房间之外仍在走的会话）不展示更新界面
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 「默认不检查」由 Info.plist 的 SUEnableAutomaticChecks=false 落地：Sparkle 因此既不询问也不排期；
@@ -36,12 +36,12 @@ final class UpdateController: UpdateSettings {
     }
 
     private init?(appState: AppState) {
-        let roomIsShown: () -> Bool = { [weak appState] in appState?.isShowingWritingRoom ?? false }
-        let delegate = UpdateUserDriver(roomIsShown: roomIsShown)
+        let isWritingSessionActive: () -> Bool = { [weak appState] in appState?.isWritingSessionActive ?? false }
+        let delegate = UpdateUserDriver(isWritingSessionActive: isWritingSessionActive)
         let presenter = RoomAwareStandardUserDriver(
             hostBundle: .main,
             delegate: delegate,
-            roomIsShown: roomIsShown,
+            isWritingSessionActive: isWritingSessionActive,
             onDeferred: { [weak delegate] in delegate?.deferUpdate() }
         )
         let updater = SPUUpdater(
@@ -62,13 +62,13 @@ final class UpdateController: UpdateSettings {
             NSLog("Write It Down could not start the updater: %@", error.localizedDescription)
             return nil
         }
-        armRoomObservation()
+        armWritingSessionObservation()
         armActivationObservation()
     }
 
-    /// 菜单动作与唯一的手动检查入口。房间内即使被程序调用也不发起检查。
+    /// 菜单动作与唯一的手动检查入口。写作会话活跃时即使被程序调用也不发起检查。
     func checkForUpdates() {
-        guard UpdatePolicy.mayPresentUpdateUI(roomIsShown: appState.isShowingWritingRoom) else { return }
+        guard UpdatePolicy.mayPresentUpdateUI(isWritingSessionActive: appState.isWritingSessionActive) else { return }
         updater.checkForUpdates()
     }
 
@@ -77,19 +77,20 @@ final class UpdateController: UpdateSettings {
         set { updater.automaticallyChecksForUpdates = newValue }
     }
 
-    /// 整个 Session surface 的进出都重新裁决：进房间结束已有的更新窗口，离开房间把推迟的更新请回一次。
-    private func armRoomObservation() {
+    /// surface 与运行状态的变化都重新裁决：写作会话一活跃就结束已有的更新窗口，
+    /// 会话结束（离开房间且不再运行）后把推迟的更新请回一次。
+    private func armWritingSessionObservation() {
         withObservationTracking { [weak self] in
-            _ = self?.appState.isShowingWritingRoom
+            _ = self?.appState.isWritingSessionActive
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if self.appState.isShowingWritingRoom {
+                if self.appState.isWritingSessionActive {
                     self.presenter.endPresentationForRoom()
                 } else {
                     self.refreshDeferredUpdate()
                 }
-                self.armRoomObservation()
+                self.armWritingSessionObservation()
             }
         }
     }
@@ -109,7 +110,8 @@ final class UpdateController: UpdateSettings {
 
     /// 定时检查已经把标准窗口建好但还没展示；这里是它唯一的展示时机。
     private func presentScheduledUpdate() {
-        guard UpdatePolicy.mayPresentUpdateUI(roomIsShown: appState.isShowingWritingRoom), NSApp.isActive else {
+        guard UpdatePolicy.mayPresentUpdateUI(isWritingSessionActive: appState.isWritingSessionActive),
+              NSApp.isActive else {
             userDriver.deferUpdate()
             return
         }

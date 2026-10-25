@@ -6,15 +6,15 @@ import Testing
 
 @MainActor
 struct UpdatePolicyTests {
-    @Test func noUpdateUIIsEverPresentedOnTheSessionSurface() {
-        #expect(UpdatePolicy.mayPresentUpdateUI(roomIsShown: false))
-        #expect(!UpdatePolicy.mayPresentUpdateUI(roomIsShown: true))
+    @Test func noUpdateUIIsEverPresentedWhileWritingMayBeLive() {
+        #expect(UpdatePolicy.mayPresentUpdateUI(isWritingSessionActive: false))
+        #expect(!UpdatePolicy.mayPresentUpdateUI(isWritingSessionActive: true))
     }
 
-    @Test func theMenuCommandIsOnlyAvailableOutsideTheRoom() {
-        #expect(UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: true, roomIsShown: false))
-        #expect(!UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: true, roomIsShown: true))
-        #expect(!UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: false, roomIsShown: false))
+    @Test func theMenuCommandIsOnlyAvailableOutsideAWritingSession() {
+        #expect(UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: true, isWritingSessionActive: false))
+        #expect(!UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: true, isWritingSessionActive: true))
+        #expect(!UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: false, isWritingSessionActive: false))
     }
 
     @Test func deferredUpdateWaitsForTheRoomToClose() {
@@ -22,21 +22,21 @@ struct UpdatePolicyTests {
         #expect(!policy.hasDeferredUpdate)
         policy.deferUpdate()
         #expect(policy.hasDeferredUpdate)
-        let duringRoom = policy.takePresentationRequest(roomIsShown: true, canCheckForUpdates: true)
+        let duringRoom = policy.takePresentationRequest(isWritingSessionActive: true, canCheckForUpdates: true)
         #expect(!duringRoom)
         #expect(policy.hasDeferredUpdate)
-        let afterRoom = policy.takePresentationRequest(roomIsShown: false, canCheckForUpdates: true)
+        let afterRoom = policy.takePresentationRequest(isWritingSessionActive: false, canCheckForUpdates: true)
         #expect(afterRoom)
         #expect(!policy.hasDeferredUpdate)
         // Asked once only; a sitting writer is not nagged on every tick.
-        let again = policy.takePresentationRequest(roomIsShown: false, canCheckForUpdates: true)
+        let again = policy.takePresentationRequest(isWritingSessionActive: false, canCheckForUpdates: true)
         #expect(!again)
     }
 
     @Test func deferredUpdateNeverOverridesBusySparkle() {
         var policy = UpdateDeferralPolicy()
         policy.deferUpdate()
-        let requested = policy.takePresentationRequest(roomIsShown: false, canCheckForUpdates: false)
+        let requested = policy.takePresentationRequest(isWritingSessionActive: false, canCheckForUpdates: false)
         #expect(!requested)
         #expect(policy.hasDeferredUpdate)
     }
@@ -63,27 +63,41 @@ struct UpdatePolicyTests {
 }
 
 @MainActor
-struct UpdateRoomSurfaceTests {
-    @Test func theSessionSurfaceIsTheRoomGate() {
+struct UpdateWritingSessionGateTests {
+    @Test func theRoomSurfaceAloneHoldsTheGate() {
         let state = licensedTestState()
-        #expect(!state.isShowingWritingRoom)
+        #expect(!state.isWritingSessionActive)
         state.selectedSurface = .session
-        #expect(state.isShowingWritingRoom)
+        #expect(state.isWritingSessionActive)
         state.selectedSurface = .home
-        #expect(!state.isShowingWritingRoom)
+        #expect(!state.isWritingSessionActive)
     }
 
-    @Test func settingsAndHomeLeaveTheRoom() {
+    /// The tempting regression: Settings hides the room while the silence clock keeps running.
+    @Test func settingsDoesNotOpenTheGateWhileTheSessionRuns() {
         let state = licensedTestState()
-        state.selectedSurface = .session
+        state.startSession()
+        #expect(state.isWritingSessionActive)
         state.openSettings()
         #expect(state.selectedSurface == .settings)
-        #expect(!state.isShowingWritingRoom)
+        #expect(state.isWritingSessionActive)
+        var policy = UpdateDeferralPolicy()
+        policy.deferUpdate()
+        let duringSettings = policy.takePresentationRequest(isWritingSessionActive: state.isWritingSessionActive,
+                                                            canCheckForUpdates: true)
+        #expect(!duringSettings)
+        #expect(policy.hasDeferredUpdate)
         state.closeSettings()
         #expect(state.selectedSurface == .session)
-        #expect(state.isShowingWritingRoom)
-        state.goHome()
-        #expect(!state.isShowingWritingRoom)
+        let backInRoom = policy.takePresentationRequest(isWritingSessionActive: state.isWritingSessionActive,
+                                                        canCheckForUpdates: true)
+        #expect(!backInRoom)
+        state.abandonSession()
+        #expect(!state.isWritingSessionActive)
+        let afterSession = policy.takePresentationRequest(isWritingSessionActive: state.isWritingSessionActive,
+                                                          canCheckForUpdates: true)
+        #expect(afterSession)
+        #expect(!policy.hasDeferredUpdate)
     }
 }
 
@@ -91,16 +105,16 @@ struct UpdateRoomSurfaceTests {
 final class UpdatePresentationGateTests {
     private var retainedDelegates: [UpdateUserDriver] = []
 
-    private func roomDriver(
-        roomIsShown: @escaping () -> Bool = { true },
+    private func writingDriver(
+        isWritingSessionActive: @escaping () -> Bool = { true },
         onDeferred: @escaping () -> Void
     ) -> RoomAwareStandardUserDriver {
-        let delegate = UpdateUserDriver(roomIsShown: roomIsShown)
+        let delegate = UpdateUserDriver(isWritingSessionActive: isWritingSessionActive)
         retainedDelegates.append(delegate)
         return RoomAwareStandardUserDriver(
             hostBundle: .main,
             delegate: delegate,
-            roomIsShown: roomIsShown,
+            isWritingSessionActive: isWritingSessionActive,
             onDeferred: onDeferred
         )
     }
@@ -108,7 +122,7 @@ final class UpdatePresentationGateTests {
     @Test func theRoomCancelsACheckBeforeItsWindowAppears() {
         var deferred = 0
         var cancelled = false
-        let driver = roomDriver(onDeferred: { deferred += 1 })
+        let driver = writingDriver(onDeferred: { deferred += 1 })
         let sparkleDriver: any SPUUserDriver = driver
         sparkleDriver.showUserInitiatedUpdateCheck(cancellation: { cancelled = true })
         #expect(cancelled)
@@ -118,7 +132,7 @@ final class UpdatePresentationGateTests {
     @Test func theRoomCancelsADownloadBeforeItsStatusWindowAppears() {
         var deferred = 0
         var cancelled = false
-        let driver = roomDriver(onDeferred: { deferred += 1 })
+        let driver = writingDriver(onDeferred: { deferred += 1 })
         let sparkleDriver: any SPUUserDriver = driver
         sparkleDriver.showDownloadInitiated(cancellation: { cancelled = true })
         #expect(cancelled)
@@ -128,7 +142,7 @@ final class UpdatePresentationGateTests {
     @Test func theRoomAcknowledgesResultsWithoutAnAlert() {
         var deferred = 0
         var acknowledged = false
-        let driver = roomDriver(onDeferred: { deferred += 1 })
+        let driver = writingDriver(onDeferred: { deferred += 1 })
         let sparkleDriver: any SPUUserDriver = driver
         sparkleDriver.showUpdateNotFoundWithError(NSError(domain: "test", code: 1), acknowledgement: { acknowledged = true })
         #expect(acknowledged)

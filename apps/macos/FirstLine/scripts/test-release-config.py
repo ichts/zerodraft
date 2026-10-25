@@ -125,13 +125,25 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     old_format = root / 'old.key'
     old_format.write_text(base64.b64encode(bytes(64) + seed_public).decode())
 
-    def key_gate(*args):
+    def key_gate(*args, key_env=None):
         return subprocess.run(['python3', str(root / 'scripts/sparkle-key.py'), '--plist', str(key_plist), *args],
-                              env=env, capture_output=True, text=True)
+                              env=key_env or env, capture_output=True, text=True)
 
     matched = key_gate('--key-file', str(seed_file))
     assert matched.returncode == 0 and matched.stdout.strip() == base64.b64encode(seed_public).decode(), matched.stderr
     assert key_gate('--key-file', str(old_format)).returncode == 0
+    # macOS ships LibreSSL, which cannot derive Ed25519 keys: the gate must fall back to the
+    # built-in RFC 8032 derivation instead of failing or skipping the proof.
+    broken_openssl = root / 'broken-openssl'
+    broken_openssl.mkdir()
+    stub = broken_openssl / 'openssl'
+    stub.write_text("#!/bin/sh\necho 'unable to load key: unsupported algorithm' >&2\nexit 1\n")
+    stub.chmod(0o755)
+    fallback = key_gate('--key-file', str(seed_file),
+                        key_env={**env, 'PATH': f'{broken_openssl}:{env["PATH"]}'})
+    assert fallback.returncode == 0, fallback.stderr
+    assert fallback.stdout.strip() == base64.b64encode(seed_public).decode(), fallback.stderr
+    assert 'built-in RFC 8032' in fallback.stderr, fallback.stderr
     mismatched = key_gate('--key-file', str(other_file))
     assert mismatched.returncode == 1 and 'does not match SUPublicEDKey' in mismatched.stderr, mismatched.stderr
     assert key_gate('--key-file', str(root / 'missing.key')).returncode == 1
@@ -152,10 +164,13 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         plist_path.write_bytes(plistlib.dumps({**signed, 'CFBundleVersion': build}))
         return subprocess.run(['bash', str(payload), str(plist_path)], env=env, capture_output=True, text=True)
 
+    version = signed['CFBundleShortVersionString']
+    first_name = f'WriteItDown-{version}-2.zip'
+    next_name = f'WriteItDown-{version}-3.zip'
     first_build = payload_name('2')
     next_build = payload_name('3')
-    assert first_build.returncode == 0 and first_build.stdout.strip() == 'WriteItDown-1.1-2.zip', first_build.stderr
-    assert next_build.returncode == 0 and next_build.stdout.strip() == 'WriteItDown-1.1-3.zip', next_build.stderr
+    assert first_build.returncode == 0 and first_build.stdout.strip() == first_name, first_build.stderr
+    assert next_build.returncode == 0 and next_build.stdout.strip() == next_name, next_build.stderr
 
     publish_env = {**env, 'WID_SPARKLE_BIN': str(sparkle)}
 
@@ -167,12 +182,13 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
 
     # A payload named by version alone can be overwritten by a rebuild under an immutable URL, so
     # the feed step must look for the build-qualified name and refuse the old one.
-    (updates / 'WriteItDown-1.1.zip').write_bytes(b'payload')
+    stale = updates / f'WriteItDown-{version}.zip'
+    stale.write_bytes(b'payload')
     stale_name = publish(base64.b64encode(seed_public).decode())
-    assert stale_name.returncode == 1 and 'WriteItDown-1.1-2.zip' in stale_name.stderr, stale_name.stderr
+    assert stale_name.returncode == 1 and first_name in stale_name.stderr, stale_name.stderr
     assert not generated.exists(), 'generate_appcast ran without the build-qualified payload'
-    (updates / 'WriteItDown-1.1.zip').unlink()
-    (updates / 'WriteItDown-1.1-2.zip').write_bytes(b'payload')
+    stale.unlink()
+    (updates / first_name).write_bytes(b'payload')
 
     refused = publish(base64.b64encode(bytes(32)).decode())
     assert refused.returncode == 1 and 'does not match SUPublicEDKey' in refused.stderr, refused.stderr

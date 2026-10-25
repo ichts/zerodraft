@@ -639,4 +639,22 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the 2026-10-24 privacy sentence "no update checks are added" in
   `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` section 7, and the download page's single-version
   release-notes absence. All other room decisions stand: update UI is never part of the room and the
-  room's strings, geometry, and motion are unchanged.)
+  room's strings, geometry, and motion are unchanged.
+  room's strings, geometry, and motion are unchanged.
+
+## D-042: An update waits while a writing session is live, whichever surface is shown
+
+- Date: 2026-10-25
+- Decision: The update gate tests whether a writing session is still live, not which surface happens
+  to be on screen. A session counts as live on the whole Session room (empty, writing, warning,
+  failure, kept) and also after the writer opens Settings, because the silence clock keeps running
+  there and the draft can still be lost when Settings is closed. Every presentation entry point
+  (menu command, scheduled check, standard Sparkle driver hooks, deferred return on activation or
+  surface change) uses that one predicate; an update found while the session is live is deferred and
+  presented at most once after the session ends. The menu command is disabled for the same reason.
+- Reason: D-040's surface-only wording left a real path to losing a draft: open Settings while
+  writing, and a deferred update could appear over Settings and take focus while the silence clock
+  ran. The captain's rule is that an update never interrupts writing, so the gate must follow what
+  is still running, not one enum that can drift.
+- Supersedes: D-041's "while the Session room is shown" gate wording only. Its opt-in default, its
+  signed-feed and key rules, and every room string, geometry and motion rule stand.

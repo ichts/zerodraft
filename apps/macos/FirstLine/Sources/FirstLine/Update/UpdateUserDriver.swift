@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、Sparkle 的 SPUStandardUserDriver/SPUStandardUserDriverDelegate 与 SUAppcastItem、Update/UpdatePolicy
  * [OUTPUT]: UpdateUserDriver（定时更新的 gentle reminder 委托）与 RoomAwareStandardUserDriver（标准 Sparkle 界面的房间闸门）
- * [POS]: 更新界面与写作房间之间的唯一闸门：Session surface 显示时拒绝或推迟任何更新窗口，窗口已经出现时通过 Sparkle 自己的取消/回复路径结束它
+ * [POS]: 更新界面与写作之间的唯一闸门：写作会话活跃时（房间任何阶段或房间之外仍在走的会话）拒绝或推迟任何更新窗口，窗口已经出现时通过 Sparkle 自己的取消/回复路径结束它
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Sparkle 在主线程回调这些方法，但协议本身不是 @MainActor，因此以 nonisolated 实现并在内部
@@ -13,14 +13,14 @@ import Sparkle
 
 @MainActor
 final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
-    private let roomIsShown: () -> Bool
+    private let isWritingSessionActive: () -> Bool
     private var deferral = UpdateDeferralPolicy()
 
     /// 定时检查到的更新由本 delegate 负责展示；控制器在这里把已经建好的标准窗口请回前台。
     var onScheduledUpdateReady: (() -> Void)?
 
-    init(roomIsShown: @escaping () -> Bool) {
-        self.roomIsShown = roomIsShown
+    init(isWritingSessionActive: @escaping () -> Bool) {
+        self.isWritingSessionActive = isWritingSessionActive
         super.init()
     }
 
@@ -30,7 +30,7 @@ final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
 
     /// 离开房间或应用回到前台后，由 UpdateController 询问是否可以把推迟的更新请回一次。
     func takePresentationRequest(canCheckForUpdates: Bool) -> Bool {
-        deferral.takePresentationRequest(roomIsShown: roomIsShown(), canCheckForUpdates: canCheckForUpdates)
+        deferral.takePresentationRequest(isWritingSessionActive: isWritingSessionActive(), canCheckForUpdates: canCheckForUpdates)
     }
 
     // MARK: - SPUStandardUserDriverDelegate（Sparkle 在主线程调用）
@@ -64,26 +64,26 @@ final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
     }
 }
 
-/// 标准 Sparkle 界面的房间闸门。真正展示前检查当前 surface；房间出现时终止已经展示的更新会话。
+/// 标准 Sparkle 界面的写作闸门。真正展示前检查写作会话是否活跃；会话活跃时终止已经展示的更新会话。
 /// 终止走 Sparkle 自己的 reply / cancellation，始终让一个更新会话有明确结局，而不是把窗口丢在原地。
 @MainActor
 final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
-    private let roomIsShown: () -> Bool
+    private let isWritingSessionActive: () -> Bool
     private let onDeferred: () -> Void
     private var activeCloser: (() -> Void)?
 
     init(
         hostBundle: Bundle,
         delegate: SPUStandardUserDriverDelegate,
-        roomIsShown: @escaping () -> Bool,
+        isWritingSessionActive: @escaping () -> Bool,
         onDeferred: @escaping () -> Void
     ) {
-        self.roomIsShown = roomIsShown
+        self.isWritingSessionActive = isWritingSessionActive
         self.onDeferred = onDeferred
         super.init(hostBundle: hostBundle, delegate: delegate)
     }
 
-    /// 房间接管窗口时调用：结束当前更新界面，并把更新记成待办。
+    /// 写作会话接管窗口时调用：结束当前更新界面，并把更新记成待办。
     func endPresentationForRoom() {
         guard let closer = activeCloser else { return }
         activeCloser = nil
@@ -92,7 +92,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             onDeferred()
             cancellation()
             return
@@ -107,7 +107,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
         state: SPUUserUpdateState,
         reply: @escaping (SPUUserUpdateChoice) -> Void
     ) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             onDeferred()
             reply(.dismiss)
             return
@@ -118,7 +118,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showUpdateNotFoundWithError(_ error: any Error, acknowledgement: @escaping () -> Void) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             acknowledgement()
             return
         }
@@ -127,7 +127,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showUpdaterError(_ error: any Error, acknowledgement: @escaping () -> Void) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             acknowledgement()
             return
         }
@@ -136,7 +136,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showDownloadInitiated(cancellation: @escaping () -> Void) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             onDeferred()
             cancellation()
             return
@@ -147,7 +147,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showDownloadDidStartExtractingUpdate() {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             onDeferred()
             dismissUpdateInstallation()
             return
@@ -158,7 +158,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
-        guard !roomIsShown() else {
+        guard !isWritingSessionActive() else {
             onDeferred()
             reply(.dismiss)
             return
@@ -183,7 +183,7 @@ final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
     }
 
     override func showUpdateInFocus() {
-        guard !roomIsShown() else { return }
+        guard !isWritingSessionActive() else { return }
         super.showUpdateInFocus()
     }
 

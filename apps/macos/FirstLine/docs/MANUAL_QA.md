@@ -2,6 +2,37 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: The update gate follows a live writing session
+
+Fourth review round on the same branch. No DMG build, notarization, upload, deployment or merge was
+performed.
+
+- The gate is one predicate, `AppState.isWritingSessionActive`: the Session room in any phase, or a
+  session that keeps running after the writer opens Settings. Every presentation entry point uses it:
+  the menu command, the scheduled-check path, the deferred return on surface change or app
+  activation, and every standard-driver hook. D-041 records the rule and supersedes D-040's
+  surface-only gate wording.
+- `sparkle-key.py` detects whether `openssl` can derive Ed25519. macOS ships LibreSSL, which cannot,
+  so it prints a warning naming that limit and uses the built-in RFC 8032 derivation instead of
+  failing, skipping or silently passing the key-pair proof.
+- `test-release-config.py` derives the expected payload names from the tracked
+  `CFBundleShortVersionString` instead of hardcoding 1.1, so the release gate survives the 1.2 bump.
+- The root `AGENTS.md` update paragraph now points at D-040/D-041 and describes the live-session gate.
+
+Evidence:
+
+- `swift test --filter Update`: 18 tests in 6 suites passed, including the new
+  `settingsDoesNotOpenTheGateWhileTheSessionRuns` (start a session, defer a scheduled update, open
+  Settings: no presentation request is taken and the deferred update survives; it is taken once after
+  the session ends) and `theRoomSurfaceAloneHoldsTheGate`.
+- `python3 scripts/test-release-config.py`: PASS (exit 0) on macOS with Homebrew OpenSSL on PATH and,
+  for the key gate, with a stub `openssl` on PATH that answers `unable to load key: unsupported
+  algorithm`; the fallback still matches the RFC 8032 seed/public vector and prints the
+  `built-in RFC 8032` warning. Payload assertions now read the version from the plist.
+- Not run: a full `scripts/release-dmg.sh` (needs the Developer ID identity and notary), the whole
+  `swift test` suite (the two pre-existing EditorFocusTests failures are unrelated), and every
+  real-window Sparkle behaviour below.
+
 ## 2026-10-25: Immutable update payload URLs, portable framework lookup, feed path
 
 Third review round on the same branch. No DMG build, notarization, upload, deployment or merge was

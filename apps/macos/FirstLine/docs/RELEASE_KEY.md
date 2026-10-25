@@ -77,11 +77,14 @@ cd apps/macos/FirstLine && python3 scripts/sparkle-key.py --plist Sources/FirstL
 
 `scripts/sparkle-key.py` derives the public half of the signing key and compares it byte for byte
 with `SUPublicEDKey`: the Keychain path asks `generate_keys -p`, and an exported seed file is wrapped
-as PKCS#8 and exported by `openssl pkey` (no hand-written curve code). It is the gate
-`scripts/publish-appcast.sh` runs before generating a feed, because `generate_appcast` only prints a
-warning on a mismatch and `sign_update --verify` would confirm the key against itself. Then run
-`python3 scripts/test-release-config.py`, `scripts/release-dmg.sh` and `scripts/publish-appcast.sh`;
-the last one also fails if the feed was not signed.
+as PKCS#8 and exported by `openssl pkey` when that `openssl` can derive Ed25519 keys. macOS ships
+LibreSSL as `/usr/bin/openssl`, which cannot; the script then prints a warning naming that limit and
+uses its built-in RFC 8032 derivation, which `scripts/test-release-config.py` proves against an RFC
+8032 test vector. That fallback is security-sensitive code and needs independent review. It is the
+gate `scripts/publish-appcast.sh` runs before generating a feed, because `generate_appcast` only
+prints a warning on a mismatch and `sign_update --verify` would confirm the key against itself. Then
+run `python3 scripts/test-release-config.py`, `scripts/release-dmg.sh` and
+`scripts/publish-appcast.sh`; the last one also fails if the feed was not signed.
 
 ## 6. What this means for rotation
 

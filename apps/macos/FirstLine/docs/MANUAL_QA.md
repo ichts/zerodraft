@@ -44,7 +44,9 @@ and the guest screen is captured as a timestamped frame stream that the host ass
 - PASS, deterministic analysis with a known-broken-state proof: `scripts/vm/analyse-recording.py` reproduces the
   1.0 launch flash from the 1.0 launch frames ("a forbidden surface appeared for 184 ms during launch") and
   passes on the same frames with that state removed; a 5.3 s capture gap and a frozen screen over 20 s each fail
-  the run, and a gapped or truncated frame stream fails before the verdict. Both recorded bundles ran the
+  the run, a step stamped inside a frozen window does not excuse it while no frame in the recording changes (a
+  still desktop during a recorded command-line step is an informational finding instead), and a gapped or
+  truncated frame stream fails before the verdict. Both recorded bundles ran the
   deterministic pass: their `findings.json` recorded no analyser error, and the 1.0 bundle's recorded findings
   include the transient launch surface that failed the launch assertion. Neither bundle contains an `analysis:`
   line in `acceptance.txt`, because both were recorded before this change; every bundle recorded from this

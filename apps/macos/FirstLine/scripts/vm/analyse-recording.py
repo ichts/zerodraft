@@ -29,8 +29,10 @@ import sys
 
 # A capture gap this long means the recorder stopped covering the run.
 MAX_FRAME_GAP_MS = 2000
-# A screen that does not change at all for this long, with no recorded step inside
-# the window, is a frozen screen: the app hung or the capture stalled.
+# A screen that does not change at all for this long is a frozen screen: the app hung
+# or the capture stalled. A recorded step excuses a static stretch (the rig runs
+# command-line steps with a still desktop on screen), but only while the rest of the
+# recording changes: a stream that never changes is a dead capture, not a quiet step.
 FROZEN_MEAN_DELTA = 0.6
 FROZEN_ASSERT_MS = 20000
 FROZEN_NOTE_MS = 4000
@@ -218,6 +220,9 @@ def video_findings(frames, deltas, similarities, steps):
             })
     # 2. frozen screen
     run_start = None
+    # Whether the screen changed anywhere in the run: without it a frozen window is
+    # not a quiet stretch between visible work but the whole recording standing still.
+    screen_changed = any(delta >= FROZEN_MEAN_DELTA for delta in deltas)
     for index, delta in enumerate(deltas):
         start_ms = frames[index][0]
         end_ms = frames[index + 1][0]
@@ -225,10 +230,10 @@ def video_findings(frames, deltas, similarities, steps):
         if frozen and run_start is None:
             run_start = index
         if not frozen and run_start is not None:
-            findings.extend(frozen_window(frames, steps, run_start, index))
+            findings.extend(frozen_window(frames, steps, run_start, index, screen_changed))
             run_start = None
     if run_start is not None:
-        findings.extend(frozen_window(frames, steps, run_start, len(deltas)))
+        findings.extend(frozen_window(frames, steps, run_start, len(deltas), screen_changed))
     # 3. transient structural states: content changes and then comes back
     for index, value in enumerate(similarities):
         if value >= SSIM_CHANGE:
@@ -275,18 +280,28 @@ def video_findings(frames, deltas, similarities, steps):
     return findings
 
 
-def frozen_window(frames, steps, start_index, end_index):
+def frozen_window(frames, steps, start_index, end_index, screen_changed):
     start_ms = frames[start_index][0]
     end_ms = frames[end_index][0]
     span = end_ms - start_ms
     if span < FROZEN_NOTE_MS:
         return []
     covered = step_in_window(steps, start_ms, end_ms)
+    # A step stamp is the guest's own clock, so it says a step was running, not that
+    # the screen was alive. It excuses the stretch only when the recording shows the
+    # screen changing somewhere else: a stream that never changes is a stalled capture.
+    excused = covered and screen_changed
     severity = "info"
     assertion = None
-    if span >= FROZEN_ASSERT_MS and not covered:
+    if span >= FROZEN_ASSERT_MS and not excused:
         severity = "high"
         assertion = "recording-stall"
+    if covered and not screen_changed:
+        suffix = "; a step was stamped inside it, but no frame in the recording ever changed"
+    elif covered:
+        suffix = "; a recorded step covers it"
+    else:
+        suffix = ""
     return [{
         "kind": "frozen-screen",
         "severity": severity,
@@ -295,8 +310,7 @@ def frozen_window(frames, steps, start_index, end_index):
         "t_end": end_ms,
         "duration_ms": span,
         "frames": [start_index, end_index],
-        "note": ("the screen did not change at all for %.1f s%s" % (
-            span / 1000, "; a recorded step covers it" if covered else "")),
+        "note": ("the screen did not change at all for %.1f s%s" % (span / 1000, suffix)),
     }]
 
 

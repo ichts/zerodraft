@@ -11,14 +11,15 @@
 [PROTOCOL] Every check runs the real executable or git on a fixture and asserts its
            observable output; nothing here greps the scripts' source. The known-broken
            cases feed the previous behaviour (a manifest whose first stamp is the
-           pre-recording span, a dropped capture, the old jq content filter, one review
-           repeated for every lens, a bytecode cache tracked in any subtree, a host
-           entry point without its launchd shim) and must fail, so a regression reopens
-           the finding. The bytecode guard resolves the repository root and constructs
+           pre-recording span, a dropped capture, an all-static frame stream with a step
+           stamped inside it, the old jq content filter, one review repeated for every
+           lens, a bytecode cache tracked in any subtree, a host entry point without its
+           launchd shim) and must fail, so a regression reopens the finding. The bytecode guard resolves the repository root and constructs
            its failure case in a scratch repository, and both host entry points are
            checked in a layout that has and lacks the shim.
 """
 
+import datetime
 import json
 import os
 import re
@@ -411,6 +412,56 @@ def check_launch_assertion_ids(workdir):
     need(licensed_run.returncode != 0, "a transient activation page in a licensed relaunch passed")
     need("FAIL [licensed-launch-no-activation-page]" in licensed_run.stdout,
          f"the licensed relaunch lost its declared-defect assertion id: {licensed_run.stdout[-400:]}")
+
+
+def write_frame_stream(evidence, colours, origin_ms=1_700_000_000_000, tick_ms=250):
+    """A frame stream whose frame N is colours[N], one frame every tick."""
+    frames_dir = os.path.join(evidence, "frames")
+    os.makedirs(frames_dir)
+    for index, colour in enumerate(colours):
+        solid_png(os.path.join(frames_dir, "%06d.jpg" % index), colour, width=192, height=108)
+    with open(os.path.join(evidence, "frames.tsv"), "w", encoding="utf-8") as handle:
+        for index in range(len(colours)):
+            handle.write("%d\t%06d.jpg\n" % (origin_ms + index * tick_ms, index))
+    return origin_ms
+
+
+def stamp_step(evidence, origin_ms, offset_ms, name):
+    moment = datetime.datetime.fromtimestamp((origin_ms + offset_ms) / 1000,
+                                             datetime.timezone.utc)
+    with open(os.path.join(evidence, "steps.tsv"), "a", encoding="utf-8") as handle:
+        handle.write(moment.strftime("%Y-%m-%dT%H:%M:%SZ") + "\t" + name + "\n")
+
+
+def check_frozen_recording(workdir):
+    # Known-broken: every frame of the run is the same image, and the guest stamped
+    # steps on its own clock inside that still window. A step stamp cannot make a dead
+    # capture evidence of a working app, so the run must fail.
+    stalled = os.path.join(workdir, "stalled")
+    origin = write_frame_stream(stalled, [PALETTE[4]] * 96)
+    for index in range(4):
+        stamp_step(stalled, origin, 5000 + index * 5000, "%02d-step" % index)
+    stalled_run = run([sys.executable, ANALYSER, stalled])
+    need(stalled_run.returncode != 0,
+         f"a recording whose screen never changes was accepted: {stalled_run.stdout[-400:]}")
+    need("FAIL [recording-stall]" in stalled_run.stdout,
+         f"the stalled recording produced no recording-stall failure: {stalled_run.stdout[-400:]}")
+
+    # The excuse that survives: a still desktop while a command-line step runs, in a
+    # recording that does show the screen changing around it.
+    quiet = os.path.join(workdir, "quiet-step")
+    origin = write_frame_stream(quiet, PALETTE[:8] + [PALETTE[9]] * 96)
+    stamp_step(quiet, origin, 8000, "08-command-line-step")
+    quiet_run = run([sys.executable, ANALYSER, quiet])
+    need(quiet_run.returncode == 0,
+         f"a still desktop during a recorded step failed the run: {quiet_run.stdout[-400:]}")
+    need("FAIL [recording-stall]" not in quiet_run.stdout,
+         f"the still desktop during a step was failed as a stall: {quiet_run.stdout[-400:]}")
+    with open(os.path.join(quiet, "findings.json"), encoding="utf-8") as handle:
+        findings = json.load(handle)["findings"]
+    still = [finding for finding in findings if finding["kind"] == "frozen-screen"]
+    need(still and all(not finding["assertion"] for finding in still),
+         f"the still desktop during a step left no informational finding: {findings!r}")
 
 
 def analysis_capability(panel):
@@ -956,6 +1007,7 @@ CHECKS = [
     ("the recorded journey stops when the launchd shim is missing", check_journey_shim),
     ("flagged clip lands on the flagged second", check_clip_origin),
     ("analyser fails on a dropped capture", check_analyser_alignment),
+    ("a recording whose screen never changes fails", check_frozen_recording),
     ("launch assertion ids are keyed to their stream", check_launch_assertion_ids),
     ("lens summary reports completeness and reason", check_lens_status),
     ("design panel writes its stages from a bundle", check_panel_stages),

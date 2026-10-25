@@ -1,6 +1,6 @@
 import { LINES, TIMELINE } from './demo-timeline.mjs';
 import { clock, wordCount } from './session.mjs';
-import { denyFeedback } from './feedback.js';
+import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 
 (function () {
   "use strict";
@@ -21,7 +21,7 @@ import { denyFeedback } from './feedback.js';
   var washPaper = document.getElementById("wash-paper");
   var hairline = document.getElementById("demo-hairline");
   var clockEl = document.getElementById("clock");
-  var prevEls = [document.getElementById("prev-0"), document.getElementById("prev-1")];
+  var prevStack = document.querySelector('.prev-stack');
   var curEl = document.getElementById("cur");
   var scriptEl = document.querySelector(".script");
   var warnEl = document.getElementById("warn");
@@ -37,6 +37,11 @@ import { denyFeedback } from './feedback.js';
   var seen = {};
   var lastT = -1;
   var barAnimation = null;
+  var barDeadline = null;
+  var doneCount = 0;
+  var shiftFrame = 0;
+  var visible = false;
+  var resuming = true;
 
   // The status slot is placed by ink, exactly as in the trial room (Mac case 34/35):
   // the numeral's ink top 44 px under the writing baseline, the caption's ink top
@@ -100,10 +105,9 @@ import { denyFeedback } from './feedback.js';
     if (seen[key] !== v) { seen[key] = v; el.textContent = v; }
   }
   function setPhase(name) {
-    if (seen.ph === name) return false;
+    if (seen.ph === name) return;
     seen.ph = name;
     paper.className = "paper " + name;
-    return true;
   }
   function setWash(k) {
     var pap;
@@ -114,17 +118,47 @@ import { denyFeedback } from './feedback.js';
   }
   // The draining minute: one continuous linear animation per loop, never a stepped tick.
   function startBar() {
+    var deadline = t0 + Math.floor((Date.now() - t0) / LOOP) * LOOP + 60000;
+    if (barAnimation && barDeadline === deadline) return;
     if (barAnimation) barAnimation.cancel();
-    barAnimation = null;
-    if (reducedMq.matches) { barEl.style.transform = "scaleX(1)"; return; }
-    barEl.style.transform = "scaleX(1)";
-    barAnimation = barEl.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
-      { duration: 60000, easing: "linear", fill: "forwards" });
+    barDeadline = deadline;
+    var remaining = Math.max(0, deadline - Date.now());
+    barEl.style.transform = "scaleX(" + remaining / 60000 + ")";
+    barAnimation = barEl.animate([{ transform: barEl.style.transform }, { transform: "scaleX(0)" }],
+      { duration: remaining, easing: "linear", fill: "forwards" });
+  }
+  function finishShift() {
+    cancelAnimationFrame(shiftFrame);
+    prevStack.style.transform = '';
+    while (prevStack.children.length > 2) prevStack.lastElementChild.remove();
   }
   function renderDraft(d) {
-    var r = d.done.slice().reverse();
-    put(prevEls[0], "p0", r[0] || "");
-    put(prevEls[1], "p1", r[1] || "");
+    if (d.done.length !== doneCount) {
+      var animate = !reducedMq.matches && !resuming && d.done.length === doneCount + 1;
+      finishShift();
+      if (!animate) prevStack.replaceChildren();
+      var lines = animate ? d.done.slice(-1) : d.done.slice(-2);
+      lines.forEach(function (text) {
+        var line = document.createElement('div');
+        line.className = 'prev-line';
+        line.textContent = text;
+        prevStack.prepend(line);
+      });
+      Array.from(prevStack.children).forEach(function (line, index) { line.id = 'prev-' + index; });
+      doneCount = d.done.length;
+      if (animate) {
+        var pitch = parseFloat(getComputedStyle(scriptEl).lineHeight);
+        var started = performance.now();
+        prevStack.style.transform = 'translateY(' + pitch + 'px)';
+        var shift = function (now) {
+          var progress = Math.min(1, (now - started) / LINE_SHIFT_MS);
+          prevStack.style.transform = 'translateY(' + pitch * (1 - lineShiftProgress(progress)) + 'px)';
+          if (progress < 1) shiftFrame = requestAnimationFrame(shift);
+          else finishShift();
+        };
+        shiftFrame = requestAnimationFrame(shift);
+      }
+    }
     put(curEl, "cur", d.cur);
     put(countEl, "count", d.done.length + d.cur.length ? words(d) : "Type to start");
   }
@@ -139,8 +173,15 @@ import { denyFeedback } from './feedback.js';
   function render(t) {
     if (t < lastT) lastT = -1;
     renderDeny(t);
+    if (t < WARN_END) startBar();
+    else {
+      if (barAnimation) barAnimation.cancel();
+      barAnimation = null;
+      barDeadline = null;
+      barEl.style.transform = 'scaleX(0)';
+    }
     if (t < SILENT_END) {
-      if (setPhase("type")) startBar();
+      setPhase("type");
       setWash(null);
       numeralEl.textContent = "";
       captionEl.textContent = "";
@@ -188,8 +229,10 @@ import { denyFeedback } from './feedback.js';
 
   function renderReduced() {
     setPhase("still");
-    barAnimation = barEl.getAnimations()[0] || null;
     if (barAnimation) barAnimation.cancel();
+    barAnimation = null;
+    barDeadline = null;
+    finishShift();
     barEl.style.transform = "scaleX(1)";
     setWash(null);
     numeralEl.textContent = "";
@@ -202,15 +245,21 @@ import { denyFeedback } from './feedback.js';
   }
 
   function tick() {
-    if (document.hidden || document.getElementById('landing').hidden) return;
+    if (document.hidden || document.getElementById('landing').hidden) {
+      visible = false;
+      barDeadline = null;
+      return;
+    }
+    resuming = !visible;
+    visible = true;
     if (reducedMq.matches) { renderReduced(); return; }
     render((Date.now() - t0) % LOOP);
   }
 
-  startBar();
   tick();
   setInterval(tick, 50);
-  if (reducedMq.addEventListener) reducedMq.addEventListener("change", function () { barAnimation = null; tick(); });
+  if (reducedMq.addEventListener) reducedMq.addEventListener("change", tick);
+  document.addEventListener('visibilitychange', tick);
   document.fonts.ready.then(function () { placeStatus(); });
   window.addEventListener("resize", placeStatus);
 })();

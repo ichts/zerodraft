@@ -4,6 +4,9 @@
 // state instead of being dropped. Reduce Motion keeps the flash alone. This is
 // the Mac room's case 44 treatment on the web; the two surfaces must not drift.
 
+export const LINE_SHIFT_MS = 180;
+export const lineShiftProgress = progress => 1 - (1 - progress) ** 3;
+
 const SHAKE_MS = 200;
 const FLASH_MS = 220;
 
@@ -19,9 +22,10 @@ function currentTranslateX(paper) {
 }
 
 export function denyFeedback(paper, hairline) {
+  const from = currentTranslateX(paper);
+  const opacity = hairline ? getComputedStyle(hairline).opacity : 0;
   paper.getAnimations().forEach(animation => animation.cancel());
   if (!reducedMotion()) {
-    const from = currentTranslateX(paper);
     paper.animate([
       { transform: `translateX(${from}px)`, offset: 0 },
       { transform: 'translateX(-3px)', offset: .18 },
@@ -33,7 +37,7 @@ export function denyFeedback(paper, hairline) {
   if (hairline) {
     hairline.getAnimations().forEach(animation => animation.cancel());
     hairline.animate([
-      { opacity: 0, offset: 0 },
+      { opacity, offset: 0 },
       { opacity: 1, offset: .08 },
       { opacity: 1, offset: .55 },
       { opacity: 0, offset: 1 }

@@ -1,5 +1,5 @@
 import { fresh, advance, append, clock, wordCount } from './session.mjs';
-import { denyFeedback } from './feedback.js';
+import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 
 const $ = id => document.getElementById(id);
 const room = $('room');
@@ -10,7 +10,6 @@ const bar = $('room-bar');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const insertions = new Set(['insertText', 'insertParagraph', 'insertLineBreak']);
 const SESSION_MS = 60000;
-const SHIFT_MS = 180;
 const CONFIRM_MS = 2000;
 const EXIT_HINT = 'Press Esc again to leave and delete the draft.';
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
@@ -90,14 +89,14 @@ function syncBar(now) {
   if (state.started === null) { stepBar(1); return; }
   const remaining = Math.max(0, state.started + SESSION_MS - now);
   if (reduced.matches) {
-    if (now - barSteppedAt >= 500) { barSteppedAt = now; stepBar(remaining / SESSION_MS); }
+    if (barAnimation || now - barSteppedAt >= 500) { barSteppedAt = now; stepBar(remaining / SESSION_MS); }
     return;
   }
   if (barAnimation && barStarted === state.started) return;
   barAnimation?.cancel();
   barStarted = state.started;
-  bar.style.transform = 'scaleX(1)';
-  barAnimation = bar.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }],
+  bar.style.transform = `scaleX(${remaining / SESSION_MS})`;
+  barAnimation = bar.animate([{ transform: bar.style.transform }, { transform: 'scaleX(0)' }],
     { duration: remaining, easing: 'linear', fill: 'forwards' });
 }
 
@@ -119,8 +118,8 @@ function fitEditor({ animate = false } = {}) {
   shiftTarget = target;
   shiftRunning = true;
   const shift = now => {
-    const progress = Math.min(1, (now - started) / SHIFT_MS);
-    editor.scrollTop = from + (target - from) * (1 - (1 - progress) ** 3);
+    const progress = Math.min(1, (now - started) / LINE_SHIFT_MS);
+    editor.scrollTop = from + (target - from) * lineShiftProgress(progress);
     if (progress < 1) shiftFrame = requestAnimationFrame(shift);
     else shiftRunning = false;
   };

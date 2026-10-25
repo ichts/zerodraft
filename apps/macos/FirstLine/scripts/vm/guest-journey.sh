@@ -18,8 +18,13 @@
 #            posted at the element's accessibility frame centre, and every keystroke
 #            is a real HID key event. Accessibility/Screen Recording belong to the
 #            prepared golden image (scripts/vm/prepare-guest.sh) through the
-#            sshd-keygen-wrapper TCC grants the base image already ships. The
-#            licensed-launch case runs a COPY of the installed app whose Info.plist
+#            sshd-keygen-wrapper TCC grants the base image already ships. Evidence
+#            video is a timestamped frame stream rather than `screencapture -v`:
+#            the -v recorder buffers the whole recording in memory and only writes
+#            the file when its -V cap expires, so any signal or crash loses every
+#            frame. Frames already captured survive, carry exact wall-clock times
+#            and are assembled into one continuous screen.mov by the host script.
+#            The licensed-launch case runs a COPY of the installed app whose Info.plist
 #            points at a loopback Ed25519 fixture, because the shipped binary trusts
 #            only the production public key; the shipped app itself is what the
 #            install, trial-launch and three-session cases exercise.
@@ -37,6 +42,10 @@ work="$(mktemp -d /tmp/wid-journey.XXXXXX)"
 failures=0
 pid=''
 rec_pid=''
+rec_dir=''
+rec_manifest=''
+rec_started=''
+rec_stop="$work/stop-recording"
 fixture_pid=''
 mnt=''
 steps=0
@@ -57,28 +66,30 @@ stop_app() {
 # Invoked indirectly by the EXIT trap.
 # shellcheck disable=SC2329
 cleanup() {
-  local status=$? recorder_status=0 recorder_started=$rec_pid i
+  local status=$? frames=0 i
   trap - EXIT
   stop_app
   [[ -n "$fixture_pid" ]] && { kill "$fixture_pid" 2>/dev/null; wait "$fixture_pid" 2>/dev/null; }
-  if [[ -n "$recorder_started" ]]; then
+  if [[ -n "$rec_pid" ]]; then
     if kill -0 "$rec_pid" 2>/dev/null; then
-      kill -INT "$rec_pid" 2>/dev/null || bad 'could not stop the screen recorder'
-      for i in {1..100}; do kill -0 "$rec_pid" 2>/dev/null || break; sleep 0.1; done
-      kill -0 "$rec_pid" 2>/dev/null && { bad 'screen recorder did not finish after stopping'; kill -TERM "$rec_pid" 2>/dev/null; }
+      : >"$rec_stop"
+      for i in {1..40}; do kill -0 "$rec_pid" 2>/dev/null || break; sleep 0.25; done
+      kill -0 "$rec_pid" 2>/dev/null && { bad 'the frame recorder did not stop'; kill -KILL "$rec_pid" 2>/dev/null; }
     else
-      bad 'screen recorder exited before the journey ended'
+      bad 'the frame recorder exited before the journey ended'
     fi
-    wait "$rec_pid" || recorder_status=$?
-    [[ "$recorder_status" -eq 0 ]] || bad "screen recorder exited with status $recorder_status"
-    if [[ -s "$evidence/screen.mov" ]]; then pass 'continuous screen.mov recorded'; else bad 'screen.mov missing or empty'; fi
+    wait "$rec_pid" 2>/dev/null
+    printf '%s\t%s\n' "$rec_started" "$(now_ms)" >"$evidence/recording-span.tsv"
+    frames="$(wc -l <"$rec_manifest" 2>/dev/null | tr -d ' ')"
+    [[ "${frames:-0}" -ge 30 ]] && pass "captured $frames timestamped frames for the evidence video" \
+      || bad "the frame recorder captured only ${frames:-0} frames"
   else
-    bad 'screen recorder was never started'
+    bad 'the frame recorder was never started'
   fi
   [[ -n "$mnt" ]] && hdiutil detach "$mnt" -quiet -force 2>/dev/null
   rm -rf "$work"
-  printf '{"failures": %d, "steps": %d, "macos": "%s", "model": "%s"}\n' \
-    "$failures" "$steps" "$(sw_vers -productVersion)" "$(sysctl -n hw.model)" >"$evidence/summary.json"
+  printf '{"failures": %d, "steps": %d, "frames": %d, "macos": "%s", "model": "%s"}\n' \
+    "$failures" "$steps" "${frames:-0}" "$(sw_vers -productVersion)" "$(sysctl -n hw.model)" >"$evidence/summary.json"
   [[ "$failures" -eq 0 ]] || status=1
   log "FINAL failures: $failures; exit $status"
   exit "$status"
@@ -89,14 +100,39 @@ trap cleanup EXIT
 
 snap() { # snap <name> [-before|-after already folded into the name]
   steps=$((steps + 1))
-  local base="$evidence/$(printf '%02d' "$steps")-$1"
+  local base
+  base="$evidence/$(printf '%02d' "$steps")-$1"
   screencapture -x "$base.png" || bad "screenshot failed for $1"
   [[ -n "$pid" ]] && "$rig" tree --pid "$pid" >"$base.json" 2>/dev/null
   printf '%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$base" >>"$evidence/steps.tsv"
 }
 
+now_ms() { /usr/bin/perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000'; }
+
+# The evidence recorder: one timestamped JPEG per tick until the stop file appears.
+# Ordering, not duration, carries the truth - the host assembles screen.mov from
+# the recorded wall-clock times, so a slow tick stretches the frame instead of
+# silently dropping coverage, and an interrupted run still has every earlier frame.
+record_frames() {
+  local n=0 frame
+  # The first capture in a fresh VM pays for the capture-session handshake (seconds,
+  # not milliseconds), so warm up before the timestamped stream starts.
+  screencapture -x -t jpg "$work/warmup.jpg" 2>/dev/null || true
+  rm -f "$work/warmup.jpg"
+  while [[ ! -e "$rec_stop" ]]; do
+    frame="$(printf '%06d' "$n")"
+    screencapture -x -t jpg "$rec_dir/$frame.jpg" 2>/dev/null || true
+    [[ -s "$rec_dir/$frame.jpg" ]] && printf '%s\t%s\n' "$(now_ms)" "$frame.jpg" >>"$rec_manifest"
+    n=$((n + 1))
+    sleep 0.25
+  done
+}
+
 screen_text() { [[ -n "$pid" ]] && "$rig" text --pid "$pid" 2>/dev/null | jq -r '.text // ""'; }
-has_re() { screen_text | grep -qE -- "$1"; }
+# grep -q on a pipeline closes it on the first match; under `set -o pipefail` the
+# SIGPIPE that gives jq then turns a real match into a failed assertion. Read the
+# text on its own line instead, where -q only ends grep's own read.
+has_re() { grep -qE -- "$1" <<<"$(screen_text)"; }
 wait_re() { # wait_re <regex> [timeout]
   [[ -n "$pid" ]] || return 1
   "$rig" wait --pid "$pid" --text "$1" --timeout "${2:-20}" >/dev/null 2>&1
@@ -164,11 +200,23 @@ watch_seen() { # watch_seen <jsonl> <regex> <label>
 
 # --- 1. recording and preflight ---------------------------------------------
 
-[[ ! -e "$evidence/screen.mov" ]] || { bad 'screen.mov already exists; use a fresh evidence directory'; exit 1; }
-screencapture -v -V 1200 "$evidence/screen.mov" 2>"$evidence/recorder.log" & rec_pid=$!
-sleep 2
-kill -0 "$rec_pid" 2>/dev/null || { bad 'screen recording failed to start'; exit 1; }
-pass 'continuous screen recording started'
+[[ ! -e "$evidence/frames.tsv" ]] || { bad 'frames.tsv already exists; use a fresh evidence directory'; exit 1; }
+rec_dir="$evidence/frames"
+rec_manifest="$evidence/frames.tsv"
+mkdir -p "$rec_dir"
+: >"$rec_manifest"
+rec_started="$(now_ms)"
+record_frames &
+rec_pid=$!
+recorded=0
+for _ in {1..60}; do
+  recorded="$(wc -l <"$rec_manifest" | tr -d ' ')"
+  [[ "${recorded:-0}" -ge 3 ]] && break
+  kill -0 "$rec_pid" 2>/dev/null || break
+  sleep 0.5
+done
+[[ "${recorded:-0}" -ge 3 ]] && pass 'continuous screen recording started' \
+  || { bad "the frame recorder is not writing frames (${recorded:-0} so far)"; exit 1; }
 
 "$rig" trusted | jq -e '.accessibility == true' >/dev/null && pass 'guest accessibility grant is live' \
   || bad 'guest accessibility grant is missing'
@@ -256,11 +304,14 @@ for used in 1 2 3; do
   click_el AXRadioButton '1 minute' || { bad "session $used: no 1-minute control"; exit 1; }
   snap "session-$used-minute-after"
   [[ "$(screen_text)" == *"1 minute"* ]] || bad "session $used: the 1-minute choice is not on screen"
-  click_el AXButton '^Begin writing$' || { bad "session $used: no Begin writing button"; exit 1; }
+  click_el AXButton 'Begin writing' || { bad "session $used: no Begin writing button"; exit 1; }
   wait_re 'Type to start' 20 || { bad "session $used: the writing room did not open"; exit 1; }
   snap "session-$used-room"
   sentence='I watched the rain cross the garden.'
-  started="$(python3 -c 'import time; print(time.monotonic())')"
+  # Wall clock, not time.monotonic(): a virtualized guest can freeze the monotonic
+  # clock (observed: 6 ms of monotonic time across 3 s of real time), which would
+  # keep every elapsed-time loop running forever.
+  started="$(now_ms)"
   type_text "$sentence" || { bad "session $used: typing failed"; exit 1; }
   snap "session-$used-typed-after"
   if [[ "$(screen_text)" == *"$sentence"* ]]; then
@@ -281,7 +332,7 @@ for used in 1 2 3; do
     typed="$sentence"
     continuation=' The clouds are moving east and the birds have started singing again.'
     i=0
-    while python3 -c 'import sys,time; sys.exit(not (time.monotonic() - float(sys.argv[1]) < 57))' "$started"; do
+    while [[ $(( $(now_ms) - started )) -lt 57000 ]]; do
       char="${continuation:i:1}"
       type_text "$char" || { bad 'session 3: continuous typing failed'; exit 1; }
       typed="$typed$char"
@@ -290,7 +341,7 @@ for used in 1 2 3; do
     snap 'session-3-kept-before'
     wait_re 'You wrote it down\.' 30 && pass 'session 3: the full minute completed into the kept receipt' \
       || bad 'session 3: never reached the kept receipt'
-    python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
+    [[ $(( $(now_ms) - started )) -ge 60000 ]] \
       && pass 'session 3: the deadline was a real minute, not a shortened one' \
       || bad 'session 3: completed before a full minute elapsed'
     has_re '1 MINUTE\. ' && has_re ' WORDS\.' && ! has_re 'DRAFT DELETED AT ' \
@@ -355,19 +406,21 @@ if [[ -n "$fixture_bin" && -x "$fixture_bin" ]]; then
     launch_watched "$qa_app" 3 "$evidence/launch-fixture-first.jsonl" || { bad 'the fixture build did not launch'; exit 1; }
     wait_re 'Activate Write It Down' 30 && pass 'fixture build opens on the activation page before activation' \
       || bad 'fixture build did not open on the activation page'
-    click_el AXTextField '.' || bad 'fixture build: no activation key field'
+    click_el AXTextField '' || bad 'fixture build: no activation key field'
     type_text 'window-qa-order'
     snap 'fixture-key-typed'
-    click_el AXButton '^Activate$' || bad 'fixture build: no Activate button'
-    wait_re 'License active on this Mac\.' 40 && pass 'the fixture activation produced an active signed license' \
+    click_el AXButton '^Activate' || bad 'fixture build: no Activate button'
+    wait_re 'This Mac is licensed\.' 40 && pass 'the fixture activation produced an active signed license' \
       || bad 'the fixture activation did not reach an active license'
     snap 'fixture-activated'
     stop_app
     sleep 1
     snap 'licensed-relaunch-before'
     launch_watched "$qa_app" 5 "$evidence/launch-licensed.jsonl" || { bad 'the licensed app did not relaunch'; exit 1; }
-    wait_re 'License active\.' 40 && pass 'licensed relaunch goes straight to the licensed home' \
+    wait_re 'Begin writing' 40 && pass 'licensed relaunch goes straight to the licensed home' \
       || bad 'licensed relaunch did not reach the licensed home'
+    has_re 'Free trial:' && bad 'the licensed home still advertises the free trial' \
+      || pass 'the licensed home does not advertise the trial'
     snap 'licensed-relaunch-after'
     watch_never "$evidence/launch-licensed.jsonl" 'Activate Write It Down' 'licensed launch'
     watch_never "$evidence/launch-licensed.jsonl" 'Enter your order number' 'licensed launch'
@@ -389,7 +442,10 @@ cat >"$evidence/notes.md" <<EOF
 - DMG: $dmg
 - DMG SHA-256: $actual_sha
 - Driver: CGEvent HID keyboard/mouse posted inside the guest; accessibility reads for assertions; no AXPress
-- Recording: screen.mov (continuous, whole run), $(steps) timestamped step screenshots in steps.tsv
+- Recording: one timestamped JPEG per 0.25 s tick in frames/ (frames.tsv carries the
+  wall clock of each frame); the host assembles screen.mov from those times, so the
+  video stays continuous and an interrupted run keeps every frame it reached
+- Steps: $steps timestamped before/after screenshots in steps.tsv
 - Launch watchers: launch-trial.jsonl (no license), launch-licensed.jsonl (active signed fixture)
 - Failures: $failures
 EOF

@@ -794,3 +794,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
   implementation shortcut, never a recorded decision). D-047's assertion ownership, its six-lens gate and its
   exit codes stand.
+
+## D-046: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
+
+- Date: 2026-10-25
+- Decision: the analyser's forbidden-surface rule is keyed to the launch stream, not to the text alone. The
+  fixture launch is started to show the activation page before activation, so `launch-fixture-first.jsonl`
+  is judged only for the transience of its states and never against the forbidden list; the trial and the
+  licensed relaunch streams keep failing on it under their own assertion ids, and no PASS line is printed
+  for a stream the rule does not judge. `panel-lib.py gate` reports the review state as the command's own
+  exit status (0 complete, 79 not) so `vm-journey.sh` cannot turn an unparseable printed value into a pass.
+  A sign-off is `accepted` only for the recorded `accepted` verdict; an unknown, renamed or absent verdict
+  line is written as not accepted and names the verdict the record states.
+- Reason: the fixture stream's contract requires the surface the forbidden list names, so a clean DMG run
+  was rejected for showing exactly the screen the rig demands, while a non-numeric gate value silently
+  skipped the 79 exit, and a renamed verdict line could sign off with no criterion at all.
+- Supersedes: D-043's "the same surface in another launch stream fails under its own id" only for a stream
+  whose own contract requires that surface, and D-044's read of the gate as a number. D-043's six named
+  lenses, its exit codes and its declared-defect keying stand.

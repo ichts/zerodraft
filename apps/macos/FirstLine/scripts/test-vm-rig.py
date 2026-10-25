@@ -491,6 +491,24 @@ def check_launch_assertion_ids(workdir):
     need("FAIL [licensed-launch-no-activation-page]" in licensed_run.stdout,
          f"the licensed relaunch lost its declared-defect assertion id: {licensed_run.stdout[-400:]}")
 
+    # The fixture build is launched to show the activation page before it is activated, so
+    # that stream is judged for the transient and never against the forbidden surfaces.
+    os.remove(os.path.join(evidence, "launch-licensed-1.jsonl"))
+    write_launch_stream(os.path.join(evidence, "launch-fixture-first.jsonl"))
+    fixture_run = run([sys.executable, ANALYSER, evidence])
+    need(fixture_run.returncode == 0,
+         f"the fixture launch the rig requires on the activation page failed the analysis: "
+         f"{fixture_run.stdout[-400:]}")
+    need("FAIL [launch-fixture-first-no-activation-page]" not in fixture_run.stdout
+         and "PASS [launch-fixture-first-no-activation-page]" not in fixture_run.stdout,
+         f"the fixture launch was judged against the forbidden surfaces: {fixture_run.stdout[-400:]}")
+    with open(os.path.join(evidence, "findings.json"), encoding="utf-8") as handle:
+        transient = [finding for finding in json.load(handle)["findings"]
+                     if finding["kind"] == "transient-launch-state"]
+    need(len(transient) == 1 and transient[0]["source"] == "launch-fixture-first.jsonl"
+         and transient[0]["assertion"] is None and transient[0]["severity"] == "low",
+         f"the fixture launch transient is not recorded as informational only: {transient!r}")
+
 
 def analysis_capability(panel):
     return next((capability for capability in panel.get("capabilities") or []
@@ -862,8 +880,8 @@ def check_review_record_extra_lens(workdir):
     need(not any(line.startswith("panel_not_run:") for line in lines),
          f"a complete review carried a refusal reason: {lines!r}")
     gate = run([sys.executable, PANEL_LIB, "gate", evidence])
-    need(gate.stdout.strip() == "0",
-         f"a complete seven-lens review would fail the panel gate: {gate.stdout!r}")
+    need(gate.returncode == 0,
+         f"a complete seven-lens review would fail the panel gate: {gate.returncode!r}")
 
     renamed = os.path.join(workdir, "renamed lens")
     os.makedirs(renamed)
@@ -887,8 +905,8 @@ def check_review_record_extra_lens(workdir):
     need("panel: not run" in renamed_lines,
          f"a renamed lens list signed off without its required name: {renamed_lines!r}")
     gate = run([sys.executable, PANEL_LIB, "gate", renamed])
-    need(gate.stdout.strip() == "79",
-         f"a review missing a required lens would pass the panel gate: {gate.stdout!r}")
+    need(gate.returncode == 79,
+         f"a review missing a required lens would pass the panel gate: {gate.returncode!r}")
 
     with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
         handle.write("artifact: fixture\nverdict: rejected\n")
@@ -900,8 +918,33 @@ def check_review_record_extra_lens(workdir):
     need("sign_off: not accepted - an assertion or the recording failed" in lines,
          f"a rejected run recorded an accepted sign-off: {lines!r}")
     gate = run([sys.executable, PANEL_LIB, "gate", evidence])
-    need(gate.stdout.strip() == "0",
-         f"a rejected run with a complete review broke the panel gate: {gate.stdout!r}")
+    need(gate.returncode == 0,
+         f"a rejected run with a complete review broke the panel gate: {gate.returncode!r}")
+
+    # An unknown or missing verdict is not an acceptance: the record states one, so a
+    # remedy run over a bundle with a renamed verdict line must not sign it off.
+    for verdict_line, stated in (("verdict: accepted-by-acclamation\n", "accepted-by-acclamation"),
+                                 ("", "none")):
+        with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
+            handle.write("artifact: fixture\n" + verdict_line)
+        recorded = subprocess.run([sys.executable, PANEL_LIB, "record", evidence],
+                                  capture_output=True, text=True, timeout=120)
+        need(recorded.returncode == 0, f"record failed: {recorded.stderr[:300]}")
+        with open(os.path.join(evidence, "acceptance.txt"), encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+        need("sign_off: accepted" not in lines,
+             f"an unrecorded verdict signed off as accepted: {lines!r}")
+        need("sign_off: not accepted - the record states no accepted verdict (%s)" % stated in lines,
+             f"the refusal does not name the verdict the record states: {lines!r}")
+
+    # A record whose panel state is unreadable fails the gate instead of passing it.
+    for state in ("maybe", ""):
+        with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
+            handle.write("artifact: fixture\nverdict: accepted\npanel: %s\n" % state)
+        gate = run([sys.executable, PANEL_LIB, "gate", evidence])
+        need(gate.returncode == 79,
+             f"a review record with panel state {state!r} passed the panel gate: "
+             f"{gate.returncode!r}")
 
 
 def check_widrig_timeout(workdir):
@@ -957,6 +1000,32 @@ def check_declared_gap_remedy(workdir):
         lines = handle.read().splitlines()
     need("panel_command: " + remedy in lines,
          f"the bundle carries two different remedies: {lines!r} vs {remedy!r}")
+
+
+def check_lens_evidence_thumbnail(workdir):
+    evidence = os.path.join(workdir, "bundle")
+    panel = os.path.join(evidence, "panel")
+    thumbs = os.path.join(panel, "thumbs")
+    os.makedirs(thumbs)
+    solid_png(os.path.join(evidence, "03-home.png"), PALETTE[4])
+    solid_png(os.path.join(thumbs, "03-home.jpg"), PALETTE[4])
+    with open(os.path.join(panel, "panel.json"), "w", encoding="utf-8") as handle:
+        json.dump({"run": {"run": "fixture"},
+                   "lenses": [{"lens": "rams", "status": "complete",
+                               "model": "stub/model", "command": "pi --model stub/model",
+                               "answer": {"lens": "rams", "verdict": "sound",
+                                          "summary": "quiet",
+                                          "findings": [{
+                                              "severity": "minor", "title": "measure",
+                                              "why": "the measure narrows", "fix": "none",
+                                              "evidence": os.path.join(evidence, "03-home.png")}]}}]},
+                  handle)
+    rendered = run([sys.executable, PANEL_LIB, "report", evidence])
+    need(rendered.returncode == 0, f"report failed: {rendered.stderr[-300:]}")
+    with open(os.path.join(panel, "report.html"), encoding="utf-8") as handle:
+        report = handle.read()
+    need("data:image/jpeg;base64" in report.split("<h2>Six lenses</h2>", 1)[-1],
+         "the lens evidence capture the panel wrote a thumbnail for was not rendered")
 
 
 def check_review_record_remedy(workdir):
@@ -1046,6 +1115,7 @@ CHECKS = [
     ("launch assertion ids are keyed to their stream", check_launch_assertion_ids),
     ("lens summary reports completeness and reason", check_lens_status),
     ("design panel writes its stages from a bundle", check_panel_stages),
+    ("lens evidence renders the thumbnail the panel wrote", check_lens_evidence_thumbnail),
     ("a blocked review record is refreshed by its printed remedy", check_review_record_remedy),
     ("the launchd job receives the panel's environment", check_launchd_forwarding),
     ("the review record and the panel gate agree", check_review_record_extra_lens),

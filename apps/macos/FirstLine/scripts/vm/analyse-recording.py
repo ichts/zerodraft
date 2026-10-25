@@ -18,7 +18,10 @@
            only when the signal is unambiguous (a capture gap, a frozen screen for
            most of a minute, a forbidden surface that appears and vanishes during
            launch); everything else is recorded as an informational finding for the
-           review stage. Thresholds are named constants, not magic numbers. A
+           review stage. A forbidden surface fails only the launch stream that must
+           never show it: the fixture build is started to open on the activation page,
+           so its stream is judged for transience and never against that list.
+           Thresholds are named constants, not magic numbers. A
            frozen screen always fails, whatever steps.tsv says: the guest stamps
            steps on its own schedule, so a step inside the frozen window is a
            picture of the frozen screen and proves nothing about the app moving.
@@ -54,14 +57,18 @@ FLASH_MAX_FRAMES = 3
 # transient: it is what a person sees as a flash.
 TRANSIENT_MAX_MS = 3000
 # The assertion id a declared known defect may excuse. It belongs to the licensed
-# relaunch streams; the same surface anywhere else fails under its own id.
+# relaunch streams; the same surface in any other stream the rule judges fails under its
+# own id.
 DECLARED_LAUNCH_ASSERTION = "licensed-launch-no-activation-page"
-# Surfaces that must never appear during the launch of a licensed install.
+# Surfaces that must never appear during the launch of a trial or a licensed relaunch.
 FORBIDDEN_LAUNCH_TEXT = [
-    (re.compile(r"Activate Write It Down", re.I), DECLARED_LAUNCH_ASSERTION),
-    (re.compile(r"Enter your order number", re.I), DECLARED_LAUNCH_ASSERTION),
-    (re.compile(r"License not activated on this Mac", re.I), DECLARED_LAUNCH_ASSERTION),
+    re.compile(r"Activate Write It Down", re.I),
+    re.compile(r"Enter your order number", re.I),
+    re.compile(r"License not activated on this Mac", re.I),
 ]
+# The launch stream whose own contract requires the activation page: the fixture build is
+# started to show it before activation, so only its transience is judged, never the surface.
+LAUNCH_STREAMS_EXPECTING_ACTIVATION = {"launch-fixture-first"}
 # Every frame is scaled to this width before differencing, so the metric is cheap
 # and comparable between runs (a full-size difference would be dominated by noise).
 DIFF_WIDTH = 192
@@ -320,6 +327,11 @@ def launch_assertion_id(stream_name):
     return f"{stream_name[:-len('.jsonl')]}-no-activation-page"
 
 
+def judged_by_forbidden_rule(stream_name):
+    """Whether the forbidden-surface rule applies to this launch stream at all."""
+    return stream_name[:-len(".jsonl")] not in LAUNCH_STREAMS_EXPECTING_ACTIVATION
+
+
 def launch_findings(evidence, steps):
     findings = []
     for name in sorted(os.listdir(evidence)):
@@ -340,6 +352,7 @@ def launch_findings(evidence, steps):
                 if states and states[-1][1] == text:
                     continue
                 states.append((moment, text))
+        judged = judged_by_forbidden_rule(name)
         for index, (moment, text) in enumerate(states):
             end = states[index + 1][0] if index + 1 < len(states) else moment
             lived = end - moment
@@ -347,13 +360,12 @@ def launch_findings(evidence, steps):
                 continue
             if lived > TRANSIENT_MAX_MS:
                 continue
-            forbidden = [(pattern, launch_assertion_id(name))
-                         for pattern, assertion in FORBIDDEN_LAUNCH_TEXT
-                         if pattern.search(text)]
+            forbidden = [launch_assertion_id(name) for pattern in FORBIDDEN_LAUNCH_TEXT
+                         if judged and pattern.search(text)]
             findings.append({
                 "kind": "transient-launch-state",
                 "severity": "high" if forbidden else "low",
-                "assertion": forbidden[0][1] if forbidden else None,
+                "assertion": forbidden[0] if forbidden else None,
                 "t_start": moment,
                 "t_end": end,
                 "duration_ms": lived,
@@ -397,7 +409,8 @@ def main(argv):
     launch_assertions = sorted({
         launch_assertion_id(name)
         for name in os.listdir(evidence)
-        if name.startswith("launch-") and name.endswith(".jsonl")})
+        if name.startswith("launch-") and name.endswith(".jsonl")
+        and judged_by_forbidden_rule(name)})
     # One finding per distinct window and kind: the detectors can hit the same window
     # from two directions (a dip and its recovery), which is noise for a reviewer.
     seen = set()

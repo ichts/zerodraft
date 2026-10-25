@@ -15,7 +15,9 @@
          `{"status": "complete", "answer": <validated answer>}` or `{"status":
          "unavailable", "error": "<reason>"}`); a JSON clip record (origin, seek and
          the extracted frame names); the diagnostic summary `status` prints from the
-         panel stages and the panel gate exit code `gate` reads from the review record;
+         panel stages and the panel gate `gate` reads from the review record and exits
+         with (0 complete, 79 not), so an incomplete review is a failing command rather
+         than a number its caller has to compare;
          the pasteable re-run command for a bundle; the derived review lines of
          acceptance.txt, with re-run provenance; or a self-contained static HTML report
          whose images are inlined so the bundle can be read on its own.
@@ -31,7 +33,10 @@
            observed failure of a requested lens or the required lens that is missing,
            never a fixed probe result. Report rendering never invents content: a stage
            that did not run is rendered as a declared gap with its recorded reason, and
-           a lens with no answer is rendered as unavailable rather than omitted.
+           a lens with no answer is rendered as unavailable rather than omitted. Nothing
+           here signs off by default: the sign-off is `accepted` only for the recorded
+           `accepted` verdict, and the gate command fails for any record that is not
+           complete.
 """
 
 import argparse
@@ -322,6 +327,8 @@ def sign_off_text(verdict, state):
         return "blocked - the six-lens review did not run (%s)" % state["reason"]
     if verdict == "accepted-with-declared-defect":
         return "not accepted - the declared known defect reproduced on this artifact"
+    if verdict != "accepted":
+        return "not accepted - the record states no accepted verdict (%s)" % (verdict or "none")
     return "accepted"
 
 
@@ -497,6 +504,13 @@ def render_vision_checks(checks):
             "<th>Check step</th><th>Why</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
 
 
+def evidence_thumb(panel_dir, reference):
+    """The thumbnail design-panel.sh wrote for a lens's evidence capture."""
+    if not reference:
+        return ""
+    return image(panel_dir, os.path.splitext(os.path.basename(reference))[0] + ".jpg")
+
+
 def render_lenses(lenses, panel_dir):
     if not lenses:
         return "<p class=muted>No lens reviews were recorded.</p>"
@@ -517,9 +531,7 @@ def render_lenses(lenses, panel_dir):
         items = []
         for finding in findings:
             reference = finding.get("evidence") or ""
-            thumb = ""
-            if reference.endswith(".png"):
-                thumb = image(panel_dir, os.path.basename(reference))
+            thumb = evidence_thumb(panel_dir, reference)
             items.append(f"""<div class=finding>{severity_badge(finding.get('severity'))}
 <strong>{esc(finding.get('title'))}</strong>
 <div>{esc(finding.get('why'))}</div>
@@ -650,8 +662,9 @@ def main():
         if len(sys.argv) < 3:
             print("usage: panel-lib.py gate <evidence-dir>", file=sys.stderr)
             return 2
-        print(panel_gate(sys.argv[2]))
-        return 0
+        code = panel_gate(sys.argv[2])
+        print(code)
+        return code
     if command == "report":
         return report()
     print(f"unknown command {command}", file=sys.stderr)

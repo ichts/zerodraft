@@ -32,8 +32,10 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await page.screenshot({ path: info.outputPath('mac.png'), fullPage: true });
 });
 
-test('every shipped link resolves and every fragment exists', async ({ page, request }) => {
-  const base = new URL('/writeitdown/', 'http://127.0.0.1:8015');
+test('every shipped link resolves and every fragment exists', async ({ page, request }, info) => {
+  // Derived from the configured baseURL so the suite still holds its own origin when it runs on
+  // another port; the default remains http://127.0.0.1:8015/writeitdown/.
+  const base = new URL('/writeitdown/', info.project.use.baseURL);
   for (const file of shipped) {
     await page.goto(file);
     const hrefs = await page.locator('a[href]').evaluateAll(links => links.map(a => a.getAttribute('href')));
@@ -167,45 +169,48 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(card.locator('.tag, .saved')).toHaveCount(0);
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
-  const cta = page.locator('.cta');
-  await expect(cta.locator('> *'), 'the band under the demo holds exactly the door and its line').toHaveCount(2);
-  await expect(cta.locator('> a'), 'the only entrance under the demo is the 60-second door').toHaveCount(1);
-  await expect(cta).not.toContainText('Stop typing for 8 seconds');
-  await expect(cta.locator('.cta-note'), 'one line of reassurance under the door').toHaveText('No account. Nothing is saved. Just the timer.');
+  const cta = page.locator('#landing > .cta');
+  await expect(cta.locator('> *'), 'the entrance band holds the door and nothing else').toHaveCount(1);
+  await expect(cta.locator('> a'), 'the only entrance is the 60-second door').toHaveCount(1);
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
+  await expect(page.locator('#landing a.btn-primary[href="#trial"]'), 'one door on the page, not two').toHaveCount(1);
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
   const layout = await page.evaluate(() => {
     const pin = document.createElement('style');
     pin.textContent = '.home{--sans:Arial, sans-serif}';
     document.head.append(pin);
     const r = s => document.querySelector(s).getBoundingClientRect();
-    const out = { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), note: r('.cta-note'), points: r('.points'), vh: innerHeight };
+    const home = document.querySelector('#landing');
+    const token = n => parseFloat(getComputedStyle(home).getPropertyValue(n));
+    const out = {
+      card: r('#paper'), sub: r('.hero-sub'), door: r('#landing > .cta .btn'), vh: innerHeight,
+      ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing > .cta')).paddingTop),
+      stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
+      tokens: { s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
+    };
     pin.remove();
     return out;
   });
-  expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
-  expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);
-  expect(layout.door.top, 'the room button sits under the demo card').toBeGreaterThan(layout.card.bottom);
-  expect(layout.door.bottom, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
-  expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred under the sheet').toBeLessThan(1);
-  expect(layout.note.top, 'the reassurance line sits under the room button').toBeGreaterThan(layout.door.bottom);
-  expect(layout.note.bottom, 'the reassurance line is on the first screen with the room button').toBeLessThanOrEqual(layout.vh);
-  expect(Math.abs(layout.note.left + layout.note.width / 2 - (layout.card.left + layout.card.width / 2)), 'the reassurance line is centred under the sheet').toBeLessThan(1);
-  // The three below-the-fold points, in the captain's words, as one sentence per column.
-  await expect(page.locator('.points > li')).toHaveText([
-    'You can only write forward, and if you stop for a few seconds the draft is deleted, so the only way out is through.',
-    "Use it when you've been circling a thought for days and still haven't said it plainly.",
-    'Nothing you write is saved, on the web or on the Mac.',
-  ]);
-  expect(layout.points.top, 'the points start below the first viewport').toBeGreaterThanOrEqual(layout.vh);
+  const phone = page.viewportSize().width <= 820;
+  expect(layout.card.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
+  expect((Math.min(layout.card.bottom, layout.vh) - layout.card.top) / layout.vh, 'at least 60% of the demo paper is on the first screen').toBeGreaterThanOrEqual(0.6);
+  expect(layout.door.top, 'the door sits under the subheadline').toBeGreaterThan(layout.sub.bottom);
+  expect(layout.door.bottom, 'the door is on the first screen').toBeLessThanOrEqual(layout.vh);
+  expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
+  expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred over the sheet').toBeLessThan(1);
+  expect(layout.ctaTop, 'the headline group closes on the spacing scale').toBe(phone ? layout.tokens.s4 : layout.tokens.s5);
+  expect(layout.stageTop, 'the sheet gets the larger gap under the door').toBe(phone ? layout.tokens.s5 : layout.tokens.s7);
+
+  await expect(page.locator('#facts, .points, .callback'), 'the facts table, the points band and the closing block are gone').toHaveCount(0);
+  await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');
+  await expect(page.locator('#landing')).not.toContainText(/Real rules, real numbers|Straight answers|A native writing room/);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
   await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
-  await expect(mac).toContainText('Your first 3 sessions are free. Free updates.');
   await expect(mac.locator('.facts')).toContainText('$4.99');
   await expect(mac.locator('.facts')).toContainText('2 Macs');
   await expect(mac.locator('.facts')).toContainText('14 days');
@@ -228,7 +233,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
 test('light is the default theme; the toggle switches to dark and remembers it', async ({ browser }) => {
   const context = await browser.newContext({ colorScheme: 'dark', storageState: { cookies: [], origins: [] } });
   const page = await context.newPage();
-  await page.goto('http://127.0.0.1:8015/writeitdown/index.html');
+  await page.goto('index.html');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await page.locator('#landing .home-nav [data-theme-toggle]').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -570,17 +575,12 @@ test('the Mac page wears the approved background A canvas, not the legacy beige 
   expect(mac.stage, `${mac.theme}: the purchase page and the landing share one canvas`).toBe(landing);
 });
 
-test('landing sections: heading tree, honest facts, FAQ matches its schema, call-back enters the room', async ({ page }) => {
+test('landing sections: heading tree, Mac facts, FAQ matches its schema, the door enters the room', async ({ page }) => {
   await page.goto('index.html');
   await expect(page.locator('#landing h1')).toHaveCount(1);
   await expect(page.locator('#landing h2')).toHaveText([
-    /What it feels like when you stop/, /Sixty seconds\. Forward only\. Nothing kept\./, 'Real rules, real numbers',
-    'Write It Down for Mac', 'Questions, answered', /We force you to write it down/]);
-  const ledger = page.locator('#facts .ledger');
-  for (const fact of ['Strict 5 s, Standard 8 s or Relaxed 12 s', '1, 5, 10, 20 or 30 minutes', '3 free sessions on the Mac, then $4.99 once', 'Free updates.', 'Trefoil Studio'])
-    await expect(ledger).toContainText(fact);
-  await expect(page.locator('#mac')).toContainText('macOS 14 Sonoma or later');
-
+    /What it feels like when you stop/, /Sixty seconds\. Forward only\. Nothing kept\./,
+    'Write It Down for Mac', 'Questions, answered']);
   const questions = page.locator('#faq details');
   await expect(questions).toHaveCount(8);
   await expect(questions.first()).toHaveAttribute('open', '');
@@ -608,7 +608,7 @@ test('landing sections: heading tree, honest facts, FAQ matches its schema, call
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mac.html#buy'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
-  await page.locator('.callback a.btn-primary').click();
+  await page.locator('#landing > .cta a.btn-primary').click();
   await expect(page.locator('#editor')).toBeFocused();
 });
 

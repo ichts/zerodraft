@@ -198,7 +198,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
 @keyframes wid-write{to{clip-path:inset(-10% -4% -20% 0)}}
 /* sheet (the paper): the demo.js preview */
-.stagewrap{max-width:var(--maxw);margin:var(--s4) auto 0;padding:0 var(--gut)}
+.stagewrap{max-width:var(--maxw);margin:var(--s7) auto 0;padding:0 var(--gut)}
 /* The sheet sits straight on the page (background option A). The captain's rule: the demo sheet is at least 60% of the first viewport. */
 .stagewrap{position:relative}
 .home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-paper:var(--red-soft);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:var(--lh-write)}
@@ -224,15 +224,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .prev-line:nth-child(2){opacity:.07}
 .home .prev-line:nth-child(n+3){opacity:0}
 .bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:2}
-/* the one button under the demo, with its one line of reassurance */
-.cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s4) var(--gut) 0;text-align:center}
-.cta-note{margin:12px 0 0;max-width:52ch;font:400 var(--t-ui)/1.5 var(--sans);color:var(--mute)}
-/* the three points under the fold: one sentence per column, sharing one hairline */
-.points{list-style:none;max-width:var(--maxw);margin:var(--s8) auto 0;padding:0 var(--gut);display:grid;grid-template-columns:repeat(3,1fr);gap:0 var(--s6)}
-.points li{padding-top:var(--s4);border-top:1px solid var(--hair-2);font:400 var(--t-body)/1.55 var(--sans);color:var(--ink)}
+/* the one button between the headline and the demo, and nothing else */
+.cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s5) var(--gut) 0;text-align:center}
 /* sections */
 .sect{max-width:var(--maxw);margin:0 auto;padding:var(--section) var(--gut) 0}
-.eyebrow{margin:0 0 14px;text-align:center;font:500 var(--t-small)/1.5 var(--sans);color:var(--mute)}
 .home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
 .home h2 .hand{font-size:1.5em;line-height:.8}
 .sub{margin:18px auto 0;max-width:46ch;text-align:center;font:400 var(--t-body)/1.55 var(--sans);color:var(--mute)}
@@ -261,10 +256,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mo .n{font:italic 400 150px/1 var(--serif);color:var(--red)}
 .mo .r{font:500 var(--t-small)/1.6 var(--sans);color:var(--red)}
 .mo .cur{display:inline-block;width:2px;height:.9em;background:var(--ink);vertical-align:-.1em;margin-left:2px}
-/* Mac block: card + price facts */
+/* Mac block: card + price facts. The heading and the two actions sit as one group beside the four
+   facts; the native-room paragraph that used to fill the left column is gone (D-047). */
 .home .mac-card{padding:clamp(28px,5vw,56px);display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
-.mac-card p{color:var(--mute);font:400 var(--t-body)/1.6 var(--sans);margin:14px 0 0;max-width:46ch}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
 .facts{list-style:none;margin:0;padding:0;display:grid}
 .facts li{display:flex;align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
@@ -279,13 +274,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .foot-grid nav a{display:block;margin:0 0 8px}
 .home-foot a:hover{color:var(--ink)}
 .home-foot .copy{padding:0 0 var(--s7);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--s2) var(--s5);font-size:13px}
-/* facts ledger */
-.ledger{margin-top:40px;background:var(--sheet);border:1px solid var(--hair);border-radius:var(--r-card);overflow:hidden}
-.ledger div{display:grid;grid-template-columns:minmax(150px,.7fr) 1.6fr;gap:var(--s5);padding:20px 28px;border-bottom:1px solid var(--hair)}
-.ledger div:last-child{border-bottom:0}
-.ledger b{font:500 22px/1.3 var(--serif);letter-spacing:-.01em}
-.ledger span{color:var(--mute);font-size:16px;line-height:1.55}
-.mac-card .req{font-size:14px;margin-top:10px}
 /* FAQ: details/summary, every answer in the HTML */
 .faqwrap{display:grid;grid-template-columns:.7fr 1.5fr;gap:48px;align-items:start}
 .faqwrap h2{text-align:left}
@@ -299,11 +287,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .faq summary::after{content:"+";flex:none;font:400 24px/1 var(--sans);color:var(--mute);transition:transform var(--d-feedback) var(--ease-out)}
 .faq details[open] summary::after{transform:rotate(45deg)}
 .faq p{margin:0 0 20px;color:var(--mute);font-size:16.5px;line-height:1.6;max-width:62ch}
-/* call-back band */
-.callback{text-align:center;padding:var(--section) var(--gut)}
-.home .callback h2{display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font-size:clamp(36px,5vw,64px)}
-.callback h2 .hand{font-size:min(1.7em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7}
-.callback p{margin:18px auto 28px;max-width:44ch;color:var(--mute);font:italic 400 19px/1.4 var(--serif)}
 @media (max-width:820px){
   .brand{font-size:19px}
   /* The lockup now carries the chip, so the mobile header trades a few pixels of gap for it and keeps
@@ -314,21 +297,17 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .home .hero{padding-top:var(--s1)}
   .home .h1{flex-direction:column;align-items:center;font-size:clamp(34px,10.5vw,44px)}
   .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 4.6));margin-top:.02em}
-  /* The hero subhead and the CTA's one line claim the phone's spare pixels, so the door, its line
-     and the 61% sheet still land on the first screen at 390x844. The gate measures this stack with
-     the sans face pinned, so a host font cannot decide the result. */
+  /* The hero, the door and the 61% sheet are one stack: the door closes the headline group,
+     the sheet gets the larger gap. The gate measures this stack with the sans face pinned, so a
+     host font cannot decide whether the sheet still fills 60% of the first screen. */
   .hero-sub{margin-top:var(--s1)}
-  .stagewrap{margin-top:var(--s1)}
+  .cta{padding-top:var(--s4)}
+  .stagewrap{margin-top:var(--s5)}
   .home .paper{border-radius:14px}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
-  .cta{padding-top:var(--s2)}
-  .cta-note{margin-top:var(--s2)}
-  .points{grid-template-columns:1fr;gap:var(--s5) 0;margin-top:var(--s7)}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
-  .ledger div{grid-template-columns:1fr;gap:6px}
   .faqwrap{grid-template-columns:1fr;gap:20px}
   .foot-grid{grid-template-columns:1fr 1fr}
-  .home .callback h2{flex-direction:column;align-items:center}
 }
 /* Narrow phones keep the 16 px lockup and tighten the header gap so wider system fonts also fit. */
 @media (max-width:390px){

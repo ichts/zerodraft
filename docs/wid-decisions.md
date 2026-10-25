@@ -557,3 +557,17 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-039's "at 380 px and below" step and the D-039 corrections' band wording down to 380 px, plus
   the D-039 reason's sampled gutter figures; the 16 px lockup, the two aligned masks, the theme polarity, the
   `--brand-plate` token, the plate hairline, the 6 px action-group gap and D-038 stand.
+
+### Correction to the D-039 correction: the room keeps main's dvh sizing
+
+- Date: 2026-10-25
+- Decision: The trial room's vertical sizing is main's again: `.room{...min-height:0}`, the `.room-paper`
+  `100vh`/`100dvh` calc pair, `.room.home{min-height:0}` and the `.room-nav` padding shorthand are restored
+  verbatim. The stacked header at 360 px and below carries `--nav-h: 77px`, its min-height, so the unchanged
+  paper calc still pins the sheet to `100dvh`. The header work (the 390 px narrow-phone step, the two-row
+  header and the 320-1440 px sweep) stands.
+- Reason: The flex-filled paper removed the room's `dvh` minimum, so an expanded mobile toolbar let `100vh` win
+  and pushed EXIT and the word count out of the un-scrollable trial. The paper calc takes `--nav-h` as its
+  header input, so the header tier must carry the actual stacked header height.
+- Supersedes: The previous D-039 correction's "room paper fills the stage as a flex child" sentence only. The
+  header step, the two-row header, the sweep, the plate hairline and the rest of D-039/D-038 stand.

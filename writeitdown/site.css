@@ -84,8 +84,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .nav-actions{display:flex;align-items:baseline;gap:20px}
 .theme-toggle,.paper-foot button{min-height:44px;padding:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;--chrome:var(--ink);--timer:var(--ink)}
-.room-paper{position:relative;flex:1;min-height:0;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow)}
+.room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
+.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow)}
 .room .wash{transition:opacity 120ms linear;opacity:0}
 .room-paper-wash{background:var(--red-soft);border-radius:inherit}
 .room[data-phase="typing"]{--chrome:var(--mute);--timer:var(--mute)}
@@ -318,7 +318,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 }
 /* Below 360 px the brand and the right-aligned action group stack into two rows. */
 @media (max-width:359px){
-  .home-nav{height:auto;min-height:var(--nav-h);flex-wrap:wrap;padding:var(--s2) 0}
+  .home-nav{height:auto;min-height:var(--nav-h);flex-wrap:wrap;align-content:center;padding:var(--s2) 0}
   .nav-end{margin-left:auto}
 }
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .btn{transition:none}}
@@ -346,8 +346,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    The room carries .home, so it reads the same tokens as the landing: page background A, the white sheet with
    the only shadow, Newsreader for the writing, the system UI stack for the tool, red for the stakes. The wash
    lives on the sheet only (no desk behind it). Zen geometry and the 39% anchor are defined with the room above. */
-.room.home{--script:var(--t-write);--lh:var(--lh-write);font:400 var(--t-ui)/1.5 var(--sans)}
-.room-nav{flex:none;padding-left:calc(var(--gut) - var(--room-gut));padding-right:calc(var(--gut) - var(--room-gut))}
+.room.home{min-height:0;--script:var(--t-write);--lh:var(--lh-write);font:400 var(--t-ui)/1.5 var(--sans)}
+.room-nav{flex:none;padding:0 calc(var(--gut) - var(--room-gut))}
 .room .mini-link{font:500 var(--t-small)/1.5 var(--sans);letter-spacing:.04em;color:var(--chrome)}
 .room #room-warning{color:var(--ink)}
 .room .report{font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.02em;color:var(--red)}

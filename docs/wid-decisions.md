@@ -591,3 +591,24 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: The previous D-039 corrections' stacked tier, their `--nav-h: 77px` sentence and their
   "stacking preserves..." reason only. The room's restored dynamic-viewport sizing, the 390 px step, the two
   aligned masks, the theme polarity, the `--brand-plate` token, the plate hairline and D-038 stand.
+
+## D-040: The landing states the rule, the promise and the privacy line
+
+- Date: 2026-10-25
+- Decision: The landing carries the captain's copy verbatim, and no other words on the page change. The
+  headline stays `We force you to write it down`. A subheadline sits directly under it: `Forward only.
+  Pause and the draft disappears. Keep going and you get to keep it.` One small line sits under the
+  `Give it 60 seconds` door: `No account. Nothing is saved. Just the timer.` Three one-sentence points sit
+  below the first viewport, one per column, as one plain list on a hairline (not cards, not a new
+  section): the forward-only rule, the situation the tool is for, and the no-save promise on web and Mac.
+  The door and its line stay fully on the first screen at both target sizes, 390x844 and 1440x900, and
+  that is measured, not assumed: `qa/mac.spec.mjs` and `journey/journey.mjs` assert the line's bottom ends
+  at or above the fold beside the door, with the sans stack pinned to one face so the host's system font
+  cannot decide the result. The phone keeps the 61% sheet and the line by tightening the hero and CTA
+  gaps, not by shrinking type or dropping the sheet.
+- Reason: A visitor who reads only the first screen learns what the tool does to them, what it costs them
+  and when to reach for it, before scrolling into the mechanics. The captain supplied and approved these
+  words directly. D-002's no-extra-labels rule was aimed at the writing room, whose chrome stays bare.
+- Supersedes: none. D-002 continues to govern the room; this entry is the landing's exception and names
+  its exact words.
+

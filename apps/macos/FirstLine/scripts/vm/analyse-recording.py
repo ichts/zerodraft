@@ -47,11 +47,14 @@ FLASH_MAX_FRAMES = 3
 # A launch state that lives at most this long and is replaced by another state is a
 # transient: it is what a person sees as a flash.
 TRANSIENT_MAX_MS = 3000
+# The assertion id a declared known defect may excuse. It belongs to the licensed
+# relaunch streams; the same surface anywhere else fails under its own id.
+DECLARED_LAUNCH_ASSERTION = "licensed-launch-no-activation-page"
 # Surfaces that must never appear during the launch of a licensed install.
 FORBIDDEN_LAUNCH_TEXT = [
-    (re.compile(r"Activate Write It Down", re.I), "licensed-launch-no-activation-page"),
-    (re.compile(r"Enter your order number", re.I), "licensed-launch-no-activation-page"),
-    (re.compile(r"License not activated on this Mac", re.I), "licensed-launch-no-activation-page"),
+    (re.compile(r"Activate Write It Down", re.I), DECLARED_LAUNCH_ASSERTION),
+    (re.compile(r"Enter your order number", re.I), DECLARED_LAUNCH_ASSERTION),
+    (re.compile(r"License not activated on this Mac", re.I), DECLARED_LAUNCH_ASSERTION),
 ]
 # Every frame is scaled to this width before differencing, so the metric is cheap
 # and comparable between runs (a full-size difference would be dominated by noise).
@@ -91,10 +94,28 @@ def read_steps(path):
     return steps
 
 
+def frame_size(evidence, frames):
+    """Bytes per decoded grayscale frame, measured on the first captured frame."""
+    first = os.path.join(evidence, "frames", frames[0][1])
+    if not os.path.exists(first):
+        raise RuntimeError(f"the first captured frame {frames[0][1]!r} is missing from frames/")
+    result = subprocess.run(
+        ["ffmpeg", "-loglevel", "error", "-nostdin", "-i", first,
+         "-vf", f"scale={DIFF_WIDTH}:-1,format=gray", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+        capture_output=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"ffmpeg could not decode the first frame: {result.stderr[:400]!r}")
+    if not result.stdout:
+        raise RuntimeError("the first captured frame decoded to nothing")
+    return len(result.stdout)
+
+
 def frame_deltas(evidence, frames):
     """Mean absolute luminance difference between each frame and the previous one."""
     if len(frames) < 2:
         return []
+    per_frame = frame_size(evidence, frames)
     pattern = os.path.join(evidence, "frames", "%06d.jpg")
     command = [
         "ffmpeg", "-loglevel", "error", "-nostdin", "-start_number", "0",
@@ -105,10 +126,15 @@ def frame_deltas(evidence, frames):
     if result.returncode != 0:
         raise RuntimeError(f"ffmpeg could not decode the frame stream: {result.stderr[:400]!r}")
     raw = result.stdout
-    # The scaled height keeps ffmpeg's aspect ratio; derive it from the byte count.
-    per_frame = len(raw) // len(frames) if frames else 0
-    if per_frame <= 0:
-        raise RuntimeError("the frame stream decoded to nothing")
+    decoded = len(raw) // per_frame
+    if len(raw) % per_frame:
+        raise RuntimeError(
+            f"the frame stream decoded to a trailing {len(raw) % per_frame}-byte partial image; "
+            "it is not the recorder's frame sequence")
+    if decoded != len(frames):
+        raise RuntimeError(
+            f"the frame stream decoded to {decoded} images for {len(frames)} recorded frames: "
+            "a capture is missing, so every per-frame metric would be misaligned")
     deltas = []
     similarities = []
     previous = raw[0:per_frame]
@@ -274,6 +300,18 @@ def frozen_window(frames, steps, start_index, end_index):
     }]
 
 
+def launch_assertion_id(stream_name):
+    """Key the launch assertion to the stream it was seen in.
+
+    Only a licensed relaunch carries the id a declared known defect may excuse; the
+    same surface in any other launch stream is still a defect, under its own id, so
+    the declaration cannot excuse it.
+    """
+    if stream_name.startswith("launch-licensed-"):
+        return DECLARED_LAUNCH_ASSERTION
+    return f"{stream_name[:-len('.jsonl')]}-no-activation-page"
+
+
 def launch_findings(evidence, steps):
     findings = []
     for name in sorted(os.listdir(evidence)):
@@ -301,7 +339,8 @@ def launch_findings(evidence, steps):
                 continue
             if lived > TRANSIENT_MAX_MS:
                 continue
-            forbidden = [(pattern, assertion) for pattern, assertion in FORBIDDEN_LAUNCH_TEXT
+            forbidden = [(pattern, launch_assertion_id(name))
+                         for pattern, assertion in FORBIDDEN_LAUNCH_TEXT
                          if pattern.search(text)]
             findings.append({
                 "kind": "transient-launch-state",
@@ -343,6 +382,10 @@ def main(argv):
     if deltas:
         findings.extend(video_findings(frames, deltas, similarities, steps))
     findings.extend(launch_findings(evidence, steps))
+    launch_assertions = sorted({
+        launch_assertion_id(name)
+        for name in os.listdir(evidence)
+        if name.startswith("launch-") and name.endswith(".jsonl")})
     # One finding per distinct window and kind: the detectors can hit the same window
     # from two directions (a dip and its recovery), which is noise for a reviewer.
     seen = set()
@@ -411,8 +454,9 @@ def main(argv):
         say(f"PASS [recording-gap] every consecutive frame pair is under {MAX_FRAME_GAP_MS} ms apart")
     if "recording-stall" not in failed_ids:
         say(f"PASS [recording-stall] no frozen window of {FROZEN_ASSERT_MS} ms or longer")
-    if "licensed-launch-no-activation-page" not in failed_ids:
-        say("PASS [licensed-launch-no-activation-page] no forbidden surface appeared transiently during launch")
+    for assertion in launch_assertions:
+        if assertion not in failed_ids:
+            say(f"PASS [{assertion}] no forbidden surface appeared transiently in its launch stream")
     informational = [finding for finding in findings if not finding.get("assertion")]
     say("findings recorded for review: %d (assertion failures: %d)" % (
         len(findings), len(failed_ids)))

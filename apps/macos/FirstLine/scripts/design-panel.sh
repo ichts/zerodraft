@@ -7,6 +7,8 @@
 #         to produce the deterministic report without model stages.
 # [OUTPUT] <evidence-dir>/panel/: report.html (static, self-contained), panel.json,
 #          per-stage answers, the exact command of every model call, and thumbnails.
+#          vm-journey.sh runs this as the last stage of a recorded run, so the six
+#          lenses land in the same bundle and their completeness is part of sign-off.
 #          Exit 0 when every stage is complete or its gap is declared; exit 2 on a
 #          usage error.
 # [POS] apps/macos/FirstLine/scripts/design-panel.sh - the review stage that runs on
@@ -16,7 +18,10 @@
 #            assertion source and runs before any model. Models only read captures:
 #            they never choose an action and never gate a run. A model route that is
 #            unavailable is recorded as a declared gap with its exact error, never
-#            skipped silently, and never turns into a failure of the recording.
+#            skipped silently, and never turns into a failure of the recording. A
+#            flagged clip is seeked from the recording's own time origin (the first
+#            timestamped frame), and every model answer is read through
+#            scripts/vm/panel-lib.py, never through a second parser.
 set -uo pipefail
 
 evidence="${1:?usage: design-panel.sh <evidence-dir>}"
@@ -72,13 +77,16 @@ review_model=''
 model_notes=()
 probe_log="$panel/model-probes.tsv"
 : >"$probe_log"
+# An answer is a turn_end record whose stopReason is stop, read from the runtime's own
+# JSONL. Every probe and every stage read that one record shape.
+answered() { grep '^{' "$1" 2>/dev/null \
+  | jq -e 'select(.type=="turn_end") | (.message.stopReason // "") == "stop"' >/dev/null 2>&1; }
 probe_model() { # probe_model <model>
   local candidate="$1" out attempt=1 delay="$backoff"
   out="$answers/probe-$(printf '%s' "$1" | tr '/.' '--').jsonl"
   while [[ "$attempt" -le "$attempts" ]]; do
     pi --model "$candidate" --print --no-session --no-tools --mode json 'Reply with exactly: OK' >"$out" 2>&1
-    if grep -q '"type":"turn_end"' "$out" 2>/dev/null \
-      && grep '^{' "$out" | jq -e 'select(.type=="turn_end") | (.message.stopReason // "") == "stop"' >/dev/null 2>&1; then
+    if answered "$out"; then
       printf '%s' "$candidate"
       return 0
     fi
@@ -131,12 +139,11 @@ fi
 # Only the flagged windows are reviewed, never the whole recording: the clip covers
 # the window plus a second either side, sampled at the recorder's own frame rate
 # (the recording is a timestamped frame stream, so there is no finer information).
-rec_start="$(cut -f1 "$evidence/recording-span.tsv" 2>/dev/null)"
 clip_count=0
 clip_reviews='[]'
 # The clips are cut for the deterministic findings whether or not a model is
 # available: they are evidence in their own right, and the review only adds a verdict.
-if [[ -f "$evidence/screen.mov" && -n "$rec_start" && -f "$evidence/findings.json" ]]; then
+if [[ -f "$evidence/screen.mov" && -f "$evidence/frames.tsv" && -f "$evidence/findings.json" ]]; then
   flagged=()
   while IFS= read -r flagged_line; do
     [[ -n "$flagged_line" ]] && flagged+=("$flagged_line")
@@ -145,21 +152,25 @@ if [[ -f "$evidence/screen.mov" && -n "$rec_start" && -f "$evidence/findings.jso
     | .[0:6][] | "\(.t_start)\t\(.t_end)\t\(.kind)\t\(.note)"' "$evidence/findings.json" 2>/dev/null)
   for entry in ${flagged[@]+"${flagged[@]}"}; do
     IFS=$'\t' read -r t_start t_end kind finding_note <<<"$entry"
-    rel_start=$(( (t_start - rec_start) / 1000 - 1 ))
-    [[ "$rel_start" -lt 0 ]] && rel_start=0
+    [[ "$t_end" =~ ^[0-9]+$ ]] || t_end="$t_start"
     clip_count=$((clip_count + 1))
-    # Raised rate: resample the window to 10 fps, then keep six frames spread across
-    # it, so a sub-second state has a chance to appear in the review set.
-    rm -f "$panel"/clip-"$clip_count"-*.png
-    ffmpeg -loglevel error -ss "$rel_start" -i "$evidence/screen.mov" -vf "fps=10" \
-      -frames:v 60 "$panel/clip-$clip_count-%03d.png" -y >/dev/null 2>&1
-    available=$(ls "$panel"/clip-"$clip_count"-*.png 2>/dev/null | wc -l | tr -d ' ')
+    clip_dir="$panel/clip-$clip_count"
+    rm -rf "$clip_dir"
+    mkdir -p "$clip_dir"
+    # The clip is seeked from the recording's own time origin (the first captured
+    # frame, which is time zero of screen.mov) at 10 fps across the window plus a
+    # second either side, so a sub-second state has a chance to appear.
+    python3 "$here/vm/panel-lib.py" clip --video "$evidence/screen.mov" --frames "$evidence/frames.tsv" \
+      --t-start "$t_start" --t-end "$t_end" --out "$clip_dir" >"$panel/clip-$clip_count.json" 2>&1
+    available=$(ls "$clip_dir"/clip-*.png 2>/dev/null | wc -l | tr -d ' ')
     if [[ "${available:-0}" -gt 0 ]]; then
       for slot in 0 1 2 3 4 5; do
         source_index=$(( 1 + slot * available / 6 ))
-        source_file=$(printf '%s/clip-%s-%03d.png' "$panel" "$clip_count" "$source_index")
+        source_file=$(printf '%s/clip-%03d.png' "$clip_dir" "$source_index")
         [[ -f "$source_file" ]] && make_thumb "$source_file" "frame-$t_start-$slot.jpg"
       done
+    else
+      note "clip $clip_count: no frames were extracted from the $t_start ms window"
     fi
     if [[ -z "$review_model" ]]; then
       note "clip $clip_count: frames cut for the record; no reviewer model answered, so no verdict"
@@ -184,7 +195,7 @@ EOF
     answer_file="$answers/clip-$clip_count.jsonl"
     command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
     pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-    text="$(grep '^{' "$answer_file" | jq -r 'select(.type=="turn_end") | .message.content[]? | select(.type=="text") | .text' | tail -1)"
+    text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
     parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
     if [[ -z "$parsed" ]]; then
       note "clip $clip_count: the reviewer did not return JSON"
@@ -195,6 +206,8 @@ EOF
       --arg command "$command_line" --argjson frames "$frames_json" --argjson answer "$parsed" \
       '. + [{window: $window, model: $model, command: $command, frames: $frames} + $answer]' <<<"$clip_reviews")"
   done
+else
+  [[ -f "$evidence/screen.mov" ]] && note 'no frames.tsv in the bundle: the recording has no time origin, so no clips were cut'
 fi
 jq -n --argjson reviews "$clip_reviews" '{clip_reviews: $reviews}' >"$panel/stage-02-clips.json"
 note "flagged clips reviewed: $clip_count"
@@ -207,7 +220,7 @@ if [[ "$skip_models" != '1' && -n "$review_model" && ${#step_names[@]} -gt 1 ]];
   for ((i = 0; i + 1 < ${#step_names[@]}; i++)); do
     before="$evidence/${step_names[i]}.png"
     after="$evidence/${step_names[i + 1]}.png"
-    next="$(printf '%s' "${step_names[i + 1]}")"
+    next="${step_names[i + 2]:-end of script}"
     [[ -f "$before" && -f "$after" ]] || continue
     metric="$(ffmpeg -hide_banner -i "$before" -i "$after" -lavfi '[0:v][1:v]psnr' -f null - 2>&1 \
       | grep -o 'average:[0-9.]*' | head -1 | cut -d: -f2)"
@@ -232,7 +245,7 @@ EOF
     answer_file="$answers/vision-$i.jsonl"
     command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
     pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-    text="$(grep '^{' "$answer_file" | jq -r 'select(.type=="turn_end") | .message.content[]? | select(type=="text") | .text' | tail -1)"
+    text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
     parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
     [[ -z "$parsed" ]] && { note "vision check $i: no JSON answer"; continue; }
     vision="$(jq -c --arg transition "${step_names[i]} -> ${step_names[i+1]}" --arg next "$next" \
@@ -301,7 +314,7 @@ RULES
   answer_file="$answers/lens-$lens.jsonl"
   command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
   pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-  text="$(grep '^{' "$answer_file" | jq -r 'select(.type=="turn_end") | .message.content[]? | select(type=="text") | .text' | tail -1)"
+  text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
   parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
   if [[ -z "$parsed" ]]; then
     reason="$(grep '^{' "$answer_file" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)"
@@ -319,27 +332,29 @@ jq -n --argjson lenses "$lens_stage" '{lenses: $lenses}' >"$panel/stage-04-lense
 # --- capability matrix and declared gaps ----------------------------------------
 gaps=()
 capabilities='[]'
-capabilities="$(jq -c --arg model "$review_model" \
-  '. + [{stage: "reviewer model", status: ($model | if . == "" then "declared gap" else "complete" end), model: $model, detail: (if $model == "" then "no candidate route answered; see panel/model-probes.tsv" else "answered the readiness probe" end)}]' <<<"$capabilities")"
+capabilities="$(jq -c --arg model "$review_model" --arg skip "$skip_models" \
+  '. + [{stage: "reviewer model", status: ($model | if . == "" then "declared gap" else "complete" end), model: $model, detail: (if $model != "" then "answered the readiness probe" elif $skip == "1" then "model stages disabled by WID_PANEL_SKIP_MODELS=1" else "no candidate route answered; see panel/model-probes.tsv" end)}]' <<<"$capabilities")"
 while IFS=$'\t' read -r probed_model probed_detail _probed_soft; do
   [[ -n "${probed_model:-}" ]] || continue
   capabilities="$(jq -c --arg model "$probed_model" --arg detail "$probed_detail" \
     '. + [{stage: "reviewer candidate", status: "declared gap", route: $model, detail: $detail}]' <<<"$capabilities")"
 done <"$probe_log"
 capabilities="$(jq -c '. + [{stage: "deterministic analysis", status: "complete", model: "", detail: "scripts/vm/analyse-recording.py, no model"}]' <<<"$capabilities")"
-for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
-  probe_out="$answers/probe-$(printf '%s' "$route" | tr '/' '-').jsonl"
-  pi --model "$route" --print --no-session --no-tools --mode json 'Reply with exactly: OK' >"$probe_out" 2>&1
-  detail="$(grep '^{' "$probe_out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)"
-  if [[ -z "$detail" ]] && grep -q '"type":"turn_end"' "$probe_out" 2>/dev/null; then
-    capabilities="$(jq -c --arg route "$route" '. + [{stage: "gemini review route", status: "complete", route: $route, detail: "answered"}]' <<<"$capabilities")"
-  else
-    capabilities="$(jq -c --arg route "$route" --arg detail "${detail:-no answer}" \
-      '. + [{stage: "gemini review route", status: "declared gap", route: $route, detail: $detail}]' <<<"$capabilities")"
-    gaps+=("Gemini route $route is unavailable on this machine: ${detail:-no answer}. Flagged clips were reviewed by $([[ -n "$review_model" ]] && printf '%s' "$review_model" || printf 'no model') instead.")
-  fi
-done
-if [[ -z "$review_model" ]]; then
+if [[ "$skip_models" != '1' ]]; then
+  for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
+    probe_out="$answers/probe-$(printf '%s' "$route" | tr '/' '-').jsonl"
+    pi --model "$route" --print --no-session --no-tools --mode json 'Reply with exactly: OK' >"$probe_out" 2>&1
+    detail="$(grep '^{' "$probe_out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)"
+    if [[ -z "$detail" ]] && answered "$probe_out"; then
+      capabilities="$(jq -c --arg route "$route" '. + [{stage: "gemini review route", status: "complete", route: $route, detail: "answered"}]' <<<"$capabilities")"
+    else
+      capabilities="$(jq -c --arg route "$route" --arg detail "${detail:-no answer}" \
+        '. + [{stage: "gemini review route", status: "declared gap", route: $route, detail: $detail}]' <<<"$capabilities")"
+      gaps+=("Gemini route $route is unavailable on this machine: ${detail:-no answer}. Flagged clips were reviewed by $([[ -n "$review_model" ]] && printf '%s' "$review_model" || printf 'no model') instead.")
+    fi
+  done
+fi
+if [[ -z "$review_model" && "$skip_models" != '1' ]]; then
   gaps+=("No reviewer model answered from this lane. Every candidate is listed with its exact error in panel/model-probes.tsv and in the capability matrix; the deterministic analysis and the report were still produced. Re-run: bash apps/macos/FirstLine/scripts/design-panel.sh $(printf '%s' "$evidence")")
 fi
 [[ "$skip_models" == '1' ]] && gaps+=("Model stages were disabled by WID_PANEL_SKIP_MODELS=1; only the deterministic analysis ran.")

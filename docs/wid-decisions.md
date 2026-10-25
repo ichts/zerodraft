@@ -743,3 +743,17 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-040 for the reassurance line, the three points and the 390x844/1440x900 fold assertion
   on the door and its line; D-044's "one entrance under the sheet" wording, since the one entrance is
   now above the sheet. The wordmark, subheadline, cards, FAQ and Mac facts are unchanged.
+## D-047: The six-lens review is the last stage of an acceptance run, and a declared defect is never a pass
+
+- Date: 2026-10-25
+- Decision: `scripts/vm-journey.sh` invokes `scripts/design-panel.sh` on its own evidence bundle as the
+  run's last stage and records every lens result in `acceptance.txt`. A run whose six lenses did not all
+  complete writes an explicit "panel not run: <reason>" block with the exact re-run command into
+  `acceptance.txt` and `notes.md` and exits 79; it never signs off. A run accepted with the declared known
+  defect exits 78 and marks the sign-off as not accepted. Only a clean, fully reviewed run exits 0. The
+  declaration stays keyed to one artifact checksum and one assertion id, and that id is emitted only for
+  the licensed relaunch streams, so the same surface in another launch stream fails under its own id.
+- Reason: The recorded acceptance must end with the six-lens review inside the same evidence bundle, and no
+  exit status may read as a pass when a lens is missing or a declared defect reproduced.
+- Supersedes: the separate-command panel procedure and the exit-0 `accepted-with-declared-defect` verdict;
+  the declared-defect key and the strict launch assertion stand.

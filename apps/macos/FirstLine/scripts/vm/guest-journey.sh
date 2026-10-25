@@ -5,10 +5,10 @@
 #         Runs INSIDE the macOS guest of the recorded acceptance rig.
 # [OUTPUT] journey.log with one PASS/FAIL line per assertion, timestamped before/after
 #          screenshots plus AX snapshots per step (steps.tsv), launch-watch frames
-#          (launch-*.jsonl), the mandatory continuous screen.mov, summary.json and
-#          notes.md. Exit 0 only when every assertion passed and the recording is
-#          intact; exit 1 on any failed assertion, failed/interrupted recording, or
-#          setup error.
+#          (launch-*.jsonl), recording-drops.tsv (captures the recorder failed to
+#          write), the mandatory continuous screen.mov, summary.json and notes.md.
+#          Exit 0 only when every assertion passed and the recording is intact; exit 1
+#          on any failed assertion, failed/interrupted recording, or setup error.
 # [POS] apps/macos/FirstLine/scripts/vm/guest-journey.sh - the in-guest half of the
 #       recorded DMG acceptance rig. It installs the shipped DMG the way a person
 #       does (mount, copy to /Applications, quarantined first launch), then drives
@@ -51,7 +51,6 @@ pid=''
 rec_pid=''
 rec_dir=''
 rec_manifest=''
-rec_started=''
 rec_stop="$work/stop-recording"
 fixture_pid=''
 mnt=''
@@ -75,7 +74,7 @@ stop_app() {
 # Invoked indirectly by the EXIT trap.
 # shellcheck disable=SC2329
 cleanup() {
-  local status=$? frames=0 i
+  local status=$? frames=0 drops=0 i
   trap - EXIT
   stop_app
   [[ -n "$fixture_pid" ]] && { kill "$fixture_pid" 2>/dev/null; wait "$fixture_pid" 2>/dev/null; }
@@ -88,10 +87,12 @@ cleanup() {
       bad 'the frame recorder exited before the journey ended'
     fi
     wait "$rec_pid" 2>/dev/null
-    printf '%s\t%s\n' "$rec_started" "$(now_ms)" >"$evidence/recording-span.tsv"
     frames="$(wc -l <"$rec_manifest" 2>/dev/null | tr -d ' ')"
     [[ "${frames:-0}" -ge 30 ]] && pass "captured $frames timestamped frames for the evidence video" \
       || bad "the frame recorder captured only ${frames:-0} frames"
+    drops="$(wc -l <"$evidence/recording-drops.tsv" 2>/dev/null | tr -d ' ')"
+    [[ "${drops:-0}" -eq 0 ]] && pass "the recorder dropped no capture in $((frames + drops)) ticks" \
+      || bad "the recorder dropped ${drops:-0} captures, so the frame stream has a hole"
   else
     bad 'the frame recorder was never started'
   fi
@@ -131,7 +132,11 @@ record_frames() {
   while [[ ! -e "$rec_stop" ]]; do
     frame="$(printf '%06d' "$n")"
     screencapture -x -t jpg "$rec_dir/$frame.jpg" 2>/dev/null || true
-    [[ -s "$rec_dir/$frame.jpg" ]] && printf '%s\t%s\n' "$(now_ms)" "$frame.jpg" >>"$rec_manifest"
+    if [[ -s "$rec_dir/$frame.jpg" ]]; then
+      printf '%s\t%s\n' "$(now_ms)" "$frame.jpg" >>"$rec_manifest"
+    elif [[ ! -e "$rec_stop" ]]; then
+      printf '%s\n' "$frame" >>"$evidence/recording-drops.tsv"
+    fi
     n=$((n + 1))
     sleep 0.25
   done
@@ -214,7 +219,7 @@ rec_dir="$evidence/frames"
 rec_manifest="$evidence/frames.tsv"
 mkdir -p "$rec_dir"
 : >"$rec_manifest"
-rec_started="$(now_ms)"
+: >"$evidence/recording-drops.tsv"
 record_frames &
 rec_pid=$!
 recorded=0

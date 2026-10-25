@@ -80,6 +80,22 @@ test('room bar reanchors to the deadline after motion preference changes', async
   expectAligned(await barAnchor(page, '#room-bar', '#room-clock'));
 });
 
+test('room bar starts a fresh session full under Reduce Motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.clock.runFor(50);
+  await page.locator('#landing .cta a[href="#trial"]').click();
+  await expect(page.locator('#room')).toBeVisible();
+  await expect(page.locator('#editor')).toBeFocused();
+  await page.keyboard.insertText('Start');
+  for (const ms of [500, 4900, 2000, 500, 100]) await page.clock.fastForward(ms);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
+  const scale = () => page.locator('#room-bar').evaluate(bar => Number(bar.style.transform.match(/scaleX\(([^)]+)\)/)[1]));
+  expect(await scale()).toBe(0);
+  await page.keyboard.insertText('A');
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');
+  expect(await scale()).toBeGreaterThan(0.99);
+});
+
 test('demo bar reanchors after hidden loops and motion preference changes', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.runFor(50);

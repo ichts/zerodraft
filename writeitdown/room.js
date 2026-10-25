@@ -57,7 +57,11 @@ function syncBar(now) {
   if (state.started === null) { stepBar(1); return; }
   const remaining = Math.max(0, state.started + SESSION_MS - now);
   if (reduced.matches) {
-    if (barAnimation || now - barSteppedAt >= 500) { barSteppedAt = now; stepBar(remaining / SESSION_MS); }
+    if (barAnimation || barStarted !== state.started || now - barSteppedAt >= 500) {
+      barStarted = state.started;
+      barSteppedAt = now;
+      stepBar(remaining / SESSION_MS);
+    }
     return;
   }
   if (barAnimation && barStarted === state.started) return;
@@ -78,6 +82,7 @@ function fitEditor({ animate = false } = {}) {
   cancelAnimationFrame(shiftFrame);
   shiftRunning = false;
   const from = editor.scrollTop;
+  if (target === from) return;
   const pitch = parseFloat(getComputedStyle(editor).lineHeight);
   // Only a new line (one pitch) animates; a wholesale replacement such as a restore
   // or a test's programmatic insert snaps, so the draft is never left mid-way.

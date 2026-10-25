@@ -16,6 +16,8 @@ pi-session-*.html
 apps/macos/FirstLine/dist/
 apps/macos/FirstLine/build/
 __pycache__/
+*.pyc
+*.pyo
 
 # Debug bundles
 *.zip

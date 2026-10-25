@@ -15,7 +15,8 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   bundle without a completed review is recorded as "panel not run" with the exact re-run command and the run
   exits 79 instead of signing off. `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` re-checks the rig's
   shared boundaries (answer validation including lens identity, the required lens names, clip origin, frame
-  alignment, the report's recording metadata, and that no bytecode cache is tracked) without a VM.
+  alignment, the report's recording metadata, and that no bytecode cache is tracked anywhere in the
+  repository index) without a VM.
 - PASS, shipped `Write-It-Down-1.0.dmg` (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`):
   signature, notarization ticket and `spctl` acceptance of both disk image and installed app; clean-clone install
   with the browser-download quarantine flag and the Gatekeeper first-launch question answered by a real click;

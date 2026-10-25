@@ -325,6 +325,8 @@ panel_status=0
 bash "$scripts/design-panel.sh" "$evidence" >>"$evidence/panel.log" 2>&1 || panel_status=$?
 required_lenses='rams norman spiekermann kare matas vignelli'
 panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" --require $required_lenses 2>/dev/null)"
+analysis_line="$(sed -n 's/^analysis=//p' <<<"$panel_summary")"
+analysis_line="${analysis_line:-not recorded: the panel produced no status}"
 panel_total="$(sed -n 's/^lenses_total=//p' <<<"$panel_summary")"
 panel_complete="$(sed -n 's/^lenses_complete=//p' <<<"$panel_summary")"
 panel_missing="$(sed -n 's/^lenses_required_missing=//p' <<<"$panel_summary")"
@@ -340,6 +342,7 @@ elif [[ "$panel_total" -ne 6 || -n "${panel_missing:-}" ]]; then
   panel_reason="${panel_reason:-the six-lens review is incomplete: $panel_total lens(es) recorded, $panel_complete complete, missing: ${panel_missing:-none}}"
 fi
 {
+  printf 'analysis: %s\n' "$analysis_line"
   printf 'panel: %s\n' "$panel_state"
   printf 'panel_lenses_complete: %s/%s\n' "$panel_complete" "$panel_total"
   printf 'panel_lenses_required: %s\n' "$required_lenses"
@@ -370,7 +373,7 @@ fi
 printf 'sign_off: %s\n' "$sign_off" >>"$evidence/acceptance.txt"
 cat "$evidence/acceptance.txt"
 
-log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); panel: $panel_state ($panel_complete/$panel_total lenses); sign-off: $sign_off"
+log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); analysis: $analysis_line; panel: $panel_state ($panel_complete/$panel_total lenses); sign-off: $sign_off"
 if [[ "$verdict" == 'rejected' ]]; then
   exit 1
 fi

@@ -312,8 +312,10 @@ def check_lens_status(workdir):
     os.makedirs(panel)
     required = REQUIRED_LENSES
     with open(os.path.join(panel, "stage-05-capabilities.json"), "w", encoding="utf-8") as handle:
-        json.dump({"declared_gaps": [
-            "Gemini route cursor/gemini-4-argon is unavailable on this machine: no answer."]}, handle)
+        json.dump({"capabilities": [{"stage": "deterministic analysis", "status": "complete",
+                                     "detail": "3 finding(s) from scripts/vm/analyse-recording.py, no model"}],
+                   "declared_gaps": [
+                       "Gemini route cursor/gemini-4-argon is unavailable on this machine: no answer."]}, handle)
 
     # One lens failed while the others answered: that failure is the reason, not the
     # routine route gap that sits in the same bundle.
@@ -322,6 +324,9 @@ def check_lens_status(workdir):
         {"lens": "norman", "status": "unavailable", "error": "the answer names no lens"},
     ])
     result, fields = status_fields(evidence)
+    need(fields.get("analysis") ==
+         "complete (3 finding(s) from scripts/vm/analyse-recording.py, no model)",
+         f"the analysis outcome is not in the host summary: {fields.get('analysis')!r}")
     need(fields.get("lenses_total") == "2", f"wrong total: {fields.get('lenses_total')!r}")
     need(fields.get("lenses_complete") == "1", f"wrong completed count: {fields.get('lenses_complete')!r}")
     need(fields.get("lenses_required_missing") == "norman spiekermann kare matas vignelli",
@@ -463,6 +468,9 @@ def check_panel_stages(workdir):
     need(clips, "no flagged clip was cut into the bundle")
     status = run([sys.executable, PANEL_LIB, "status", evidence])
     fields = dict(line.split("=", 1) for line in status.stdout.splitlines() if "=" in line)
+    need(fields.get("analysis", "").startswith("complete")
+         and "1 finding" in fields.get("analysis", ""),
+         f"the host summary does not carry the analysis outcome: {fields.get('analysis')!r}")
     need(fields.get("lenses_complete") == "0",
          f"a model-free panel reported {fields.get('lenses_complete')} completed lenses")
     need(fields.get("reason"), "a model-free panel reported no blocking reason")
@@ -574,6 +582,10 @@ def check_panel_stages(workdir):
          f"the bundle does not declare the missing analysis: {without_analysis.get('declared_gaps')!r}")
     need("findings.json is missing" in report,
          "the report hides why the deterministic analysis did not run")
+    _, fields = status_fields(evidence)
+    need(fields.get("analysis", "").startswith("failed")
+         and "findings.json is missing" in fields.get("analysis", ""),
+         f"the host summary does not carry the missing analysis: {fields.get('analysis')!r}")
 
     refused_reason = ("the frame stream decoded to 5 images for 6 recorded frames: "
                       "a capture is missing")
@@ -588,6 +600,10 @@ def check_panel_stages(workdir):
     need(any(refused_reason in gap for gap in refused_panel.get("declared_gaps") or []),
          f"the bundle does not declare the analyser's refusal: {refused_panel.get('declared_gaps')!r}")
     need(refused_reason in report, "the report hides the analyser's failure reason")
+    _, fields = status_fields(evidence)
+    need(fields.get("analysis", "").startswith("failed")
+         and refused_reason in fields.get("analysis", ""),
+         f"the host summary does not carry the analyser's refusal: {fields.get('analysis')!r}")
 
     with open(os.path.join(evidence, "findings.json"), "w", encoding="utf-8") as handle:
         handle.write("{ this is not the analyser output\n")
@@ -598,6 +614,10 @@ def check_panel_stages(workdir):
     need("could not be read" in (analysis.get("detail") or ""),
          f"the unreadable analysis gives no reason: {analysis.get('detail')!r}")
     need("could not be read" in report, "the report hides that the analysis file is unreadable")
+    _, fields = status_fields(evidence)
+    need(fields.get("analysis", "").startswith("failed")
+         and "could not be read" in fields.get("analysis", ""),
+         f"the host summary does not carry the unreadable analysis: {fields.get('analysis')!r}")
 
 
 def repository_root(path):

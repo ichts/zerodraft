@@ -2,6 +2,13 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: Release artifact for the aligned room and the split-W logo
+
+- Source: `origin/main` commit `1446b4af694e31f08d019f6fece189702e6ebfa7` (the merged writing-room/After alignment and split-W logo PRs), in a fresh clone on the Mac mini, built with `scripts/release-dmg.sh` (configured release, not `--staging`). Signing and notarization ran in the captain's own unlocked terminal on that Mac; an SSH session with a locked login keychain cannot sign.
+- Air verification of the copied artifact `Write-It-Down-1.0.dmg` (8117026 bytes, SHA-256 `5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`): Developer ID Application: Ziying WANG (4BNUMV44F8), hardened runtime, `Notarization Ticket=stapled`; `codesign -dv` shows that ticket embedded, and `xcrun stapler validate` plus `spctl -a -t open --context context:primary-signature` accepted the disk image. The mounted app verifies `codesign --verify --deep --strict`, carries its own stapled ticket, and `spctl -a -t exec` accepts it as `Notarized Developer ID`; `lipo -archs` reports `x86_64 arm64`.
+- Read-only mount confirms the release configuration: service `https://licenses.writeitdown.app`, product `prod_VUeTDTehcGAqJK`, base64 Ed25519 public key `ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=`, checkout `https://writeitdown.app/mac.html`, `$4.99`, version 1.0 (build 1), copyright Trefoil Studio.
+- Not run: `scripts/dmg-journey.sh` (needs an approved GUI test machine plus the clean-login evidence directory), any real-window session, and any Finder install or activation. Installed-DMG TEST acceptance remains pending with the maintainer; this record makes no GUI, purchase or payment claim.
+
 ## 2026-10-23: Configured purchase build, no real-window acceptance
 
 - `swift build && swift test`: exit 0, 198 tests in 16 suites. Existing signed Ed25519 fixtures exercise activation, product/device binding, expiry, persistence and revocation through the unchanged token verifier and HTTP client. The exhausted-trial Buy test now clicks the enabled control through an injected URL opener and verifies the public purchase page; it never opens a real checkout.

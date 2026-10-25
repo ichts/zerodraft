@@ -618,13 +618,14 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Decision: `scripts/vm-journey.sh` invokes `scripts/design-panel.sh` on its own evidence bundle as the
   run's last stage and records every lens result in `acceptance.txt`. Sign-off asserts the six named lenses
   (Rams, Norman, Spiekermann, Kare, Matas, Vignelli) by name, so a shorter or renamed lens list cannot
-  satisfy it. A lens counts only when its model turn ended normally and its answer is a review of that
-  shape. A run whose six lenses did not all complete writes an explicit "panel not run: <reason>" block
-  with the exact re-run command into `acceptance.txt` and `notes.md` and exits 79; it never signs off. A
-  run accepted with the declared known defect exits 78 and marks the sign-off as not accepted. Only a
-  clean, fully reviewed run exits 0. The declaration stays keyed to one artifact checksum and one
-  assertion id, and that id is emitted only for the licensed relaunch streams, so the same surface in
-  another launch stream fails under its own id.
+  satisfy it. A lens counts only when its model turn ended normally, its answer is a review of that shape,
+  and it declares the lens that was asked: one review repeated across six prompts counts once. A run whose
+  six lenses did not all complete writes an explicit "panel not run: <reason>" block with the exact re-run
+  command into `acceptance.txt` and `notes.md` and exits 79; the recorded reason is the observed lens
+  failure, never a route probe. It never signs off. A run accepted with the declared known defect exits 78
+  and marks the sign-off as not accepted. Only a clean, fully reviewed run exits 0. The declaration stays
+  keyed to one artifact checksum and one assertion id, and that id is emitted only for the licensed
+  relaunch streams, so the same surface in another launch stream fails under its own id.
 - Reason: The recorded acceptance must end with the six-lens review inside the same evidence bundle, and no
   exit status may read as a pass when a lens is missing or a declared defect reproduced.
 - Supersedes: the separate-command panel procedure and the exit-0 `accepted-with-declared-defect` verdict;

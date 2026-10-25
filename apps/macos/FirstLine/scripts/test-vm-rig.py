@@ -22,7 +22,6 @@
 import json
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -716,8 +715,33 @@ def check_tracked_bytecode(workdir):
          % (scoped_paths,))
 
 
+def check_launchd_forwarding(workdir):
+    probe = os.path.join(workdir, "probe.sh")
+    with open(probe, "w", encoding="utf-8") as handle:
+        handle.write("#!/bin/bash\nset -uo pipefail\n. \"$1\"\nwid_launchd_forwarded\n")
+    result = subprocess.run(["/bin/bash", probe, os.path.join(HERE, "vm", "launchd-host.sh")],
+                            capture_output=True, text=True, timeout=60,
+                            env={"PATH": "/usr/bin:/bin", "HOME": "/Users/probe",
+                                 "WID_VM_ROOT": "/vm",
+                                 "WID_PANEL_MODEL": "openai-codex/gpt-6-astra",
+                                 "WID_PANEL_SKIP_MODELS": "1",
+                                 "ANTHROPIC_API_KEY": "sk-test",
+                                 "OPENAI_BASE_URL": "https://example.invalid",
+                                 "HTTPS_PROXY": "http://proxy.invalid:3128",
+                                 "PI_OFFLINE": "1",
+                                 "UNRELATED_SECRET": "not-for-the-job"})
+    need(result.returncode == 0,
+         f"the launchd shim could not list its environment: {result.stderr[-300:]!r}")
+    forwarded = set(result.stdout.split())
+    need({"PATH", "HOME", "WID_VM_ROOT", "WID_PANEL_MODEL", "WID_PANEL_SKIP_MODELS",
+          "ANTHROPIC_API_KEY", "OPENAI_BASE_URL", "HTTPS_PROXY", "PI_OFFLINE"} <= forwarded,
+         f"the launchd job would lose panel inputs: {sorted(forwarded)}")
+    need("UNRELATED_SECRET" not in forwarded,
+         "the launchd job would receive variables nobody asked it to forward")
+
+
 def check_review_record_remedy(workdir):
-    evidence = os.path.join(workdir, "bundle")
+    evidence = os.path.join(workdir, "a bundle with spaces")
     os.makedirs(evidence)
     with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
         handle.write("artifact: fixture\nverdict: accepted\n")
@@ -742,6 +766,11 @@ def check_review_record_remedy(workdir):
                    if line.startswith("panel_command:")), "")
     need("bash " in remedy and "design-panel.sh" in remedy,
          f"the blocked record prints no re-run command: {remedy!r}")
+    parsed = subprocess.run(["/bin/sh", "-c", "set -- " + remedy + '; printf \'%s\\n\' "$@"'],
+                            capture_output=True, text=True, timeout=60)
+    arguments = parsed.stdout.split("\n")[:-1]
+    need(arguments == ["bash", DESIGN_PANEL, os.path.realpath(evidence)],
+         f"the recorded remedy does not survive a shell parse: {arguments!r}")
 
     bindir = os.path.join(workdir, "bin")
     os.makedirs(bindir)
@@ -749,7 +778,8 @@ def check_review_record_remedy(workdir):
                   "found = re.search(r'lens identifier is \"([a-z]+)\"', prompt)\n"
                   "answer = dict({\"lens\": 'rams', \"verdict\": \"sound\", \"summary\": \"quiet\", "
                   "\"findings\": []}, lens=found.group(1) if found else '')\n")
-    replayed = subprocess.run(shlex.split(remedy), capture_output=True, text=True, timeout=300,
+    replayed = subprocess.run(["/bin/sh", "-c", remedy], capture_output=True, text=True,
+                              timeout=300,
                               env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"]))
     need(replayed.returncode == 0,
          f"the recorded remedy failed: {replayed.stderr[-400:]!r}")
@@ -796,6 +826,7 @@ CHECKS = [
     ("lens summary reports completeness and reason", check_lens_status),
     ("design panel writes its stages from a bundle", check_panel_stages),
     ("a blocked review record is refreshed by its printed remedy", check_review_record_remedy),
+    ("the launchd job receives the panel's environment", check_launchd_forwarding),
 ]
 
 

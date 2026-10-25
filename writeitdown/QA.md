@@ -2,7 +2,7 @@
 
 Current user-visible behavior is documented in [README.md](README.md); shared writing geometry is owned by `tokens.css` and `site.css`. Run the browser acceptance command in the README for this revision. The records below describe earlier revisions, not evidence that the current change passed.
 
-`qa/mac.spec.mjs` covers removed demo labels and caption and header theme controls. `qa/phase4.spec.mjs` covers shared demo/trial start-line placement, the blocked demo Backspace, the reduced-height mobile trial footer, the demo loop and room interactions. Use the current run's results and screenshots for release acceptance.
+`qa/mac.spec.mjs` covers removed demo labels and caption and header theme controls. `qa/phase4.spec.mjs` covers shared demo/trial start-line placement, the blocked demo Backspace, the reduced-height mobile trial footer, short-sheet warning/failure/kept placement, the demo reset and loop, and room interactions; `qa/motion-regression.spec.mjs` covers the animated history shift, bar re-anchoring and refusal continuity. Use the current run's results and screenshots for release acceptance.
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
@@ -25,6 +25,52 @@ version.
   A page whose link is renamed to `Write-It-Down.dmg` passed the previous checker and is refused by
   this one with `DMG URL: the file name does not carry the version`; `qa/mac.spec.mjs` gained that
   rejection case and the current page still reports STATIC CHECK PASSED.
+
+# 2026-10-25: Web room parity with the shipped Mac app (local, branch `fm/wid-parity-mini`)
+
+- Scope: `writeitdown/index.html`'s landing demo and `#trial` room brought to the Mac room's settled
+  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped  per-line history with a one-pitch 180 ms shift, ink-placed warning group and wipe receipt, one 2 pt
+  linear session bar and no bottom meter, `You stopped.` / `Begin again` failure screen, kept top block
+  with `1 MINUTE. N WORDS.`, two-step exit with an inline confirmation, 200 ms/220 ms refusal. The root
+  Zero Draft landing (`/index.html`) is out of scope: it is the separate outward brand.
+- The delivered spec now includes `short sheets keep the warning and result slots inside the paper`,
+  `kept screens keep the controls and draft clear of the paper foot`, `the demo danger group clears when a new
+  loop reaches typing`, `short demo sheets keep the status slot inside the paper`, and the 5-test
+  `qa/motion-regression.spec.mjs`. The full eight-project `npx playwright test` gate for this revision
+  is the repository acceptance command and runs in the pipeline test step; focused review runs of the
+  touched tests passed on 1440-light, 390-dark and 390-dark-reduce. The earlier 108-pass figure
+  belongs to the initial parity pass, not this revision. `qa/mac.spec.mjs` and `qa/seo.spec.mjs` pass
+  (26 tests, 1440-light).
+- Release journey, room scenarios only against a local server (`journey/serve-local.mjs --root .`):
+  `full-session` and `silence-wipe` PASS on WebKit (iPhone 14 profile, 390x844) and Chromium 1440x900,
+  one continuous video each. `journey/verify-room.mjs`: `no-finish`, `no-wipe` and `no-copy` fail on
+  both viewports at the named step and the intact build passes.
+- Measurements (task evidence, both sizes, light and dark): active line 0.390 -> 0.350 of the sheet;
+  warning numeral ink 218/221 pt under the writing baseline -> 44/43 pt; caption 67/46 pt under the
+  numeral ink -> 21/22 pt; trial session bars none -> one 2 pt bar; demo bars 2 pt + 3 pt meter -> one
+  2 pt bar; demo history 0.36/0.22 -> 0.22/0.07; count `0 WORDS` -> `Type to start` / `0 words`; kept
+  receipt `0:00 - N WORDS KEPT.` -> `1 MINUTE. N WORDS.`; exit row baselines equal within 0 pt on
+  desktop (a phone wraps the confirmation onto its own line instead of truncating it).
+- Short-sheet follow-up: at the compact sizes 1440x350 and 844x390 the warning group, failure block
+  and kept layout clamp above the paper foot, the kept actions stay clear of the footer, and at least
+  one kept draft line remains visible. The exit confirmation row's measured height (one or two
+  lines at the current width) is reserved permanently by a hidden probe: the kept bottom derives
+  from the measured footer plus that row in the compact and tall layouts alike, so arming the
+  confirmation neither reflows nor overlaps the kept screen. The kept test forces a two-line
+  confirmation at 320, 390 and 767 px widths with a filled box, and asserts the last kept line
+  stays above the confirmation on the tall desktop sheets too. Tall desktop kept screens
+  keep the Mac 72 px offset and the token title size. The compact
+  threshold is a 480 px paper; 667x375, 390x844 and 1440x620 cover the boundary. The Mac 44 px ink
+  offsets are unchanged.
+- Kept draft line, metric-independent: the kept screen owes the writer one full line of the returned
+  draft, so `status-slot.js` measures the rendered line box against the measured scroll box and, only
+  when the title, receipt, controls or the reserved confirmation row squeeze it, gives way through the
+  screen's own gaps (draft gap, then actions gap, then receipt gap) until a line fits. The guarantee is
+  therefore not a font constant: the Linux runner wraps the phone confirmation row one line taller and
+  left 30.4 px of a 33.6 px draft line, which this test now reproduces deterministically on every
+  platform by adding one receipt line above the draft at 320 px.
+- Not re-run here: the whole suite in a single final pass, the pre-deploy journey against a real DMG
+  (`npm run journey --expect-sha`, needs the artifact), and real-device IME/iOS checks.
 
 # 2026-10-25: Aligned-room build and split-W logo (local)
 

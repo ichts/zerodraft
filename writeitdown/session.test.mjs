@@ -80,7 +80,7 @@ test('demo is forward-only: the false start stays, Backspace is tried once and b
   const before = events[events.indexOf(deny) - 1], after = events[events.indexOf(deny) + 1];
   assert.equal(deny.cur, before.cur, 'the blocked Backspace changes nothing');
   assert.ok(deny.t - before.t >= 350, 'a beat to notice the false start');
-  assert.ok(after.t - deny.t >= 900, 'the blocked keycap holds before typing goes on');
+  assert.ok(after.t - deny.t >= 900, 'the refusal holds before typing goes on');
   assert.equal(LINES[2], deny.cur + ' pretending.', 'the false start stays in the draft');
 });
 

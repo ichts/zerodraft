@@ -28,14 +28,8 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `og.png`: 1200×630 light-theme social share card with the split-W lockup, referenced by landing and download metadata.
 - `logo/write-it-down-lockup.svg`, `logo/write-it-down-lockup-plate.svg`, `favicon.svg`, `favicon-16.png`, `favicon-32.png`, `favicon-dark.svg`,
   `favicon-dark-16.png`, `favicon-dark-32.png`, `apple-touch-icon.png`: the A split-W lockup and the brand favicon
-  set. The lockup is the header and footer brand: the app-icon chip then the wordmark. Two aligned alpha masks
-  share one viewBox: the plate uses the existing paper-surface token, the W and wordmark use `currentColor`.
-  Light appearance has a paper plate with ink W; dark has an ink plate with bone W.
-  The default favicon is the full-bleed bone square with the ink split W, and the dark
-  `prefers-color-scheme` links use the ink square with the bone split W. The usage rules and optical sizes are
-  owned by `../design/DESIGN.md` §11.
-  `install.sh` and `qa/test-install.py` list the nine files exactly, so a deploy and the installer acceptance
-  cannot drift.
+  set. `../design/DESIGN.md` §11 owns the lockup composition, theme roles, favicon usage and optical sizes.
+  `install.sh` owns the production file list; `qa/test-install.py` checks that the installed set matches it.
 - `robots.txt`, `sitemap.xml`, `llms.txt`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Content and deployment requirements live in `README.md`, "Discovery files and answer pages".
 - `journey/journey.mjs`, `journey/serve-local.mjs`: release journey gate and local artifact server, separate from `npm test`. Execution and acceptance requirements live in `README.md`, "Host routing (Caddy) and the release journey gate".
 - `journey/waivers.json`: authoritative sign-in exemption and integration-only delivery approval with installed-DMG TEST acceptance pending for the maintainer. `journey/waivers.mjs` enforces approval, sign-in absence and the LIVE-sales block; `journey/waivers.test.mjs` covers validation. The `mac-purchase` journey intercepts all checkout/license calls and the hosted destination, asserting integration only. See `README.md` for the release procedure.

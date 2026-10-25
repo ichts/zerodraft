@@ -484,3 +484,12 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-038's mobile gap trade ("the mobile header trades gap for it ... so the theme button stays on the
   390 px right gutter") only, in that the 12 px/6 px gap trade now stops at 380 px and the lockup itself steps
   down below it. The chip, the single mask file, the palette and the rest of D-038 stand.
+
+### Correction to D-039: mask layers and mobile gaps
+
+- Date: 2026-10-25
+- Decision: D-039 changes only the lockup size at 380 px and below. The mobile gaps remain in effect there;
+  the implementation uses two aligned masks, as defined in `design/DESIGN.md` section 11.6.
+- Reason: D-039's closing sentence retained the earlier single-mask description and incorrectly said the mobile
+  gap trade stopped at 380 px. Neither describes the shipped CSS.
+- Supersedes: D-039's "single mask file" and "12 px/6 px gap trade now stops at 380 px" wording only.

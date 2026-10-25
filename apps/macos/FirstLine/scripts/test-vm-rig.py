@@ -405,6 +405,11 @@ def check_launch_assertion_ids(workdir):
          f"the licensed relaunch lost its declared-defect assertion id: {licensed_run.stdout[-400:]}")
 
 
+def analysis_capability(panel):
+    return next((capability for capability in panel.get("capabilities") or []
+                 if capability.get("stage") == "deterministic analysis"), {})
+
+
 def check_panel_stages(workdir):
     evidence = os.path.join(workdir, "bundle")
     os.makedirs(evidence)
@@ -445,8 +450,7 @@ def check_panel_stages(workdir):
          "the report header did not use recording.tsv: %r" % (run_metadata.get("recording"),))
     with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
         merged = json.load(handle)
-    analysis = next((capability for capability in merged.get("capabilities") or []
-                     if capability.get("stage") == "deterministic analysis"), {})
+    analysis = analysis_capability(merged)
     need(analysis.get("status") == "complete"
          and "1 finding" in (analysis.get("detail") or ""),
          f"the deterministic analysis stage is not labelled by its outcome: {analysis!r}")
@@ -520,25 +524,6 @@ def check_panel_stages(workdir):
          f"a fully answered panel reported missing lenses: {fields.get('lenses_required_missing')!r}")
     need("reason=" not in status.stdout, "a fully answered panel still reported a blocking reason")
 
-    # Known-broken: without findings.json the analysis stage used to be labelled
-    # complete anyway. It must be a declared gap that names the missing file.
-    os.remove(os.path.join(evidence, "findings.json"))
-    unanalysed = subprocess.run(["bash", DESIGN_PANEL, evidence], capture_output=True, text=True,
-                                env=dict(os.environ, WID_PANEL_SKIP_MODELS="1"), timeout=300)
-    need(unanalysed.returncode == 0,
-         f"design-panel.sh exited {unanalysed.returncode}: {unanalysed.stderr[-400:]}")
-    with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
-        without_analysis = json.load(handle)
-    analysis = next((capability for capability in without_analysis.get("capabilities") or []
-                     if capability.get("stage") == "deterministic analysis"), {})
-    need(analysis.get("status") == "declared gap",
-         f"a missing analysis was labelled {analysis.get('status')!r} instead of a declared gap")
-    need("findings.json is missing" in (analysis.get("detail") or ""),
-         f"the gap does not name the reason: {analysis.get('detail')!r}")
-    need(any("deterministic analysis did not run" in gap
-             for gap in without_analysis.get("declared_gaps") or []),
-         f"the bundle does not declare the missing analysis: {without_analysis.get('declared_gaps')!r}")
-
     # Known-broken: every prompt answered with the Rams review. That is one review
     # repeated, so no lens may count and the six-lens gate must stay blocked.
     fixed_bindir = os.path.join(workdir, "fixed-bin")
@@ -564,6 +549,55 @@ def check_panel_stages(workdir):
          f"a repeated single-lens answer reported {fields.get('lenses_complete')} completed lenses")
     need(fields.get("lenses_required_missing") == " ".join(REQUIRED_LENSES[1:]),
          f"the repeated answer satisfied the required set: {fields.get('lenses_required_missing')!r}")
+
+    def panel_run():
+        completed = subprocess.run(["bash", DESIGN_PANEL, evidence], capture_output=True,
+                                   text=True, timeout=300,
+                                   env=dict(os.environ, WID_PANEL_SKIP_MODELS="1"))
+        need(completed.returncode == 0,
+             f"design-panel.sh exited {completed.returncode}: {completed.stderr[-400:]}")
+        with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
+            loaded = json.load(handle)
+        with open(os.path.join(panel, "report.html"), encoding="utf-8") as handle:
+            return loaded, handle.read()
+
+    # Known-broken: a missing, refused or unreadable analysis was labelled complete.
+    os.remove(os.path.join(evidence, "findings.json"))
+    without_analysis, report = panel_run()
+    analysis = analysis_capability(without_analysis)
+    need(analysis.get("status") == "failed",
+         f"a missing analysis was labelled {analysis.get('status')!r} instead of a failure")
+    need("findings.json is missing" in (analysis.get("detail") or ""),
+         f"the failure does not name the reason: {analysis.get('detail')!r}")
+    need(any("deterministic analysis did not complete" in gap
+             for gap in without_analysis.get("declared_gaps") or []),
+         f"the bundle does not declare the missing analysis: {without_analysis.get('declared_gaps')!r}")
+    need("findings.json is missing" in report,
+         "the report hides why the deterministic analysis did not run")
+
+    refused_reason = ("the frame stream decoded to 5 images for 6 recorded frames: "
+                      "a capture is missing")
+    with open(os.path.join(evidence, "findings.json"), "w", encoding="utf-8") as handle:
+        json.dump({"recording": {"error": refused_reason}, "findings": []}, handle)
+    refused_panel, report = panel_run()
+    analysis = analysis_capability(refused_panel)
+    need(analysis.get("status") == "failed",
+         f"an analyser refusal was labelled {analysis.get('status')!r} instead of a failure")
+    need(refused_reason in (analysis.get("detail") or ""),
+         f"the failure does not carry the analyser's reason: {analysis.get('detail')!r}")
+    need(any(refused_reason in gap for gap in refused_panel.get("declared_gaps") or []),
+         f"the bundle does not declare the analyser's refusal: {refused_panel.get('declared_gaps')!r}")
+    need(refused_reason in report, "the report hides the analyser's failure reason")
+
+    with open(os.path.join(evidence, "findings.json"), "w", encoding="utf-8") as handle:
+        handle.write("{ this is not the analyser output\n")
+    broken_panel, report = panel_run()
+    analysis = analysis_capability(broken_panel)
+    need(analysis.get("status") == "failed",
+         f"an unreadable analysis was labelled {analysis.get('status')!r} instead of a failure")
+    need("could not be read" in (analysis.get("detail") or ""),
+         f"the unreadable analysis gives no reason: {analysis.get('detail')!r}")
+    need("could not be read" in report, "the report hides that the analysis file is unreadable")
 
 
 def repository_root(path):

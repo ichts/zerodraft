@@ -442,10 +442,15 @@ def report():
         gaps = "".join(f"<li>{esc(gap)}</li>" for gap in panel["declared_gaps"])
         parts.append(f"<div class=banner><strong>Declared gaps in this review</strong><ul>{gaps}</ul></div>")
     parts.append("<h2>Capability matrix</h2>" + render_capabilities(panel.get("capabilities") or []))
-    parts.append("<h2>Deterministic analysis (primary detector)</h2>"
-                 + render_findings(panel.get("findings") or [], panel_dir))
-    cadence = ""
     analysis = panel.get("recording_analysis") or {}
+    analysis_sections = []
+    if analysis.get("error"):
+        analysis_sections.append(
+            "<div class=banner><strong>The deterministic analysis did not complete.</strong>"
+            f"<p>{esc(analysis['error'])}</p></div>")
+    analysis_sections.append(render_findings(panel.get("findings") or [], panel_dir))
+    parts.append("<h2>Deterministic analysis (primary detector)</h2>" + "".join(analysis_sections))
+    cadence = ""
     if analysis.get("frames") and analysis.get("span_ms"):
         cadence = (" The recorder captured %.1f frames per second, which bounds what a clip can "
                    "show; the clip frames are sampled at 10 fps from that source."

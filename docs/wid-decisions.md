@@ -658,3 +658,61 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   is still running, not one enum that can drift.
 - Supersedes: D-041's "while the Session room is shown" gate wording only. Its opt-in default, its
   signed-feed and key rules, and every room string, geometry and motion rule stand.
+
+## D-043: The web room and the landing demo follow the shipped Mac room
+
+- Date: 2026-10-25
+- Decision: writeitdown.app's `#room` trial and its landing demo (`#demo`) carry the Mac room's
+  settled behaviour, not the pre-PR-58 web variant. The active line sits at 35% of the sheet; the
+  empty room shows only the caret with `Type to start` in the count slot and `0 words` after a wipe;
+  the history fade is stepped per rendered line (100/22/7/gone) with a one-pitch, 180 ms ease-out
+  shift on a new line; the warning numeral and `KEEP TYPING OR THE DRAFT IS DELETED.` are one group
+  placed by ink 44 px under the writing baseline; the wipe receipt takes the same status slot; one
+  2 pt bar runs as a single linear animation over the remaining session and there is no bottom meter;
+  the wipe screen is `You stopped.` with a 48 pt outlined `Begin again` and the red receipt; the kept
+  screen puts `You wrote it down.`, `1 MINUTE. N WORDS.` and COPY TEXT / RUN IT AGAIN in a fixed top
+  block above a scrollable draft; exit takes two acts with an inline confirmation on the footer row;
+  and a blocked edit is a 200 ms transform-only shake with a 220 ms red-hairline flash. The parity
+  table for the pass lives in the task record; the Mac cases are `docs/wid-mac-behavior.md` 18-57 and
+  the web assertions are `writeitdown/qa/phase4.spec.mjs`.
+- Reason: D-001 says both surfaces are one product. After PR https://github.com/ichts/zerodraft/pull/58
+  the Mac moved (35% anchor, `Type to start`, stepped fade, grouped warning, one bar, the stopped
+  screen, the kept top block, the two-step exit) and the web room did not, so the same product showed
+  two different rooms.
+- Supersedes: the web-only room values that D-014, D-020, D-021, D-025 to D-030 and D-031 set for the
+  trial where they differ from the list above. It does not change any Mac decision.
+
+## D-044: The landing demo shows the result screens without their controls
+
+- Date: 2026-10-25
+- Decision: The landing demo is watch-only theatre, so its wipe stage shows the room's failure screen
+  (`You stopped.` plus the red `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` receipt) but no
+  `Begin again` button, and its loop rearms by itself. The trial's control is real; the demo gets no
+  control that does nothing.
+- Reason: Q-13 forbids dead zones, and a second button inside the hero would compete with the one
+  entrance under the sheet. The copy and the result screen still match the app.
+- Supersedes: none.
+
+## D-045: The web keeps its nav row, and a phone wraps the exit confirmation
+
+- Date: 2026-10-25
+- Decision: The browser room keeps its nav row (brand, `Download for Mac`, theme toggle): dark mode
+  and the app link stay reachable without leaving the writing, and the Mac has no nav row at all. On a
+  phone (<=767 px) the inline exit confirmation takes its own line above `ESC - EXIT` and the count
+  instead of being truncated the way the Mac truncates it. Every other block, copy string and motion
+  timing follows the Mac exactly.
+- Reason: The Mac can truncate because it has a window menu and no nav; a phone cannot, and a clipped
+  destructive confirmation hides the part that matters. Both deviations are platform-forced and are
+  the only ones in the parity pass besides the missing picker, settings and licence surfaces (the web
+  trial is 60 seconds, free and unlimited, and stores nothing).
+- Supersedes: none.
+
+## D-046: The refusal is visual only on both surfaces
+
+- Date: 2026-10-25
+- Decision: A blocked edit is announced visually and to assistive technology only: the 200 ms shake
+  with the 220 ms red hairline, plus the live-region line. The web's short browser tone is removed;
+  the Mac has no sound for a refusal either.
+- Reason: One product, one answer to a blocked key. The tone was web-only, undocumented, and forced
+  nothing about the browser.
+- Supersedes: none.

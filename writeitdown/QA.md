@@ -26,6 +26,31 @@ version.
   this one with `DMG URL: the file name does not carry the version`; `qa/mac.spec.mjs` gained that
   rejection case and the current page still reports STATIC CHECK PASSED.
 
+# 2026-10-25: Web room parity with the shipped Mac app (local, branch `fm/wid-web-parity`)
+
+- Scope: `writeitdown/index.html`'s landing demo and `#room` trial brought to the Mac room's settled
+  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped
+  per-line history with a one-pitch 180 ms shift, ink-placed warning group and wipe receipt, one 2 pt
+  linear session bar and no bottom meter, `You stopped.` / `Begin again` failure screen, kept top block
+  with `1 MINUTE. N WORDS.`, two-step exit with an inline confirmation, 200 ms/220 ms refusal. The root
+  Zero Draft landing (`/index.html`) is out of scope: it is the separate outward brand.
+- `npx playwright test qa/phase4.spec.mjs`: green across all eight viewport/theme/motion projects
+  before the last two assertion additions (108 passed, 8 expected skips); after them the two touched
+  tests (`history is stepped per line...`, `native zen input, deny, IME paths...`) were re-run green on
+  1440-light and 390-dark. `qa/mac.spec.mjs` and `qa/seo.spec.mjs` pass (26 tests, 1440-light).
+- Release journey, room scenarios only against a local server (`journey/serve-local.mjs --root .`):
+  `full-session` and `silence-wipe` PASS on WebKit (iPhone 14 profile, 390x844) and Chromium 1440x900,
+  one continuous video each. `journey/verify-room.mjs`: `no-finish`, `no-wipe` and `no-copy` fail on
+  both viewports at the named step and the intact build passes.
+- Measurements (task evidence, both sizes, light and dark): active line 0.390 -> 0.350 of the sheet;
+  warning numeral ink 218/221 pt under the writing baseline -> 44/43 pt; caption 67/46 pt under the
+  numeral ink -> 21/22 pt; trial session bars none -> one 2 pt bar; demo bars 2 pt + 3 pt meter -> one
+  2 pt bar; demo history 0.36/0.22 -> 0.22/0.07; count `0 WORDS` -> `Type to start` / `0 words`; kept
+  receipt `0:00 - N WORDS KEPT.` -> `1 MINUTE. N WORDS.`; exit row baselines equal within 0 pt on
+  desktop (a phone wraps the confirmation onto its own line instead of truncating it).
+- Not re-run here: the whole suite in a single final pass, the pre-deploy journey against a real DMG
+  (`npm run journey --expect-sha`, needs the artifact), and real-device IME/iOS checks.
+
 # 2026-10-25: Aligned-room build and split-W logo (local)
 
 - Source `1446b4a` (the merged writing-room/After alignment and split-W logo PRs). The download page and the `journey:live` expectation publish the rebuilt DMG's SHA-256 `5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`.

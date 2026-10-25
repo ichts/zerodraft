@@ -35,19 +35,21 @@ this round closes two review findings against it and drives the real signed 1.0 
   defect, which reproduced (`licensed-launch-no-activation-page`, a 181 ms activation card during a licensed
   launch). `recording-gap` and `recording-stall` both passed under the strict rule, so it does not misfire on a
   real run. Verdict `accepted-with-declared-defect`, 0 failures outside the declaration, therefore not a pass.
-- Six-lens review on that run: not run. Every configured reviewer route failed on this host - the four
-  `anthropic/*` candidates answered `rate_limit_error` on all four attempts each, `openai-codex/gpt-5.5` is not
-  served for this account, `openai-codex/gpt-6-astra` reported its usage limit, and `openai/gpt-4o` and
-  `openai/gpt-5.1` returned WebSocket errors; `panel/model-probes.tsv` records each candidate with its exact
-  error. The bundle therefore records `panel_not_run: no reviewer model answered`, `sign_off: blocked`, the
-  exact re-run command, and the run exits 79 rather than signing off. Re-running the panel with the only route
-  that answers here (`deepseek/deepseek-flash`) reviewed all six flagged clips and 26 vision checks but could
-  not produce a lens answer: the route's own image loop exceeded the request-body limit (`413 ... length limit
-  exceeded`) and left hundreds of megabytes of stream per lens, so that attempt was stopped and the record
-  keeps "panel not run".
-- NOT RUN: a clean six-lens sign-off (no reviewer route on this host), the declared-defect exit-78 code (it
-  requires the completed review, so this run's 79 is correct), the `.app` licensed-launch mode, real purchase
-  and payment, and any Finder install or first launch outside the prepared VM image.
+- Declared capability gap, not a panel pass - six-lens review on that run: not run. The panel is implemented and
+  wired as the run's last stage (`scripts/design-panel.sh`, invoked by `scripts/vm-journey.sh` on its own bundle),
+  and no reviewer route answers on this host: the four `anthropic/*` candidates answered `rate_limit_error` on
+  all four attempts each, `openai-codex/gpt-5.5` is not served for this account, `openai-codex/gpt-6-astra`
+  reported its usage limit, and `openai/gpt-4o` and `openai/gpt-5.1` returned WebSocket errors;
+  `panel/model-probes.tsv` records each candidate with its exact error. The bundle therefore records
+  `panel_not_run: no reviewer model answered`, `sign_off: blocked` and the exact re-run command, and the run
+  exits 79 rather than signing off. Sign-off is blocked rather than accepted, and a released build still needs
+  a real six-lens run; this bundle is not that run. Re-running the panel with the only route that answers here
+  (`deepseek/deepseek-flash`) reviewed all six flagged clips and 26 vision checks but could not produce a lens
+  answer: the route's own image loop exceeded the request-body limit (`413 ... length limit exceeded`) and left
+  hundreds of megabytes of stream per lens, so that attempt was stopped and the record keeps "panel not run".
+- NOT RUN: a clean six-lens sign-off (no reviewer route on this host), the declared-defect acceptance outcome
+  (it is recorded only once the review completes, so this run's 79 is correct), the `.app` licensed-launch mode,
+  real purchase and payment, and any Finder install or first launch outside the prepared VM image.
 
 ## 2026-10-25: Recorded VM run of the shipped 1.0 DMG (declared defect, not accepted), and the launch-flash fix proven live
 
@@ -71,7 +73,7 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   silence wipe with the restart receipt and a zeroed count; session 3 written through a real one-minute deadline
   with the exact kept draft, the `1 MINUTE. N WORDS.` receipt, COPY TEXT flipping to COPIED and the exact
   clipboard contents; RUN IT AGAIN reaching the activation page with no writable editor left. One continuous
-  `screen.mov` of 125.7 s over 355 captured frames, largest frame gap 1.31 s.
+  `screen.mov` of 125.52 s over 367 captured frames, largest frame gap 892 ms.
 - DECLARED KNOWN DEFECT on that artifact, reproduced twice in one bundle: `licensed-launch-no-activation-page`.
   On a licensed Mac whose trial is spent, the launch presented the activation card until the license revalidation
   returned, because entitlement required that no validation be in flight and the launch validation always starts
@@ -79,11 +81,11 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   deterministic analyser saw it: the first frame of the relaunch was the unlicensed card, the licensed home
   followed 184 ms later against the loopback fixture. Fixed on main by PR 62
   (https://github.com/ichts/zerodraft/pull/62). The rig excuses exactly that assertion id on exactly that
-  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, exits 78 rather
-  than 0 with `sign_off: not accepted` for exactly this artifact, and fails the run if the assertion passes with
-  the declaration still in place. This artifact is therefore not a release acceptance. The analyser keeps that
-  id for the licensed relaunch streams only, so the same surface in any other launch stream fails under its own
-  id and cannot borrow the declaration.
+  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, and fails the run
+  if the assertion passes with the declaration still in place. This artifact's run keeps `panel_not_run` and
+  `sign_off: blocked` because its six-lens panel did not run, so it ends 79; `writeitdown/README.md` owns the
+  exit-code contract. This artifact is therefore not a release acceptance. The analyser keys that id to the
+  licensed relaunch streams alone, so no other launch stream can borrow the declaration.
 - PASS, fix proven live: a locally built `.app` from current main (ad-hoc signed by `scripts/package-app.sh`,
   the app sources at that commit, no Developer ID, no notarization) installed into a fresh clone and driven by the
   same launcher, activated against the loopback fixture, then relaunched three times with the watcher armed. All
@@ -99,6 +101,7 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   the six-lens result.
 - NOT RUN: the offline re-verification and revocation paths of case 58, real purchase and payment, and any
   Finder install or first launch outside the prepared VM image. No claim is made for those here.
+
 ## 2026-10-25: The update gate follows a live writing session
 
 Fourth review round on the same branch. No DMG build, notarization, upload, deployment or merge was
@@ -236,7 +239,6 @@ window journey was run, and no DMG, upload, deployment or merge was performed.
 - Correction to the 2026-10-25 Sparkle record below: that run's feed was **not** signed, because the
   bundle did not declare `SURequireSignedFeed` yet; the signature verified there was the ZIP
   enclosure's. The feed signature is first proven in this record.
-
 ## 2026-10-25: Release artifact for the aligned room and the split-W logo
 
 - Source: `origin/main` commit `1446b4af694e31f08d019f6fece189702e6ebfa7` (the merged writing-room/After alignment and split-W logo PRs), in a fresh clone on the Mac mini, built with `scripts/release-dmg.sh` (configured release, not `--staging`). Signing and notarization ran in the captain's own unlocked terminal on that Mac; an SSH session with a locked login keychain cannot sign.

@@ -777,7 +777,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
   re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
   reviewer reads contradicted the artifact it sat next to.
-- Supersedes: D-047's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
+- Supersedes: D-051's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
   its declared-defect keying stand.
 ## D-049: A frozen screen fails the run, and no recorded step excuses it
 
@@ -792,10 +792,10 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   to distrust. A dead screen is either a hung app or a stalled recorder, and both must fail the run, so no
   evidence inside the bundle may downgrade them.
 - Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
-  implementation shortcut, never a recorded decision). D-047's assertion ownership, its six-lens gate and its
+  implementation shortcut, never a recorded decision). D-051's assertion ownership, its six-lens gate and its
   exit codes stand.
 
-## D-046: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
+## D-050: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
 
 - Date: 2026-10-25
 - Decision: the analyser's forbidden-surface rule is keyed to the launch stream, not to the text alone. The
@@ -809,6 +809,25 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the fixture stream's contract requires the surface the forbidden list names, so a clean DMG run
   was rejected for showing exactly the screen the rig demands, while a non-numeric gate value silently
   skipped the 79 exit, and a renamed verdict line could sign off with no criterion at all.
-- Supersedes: D-043's "the same surface in another launch stream fails under its own id" only for a stream
-  whose own contract requires that surface, and D-044's read of the gate as a number. D-043's six named
+- Supersedes: D-047's "the same surface in another launch stream fails under its own id" only for a stream
+  whose own contract requires that surface, and D-048's read of the gate as a number. D-047's six named
   lenses, its exit codes and its declared-defect keying stand.
+
+## D-051: A panel that could not run is a declared capability gap, and the release record states the run that happened
+
+- Date: 2026-10-25
+- Decision: on this host the six-lens panel is a declared capability gap, not a panel failure and never a pass: it
+  is implemented and wired as the run's last stage, it did not run for the 1.0 bundle because no reviewer route
+  answers, the bundle carries `panel_not_run` with the exact re-run command and `sign_off: blocked`, and a
+  released build still needs a real six-lens run in its own bundle. The evidence bundle is the only authority for
+  the recorded run: the 1.0 bundle recorded 367 captured frames, an 892 ms largest frame gap, 125.52 s of
+  recording, 31 deterministic findings, verdict `accepted-with-declared-defect`, panel not run, `sign_off`
+  blocked, and exit 79. `writeitdown/README.md` states the exit-code contract once - 0 clean pass, 78 the
+  declared known defect reproduced with the deterministic analysis and the panel complete, 79 blocked including
+  a panel that could not run, 1 rejected - and the QA record points at it instead of restating a per-run code.
+- Reason: the record claimed that same run exited 78 with a signed-off declared defect and carried the six-lens
+  review, while the bundle it described recorded a blocked panel and exit 79, and the QA record carried two
+  different frame counts and frame gaps for one recording. A release record that disagrees with its own bundle
+  cannot be used to decide a release.
+- Supersedes: D-047's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
+  lenses, its assertion ownership and its declared-defect keying stand.

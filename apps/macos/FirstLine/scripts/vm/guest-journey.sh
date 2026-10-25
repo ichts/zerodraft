@@ -31,9 +31,16 @@
 set -uo pipefail
 
 evidence="${1:?usage: guest-journey.sh <evidence-dir> <dmg-path> [sha256] [license-fixture]}"
-dmg="${2:?usage: guest-journey.sh <evidence-dir> <dmg-path> [sha256] [license-fixture]}"
+artifact="${2:?usage: guest-journey.sh <evidence-dir> <dmg-or-app-path> [sha256] [license-fixture] [--licensed-only]}"
+dmg="$artifact"
 expected_sha="${3:-}"
 fixture_bin="${4:-}"
+mode="${5:-}"
+# `--licensed-only` installs a locally built bundle instead of the DMG payload and
+# runs only the licensed-launch case, three times, so a fix can be proven live on a
+# fresh clone with the same launch watcher the acceptance run uses.
+licensed_only=0
+[[ "$mode" == '--licensed-only' ]] && licensed_only=1
 evidence="$(cd "$evidence" && pwd -P)"
 rig=/usr/local/wid-rig/bin/widrig
 app_path="/Applications/Write It Down.app"
@@ -51,8 +58,10 @@ mnt=''
 steps=0
 
 log() { printf '%s\n' "$*" | tee -a "$evidence/journey.log"; }
-pass() { log "PASS $1"; }
-bad() { log "FAIL $1"; failures=$((failures + 1)); }
+# Assertions that a declared known defect may point at carry a stable id, so the host
+# can match one exact assertion instead of a message that may be reworded later.
+pass() { if [[ -n "${2:-}" ]]; then log "PASS [$2] $1"; else log "PASS $1"; fi; }
+bad() { if [[ -n "${2:-}" ]]; then log "FAIL [$2] $1"; else log "FAIL $1"; fi; failures=$((failures + 1)); }
 step() { local name="$1"; shift; if "$@" >>"$evidence/journey.log" 2>&1; then pass "$name"; else bad "$name"; return 1; fi; }
 
 stop_app() {
@@ -187,12 +196,12 @@ watch_texts() { jq -r '.text // ""' "$1" 2>/dev/null; }
 watch_frames() { wc -l <"$1" | tr -d ' '; }
 # grep without -q on purpose: -q closes the pipe on the first match, jq then dies of
 # SIGPIPE and `set -o pipefail` turns a real match into a failed pipeline.
-watch_never() { # watch_never <jsonl> <regex> <label>
+watch_never() { # watch_never <jsonl> <regex> <label> [assertion-id]
   if watch_texts "$1" | grep -E -- "$2" >/dev/null; then
-    bad "$3: forbidden text /$2/ appeared during launch"
+    bad "$3: forbidden text /$2/ appeared during launch" "${4:-}"
     return 1
   fi
-  pass "$3: /$2/ never appeared in $(watch_frames "$1") launch frames"
+  pass "$3: /$2/ never appeared in $(watch_frames "$1") launch frames" "${4:-}"
 }
 watch_seen() { # watch_seen <jsonl> <regex> <label>
   if watch_texts "$1" | grep -E -- "$2" >/dev/null; then pass "$3: /$2/ observed while watching"; else bad "$3: /$2/ missing from launch frames"; return 1; fi
@@ -250,6 +259,13 @@ snap 'fresh-clone-before'
   && pass 'the clean clone has no previous Write It Down settings' \
   || bad 'the clone already has Write It Down settings; the VM is not clean'
 
+if [[ "$licensed_only" -eq 1 ]]; then
+  step 'install the locally built bundle the way the DMG payload is installed' ditto "$artifact" "$app_path"
+  xattr -cr "$app_path" 2>/dev/null
+  step 'codesign --deep --strict verifies the local build' codesign --verify --deep --strict --verbose=2 "$app_path"
+  actual_sha=''
+  snap 'installed-after'
+else
 step 'DMG size plausible' bash -c "[[ \$(stat -f %z '$dmg') -ge 1000000 ]]"
 actual_sha="$(shasum -a 256 "$dmg" | cut -d' ' -f1)"
 if [[ -n "$expected_sha" ]]; then
@@ -276,9 +292,11 @@ step 'spctl accepts the installed app' spctl --assess --type execute --verbose=2
 step 'stapler validates the installed app' xcrun stapler validate "$app_path"
 xattr -w com.apple.quarantine "0081;$(printf '%x' "$(date +%s)");Safari;" "$app_path" 2>/dev/null
 pass 'installed app carries the browser-download quarantine flag'
+fi
 
 # --- 3. launch case 1: first launch with no license (trial path) ------------
 
+[[ "$licensed_only" -eq 1 ]] || {
 snap 'first-launch-before'
 screencapture -x "$work/first-launch-loading.png"
 launch_watched "$app_path" 8 "$evidence/launch-trial.jsonl" || { bad 'the app did not launch'; exit 1; }
@@ -380,6 +398,7 @@ wait_re 'Activate Write It Down' 30 && pass 'after three free sessions the activ
 has_re 'Type to start' && bad 'the editor is still writable after the free sessions' \
   || pass 'no writable editor remains after the free sessions'
 snap 'activation-page'
+}
 
 # --- 6. launch case 2: an already-active signed license must not flash the licence view
 
@@ -404,27 +423,45 @@ if [[ -n "$fixture_bin" && -x "$fixture_bin" ]]; then
       || bad 'fixture build could not re-sign the copied app'
     stop_app
     launch_watched "$qa_app" 3 "$evidence/launch-fixture-first.jsonl" || { bad 'the fixture build did not launch'; exit 1; }
-    wait_re 'Activate Write It Down' 30 && pass 'fixture build opens on the activation page before activation' \
-      || bad 'fixture build did not open on the activation page'
+    if [[ "$licensed_only" -eq 1 ]]; then
+      # A freshly built bundle still has its three trial sessions, so it opens on the
+      # home instead of the activation card. The licence is then activated from the
+      # app's own Settings surface, which runs the same activation code path.
+      click_el AXMenuBarItem '^Write It Down' || bad 'proof build: could not open the app menu'
+      click_el AXMenuItem '^Settings' || bad 'proof build: could not open Settings'
+      wait_re '[Oo]rder number or activation code' 20 >/dev/null \
+        && pass 'proof build: Settings shows the activation field' \
+        || bad 'proof build: Settings did not show the activation field'
+    else
+      wait_re 'Activate Write It Down' 30 && pass 'fixture build opens on the activation page before activation' \
+        || bad 'fixture build did not open on the activation page'
+    fi
     click_el AXTextField '' || bad 'fixture build: no activation key field'
     type_text 'window-qa-order'
     snap 'fixture-key-typed'
     click_el AXButton '^Activate' || bad 'fixture build: no Activate button'
-    wait_re 'This Mac is licensed\.' 40 && pass 'the fixture activation produced an active signed license' \
+    wait_re 'This Mac is licensed\.|Activated ' 40 && pass 'the fixture activation produced an active signed license' \
       || bad 'the fixture activation did not reach an active license'
     snap 'fixture-activated'
     stop_app
-    sleep 1
-    snap 'licensed-relaunch-before'
-    launch_watched "$qa_app" 5 "$evidence/launch-licensed.jsonl" || { bad 'the licensed app did not relaunch'; exit 1; }
-    wait_re 'Begin writing' 40 && pass 'licensed relaunch goes straight to the licensed home' \
-      || bad 'licensed relaunch did not reach the licensed home'
-    has_re 'Free trial:' && bad 'the licensed home still advertises the free trial' \
-      || pass 'the licensed home does not advertise the trial'
-    snap 'licensed-relaunch-after'
-    watch_never "$evidence/launch-licensed.jsonl" 'Activate Write It Down' 'licensed launch'
-    watch_never "$evidence/launch-licensed.jsonl" 'Enter your order number' 'licensed launch'
-    watch_seen "$evidence/launch-licensed.jsonl" 'Begin writing' 'licensed launch'
+    # The witness: the watcher is armed before the process exists and samples every
+    # 50 ms, so it sees the very first drawn surface rather than a settled window.
+    rounds=1
+    [[ "$licensed_only" -eq 1 ]] && rounds=3
+    for round in $(seq 1 "$rounds"); do
+      sleep 1
+      snap "licensed-relaunch-$round-before"
+      launch_watched "$qa_app" 5 "$evidence/launch-licensed-$round.jsonl" || { bad "licensed relaunch $round: the app did not launch"; exit 1; }
+      wait_re 'Begin writing' 40 && pass "licensed relaunch $round: goes straight to the licensed home" \
+        || bad "licensed relaunch $round: did not reach the licensed home"
+      has_re 'Free trial:' && bad "licensed relaunch $round: the licensed home still advertises the free trial" \
+        || pass "licensed relaunch $round: the licensed home does not advertise the trial"
+      snap "licensed-relaunch-$round-after"
+      watch_never "$evidence/launch-licensed-$round.jsonl" 'Activate Write It Down' "licensed launch $round" 'licensed-launch-no-activation-page'
+      watch_never "$evidence/launch-licensed-$round.jsonl" 'Enter your order number' "licensed launch $round"
+      watch_seen "$evidence/launch-licensed-$round.jsonl" 'Begin writing' "licensed launch $round"
+      stop_app
+    done
   else
     bad 'the license fixture did not start'
   fi
@@ -439,14 +476,15 @@ cat >"$evidence/notes.md" <<EOF
 
 - Run: $(date -u +%Y-%m-%dT%H:%M:%SZ)
 - Guest: macOS $(sw_vers -productVersion) ($(sw_vers -buildVersion)) on $(sysctl -n hw.model), $(sips -g pixelWidth "$work/probe-a.png" 2>/dev/null | awk '/pixelWidth/{print $2}')x$(sips -g pixelHeight "$work/probe-a.png" 2>/dev/null | awk '/pixelHeight/{print $2}')
-- DMG: $dmg
-- DMG SHA-256: $actual_sha
+- Artifact: $artifact
+- Artifact SHA-256: ${actual_sha:-locally built bundle, no DMG checksum}
 - Driver: CGEvent HID keyboard/mouse posted inside the guest; accessibility reads for assertions; no AXPress
+- Case: $([[ "$licensed_only" -eq 1 ]] && printf 'licensed-launch proof of a locally built bundle' || printf 'shipped DMG acceptance')
 - Recording: one timestamped JPEG per 0.25 s tick in frames/ (frames.tsv carries the
   wall clock of each frame); the host assembles screen.mov from those times, so the
   video stays continuous and an interrupted run keeps every frame it reached
 - Steps: $steps timestamped before/after screenshots in steps.tsv
-- Launch watchers: launch-trial.jsonl (no license), launch-licensed.jsonl (active signed fixture)
+- Launch watchers: launch-licensed-*.jsonl (active signed fixture, armed before the process exists)
 - Failures: $failures
 EOF
 pass 'evidence notes.md written'

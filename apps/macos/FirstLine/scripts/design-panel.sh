@@ -24,7 +24,7 @@ evidence="$(cd "$evidence" && pwd -P)"
 here="$(cd "$(dirname "$0")" && pwd -P)"
 repo="$(cd "$here/../../../.." && pwd -P)"
 model="${WID_PANEL_MODEL:-anthropic/claude-opus-5-5}"
-alternates="${WID_PANEL_ALTERNATES:-anthropic/claude-opus-4-8,anthropic/claude-fable-5,openai-codex/gpt-5.5,openai/gpt-5.1,openai-codex/gpt-5.6-sol}"
+alternates="${WID_PANEL_ALTERNATES:-anthropic/claude-opus-4-8,anthropic/claude-haiku-5-5,anthropic/claude-fable-5,openai-codex/gpt-5.5,openai-codex/gpt-6-astra,openai/gpt-4o,openai/gpt-5.1}"
 lenses="${WID_PANEL_LENSES:-rams norman spiekermann kare matas vignelli}"
 attempts="${WID_PANEL_ATTEMPTS:-4}"
 backoff="${WID_PANEL_BACKOFF:-30}"
@@ -158,6 +158,10 @@ if [[ -f "$evidence/screen.mov" && -n "$rec_start" && -f "$evidence/findings.jso
         source_file=$(printf '%s/clip-%s-%03d.png' "$panel" "$clip_count" "$source_index")
         [[ -f "$source_file" ]] && make_thumb "$source_file" "frame-$t_start-$slot.jpg"
       done
+    fi
+    if [[ -z "$review_model" ]]; then
+      note "clip $clip_count: frames cut for the record; no reviewer model answered, so no verdict"
+      continue
     fi
     prompt="$panel/clip-$clip_count-prompt.txt"
     cat >"$prompt" <<EOF

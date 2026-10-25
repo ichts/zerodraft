@@ -14,8 +14,32 @@
 #            requiring each operator to grant a harness app local network access,
 #            the rig runs itself as a launchd job. WID_VM_NO_LAUNCHD=1 keeps the
 #            script in the caller's process tree for hosts or callers that already
-#            hold the grant.
+#            hold the grant. A launchd job does not inherit the caller's environment,
+#            so wid_launchd_forwarded lists what the job gets: the runtime basics, the
+#            rig's own WID_* configuration (including every WID_PANEL_* input), Pi's
+#            process configuration, the proxy settings and every provider credential or
+#            endpoint name (suffixes _API_KEY, _AUTH_TOKEN, _OAUTH_TOKEN, _BASE_URL, and
+#            AWS_*). Anything not listed stays out, so the job's reviewer route is the
+#            one the operator configured.
 set -uo pipefail
+
+# The names a launchd job gets exported from the caller's environment.
+wid_launchd_forwarded() {
+  local name
+  for name in PATH HOME TMPDIR USER LOGNAME \
+    HTTP_PROXY HTTPS_PROXY NO_PROXY http_proxy https_proxy no_proxy ALL_PROXY all_proxy \
+    PI_CODING_AGENT_DIR PI_CODING_AGENT_SESSION_DIR PI_PACKAGE_DIR PI_OFFLINE \
+    PI_SKIP_VERSION_CHECK PI_TELEMETRY PI_CACHE_RETENTION PI_RADIUS_GATEWAY \
+    PI_SHARE_VIEWER_URL
+  do
+    [[ -n "${!name+set}" ]] && printf '%s\n' "$name"
+  done
+  while IFS= read -r name; do
+    case "$name" in
+      WID_*|*_API_KEY|*_AUTH_TOKEN|*_OAUTH_TOKEN|*_BASE_URL|AWS_*) printf '%s\n' "$name" ;;
+    esac
+  done < <(compgen -v)
+}
 
 # wid_launchd_reexec <program> [args...]
 # Returns only when the caller should keep running in its own process tree;
@@ -40,11 +64,10 @@ wid_launchd_reexec() {
     printf '[[ -e %q ]] && exit 0\n' "$status"
     printf 'cd %q || exit 2\n' "$(pwd -P)"
     printf 'export WID_VM_LAUNCHD=1\n'
-    printf 'export PATH=%q\n' "$PATH"
-    for name in $(compgen -v | grep '^WID_VM_'); do
+    while IFS= read -r name; do
       [[ "$name" == 'WID_VM_LAUNCHD' ]] && continue
       printf 'export %s=%q\n' "$name" "${!name}"
-    done
+    done < <(wid_launchd_forwarded)
     printf '%q' "$program"
     for arg in "$@"; do printf ' %q' "$arg"; done
     printf ' >>%q 2>&1\n' "$log"

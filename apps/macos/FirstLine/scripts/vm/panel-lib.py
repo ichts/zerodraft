@@ -1,26 +1,135 @@
 #!/usr/bin/env python3
-"""Helpers for the design panel report.
+"""Helpers for the design panel and for the acceptance verdict.
 
-[INPUT] `extract` reads a model answer on stdin and returns the first JSON object
-        in it. `report` reads <evidence>/panel/panel.json plus the thumbnails the
-        panel script wrote and renders <evidence>/panel/report.html.
-[OUTPUT] Either the extracted JSON on stdout, or a self-contained static HTML
-         report whose images are inlined, so the bundle can be read on its own.
+[INPUT] `answer` reads the JSONL stream `pi --mode json` prints on stdin. `clip`
+        reads the assembled recording plus the frame manifest. `status` reads
+        <evidence>/panel/stage-*.json. `extract` reads a model answer on stdin and
+        returns the first JSON object in it. `report` reads
+        <evidence>/panel/panel.json plus the thumbnails the panel script wrote.
+[OUTPUT] The text of the last turn_end message, a JSON clip record (origin, seek and
+         the extracted frame names), the lens summary lines the host verdict reads,
+         the extracted JSON, or a self-contained static HTML report whose images are
+         inlined so the bundle can be read on its own.
 [POS] apps/macos/FirstLine/scripts/vm/panel-lib.py - the small, boring part of
-      design-panel.sh: model-answer parsing and report rendering.
-[PROTOCOL] Report rendering never invents content: a stage that did not run is
-           rendered as a declared gap with its recorded reason, and a lens with no
-           answer is rendered as unavailable rather than omitted.
+      design-panel.sh and vm-journey.sh: model-answer parsing, clip cutting, lens
+      summary and report rendering.
+[PROTOCOL] The recording's own time origin is the first timestamp in frames.tsv,
+           because that frame is time zero of the assembled video. Answer parsing
+           compares the content item's own `type` field. Report rendering never
+           invents content: a stage that did not run is rendered as a declared gap
+           with its recorded reason, and a lens with no answer is rendered as
+           unavailable rather than omitted.
 """
 
+import argparse
 import base64
+import glob
 import html
 import json
+import math
 import os
 import re
+import subprocess
 import sys
 
 SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3, "info": 4}
+# A flagged clip covers the window plus this much either side, sampled at this rate
+# and never longer than a minute of recording.
+CLIP_LEAD_MS = 1000
+CLIP_FPS = 10
+CLIP_MIN_FRAMES = 6
+CLIP_MAX_FRAMES = 60
+
+
+def answer():
+    """The text of the last turn_end message in a `pi --mode json` stream."""
+    text = ""
+    for line in sys.stdin:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("type") != "turn_end":
+            continue
+        for item in (record.get("message") or {}).get("content") or []:
+            if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
+                text = item["text"]
+    sys.stdout.write(text)
+    return 0
+
+
+def recording_origin_ms(manifest):
+    with open(manifest, encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            return int(line.split("\t", 1)[0])
+    raise SystemExit(f"panel-lib: {manifest} has no captured frame to take the origin from")
+
+
+def clip(argv):
+    parser = argparse.ArgumentParser(prog="panel-lib.py clip")
+    parser.add_argument("--video", required=True)
+    parser.add_argument("--frames", required=True)
+    parser.add_argument("--t-start", type=int, required=True)
+    parser.add_argument("--t-end", type=int, required=True)
+    parser.add_argument("--out", required=True)
+    options = parser.parse_args(argv)
+    origin = recording_origin_ms(options.frames)
+    seek = max(0.0, (options.t_start - origin) / 1000.0 - CLIP_LEAD_MS / 1000.0)
+    span = max(0, options.t_end - options.t_start)
+    count = math.ceil((span + 2 * CLIP_LEAD_MS) / 1000.0 * CLIP_FPS)
+    count = max(CLIP_MIN_FRAMES, min(CLIP_MAX_FRAMES, count))
+    os.makedirs(options.out, exist_ok=True)
+    for stale in glob.glob(os.path.join(options.out, "clip-*.png")):
+        os.remove(stale)
+    pattern = os.path.join(options.out, "clip-%03d.png")
+    command = ["ffmpeg", "-loglevel", "error", "-nostdin", "-ss", "%.3f" % seek,
+               "-i", options.video, "-vf", "fps=%d" % CLIP_FPS, "-frames:v", str(count),
+               pattern, "-y"]
+    result = subprocess.run(command, capture_output=True)
+    if result.returncode != 0:
+        print(f"panel-lib: ffmpeg could not cut the clip: {result.stderr[:400]!r}", file=sys.stderr)
+        return 1
+    frames = sorted(os.path.basename(path) for path in glob.glob(os.path.join(options.out, "clip-*.png")))
+    print(json.dumps({"origin_ms": origin, "seek_s": round(seek, 3),
+                      "window_ms": [options.t_start, options.t_end], "frames": frames},
+                     sort_keys=True))
+    return 0
+
+
+def lens_status(evidence):
+    """Shell-readable summary of the six-lens stage for the host verdict."""
+    panel_dir = os.path.join(os.path.abspath(evidence), "panel")
+    lenses = []
+    lens_stage = os.path.join(panel_dir, "stage-04-lenses.json")
+    if os.path.exists(lens_stage):
+        with open(lens_stage, encoding="utf-8") as handle:
+            lenses = json.load(handle).get("lenses") or []
+    complete = [lens for lens in lenses if lens.get("status") == "complete"]
+    print(f"lenses_total={len(lenses)}")
+    print(f"lenses_complete={len(complete)}")
+    for lens in lenses:
+        answer_object = lens.get("answer") or {}
+        print("lens=%s\t%s\t%s\t%d\t%s" % (
+            lens.get("lens") or "?", lens.get("status") or "unavailable",
+            answer_object.get("verdict") or "-", len(answer_object.get("findings") or []),
+            " ".join((lens.get("error") or "").split())))
+    if len(complete) < len(lenses):
+        gaps = []
+        capability_stage = os.path.join(panel_dir, "stage-05-capabilities.json")
+        if os.path.exists(capability_stage):
+            with open(capability_stage, encoding="utf-8") as handle:
+                gaps = json.load(handle).get("declared_gaps") or []
+        reason = gaps[0] if gaps else next(
+            (lens.get("error") for lens in lenses if lens.get("status") != "complete" and lens.get("error")),
+            "")
+        print("reason=%s" % " ".join(str(reason).split()))
+    return 0
 
 
 def extract():
@@ -237,13 +346,20 @@ def report():
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: panel-lib.py extract|report <evidence-dir>", file=sys.stderr)
+        print("usage: panel-lib.py extract|answer|clip|status|report", file=sys.stderr)
         return 2
-    if sys.argv[1] == "extract":
+    command = sys.argv[1]
+    if command == "extract":
         return extract()
-    if sys.argv[1] == "report":
+    if command == "answer":
+        return answer()
+    if command == "clip":
+        return clip(sys.argv[2:])
+    if command == "status":
+        return lens_status(sys.argv[2])
+    if command == "report":
         return report()
-    print(f"unknown command {sys.argv[1]}", file=sys.stderr)
+    print(f"unknown command {command}", file=sys.stderr)
     return 2
 
 

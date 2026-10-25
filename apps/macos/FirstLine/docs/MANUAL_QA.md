@@ -10,8 +10,11 @@ and the guest screen is captured as a timestamped frame stream that the host ass
 `screen.mov`. The Mini's own screen, login keychain and signing identity are never used.
 
 - Entry point: `bash apps/macos/FirstLine/scripts/vm-journey.sh <dmg> <evidence-directory>` (from the repository
-  root, on the Mini). `scripts/vm/prepare-guest.sh` prepares the golden image once; `scripts/design-panel.sh`
-  adds the analysis and review stages to an evidence bundle.
+  root, on the Mini). `scripts/vm/prepare-guest.sh` prepares the golden image once. The run's last stage invokes
+  `scripts/design-panel.sh` on its own bundle, so the six-lens review lands in the same evidence directory; a
+  bundle without a completed review is recorded as "panel not run" with the exact re-run command and the run
+  exits 79 instead of signing off. `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` re-checks the rig's
+  shared boundaries (answer parsing, clip origin, frame alignment, lens summary) without a VM.
 - PASS, shipped `Write-It-Down-1.0.dmg` (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`):
   signature, notarization ticket and `spctl` acceptance of both disk image and installed app; clean-clone install
   with the browser-download quarantine flag and the Gatekeeper first-launch question answered by a real click;
@@ -27,8 +30,10 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   deterministic analyser saw it: the first frame of the relaunch was the unlicensed card, the licensed home
   followed 184 ms later against the loopback fixture. Fixed on main by PR 62
   (https://github.com/ichts/zerodraft/pull/62). The rig excuses exactly that assertion id on exactly that
-  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, and fails the run
-  if the assertion passes with the declaration still in place.
+  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, exits 78 rather
+  than 0, and fails the run if the assertion passes with the declaration still in place. The analyser keeps that
+  id for the licensed relaunch streams only, so the same surface in any other launch stream fails under its own
+  id and cannot borrow the declaration.
 - PASS, fix proven live: a locally built `.app` from current main (ad-hoc signed by `scripts/package-app.sh`,
   the app sources at that commit, no Developer ID, no notarization) installed into a fresh clone and driven by the
   same launcher, activated against the loopback fixture, then relaunched three times with the watcher armed. All

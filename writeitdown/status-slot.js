@@ -4,9 +4,9 @@
 // On a tall sheet those Mac offsets are used exactly; when the group cannot fit above
 // the footer it moves above the writing line, and the failure block and receipt clamp
 // above the footer, so nothing is clipped or laid over the active line or the controls.
-// The footer top reserves the measured height of the confirmation row (one or two
-// lines at the current width) via a hidden probe, so arming the confirmation neither
-// reflows nor overlaps a result screen.
+// The footer top reserves the measured height of the wrapped confirmation row, and the
+// kept screen reserves the inline row's own top, both via a hidden probe at the current
+// width, so arming the confirmation neither reflows nor overlaps a result screen.
 // Placement is cached on the three strings and re-anchored only when the caller marks
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
@@ -61,6 +61,7 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const footer = paper.querySelector('.paper-foot');
       let footerTop = paperHeight - 60;
       let confirmRow = 0;
+      let hintTop = null;
       if (footer) {
         const footerRect = footer.getBoundingClientRect();
         const hint = footer.querySelector('.exit-hint');
@@ -80,7 +81,13 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
             probe.style.visibility = 'hidden';
             footer.append(probe);
             const probeRect = probe.getBoundingClientRect();
-            if (probeRect.height > 0 && probeRect.bottom <= stableTop + 1) confirmRow = probeRect.height;
+            if (probeRect.height > 0) {
+              const wrapped = probeRect.bottom <= stableTop + 1;
+              confirmRow = wrapped ? probeRect.height : 0;
+              hintTop = wrapped
+                ? stableTop - paperTop - probeRect.height
+                : stableTop - paperTop + (stableHeight - probeRect.height) / 2;
+            }
             probe.remove();
           }
         }
@@ -105,9 +112,9 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
         paper.style.setProperty('--room-top', `${Math.max(gap, Math.min(72, receiptTop - gap - blockHeight))}px`);
       }
       const compact = paperHeight < COMPACT_BELOW;
-      const keptBottom = confirmRow || compact
-        ? Math.max(0, paperHeight - footerTop + gap)
-        : Math.max(0, paperHeight - footerTop - 24);
+      const keptBottom = Math.max(0, compact
+        ? paperHeight - footerTop + gap
+        : hintTop != null ? paperHeight - hintTop + gap : paperHeight - footerTop - 24);
       const compactVars = ['--kept-title', '--kept-receipt-gap', '--kept-actions-gap', '--kept-scroll-gap'];
       paper.style.setProperty('--kept-top', `${compact ? 8 : 72}px`);
       paper.style.setProperty('--kept-bottom', `${keptBottom}px`);

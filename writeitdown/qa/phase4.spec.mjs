@@ -492,8 +492,8 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     expect(hinted.scroll.top).toBeCloseTo(kept.scroll.top, 0);
     expect(hinted.scroll.bottom, 'the confirmation does not move the kept placement').toBeCloseTo(kept.scroll.bottom, 0);
     if (forced) expect(hinted.hint.height, 'the forced confirmation is two lines').toBeGreaterThanOrEqual(hinted.hintLine * 2 - 1);
-    if (size.width <= 767 || compact) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
-    else expect(hinted.scroll.bottom - hinted.footer.top, 'the tall kept bottom keeps its 24 px footer allowance').toBeCloseTo(24, 0);
+    if (compact) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
+    expect(hinted.scroll.bottom, 'the confirmation never covers the kept draft').toBeLessThanOrEqual(hinted.hint.top);
     await page.keyboard.press('Escape');
     await expect(page.locator('#landing')).toBeVisible();
   }

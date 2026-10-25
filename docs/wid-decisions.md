@@ -612,3 +612,49 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: none. D-002 continues to govern the room; this entry is the landing's exception and names
   its exact words.
 
+## D-041: Updates are opt-in, and never enter the writing room
+
+- Date: 2026-10-25
+- Decision: Write It Down 1.1 ships Sparkle 2.10.0 with automatic checks OFF by default.
+  `SUEnableAutomaticChecks` is false, so the app never prompts and never schedules a check; the only
+  two triggers are `Settings > Updates > Check for updates automatically` and `Check for Updates…`
+  in the app menu. The standard Sparkle UI is used, and no update window may appear while the
+  Session room is shown: the empty room, writing, warning, failure and kept states all count. A
+  scheduled update found while the room is shown is remembered, a check or update window started
+  before the room opens is ended through Sparkle's own cancellation or reply path, and every
+  deferred update returns once the room is left; the menu command is disabled in the room. Update
+  archives are EdDSA-signed ZIP payloads served from
+  `https://writeitdown.app/download/updates/` with the feed at
+  `https://writeitdown.app/download/appcast.xml`; the DMG stays the public installer. The captain
+  creates and holds the signing key (`apps/macos/FirstLine/docs/RELEASE_KEY.md`); the tracked
+  `Info.plist` carries the captain's real public key, and the release gate refuses the pre-key
+  placeholder. The privacy promise in `WRITEITDOWN_PLAN.md` and `writeitdown/privacy.html` is
+  amended to state exactly this: no check runs unless the writer turns it on or asks. 1.0 users
+  learn about 1.1 from a release-notes line on the download page; the first automatic delivery
+  lands with 1.2.
+- Reason: 1.0 shipped with no update channel, so IME and room fixes could never reach installed
+  copies, and "free updates included" stayed an empty promise. The captain chose the least invasive
+  version of it: no network traffic the writer did not ask for, no window that can steal focus from
+  an eight-second silence deadline, and no key material in the repository.
+- Supersedes: the 2026-10-24 privacy sentence "no update checks are added" in
+  `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` section 7, and the download page's single-version
+  release-notes absence. All other room decisions stand: update UI is never part of the room and the
+  room's strings, geometry, and motion are unchanged.
+  room's strings, geometry, and motion are unchanged.
+
+## D-042: An update waits while a writing session is live, whichever surface is shown
+
+- Date: 2026-10-25
+- Decision: The update gate tests whether a writing session is still live, not which surface happens
+  to be on screen. A session counts as live on the whole Session room (empty, writing, warning,
+  failure, kept) and also after the writer opens Settings, because the silence clock keeps running
+  there and the draft can still be lost when Settings is closed. Every presentation entry point
+  (menu command, scheduled check, standard Sparkle driver hooks, deferred return on activation or
+  surface change) uses that one predicate; an update found while the session is live is deferred and
+  presented at most once after the session ends. The menu command is disabled for the same reason.
+- Reason: D-040's surface-only wording left a real path to losing a draft: open Settings while
+  writing, and a deferred update could appear over Settings and take focus while the silence clock
+  ran. The captain's rule is that an update never interrupts writing, so the gate must follow what
+  is still running, not one enum that can drift.
+- Supersedes: D-041's "while the Session room is shown" gate wording only. Its opt-in default, its
+  signed-feed and key rules, and every room string, geometry and motion rule stand.

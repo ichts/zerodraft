@@ -30,6 +30,9 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
+    /// Marketing version shown in Settings > About; the same configuration source as the price,
+    /// so a bare executable (swift run, tests) reports the tracked Info.plist instead of a placeholder.
+    static var displayVersion: String { configuration["CFBundleShortVersionString"] as? String ?? "" }
     static var licenseProductID: String { configuration["WIDLicenseProductID"] as? String ?? "" }
     static var configuredLicenseClient: WaffoLicenseClient {
         WaffoLicenseClient(baseURL: (configuration["WIDLicenseServiceURL"] as? String).flatMap(URL.init(string:)),
@@ -247,6 +250,12 @@ final class AppState {
 
     var sessionIsRunning: Bool {
         sessionEngine.phase == .writing || sessionEngine.phase == .danger
+    }
+
+    /// 更新界面绝不能在写作可能仍在进行时出现：整个 Session 房间（空、写作、警告、失败、成稿），
+    /// 以及离开房间后仍在其他 surface 上继续走的会话（从房间进 Settings 时静默计时不会停）。
+    var isWritingSessionActive: Bool {
+        selectedSurface == .session || sessionIsRunning
     }
 
     func updateDefaultDuration(_ duration: TimeInterval) {

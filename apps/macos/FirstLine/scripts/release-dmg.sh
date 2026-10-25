@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
 # [INPUT] Mode: (none) configured release or --staging (empty checkout/license config only).
 #         Release requires the complete HTTPS license service, product and raw Ed25519
-#         public key in Info.plist. TEST and LIVE use the same app configuration.
+#         public key in Info.plist, plus the Sparkle feed URL, the real (non-placeholder)
+#         update signing key and the signed-feed policy (SURequireSignedFeed,
+#         SUVerifyUpdateBeforeExtraction and a zero SUSignedFeedFailureExpirationInterval).
+#         TEST and LIVE use the same app configuration. A release also requires
+#         dist/updates/last-build.txt to hold exactly the last released CFBundleVersion.
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
+#          A release run also writes dist/updates/WriteItDown-<version>-<build>.zip (the Sparkle
+#          update payload, made from the same stapled app) and records dist/updates/last-build.txt.
 #          The app is notarized and stapled on its own before the DMG, so it keeps a ticket
 #          after it is copied out of the disk image.
-# [POS] apps/macos/FirstLine/scripts/release-dmg.sh — release packaging on top of
-#       scripts/package-app.sh; both modes require the owner's Developer ID.
-# [PROTOCOL] Code is signed inside-out (deepest nested bundle first, then the app,
-#            then the DMG) instead of --deep, so embedded updater code (Sparkle
-#            frameworks/XPC services) can be added later without reworking signing.
+# [POS] apps/macos/FirstLine/scripts/release-dmg.sh - release packaging on top of
+#       scripts/package-app.sh; both modes require the owner's Developer ID. The appcast is a
+#       separate step: scripts/publish-appcast.sh.
+# [PROTOCOL] Signing is scripts/sign-nested.sh (plain Mach-O first, then nested bundles, then
+#            the app, then the same-team gate), which is what makes Sparkle's Autoupdate helper
+#            pass notarization. The update ZIP is written after notarization and stapling only,
+#            so the payload users receive carries its own ticket; staging runs skip it.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -58,15 +66,62 @@ try:
         raise ValueError('product and raw Ed25519 public key required')
 except (ValueError, TypeError) as error:
     sys.exit(f'Release blocked: configure checkout and license service in Info.plist: {error}')
+
+# Sparkle: no release may ship a placeholder update key, and the feed must be real HTTPS.
+PLACEHOLDER_UPDATE_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+try:
+    feed = urlsplit(str(config.get('SUFeedURL', '')))
+    if feed.scheme != 'https' or not feed.hostname or feed.username or feed.fragment:
+        raise ValueError('HTTPS appcast URL required')
+    update_key = str(config.get('SUPublicEDKey', ''))
+    if update_key == PLACEHOLDER_UPDATE_KEY:
+        raise ValueError('SUPublicEDKey is still the build placeholder; run Sparkle generate_keys on the release Mac and put the printed key in Info.plist')
+    if len(base64.b64decode(update_key, validate=True)) != 32:
+        raise ValueError('SUPublicEDKey must be the raw 32-byte Ed25519 public key')
+    if config.get('SUEnableAutomaticChecks') is not False:
+        raise ValueError('SUEnableAutomaticChecks must be false: no check runs until the writer turns it on')
+    if config.get('SURequireSignedFeed') is not True:
+        raise ValueError('SURequireSignedFeed must be true: installed copies must refuse a rewritten feed')
+    if config.get('SUVerifyUpdateBeforeExtraction') is not True:
+        raise ValueError('SUVerifyUpdateBeforeExtraction must be true: Sparkle requires it together with a signed feed')
+    interval = config.get('SUSignedFeedFailureExpirationInterval')
+    if isinstance(interval, bool) or not isinstance(interval, (int, float)) or interval != 0:
+        raise ValueError('SUSignedFeedFailureExpirationInterval must be 0: no grace period may accept an unverified feed')
+    build = str(config.get('CFBundleVersion', '')).strip()
+    if not build.isdigit() or int(build) <= 0:
+        raise ValueError('CFBundleVersion must be a positive integer: Sparkle compares it, not the marketing version')
+except (ValueError, TypeError) as error:
+    sys.exit(f'Release blocked: configure the update feed in Info.plist: {error}')
 PY
 
+# Sparkle compares CFBundleVersion; a reused or lower number reaches no installed copy. Staging
+# neither enters the update feed nor records a build, so it is not held to the last release.
+last_build_file="$PWD/dist/updates/last-build.txt"
+if [[ "$mode" != '--staging' ]]; then
+  build="$(python3 scripts/plist-value.py "$plist" CFBundleVersion)"
+  if [[ ! -e "$last_build_file" && ! -L "$last_build_file" ]]; then
+    printf 'Release blocked: %s is missing. Record the last released CFBundleVersion there; on a fresh release machine write the last shipped build number (1 for the 1.0 release) first.\n' "$last_build_file" >&2
+    exit 1
+  fi
+  if [[ ! -f "$last_build_file" || ! -r "$last_build_file" ]]; then
+    printf 'Release blocked: %s is unreadable; it must record the last released CFBundleVersion.\n' "$last_build_file" >&2
+    exit 1
+  fi
+  last_build=''
+  IFS= read -r -d '' last_build < "$last_build_file" || true
+  last_build="${last_build%$'\n'}"
+  if [[ ! "$last_build" =~ ^[0-9]+$ ]]; then
+    printf 'Release blocked: %s must hold one build number, found "%s".\n' "$last_build_file" "${last_build//$'\n'/\\n}" >&2
+    exit 1
+  fi
+  if (( build <= 10#$last_build )); then
+    echo "Release blocked: CFBundleVersion $build is not greater than the last release ($last_build in dist/updates/last-build.txt)." >&2
+    exit 1
+  fi
+fi
+
 WID_APP_OUTPUT="$app" scripts/package-app.sh --unsigned
-while IFS= read -r -d '' nested; do
-  codesign --force --options runtime --timestamp --sign "$identity" "$nested"
-done < <(find "$app/Contents" -type d \( -name '*.framework' -o -name '*.app' -o -name '*.xpc' \) -print0 \
-           | sort -rz --zero-terminated)
-codesign --force --options runtime --timestamp --sign "$identity" "$app"
-codesign --verify --deep --strict --verbose=2 "$app"
+scripts/sign-nested.sh "$app" "$identity"
 
 notarize() {
   xcrun notarytool submit "$1" --keychain-profile writeitdown-notary \
@@ -80,9 +135,19 @@ notarize "$work/app.zip"
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"
 
-version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+version="$(python3 scripts/plist-value.py "$app/Contents/Info.plist" CFBundleShortVersionString)"
 suffix=''
 if [[ "$mode" == '--staging' ]]; then suffix='-staging'; fi
+
+# The update payload: the same notarized, stapled app users get from the DMG. Never create it
+# before stapling, and never for staging, so a staging build can never enter the feed.
+if [[ "$mode" != '--staging' ]]; then
+  mkdir -p dist/updates
+  update_zip="$PWD/dist/updates/$(scripts/update-payload-name.sh "$plist")"
+  rm -f "$update_zip"
+  ditto -c -k --sequesterRsrc --keepParent "$app" "$update_zip"
+fi
+
 dmg="$PWD/dist/Write-It-Down-$version$suffix.dmg"
 rm -f "$dmg" "$dmg.sha256"
 
@@ -112,4 +177,8 @@ spctl -a -t open --context context:primary-signature -v "$dmg"
 spctl -a -t exec -v "$app"
 codesign --verify --deep --strict --verbose=2 "$app"
 (cd "$(dirname "$dmg")" && shasum -a 256 "$(basename "$dmg")" > "$(basename "$dmg").sha256")
+if [[ "$mode" != '--staging' ]]; then
+  printf '%s\n' "$build" > "$last_build_file"
+  printf 'Update payload: %s\n' "$update_zip"
+fi
 printf 'Release artifact: %s\nChecksum: %s.sha256\n' "$dmg" "$dmg"

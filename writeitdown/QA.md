@@ -6,6 +6,26 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-25: Download-page release-note version gate (local)
+
+The download card keeps its 1.0 facts and now says the 1.1 update check is not released yet. The note
+declares the version it describes in `data-release-note` and carries `data-launch-pending` while that
+version is not the linked download. `release-check.mjs` refuses a note newer than the linked DMG
+without that mark, a pending mark once its version is the linked download, and a note without a
+version.
+
+- `node writeitdown/release-check.mjs --download`: STATIC CHECK PASSED on the current page.
+- Known-broken proof: the pre-fix page at `7932fe0` passes the pre-fix checker (exit 0) and is refused
+  by the new one with `the note announces 1.1 but the download is 1.0`.
+- `qa/mac.spec.mjs` gained four rejection cases (pending mark removed, DMG advanced to 1.1 while the
+  note stays pending, missing `data-release-note`, current-tense 2.0 note). Those exact inputs were
+  executed against `release-check.mjs` and each was blocked with its expected message. The full
+  Playwright suite was not run in this round (`writeitdown/node_modules` is not installed here).
+- Follow-up: the version comparison no longer falls through when the DMG file name carries no version.
+  A page whose link is renamed to `Write-It-Down.dmg` passed the previous checker and is refused by
+  this one with `DMG URL: the file name does not carry the version`; `qa/mac.spec.mjs` gained that
+  rejection case and the current page still reports STATIC CHECK PASSED.
+
 # 2026-10-25: Aligned-room build and split-W logo (local)
 
 - Source `1446b4a` (the merged writing-room/After alignment and split-W logo PRs). The download page and the `journey:live` expectation publish the rebuilt DMG's SHA-256 `5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`.
@@ -13,6 +33,33 @@ Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unver
 - Pre-deploy journey against the real artifact (`node journey/serve-local.mjs --root . --dmg-file <dmg> --port 8025`, then `npm run journey -- --base http://127.0.0.1:8025 --expect-sha 5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`): 82 passed, 0 failed, 2 WAIVED (sign-in absent; installed-DMG TEST acceptance pending). Both viewports (WebKit iPhone 14 profile, Chromium 1440x900) recorded one continuous video each, and the served DMG matched its published size and SHA-256.
 - `npm run release-check` and `npm run release-check -- --download`: static checks passed before the deploy.
 - Live deploy: the bundle built from merged commit `fa136cd` was installed on the host and the ten sampled production files match the tested tree byte for byte; the previous site copy and the previous DMG (SHA-256 `714822ee...`) are kept as backups. `npm run release-check -- --download --live` and `npm run release-check -- --live` both reported `LIVE CHECK PASSED`. `npm run journey:live`: 82 passed, 0 failed, 2 WAIVED, with one continuous video per viewport; live captures of the landing, download and Mac pages at 1440x900 and 390x844 show the split-W headers, the room, and the published `5b8483bd...` hash on one line on desktop and wrapped without clipping on mobile. The hosted DMG answers `application/x-apple-diskimage`, 8117026 bytes, and hashes to the published value; `/llms.txt` answers `text/plain; charset=utf-8`.
+
+# 2026-10-25: Download-page release note and update-feed hosting (local only)
+
+The Mac 1.1 release adds Sparkle auto-update (see `../docs/wid-decisions.md` D-041). The site change
+is small: one `#release-notes` line inside the download card, one scoped spacing rule in
+`site.css`, and the Mac section of `privacy.html` gains the opt-in update paragraph with `UPDATED`
+moved to October 25, 2026. No page was added to the sitemap; no other surface changed.
+
+- `cd writeitdown && npm ci && npx playwright test`: 460 passed, 36 skipped across the eight
+  viewport/theme/motion projects. The Install/Activate/Refunds structure, the single DMG link, the
+  published SHA-256 slot and the canonical/og metadata the journey asserts are unchanged. The
+  legal-page check now also asserts the opt-in update disclosure in `privacy.html` (`Updates are
+  opt-in.`, `Check for updates automatically`, `Check for Updates…`); the page is still in the
+  shipped-file list and the sitemap/SEO checks still see it.
+- `npm run release-check -- --download`: passes locally. The published SHA-256 still names the live
+  1.0 DMG, so the DMG link name, the Install card's `shasum` filename, the note and the checksum
+  must flip together in the deploy that uploads 1.1 (see `README.md`, "Mac download release"). The
+  release gate now refuses an Install command that names a different DMG than the link;
+  `qa/mac.spec.mjs` covers the rendered Install command and that rejection.
+- Captures: `download-desk.png` (1440x900, full page) and `download-mobile.png` (390x844, full page),
+  plus a crop of the card footer. Inspected: the note sits 16 px under the last requirement row, wraps
+  to three lines on desktop and four on mobile, stays inside the card, and neither eats the card's
+  bottom padding nor pushes the three step cards down. Light theme only; the note inherits the chrome
+  colour, so the dark theme needs no separate capture.
+- Not verified here: the live host's new Caddy handlers, the appcast content type, and the 404 for a
+  missing update file. Those are release-day checks in `README.md`; nothing in this repository
+  deploys.
 
 # GEO acceptance (historical)
 

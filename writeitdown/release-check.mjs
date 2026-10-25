@@ -3,8 +3,11 @@
 //   node release-check.mjs             static check of every launch input (download page
 //                                      and sale page): exits 1 and lists each missing or
 //                                      placeholder input.
-//   node release-check.mjs --download  only the free-trial download page: the DMG link and
-//                                      its published SHA-256.
+//   node release-check.mjs --download  only the free-trial download page: the DMG link,
+//                                      the Install card's DMG filename and its published
+//                                      SHA-256, and the release note's declared version,
+//                                      which may only exceed the linked DMG while it is
+//                                      marked data-launch-pending.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -24,6 +27,16 @@ const PLACEHOLDER_TEXT = /\b(todo|tbd|placeholder|lorem|example)\b/i;
 
 const stripComments = html => html.replace(/<!--[\s\S]*?-->/g, '');
 const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`))?.[1];
+const VERSION = /^\d+(?:\.\d+)*$/;
+const versionOrder = (left, right) => {
+  const a = left.split('.').map(Number);
+  const b = right.split('.').map(Number);
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const delta = (a[index] ?? 0) - (b[index] ?? 0);
+    if (delta) return delta;
+  }
+  return 0;
+};
 const plistValue = (plist, key) =>
   plist.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`))?.[1] ?? '';
 
@@ -78,6 +91,33 @@ export function downloadBlockers({ download }) {
   const sha = slot(download, 'sha256');
   if (!sha) found.push('SHA-256: not published in download/index.html');
   else if (!/^[0-9a-f]{64}$/.test(sha.text)) found.push('SHA-256: not 64 lowercase hex digits');
+  const install = download.match(/<div class="card" id="install">([\s\S]*?)<\/div>/)?.[1] ?? '';
+  const installFile = install.match(/shasum -a 256\s+([^\s<]+)/)?.[1];
+  let linkedFile = '';
+  if (dmg) {
+    try { linkedFile = decodeURIComponent(new URL(attr(dmg.tag, 'href')).pathname.split('/').pop()); } catch {}
+  }
+  if (!installFile) found.push('Install command: the card does not name the DMG file to hash');
+  else if (linkedFile && installFile !== linkedFile)
+    found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
+
+  // The release note is the page's claim about a version. A note newer than the DMG on offer is
+  // only honest while it says that version is not released yet, and a note that is still marked
+  // not released once its version is the download contradicts the card.
+  const noteTag = download.match(/<p[^>]*\sid="release-notes"[^>]*>/i)?.[0] ?? '';
+  const noteVersion = attr(noteTag, 'data-release-note') ?? '';
+  const notePending = Boolean(attr(noteTag, 'data-launch-pending'));
+  const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
+  if (!linkedVersion) {
+    found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
+  } else if (!VERSION.test(noteVersion)) {
+    found.push('Release notes: the note does not declare its version in data-release-note');
+  } else {
+    if (versionOrder(noteVersion, linkedVersion) > 0 && !notePending)
+      found.push(`Release notes: the note announces ${noteVersion} but the download is ${linkedVersion}; publish that DMG or mark the note data-launch-pending`);
+    else if (versionOrder(noteVersion, linkedVersion) === 0 && notePending)
+      found.push(`Release notes: the note is marked not yet released, but ${noteVersion} is already the linked download`);
+  }
   return found;
 }
 
@@ -140,5 +180,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? 'LIVE CHECK PASSED: inputs present and reachable.'
     : 'STATIC CHECK PASSED: inputs present. Not verified live; run with --live.');
   if (sale) console.log('Still required before LIVE sales: a real test order through checkout, returned license key, installed DMG activation and refund verification. No live payment was attempted.');
-  else console.log('Download page ready: the DMG link and its published SHA-256 are in place.');
+  else console.log('Download page ready: the DMG link, the Install command and its published SHA-256 agree.');
 }

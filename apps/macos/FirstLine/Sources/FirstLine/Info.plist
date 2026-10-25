@@ -7,9 +7,9 @@
     <key>CFBundleName</key>
     <string>Write It Down</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.1</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>WIDDisplayPrice</key>
     <string>$4.99</string>
     <key>WIDCheckoutURL</key>
@@ -20,6 +20,31 @@
     <string>prod_VUeTDTehcGAqJK</string>
     <key>WIDLicensePublicKey</key>
     <string>ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=</string>
+    <!-- Updates (Sparkle 2.10.0). The feed and its archives live under https://writeitdown.app/download/. -->
+    <key>SUFeedURL</key>
+    <string>https://writeitdown.app/download/appcast.xml</string>
+    <!-- The captain's EdDSA update signing key, created with Sparkle's generate_keys on the Mac mini
+         release machine (see docs/RELEASE_KEY.md). This is the public half only: the private key
+         stays in that machine's login Keychain and backup, never in this repository. The pre-key
+         placeholder (a 32-byte all-zero key) is refused by scripts/release-dmg.sh, so it cannot
+         come back by accident. -->
+    <key>SUPublicEDKey</key>
+    <string>JpTnddys5uriQSSGWPOy6MN4vc3scZ28fl5OI+1DGLs=</string>
+    <!-- Both keys are required together: Sparkle 2.10.0 refuses to start an updater that asks for
+         a signed feed without verifying payloads before extraction. -->
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
+    <!-- No recovery window: Sparkle's 20-day default would accept an unverified feed after that
+         long, and a rewritten feed must never be accepted. -->
+    <key>SUSignedFeedFailureExpirationInterval</key>
+    <integer>0</integer>
+    <!-- Off by default: no check runs until the writer turns it on in Settings or asks from the menu. -->
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>

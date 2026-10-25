@@ -50,20 +50,82 @@ Attribution stays on the existing Cloudflare Web Analytics beacon's referrer rep
 
 ### Mac download release
 
-`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must contain the configured license service origin, product ID and deployed Ed25519 public key from the app's `Info.plist` (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page now publishes its SHA-256 in the `data-launch="sha256"` slot; update that slot if the artifact changes. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Payment acceptance and the TEST-to-LIVE gate are below.
+`download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.0.dmg`. That disk image must contain the configured license service origin, product ID and deployed Ed25519 public key from the app's `Info.plist` (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page publishes its SHA-256 in the `data-launch="sha256"` slot, names the DMG in the Install card's `shasum` command, and carries a one-line release note in `#release-notes` that declares the version it describes in `data-release-note`; while that version is not the linked download yet, the note also carries `data-launch-pending`. Update the DMG link name, the Install command's filename, the SHA-256 slot and the note together in the deploy that publishes a new version. `npm run release-check -- --download` refuses a page whose Install command names a different DMG than the link, a DMG file name that does not carry its version as `Write-It-Down-<version>.dmg`, a note that announces a version newer than the linked DMG without the pending mark, and a pending mark left on once its version is the linked download. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Payment acceptance and the TEST-to-LIVE gate are below.
 
-### Host routing (Caddy) and the release journey gate
+The DMG link name, the Install card's `shasum` filename, the SHA-256 slot and the release note are the page's version facts. From 1.1 on they must match the version the appcast advertises, so the same deploy that uploads a new DMG also updates them.
 
-Use mutually exclusive download and page handlers. Do not put a site-level `try_files` before these handlers: it would rewrite missing downloads into the home page before the DMG matcher runs. Preserve the host's existing API routes separately.
+#### Update feed (Sparkle, from 1.1)
+
+1.1 and later check `https://writeitdown.app/download/appcast.xml` and install EdDSA-signed ZIP
+payloads. The feed is EdDSA-signed too (`SURequireSignedFeed`), so a rewritten feed is refused;
+both live in the same `download/` directory as the DMG but are **not** part of the site bundle and
+are never committed. The app checks only when the writer turns on `Check for updates automatically`
+in Settings or chooses `Check for Updates…`; the default is off.
+
+Artifacts a release run produces on the release Mac (`apps/macos/FirstLine/`):
+
+```
+dist/Write-It-Down-<version>.dmg          the public installer (stays the advertised download)
+dist/Write-It-Down-<version>.dmg.sha256
+dist/updates/WriteItDown-<version>-<build>.zip   the update payload, from the same stapled app
+dist/updates/*.delta                             binary deltas generate_appcast builds from older archives
+dist/updates/appcast.xml                         the signed feed
+dist/updates/last-build.txt                      the last released CFBundleVersion
+```
+
+The payload name carries both the marketing version and the build number (`scripts/update-payload-name.sh`
+is its only definition), so a rebuild that only raises the build number gets a new URL. Upload mapping:
+`dist/updates/appcast.xml` goes to `/var/www/writeitdown.app/download/appcast.xml`, while the payload
+ZIP and its deltas go to `/var/www/writeitdown.app/download/updates/`. Do not upload the feed into
+`updates/`: `SUFeedURL` and the Caddy handlers below read `/download/appcast.xml`, and a 404 there
+leaves every installed copy silently unable to update.
+
+Every release run requires `last-build.txt` to exist and hold exactly one build number. On a
+fresh release machine or checkout, create it with the last released build number (1 for the 1.0
+release) before packaging; a rebuilt artifact ships with a higher number, never the same one.
+
+Host layout: `/var/www/writeitdown.app/download/` keeps `index.html`, the DMG and its sidecar, and
+`appcast.xml`; `/var/www/writeitdown.app/download/updates/` holds the ZIP archives and their deltas
+(create it once with `install -d -m 0755`). `install.sh` neither creates nor prunes `updates/`, so
+the site bundle install cannot delete update payloads. Keep the previous one or two archives there
+so `generate_appcast` can rebuild deltas; it prunes feed entries itself and moves stale archives into
+`old_updates/`, which is never uploaded.
+
+The update signing key is the captain's and never enters this repository; the exact creation, backup
+and rotation procedure is
+[`apps/macos/FirstLine/docs/RELEASE_KEY.md`](../apps/macos/FirstLine/docs/RELEASE_KEY.md).
+
+#### Host routing (Caddy) and the release journey gate
+
+Use mutually exclusive download, update-feed and page handlers. Do not put a site-level `try_files`
+before these handlers: it would rewrite missing downloads into the home page (HTTP 200 HTML) before
+the DMG and update matchers run, and Sparkle would then parse the landing page as a feed. Preserve
+the host's existing API routes separately.
 
 ```caddyfile
 writeitdown.app {
 	root * /var/www/writeitdown.app
+
+	@appcast path /download/appcast.xml
+	handle @appcast {
+		header Content-Type "application/xml; charset=utf-8"
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	@updatefiles path /download/updates/*
+	handle @updatefiles {
+		# Archive names carry the version and build number, so a given payload never changes.
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
 	@dmg path *.dmg
 	handle @dmg {
 		header Content-Type application/x-apple-diskimage
 		file_server
 	}
+
 	handle {
 		try_files {path} {path}/index.html /index.html
 		file_server
@@ -71,7 +133,15 @@ writeitdown.app {
 }
 ```
 
-The DMG branch has no fallback: `file_server` returns 404 when the image is absent. The page branch resolves `/download/` to `download/index.html` before trying the home page.
+The DMG, appcast and update branches have no fallback: `file_server` returns 404 when the file is
+absent. The page branch resolves `/download/` to `download/index.html` before trying the home page.
+After `caddy reload`, prove the routing instead of assuming it:
+
+```sh
+curl -sSI https://writeitdown.app/download/appcast.xml | grep -Ei '^(HTTP|content-type)'   # 200 application/xml
+curl -sSI https://writeitdown.app/download/updates/does-not-exist.zip | head -1             # 404, never 200
+curl -sSI https://writeitdown.app/download/absent.dmg | head -1                             # 404, never 200
+```
 
 After any deploy run the journey gate against the live domain: `npm ci && npx playwright install webkit && npm run journey:live`, then `npm run release-check -- --download --live`. The journey's screenshots and the two viewport videos are reviewed against `docs/ui-quality.md` before a deploy is accepted. The gate plays a brand-new visitor with one continuous video per viewport on a WebKit iPhone profile (390x844) and Chromium desktop (1440x900). Its single fixed pace uses a two-second reading pause after every step and 90 ms keystrokes; there is no fast mode. The named `full-session` scenario completes a real sixty-second session and verifies the exact kept draft, COPY TEXT/COPIED action and real clipboard contents. The independent `silence-wipe` scenario enters a fresh room and verifies deletion after eight seconds of silence (100 ms scheduling allowance). Chromium grants clipboard read/write permissions; WebKit grants clipboard read permission and uses its gesture-authorized write path because Playwright WebKit does not accept a clipboard-write permission. The browser's deletion receipt is `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` It also checks the DMG content type, size and SHA-256 against the page and a random missing DMG's 404. The `mac-purchase` scenario intercepts checkout and license endpoints and the hosted destination in the browser harness. It checks Buy navigation, Back/retry, paid-fixture key delivery with its copy control and activation sentence, credential URL cleanup, and the unpaid neutral notice without a key. It never calls the real checkout or proves a payment or real license. Sign-in remains absent. `journey/waivers.json` records that exemption and the captain's integration-only decision: installed-DMG TEST acceptance is pending with the maintainer. The gate records these as WAIVED, not PASS, and fails before browser work on missing or invalid approval. After every step a shared guard rejects sign-in controls, including accessible roles, inputs and form targets. `npm run journey:live -- --live-sales` fails while the installed-DMG TEST acceptance remains pending. `--live` names the hosted site, not permission to take LIVE money. A gate pass still does not itself authorize deployment.
 
@@ -119,7 +189,7 @@ The script checks the directory, recording and notes before allowing exit 0. The
 Send a test email to and from contact@trefoilstudio.com to verify the support and refund contact.
 
 1. Deploy the license service in TEST mode, including the buyer-key route and CORS allowing the apex site. The buyer-key route is an external dependency: a missing route must show the neutral pending notice, not a successful purchase.
-2. Build the signed/notarized DMG with `apps/macos/FirstLine/scripts/release-dmg.sh`. Publish its exact SHA-256 in the download page and keep the tested website files and DMG in one deploy bundle. The script refuses an empty or incomplete release configuration. Keep the existing service signing key for TEST and LIVE.
+2. Build the signed/notarized DMG with `apps/macos/FirstLine/scripts/release-dmg.sh`. Build the update payload and feed with `apps/macos/FirstLine/scripts/publish-appcast.sh` once `SUPublicEDKey` holds the captain's real key; it refuses a signing key whose public half is not that key and verifies both the feed signature and the enclosure, then upload the ZIP and any deltas **before** `appcast.xml` (a first release has no deltas). Publish the DMG's exact SHA-256 and the new release note in the download page and keep the tested website files and DMG in one deploy bundle. The scripts refuse an empty or incomplete release configuration, a placeholder update key, a build number that is not greater than the previous release, and a missing signed-feed policy. Keep the existing service signing key for TEST and LIVE.
 3. Run `npm run release-check -- --download` and `npm run release-check` locally. After an authorized bundle installation, run their `--live` variants to verify the actual hosted artifact. These commands never create checkout sessions or charges.
 4. This delivery is the integration. Installed-DMG TEST acceptance is pending and assigned to the maintainer, who deploys from another machine and then runs the real TEST card journey on the live site with a real installed DMG before LIVE. Retrieve the key, install this DMG via Finder, exhaust the three trial sessions and activate it. Check the second-Mac allowance, third-install denial and refund revocation. Record the real-window/clean-login evidence in `apps/macos/FirstLine/docs/MANUAL_QA.md` and retire the pending `test-payment` waiver and its required-step declaration in `journey/waivers.mjs` only after independent acceptance. Mocked Playwright responses and signed-token unit fixtures do not prove this loop.
 5. Only after that TEST loop passes may the authorized maintainer switch the service environment to LIVE and restart it, following `services/license/deploy/DEPLOY.md` and the readiness gates in `services/license/README.md`. Keep the same signing key, service URL, product ID and website checkout URL: no new DMG or rebuild is required. Do not create a second payment account.

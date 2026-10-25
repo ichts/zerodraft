@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
 const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
+const dmgFile = new URL(dmgURL).pathname.split('/').pop();
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
 
@@ -112,8 +113,15 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ support: support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD') }, 'Support address'],
     [{ download: download.replace('data-launch="dmg"', 'data-launch-pending="dmg"') }, 'DMG URL: not confirmed'],
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
+    [{ download: download.replaceAll(dmgFile, 'Write-It-Down.dmg') }, 'DMG URL: the file name does not carry the version'],
     [{ download: download.replace('data-launch="sha256"', 'data-launch-pending="sha256"') }, 'SHA-256: not published'],
     [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
+    [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
+    [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
+    [{ download: download.replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 1.1 but the download is 1.0'],
+    [{ download: download.replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note is marked not yet released, but 1.1 is already the linked download'],
+    [{ download: download.replace(' data-release-note="1.1"', '') }, 'Release notes: the note does not declare its version'],
+    [{ download: download.replace('data-release-note="1.1"', 'data-release-note="2.0"').replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 2.0 but the download is 1.0'],
   ];
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
@@ -617,6 +625,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('#requirements')).toContainText('macOS 14 Sonoma or later');
   await expect(page.locator('#requirements')).toContainText('One universal app for Apple silicon and Intel Macs.');
   await expect(main).toContainText('Ziying WANG (Developer ID)');
+  await expect(page.locator('#install')).toContainText(`shasum -a 256 ${dmgFile}`);
   await expect(main).toContainText('Free updates included.');
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
   await expect(page.locator('main a[href="../mac.html#buy"]').first()).toBeVisible();
@@ -627,7 +636,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
 
-test('legal pages state the 3-session trial and the local counter', async ({ page }) => {
+test('legal pages state the 3-session trial, the local counter and the opt-in updates', async ({ page }) => {
   await page.goto('privacy.html');
   const privacy = page.locator('#mac + p');
   await expect(privacy).toContainText('Your first 3 writing sessions are free.');
@@ -635,6 +644,11 @@ test('legal pages state the 3-session trial and the local counter', async ({ pag
   await expect(privacy).toContainText('Free updates included.');
   await expect(privacy).toContainText('local trial session counter in its settings file on the Mac');
   await expect(privacy).toContainText('That counter is not sent anywhere.');
+  const updateNotice = page.locator('#mac ~ p').filter({ hasText: 'Updates are opt-in.' });
+  await expect(updateNotice).toHaveCount(1);
+  await expect(updateNotice).toContainText('No check runs unless you turn on');
+  await expect(updateNotice).toContainText('Check for updates automatically');
+  await expect(updateNotice).toContainText('Check for Updates…');
 
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');
@@ -657,7 +671,7 @@ test('legal pages state the 3-session trial and the local counter', async ({ pag
 
 test('DMG release packaging refuses unconfigured builds', () => {
   test.skip(test.info().project.name !== '1440-dark-no-preference', 'configuration gate, one project is enough');
-  expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete safe configuration');
+  expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete license and update configuration');
 });
 
 test('installer installs the complete purchase bundle and rejects symlinks', () => {

@@ -32,6 +32,9 @@ struct SnapshotTests {
 
             try snapshot(SettingsViewController(appState: licensedTestState()), name: "settings-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
+            try snapshot(SettingsViewController(appState: licensedTestState(), updateSettings: StubUpdateSettings()),
+                         name: "settings-updates-\(suffix)",
+                         appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
             let exhaustedSettings = try trialState(used: 3)
             try snapshot(SettingsViewController(appState: exhaustedSettings), name: "settings-entry-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))

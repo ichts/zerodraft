@@ -1,7 +1,7 @@
 /**
- * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder
+ * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder、Update/UpdateController
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置
+ * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -28,6 +28,7 @@ enum FirstLineMain {
 final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
     let appState: AppState
     private var rootWindowController: RootWindowController?
+    private var updateController: UpdateController?
 
     init(appState: AppState = AppState(), windowController: RootWindowController? = nil) {
         self.appState = appState
@@ -38,10 +39,15 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
 
-        let menu = MainMenuBuilder.buildMenu(appState: appState, validationOwner: self)
+        // The updater only exists inside a real .app; bare executables have no update configuration.
+        let update = UpdateController.make(appState: appState)
+        updateController = update
+
+        let menu = MainMenuBuilder.buildMenu(appState: appState, validationOwner: self,
+                                             showsUpdateCheck: update != nil)
         NSApp.mainMenu = menu
 
-        let controller = RootWindowController(appState: appState)
+        let controller = RootWindowController(appState: appState, updateSettings: update)
         rootWindowController = controller
         controller.showWindow(nil)
 
@@ -68,6 +74,7 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
     @objc func goHome(_ sender: Any?) { appState.goHome() }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
     @objc func terminateApp(_ sender: Any?) { NSApp.terminate(nil) }
+    @objc func checkForUpdates(_ sender: Any?) { updateController?.checkForUpdates() }
     @objc func orderFrontStandardAboutPanel(_ sender: Any?) {
         NSApp.orderFrontStandardAboutPanel(nil)
     }
@@ -82,6 +89,10 @@ extension FirstLineAppDelegate: NSMenuItemValidation {
             return appState.sessionEngine.phase == .success && appState.selectedSurface == .session
         case #selector(openSettings), #selector(newPiece):
             return appState.canUseApp
+        case #selector(checkForUpdates):
+            // Available even when the trial is used up; never while a writing session is active.
+            return UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: updateController != nil,
+                                                         isWritingSessionActive: appState.isWritingSessionActive)
         case #selector(closeWindow):
             return true
         case #selector(openWriting), #selector(goHome):

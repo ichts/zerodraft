@@ -97,6 +97,8 @@ struct RoundThreeTests {
             ("activation", UpgradeViewController(appState: try trialState(used: 3))),
             ("licensed", UpgradeViewController(appState: licensedTestState())),
             ("settings", SettingsViewController(appState: licensedTestState())),
+            ("settings-updates", SettingsViewController(appState: licensedTestState(),
+                                                       updateSettings: StubUpdateSettings())),
             ("room", SessionViewController(appState: licensedTestState())),
             ("kept", room),
         ]

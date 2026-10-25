@@ -1,9 +1,10 @@
 # Write It Down (Mac): outside-in behaviour contract
 
-Status: acceptance spec for PR #58, branch `fm/wid-mac-consistency`. This file is the contract the
-independent audit reads against the code. A case is done only when the code implements it, the bound
-test drives the real path, and the signed DMG has a real-window recording of the same behaviour.
-Case numbers are stable; cite them in review. Every case must also keep the cross-surface bar in
+Status: acceptance spec for the Mac batches from PR #58 onward; each batch appends its own cases.
+This file is the contract the independent audit reads against the code. A case is done only when the
+code implements it, the bound test drives the real path, and the signed DMG has a real-window
+recording of the same behaviour. Case numbers are stable; cite them in review. Every case must also
+keep the cross-surface bar in
 `docs/ui-quality.md`, which names the measurement each rule is decided by.
 
 The room is the native AppKit writing surface (`SessionViewController`, `AppendOnlyTextView`). Input
@@ -114,6 +115,18 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 | 56 | A denied selection or blocked command during a live marked composition preserves the composition range; the IME's following unmark-replace commit still reaches the editor and the engine. | `PinyinInputTests.deniedCommandDuringCompositionKeepsTheCommit` | signed-build recording |
 | 57 | RUN IT AGAIN on the kept screen starts a new session in the same room: the writing surface and editor focus return before the next tick, and the first keystroke lands in the draft. | `ReviewRoundTests.keptRestartEntersTheWritingRoomWithoutATick` | signed-build recording pending |
 | 58 | Launch on a Mac whose stored license verifies locally (signature, product, install label, seven-day lifetime, inside the offline grace) presents the picker as the first surface. The activation card never appears, neither while the launch revalidation is still in flight nor when it cannot reach the service; the check runs silently behind the picker. Only a definitive revocation or an invalid token replaces the picker with the license card. The trial and unlicensed launch paths are unchanged. | `LicenseEntitlementTests.launchWithAStoredSignedLicensePresentsThePickerFirst` (fails on the pre-fix build: activation card first, `.upgrade`, `hasFullAccess == false`); the restart expectations in `WaffoLicenseClientTests.activationRequiredAfterTrialAndAfterRefundOrExpiry`, `LicenseEntitlementTests.activatedLicenseUnlocksHomeAndRestartsWithoutTrialBudget`, `TrialReleaseTests.corruptTrialCountPreservesOfflineSignedLicense` | launch frame captures before/after, task evidence `capture-before/`, `capture-after/` |
+
+## 9. Updates (1.1)
+
+The update gate follows a live writing session, not the visible surface (D-041, D-042). A case passes
+only when its bound tests drive the policy and the driver hooks; the real-window recordings are listed
+in `apps/macos/FirstLine/docs/RELEASE_CHECKLIST.md` (Updates) and stay pending until a signed DMG can
+be exercised on the release Mac.
+
+| # | Case | Bound test | Recording |
+| 59 | No update window appears while writing may be live: the Session room in any phase, or a session still running after the writer opens Settings. A scheduled update is deferred and returned at most once after the session ends; a check or status window not yet shown is cancelled, a result is acknowledged without an alert, and a window already on screen is ended when the room opens. | `UpdatePolicyTests.noUpdateUIIsEverPresentedWhileWritingMayBeLive`, `deferredUpdateWaitsForTheRoomToClose`; `UpdateWritingSessionGateTests.theRoomSurfaceAloneHoldsTheGate`, `settingsDoesNotOpenTheGateWhileTheSessionRuns`, `theRoomCancelsACheckBeforeItsWindowAppears`, `theRoomCancelsADownloadBeforeItsStatusWindowAppears`, `theRoomAcknowledgesResultsWithoutAnAlert` | signed-build recording pending |
+| 60 | Checks are opt-in: `SUEnableAutomaticChecks` is false, so no check runs until the writer turns on `Check for updates automatically` or chooses `Check for Updates…`. The toggle writes through to Sparkle, reflects a previously enabled setting, and the row is absent where no updater exists. | `UpdatePolicyTests.infoPlistKeepsChecksOffUntilTheWriterOptsIn`; `SettingsUpdateTests.automaticChecksStartOffAndTheSwitchWritesThrough`, `theSwitchReflectsAPreviouslyTurnedOnSetting`, `noUpdateSwitchWhereThereIsNoUpdater` | `settings-updates-light.png`, `settings-updates-dark.png` content snapshots |
+| 61 | `Check for Updates…` sits directly under About and exists only when the app really has an updater; its enablement uses the same policy call, so it is unavailable inside a live writing session and without an updater. | `UpdateMenuTests.updateItemSitsUnderAboutWhenPresent`, `updateItemIsAbsentWithoutAnUpdater`, `checkForUpdatesIsDisabledWithoutAnUpdater`; `UpdatePolicyTests.theMenuCommandIsOnlyAvailableOutsideAWritingSession` | signed-build recording pending |
 
 ## Measured changes
 

@@ -2,12 +2,193 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: The update gate follows a live writing session
+
+Fourth review round on the same branch. No DMG build, notarization, upload, deployment or merge was
+performed.
+
+- The gate is one predicate, `AppState.isWritingSessionActive`: the Session room in any phase, or a
+  session that keeps running after the writer opens Settings. Every presentation entry point uses it:
+  the menu command, the scheduled-check path, the deferred return on surface change or app
+  activation, and every standard-driver hook. D-042 records the rule and supersedes D-041's
+  surface-only gate wording.
+- `sparkle-key.py` detects whether `openssl` can derive Ed25519. macOS ships LibreSSL, which cannot,
+  so it prints a warning naming that limit and uses the built-in RFC 8032 derivation instead of
+  failing, skipping or silently passing the key-pair proof.
+- `test-release-config.py` derives the expected payload names from the tracked
+  `CFBundleShortVersionString` instead of hardcoding 1.1, so the release gate survives the 1.2 bump.
+- The root `AGENTS.md` update paragraph now points at D-041/D-042 and describes the live-session gate.
+
+Evidence:
+
+- `swift test --filter Update`: 18 tests in 6 suites passed, including the new
+  `settingsDoesNotOpenTheGateWhileTheSessionRuns` (start a session, defer a scheduled update, open
+  Settings: no presentation request is taken and the deferred update survives; it is taken once after
+  the session ends) and `theRoomSurfaceAloneHoldsTheGate`.
+- `python3 scripts/test-release-config.py`: PASS (exit 0) on macOS with Homebrew OpenSSL on PATH and,
+  for the key gate, with a stub `openssl` on PATH that answers `unable to load key: unsupported
+  algorithm`; the fallback still matches the RFC 8032 seed/public vector and prints the
+  `built-in RFC 8032` warning. Payload assertions now read the version from the plist.
+- Not run: a full `scripts/release-dmg.sh` (needs the Developer ID identity and notary), the whole
+  `swift test` suite (the two pre-existing EditorFocusTests failures are unrelated), and every
+  real-window Sparkle behaviour below.
+
+## 2026-10-25: Immutable update payload URLs, portable framework lookup, feed path
+
+Third review round on the same branch. No DMG build, notarization, upload, deployment or merge was
+performed.
+
+- The update payload name now carries the build number (`WriteItDown-<version>-<build>.zip`), defined
+  once in `scripts/update-payload-name.sh` and used by both `release-dmg.sh` (writer) and
+  `publish-appcast.sh` (looker-up). A rebuild that only raises `CFBundleVersion` therefore gets a new
+  URL, so the host's `max-age=31536000, immutable` rule on `/download/updates/*` stays honest.
+- `package-app.sh` finds a misplaced `Sparkle.framework` with POSIX `find` primaries piped to
+  `head -n 1` instead of `-maxdepth`/`-quit`, which macOS 14's BSD find does not provide.
+- `writeitdown/README.md` now states the upload mapping: `dist/updates/appcast.xml` goes to
+  `download/appcast.xml`, while the payload ZIP and deltas go to `download/updates/`.
+
+Evidence:
+
+- `python3 scripts/test-release-config.py`: PASS (exit 0). It now also executes
+  `scripts/update-payload-name.sh` for builds 2 and 3 of version 1.1 (`WriteItDown-1.1-2.zip` and
+  `WriteItDown-1.1-3.zip`) and proves `publish-appcast.sh` refuses a directory holding only the
+  version-only `WriteItDown-1.1.zip`, naming the expected build-qualified payload. Known-broken
+  proof: the same test fails on `66f673c` because that publish step accepts the version-only name.
+- Real Sparkle 2.10.0 tools (pinned artifacts, read-only) with a disposable RFC 8032 key: two
+  ad-hoc-signed apps with the same `CFBundleShortVersionString` 1.1 and builds 2 and 3 were zipped
+  under the names the helper prints. `scripts/publish-appcast.sh` exited 0 for both and wrote
+  enclosures `.../updates/WriteItDown-1.1-2.zip` and `.../updates/WriteItDown-1.1-3.zip`, so the
+  enclosure URL changes with the build while the feed and enclosure signatures still verify.
+- `node writeitdown/release-check.mjs --download`: PASS both before and after the rename; the
+  download page names only the DMG and its checksum, so payload renames cannot change its facts.
+- Framework fallback: the exact command from `package-app.sh` resolves
+  `.build/apple/Products/Release/Sparkle.framework` in a fixture tree.
+- Not run: a full `scripts/release-dmg.sh` (needs the Developer ID identity and notary), `swift
+  build`/`swift test`, and every real-window Sparkle behaviour below.
+
+## 2026-10-25: Fail-closed release gates and library-backed key derivation
+
+Second review round on the same branch head. No window journey, DMG build, upload, deployment or
+merge was performed.
+
+- `release-dmg.sh` parses `dist/updates/last-build.txt` strictly: after stripping at most one
+  trailing newline the whole content must match `^[0-9]+$`, and a missing, unreadable or non-numeric
+  record refuses the release. `--staging` stays outside the comparison because it records no build,
+  and its mode check is still the only way to reach that branch.
+- `release-check.mjs` now refuses a DMG link whose file name does not carry its version as
+  `Write-It-Down-<version>.dmg`; previously that made the release-note version comparison fall
+  through and accept any newer note.
+- `Info.plist` sets `SUSignedFeedFailureExpirationInterval` to 0, so a failed feed-signature check is
+  never retried in Sparkle's 20-day "safe mode". `release-dmg.sh` requires exactly that value and
+  `UpdateTests` asserts it.
+- `scripts/sparkle-key.py` wraps an exported 32-byte seed as PKCS#8 and asks `openssl pkey` for the
+  public half, removing the hand-written Ed25519 arithmetic; the 96-byte Sparkle export still reads
+  its trailing public key directly.
+- `scripts/publish-appcast.sh` tool lookup is only `.build/artifacts/sparkle/Sparkle/bin` (after
+  `swift package resolve`) or `WID_SPARKLE_BIN`; the host `/Applications` candidate is gone.
+- `python3 scripts/test-release-config.py`: PASS (exit 0), now also covering a zero interval, a
+  missing interval, empty/partly numeric/unreadable/missing `last-build.txt`, and the staging
+  exemption with a record holding the same build number (2). Known-broken proof: the same test
+  fails on commit `e87bf5a` at the partly numeric records (`v2`, `12abc`, `2 (build)`, `2\nextra`)
+  and the missing-record case, which it treated as a first release and packaged.
+- `node writeitdown/release-check.mjs --download`: PASS on the current page. Known-broken proof: a
+  page whose DMG link is renamed to `Write-It-Down.dmg` passes the previous checker and is refused by
+  this one with `DMG URL: the file name does not carry the version`.
+- Not run: `swift build`/`swift test` (the Swift changes are plist data plus two assertions),
+  notarization, real-key signing, and every real-window Sparkle behaviour below.
+
+## 2026-10-25: Signed appcast feed, key-pair gate, staging and page-version gates
+
+Review round on `fm/wid-autoupdate-mini` (base `5964110`) that closes four release-path defects. No
+window journey was run, and no DMG, upload, deployment or merge was performed.
+
+- Client: `Info.plist` now sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` together
+  (Sparkle 2.10.0 refuses to start an updater that sets the first without the second).
+- Generator: `scripts/publish-appcast.sh` proves the signing key's public half equals
+  `SUPublicEDKey` through the new `scripts/sparkle-key.py` before generating anything, and after
+  generation verifies the embedded feed signature (`sign_update --verify appcast.xml`) as well as the
+  enclosure. The script resolves the pinned Sparkle tools from
+  `.build/artifacts/sparkle/Sparkle/bin` (running `swift package resolve` when absent) or from
+  `WID_SPARKLE_BIN`; it uses no other copy.
+- Gates: `release-dmg.sh` refuses a release whose plist lacks the signed-feed policy and no longer
+  applies the build-number increase to `--staging`; `release-check.mjs` refuses a release note that
+  announces a version newer than the linked DMG unless it is marked `data-launch-pending`, and
+  refuses that mark once its version is the linked download. The download page keeps its 1.0 facts
+  and states that 1.1 is not released yet.
+- `python3 scripts/test-release-config.py`: PASS (exit 0). It now also covers the two policy keys,
+  staging with an existing `dist/updates/last-build.txt` set to 2, the Ed25519 public-key derivation
+  (RFC 8032 seed/public vector, 96-byte export), and `publish-appcast.sh` refusing a mismatched key
+  before `generate_appcast` runs. Known-broken proof: the same test fails on `7932fe0`'s
+  `release-dmg.sh` at the `SURequireSignedFeed` case, and fails with
+  `CFBundleVersion 2 is not greater than the last release (7 ...)` when only the staging boundary is
+  reverted.
+- Real Sparkle 2.10.0 tools (read-only pinned artifacts) with a disposable RFC 8032 key in `/tmp`:
+  an app declaring the signed-feed policy produced a feed with a `sparkle-signatures` block;
+  `sign_update --verify appcast.xml` exited 0; changing `minimumSystemVersion 14.0` to `14.1` made it
+  exit 1. The same app without the policy produced no signature block and verification reported
+  "Is the appcast signed?". A full `scripts/publish-appcast.sh` run exited 0 on the signed bundle and
+  exited 1 on the unsigned one, which is the pre-fix failure mode.
+- `node writeitdown/release-check.mjs --download`: PASS on the current page. The pre-fix page
+  (`7932fe0`) passes the pre-fix checker (exit 0) and is refused by the new one ("the note announces
+  1.1 but the download is 1.0"). `writeitdown/qa/mac.spec.mjs` gained four rejection cases; the four
+  inputs were executed against `release-check.mjs` directly and each was blocked with its expected
+  message. `npx playwright test` was not run in this round because `writeitdown/node_modules` is not
+  installed here.
+- Not run: `swift build`/`swift test` (the Swift change is `Info.plist` data only), notarization,
+  real-key signing, and every real-window Sparkle behaviour listed below.
+- Correction to the 2026-10-25 Sparkle record below: that run's feed was **not** signed, because the
+  bundle did not declare `SURequireSignedFeed` yet; the signature verified there was the ZIP
+  enclosure's. The feed signature is first proven in this record.
+
 ## 2026-10-25: Release artifact for the aligned room and the split-W logo
 
 - Source: `origin/main` commit `1446b4af694e31f08d019f6fece189702e6ebfa7` (the merged writing-room/After alignment and split-W logo PRs), in a fresh clone on the Mac mini, built with `scripts/release-dmg.sh` (configured release, not `--staging`). Signing and notarization ran in the captain's own unlocked terminal on that Mac; an SSH session with a locked login keychain cannot sign.
 - Air verification of the copied artifact `Write-It-Down-1.0.dmg` (8117026 bytes, SHA-256 `5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`): Developer ID Application: Ziying WANG (4BNUMV44F8), hardened runtime, `Notarization Ticket=stapled`; `codesign -dv` shows that ticket embedded, and `xcrun stapler validate` plus `spctl -a -t open --context context:primary-signature` accepted the disk image. The mounted app verifies `codesign --verify --deep --strict`, carries its own stapled ticket, and `spctl -a -t exec` accepts it as `Notarized Developer ID`; `lipo -archs` reports `x86_64 arm64`.
 - Read-only mount confirms the release configuration: service `https://licenses.writeitdown.app`, product `prod_VUeTDTehcGAqJK`, base64 Ed25519 public key `ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=`, checkout `https://writeitdown.app/mac.html`, `$4.99`, version 1.0 (build 1), copyright Trefoil Studio.
 - Not run: `scripts/dmg-journey.sh` (needs an approved GUI test machine plus the clean-login evidence directory), any real-window session, and any Finder install or activation. Installed-DMG TEST acceptance remains pending with the maintainer; this record makes no GUI, purchase or payment claim.
+
+## 2026-10-25: Sparkle 1.1 auto-update, release signing fix, no real-window acceptance
+
+This batch adds Sparkle 2.10.0 (opt-in checks, room guard), fixes the release signing so Sparkle's
+plain-Mach-O helpers are Developer ID signed, and adds the appcast/ZIP release path. No native window
+journey was run here: this machine has Command Line Tools only (no Xcode, so no universal build) and
+no Developer ID identity, and GUI journeys are prohibited on the Mini.
+
+- `swift build`: pass. `swift test`: 299 tests, with exactly the two failures that already fail on the
+  pristine base commit `1446b4a` (`EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and
+  `EditorFocusTests.imeMovementStaysWithinMarkedRange`, both `engine.lastDenyAt == nil`): a headless
+  CLI test process has no active app, so `NSApp.sendAction` never delivers the movement command to the
+  editor. Proven pre-existing by stashing this batch and running the same filters. New and changed
+  tests pass: `UpdatePolicyTests`, `SettingsUpdateTests`, `UpdateMenuTests`, `SnapshotTests`.
+- Captures (`WID_SNAPSHOT_DIR`, 1040x720 AppKit content snapshots, not live windows):
+  `settings-updates-light.png` and `settings-updates-dark.png`. Inspected: the `Updates` section header
+  aligns with the `Appearance` header's left edge; the checkbox box shares that edge; the label uses
+  the same 13 pt control style as `Fullscreen focus`; the 28 pt section rhythm is unchanged above and
+  below; About now reads `Version 1.1` from the tracked `Info.plist`. No text is clipped, no row
+  shifts when the section is absent (bare executable) and `settings-light.png` is unchanged.
+- Release tooling proof without Xcode, in `/tmp/wid-sparkle-proof` (disposable): a universal app was
+  assembled by hand (arm64 and x86_64 lipo'd, Sparkle.framework via `ditto`), signed with
+  `Apple Development: Ziying WANG (N42F4QZ48V)` through `scripts/sign-nested.sh`. The team gate passes
+  (`4BNUMV44F8` on the app, framework, Updater.app, both XPCs and `Autoupdate`), every helper carries
+  `flags=0x10000(runtime)` plus a secure timestamp, and `codesign --verify --deep --strict` prints
+  `valid on disk`. The Sparkle ZIP payload is 8,507,080 bytes and keeps `Versions/Current`.
+  `scripts/publish-appcast.sh` (disposable key file, `WID_SPARKLE_KEY_FILE`) wrote a signed feed for
+  `sparkle:version 2`, `1.1`, `minimumSystemVersion 14.0`, no `hardwareRequirements`, with
+  `sign_update --verify` exit 0 and a one-byte-tampered copy exit 1. An arm64-only build is refused by
+  the feed check, which is the negative control for the universal requirement.
+- `python3 scripts/test-release-config.py`: exit 0. It now also proves the release is blocked by a
+  placeholder `SUPublicEDKey`, an unsafe appcast URL, a non-integer build number, and a build number
+  that is not greater than `dist/updates/last-build.txt`.
+- Site: `cd writeitdown && npm ci && npx playwright test` - 460 passed, 36 skipped. Root landing
+  `npm test` - 2 passed. The download page gained one `#release-notes` line inside the download card,
+  so the Install/Activate/Refunds structure the journey asserts is unchanged.
+- Pending, not claimed: notarization of a build carrying the re-signed Sparkle helpers (needs the
+  Developer ID identity and notary credentials), the universal `swift build` through
+  `scripts/package-app.sh` (needs Xcode), Gatekeeper verdicts on the new bundle, and every real-window
+  Sparkle behaviour - no consent prompt on launch, no check before the toggle, the update UI refused or
+  deferred whenever the Session room is shown (empty, writing, warning, failure and kept) and returned
+  after leaving it, and the alert's buttons. Those belong to the release-Mac acceptance in
+  `docs/RELEASE_CHECKLIST.md`. No DMG build, upload, deployment or merge was performed.
 
 ## 2026-10-23: Configured purchase build, no real-window acceptance
 

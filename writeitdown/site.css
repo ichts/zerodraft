@@ -149,7 +149,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
 /* nav */
 .home-nav{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
-.brand{--brand-plate:var(--sheet,var(--paper));position:relative;display:inline-block;flex:none;width:7.467em;height:1.046em;font-size:21px;line-height:1;color:var(--ink)}
+.brand{position:relative;display:inline-block;flex:none;width:7.467em;height:1.046em;font-size:21px;line-height:1;color:var(--ink)}
 .brand:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl,8px)}
 .brand::before{content:"";position:absolute;inset:0;background:var(--brand-plate);
   -webkit-mask:url(logo/write-it-down-lockup-plate.svg) no-repeat left center/contain;

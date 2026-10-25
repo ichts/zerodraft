@@ -368,6 +368,33 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
   }
 });
 
+// One brand rule for every page: the chip plate is a single `--brand-plate` token per theme, resolved where the
+// other colour roles live (tokens.css). A per-page fallback let mac.html resolve its own paper colour, so the
+// same lockup read as a chip on the landing and as a bare mark on the mac page. This reads the rendered
+// ::before background, so a page-level override or a reintroduced fallback chain fails here.
+test('the header chip paints one plate colour on every page', async ({ page }) => {
+  const samples = [];
+  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+    await page.goto(path);
+    const brand = page.locator('.brand:visible').first();
+    expect(await brand.count(), `${path}: visible lockup`).toBeGreaterThan(0);
+    samples.push(await brand.evaluate((el, pagePath) => ({
+      path: pagePath,
+      theme: document.documentElement.dataset.theme,
+      plate: getComputedStyle(el, '::before').backgroundColor,
+      token: getComputedStyle(el).getPropertyValue('--brand-plate').trim(),
+    }), path));
+  }
+  const theme = samples[0].theme;
+  expect(new Set(samples.map(s => s.theme)).size, 'every page renders the same stored theme').toBe(1);
+  const plates = new Set(samples.map(s => s.plate));
+  expect(plates.size, `${theme}: one plate colour, not ${samples.map(s => `${s.path}=${s.plate}`).join(', ')}`).toBe(1);
+  expect(samples[0].plate, `${theme}: the plate is opaque`).toMatch(/^rgba?\(.*, 1\)$|^rgb\(/);
+  const tokens = new Set(samples.map(s => s.token));
+  expect(tokens.size, `${theme}: one --brand-plate token, not ${samples.map(s => `${s.path}=${s.token || '(unset)'}`).join(', ')}`).toBe(1);
+  expect(samples[0].token, `${theme}: the plate resolves the --brand-plate token, not a page-local fallback`).not.toBe('');
+});
+
 // Narrow phones: /download/ carries the widest header (brand, page action, theme button), so 360 px decides
 // the narrow lockup step, and landing and mac share that one rule instead of diverging. The chip also has to
 // stay legible at the step the narrowest phone gets.

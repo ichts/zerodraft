@@ -504,3 +504,18 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the action. Browser acceptance covers native metrics and a 164 px action width on both platforms.
 - Supersedes: The earlier D-039 correction's claim that the 12 px mobile header gap remains at 380 px and below.
   The 16 px lockup, two mask layers, theme polarity and 6 px action-group gap stand.
+
+### Correction to D-038: one plate token for every page
+
+- Date: 2026-10-25
+- Decision: The chip plate is the single `--brand-plate` token, one value per theme, owned with the other root
+  colour roles in `writeitdown/tokens.css` (`#ffffff` light, `#26231c` dark). `.brand` consumes the token
+  directly; the `var(--sheet, var(--paper))` fallback chain is gone, so the landing, the trial room,
+  `/download/` and `mac.html` paint one plate.
+- Reason: The fallback resolved `--sheet` on the landing and `/download/` but fell through to `--paper` on
+  `mac.html`, whose page colour is `#f7f4ea` light and `#211f18` dark. The same lockup was a chip on two pages
+  and a bare mark on the third, which the "one rule for every page" contract forbids.
+  `writeitdown/qa/mac.spec.mjs` "the header chip paints one plate colour on every page" failed on the
+  `mac.html` plate before the token and passes after it.
+- Supersedes: D-038's "`--sheet`, falling back to `--paper`" plate source only. The chip drawing, the two aligned
+  masks, the light-plate/ink-W and dark-plate/bone-W polarity, the responsive sizes and D-039 stand.

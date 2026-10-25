@@ -267,7 +267,8 @@ the notch.
 - Site header, narrow phones: at 380 px and below the lockup is 16 px type (119.5 px of row) and the gap
   between brand and action group is 8 px; the action group's internal gap stays 6 px. This leaves at least
   6 px of right gutter at 360 px even with wider system-font metrics. One rule for every page that uses
-  `.brand`, so `/download/` does not diverge from the landing, trial room and `mac.html`.
+  `.brand` - these sizes and the single `--brand-plate` token in 11.6 - so `/download/` does not diverge from
+  the landing, trial room and `mac.html`.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
@@ -278,8 +279,8 @@ the notch.
 ### 11.4 Do not
 
 - Put red, the old red underscore, or the old `WID` sheet in the mark.
-- Add a palette colour, border, shadow, or gradient to the header chip. Its two masks use only the existing
-  paper-surface and ink tokens. Do not put the dark plate in the light header or the light plate in the dark header.
+- Add a palette colour, border, shadow, or gradient to the header chip. Its two masks use only the
+  `--brand-plate` and ink tokens. Do not put the dark plate in the light header or the light plate in the dark header.
 - Insert a line, rule, or caption between the chip and wordmark, or set the chip alone above, below, or after
   the wordmark.
 - Use the ink plate as the favicon default; it is the dark-appearance favicon alternate only. Do not put the light
@@ -301,6 +302,9 @@ the notch.
   inside it with matching bounds, the split to survive at 2x, and the wordmark to follow it. Computed colours
   must give a lighter plate than W in light appearance and a darker plate than W in dark appearance.
   It fails on a wordmark-only lockup or inverted polarity.
+  "the header chip paints one plate colour on every page" reads the rendered `::before` background on the
+  landing, the trial room, `/download/` and `mac.html` and requires one `--brand-plate` value per theme, so a
+  page-local fallback cannot make the chip diverge again.
   "the header keeps its right gutter and a legible chip at 360 px" repeats it at 360 px and requires no
   horizontal overflow, at least 6 px of right gutter, one lockup step across landing, `/download/` and `mac.html`,
   and a chip of at least 16 px with the split still reading. Verify the sizes in 11.3 in light and dark, with
@@ -325,10 +329,12 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
 - The chip is the small-size variant of the mark: its notch is 180 word-units (11% of the W) instead of the
   master's 90, the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
 - The aligned alpha-only masks are `writeitdown/logo/write-it-down-lockup-plate.svg` for the plate and
-  `writeitdown/logo/write-it-down-lockup.svg` for the W and wordmark. The plate uses
-  `--brand-plate:var(--sheet,var(--paper))`; the W and wordmark use `currentColor` from
-  `--ink`. Light appearance gives a paper plate with ink W, dark gives an ink plate with bone W. The paper
-  surface keeps the small chip visible against the wall. Both layers share one viewBox and
+  `writeitdown/logo/write-it-down-lockup.svg` for the W and wordmark. The plate paints the `--brand-plate`
+  token; the W and wordmark paint `currentColor` from `--ink`. `--brand-plate` has one value per theme and is
+  owned with the other root colour roles in `writeitdown/tokens.css`, so `.brand` consumes it directly with no
+  page-local fallback: light is the paper plate `#ffffff` with the ink W, dark is the ink plate `#26231c` with
+  the bone W, on the landing, the trial room, `/download/` and `mac.html` alike. Each plate sits one step off
+  its wall, which keeps the small chip an object. Both layers share one viewBox and
   `shape-rendering="geometricPrecision"`, with no theme-specific CSS or new palette colour. The glyph layer
   retains the split strokes with `fill-rule="evenodd"`.
 - Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.

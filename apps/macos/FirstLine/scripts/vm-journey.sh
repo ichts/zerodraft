@@ -10,9 +10,13 @@
 # [OUTPUT] A timestamped evidence bundle (evidence-dir, default
 #          <root>/evidence/<timestamp>): screen.mov assembled from the guest's
 #          timestamped frame stream, per-step screenshots and AX snapshots,
-#          journey.log, launch watchers, summary.json and notes.md. Exit 0 only
-#          when the guest journey passed AND the assembled recording covers the
-#          whole run without a gap; exit 1 otherwise; exit 2 on a rig setup error.
+#          journey.log, launch watchers, panel/ (the six-lens review of this same
+#          bundle), summary.json and notes.md. Exit 0 only when the guest journey
+#          passed, the assembled recording covers the whole run without a gap, both
+#          analyser stages recorded an assertion and all six lenses completed; exit 1
+#          when the run is rejected; exit 78 when the only failing assertion is the
+#          declared known defect; exit 79 when the six-lens review did not complete;
+#          exit 2 on a rig setup error.
 # [POS] apps/macos/FirstLine/scripts/vm-journey.sh - the recorded acceptance entry
 #       point. Runs ON the Mac mini (everything heavy stays there): clones the
 #       prepared golden VM, boots it headless, installs the DMG inside the guest,
@@ -23,9 +27,12 @@
 #            screen is captured inside the guest. A failed, interrupted or truncated
 #            recording fails the run. Preparation lives in scripts/vm/prepare-guest.sh.
 #            Assertions are never weakened. One artifact may carry a declared known
-#            defect (a checksum plus one assertion id plus a reference); the run then
-#            exits 0 only when exactly that assertion fails on exactly that artifact,
-#            and fails when the declared defect no longer reproduces.
+#            defect (a checksum plus one assertion id plus a reference). That run
+#            exits 78, never 0: it reproduces a defect and is not a pass. The run
+#            fails when the declared defect no longer reproduces. The six-lens review
+#            is the last stage of the run; when no reviewer answered, the bundle
+#            records "panel not run" with the exact re-run command and the run exits
+#            79 instead of signing off.
 set -uo pipefail
 
 artifact="${1:?usage: vm-journey.sh <dmg-or-app-path> [evidence-dir]}"
@@ -219,7 +226,22 @@ assemble_recording() {
     log 'ERROR: python3 is required for the deterministic recording analysis'
     return 1
   fi
-  python3 "$scripts/vm/analyse-recording.py" "$evidence" >>"$evidence/journey.log" 2>&1 || true
+  local fail_before fail_after analysis_status
+  fail_before="$(grep -c '^FAIL ' "$evidence/journey.log" 2>/dev/null || true)"
+  python3 "$scripts/vm/analyse-recording.py" "$evidence" >>"$evidence/journey.log" 2>&1
+  analysis_status=$?
+  fail_after="$(grep -c '^FAIL ' "$evidence/journey.log" 2>/dev/null || true)"
+  if [[ "$analysis_status" -ne 0 && "${fail_after:-0}" -le "${fail_before:-0}" ]]; then
+    printf 'FAIL [recording-analysis] the analyser exited %s without recording a failed assertion\n' \
+      "$analysis_status" >>"$evidence/journey.log"
+    log "ERROR: the deterministic analysis exited $analysis_status with no assertion line"
+    return 1
+  fi
+  if [[ "$analysis_status" -eq 0 ]] && ! grep -q '^PASS \[recording-analysis\] ' "$evidence/journey.log"; then
+    printf 'FAIL [recording-analysis] the analyser exited 0 without recording an assertion\n' >>"$evidence/journey.log"
+    log 'ERROR: the deterministic analysis produced no assertion line'
+    return 1
+  fi
   rm -rf "$dir" "$list"
   return 0
 }
@@ -234,12 +256,9 @@ assemble_recording || { recording_ok=0; guest_status=1; }
 fail_total="$(grep -c '^FAIL ' "$evidence/journey.log" 2>/dev/null)"
 fail_total="${fail_total:-0}"
 declared_failures=0
-declared_passes=0
 if [[ "$declared_defect" -eq 1 ]]; then
   declared_failures="$(grep -c "^FAIL \[$known_defect_id\] " "$evidence/journey.log" 2>/dev/null)"
   declared_failures="${declared_failures:-0}"
-  declared_passes="$(grep -c "^PASS \[$known_defect_id\] " "$evidence/journey.log" 2>/dev/null)"
-  declared_passes="${declared_passes:-0}"
 fi
 other_failures=$((fail_total - declared_failures))
 
@@ -281,7 +300,6 @@ fi
     printf 'known_defect_assertion_source: %s\n' "$(grep -m1 "^FAIL \[$known_defect_id\] \|^PASS \[$known_defect_id\] " "$evidence/journey.log")"
   fi
 } >"$evidence/acceptance.txt"
-cat "$evidence/acceptance.txt"
 
 if [[ "$declared_defect" -eq 1 ]]; then
   {
@@ -295,6 +313,68 @@ if [[ "$declared_defect" -eq 1 ]]; then
   } >>"$evidence/notes.md"
 fi
 
-log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures)"
-[[ "$verdict" == 'rejected' ]] && exit 1
+# --- six-lens design review --------------------------------------------------
+# The recorded acceptance ends with the six-lens review inside this bundle. The panel
+# is a stage of the run, not a separate command: its lens results are part of the
+# sign-off, and a run whose panel did not run is declared and blocked, never silently
+# passed.
+panel_command="bash $(printf '%q' "$scripts/design-panel.sh") $(printf '%q' "$evidence")"
+panel_status=0
+bash "$scripts/design-panel.sh" "$evidence" >>"$evidence/panel.log" 2>&1 || panel_status=$?
+panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" 2>/dev/null)"
+panel_total="$(sed -n 's/^lenses_total=//p' <<<"$panel_summary")"
+panel_complete="$(sed -n 's/^lenses_complete=//p' <<<"$panel_summary")"
+panel_total="${panel_total:-0}"
+panel_complete="${panel_complete:-0}"
+panel_reason="$(sed -n 's/^reason=//p' <<<"$panel_summary")"
+panel_state='complete'
+if [[ "$panel_status" -ne 0 ]]; then
+  panel_state='not run'
+  panel_reason="design-panel.sh exited $panel_status; see panel/panel.log"
+elif [[ "$panel_total" -eq 0 || "$panel_complete" -lt "$panel_total" ]]; then
+  panel_state='not run'
+  panel_reason="${panel_reason:-the panel recorded no lens result}"
+fi
+{
+  printf 'panel: %s\n' "$panel_state"
+  printf 'panel_lenses_complete: %s/%s\n' "$panel_complete" "$panel_total"
+  printf 'panel_command: %s\n' "$panel_command"
+  while IFS=$'\t' read -r lens_name lens_state lens_verdict lens_findings _lens_error; do
+    [[ -n "${lens_name:-}" ]] || continue
+    printf 'panel_lens: %s\t%s\t%s\t%s\n' "$lens_name" "$lens_state" "$lens_verdict" "$lens_findings"
+  done < <(sed -n 's/^lens=//p' <<<"$panel_summary")
+  [[ "$panel_state" == 'complete' ]] || printf 'panel_not_run: %s\n' "$panel_reason"
+} >>"$evidence/acceptance.txt"
+if [[ "$panel_state" != 'complete' ]]; then
+  {
+    printf '\n## Design panel not run - this bundle has no six-lens review\n\n'
+    printf -- '- Reason: %s\n' "$panel_reason"
+    printf -- '- Lenses complete: %s of %s\n' "$panel_complete" "$panel_total"
+    printf -- '- Re-run for this bundle: `%s`\n' "$panel_command"
+  } >>"$evidence/notes.md"
+fi
+
+sign_off='accepted'
+if [[ "$verdict" == 'rejected' ]]; then
+  sign_off='not accepted - an assertion or the recording failed'
+elif [[ "$panel_state" != 'complete' ]]; then
+  sign_off="blocked - the six-lens review did not run ($panel_reason)"
+elif [[ "$verdict" == 'accepted-with-declared-defect' ]]; then
+  sign_off='not accepted - the declared known defect reproduced on this artifact'
+fi
+printf 'sign_off: %s\n' "$sign_off" >>"$evidence/acceptance.txt"
+cat "$evidence/acceptance.txt"
+
+log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); panel: $panel_state ($panel_complete/$panel_total lenses); sign-off: $sign_off"
+if [[ "$verdict" == 'rejected' ]]; then
+  exit 1
+fi
+if [[ "$panel_state" != 'complete' ]]; then
+  log 'ERROR: the six-lens review did not complete, so this bundle cannot sign off'
+  exit 79
+fi
+if [[ "$verdict" == 'accepted-with-declared-defect' ]]; then
+  log 'ERROR: this artifact is accepted only with a declared known defect; it is not a clean pass'
+  exit 78
+fi
 exit 0

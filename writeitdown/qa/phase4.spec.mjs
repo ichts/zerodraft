@@ -462,16 +462,15 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     await capture(page, info, `kept-${size.width}x${size.height}`);
     await page.keyboard.press('Escape');
     await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     const hinted = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-      return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll'),
-        top: box('#kept').top - box('.room-paper').top };
+      return { scroll: box('.kept-scroll'), top: box('#kept').top - box('.room-paper').top,
+        title: getComputedStyle(document.querySelector('#kept h1')).fontSize };
     });
-    if (hinted.top === 8) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
-    else {
-      expect(hinted.top, 'the tall kept layout keeps the Mac offset when the hint is armed').toBe(72);
-      expect(hinted.scroll.bottom - hinted.footer.top, 'the tall kept bottom keeps its 24 px footer allowance').toBeCloseTo(24, 0);
-    }
+    expect(hinted.top, 'the confirmation does not change the kept layout mode').toBe(kept.top);
+    expect(hinted.title, 'the confirmation does not change the kept title').toBe(kept.title);
+    expect(hinted.scroll.bottom, 'the confirmation does not move the kept placement').toBeCloseTo(kept.scroll.bottom, 0);
     await page.keyboard.press('Escape');
     await expect(page.locator('#landing')).toBeVisible();
   }

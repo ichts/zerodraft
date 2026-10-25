@@ -4,6 +4,8 @@
 // On a tall sheet those Mac offsets are used exactly; when the group cannot fit above
 // the footer it moves above the writing line, and the failure block and receipt clamp
 // above the footer, so nothing is clipped or laid over the active line or the controls.
+// The footer top excludes the transient exit-hint row, so arming the confirmation
+// does not reflow the status slot or the kept result screen.
 // Placement is cached on the three strings and re-anchored only when the caller marks
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
@@ -52,7 +54,14 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const captionFont = fontOf(caption);
       const receiptFont = fontOf(receipt);
       const footer = paper.querySelector('.paper-foot');
-      const footerTop = footer ? footer.getBoundingClientRect().top - paperTop : paperHeight - 64;
+      let footerTop = paperHeight - 60;
+      if (footer) {
+        const footerRect = footer.getBoundingClientRect();
+        const stableChildren = [...footer.children].filter(child => !child.classList.contains('exit-hint'));
+        const stableHeight = stableChildren.length
+          ? Math.max(...stableChildren.map(child => child.getBoundingClientRect().height)) : 44;
+        footerTop = footerRect.bottom - stableHeight - paperTop;
+      }
       const gap = 8;
       const captionInk = ink(caption.textContent, captionFont.css, captionFont.lineHeight);
       const captionGap = numeralInk.inkTop + numeralInk.inkHeight + 20 - numeralFont.size - captionInk.inkTop;

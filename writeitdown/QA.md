@@ -55,8 +55,8 @@ version.
 - Short-sheet follow-up: at the compact sizes 1440x350 and 844x390 the warning group, failure block
   and kept layout clamp above the paper foot, the kept actions stay clear of the footer, and at least
   one kept draft line remains visible. Tall kept screens keep the Mac 72 px offset, the 24 px footer
-  allowance and the token title size, and follow a wrapped exit hint; 667x375, 390x844 and 1440x620
-  cover the fit boundary. The Mac 44 px ink offsets are unchanged.
+  allowance and the token title size, and keep that placement when the exit confirmation wraps;
+  667x375, 390x844 and 1440x620 cover the fit boundary. The Mac 44 px ink offsets are unchanged.
 - Not re-run here: the whole suite in a single final pass, the pre-deploy journey against a real DMG
   (`npm run journey --expect-sha`, needs the artifact), and real-device IME/iOS checks.
 

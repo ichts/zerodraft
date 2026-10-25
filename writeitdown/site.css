@@ -178,14 +178,14 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .key{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:58px;height:50px;padding:0 12px;border-radius:10px;background:var(--sheet);border:1px solid var(--hair-2);font:600 17px/1 var(--sans)}
 .home .key.no::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:var(--red);transform:rotate(-14deg);border-radius:2px}
 /* headline */
-.home .hero{text-align:center;padding:22px var(--gut) 0}
+.home .hero{text-align:center;padding:var(--s4) var(--gut) 0}
 .home .h1{margin:0;display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font:500 var(--t-display)/1.05 var(--serif);letter-spacing:-.02em}
 .home .h1 .l1{white-space:nowrap}
 .home .hand{font-family:var(--hand);font-weight:400;color:var(--red);letter-spacing:0;white-space:nowrap}
 .home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
 @keyframes wid-write{to{clip-path:inset(-10% -4% -20% 0)}}
 /* sheet (the paper): the demo.js preview */
-.stagewrap{max-width:var(--maxw);margin:22px auto 0;padding:0 var(--gut)}
+.stagewrap{max-width:var(--maxw);margin:var(--s4) auto 0;padding:0 var(--gut)}
 /* The sheet sits straight on the page (background option A). The captain's rule: the demo sheet is at least 60% of the first viewport. */
 .stagewrap{position:relative;--wash-wall:var(--red-soft);--deep-wall:var(--red-deep)}
 /* No desk behind the sheet, so the warning wash lives on the sheet only. */
@@ -217,7 +217,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .meter{position:absolute;left:0;right:0;bottom:0;height:3px}
 .meter i{display:block;height:100%;width:0;background:var(--red)}
 /* the one button under the demo, with its one line of reassurance */
-.cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:22px var(--gut) 0;text-align:center}
+.cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s4) var(--gut) 0;text-align:center}
 .cta-note{margin:12px 0 0;max-width:52ch;font:400 var(--t-ui)/1.5 var(--sans);color:var(--mute)}
 /* the three points under the fold: one sentence per column, sharing one hairline */
 .points{list-style:none;max-width:var(--maxw);margin:var(--s8) auto 0;padding:0 var(--gut);display:grid;grid-template-columns:repeat(3,1fr);gap:0 var(--s6)}
@@ -228,7 +228,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
 .home h2 .hand{font-size:1.5em;line-height:.8}
 .sub{margin:18px auto 0;max-width:46ch;text-align:center;font:400 var(--t-body)/1.55 var(--sans);color:var(--mute)}
-.hero-sub{max-width:62ch;margin-top:14px}
+.hero-sub{max-width:var(--measure);margin-top:var(--s3)}
 .cards,.moments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:var(--s7)}
 .home .card{background:var(--sheet);border-radius:var(--r-card);border:1px solid var(--hair);overflow:hidden;display:flex;flex-direction:column}
 .card .vis{height:190px;background:linear-gradient(180deg,var(--stage-a),var(--stage-b));display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--hair)}
@@ -303,17 +303,17 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .home-nav{gap:var(--s3)}
   .nav-end{gap:6px}
   .home .btn-quiet{font-size:13px;padding:0 12px}
-  .home .hero{padding-top:4px}
+  .home .hero{padding-top:0}
   .home .h1{flex-direction:column;align-items:center;font-size:clamp(34px,10.5vw,44px)}
   .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 4.6));margin-top:.02em}
   /* The hero subhead and the CTA's one line claim the phone's spare pixels, so the door, its line
      and the 61% sheet still land on the first screen at 390x844. */
-  .hero-sub{margin-top:8px}
-  .stagewrap{margin-top:6px}
+  .hero-sub{margin-top:var(--s1)}
+  .stagewrap{margin-top:var(--s1)}
   .home .paper{border-radius:14px}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
-  .cta{padding-top:8px}
-  .cta-note{margin-top:10px}
+  .cta{padding-top:var(--s1)}
+  .cta-note{margin-top:var(--s2)}
   .points{grid-template-columns:1fr;gap:var(--s5) 0;margin-top:var(--s7)}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
   .ledger div{grid-template-columns:1fr;gap:6px}

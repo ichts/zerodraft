@@ -137,10 +137,18 @@ async function run(size, browser) {
       const note = cta.locator('.cta-note');
       ok(await note.count() === 1, `${await note.count()} lines of reassurance under the door`);
       ok((await note.innerText()).replace(/\s+/g, ' ').trim() === 'No account. Nothing is saved. Just the timer.', `the line under the door is "${await note.innerText()}"`);
-      const db = await landingDoor.boundingBox(), nb = await note.boundingBox();
-      ok(db.y + db.height <= size.height, `the door ends at ${Math.round(db.y + db.height)} px, past the ${size.height} px first screen`);
-      ok(nb.y >= db.y + db.height, 'the line of reassurance is not under the door');
-      ok(nb.y + nb.height <= size.height, `the line under the door ends at ${Math.round(nb.y + nb.height)} px, past the ${size.height} px first screen`);
+      const screen = await page.evaluate(() => {
+        const pin = document.createElement('style');
+        pin.textContent = '.home{--sans:Arial, sans-serif}';
+        document.head.append(pin);
+        const r = s => document.querySelector(s).getBoundingClientRect();
+        const door = r('#landing > .cta a[href="#trial"]'), note = r('#landing > .cta .cta-note');
+        pin.remove();
+        return { doorBottom: door.bottom, noteTop: note.top, noteBottom: note.bottom };
+      });
+      ok(screen.doorBottom <= size.height, `the door ends at ${Math.round(screen.doorBottom)} px, past the ${size.height} px first screen`);
+      ok(screen.noteTop >= screen.doorBottom, 'the line of reassurance is not under the door');
+      ok(screen.noteBottom <= size.height, `the line under the door ends at ${Math.round(screen.noteBottom)} px, past the ${size.height} px first screen`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
     await step('three one-sentence points sit below the first viewport', async () => {

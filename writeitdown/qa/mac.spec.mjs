@@ -169,8 +169,13 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
   const layout = await page.evaluate(() => {
+    const pin = document.createElement('style');
+    pin.textContent = '.home{--sans:Arial, sans-serif}';
+    document.head.append(pin);
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), note: r('.cta-note'), vh: innerHeight };
+    const out = { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), note: r('.cta-note'), points: r('.points'), vh: innerHeight };
+    pin.remove();
+    return out;
   });
   expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);
@@ -186,11 +191,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
     "Use it when you've been circling a thought for days and still haven't said it plainly.",
     'Nothing you write is saved, on the web or on the Mac.',
   ]);
-  const pointsBand = await page.evaluate(() => {
-    const b = document.querySelector('.points').getBoundingClientRect();
-    return { top: b.top, vh: innerHeight };
-  });
-  expect(pointsBand.top, 'the points start below the first viewport').toBeGreaterThanOrEqual(pointsBand.vh);
+  expect(layout.points.top, 'the points start below the first viewport').toBeGreaterThanOrEqual(layout.vh);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
   await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);

@@ -160,6 +160,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('.cta');
+  await expect(cta.locator('> *'), 'the band under the demo holds exactly the door and its line').toHaveCount(2);
   await expect(cta.locator('> a'), 'the only entrance under the demo is the 60-second door').toHaveCount(1);
   await expect(cta).not.toContainText('Stop typing for 8 seconds');
   await expect(cta.locator('.cta-note'), 'one line of reassurance under the door').toHaveText('No account. Nothing is saved. Just the timer.');
@@ -169,13 +170,16 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
   const layout = await page.evaluate(() => {
     const r = s => document.querySelector(s).getBoundingClientRect();
-    return { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), vh: innerHeight };
+    return { card: r('#paper'), paper: r('#paper'), door: r('.cta .btn'), note: r('.cta-note'), vh: innerHeight };
   });
   expect(layout.paper.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.paper.bottom, 'the whole demo paper is on the first screen').toBeLessThanOrEqual(layout.vh);
   expect(layout.door.top, 'the room button sits under the demo card').toBeGreaterThan(layout.card.bottom);
   expect(layout.door.bottom, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
   expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred under the sheet').toBeLessThan(1);
+  expect(layout.note.top, 'the reassurance line sits under the room button').toBeGreaterThan(layout.door.bottom);
+  expect(layout.note.bottom, 'the reassurance line is on the first screen with the room button').toBeLessThanOrEqual(layout.vh);
+  expect(Math.abs(layout.note.left + layout.note.width / 2 - (layout.card.left + layout.card.width / 2)), 'the reassurance line is centred under the sheet').toBeLessThan(1);
   // The three below-the-fold points, in the captain's words, as one sentence per column.
   await expect(page.locator('.points > li')).toHaveText([
     'You can only write forward, and if you stop for a few seconds the draft is deleted, so the only way out is through.',

@@ -131,11 +131,16 @@ async function run(size, browser) {
       const c = await cta.boundingBox(), d = await demo.boundingBox();
       ok(c.y >= d.y + d.height - 2, 'the entrance band is not below the demo');
       ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
+      ok(await cta.locator('> *').count() === 2, `${await cta.locator('> *').count()} elements in the entrance band`);
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
       const note = cta.locator('.cta-note');
       ok(await note.count() === 1, `${await note.count()} lines of reassurance under the door`);
       ok((await note.innerText()).replace(/\s+/g, ' ').trim() === 'No account. Nothing is saved. Just the timer.', `the line under the door is "${await note.innerText()}"`);
+      const db = await landingDoor.boundingBox(), nb = await note.boundingBox();
+      ok(db.y + db.height <= size.height, `the door ends at ${Math.round(db.y + db.height)} px, past the ${size.height} px first screen`);
+      ok(nb.y >= db.y + db.height, 'the line of reassurance is not under the door');
+      ok(nb.y + nb.height <= size.height, `the line under the door ends at ${Math.round(nb.y + nb.height)} px, past the ${size.height} px first screen`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
     await step('three one-sentence points sit below the first viewport', async () => {

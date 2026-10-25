@@ -601,7 +601,9 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `Give it 60 seconds` door: `No account. Nothing is saved. Just the timer.` Three one-sentence points sit
   below the first viewport, one per column, as one plain list on a hairline (not cards, not a new
   section): the forward-only rule, the situation the tool is for, and the no-save promise on web and Mac.
-  The phone keeps the 61% sheet, the door and its line on the 390x844 first screen by tightening the hero
+  The door and its line stay fully on the first screen at both target sizes, 390x844 and 1440x900, and
+  that is measured, not assumed: `qa/mac.spec.mjs` and `journey/journey.mjs` assert the line's bottom ends
+  at or above the fold beside the door. The phone keeps the 61% sheet and the line by tightening the hero
   and CTA gaps, not by shrinking type or dropping the sheet.
 - Reason: A visitor who reads only the first screen learns what the tool does to them, what it costs them
   and when to reach for it, before scrolling into the mechanics. The captain supplied and approved these

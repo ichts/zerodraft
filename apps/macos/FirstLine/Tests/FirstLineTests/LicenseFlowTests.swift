@@ -380,17 +380,19 @@ struct LicenseFlowTests {
     }
 
     @Test
-    func cachedKeyIsBlockedUntilValidationAndRequiresMatchingProduct() async throws {
+    func cachedKeyOpensBeforeRevalidationButRequiresMatchingProduct() async throws {
         let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
         let (state, mock, _, fm, root) = try makeAppState(initialSettings: active)
         defer { try? fm.removeItem(at: root) }
+        #expect(state.licenseValidationInFlight)
         state.startSession()
-        #expect(state.sessionEngine.phase == .idle)
+        #expect(state.sessionEngine.phase == .writing)
         await state.validateLicenseIfNeeded()
         #expect(await mock.lastValidatedToken == "mock-token")
+        state.goHome()
         state.startSession()
         #expect(state.sessionEngine.phase == .writing)
 
@@ -646,8 +648,10 @@ struct LicenseFlowTests {
         let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "WID-XXXX-XXXX" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
+        // The cached license is already trusted, so the licensed card is shown before the
+        // background check returns; only the Settings line reports that a check is running.
+        #expect(fields(upgradeView).contains { $0.stringValue == "This Mac is licensed." })
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })
-        #expect(fields(upgradeView).contains { $0.stringValue == "Checking license..." })
 
         await state.validateLicenseIfNeeded()
         let status = valid ? "License active." : "License revoked. Enter a valid order number or activation code."
@@ -685,12 +689,10 @@ struct LicenseFlowTests {
         let status = try #require(fields(view).first { $0.stringValue == "Checking license..." })
         let input = try #require(fields(view).first { $0.placeholderString == "Order number or activation code" })
         input.stringValue = "unfinished key"
+        // A failed activation cannot hijack the line of an already licensed Mac.
         await state.activateLicense(key: "BAD")
-        for _ in 0..<50 {
-            if status.stringValue == LicenseActivationError.invalidKey.errorDescription { break }
-            await Task.yield()
-        }
-        #expect(status.stringValue == LicenseActivationError.invalidKey.errorDescription)
+        #expect(state.licenseActivationError == .invalidKey)
+        #expect(status.stringValue == "Checking license...")
         await state.validateLicenseIfNeeded()
         for _ in 0..<50 {
             if status.stringValue == "License active." { break }
@@ -725,7 +727,8 @@ struct LicenseFlowTests {
 
         await state.activateLicense(key: "NEW")
         #expect(state.licenseActivationError == .cleanupFailure)
-        #expect(!state.hasFullAccess)
+        // The failed cleanup cannot take the still-valid cached license away.
+        #expect(state.hasFullAccess)
         #expect(state.settings.licenseKey == "OLD")
         #expect(await mock.lastDeactivatedToken == "mock-token")
         await state.validateLicenseIfNeeded()

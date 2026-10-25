@@ -345,8 +345,9 @@ struct TrialReleaseTests {
                              productID: fixture.product)
         #expect(state.settings.trialSessionsUsed == 3)
         #expect(state.trialSessionsRemaining == 0)
-        #expect(!state.hasFullAccess)
-        #expect(state.selectedSurface == .upgrade)
+        // The stored signed token is trusted at launch; a corrupt trial counter cannot take it away.
+        #expect(state.hasFullAccess)
+        #expect(state.selectedSurface == .home)
         #expect(await state.validateLicenseIfNeeded() == nil)
         #expect(state.hasFullAccess)
         state.startSession()

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
  * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
- * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；完整访问仍须订单号与合法签名 token；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
+ * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -94,9 +94,11 @@ final class AppState {
         return licenseStatusText
     }
 
+    /// Revalidation must not withhold locally verified access while the network request runs.
+    /// Keep this predicate independent of licenseValidationInFlight so launch selects Home immediately.
     var hasFullAccess: Bool {
         guard settings.licenseStatus == .active, settings.hasLicenseKey else { return false }
-        return settings.licenseInstanceID != nil && !licenseValidationInFlight && !productID.isEmpty &&
+        return settings.licenseInstanceID != nil && !productID.isEmpty &&
             licenseClient.isConfigured && settings.licenseProductID == productID && licenseWithinGrace
     }
 

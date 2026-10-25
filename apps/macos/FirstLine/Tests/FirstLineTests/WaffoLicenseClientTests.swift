@@ -283,10 +283,14 @@ struct WaffoLicenseClientTests {
         state.abandonSession()
 
         LicenseHTTPStub.handler.set { _ in throw URLError(.notConnectedToInternet) }
+        // A restart with a stored token opens on the picker: the in-flight revalidation is
+        // silent and never holds access (the launch flash regression).
         let offline = makeState(f, root: root, clock: { now })
-        #expect(!offline.hasFullAccess)
+        #expect(offline.hasFullAccess)
+        #expect(offline.selectedSurface == .home)
         await offline.validateLicenseIfNeeded()
         #expect(offline.hasFullAccess)
+        #expect(offline.selectedSurface == .home)
         now = f.now.addingTimeInterval(604_799)
         #expect(offline.hasFullAccess)
         now = f.now.addingTimeInterval(604_800)

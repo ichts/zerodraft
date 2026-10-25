@@ -473,11 +473,13 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Date: 2026-10-25
 - Decision: `design-panel.sh` owns the derived lines of a bundle's `acceptance.txt` (the `analysis:` line,
   the panel state and counts, the per-lens results and `sign_off`) and rewrites them from the single status
-  it derives at the end of every run. `vm-journey.sh` keeps the run's own assertion and verdict lines and its
-  exit codes; if the panel wrote no record at all, the journey writes that record once from the same
-  derivation. A run that replaces an earlier review adds `review:` with the UTC timestamp and
-  `review_lenses:` with the lens results, and appends the same fact to `notes.md`, stating that this repairs
-  the review artifact only and does not re-validate the product.
+  it derives at the end of every run; its declared-gap re-run text is the same quoted, absolute command the
+  record carries. `vm-journey.sh` keeps the run's own assertion and verdict lines, and reads that record for
+  its panel gate, log line and notes summary instead of deriving the panel state a second time. If the panel
+  wrote no record at all, the journey writes that record once from the same derivation. A run that replaces
+  an earlier review adds `review:` with the UTC timestamp and `review_lenses:` with the lens results, and
+  appends the same fact to `notes.md`, stating that this repairs the review artifact only and does not
+  re-validate the product.
 - Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
   re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
   reviewer reads contradicted the artifact it sat next to.

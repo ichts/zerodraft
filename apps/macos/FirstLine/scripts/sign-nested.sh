@@ -5,7 +5,7 @@
 #          frameworks/apps/XPC services deepest-first, then the app itself; exit 0 only when
 #          `codesign --verify --deep --strict` passes, and for a Developer ID identity only
 #          when every executable inside carries the app's TeamIdentifier.
-# [POS] apps/macos/FirstLine/scripts/sign-nested.sh — the one signing loop shared by
+# [POS] apps/macos/FirstLine/scripts/sign-nested.sh - the one signing loop shared by
 #       package-app.sh (ad-hoc QA builds) and release-dmg.sh (Developer ID releases).
 # [PROTOCOL] Sparkle ships `Sparkle.framework/Versions/B/Autoupdate` as a plain Mach-O file,
 #            not a bundle. The old loop only matched *.framework/*.app/*.xpc, so Autoupdate

@@ -22,11 +22,11 @@ docs/LICENSE_PAYMENT_SPEC.md: 签名许可服务、Mac 激活及真实订单发�
 docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前签名许可服务。
 docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；行为验收以 `../../../docs/wid-mac-behavior.md` 为准，视觉验收以 `docs/WRITEITDOWN_PLAN.md` 第 6 节为准。
 架构：纯 AppKit（无 SwiftUI；全仓 `grep import SwiftUI` = 0）。@main 是 NSApplication 入口，各 surface 是 NSViewController，经 RootContainerViewController 原地切换；编辑器与状态机复用。
-Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppState、构建菜单和窗口、激活应用；桥接新篇、整篇复制、关闭窗口等菜单动作与验证。
-Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cmd+,、新篇 Cmd+N、成稿复制 Cmd+C、关窗 Cmd+W）。
-Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；启用鼠标移动事件供专注模式悬停显示计时/字数，原生退出全屏时同步关闭写作中的专注偏好，导航导致的退出则保留偏好；所有会话相位留在同一个房间。
-Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
-Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 访问门槛（契约见 `docs/LICENSE_PAYMENT_SPEC.md#entitlement-and-persisted-state`；@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
+Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppState、构建菜单和窗口、激活应用；桥接新篇、整篇复制、关闭窗口、检查更新等菜单动作与验证；只在真实 .app 内启动 UpdateController，并把更新开关注入窗口。
+Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cmd+,、新篇 Cmd+N、成稿复制 Cmd+C、关窗 Cmd+W、真实更新器存在时才有的 Check for Updates…）。
+Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController（把 UpdateSettings 透传给内容容器）；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；启用鼠标移动事件供专注模式悬停显示计时/字数，原生退出全屏时同步关闭写作中的专注偏好，导航导致的退出则保留偏好；所有会话相位留在同一个房间。
+Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout；把 UpdateSettings 转交给按需新建的 Settings surface。
+Sources/FirstLine/App/AppState.swift: 顶层导航与 `isShowingWritingRoom`（整个 Session surface，更新界面时机的唯一判据）、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/版本/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 访问门槛（契约见 `docs/LICENSE_PAYMENT_SPEC.md#entitlement-and-persisted-state`；@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
 Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前“How long?”白卡片；顶部为 split-W lockup，右上角一个小而安静的“?”打开规则页；五个时长分段按钮 + 三个静默分段只做选择并持久化，单个 Begin 启动选中时长；无副标题；默认 Begin 获焦点；通过 Observation 更新异步许可状态与试用计数。
 Sources/FirstLine/App/RulesViewController.swift: 由选择器“?”打开的规则 sheet；复用 landing “How it works”的文案与顺序（No way back / Eight seconds of silence / Reach zero, keep it），Done 或 Return 关闭，Esc 取消，明暗皆用 After 卡片。
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；含 Sparkle 的 `SUFeedURL`、`SUPublicEDKey`（船长的更新签名公钥，私钥只在 Mac mini login Keychain）、`SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`（成对开启，app 必须拒绝被改写的 feed）、`SUSignedFeedFailureExpirationInterval=0`（没有 20 天安全模式宽限）、`SUEnableAutomaticChecks=false`（默认不检查、也不弹许可提示）与 `SUScheduledCheckInterval=86400`；AppIcon 使用 A split-W 标记，AppIcon `.icns` 只含浅色稿，图标内不出现红色；尺寸与配色规则见 `../../../design/DESIGN.md` §11。
@@ -68,7 +68,7 @@ Tests/FirstLineTests/BrandTests.swift: 开始屏 split-W lockup、“?”规则�
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
 Tests/FirstLineTests/CheckoutFixtures.swift: CheckoutClientTests 的测试替身（MockCheckoutClient）；仅测试目标，不建真实会话、不扣款。
 Tests/FirstLineTests/DesignTokenTests.swift: background A 与暗色 role 的颜色解析、system-sans 界面与 Newsreader 书写字体断言。
-Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
+Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态、带更新开关的 Settings）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。
 Tests/FirstLineTests/PinyinInputTests.swift: NSTextInputClient 入口的 Apple Pinyin/WeType/双拼组合、候选键、unmark-then-replace 记账与拒绝边界测试。
 Tests/FirstLineTests/ReviewRoundTests.swift: 评审回归：空态与擦除后光标、kept 动作光学中心与长稿、窗口 resize 重排、规则页鼠标命中、kept 重启、设置/激活卡布局与警告 wash 像素。

@@ -420,7 +420,9 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     { width: 1440, height: 350 },
     { width: 844, height: 390 },
     { width: 667, height: 375 },
+    { width: 320, height: 568 },
     { width: 390, height: 844 },
+    { width: 767, height: 900 },
     { width: 1440, height: 620 },
   ];
   const compactSizes = new Set(['1440x350', '844x390', '667x375']);
@@ -431,10 +433,20 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     await page.keyboard.insertText('This draft survives on a short sheet.\n');
     for (let second = 0; second < 57; second += 3) {
       await page.clock.fastForward(3000);
-      await page.keyboard.insertText('Keep going. Keep going. ');
+      await page.keyboard.insertText('Keep going. '.repeat(5));
     }
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+    const forced = [320, 390, 767].includes(size.width);
+    if (forced) {
+      await page.locator('#exit-hint').evaluate(e => {
+        const width = document.querySelector('.room-paper .paper-foot').clientWidth;
+        const pad = Math.max(0, (width - 150) / 2);
+        e.style.paddingLeft = `${pad}px`;
+        e.style.paddingRight = `${pad}px`;
+      });
+      await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    }
     const kept = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
       const probe = document.createElement('i');
@@ -465,9 +477,10 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     const hinted = await page.evaluate(() => {
-      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
       return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll'), actions: box('.kept-actions'),
-        heading: box('#kept h1'), receipt: box('#receipt'),
+        heading: box('#kept h1'), receipt: box('#receipt'), hint: box('#exit-hint'),
+        hintLine: parseFloat(getComputedStyle(document.querySelector('#exit-hint')).lineHeight),
         top: box('#kept').top - box('.room-paper').top,
         title: getComputedStyle(document.querySelector('#kept h1')).fontSize };
     });
@@ -478,6 +491,7 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     expect(hinted.actions.top).toBeCloseTo(kept.actions.top, 0);
     expect(hinted.scroll.top).toBeCloseTo(kept.scroll.top, 0);
     expect(hinted.scroll.bottom, 'the confirmation does not move the kept placement').toBeCloseTo(kept.scroll.bottom, 0);
+    if (forced) expect(hinted.hint.height, 'the forced confirmation is two lines').toBeGreaterThanOrEqual(hinted.hintLine * 2 - 1);
     if (size.width <= 767 || compact) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
     else expect(hinted.scroll.bottom - hinted.footer.top, 'the tall kept bottom keeps its 24 px footer allowance').toBeCloseTo(24, 0);
     await page.keyboard.press('Escape');

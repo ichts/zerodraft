@@ -54,9 +54,11 @@ version.
   desktop (a phone wraps the confirmation onto its own line instead of truncating it).
 - Short-sheet follow-up: at the compact sizes 1440x350 and 844x390 the warning group, failure block
   and kept layout clamp above the paper foot, the kept actions stay clear of the footer, and at least
-  one kept draft line remains visible. At phone widths the wrapped exit confirmation row is reserved permanently: the kept
-  bottom derives from the measured footer plus that row in both the compact and tall layouts, and
-  arming the confirmation neither reflows nor overlaps the kept screen. Tall desktop kept screens
+  one kept draft line remains visible. At phone widths the exit confirmation row's measured wrapped height (one or two lines
+  at the current width) is reserved permanently by a hidden probe: the kept bottom derives from
+  the measured footer plus that row in both the compact and tall layouts, and arming the
+  confirmation neither reflows nor overlaps the kept screen. The kept test forces a two-line
+  confirmation at 320, 390 and 767 px widths with a filled box. Tall desktop kept screens
   keep the Mac 72 px offset, the 24 px footer allowance and the token title size. The compact
   threshold is a 480 px paper; 667x375, 390x844 and 1440x620 cover the boundary. The Mac 44 px ink
   offsets are unchanged.

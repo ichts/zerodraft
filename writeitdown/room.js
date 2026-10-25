@@ -14,6 +14,7 @@ const SESSION_MS = 60000;
 const CONFIRM_MS = 2000;
 const EXIT_HINT = 'Press Esc again to leave and delete the draft.';
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
+$('exit-hint').dataset.hint = EXIT_HINT;
 let state = fresh();
 let compositionBase = null;
 let copyGeneration = 0;

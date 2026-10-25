@@ -4,8 +4,9 @@
 // On a tall sheet those Mac offsets are used exactly; when the group cannot fit above
 // the footer it moves above the writing line, and the failure block and receipt clamp
 // above the footer, so nothing is clipped or laid over the active line or the controls.
-// The footer top reserves the wrapped confirmation row and excludes the live hint
-// content, so arming the confirmation neither reflows nor overlaps a result screen.
+// The footer top reserves the measured height of the confirmation row (one or two
+// lines at the current width) via a hidden probe, so arming the confirmation neither
+// reflows nor overlaps a result screen.
 // Placement is cached on the three strings and re-anchored only when the caller marks
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
@@ -63,11 +64,27 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       if (footer) {
         const footerRect = footer.getBoundingClientRect();
         const hint = footer.querySelector('.exit-hint');
-        if (hint && getComputedStyle(hint).flexBasis === '100%') confirmRow = parseFloat(getComputedStyle(hint).lineHeight);
         const stableChildren = [...footer.children].filter(child => !child.classList.contains('exit-hint'));
         const stableHeight = stableChildren.length
           ? Math.max(...stableChildren.map(child => child.getBoundingClientRect().height)) : 44;
-        footerTop = footerRect.bottom - stableHeight - paperTop - confirmRow;
+        const stableTop = footerRect.bottom - stableHeight;
+        if (hint) {
+          const text = hint.dataset.hint || hint.textContent;
+          if (text) {
+            const probe = hint.cloneNode(false);
+            probe.removeAttribute('id');
+            probe.removeAttribute('role');
+            probe.removeAttribute('aria-live');
+            probe.setAttribute('aria-hidden', 'true');
+            probe.textContent = text;
+            probe.style.visibility = 'hidden';
+            footer.append(probe);
+            const probeRect = probe.getBoundingClientRect();
+            if (probeRect.height > 0 && probeRect.bottom <= stableTop + 1) confirmRow = probeRect.height;
+            probe.remove();
+          }
+        }
+        footerTop = stableTop - paperTop - confirmRow;
       }
       const gap = 8;
       const captionInk = ink(caption.textContent, captionFont.css, captionFont.lineHeight);

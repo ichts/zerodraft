@@ -59,20 +59,13 @@ struct UpdatePolicyTests {
 
 @MainActor
 struct UpdateRoomSurfaceTests {
-    @Test func theWholeSessionRoomBlocksUpdateUI() {
+    @Test func theSessionSurfaceIsTheRoomGate() {
         let state = licensedTestState()
         #expect(!state.isShowingWritingRoom)
         state.selectedSurface = .session
         #expect(state.isShowingWritingRoom)
-        // Writing, warning, failure and kept all stay inside the same room surface.
-        state.sessionEngine.phase = .writing
-        #expect(state.isShowingWritingRoom)
-        state.sessionEngine.phase = .danger
-        #expect(state.isShowingWritingRoom)
-        state.sessionEngine.phase = .failure
-        #expect(state.isShowingWritingRoom)
-        state.sessionEngine.phase = .success
-        #expect(state.isShowingWritingRoom)
+        state.selectedSurface = .home
+        #expect(!state.isShowingWritingRoom)
     }
 
     @Test func settingsAndHomeLeaveTheRoom() {

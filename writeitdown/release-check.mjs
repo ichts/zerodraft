@@ -3,8 +3,9 @@
 //   node release-check.mjs             static check of every launch input (download page
 //                                      and sale page): exits 1 and lists each missing or
 //                                      placeholder input.
-//   node release-check.mjs --download  only the free-trial download page: the DMG link and
-//                                      its published SHA-256.
+//   node release-check.mjs --download  only the free-trial download page: the DMG link,
+//                                      the Install card's DMG filename and its published
+//                                      SHA-256.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -78,6 +79,15 @@ export function downloadBlockers({ download }) {
   const sha = slot(download, 'sha256');
   if (!sha) found.push('SHA-256: not published in download/index.html');
   else if (!/^[0-9a-f]{64}$/.test(sha.text)) found.push('SHA-256: not 64 lowercase hex digits');
+  const install = download.match(/<div class="card" id="install">([\s\S]*?)<\/div>/)?.[1] ?? '';
+  const installFile = install.match(/shasum -a 256\s+([^\s<]+)/)?.[1];
+  let linkedFile = '';
+  if (dmg) {
+    try { linkedFile = decodeURIComponent(new URL(attr(dmg.tag, 'href')).pathname.split('/').pop()); } catch {}
+  }
+  if (!installFile) found.push('Install command: the card does not name the DMG file to hash');
+  else if (linkedFile && installFile !== linkedFile)
+    found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
   return found;
 }
 
@@ -140,5 +150,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? 'LIVE CHECK PASSED: inputs present and reachable.'
     : 'STATIC CHECK PASSED: inputs present. Not verified live; run with --live.');
   if (sale) console.log('Still required before LIVE sales: a real test order through checkout, returned license key, installed DMG activation and refund verification. No live payment was attempted.');
-  else console.log('Download page ready: the DMG link and its published SHA-256 are in place.');
+  else console.log('Download page ready: the DMG link, the Install command and its published SHA-256 agree.');
 }

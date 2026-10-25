@@ -51,10 +51,11 @@ key procedure is `docs/RELEASE_KEY.md`; hosting and routing are owned by
 - [ ] `curl -sSI https://writeitdown.app/download/appcast.xml` returns 200 `application/xml`, and a missing file under `/download/updates/` returns 404, never 200 HTML from the site's catch-all.
 - [ ] `lipo -info` on `Contents/MacOS/WriteItDown` and on `Sparkle.framework/Versions/B/Sparkle` shows `x86_64 arm64`.
 - [ ] The download page's DMG name and published SHA-256 are updated in the same deploy as the DMG upload, and `npm run release-check -- --download` passes (`--live` after the install).
-- [ ] Real-window evidence for the first Sparkle release (update UI absent whenever the Session room is shown, deferred alert returned after leaving the room, consent-free default with the toggle off) is recorded in `MANUAL_QA.md`. Until then the room guard is proven by unit tests only.
+- [ ] Real-window evidence for the first Sparkle release is recorded in `MANUAL_QA.md`: an update window already on screen ends when the Session room opens, the deferred update returns after the room closes, no window appears in any room state, the default is consent-free with the toggle off, and the alert's buttons behave. Unit tests prove the update policy, the Session-surface mapping, and the driver's refusal of a new check, download and not-found presentation; they do not prove the found-update/ready-to-install alerts, the already-shown-window dismissal, or the deferred return.
 
 ## Release packaging
 - [ ] Name release artifact consistently
+- [ ] The packaged app carries `Contents/Resources/Sparkle-LICENSE.txt` with Sparkle's MIT notice; the same file is inside the DMG and update ZIP.
 - [ ] Include short installation instructions: open the DMG, drag Write It Down to Applications, then eject the disk image
 - [ ] Include known limitations if any remain
 - [ ] Publish checksum alongside DMG

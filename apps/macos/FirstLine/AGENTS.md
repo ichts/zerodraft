@@ -4,7 +4,7 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过；精确锁定 Sparkle 2.10.0 并为二进制目标加 `@executable_path/../Frameworks` rpath，`Package.resolved` 入库。
-scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath 与 `Updater.app`，支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/sign-nested.sh: package-app.sh 与 release-dmg.sh 共用的 inside-out 签名：先签每个普通 Mach-O（Sparkle 的 Autoupdate），再由深到浅签 bundle，最后签 app，并校验 `codesign --verify --deep --strict`；Developer ID 模式还要求每个可执行文件的 TeamIdentifier 与 app 一致（公证前的失败门槛）。
 packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、非整数或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>.zip` 更新载荷并记录 `last-build.txt`（staging 不产 ZIP）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。
@@ -76,7 +76,7 @@ Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功�
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入许可 gate 交互。
 Tests/FirstLineTests/LicenseEntitlementTests.swift: 试用耗尽激活页、网页链接、菜单绕过、旧解锁标记无效、合法激活及重启回归。
 Tests/FirstLineTests/TrialReleaseTests.swift: 三次试用、首输入及 IME 扣次、失败重启、末次成稿、读写失败关闭访问、激活和退款不恢复次数。
-Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、Session surface 闸门、推迟/请回状态机、标准 driver 在房间内的取消/acknowledge 行为、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
+Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、Session surface 闸门、推迟待办策略、标准 driver 在房间内的取消/acknowledge 行为、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
 Tests/FirstLineTests/WaffoLicenseClientTests.swift: URLProtocol HTTP 合约、真实 Ed25519 签名失败、token 续期、持久化旧缓存、首次未激活拦截、退款和精确七天边界；不触外网。
 Tests/FirstLineTests/MockLicenseClient.swift: 仅测试目标的状态机替身，不随应用发布，不证明真实签名或购买。
 Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mock 许可 fixture；许可测试直接构造 AppState，不使用此快捷设置。

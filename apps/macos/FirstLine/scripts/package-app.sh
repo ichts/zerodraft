@@ -2,7 +2,8 @@
 # [INPUT] Mode argument: --adhoc (default, ad-hoc signed) or --unsigned; optional
 #         WID_APP_OUTPUT override for the .app destination.
 # [OUTPUT] A universal (arm64 + x86_64) dist/Write It Down.app bundle carrying
-#          Contents/Frameworks/Sparkle.framework; exit 0 only when the bundle builds,
+#          Contents/Frameworks/Sparkle.framework and Sparkle's MIT notice at
+#          Contents/Resources/Sparkle-LICENSE.txt; exit 0 only when the bundle builds,
 #          assembles, and (in --adhoc mode) verifies.
 # [POS] apps/macos/FirstLine/scripts/package-app.sh — the single packager every
 #       release and QA path calls; release-dmg.sh drives it with --unsigned.
@@ -60,6 +61,20 @@ case "$(lipo -info "$app/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkl
   *) echo 'The embedded Sparkle binary is not universal (x86_64 + arm64); check the SwiftPM artifact.' >&2
      exit 1 ;;
 esac
+
+# Sparkle's framework resources do not carry its MIT notice.
+sparkle_license=''
+for candidate in .build/artifacts/sparkle/Sparkle/LICENSE .build/checkouts/Sparkle/LICENSE; do
+  if [[ -f "$candidate" ]]; then
+    sparkle_license="$candidate"
+    break
+  fi
+done
+if [[ -z "$sparkle_license" ]]; then
+  echo 'Sparkle LICENSE was not found under .build; run swift package resolve so the bundled notice ships with the app.' >&2
+  exit 1
+fi
+cp "$sparkle_license" "$app/Contents/Resources/Sparkle-LICENSE.txt"
 
 cp Sources/FirstLine/Info.plist "$app/Contents/Info.plist"
 plist="$app/Contents/Info.plist"

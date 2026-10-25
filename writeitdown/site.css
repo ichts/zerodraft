@@ -5,7 +5,7 @@
 html,body{margin:0;padding:0}
 html.in-trial,html.in-trial body{height:100%;overflow:hidden}
 body{background:var(--wall);color:var(--ink)}
-/* Canvas-only adoption requires tokens.css; see its header for the scope contract. */
+/* Every shipped page takes the shared tokens and shell; .page-a maps the page canvas. */
 .page-a{--wall:var(--page)}
 ::selection{background:color-mix(in oklab,var(--ink) 18%,transparent)}
 a{color:var(--mute);text-decoration:none}

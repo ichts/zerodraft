@@ -29,7 +29,7 @@ The legal pages disclose Google Fonts requests, possible hosting access logs, pa
 
 ### Discovery files and answer pages
 
-`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, a pointer to current Mac purchase details, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the host page handler (`try_files {path} {path}/index.html /index.html`) returns the homepage HTML with HTTP 200 for any missing path, which is why `/llms.txt` used to answer with the landing page. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
+`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, a pointer to current Mac purchase details, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the host page handler (`try_files {path} {path}/index.html`) has no `/index.html` fallback, so a missing path is a 404, not the landing page with a 200. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
 
 ```sh
 curl -sI https://writeitdown.app/llms.txt | grep -i '^content-type:'

@@ -247,9 +247,9 @@ async function run(size, browser) {
       ok(await h1.count() === 1, `${await h1.count()} h1 elements on the download page`);
       ok((await h1.innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may serve the landing as fallback)');
     });
-    await step('trial terms: 3 sessions, USD 4.99 one-time, 2 Macs, 14-day refund', async () => {
-      const t = (await page.locator('#trial-terms').innerText()).toUpperCase();
-      ok(/3 SESSIONS/.test(t) && /USD 4\.99 ONE-TIME/.test(t) && /2 MACS/.test(t) && /14-DAY REFUND/.test(t), `terms read "${t}"`);
+    await step('trial terms: 3 sessions, $4.99 once, 2 Macs, 14-day refund', async () => {
+      const t = (await page.locator('#requirements').innerText()).toUpperCase();
+      ok(/3 FREE SESSIONS/.test(t) && /\$4\.99 ONCE/.test(t) && /2 MACS/.test(t) && /14-DAY REFUND/.test(t), `terms read "${t}"`);
     });
     await step('no waived sign-in feature offered on download page', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
     await step('DMG link is the canonical URL', async () => {
@@ -371,7 +371,7 @@ async function run(size, browser) {
     });
     await step('Buy follows harness checkout and Back permits another checkout', async () => {
       await page.goto(url('/mac.html#buy'));
-      const buy = page.getByRole('button', { name: 'BUY - $4.99', exact: true });
+      const buy = page.getByRole('button', { name: 'Buy for $4.99 once', exact: true });
       await buy.click();
       await page.waitForURL(hosted);
       ok(posts === 1, 'expected one checkout POST');
@@ -387,17 +387,18 @@ async function run(size, browser) {
       await page.goto(url('/mac.html?session_id=cs_test_paid_fixture'));
       await page.locator('#license-result').waitFor({ state: 'visible' });
       ok(await page.locator('#license-key').textContent() === licenseKey, 'fixture key missing');
-      ok(await page.getByRole('button', { name: 'COPY LICENSE KEY', exact: true }).isVisible(), 'copy control missing');
+      ok(await page.getByRole('button', { name: 'Copy license key', exact: true }).isVisible(), 'copy control missing');
       ok((await page.locator('#license-result').innerText()).includes("Paste this key into the app's activation field."), 'activation sentence missing');
       ok(!new URL(page.url()).searchParams.has('session_id'), 'credential retained after delivery');
     });
     await ctx.route(EXPECTED_404_URL, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
-    await step('unpaid fixture shows neutral notice, no key, and retains retry URL', async () => {
+    await step('unpaid fixture shows neutral notice, no key, and clears the credential', async () => {
       await page.goto(url(`/mac.html?session_id=${PENDING_SESSION}`));
-      await page.getByText('Your licence is not ready yet. Reload in a moment.', { exact: true }).waitFor();
+      await page.getByText('Your license is not ready yet.', { exact: true }).waitFor();
       ok(!await page.locator('#license-key').isVisible(), 'unpaid key visible');
       ok(!await page.locator('#copy-license').isVisible(), 'unpaid copy visible');
-      ok(new URL(page.url()).searchParams.get('session_id') === PENDING_SESSION, 'retry credential lost');
+      ok(!new URL(page.url()).searchParams.has('session_id'), 'credential retained after a failed delivery');
+      ok(await page.locator('#retry-license').isVisible(), 'the buyer has no retry control');
     });
   });
   await block('console', async () => { await step('no unexpected console errors across the journey', async () => ok(errors.length === 0, errors.slice(0, 3).join(' | '))); });

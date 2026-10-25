@@ -831,3 +831,28 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   cannot be used to decide a release.
 - Supersedes: D-048's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
   lenses, its assertion ownership and its declared-defect keying stand.
+
+## D-053: Every shipped page is one design system, and the phone room nav yields to the clock
+
+- Date: 2026-10-25
+- Decision: the landing's design system governs all twelve writeitdown.app pages. The nine
+  help/legal/answer pages and `mac.html` move onto the shared document shell: the A mark lockup on its
+  paper plate, the theme button, the same footer, 17 px system-face body copy at the 62ch measure,
+  Newsreader headings, token-only colours, and the v2 pill and underlined-link treatments. There is no
+  reading-mode exception. `mac.html#buy` becomes a section with the heading and the `$4.99 once` price
+  row in view, the buy form's pending and error states, and a licence card for the ready, copied and
+  unpaid states; the `session_id` credential is cleared from the address bar and history on success and
+  failure alike, with `Check again` as the in-page retry. One price string, `$4.99 once`, appears
+  wherever the Mac page names the price. On a phone the room nav keeps only the lockup and the theme
+  icon, and the Mac link moves into the exit row. The download page carries no 1.1 note until 1.1
+  ships; the note returns with that release.
+- Reason: the captain read the live site and found the colours wrong on `support.html` and the design
+  system wrong on the page buyers reach before paying. Two support pages and nine help pages were still
+  a retired beige/mono document style, and `mac.html` was a third system: a 48 px left-aligned serif
+  heading, 21 px serif body, square mono buttons and a transparent theme button, while `/download/` two
+  links away was 60 px centred, 17 px sans and pill-shaped. A buyer paid from the page that matched the
+  least. On a phone, the room nav's filled pill was louder than the clock above it, and D-045's
+  reachability reason survives without it because the Mac link stays in the exit row.
+- Supersedes: D-045's room-nav clause (the nav row is still kept on the landing room at every width,
+  but a phone shows only the lockup and the theme icon; the Mac link moves into the exit row). It also
+  supersedes the canvas-only adoption recorded for `mac.html` in the `tokens.css` header.

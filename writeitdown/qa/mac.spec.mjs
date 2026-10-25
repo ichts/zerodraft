@@ -9,23 +9,28 @@ const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
 const dmgFile = new URL(dmgURL).pathname.split('/').pop();
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
+// Every shipped page carries the same shell: the landing header lockup with its plate, the theme
+// button and the three-column footer. #trial is the room on the landing page.
+const shellPages = [...shipped, 'index.html#trial'];
 
 test('Mac page offers the free trial and real Buy without dead or fake CTAs', async ({ page }, info) => {
   await page.goto('mac.html');
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
-  await expect(page.locator('#price')).toHaveText(`${appPrice} ONCE. TWO MACS. NO SUBSCRIPTION.`);
+  await expect(page.locator('#price')).toHaveText(`${appPrice} once`);
   await expect(main).toContainText('Your first 3 writing sessions are free.');
-  await expect(main).toContainText('USD $4.99 payment to Trefoil Studio covers 2 Macs, free updates, and a 14-day refund.');
+  await expect(main).toContainText('one license covers 2 Macs for $4.99 once, with free updates and a 14-day refund.');
   await expect(main).not.toContainText(/buying opens soon|not open yet|coming soon/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
   await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('method', 'post');
   await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('action', 'https://licenses.writeitdown.app/api/v1/checkout');
-  await expect(page.getByRole('button', { name: 'BUY - $4.99', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Buy for $4.99 once', exact: true })).toBeEnabled();
   await expect(page.locator('[data-launch="license"]')).toContainText("paste it into the app's activation field");
   await expect(page.locator('#waitlist-form')).toHaveCount(0);
-  await expect(page.locator('.door', { hasText: 'DOWNLOAD FREE TRIAL FOR MAC' })).toHaveAttribute('href', 'download/');
-  await page.locator('.door', { hasText: 'TRY IT IN YOUR BROWSER' }).click();
+  await expect(page.getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
+  await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down for Mac');
+  await expect(page.locator('#price-row')).toContainText('2 Macs');
+  await page.locator('.doc-buy a[href="index.html#trial"]').click();
   await expect(page.locator('#editor')).toBeFocused();
   await page.goto('mac.html');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
@@ -62,8 +67,8 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
 test('help pages route to the Mac page', async ({ page }) => {
   for (const file of ['support.html', 'privacy.html', 'terms.html']) {
     await page.goto(file);
-    await page.locator('.foot-links a', { hasText: 'MAC APP' }).click();
-    await expect(page).toHaveURL(/\/mac\.html$/);
+    await page.locator('.home-foot a', { hasText: 'Buy for Mac' }).click();
+    await expect(page).toHaveURL(/\/mac\.html#buy$/);
   }
 });
 
@@ -93,6 +98,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
+  const withNote = attrs => download.replace('</section>', `<p id="release-notes" ${attrs}>1.1 is not released yet.</p></section>`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
@@ -111,7 +117,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ mac: mac.replace('data-launch="license"', 'data-launch-pending="license"') }, 'activation steps: not confirmed'],
     [{ mac: mac.replace(/<p data-launch="license">.*?<\/p>/, '<p data-launch="license">TBD</p>') }, 'activation steps: placeholder copy'],
     [{ checkout: '' }, 'WIDCheckoutURL differs'],
-    [{ mac: mac.replace(`${appPrice} ONCE.`, '$9 ONCE.') }, 'Price:'],
+    [{ mac: mac.replaceAll(`${appPrice} once`, '$9 once') }, 'Price:'],
     [{ support: support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD') }, 'Support address'],
     [{ download: download.replace('data-launch="dmg"', 'data-launch-pending="dmg"') }, 'DMG URL: not confirmed'],
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
@@ -120,11 +126,14 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
     [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
     [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
-    [{ download: download.replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 1.1 but the download is 1.0'],
-    [{ download: download.replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note is marked not yet released, but 1.1 is already the linked download'],
-    [{ download: download.replace(' data-release-note="1.1"', '') }, 'Release notes: the note does not declare its version'],
-    [{ download: download.replace('data-release-note="1.1"', 'data-release-note="2.0"').replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 2.0 but the download is 1.0'],
+    [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note announces 1.1 but the download is 1.0'],
+    [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: the note is marked not yet released, but 1.0 is already the linked download'],
+    [{ download: withNote('data-launch-pending="release-notes"') }, 'Release notes: the note does not declare its version in data-release-note'],
   ];
+  // A release note is optional: before 1.1 ships the download page says nothing about it. The
+  // documented note is a pending one, which the gate accepts, and the note must fail once its
+  // version is the linked download.
+  expect(releaseCheck({ ...inputs, download: withNote('data-release-note="1.1" data-launch-pending="release-notes"') })[0]).toBe(0);
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
     expect(code, message).toBe(1);
@@ -369,7 +378,7 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
 // wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
 // solid tile without the split.
 test('the header lockup shows the A mark chip beside the wordmark', async ({ page }, info) => {
-  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+  for (const path of shellPages) {
     await page.goto(path);
     const brands = page.locator('.brand:visible');
     expect(await brands.count(), `${path}: visible lockup`).toBeGreaterThan(0);
@@ -404,7 +413,7 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
 // ::before background, so a page-level override or a reintroduced fallback chain fails here.
 test('the header chip paints one plate colour on every page', async ({ page }) => {
   const samples = [];
-  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+  for (const path of shellPages) {
     await page.goto(path);
     const brand = page.locator('.brand:visible').first();
     expect(await brand.count(), `${path}: visible lockup`).toBeGreaterThan(0);
@@ -446,7 +455,7 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const lockups = [];
-    for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+    for (const path of shellPages) {
       await page.goto(path);
       // Linux system fonts make the download action wider than macOS does. Exercise that layout on either OS.
       if (actionWidth) await page.addStyleTag({ content: `nav .btn-quiet { min-width: ${actionWidth}px }` });
@@ -507,7 +516,7 @@ test('the header holds its gutter at every width from 320 to 1440 px', async ({ 
 });
 
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
-  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+  for (const path of shellPages) {
     await page.goto(path);
     const brands = page.locator('.brand:visible');
     const count = await brands.count();
@@ -541,38 +550,54 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
   }
 });
 
-// The Mac page keeps the document shell but sits on the approved background A (tokens.css page colour), so the
-// purchase page and the landing share one canvas and the legacy beige wall cannot come back.
-test('the Mac page wears the approved background A canvas, not the legacy beige wall', async ({ page }) => {
-  const read = () => page.evaluate(() => {
-    const probe = (name) => {
-      const raw = getComputedStyle(document.body).getPropertyValue(name).trim();
+// The purchase page is the last thing a buyer sees before paying, so it wears the same document
+// shell as every other shipped page: the landing header, the shared footer, the .home canvas and
+// the v2 pill, with no second button system left on the page.
+test('the Mac page is the shared document shell, not a second design system', async ({ page }) => {
+  await page.goto('mac.html');
+  const shell = await page.evaluate(() => {
+    const probe = () => {
       const i = document.createElement('i');
-      i.style.color = raw;
+      i.style.color = 'var(--page)';
       document.body.append(i);
       const color = getComputedStyle(i).color;
       i.remove();
-      return { raw, color };
+      return color;
     };
+    const primary = document.querySelector('.doc-buy .btn-primary');
     return {
-      theme: document.documentElement.dataset.theme,
-      stage: getComputedStyle(document.querySelector('.stage')).backgroundColor,
+      bodyHome: document.body.classList.contains('home'),
+      doc: !!document.querySelector('main.doc'),
+      legacy: document.querySelectorAll('.stage, .legal, .door, .deck, .logotype, .foot').length,
       canvas: getComputedStyle(document.body).backgroundColor,
-      door: getComputedStyle(document.querySelector('.door')).color,
-      page: probe('--page'),
-      wall: probe('--wall'),
+      page: probe(),
+      footer: !!document.querySelector('.home-foot .foot-grid'),
+      radius: getComputedStyle(primary).borderRadius,
+      height: getComputedStyle(primary).height,
+      label: getComputedStyle(primary).color,
+      onInk: getComputedStyle(document.querySelector('.doc-buy')).getPropertyValue('--on-ink').trim(),
+      onInkColor: (() => {
+        const i = document.createElement('i');
+        i.style.color = 'var(--on-ink)';
+        document.body.append(i);
+        const color = getComputedStyle(i).color;
+        i.remove();
+        return color;
+      })(),
     };
   });
-  await page.goto('mac.html');
-  const mac = await read();
-  expect(mac.page.raw, 'tokens.css page colour is in force on the Mac page').not.toBe('');
-  expect(mac.stage, 'the Mac page canvas is background A').toBe(mac.page.color);
-  expect(mac.canvas, 'the document canvas matches, so overscroll never shows beige').toBe(mac.page.color);
-  expect(mac.wall.color, 'the legacy wall name resolves to the page colour on this page').toBe(mac.page.color);
-  expect(mac.door, 'the primary button label is the page colour, not beige').toBe(mac.page.color);
+  expect(shell.bodyHome, 'the page resolves the shared tokens').toBe(true);
+  expect(shell.doc, 'the page uses the shared document shell').toBe(true);
+  expect(shell.legacy, 'no legacy shell class survives on the purchase page').toBe(0);
+  expect(shell.canvas, 'the page canvas is background A').toBe(shell.page);
+  expect(shell.footer, 'the shared footer is present').toBe(true);
+  expect(shell.radius, 'the primary control is the v2 pill').toBe('999px');
+  expect(shell.height, 'the primary control is the v2 48 px pill').toBe('48px');
+  expect(shell.label, 'the pill label wears the on-ink token').toBe(shell.onInkColor);
+  expect(shell.onInk, 'the on-ink token resolves').not.toBe('');
   await page.goto('index.html');
   const landing = await page.evaluate(() => getComputedStyle(document.querySelector('#landing')).backgroundColor);
-  expect(mac.stage, `${mac.theme}: the purchase page and the landing share one canvas`).toBe(landing);
+  expect(shell.canvas, 'the purchase page and the landing share one canvas').toBe(landing);
 });
 
 test('landing sections: heading tree, Mac facts, FAQ matches its schema, the door enters the room', async ({ page }) => {
@@ -615,7 +640,9 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
 test('download page states the trial, the DMG, its checksum slot, requirements, and the signer', async ({ page }, info) => {
   await page.goto('download/');
   const main = page.locator('main');
-  await expect(page.locator('#trial-terms')).toHaveText('FREE TRIAL: 3 SESSIONS, THEN USD 4.99 ONE-TIME (2 MACS, 14-DAY REFUND).');
+  await expect(page.locator('#requirements')).toContainText('3 free sessions');
+  await expect(page.locator('#requirements')).toContainText('$4.99 once');
+  await expect(page.locator('#requirements')).toContainText('2 Macs, 14-day refund');
   const dmg = page.locator('[data-launch="dmg"]');
   await expect(dmg).toHaveText('Download free trial for Mac');
   await expect(dmg).toHaveAttribute('href', dmgURL);

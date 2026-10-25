@@ -91,10 +91,17 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       if (footer) {
         const footerRect = footer.getBoundingClientRect();
         const hint = footer.querySelector('.exit-hint');
-        const stableChildren = [...footer.children].filter(child => !child.classList.contains('exit-hint'));
-        const stableHeight = stableChildren.length
-          ? Math.max(...stableChildren.map(child => child.getBoundingClientRect().height)) : 44;
-        const stableTop = footerRect.bottom - stableHeight;
+        const stableChildren = [...footer.children]
+          .filter(child => !child.classList.contains('exit-hint'))
+          .map(child => child.getBoundingClientRect())
+          .filter(rect => rect.height > 0);
+        // The stable controls can wrap onto more than one row on a narrow sheet, so the block is
+        // measured as a whole: the topmost control to the footer's bottom edge. Reserving only the
+        // tallest single control let a wrapped row eat a line of the kept draft.
+        const stableTop = stableChildren.length
+          ? Math.min(...stableChildren.map(rect => rect.top))
+          : footerRect.bottom - 44;
+        const stableHeight = footerRect.bottom - stableTop;
         if (hint) {
           const text = hint.dataset.hint || hint.textContent;
           if (text) {

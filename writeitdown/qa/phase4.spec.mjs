@@ -752,6 +752,21 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await seek(CUT_END + 300);
   await expect(page.locator('#demo-stopped')).toBeVisible();
   await expect(page.locator('#demo-stopped .stopped')).toHaveText('You stopped.');
+  const reportLook = await page.evaluate(() => {
+    const probe = name => {
+      const i = document.createElement('i');
+      i.style.color = getComputedStyle(document.querySelector('#demo')).getPropertyValue(name);
+      document.querySelector('#demo').append(i);
+      const color = getComputedStyle(i).color; i.remove(); return color;
+    };
+    return {
+      title: getComputedStyle(document.querySelector('#demo-stopped .stopped')).color,
+      ink: probe('--ink'),
+      tracking: getComputedStyle(document.querySelector('#clock')).letterSpacing,
+    };
+  });
+  expect(reportLook.title).toBe(reportLook.ink);
+  expect(reportLook.tracking).toBe('normal');
   await expect(page.locator('#report')).toContainText(`DRAFT DELETED AT 0:${60 - Math.round(CUT_END / 1000)}. TYPE TO START AGAIN`);
   await expect(page.locator('#count')).toHaveText('0 words');
   const receipt = await page.evaluate(() => {

@@ -202,6 +202,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .stagewrap{position:relative}
 .home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-paper:var(--red-soft);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:var(--lh-write)}
 .home .paper > .wash{border-radius:inherit}
+/* demo.js marks the report phase with the .report class on the sheet too; keep the sheet's own type. */
+.home .paper.report{font:inherit;letter-spacing:normal;color:inherit}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:flex-end;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);color:var(--ink)}
 .home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--chrome)}
@@ -212,7 +214,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .anchor-wrap{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);display:flex;justify-content:center}
 .home .script{margin:0;width:100%;max-width:62ch;font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
 .home .caret{display:inline-block;width:1.5px;height:1em;margin-left:1px;vertical-align:-.12em;background:var(--ink);animation:wid-caret 1.06s steps(1,end) infinite}
-.home .paper.cut .caret{background:transparent}
 /* The active line is centred at --write-anchor (35%) of the sheet, the same ratio as the trial room. */
 .home .anchor-wrap{top:calc(var(--write-anchor) - var(--lh) / 2)}
 .home .prev-band{bottom:calc(100% - var(--write-anchor) - var(--lh) / 2);height:calc(3 * var(--lh))}

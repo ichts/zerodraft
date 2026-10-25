@@ -259,10 +259,10 @@ the notch.
   16/32 PNG are the `prefers-color-scheme: dark` links; `apple-touch-icon.png` is 180 on the bone plate. The
   favicon is the full-bleed square, not the app icon's transparent-margin squircle.
 - Site header: 21 px above 820 px, 19 px from 391 to 820 px, 16 px at 390 px and below; the chip is 1.5 cap
-  heights (1.046 em: 22 px at 21 px type, 19.9 px at 19 px, 16.7 px at 16 px), the gap to the wordmark is
-  0.437 em, and the lockup box is 7.467 x 1.046 em. The lockup's clear space is at least a quarter of the cap
-  height on all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the
-  lockup.
+  heights (1.046 em: 22 px at 21 px type, 19.9 px at 19 px, 16.7 px at 16 px), the clear space from the chip's
+  edge to the wordmark's first stroke is 0.36 em, and the lockup box is 7.467 x 1.046 em. The lockup's clear
+  space is at least a quarter of the cap height on all sides (about 5 px at 21 px). The header link may extend
+  its hit area without enlarging the lockup.
 - Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and the theme
   button keeps at least 6 px of right gutter, with the 36 px theme button unscaled and the page action present
   at 380 px and above and hidden below 380 px. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at
@@ -347,8 +347,8 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
 - The chip is the app icon's drawing: the 824/1024 macOS squircle plate around the master split W, at a
   0.798 W width share (the app icon's 0.752 share widened by the chip notch below) and 0.526 of the plate
   height, with the plate optically centred on the wordmark's cap band.
-- The chip is the small-size variant of the mark: its notch is 180 word-units (11% of the W) instead of the
-  master's 90, the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
+- The chip is the small-size variant of the mark: its notch is 142 word-units wide (11% of the W) instead of
+  the master's 90 (6.5%), the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
 - The aligned alpha-only masks are `writeitdown/logo/write-it-down-lockup-plate.svg` for the plate and
   `writeitdown/logo/write-it-down-lockup.svg` for the W and wordmark. The plate paints the `--brand-plate`
   token; the W and wordmark paint `currentColor` from `--ink`. `--brand-plate` has one value per theme and is

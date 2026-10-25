@@ -23,13 +23,13 @@
     <!-- Updates (Sparkle 2.10.0). The feed and its archives live under https://writeitdown.app/download/. -->
     <key>SUFeedURL</key>
     <string>https://writeitdown.app/download/appcast.xml</string>
-    <!-- PLACEHOLDER: the captain replaces this with the key printed by generate_keys for the
-         writeitdown account on the release Mac (see docs/RELEASE_KEY.md). It is a well-formed
-         32-byte key so the app starts cleanly, and no one holds its private key, so no update can
-         ever verify against it. scripts/release-dmg.sh refuses to build a release while this value
-         is unchanged. -->
+    <!-- The captain's EdDSA update signing key, created with Sparkle's generate_keys on the Mac mini
+         release machine (see docs/RELEASE_KEY.md). This is the public half only: the private key
+         stays in that machine's login Keychain and backup, never in this repository. The pre-key
+         placeholder (a 32-byte all-zero key) is refused by scripts/release-dmg.sh, so it cannot
+         come back by accident. -->
     <key>SUPublicEDKey</key>
-    <string>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</string>
+    <string>JpTnddys5uriQSSGWPOy6MN4vc3scZ28fl5OI+1DGLs=</string>
     <!-- Off by default: no check runs until the writer turns it on in Settings or asks from the menu. -->
     <key>SUEnableAutomaticChecks</key>
     <false/>

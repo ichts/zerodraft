@@ -5,10 +5,11 @@ signature, and the app verifies it against `SUPublicEDKey` in `Sources/FirstLine
 The private half of that key never exists in this repository, on the web host, or in CI: it lives
 in the login Keychain of the Mac mini release machine. This file is the exact, complete procedure.
 
-The repository ships a deliberate placeholder (`AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`):
-a well-formed 32-byte key whose private key nobody holds, so the app starts cleanly and no update
-can ever verify against it. `scripts/release-dmg.sh` refuses to build a release while that value is
-unchanged, so the placeholder cannot reach a shipped DMG.
+`Info.plist` now carries the captain's real public key. Until it existed, the build shipped a
+deliberate placeholder (`AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`, a well-formed 32-byte key
+whose private half nobody holds), so the app started cleanly and no update could verify. Both
+`scripts/release-dmg.sh` and `scripts/test-release-config.py` still refuse that exact placeholder, so
+a reverted or forgotten key cannot reach a shipped DMG and cannot pass QA silently.
 
 ## 1. Get Sparkle's tools on the Mac mini
 
@@ -33,15 +34,16 @@ once, only on the Mac mini. Never run it on another machine and never let it ove
 
 ## 3. Put the public key in the build
 
-Replace the placeholder in `apps/macos/FirstLine/Sources/FirstLine/Info.plist` with the printed
-value:
+Put the printed value in `apps/macos/FirstLine/Sources/FirstLine/Info.plist` (this was done on
+2026-10-25 for the 1.1 key):
 
 ```xml
 <key>SUPublicEDKey</key>
 <string>THE_PRINTED_BASE64_KEY</string>
 ```
 
-Commit it. The public key is public; it is what installed copies pin their trust to.
+Commit it. The public key is public; it is what installed copies pin their trust to. Change it only
+as part of a deliberate key rotation (step 6), never to "fix" a failing signature check.
 
 ## 4. Back up the private key, then remove the export
 
@@ -61,9 +63,9 @@ a report, or a server.
 cd apps/macos/FirstLine && python3 scripts/test-release-config.py
 ```
 
-`test-release-config.py` asserts that the tracked `Info.plist` still carries the placeholder (so no
-one commits a key by accident) and that a release refuses it; once your real key is in place, run
-`scripts/release-dmg.sh` and confirm it no longer stops with `SUPublicEDKey is still the build
+`test-release-config.py` asserts that the tracked `SUPublicEDKey` is a raw 32-byte key and that a
+release still refuses the placeholder value; it needs no edit when the key changes. Then run
+`scripts/release-dmg.sh` and confirm it does not stop with `SUPublicEDKey is still the build
 placeholder`.
 
 ## 6. Rules that protect the key

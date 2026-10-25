@@ -743,7 +743,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-040 for the reassurance line, the three points and the 390x844/1440x900 fold assertion
   on the door and its line; D-044's "one entrance under the sheet" wording, since the one entrance is
   now above the sheet. The wordmark, subheadline, cards, FAQ and Mac facts are unchanged.
-## D-047: The six-lens review is the last stage of an acceptance run, and a declared defect is never a pass
+## D-048: The six-lens review is the last stage of an acceptance run, and a declared defect is never a pass
 
 - Date: 2026-10-25
 - Decision: `scripts/vm-journey.sh` invokes `scripts/design-panel.sh` on its own evidence bundle as the
@@ -762,7 +762,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the separate-command panel procedure and the exit-0 `accepted-with-declared-defect` verdict;
   the declared-defect key and the strict launch assertion stand.
 
-## D-048: A standalone review re-run refreshes the acceptance record with provenance
+## D-049: A standalone review re-run refreshes the acceptance record with provenance
 
 - Date: 2026-10-25
 - Decision: `design-panel.sh` owns the derived lines of a bundle's `acceptance.txt` (the `analysis:` line,
@@ -777,9 +777,9 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
   re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
   reviewer reads contradicted the artifact it sat next to.
-- Supersedes: D-047's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
+- Supersedes: D-048's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
   its declared-defect keying stand.
-## D-049: A frozen screen fails the run, and no recorded step excuses it
+## D-050: A frozen screen fails the run, and no recorded step excuses it
 
 - Date: 2026-10-25
 - Decision: the analyser's `recording-stall` assertion fails any window in which the screen does not change at
@@ -792,10 +792,10 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   to distrust. A dead screen is either a hung app or a stalled recorder, and both must fail the run, so no
   evidence inside the bundle may downgrade them.
 - Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
-  implementation shortcut, never a recorded decision). D-047's assertion ownership, its six-lens gate and its
+  implementation shortcut, never a recorded decision). D-048's assertion ownership, its six-lens gate and its
   exit codes stand.
 
-## D-050: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
+## D-051: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
 
 - Date: 2026-10-25
 - Decision: the analyser's forbidden-surface rule is keyed to the launch stream, not to the text alone. The
@@ -809,11 +809,11 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: the fixture stream's contract requires the surface the forbidden list names, so a clean DMG run
   was rejected for showing exactly the screen the rig demands, while a non-numeric gate value silently
   skipped the 79 exit, and a renamed verdict line could sign off with no criterion at all.
-- Supersedes: D-047's "the same surface in another launch stream fails under its own id" only for a stream
-  whose own contract requires that surface, and D-048's read of the gate as a number. D-047's six named
+- Supersedes: D-048's "the same surface in another launch stream fails under its own id" only for a stream
+  whose own contract requires that surface, and D-049's read of the gate as a number. D-048's six named
   lenses, its exit codes and its declared-defect keying stand.
 
-## D-051: A panel that could not run is a declared capability gap, and the release record states the run that happened
+## D-052: A panel that could not run is a declared capability gap, and the release record states the run that happened
 
 - Date: 2026-10-25
 - Decision: on this host the six-lens panel is a declared capability gap, not a panel failure and never a pass: it
@@ -829,5 +829,5 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   review, while the bundle it described recorded a blocked panel and exit 79, and the QA record carried two
   different frame counts and frame gaps for one recording. A release record that disagrees with its own bundle
   cannot be used to decide a release.
-- Supersedes: D-047's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
+- Supersedes: D-048's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
   lenses, its assertion ownership and its declared-defect keying stand.

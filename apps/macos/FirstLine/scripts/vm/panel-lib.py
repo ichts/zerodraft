@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
 """Helpers for the design panel and for the acceptance verdict.
 
-[INPUT] `answer` reads the JSONL stream `pi --mode json` prints on stdin. `clip`
-        reads the assembled recording plus the frame manifest. `status` reads
-        <evidence>/panel/stage-*.json. `extract` reads a model answer on stdin and
-        returns the first JSON object in it. `report` reads
-        <evidence>/panel/panel.json plus the thumbnails the panel script wrote.
-[OUTPUT] The text of the last turn_end message, a JSON clip record (origin, seek and
-         the extracted frame names), the lens summary lines the host verdict reads,
-         the extracted JSON, or a self-contained static HTML report whose images are
-         inlined so the bundle can be read on its own.
+[INPUT] `turn` and `verdict` read the JSONL stream `pi --mode json` prints on stdin;
+        `verdict` also takes the stage it has to answer (`lens`, `clip` or `vision`).
+        `clip` reads the assembled recording plus the frame manifest. `status` reads
+        <evidence>/panel/stage-*.json and the lens names its caller requires.
+        `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
+        script wrote.
+[OUTPUT] The terminal state of a model turn, one JSON verdict per model turn (either
+         `{"status": "complete", "answer": <validated answer>}` or `{"status":
+         "unavailable", "error": "<reason>"}`); a JSON clip record (origin, seek and
+         the extracted frame names); the lens summary lines the host verdict reads; or
+         a self-contained static HTML report whose images are inlined so the bundle can
+         be read on its own.
 [POS] apps/macos/FirstLine/scripts/vm/panel-lib.py - the small, boring part of
-      design-panel.sh and vm-journey.sh: model-answer parsing, clip cutting, lens
-      summary and report rendering.
+      design-panel.sh and vm-journey.sh: model-answer parsing and validation, clip
+      cutting, lens summary and report rendering.
 [PROTOCOL] The recording's own time origin is the first timestamp in frames.tsv,
-           because that frame is time zero of the assembled video. Answer parsing
-           compares the content item's own `type` field. Report rendering never
-           invents content: a stage that did not run is rendered as a declared gap
-           with its recorded reason, and a lens with no answer is rendered as
-           unavailable rather than omitted.
+           because that frame is time zero of the assembled video. A model turn
+           counts only when its last turn_end ended with stopReason stop and its text
+           carries a JSON object shaped for that stage; anything else is recorded as
+           unavailable with the exact reason. Report rendering never invents content:
+           a stage that did not run is rendered as a declared gap with its recorded
+           reason, and a lens with no answer is rendered as unavailable rather than
+           omitted.
 """
 
 import argparse
@@ -39,12 +44,40 @@ CLIP_LEAD_MS = 1000
 CLIP_FPS = 10
 CLIP_MIN_FRAMES = 6
 CLIP_MAX_FRAMES = 60
+LENS_VERDICTS = {"sound", "needs work", "blocked"}
+CLIP_VERDICTS = {"defect", "expected"}
+CLIP_SEVERITIES = {"blocker", "major", "minor", "nit"}
 
 
-def answer():
-    """The text of the last turn_end message in a `pi --mode json` stream."""
+def first_json_object(text):
+    """The first complete JSON object in a model answer, or None."""
+    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
+    candidate = fenced.group(1) if fenced else text
+    start = candidate.find("{")
+    while start != -1:
+        depth = 0
+        for index in range(start, len(candidate)):
+            char = candidate[index]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        return json.loads(candidate[start:index + 1])
+                    except json.JSONDecodeError:
+                        break
+        start = candidate.find("{", start + 1)
+    return None
+
+
+def model_turn(stream):
+    """The last turn_end of a `pi --mode json` stream: seen, stopReason, text, error."""
+    seen = False
+    stop_reason = ""
+    error_message = ""
     text = ""
-    for line in sys.stdin:
+    for line in stream:
         line = line.strip()
         if not line.startswith("{"):
             continue
@@ -52,12 +85,110 @@ def answer():
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if not isinstance(record, dict) or record.get("type") != "turn_end":
+        if not isinstance(record, dict):
             continue
-        for item in (record.get("message") or {}).get("content") or []:
-            if isinstance(item, dict) and item.get("type") == "text" and item.get("text"):
-                text = item["text"]
-    sys.stdout.write(text)
+        if record.get("type") == "message_end":
+            error_message = (record.get("message") or {}).get("errorMessage") or error_message
+            continue
+        if record.get("type") != "turn_end":
+            continue
+        seen = True
+        message = record.get("message") or {}
+        stop_reason = message.get("stopReason") or ""
+        chunks = [item["text"] for item in message.get("content") or []
+                  if isinstance(item, dict) and item.get("type") == "text" and item.get("text")]
+        if chunks:
+            text = chunks[-1]
+    return seen, stop_reason, text, error_message
+
+
+def normalised_text(value):
+    return value.strip() if isinstance(value, str) else ""
+
+
+def lens_answer(value):
+    name = normalised_text(value.get("lens"))
+    if not name:
+        return None, "the answer names no lens"
+    verdict = normalised_text(value.get("verdict")).lower()
+    if verdict not in LENS_VERDICTS:
+        return None, f"the answer has no lens verdict (got {value.get('verdict')!r})"
+    if not isinstance(value.get("findings"), list):
+        return None, "the answer has no findings list"
+    return {"lens": name, "verdict": verdict, "summary": normalised_text(value.get("summary")),
+            "findings": [item for item in value["findings"] if isinstance(item, dict)]}, ""
+
+
+def clip_answer(value):
+    verdict = normalised_text(value.get("verdict")).lower()
+    if verdict not in CLIP_VERDICTS:
+        return None, f"the answer has no clip verdict (got {value.get('verdict')!r})"
+    severity = normalised_text(value.get("severity")).lower()
+    if severity not in CLIP_SEVERITIES:
+        return None, f"the answer has no severity (got {value.get('severity')!r})"
+    reason = normalised_text(value.get("reason"))
+    if not reason:
+        return None, "the answer gives no reason"
+    return {"verdict": verdict, "severity": severity, "reason": reason,
+            "what_to_fix": normalised_text(value.get("what_to_fix"))}, ""
+
+
+def vision_answer(value):
+    valid = value.get("next_step_valid")
+    if not isinstance(valid, bool):
+        return None, "the answer does not say whether the next step is valid"
+    index = value.get("check_step_index")
+    if not isinstance(index, int) or isinstance(index, bool):
+        return None, "the answer has no numeric check_step_index"
+    reason = normalised_text(value.get("reason"))
+    if not reason:
+        return None, "the answer gives no reason"
+    return {"next_step_valid": valid, "check_step_index": index, "reason": reason}, ""
+
+
+ANSWERS = {"lens": lens_answer, "clip": clip_answer, "vision": vision_answer}
+
+
+def turn():
+    """The terminal state of a `pi --mode json` stream: `stop` when it answered, else why."""
+    seen, stop_reason, _text, error_message = model_turn(sys.stdin)
+    if error_message:
+        print(error_message)
+        return 1
+    if not seen:
+        print("the model stream has no turn_end record")
+        return 1
+    if stop_reason != "stop":
+        print(f"the model turn ended with stopReason {stop_reason or 'unknown'}")
+        return 1
+    print("stop")
+    return 0
+
+
+def verdict(argv):
+    """Validate one model turn against the stage it was asked to answer."""
+    stage = argv[0] if argv else ""
+    if stage not in ANSWERS:
+        print(f"panel-lib: unknown answer stage {stage!r}", file=sys.stderr)
+        return 2
+    seen, stop_reason, text, error_message = model_turn(sys.stdin)
+
+    def unavailable(reason):
+        print(json.dumps({"status": "unavailable", "error": error_message or reason},
+                         sort_keys=True))
+        return 0
+
+    if not seen:
+        return unavailable("the model stream has no turn_end record")
+    if stop_reason != "stop":
+        return unavailable(f"the model turn ended with stopReason {stop_reason or 'unknown'}")
+    answer_object = first_json_object(text)
+    if not isinstance(answer_object, dict):
+        return unavailable("the answer contains no JSON object")
+    normalised, problem = ANSWERS[stage](answer_object)
+    if problem:
+        return unavailable(problem)
+    print(json.dumps({"status": "complete", "answer": normalised}, sort_keys=True))
     return 0
 
 
@@ -102,7 +233,7 @@ def clip(argv):
     return 0
 
 
-def lens_status(evidence):
+def lens_status(evidence, required):
     """Shell-readable summary of the six-lens stage for the host verdict."""
     panel_dir = os.path.join(os.path.abspath(evidence), "panel")
     lenses = []
@@ -111,50 +242,32 @@ def lens_status(evidence):
         with open(lens_stage, encoding="utf-8") as handle:
             lenses = json.load(handle).get("lenses") or []
     complete = [lens for lens in lenses if lens.get("status") == "complete"]
+    complete_names = {lens.get("lens") for lens in complete}
+    missing = [name for name in required if name not in complete_names]
     print(f"lenses_total={len(lenses)}")
     print(f"lenses_complete={len(complete)}")
+    if required:
+        print("lenses_required_missing=%s" % " ".join(missing))
     for lens in lenses:
         answer_object = lens.get("answer") or {}
         print("lens=%s\t%s\t%s\t%d\t%s" % (
             lens.get("lens") or "?", lens.get("status") or "unavailable",
             answer_object.get("verdict") or "-", len(answer_object.get("findings") or []),
             " ".join((lens.get("error") or "").split())))
-    if len(complete) < len(lenses):
-        gaps = []
-        capability_stage = os.path.join(panel_dir, "stage-05-capabilities.json")
-        if os.path.exists(capability_stage):
-            with open(capability_stage, encoding="utf-8") as handle:
-                gaps = json.load(handle).get("declared_gaps") or []
-        reason = gaps[0] if gaps else next(
-            (lens.get("error") for lens in lenses if lens.get("status") != "complete" and lens.get("error")),
-            "")
-        print("reason=%s" % " ".join(str(reason).split()))
+    if len(complete) < len(lenses) or missing:
+        reason = next((lens.get("error") for lens in lenses
+                       if lens.get("status") != "complete" and lens.get("error")), "")
+        if not reason:
+            capability_stage = os.path.join(panel_dir, "stage-05-capabilities.json")
+            gaps = []
+            if os.path.exists(capability_stage):
+                with open(capability_stage, encoding="utf-8") as handle:
+                    gaps = json.load(handle).get("declared_gaps") or []
+            reason = gaps[0] if gaps else ""
+        if not reason and missing:
+            reason = "the panel recorded no result for %s" % " ".join(missing)
+        print("reason=%s" % " ".join(str(reason or "the panel recorded no lens result").split()))
     return 0
-
-
-def extract():
-    text = sys.stdin.read()
-    fenced = re.search(r"```(?:json)?\s*(.*?)```", text, re.S)
-    candidate = fenced.group(1) if fenced else text
-    start = candidate.find("{")
-    while start != -1:
-        depth = 0
-        for index in range(start, len(candidate)):
-            char = candidate[index]
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-                if depth == 0:
-                    chunk = candidate[start:index + 1]
-                    try:
-                        print(json.dumps(json.loads(chunk), sort_keys=True))
-                        return 0
-                    except json.JSONDecodeError:
-                        break
-        start = candidate.find("{", start + 1)
-    print("panel-lib: no JSON object in the model answer", file=sys.stderr)
-    return 1
 
 
 def image(panel_dir, name, max_height=320):
@@ -346,17 +459,25 @@ def report():
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: panel-lib.py extract|answer|clip|status|report", file=sys.stderr)
+        print("usage: panel-lib.py turn|verdict|clip|status|report", file=sys.stderr)
         return 2
     command = sys.argv[1]
-    if command == "extract":
-        return extract()
-    if command == "answer":
-        return answer()
+    if command == "turn":
+        return turn()
+    if command == "verdict":
+        return verdict(sys.argv[2:])
     if command == "clip":
         return clip(sys.argv[2:])
     if command == "status":
-        return lens_status(sys.argv[2])
+        arguments = sys.argv[2:]
+        if not arguments:
+            print("usage: panel-lib.py status <evidence-dir> [--require <lens> ...]", file=sys.stderr)
+            return 2
+        rest = arguments[1:]
+        if rest and rest[0] != "--require":
+            print(f"panel-lib: unknown status option {rest[0]!r}", file=sys.stderr)
+            return 2
+        return lens_status(arguments[0], rest[1:])
     if command == "report":
         return report()
     print(f"unknown command {command}", file=sys.stderr)

@@ -32,7 +32,8 @@
 #            fails when the declared defect no longer reproduces. The six-lens review
 #            is the last stage of the run; when no reviewer answered, the bundle
 #            records "panel not run" with the exact re-run command and the run exits
-#            79 instead of signing off.
+#            79 instead of signing off. Sign-off asserts the six lenses by name, not
+#            the panel's own count.
 set -uo pipefail
 
 artifact="${1:?usage: vm-journey.sh <dmg-or-app-path> [evidence-dir]}"
@@ -321,9 +322,11 @@ fi
 panel_command="bash $(printf '%q' "$scripts/design-panel.sh") $(printf '%q' "$evidence")"
 panel_status=0
 bash "$scripts/design-panel.sh" "$evidence" >>"$evidence/panel.log" 2>&1 || panel_status=$?
-panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" 2>/dev/null)"
+required_lenses='rams norman spiekermann kare matas vignelli'
+panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" --require $required_lenses 2>/dev/null)"
 panel_total="$(sed -n 's/^lenses_total=//p' <<<"$panel_summary")"
 panel_complete="$(sed -n 's/^lenses_complete=//p' <<<"$panel_summary")"
+panel_missing="$(sed -n 's/^lenses_required_missing=//p' <<<"$panel_summary")"
 panel_total="${panel_total:-0}"
 panel_complete="${panel_complete:-0}"
 panel_reason="$(sed -n 's/^reason=//p' <<<"$panel_summary")"
@@ -331,13 +334,14 @@ panel_state='complete'
 if [[ "$panel_status" -ne 0 ]]; then
   panel_state='not run'
   panel_reason="design-panel.sh exited $panel_status; see panel/panel.log"
-elif [[ "$panel_total" -eq 0 || "$panel_complete" -lt "$panel_total" ]]; then
+elif [[ "$panel_total" -ne 6 || -n "${panel_missing:-}" ]]; then
   panel_state='not run'
-  panel_reason="${panel_reason:-the panel recorded no lens result}"
+  panel_reason="${panel_reason:-the six-lens review is incomplete: $panel_total lens(es) recorded, $panel_complete complete, missing: ${panel_missing:-none}}"
 fi
 {
   printf 'panel: %s\n' "$panel_state"
   printf 'panel_lenses_complete: %s/%s\n' "$panel_complete" "$panel_total"
+  printf 'panel_lenses_required: %s\n' "$required_lenses"
   printf 'panel_command: %s\n' "$panel_command"
   while IFS=$'\t' read -r lens_name lens_state lens_verdict lens_findings _lens_error; do
     [[ -n "${lens_name:-}" ]] || continue
@@ -347,7 +351,7 @@ fi
 } >>"$evidence/acceptance.txt"
 if [[ "$panel_state" != 'complete' ]]; then
   {
-    printf '\n## Design panel not run - this bundle has no six-lens review\n\n'
+    printf '\n## Six-lens review incomplete - this bundle cannot sign off\n\n'
     printf -- '- Reason: %s\n' "$panel_reason"
     printf -- '- Lenses complete: %s of %s\n' "$panel_complete" "$panel_total"
     printf -- '- Re-run for this bundle: `%s`\n' "$panel_command"

@@ -21,7 +21,10 @@
 #            skipped silently, and never turns into a failure of the recording. A
 #            flagged clip is seeked from the recording's own time origin (the first
 #            timestamped frame), and every model answer is read through
-#            scripts/vm/panel-lib.py, never through a second parser.
+#            scripts/vm/panel-lib.py, which accepts only a turn that ended with
+#            stopReason stop and carries an answer shaped for that stage; anything
+#            else is recorded as unavailable with its exact reason. The report's
+#            recording metadata comes from recording.tsv, the numbers the host wrote.
 set -uo pipefail
 
 evidence="${1:?usage: design-panel.sh <evidence-dir>}"
@@ -45,8 +48,12 @@ note() { printf 'design-panel: %s\n' "$*"; }
 verdict="$(sed -n 's/^verdict: //p' "$evidence/acceptance.txt" 2>/dev/null)"
 artifact="$(sed -n 's/^artifact: //p' "$evidence/acceptance.txt" 2>/dev/null)"
 artifact_sha="$(sed -n 's/^artifact_sha256: //p' "$evidence/acceptance.txt" 2>/dev/null)"
-recording="$(sed -n 's/^recording: //p' "$evidence/journey.log" 2>/dev/null | tail -1)"
-[[ -n "$recording" ]] || recording="no recording line"
+recording='no recording.tsv in the bundle, so the recording stage did not complete'
+if [[ -f "$evidence/recording.tsv" ]]; then
+  IFS=$'\t' read -r recorded_duration recorded_frames recorded_bytes recorded_gap <"$evidence/recording.tsv"
+  recording="$(printf '%ss recorded, %s frames, %s bytes, largest gap %sms' \
+    "${recorded_duration:-?}" "${recorded_frames:-?}" "${recorded_bytes:-?}" "${recorded_gap:-?}")"
+fi
 python3 - "$panel/stage-00-run.json" "$(basename "$evidence")" "$artifact" "$artifact_sha" "$verdict" "$recording" <<'PY'
 import json, sys
 out, run, artifact, sha, verdict, recording = sys.argv[1:7]
@@ -77,16 +84,12 @@ review_model=''
 model_notes=()
 probe_log="$panel/model-probes.tsv"
 : >"$probe_log"
-# An answer is a turn_end record whose stopReason is stop, read from the runtime's own
-# JSONL. Every probe and every stage read that one record shape.
-answered() { grep '^{' "$1" 2>/dev/null \
-  | jq -e 'select(.type=="turn_end") | (.message.stopReason // "") == "stop"' >/dev/null 2>&1; }
 probe_model() { # probe_model <model>
   local candidate="$1" out attempt=1 delay="$backoff"
   out="$answers/probe-$(printf '%s' "$1" | tr '/.' '--').jsonl"
   while [[ "$attempt" -le "$attempts" ]]; do
     pi --model "$candidate" --print --no-session --no-tools --mode json 'Reply with exactly: OK' >"$out" 2>&1
-    if answered "$out"; then
+    if [[ "$(python3 "$here/vm/panel-lib.py" turn <"$out" 2>/dev/null)" == 'stop' ]]; then
       printf '%s' "$candidate"
       return 0
     fi
@@ -97,7 +100,7 @@ probe_model() { # probe_model <model>
       attempt=$((attempt + 1))
       continue
     fi
-    printf '%s\t%s\tno\n' "$candidate" "$(grep '^{' "$out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)" >>"$probe_log"
+    printf '%s\t%s\tno\n' "$candidate" "$(python3 "$here/vm/panel-lib.py" turn <"$out" 2>/dev/null)" >>"$probe_log"
     return 1
   done
   printf '%s\t%s\tno\n' "$candidate" "gave up after $attempts attempts" >>"$probe_log"
@@ -195,12 +198,13 @@ EOF
     answer_file="$answers/clip-$clip_count.jsonl"
     command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
     pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-    text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
-    parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
-    if [[ -z "$parsed" ]]; then
-      note "clip $clip_count: the reviewer did not return JSON"
+    answer_result="$(python3 "$here/vm/panel-lib.py" verdict clip <"$answer_file")"
+    if [[ "$(jq -r '.status // empty' <<<"$answer_result" 2>/dev/null)" != 'complete' ]]; then
+      reason="$(jq -r '.error // empty' <<<"$answer_result" 2>/dev/null)"
+      note "clip $clip_count: ${reason:-no answer}"
       continue
     fi
+    parsed="$(jq -c '.answer' <<<"$answer_result")"
     frames_json="$(for slot in 0 1 2 3 4 5; do [[ -f "$panel/thumbs/frame-$t_start-$slot.jpg" ]] && printf 'frame-%s-%s.jpg\n' "$t_start" "$slot"; done | jq -R . | jq -sc .)"
     clip_reviews="$(jq -c --arg window "$t_start-$t_end" --arg model "$review_model" \
       --arg command "$command_line" --argjson frames "$frames_json" --argjson answer "$parsed" \
@@ -245,9 +249,13 @@ EOF
     answer_file="$answers/vision-$i.jsonl"
     command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
     pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-    text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
-    parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
-    [[ -z "$parsed" ]] && { note "vision check $i: no JSON answer"; continue; }
+    answer_result="$(python3 "$here/vm/panel-lib.py" verdict vision <"$answer_file")"
+    if [[ "$(jq -r '.status // empty' <<<"$answer_result" 2>/dev/null)" != 'complete' ]]; then
+      reason="$(jq -r '.error // empty' <<<"$answer_result" 2>/dev/null)"
+      note "vision check $i: ${reason:-no answer}"
+      continue
+    fi
+    parsed="$(jq -c '.answer' <<<"$answer_result")"
     vision="$(jq -c --arg transition "${step_names[i]} -> ${step_names[i+1]}" --arg next "$next" \
       --argjson answer "$parsed" '. + [{transition: $transition, next_step: $next} + $answer]' <<<"$vision")"
   done
@@ -314,15 +322,15 @@ RULES
   answer_file="$answers/lens-$lens.jsonl"
   command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
   pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-  text="$(python3 "$here/vm/panel-lib.py" answer <"$answer_file")"
-  parsed="$(printf '%s' "$text" | python3 "$here/vm/panel-lib.py" extract 2>/dev/null)"
-  if [[ -z "$parsed" ]]; then
-    reason="$(grep '^{' "$answer_file" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)"
-    lens_stage="$(jq -c --arg lens "$lens" --arg error "${reason:-no JSON answer}" --arg command "$command_line" \
+  answer_result="$(python3 "$here/vm/panel-lib.py" verdict lens <"$answer_file")"
+  if [[ "$(jq -r '.status // empty' <<<"$answer_result" 2>/dev/null)" != 'complete' ]]; then
+    reason="$(jq -r '.error // empty' <<<"$answer_result" 2>/dev/null)"
+    lens_stage="$(jq -c --arg lens "$lens" --arg error "${reason:-no answer}" --arg command "$command_line" \
       '. + [{lens: $lens, status: "unavailable", error: $error, command: $command}]' <<<"$lens_stage")"
-    note "lens $lens: no answer (${reason:-no JSON})"
+    note "lens $lens: no answer (${reason:-no answer})"
     continue
   fi
+  parsed="$(jq -c '.answer' <<<"$answer_result")"
   lens_stage="$(jq -c --arg lens "$lens" --arg model "$review_model" --arg command "$command_line" --argjson answer "$parsed" \
     '. + [{lens: $lens, status: "complete", model: $model, command: $command, answer: $answer}]' <<<"$lens_stage")"
   note "lens $lens: complete"
@@ -344,8 +352,8 @@ if [[ "$skip_models" != '1' ]]; then
   for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
     probe_out="$answers/probe-$(printf '%s' "$route" | tr '/' '-').jsonl"
     pi --model "$route" --print --no-session --no-tools --mode json 'Reply with exactly: OK' >"$probe_out" 2>&1
-    detail="$(grep '^{' "$probe_out" | jq -r 'select(.type=="message_end") | .message.errorMessage // empty' | head -1)"
-    if [[ -z "$detail" ]] && answered "$probe_out"; then
+    detail="$(python3 "$here/vm/panel-lib.py" turn <"$probe_out" 2>/dev/null)"
+    if [[ "$detail" == 'stop' ]]; then
       capabilities="$(jq -c --arg route "$route" '. + [{stage: "gemini review route", status: "complete", route: $route, detail: "answered"}]' <<<"$capabilities")"
     else
       capabilities="$(jq -c --arg route "$route" --arg detail "${detail:-no answer}" \

@@ -165,12 +165,14 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         return subprocess.run(['bash', str(payload), str(plist_path)], env=env, capture_output=True, text=True)
 
     version = signed['CFBundleShortVersionString']
-    first_name = f'WriteItDown-{version}-2.zip'
-    next_name = f'WriteItDown-{version}-3.zip'
+    # The publish step names the payload from the tracked plist, so the fixture derives the same
+    # name instead of assuming the current build number: the next release bumps it.
+    tracked_name = f'WriteItDown-{version}-{signed["CFBundleVersion"]}.zip'
     first_build = payload_name('2')
     next_build = payload_name('3')
-    assert first_build.returncode == 0 and first_build.stdout.strip() == first_name, first_build.stderr
-    assert next_build.returncode == 0 and next_build.stdout.strip() == next_name, next_build.stderr
+    assert first_build.returncode == 0 and first_build.stdout.strip() == f'WriteItDown-{version}-2.zip', first_build.stderr
+    assert next_build.returncode == 0 and next_build.stdout.strip() == f'WriteItDown-{version}-3.zip', next_build.stderr
+    assert payload_name(signed['CFBundleVersion']).stdout.strip() == tracked_name
 
     publish_env = {**env, 'WID_SPARKLE_BIN': str(sparkle)}
 
@@ -185,10 +187,10 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     stale = updates / f'WriteItDown-{version}.zip'
     stale.write_bytes(b'payload')
     stale_name = publish(base64.b64encode(seed_public).decode())
-    assert stale_name.returncode == 1 and first_name in stale_name.stderr, stale_name.stderr
+    assert stale_name.returncode == 1 and tracked_name in stale_name.stderr, stale_name.stderr
     assert not generated.exists(), 'generate_appcast ran without the build-qualified payload'
     stale.unlink()
-    (updates / first_name).write_bytes(b'payload')
+    (updates / tracked_name).write_bytes(b'payload')
 
     refused = publish(base64.b64encode(bytes(32)).decode())
     assert refused.returncode == 1 and 'does not match SUPublicEDKey' in refused.stderr, refused.stderr

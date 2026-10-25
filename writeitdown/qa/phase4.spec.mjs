@@ -417,7 +417,7 @@ test('short sheets keep the warning and result slots inside the paper', async ({
 
 test('short kept screens keep the controls above the paper foot', async ({ page }, info) => {
   test.skip(info.project.name !== '1440-light-no-preference', 'layout check, one project is enough');
-  for (const size of [{ width: 1440, height: 350 }, { width: 844, height: 390 }]) {
+  for (const size of [{ width: 1440, height: 350 }, { width: 844, height: 390 }, { width: 667, height: 375 }]) {
     await page.setViewportSize(size);
     await enter(page);
     await page.keyboard.insertText('This draft survives on a short sheet.\n');
@@ -437,9 +437,16 @@ test('short kept screens keep the controls above the paper foot', async ({ page 
     expect(kept.scroll.height).toBeGreaterThanOrEqual(kept.line - 0.5);
     expect(kept.heading.top).toBeGreaterThanOrEqual(kept.paper.top);
     expect(kept.receipt.bottom).toBeLessThanOrEqual(kept.actions.top);
+    expect(kept.actions.bottom).toBeLessThanOrEqual(kept.scroll.top);
     await capture(page, info, `short-kept-${size.width}x${size.height}`);
-    await page.locator('#exit').click();
-    await page.locator('#exit').click();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+    const hinted = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll') };
+    });
+    expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
+    await page.keyboard.press('Escape');
     await expect(page.locator('#landing')).toBeVisible();
   }
 });

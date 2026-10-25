@@ -8,6 +8,8 @@
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
 
+const COMPACT_BELOW = 480;
+
 const ink = (() => {
   let context;
   return (text, font, lineHeight) => {
@@ -71,6 +73,13 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
         const blockHeight = block.getBoundingClientRect().height;
         paper.style.setProperty('--room-top', `${Math.max(gap, Math.min(72, receiptTop - gap - blockHeight))}px`);
       }
+      const compact = paperHeight < COMPACT_BELOW;
+      paper.style.setProperty('--kept-top', `${compact ? 8 : 72}px`);
+      paper.style.setProperty('--kept-bottom', `${compact ? Math.max(0, paperHeight - footerTop + gap) : 36}px`);
+      paper.style.setProperty('--kept-title', compact ? 'var(--t-kept-compact)' : 'var(--t-kept)');
+      paper.style.setProperty('--kept-receipt-gap', compact ? '6px' : '12px');
+      paper.style.setProperty('--kept-actions-gap', compact ? '8px' : '20px');
+      paper.style.setProperty('--kept-scroll-gap', compact ? '4px' : '24px');
       placed = key;
       dirty = false;
     }

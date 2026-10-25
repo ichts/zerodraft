@@ -106,21 +106,14 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room-top{position:absolute;z-index:2;left:32px;right:32px;top:var(--room-top,72px);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
 .room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em;max-width:62ch}
 .room-top .room-secondary{margin-top:20px;pointer-events:auto}
-#kept{position:absolute;inset:72px 36px;display:flex;flex-direction:column;align-items:center}
+#kept{position:absolute;top:var(--kept-top,72px);bottom:var(--kept-bottom,36px);left:36px;right:36px;display:flex;flex-direction:column;align-items:center}
 .kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
-#kept h1{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em}
-.kept-receipt{margin:12px 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--mute)}
-.kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:20px}
-.kept-scroll{flex:1;min-height:0;width:100%;margin-top:24px;overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
+#kept h1{margin:0;font:500 var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:-.02em}
+.kept-receipt{margin:var(--kept-receipt-gap,12px) 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--mute)}
+.kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:var(--kept-actions-gap,20px)}
+.kept-scroll{flex:1;min-height:0;width:100%;margin-top:var(--kept-scroll-gap,24px);overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
 .kept-scroll::-webkit-scrollbar{display:none}
 .kept-text{width:100%;max-width:62ch;margin:auto 0;text-align:center;font:400 var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
-@media (max-height:480px){
-  #kept{top:8px;bottom:72px}
-  #kept h1{font-size:34px}
-  .kept-receipt{margin-top:6px}
-  .kept-actions{margin-top:8px}
-  .kept-scroll{margin-top:4px}
-}
 /* Room controls: the live trial's 48 pt ink pill and 48 pt outlined secondary (the Mac's
    FirstLineButtons primary/secondary), one light inner ring on the pill edge (D-024). */
 .home .room-primary,.home .room-secondary{display:inline-flex;align-items:center;justify-content:center;height:48px;border-radius:var(--r-pill);font:600 15px/1.6 var(--sans);letter-spacing:.04em;transition:transform var(--d-feedback) var(--ease-out)}

@@ -14,8 +14,8 @@ system-face body copy at the 62ch measure, the v2 pill and underlined-link treat
 canvas. `mac.html#buy` is a section with its heading and `$4.99 once` price row in view, pending and
 error states, and a licence card for ready/copied/unpaid; `session_id` is cleared from the URL and
 history when the licence response arrives, on success and failure, with `Check again` as the in-page
-retry. The 1.1
-note left the download card. Evidence: `/Users/ichts/firstmate-homes/wid/data/wid-web-shell/`.
+retry. The 1.1 note left the download card, and the page no longer requests IBM Plex Mono; every
+shipped page now loads only Newsreader and Reenie Beanie. Evidence: `/Users/ichts/firstmate-homes/wid/data/wid-web-shell/`.
 
 ## Commands and results
 
@@ -41,7 +41,7 @@ note left the download card. Evidence: `/Users/ichts/firstmate-homes/wid/data/wi
 | `#buy` | scroll margin | 16 px |
 | pending | button label / opacity / cursor / aria-busy | `Opening checkout...` / 0.6 / progress / true |
 | error | button / status role | `Try again` / `alert` |
-| ready | URL | credential removed when the response arrives (`.../mac.html#license-heading`) |
+| ready | URL | credential removed when the response arrives (`.../mac.html`) |
 | unpaid | URL / retry | credential removed on response / visible, key hidden |
 | phone room nav | visible controls | lockup + theme icon only |
 | phone room exit row | Mac link box | inside the footer row (772-816 px in a 751-816 px row) |

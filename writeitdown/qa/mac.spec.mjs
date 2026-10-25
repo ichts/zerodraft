@@ -98,7 +98,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
-  const withNote = attrs => download.replace(/<p class="sha" id="release-notes"[^>]*>/, `<p class="sha" id="release-notes" ${attrs} hidden>`);
+  const withNote = attrs => download.replace('<ul class="reqs" id="requirements">', `<p class="sha" id="release-notes" ${attrs}>1.1 is available.</p>\n<ul class="reqs" id="requirements">`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
@@ -106,6 +106,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   expect(output).toContain('Not verified live');
   expect(output).toContain('real test order');
   expect(releaseCheck(inputs, '--download')[0]).toBe(0);
+  expect(releaseCheck({ ...inputs, download: withNote('data-release-note="1.0"') })[0]).toBe(0);
   const [live, liveOutput] = releaseCheck(inputs, '--live-sales');
   expect(live).toBe(1);
   expect(liveOutput).toContain('LIVE sales blocked: maintainer installed-DMG TEST acceptance is pending');
@@ -127,13 +128,12 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
     [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
     [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note declares 1.1 but the download is 1.0'],
-    [{ download: download.replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note declares 1.0 but the download is 1.1'],
+    [{ download: withNote('data-release-note="1.0"').replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note declares 1.0 but the download is 1.1'],
     [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: data-launch-pending is retired'],
     [{ download: withNote('') }, 'Release notes: the note does not declare its version in data-release-note'],
-    [{ download: download.replace(/<p class="sha" id="release-notes"[^>]*><\/p>/, '') }, 'Release notes: the download page does not declare a release note'],
   ];
-  // The note always declares the artifact version it links; a visible note returns when there is
-  // a newer release to announce. A page whose note and linked DMG disagree is refused.
+  // The release note is optional. When present it declares the linked artifact version and no
+  // pending mark; production ships without one.
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
     expect(code, message).toBe(1);
@@ -151,7 +151,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Forward only. Pause and the draft disappears. Keep going and you get to keep it.');
   const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
   expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
-  expect(families.every(f => ['Newsreader', 'Reenie Beanie', 'IBM Plex Mono'].includes(f)), families.join(', ')).toBe(true);
+  expect(families.every(f => ['Newsreader', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
   const ink = await hero.evaluate(h => {
     const probe = document.createElement('i');
     probe.style.color = getComputedStyle(h).getPropertyValue('--red');

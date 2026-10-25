@@ -12,7 +12,8 @@ const documentPages = ['mac.html', 'support.html', 'privacy.html', 'terms.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
 
-const readShell = page => page.evaluate(() => {
+const readShell = page => page.evaluate(async () => {
+  await document.fonts.ready;
   const css = (element, pseudo = null) => getComputedStyle(element, pseudo);
   const token = (element, name) => {
     const probe = document.createElement('i');
@@ -42,6 +43,8 @@ const readShell = page => page.evaluate(() => {
     pageToken: token(document.body, '--page'),
     footer: !!document.querySelector('.home-foot .foot-grid'),
     overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    monoLinks: [...document.querySelectorAll('link[rel="stylesheet"], link[rel="preload"]')].filter(link => /IBM\+Plex\+Mono/.test(link.href)).length,
+    monoFonts: [...document.fonts].filter(font => /IBM Plex Mono/i.test(font.family) && font.status === 'loaded').length,
   };
 });
 
@@ -69,6 +72,8 @@ test('twelve shipped pages share one header, plate, canvas and body family', asy
     expect(shell.canvas, `${at} the page canvas is background A`).toBe(shell.pageToken);
     expect(shell.footer, `${at} the shared footer is present`).toBe(true);
     expect(shell.overflow, `${at} no horizontal overflow`).toBeLessThanOrEqual(0);
+    expect(shell.monoLinks, `${at} no stylesheet requests IBM Plex Mono`).toBe(0);
+    expect(shell.monoFonts, `${at} no loaded webfont is IBM Plex Mono`).toBe(0);
   }
 });
 
@@ -85,7 +90,6 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
         size: css('main.doc p').fontSize,
         width: +box.width.toFixed(1),
         legacy: document.querySelectorAll('.legal, .door, .deck, .logotype, .foot, .stage').length,
-        monoLinks: [...document.querySelectorAll('link[rel="stylesheet"]')].filter(link => /IBM\+Plex\+Mono/.test(link.href)).length,
         h1: css('main.doc h1').fontFamily,
       };
     });
@@ -95,7 +99,6 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
     expect(read.width, `${path}: the measure fills the available column`).toBeGreaterThan(300);
     expect(read.h1, `${path}: headings keep the serif`).toMatch(/Newsreader/);
     expect(read.legacy, `${path}: no retired shell class survives`).toBe(0);
-    expect(read.monoLinks, `${path}: the retired mono face is not loaded`).toBe(0);
   }
 });
 

@@ -857,20 +857,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   but a phone shows only the lockup and the theme icon; the Mac link moves into the exit row). It also
   supersedes the canvas-only adoption recorded for `mac.html` in the `tokens.css` header.
 
-## D-054: The download card always declares the artifact version it links
+## D-054: The download card may carry a release note only for the artifact it links
 
 - Date: 2026-10-25
-- Decision: `download/index.html` always carries `#release-notes`, and that element declares the
-  version of the linked DMG in `data-release-note`. It stays empty and hidden while the linked
-  version is current, and becomes the visible one-line note when there is a newer release to
-  announce; its declared version must equal the linked DMG's version. The release gate refuses a
-  note that runs ahead of or behind the linked DMG, a missing note or declared version, and any
-  `data-launch-pending` mark. The DMG link name, the Install command's filename, the SHA-256 slot
-  and the note's declared version flip together in the deploy that publishes a version.
+- Decision: `download/index.html` carries no hidden release-note placeholder. A release note in
+  `#release-notes` is optional; when present it declares the artifact version it links in
+  `data-release-note`, and that version must equal the linked DMG's version. The release gate
+  refuses a note that runs ahead of or behind the linked DMG, a note without a valid declared
+  version, and any `data-launch-pending` mark. Publishing a version adds the visible note naming
+  that version. The DMG link name, the Install command's filename and the SHA-256 slot stay always
+  gated, so a version bump cannot ship half-flipped.
 - Reason: the design migration removed the 1.1 note from the card and relaxed the gate to accept a
   page with no note, which reversed D-041's recorded commitment that 1.0 users learn about 1.1 from
-  the download page without recording a supersession. Keeping the note element as the page's
-  declaration of the artifact it links preserves one honest version fact in the markup while the
-  visible copy returns only when it has something new to say.
+  the download page without recording a supersession. The note is product content the captain owns:
+  a published version carries a visible note naming it, and a page without one claims nothing newer
+  than the artifact it links.
 - Supersedes: D-041's download-page release-note clause and the `data-launch-pending` gate. D-041's
   opt-in update rules stand.

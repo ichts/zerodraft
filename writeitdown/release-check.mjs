@@ -5,8 +5,8 @@
 //                                      placeholder input.
 //   node release-check.mjs --download  only the free-trial download page: the DMG link,
 //                                      the Install card's DMG filename and its published
-//                                      SHA-256, and the release note, which declares the
-//                                      version of the linked DMG.
+//                                      SHA-256, and, when present, the release note,
+//                                      which declares the version of the linked DMG.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -101,15 +101,13 @@ export function downloadBlockers({ download }) {
   else if (linkedFile && installFile !== linkedFile)
     found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
 
-  // The release note is the page's claim about the version it links. It always exists, declares
-  // that version in data-release-note, and may only be visible when there is a newer release to
-  // announce. A note ahead of or behind the linked DMG is a page and artifact that disagree.
+  // The release note is optional: when present it is the page's visible claim about the version it
+  // links, and it declares that version in data-release-note. A note ahead of or behind the linked
+  // DMG is a page and artifact that disagree.
   const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
   if (linkedFile && !linkedVersion) found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
   const noteTag = download.match(/<p[^>]*\sid="release-notes"[^>]*>/i)?.[0] ?? '';
-  if (!noteTag) {
-    found.push('Release notes: the download page does not declare a release note');
-  } else {
+  if (noteTag) {
     const noteVersion = attr(noteTag, 'data-release-note') ?? '';
     if (attr(noteTag, 'data-launch-pending') !== undefined)
       found.push('Release notes: data-launch-pending is retired; the note declares the linked version');

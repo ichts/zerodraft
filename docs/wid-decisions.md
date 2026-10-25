@@ -743,3 +743,91 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-040 for the reassurance line, the three points and the 390x844/1440x900 fold assertion
   on the door and its line; D-044's "one entrance under the sheet" wording, since the one entrance is
   now above the sheet. The wordmark, subheadline, cards, FAQ and Mac facts are unchanged.
+## D-048: The six-lens review is the last stage of an acceptance run, and a declared defect is never a pass
+
+- Date: 2026-10-25
+- Decision: `scripts/vm-journey.sh` invokes `scripts/design-panel.sh` on its own evidence bundle as the
+  run's last stage and records every lens result in `acceptance.txt`. Sign-off asserts the six named lenses
+  (Rams, Norman, Spiekermann, Kare, Matas, Vignelli) by name, so a shorter or renamed lens list cannot
+  satisfy it. A lens counts only when its model turn ended normally, its answer is a review of that shape,
+  and it declares the lens that was asked: one review repeated across six prompts counts once. A run whose
+  six lenses did not all complete writes an explicit "panel not run: <reason>" block with the exact re-run
+  command into `acceptance.txt` and `notes.md` and exits 79; the recorded reason is the observed lens
+  failure, never a route probe. It never signs off. A run accepted with the declared known defect exits 78
+  and marks the sign-off as not accepted. Only a clean, fully reviewed run exits 0. The declaration stays
+  keyed to one artifact checksum and one assertion id, and that id is emitted only for the licensed
+  relaunch streams, so the same surface in another launch stream fails under its own id.
+- Reason: The recorded acceptance must end with the six-lens review inside the same evidence bundle, and no
+  exit status may read as a pass when a lens is missing or a declared defect reproduced.
+- Supersedes: the separate-command panel procedure and the exit-0 `accepted-with-declared-defect` verdict;
+  the declared-defect key and the strict launch assertion stand.
+
+## D-049: A standalone review re-run refreshes the acceptance record with provenance
+
+- Date: 2026-10-25
+- Decision: `design-panel.sh` owns the derived lines of a bundle's `acceptance.txt` (the `analysis:` line,
+  the panel state and counts, the per-lens results and `sign_off`) and rewrites them from the single status
+  it derives at the end of every run; its declared-gap re-run text is the same quoted, absolute command the
+  record carries. `vm-journey.sh` keeps the run's own assertion and verdict lines, and reads that record for
+  its panel gate, log line and notes summary instead of deriving the panel state a second time. If the panel
+  wrote no record at all, the journey writes that record once from the same derivation. A run that replaces
+  an earlier review adds `review:` with the UTC timestamp and `review_lenses:` with the lens results, and
+  appends the same fact to `notes.md`, stating that this repairs the review artifact only and does not
+  re-validate the product.
+- Reason: the documented remedy for a blocked panel is a standalone re-run, and before this decision that
+  re-run left `acceptance.txt` saying "panel: not run" beside a completed review, so the one record a
+  reviewer reads contradicted the artifact it sat next to.
+- Supersedes: D-048's ownership of those lines by the journey; its six-named-lens gate, its exit codes and
+  its declared-defect keying stand.
+## D-050: A frozen screen fails the run, and no recorded step excuses it
+
+- Date: 2026-10-25
+- Decision: the analyser's `recording-stall` assertion fails any window in which the screen does not change at
+  all for 20 s or more. Nothing in the bundle can excuse that window: a `steps.tsv` stamp inside it is itself a
+  capture of the frozen screen, and the guest stamps steps on its own schedule whether or not the screen moved.
+  The finding names the stamp as no proof of progress instead of downgrading to informational. Frozen windows
+  under 20 s stay informational, so a settled dialog or a paused step does not fail an otherwise live run.
+- Reason: the previous rule excused a frozen window whenever a step stamp fell inside it, and a recorded
+  run whose every frame delta was 0.000 was therefore accepted as a working run - the capture the rig exists
+  to distrust. A dead screen is either a hung app or a stalled recorder, and both must fail the run, so no
+  evidence inside the bundle may downgrade them.
+- Supersedes: the step-based excuse for `recording-stall` in `scripts/vm/analyse-recording.py` (an
+  implementation shortcut, never a recorded decision). D-048's assertion ownership, its six-lens gate and its
+  exit codes stand.
+
+## D-051: A launch stream is judged only against the surfaces its own contract forbids, and nothing signs off by default
+
+- Date: 2026-10-25
+- Decision: the analyser's forbidden-surface rule is keyed to the launch stream, not to the text alone. The
+  fixture launch is started to show the activation page before activation, so `launch-fixture-first.jsonl`
+  is judged only for the transience of its states and never against the forbidden list; the trial and the
+  licensed relaunch streams keep failing on it under their own assertion ids, and no PASS line is printed
+  for a stream the rule does not judge. `panel-lib.py gate` reports the review state as the command's own
+  exit status (0 complete, 79 not) so `vm-journey.sh` cannot turn an unparseable printed value into a pass.
+  A sign-off is `accepted` only for the recorded `accepted` verdict; an unknown, renamed or absent verdict
+  line is written as not accepted and names the verdict the record states.
+- Reason: the fixture stream's contract requires the surface the forbidden list names, so a clean DMG run
+  was rejected for showing exactly the screen the rig demands, while a non-numeric gate value silently
+  skipped the 79 exit, and a renamed verdict line could sign off with no criterion at all.
+- Supersedes: D-048's "the same surface in another launch stream fails under its own id" only for a stream
+  whose own contract requires that surface, and D-049's read of the gate as a number. D-048's six named
+  lenses, its exit codes and its declared-defect keying stand.
+
+## D-052: A panel that could not run is a declared capability gap, and the release record states the run that happened
+
+- Date: 2026-10-25
+- Decision: on this host the six-lens panel is a declared capability gap, not a panel failure and never a pass: it
+  is implemented and wired as the run's last stage, it did not run for the 1.0 bundle because no reviewer route
+  answers, the bundle carries `panel_not_run` with the exact re-run command and `sign_off: blocked`, and a
+  released build still needs a real six-lens run in its own bundle. The evidence bundle is the only authority for
+  the recorded run: the 1.0 bundle recorded 367 captured frames, an 892 ms largest frame gap, 125.52 s of
+  recording, 31 deterministic findings, verdict `accepted-with-declared-defect`, panel not run, `sign_off`
+  blocked, and exit 79. `writeitdown/README.md` states the exit-code contract once - 0 clean pass, 78 the
+  declared known defect reproduced with the deterministic analysis and the panel complete, 79 blocked including
+  a panel that could not run, 1 rejected - and the QA record points at it instead of restating a per-run code.
+- Reason: the record claimed that same run exited 78 with a signed-off declared defect and carried the six-lens
+  review, while the bundle it described recorded a blocked panel and exit 79, and the QA record carried two
+  different frame counts and frame gaps for one recording. A release record that disagrees with its own bundle
+  cannot be used to decide a release.
+- Supersedes: D-048's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
+  lenses, its assertion ownership and its declared-defect keying stand.

@@ -2,6 +2,106 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: A frozen screen fails the run even when a step is stamped inside it, and a real recorded run on the mini under that rule
+
+Validation round for the recorded-acceptance rig, on the Mac mini (Mac16,10). The rig is unchanged in shape;
+this round closes two review findings against it and drives the real signed 1.0 artifact end to end.
+
+- The `recording-stall` assertion no longer has an escape hatch. The analyser used to excuse a frozen window
+  whenever any `steps.tsv` stamp fell inside it, and the guest stamps steps on its own schedule whether or not
+  the screen moved, so a 74.8 s stream whose every frame delta was 0.000 was accepted as a working run. A frozen
+  screen of 20 s or more now always fails, and a step stamped inside the window is named in the finding as a
+  capture of that same frozen screen. Shorter static stretches stay informational.
+- Executable proof, with its known-broken state: `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` added one
+  check (`a frozen screen fails even when a step is stamped inside it`), 15 of 15 checks pass. The check fails
+  on the pre-fix analyser - restoring the `and not covered` condition in a scratch copy of the scripts makes it
+  report `a recording whose screen never changed was accepted (steps-inside-the-window)` - so it reopens the
+  finding if the excuse comes back. The check runs the real analyser on a 75 s single-frame stream twice, with
+  three step stamps inside the window and with no `steps.tsv` at all, and requires the same rejecting verdict
+  from both.
+- Host-level proof: the same 74.8 s all-static bundle driven through the real `vm-journey.sh` with a simulated
+  guest (no VM, nothing on the mini's own screen) ended `verdict: rejected` and exit 1 with
+  `FAIL [recording-stall] the screen did not change at all for 74.8 s; a recorded step sits inside it, which is
+  a capture of the same frozen screen and no proof of progress`, against `verdict: accepted` from the pre-fix
+  analyser on the identical bundle.
+- Review report: a finding's window cell now prints offsets from the recording's first captured frame
+  (`+0.00 s -> +74.80 s`) instead of a raw epoch pair, and the arrow is no longer double-escaped into literal
+  `&rarr;` text. `test-vm-rig.py` asserts the rendered report carries the offsets and no double-escaped entity;
+  the rendered report was also captured and read at desktop width.
+- Real run, shipped `Write-It-Down-1.0.dmg`
+  (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`) on the mini: clean clone, DMG installed
+  inside the guest, real HID input, one continuous recording of 125.52 s over 367 captured frames (largest frame
+  gap 892 ms), 31 deterministic findings. Every product assertion passed except the artifact's declared known
+  defect, which reproduced (`licensed-launch-no-activation-page`, a 181 ms activation card during a licensed
+  launch). `recording-gap` and `recording-stall` both passed under the strict rule, so it does not misfire on a
+  real run. Verdict `accepted-with-declared-defect`, 0 failures outside the declaration, therefore not a pass.
+- Declared capability gap, not a panel pass - six-lens review on that run: not run. The panel is implemented and
+  wired as the run's last stage (`scripts/design-panel.sh`, invoked by `scripts/vm-journey.sh` on its own bundle),
+  and no reviewer route answers on this host: the four `anthropic/*` candidates answered `rate_limit_error` on
+  all four attempts each, `openai-codex/gpt-5.5` is not served for this account, `openai-codex/gpt-6-astra`
+  reported its usage limit, and `openai/gpt-4o` and `openai/gpt-5.1` returned WebSocket errors;
+  `panel/model-probes.tsv` records each candidate with its exact error. The bundle therefore records
+  `panel_not_run: no reviewer model answered`, `sign_off: blocked` and the exact re-run command, and the run
+  exits 79 rather than signing off. Sign-off is blocked rather than accepted, and a released build still needs
+  a real six-lens run; this bundle is not that run. Re-running the panel with the only route that answers here
+  (`deepseek/deepseek-flash`) reviewed all six flagged clips and 26 vision checks but could not produce a lens
+  answer: the route's own image loop exceeded the request-body limit (`413 ... length limit exceeded`) and left
+  hundreds of megabytes of stream per lens, so that attempt was stopped and the record keeps "panel not run".
+- NOT RUN: a clean six-lens sign-off (no reviewer route on this host), the declared-defect acceptance outcome
+  (it is recorded only once the review completes, so this run's 79 is correct), the `.app` licensed-launch mode,
+  real purchase and payment, and any Finder install or first launch outside the prepared VM image.
+
+## 2026-10-25: Recorded VM run of the shipped 1.0 DMG (declared defect, not accepted), and the launch-flash fix proven live
+
+Recorded acceptance now runs on the Mac mini inside a Tart macOS virtual machine: the guest boots headless, the
+DMG is installed inside it the way a person installs it, the app is driven with CGEvent keyboard and mouse input,
+and the guest screen is captured as a timestamped frame stream that the host assembles into one continuous
+`screen.mov`. The Mini's own screen, login keychain and signing identity are never used.
+
+- Entry point: `bash apps/macos/FirstLine/scripts/vm-journey.sh <dmg> <evidence-directory>` (from the repository
+  root, on the Mini). `scripts/vm/prepare-guest.sh` prepares the golden image once. The run's last stage invokes
+  `scripts/design-panel.sh` on its own bundle, so the six-lens review lands in the same evidence directory; a
+  bundle without a completed review is recorded as "panel not run" with the exact re-run command and the run
+  exits 79 instead of signing off. `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` re-checks the rig's
+  shared boundaries (answer validation including lens identity, the required lens names, clip origin, frame
+  alignment, the report's recording metadata, and that no bytecode cache is tracked anywhere in the
+  repository index) without a VM.
+- PASS, shipped `Write-It-Down-1.0.dmg` (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`):
+  signature, notarization ticket and `spctl` acceptance of both disk image and installed app; clean-clone install
+  with the browser-download quarantine flag and the Gatekeeper first-launch question answered by a real click;
+  first launch on the untouched 3-of-3 free trial; session 1 typing and the two-act exit back to 2 of 3; session 2
+  silence wipe with the restart receipt and a zeroed count; session 3 written through a real one-minute deadline
+  with the exact kept draft, the `1 MINUTE. N WORDS.` receipt, COPY TEXT flipping to COPIED and the exact
+  clipboard contents; RUN IT AGAIN reaching the activation page with no writable editor left. One continuous
+  `screen.mov` of 125.52 s over 367 captured frames, largest frame gap 892 ms.
+- DECLARED KNOWN DEFECT on that artifact, reproduced twice in one bundle: `licensed-launch-no-activation-page`.
+  On a licensed Mac whose trial is spent, the launch presented the activation card until the license revalidation
+  returned, because entitlement required that no validation be in flight and the launch validation always starts
+  in flight. Both the guest's launch watcher (a 50 ms AX read armed before the process exists) and the
+  deterministic analyser saw it: the first frame of the relaunch was the unlicensed card, the licensed home
+  followed 184 ms later against the loopback fixture. Fixed on main by PR 62
+  (https://github.com/ichts/zerodraft/pull/62). The rig excuses exactly that assertion id on exactly that
+  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, and fails the run
+  if the assertion passes with the declaration still in place. This artifact's run keeps `panel_not_run` and
+  `sign_off: blocked` because its six-lens panel did not run, so it ends 79; `writeitdown/README.md` owns the
+  exit-code contract. This artifact is therefore not a release acceptance. The analyser keys that id to the
+  licensed relaunch streams alone, so no other launch stream can borrow the declaration.
+- PASS, fix proven live: a locally built `.app` from current main (ad-hoc signed by `scripts/package-app.sh`,
+  the app sources at that commit, no Developer ID, no notarization) installed into a fresh clone and driven by the
+  same launcher, activated against the loopback fixture, then relaunched three times with the watcher armed. All
+  three relaunches went straight to the licensed home; zero activation frames; verdict `accepted`.
+- PASS, deterministic analysis with a known-broken-state proof: `scripts/vm/analyse-recording.py` reproduces the
+  1.0 launch flash from the 1.0 launch frames ("a forbidden surface appeared for 184 ms during launch") and
+  passes on the same frames with that state removed; a 5.3 s capture gap and a frozen screen over 20 s each fail
+  the run, and a gapped or truncated frame stream fails before the verdict. Both recorded bundles ran the
+  deterministic pass: their `findings.json` recorded no analyser error, and the 1.0 bundle's recorded findings
+  include the transient launch surface that failed the launch assertion. Neither bundle contains an `analysis:`
+  line in `acceptance.txt`, because both were recorded before this change; every bundle recorded from this
+  change on writes that one line, read from the panel's own derived status, next to the launch assertions and
+  the six-lens result.
+- NOT RUN: the offline re-verification and revocation paths of case 58, real purchase and payment, and any
+  Finder install or first launch outside the prepared VM image. No claim is made for those here.
+
 ## 2026-10-25: The update gate follows a live writing session
 
 Fourth review round on the same branch. No DMG build, notarization, upload, deployment or merge was
@@ -139,7 +239,6 @@ window journey was run, and no DMG, upload, deployment or merge was performed.
 - Correction to the 2026-10-25 Sparkle record below: that run's feed was **not** signed, because the
   bundle did not declare `SURequireSignedFeed` yet; the signature verified there was the ZIP
   enclosure's. The feed signature is first proven in this record.
-
 ## 2026-10-25: Release artifact for the aligned room and the split-W logo
 
 - Source: `origin/main` commit `1446b4af694e31f08d019f6fece189702e6ebfa7` (the merged writing-room/After alignment and split-W logo PRs), in a fresh clone on the Mac mini, built with `scripts/release-dmg.sh` (configured release, not `--staging`). Signing and notarization ran in the captain's own unlocked terminal on that Mac; an SSH session with a locked login keychain cannot sign.
@@ -558,5 +657,5 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 - PASS after the fix, same harness and same 2.5 s responder: 30 frames over 6.2 s, the picker from frame 001 to frame 030, zero frames containing `Activate Write It Down`. Evidence: `capture-after/` (`frame-001.png`, `summary.json`).
 - PASS deterministic, with a known-broken-state proof: `swift test --filter LicenseEntitlementTests/launchWithAStoredSignedLicensePresentsThePickerFirst` records 4 failures against the pre-fix source (`hasFullAccess == false`, `selectedSurface == .upgrade`, `RootContainerViewController` child is the activation card) and passes with the fix, including the in-flight assertion that the window is built while the revalidation is still running.
 - PASS suite: `swift test` 287 tests. All license, trial, smoke and entitlement suites pass after their stale "blocked until validation" expectations were updated to the new contract (immediate access on a locally verified token, silent background revalidation). Two pre-existing failures are excluded from this change's claim because they reproduce identically on the unmodified source: `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and `EditorFocusTests.imeMovementStaysWithinMarkedRange` both expect a deny that needs an active host app/key window, which this headless session does not provide. `RoomTests.firstPinyinKeyAfterAWipeThroughTheInputContext` passes with its recorded known issue. No IME, VoiceOver or full-screen session was run.
-- PENDING: the real-window first-frame recording of case 58 - repeat launch with an activated license, offline re-verification, and the revocation path - is still pending recorded VM acceptance on an approved GUI machine. `scripts/qa-window.sh` and the cua-driver daemon are not permitted here; the independent capture review by a different model family is arranged by firstmate.
+- RECORDED: the first-frame half of case 58 now runs as recorded VM acceptance - see the 2026-10-25 section above. The launch with an activated license is recorded at 50 ms AX sampling before the process exists, and the pre-fix build (the shipped 1.0 DMG) reproduces the activation card on the first frame while a build of current main does not, over three relaunches. Still PENDING: the offline re-verification and revocation paths of that case, which the rig does not yet exercise.
 - Observed, pre-existing, not part of this change: on this machine the picker window measures 980x1079 pt (`CGWindowListCopyWindowInfo`) instead of the 1040x720 contract, and the pre-fix build shows the same size on both the trial path and after the card flips to the picker, so the license fix neither causes nor removes it. The launch captures therefore differ in window size between the card (1040x720) and the picker (980x1079) in the before set and are uniform in the after set. Window sizing is owned by `RootWindowController` and needs its own bounded investigation before it is treated as a shipped defect.

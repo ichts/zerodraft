@@ -466,3 +466,19 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   https://github.com/ichts/zerodraft/pull/59, which made the wordmark the whole lockup and forbade setting the
   mark beside it. The favicon set, the app icon, the volume icon, the Mac start screen, the og card, the palette
   and the "no red in the logo" rule stand.
+
+## D-039: The narrow-phone header steps the lockup to 16 px type
+
+- Date: 2026-10-25
+- Decision: At 380 px wide and below the writeitdown.app header lockup is 16 px type (the chip is 16.7 px)
+  instead of 19 px, on every page that uses `.brand`: the landing, the trial room, `/download/` and `mac.html`.
+  It is one rule, so those pages never diverge. Nothing changes above 380 px: 19 px up to 820 px, 21 px above.
+- Reason: `/download/` carries the widest header (the brand, `Try it in your browser` and the theme button), and
+  the chip widened the lockup by 1.384 em, so at 360 px a 19 px lockup pushed the theme button 12.3 px past the
+  right edge and the page scrolled 15 px sideways. The mark and every control stay; only the lockup size gives.
+  17 px still leaves 2.6 px of the 20 px page gutter at 360 px, so 16 px is the largest whole-pixel step that
+  clears the 6 px bar: 10.0 px of gutter at 360, 17.6 at 375, 20 at 390. The chip carries the small-size notch
+  widening (DESIGN 11.6), so the split still reads as a plate with a W at 16.7 px on a 3x phone render.
+- Supersedes: D-038's mobile gap trade ("the mobile header trades gap for it ... so the theme button stays on the
+  390 px right gutter") only, in that the 12 px/6 px gap trade now stops at 380 px and the lockup itself steps
+  down below it. The chip, the single mask file, the palette and the rest of D-038 stand.

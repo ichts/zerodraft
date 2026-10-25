@@ -312,6 +312,14 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .foot-grid{grid-template-columns:1fr 1fr}
   .home .callback h2{flex-direction:column;align-items:center}
 }
+/* Narrow phones: /download/ carries the widest header (brand, page action, theme button), and below 380 px a
+   19 px lockup pushes that button past the 20 px page gutter. 16 px is the largest whole-pixel step that still
+   leaves 6 px of gutter at 360 px on the widest header (measured 10.0 px at 360, 17.6 px at 375, 20 px at 390);
+   17 px leaves only 2.6 px at 360. One rule for every page that uses .brand, so /download/ does not diverge
+   from landing and mac. */
+@media (max-width:380px){
+  .brand{font-size:16px}
+}
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .btn{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}

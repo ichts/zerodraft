@@ -252,15 +252,9 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
   });
 }
 
-// The captain's report: the header read as plain words because the lockup was the wordmark alone, and the
-// split W inside it is invisible at 21 px. The header must show the A mark as its own chip beside the
-// wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
-// solid tile without the split.
-test('the header lockup shows the A mark chip beside the wordmark', async ({ page }) => {
-  for (const path of ['index.html', 'download/', 'mac.html']) {
-    await page.goto(path);
-    const brand = page.locator('nav[aria-label="Main"] .brand').first();
-    const mark = await brand.evaluate(async (el) => {
+// Read the shipped lockup mask the way a 2x display draws it: the plate square, the W knocked out of it, and
+// the plate strip the split leaves between the two light V shapes.
+const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
       const url = (getComputedStyle(el, '::before').maskImage || getComputedStyle(el, '::before').webkitMaskImage)
         .match(/url\("?([^"\)]+)"?\)/)[1];
       const box = el.getBoundingClientRect();
@@ -280,25 +274,28 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
       let chipInk = 0, chipHole = 0;
       for (let y = 0; y < chip; y += 1) for (let x = 0; x < chip; x += 1) (alpha(x, y) > 127 ? chipInk++ : chipHole++);
       // Transparency per column across the lower half of the chip. The split reads as a strip of plate ink
-      // between the two light V shapes, so the middle third must hold an interior ink run with a hole on
-      // each side of it; a plain W tile or a solid tile has neither.
+      // between the two light V shapes, so the widest interior strip at the window's own floor must have
+      // lighter columns on both sides of it; a plain W tile or a solid tile has neither. The comparison is
+      // against that floor, not a fixed cutoff: at 16-19 px type one raster row is about 5% of the sample, so
+      // an absolute cutoff sits on rounding noise while the flanked strip is the shape the eye actually reads.
       const columns = [];
       for (let x = Math.round(chip / 3); x < Math.round(2 * chip / 3); x += 1) {
         let clear = 0, total = 0;
         for (let y = Math.round(chip * 0.45); y < Math.round(chip * 0.95); y += 1) { total += 1; if (alpha(x, y) < 40) clear += 1; }
         columns.push(clear / total);
       }
-      const ink = (share) => share < 0.1;               // plate
-      const hole = (share) => share > 0.12;             // the W knocked out
-      let best = { length: 0, left: 1, right: 1 };
+      const floor = Math.min(...columns);
+      const margin = 0.04;                              // one raster row at the smallest header size
+      let best = { length: 0, left: floor, right: floor };
       for (let start = 1; start < columns.length - 1; start += 1) {
-        if (!ink(columns[start - 1]) || !ink(columns[start])) continue;
+        if (columns[start] > floor + margin) continue;
         let end = start;
-        while (end + 1 < columns.length && ink(columns[end + 1])) end += 1;
+        while (end + 1 < columns.length && columns[end + 1] <= floor + margin) end += 1;
+        if (end + 1 >= columns.length) break;          // the plate strip must have the W on both sides
         const length = end - start + 1;
         const left = Math.max(...columns.slice(0, start));
-        const right = end + 1 < columns.length ? Math.max(...columns.slice(end + 1)) : 0;
-        if (hole(left) && hole(right) && length > best.length) best = { length, left, right };
+        const right = Math.max(...columns.slice(end + 1));
+        if (left > floor + margin && right > floor + margin && length > best.length) best = { length, left, right };
         start = end;
       }
       let wordInk = 0, wordTotal = 0;
@@ -312,11 +309,20 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
         box: { width: +box.width.toFixed(2), height: +box.height.toFixed(2) },
         chipSide: chip, canvasWidth: width,
         chipInkShare: chipInk / (chip * chip), chipHoleShare: chipHole / (chip * chip),
-        splitLength: best.length, splitLeft: +best.left.toFixed(2), splitRight: +best.right.toFixed(2),
+        splitLength: best.length, splitContrast: +(Math.min(best.left, best.right) - floor).toFixed(2),
         topOfChipIsPlate: alpha(Math.round(chip / 2), Math.round(chip * 0.06)) > 127,
         wordInkShare: wordInk / wordTotal,
       };
-    });
+});
+
+// The captain's report: the header read as plain words because the lockup was the wordmark alone, and the
+// split W inside it is invisible at 21 px. The header must show the A mark as its own chip beside the
+// wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
+// solid tile without the split.
+test('the header lockup shows the A mark chip beside the wordmark', async ({ page }) => {
+  for (const path of ['index.html', 'download/', 'mac.html']) {
+    await page.goto(path);
+    const mark = await measureHeaderMark(page.locator('nav[aria-label="Main"] .brand').first());
     const at = `${path} at ${mark.box.width}x${mark.box.height}:`;
     expect(mark.chipInkShare, `${at} the left square is the plate, not a bare letter`).toBeGreaterThan(0.6);
     expect(mark.chipInkShare, `${at} the plate keeps the W knocked out`).toBeLessThan(0.95);
@@ -325,10 +331,43 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
     expect(mark.box.height, `${at} the chip is square and sits inside the lockup box`).toBeGreaterThan(16);
     expect(mark.box.width, `${at} the lockup is the chip plus the wordmark`).toBeGreaterThan(mark.box.height * 5);
     expect(mark.splitLength, `${at} the split survives at header size`).toBeGreaterThanOrEqual(2);
-    expect(mark.splitLeft, `${at} the split has the W on its left`).toBeGreaterThan(0.12);
-    expect(mark.splitRight, `${at} the split has the W on its right`).toBeGreaterThan(0.12);
+    expect(mark.splitContrast, `${at} the split keeps a lighter W on each side of the plate strip`).toBeGreaterThan(0.05);
     expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeGreaterThan(0.06);
     expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeLessThan(0.4);
+  }
+});
+
+// Narrow phones: /download/ carries the widest header (brand, page action, theme button), so 360 px decides
+// the narrow lockup step, and landing and mac share that one rule instead of diverging. The chip also has to
+// stay legible at the step the narrowest phone gets.
+test('the header keeps its right gutter and a legible chip at 360 px', async ({ page }) => {
+  for (const width of [360, 375, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const lockups = [];
+    for (const path of ['index.html', 'download/', 'mac.html']) {
+      await page.goto(path);
+      const header = await page.evaluate(() => {
+        const nav = document.querySelector('nav[aria-label="Main"]');
+        const brand = nav.querySelector('.brand');
+        const button = nav.querySelector('.theme-btn');
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          gutter: window.innerWidth - button.getBoundingClientRect().right,
+          lockup: parseFloat(getComputedStyle(brand).fontSize),
+        };
+      });
+      const at = `${path} at ${width}px:`;
+      lockups.push(header.lockup);
+      expect(header.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
+      expect(header.gutter, `${at} the theme button keeps the 6 px right gutter`).toBeGreaterThanOrEqual(6);
+      if (width !== 360) continue;
+      const mark = await measureHeaderMark(page.locator('nav[aria-label="Main"] .brand').first());
+      expect(mark.box.height, `${at} the chip is at least 16 px tall`).toBeGreaterThanOrEqual(16);
+      expect(mark.chipInkShare, `${at} the smallest lockup is still a plate`).toBeGreaterThan(0.6);
+      expect(mark.splitLength, `${at} the split survives at the smallest lockup`).toBeGreaterThanOrEqual(2);
+      expect(mark.splitContrast, `${at} the split keeps a lighter W on each side`).toBeGreaterThan(0.05);
+    }
+    expect(new Set(lockups).size, `${width}px: landing, download and mac share one lockup step`).toBe(1);
   }
 });
 

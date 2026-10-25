@@ -519,3 +519,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `mac.html` plate before the token and passes after it.
 - Supersedes: D-038's "`--sheet`, falling back to `--paper`" plate source only. The chip drawing, the two aligned
   masks, the light-plate/ink-W and dark-plate/bone-W polarity, the responsive sizes and D-039 stand.
+
+### Correction to D-038: the plate carries the header hairline
+
+- Date: 2026-10-25
+- Decision: The header chip keeps the paper plate `#ffffff` with the ink W in light and the ink plate `#26231c`
+  with the bone W in dark, and `.brand::before` adds the existing `--hair-2` hairline as a 1 px border on the
+  chip square, with a corner radius matching the squircle. It is the same boundary `.theme-btn` draws, with no
+  new token, shadow, or second colour, and it is one shared rule in `writeitdown/site.css`, so the landing, the
+  trial room, `/download/` and `mac.html` agree.
+- Reason: The paper plate `#ffffff` against the `#f7f7f5` page wall is 1.07:1, so in the default light theme the
+  chip collapsed into a bare split W beside the wordmark's own W - the repeated-letter reading D-038 exists to
+  prevent. A hairline is the boundary the header controls already use, and it makes the 21 px chip an object
+  without inventing a surface treatment. `writeitdown/qa/mac.spec.mjs` "the header chip paints one plate colour
+  on every page" now reads the rendered plate border and requires the 1 px solid `--hair-2` edge to equal the
+  theme button's boundary on every page.
+- Supersedes: D-038's reason and DESIGN 11.6 "Each plate sits one step off its wall" claim, in that the paper
+  plate alone does not separate from the wall and the edge does. The plate-token correction above, the chip
+  drawing, the two aligned masks, the theme polarity, the responsive sizes and D-039 stand.

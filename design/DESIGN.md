@@ -245,7 +245,8 @@ the notch.
   The light app icon and favicon are self-contained; the dark favicon link is not the default, and it is never
   used in the light appearance. The header chip's theme roles are defined in 11.6.
 - The mark itself is flat: no gradient, outline, shadow, bevel, or second colour. The app icon's plate gets the
-  system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface.
+  system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface. The header chip's
+  plate carries only its one 1 px `--hair-2` edge (11.6); the mark never does.
 
 ### 11.3 Sizes and clear space
 
@@ -279,8 +280,9 @@ the notch.
 ### 11.4 Do not
 
 - Put red, the old red underscore, or the old `WID` sheet in the mark.
-- Add a palette colour, border, shadow, or gradient to the header chip. Its two masks use only the
-  `--brand-plate` and ink tokens. Do not put the dark plate in the light header or the light plate in the dark header.
+- Add a palette colour, a border beyond the single `--hair-2` plate edge in 11.6, a shadow, or a gradient to the
+  header chip. Its two masks use only the `--brand-plate` and ink tokens. Do not put the dark plate in the light
+  header or the light plate in the dark header.
 - Insert a line, rule, or caption between the chip and wordmark, or set the chip alone above, below, or after
   the wordmark.
 - Use the ink plate as the favicon default; it is the dark-appearance favicon alternate only. Do not put the light
@@ -304,7 +306,9 @@ the notch.
   It fails on a wordmark-only lockup or inverted polarity.
   "the header chip paints one plate colour on every page" reads the rendered `::before` background on the
   landing, the trial room, `/download/` and `mac.html` and requires one `--brand-plate` value per theme, so a
-  page-local fallback cannot make the chip diverge again.
+  page-local fallback cannot make the chip diverge again. The same test reads the plate's rendered border and
+  requires the 1 px solid `--hair-2` edge to equal the theme button's boundary on every page, so a missing or
+  per-page edge fails.
   "the header keeps its right gutter and a legible chip at 360 px" repeats it at 360 px and requires no
   horizontal overflow, at least 6 px of right gutter, one lockup step across landing, `/download/` and `mac.html`,
   and a chip of at least 16 px with the split still reading. Verify the sizes in 11.3 in light and dark, with
@@ -324,8 +328,9 @@ followed by the wordmark on the same baseline. Sizes and spacing are defined in 
 the wordmark is invisible, so a wordmark-only lockup reads as plain words and the product has no logo in the corner.
 The chip makes the mark an object using two aligned alpha-only mask files, not theme-specific assets.
 
-- The chip is the app icon's drawing: the 824/1024 macOS squircle plate around the master split W, at the app
-  icon's 620/824 W share, with the plate optically centred on the wordmark's cap band.
+- The chip is the app icon's drawing: the 824/1024 macOS squircle plate around the master split W, at a
+  0.798 W width share (the app icon's 0.752 share widened by the chip notch below) and 0.526 of the plate
+  height, with the plate optically centred on the wordmark's cap band.
 - The chip is the small-size variant of the mark: its notch is 180 word-units (11% of the W) instead of the
   master's 90, the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
 - The aligned alpha-only masks are `writeitdown/logo/write-it-down-lockup-plate.svg` for the plate and
@@ -333,8 +338,10 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
   token; the W and wordmark paint `currentColor` from `--ink`. `--brand-plate` has one value per theme and is
   owned with the other root colour roles in `writeitdown/tokens.css`, so `.brand` consumes it directly with no
   page-local fallback: light is the paper plate `#ffffff` with the ink W, dark is the ink plate `#26231c` with
-  the bone W, on the landing, the trial room, `/download/` and `mac.html` alike. Each plate sits one step off
-  its wall, which keeps the small chip an object. Both layers share one viewBox and
+  the bone W, on the landing, the trial room, `/download/` and `mac.html` alike. Paper against the page wall
+  is 1.07:1, so the plate carries one 1 px edge in `--hair-2` - the same boundary `.theme-btn` draws - on the
+  chip square, with a corner radius that matches the squircle; that edge is what keeps the 21 px chip an
+  object. No other border, shadow, or colour. Both layers share one viewBox and
   `shape-rendering="geometricPrecision"`, with no theme-specific CSS or new palette colour. The glyph layer
   retains the split strokes with `fill-rule="evenodd"`.
 - Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.

@@ -151,9 +151,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home-nav{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
 .brand{position:relative;display:inline-block;flex:none;width:7.467em;height:1.046em;font-size:21px;line-height:1;color:var(--ink)}
 .brand:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl,8px)}
-.brand::before{content:"";position:absolute;inset:0;background:var(--brand-plate);
-  -webkit-mask:url(logo/write-it-down-lockup-plate.svg) no-repeat left center/contain;
-  mask:url(logo/write-it-down-lockup-plate.svg) no-repeat left center/contain}
+.brand::before{content:"";position:absolute;left:0;top:0;bottom:0;width:1.046em;box-sizing:border-box;background:var(--brand-plate);
+  border:1px solid var(--hair-2,color-mix(in oklab,var(--ink) 18%,transparent));border-radius:22.33%;
+  -webkit-mask:url(logo/write-it-down-lockup-plate.svg) no-repeat left center/cover;
+  mask:url(logo/write-it-down-lockup-plate.svg) no-repeat left center/cover}
 .brand::after{content:"";position:absolute;inset:-6px 0;background:currentColor;
   -webkit-mask:url(logo/write-it-down-lockup.svg) no-repeat center/100% auto;
   mask:url(logo/write-it-down-lockup.svg) no-repeat center/100% auto}

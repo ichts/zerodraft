@@ -266,7 +266,9 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
     const context = canvas.getContext('2d');
     const w = parseFloat(style.width), h = parseFloat(style.height);
     const size = style.maskSize || style.webkitMaskSize;
-    const ratio = size === 'contain' ? Math.min(w / image.width, h / image.height) : w / image.width;
+    const ratio = size === 'contain' ? Math.min(w / image.width, h / image.height)
+      : size === 'cover' ? Math.max(w / image.width, h / image.height)
+      : w / image.width;
     const dw = image.width * ratio, dh = image.height * ratio;
     const x = parseFloat(style.left), y = parseFloat(style.top) + (h - dh) / 2;
     context.drawImage(image, x * scale, y * scale, dw * scale, dh * scale);
@@ -321,7 +323,6 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
     return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
   };
   const plateLight = luminance(plate.color), glyphLight = luminance(glyph.color);
-  const wallLight = luminance(getComputedStyle(el.closest('.home') || document.body).backgroundColor);
   return {
     box: { width: +box.width.toFixed(2), height: +box.height.toFixed(2) },
     chipInkShare: chipInk / (chip * chip), chipHoleShare: chipHole / (chip * chip),
@@ -329,7 +330,6 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
     splitLength: best.length, splitContrast: +(Math.min(best.left, best.right) - floor).toFixed(2),
     topOfChipIsPlate: plate.alpha(Math.round(chip / 2), Math.round(chip * 0.06)) > 127,
     wordInkShare: wordInk / wordTotal, polarity: plateLight - glyphLight,
-    plateWallContrast: (Math.max(plateLight, wallLight) + 0.05) / (Math.min(plateLight, wallLight) + 0.05),
   };
 });
 
@@ -354,7 +354,6 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
       const direction = info.project.use.colorScheme === 'light' ? 1 : -1;
       expect(mark.polarity * direction, `${at} light plate with dark glyphs, dark plate with light glyphs`).toBeGreaterThan(0.6);
       if (path === 'index.html' && index === 0) {
-        console.log(`${info.project.name}: plate/wall contrast ${mark.plateWallContrast.toFixed(2)}:1`);
         await page.screenshot({ path: info.outputPath('header.png'), clip: { x: 0, y: 0, width: page.viewportSize().width, height: 110 } });
       }
       expect(mark.topOfChipIsPlate, `${at} the plate covers the top of the chip`).toBe(true);
@@ -378,12 +377,21 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
     await page.goto(path);
     const brand = page.locator('.brand:visible').first();
     expect(await brand.count(), `${path}: visible lockup`).toBeGreaterThan(0);
-    samples.push(await brand.evaluate((el, pagePath) => ({
-      path: pagePath,
-      theme: document.documentElement.dataset.theme,
-      plate: getComputedStyle(el, '::before').backgroundColor,
-      token: getComputedStyle(el).getPropertyValue('--brand-plate').trim(),
-    }), path));
+    const controlEdge = await page.locator('nav[aria-label="Main"]:visible .theme-btn').first().evaluate(button => {
+      const style = getComputedStyle(button);
+      return `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`;
+    });
+    samples.push(await brand.evaluate((el, [pagePath, edge]) => {
+      const plate = getComputedStyle(el, '::before');
+      return {
+        path: pagePath,
+        theme: document.documentElement.dataset.theme,
+        plate: plate.backgroundColor,
+        token: getComputedStyle(el).getPropertyValue('--brand-plate').trim(),
+        edge: `${plate.borderTopWidth} ${plate.borderTopStyle} ${plate.borderTopColor}`,
+        controlEdge: edge,
+      };
+    }, [path, controlEdge]));
   }
   const theme = samples[0].theme;
   expect(new Set(samples.map(s => s.theme)).size, 'every page renders the same stored theme').toBe(1);
@@ -393,6 +401,11 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
   const tokens = new Set(samples.map(s => s.token));
   expect(tokens.size, `${theme}: one --brand-plate token, not ${samples.map(s => `${s.path}=${s.token || '(unset)'}`).join(', ')}`).toBe(1);
   expect(samples[0].token, `${theme}: the plate resolves the --brand-plate token, not a page-local fallback`).not.toBe('');
+  for (const sample of samples) {
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is a solid 1 px line`).toMatch(/^1px solid /);
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is the theme button's hairline`).toBe(sample.controlEdge);
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is visible`).not.toMatch(/,\s*0\)$/);
+  }
 });
 
 // Narrow phones: /download/ carries the widest header (brand, page action, theme button), so 360 px decides

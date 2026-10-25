@@ -44,7 +44,11 @@ and the guest screen is captured as a timestamped frame stream that the host ass
 - PASS, deterministic analysis with a known-broken-state proof: `scripts/vm/analyse-recording.py` reproduces the
   1.0 launch flash from the 1.0 launch frames ("a forbidden surface appeared for 184 ms during launch") and
   passes on the same frames with that state removed; a 5.3 s capture gap and a frozen screen over 20 s each fail
-  the run, and a gapped or truncated frame stream fails before the verdict.
+  the run, and a gapped or truncated frame stream fails before the verdict. Both recorded bundles carry
+  `analysis: complete` in `acceptance.txt`: the analyser ran and produced its assertion lines with no analyser
+  error, and on the 1.0 bundle its transient-launch finding is what failed the launch assertion. Every run now
+  records that one line, read from the panel's own derived status, next to the launch assertions and the
+  six-lens result.
 - NOT RUN: the offline re-verification and revocation paths of case 58, real purchase and payment, and any
   Finder install or first launch outside the prepared VM image. No claim is made for those here.
 

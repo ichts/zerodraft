@@ -244,13 +244,25 @@ def clip(argv):
 
 
 def lens_status(evidence, required):
-    """Shell-readable summary of the six-lens stage for the host verdict."""
+    """Shell-readable summary of the panel stages the host verdict reads."""
     panel_dir = os.path.join(os.path.abspath(evidence), "panel")
     lenses = []
     lens_stage = os.path.join(panel_dir, "stage-04-lenses.json")
     if os.path.exists(lens_stage):
         with open(lens_stage, encoding="utf-8") as handle:
             lenses = json.load(handle).get("lenses") or []
+    analysis = {}
+    capability_stage = os.path.join(panel_dir, "stage-05-capabilities.json")
+    if os.path.exists(capability_stage):
+        with open(capability_stage, encoding="utf-8") as handle:
+            analysis = next((capability for capability in json.load(handle).get("capabilities") or []
+                             if capability.get("stage") == "deterministic analysis"), {})
+    if analysis:
+        print("analysis=%s" % " ".join(("%s (%s)" % (
+            analysis.get("status") or "not recorded",
+            analysis.get("detail") or "")).split()))
+    else:
+        print("analysis=not recorded: the panel wrote no deterministic analysis status")
     complete = [lens for lens in lenses if lens.get("status") == "complete"]
     incomplete = [lens for lens in lenses if lens.get("status") != "complete"]
     complete_names = {lens.get("lens") for lens in complete}

@@ -2,7 +2,7 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
-## 2026-10-25: Recorded VM acceptance of the shipped 1.0 DMG, and the launch-flash fix proven live
+## 2026-10-25: Recorded VM run of the shipped 1.0 DMG (declared defect, not accepted), and the launch-flash fix proven live
 
 Recorded acceptance now runs on the Mac mini inside a Tart macOS virtual machine: the guest boots headless, the
 DMG is installed inside it the way a person installs it, the app is driven with CGEvent keyboard and mouse input,
@@ -33,7 +33,8 @@ and the guest screen is captured as a timestamped frame stream that the host ass
   followed 184 ms later against the loopback fixture. Fixed on main by PR 62
   (https://github.com/ichts/zerodraft/pull/62). The rig excuses exactly that assertion id on exactly that
   artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, exits 78 rather
-  than 0, and fails the run if the assertion passes with the declaration still in place. The analyser keeps that
+  than 0 with `sign_off: not accepted` for exactly this artifact, and fails the run if the assertion passes with
+  the declaration still in place. This artifact is therefore not a release acceptance. The analyser keeps that
   id for the licensed relaunch streams only, so the same surface in any other launch stream fails under its own
   id and cannot borrow the declaration.
 - PASS, fix proven live: a locally built `.app` from current main (ad-hoc signed by `scripts/package-app.sh`,

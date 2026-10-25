@@ -262,6 +262,24 @@ def check_analyser_alignment(workdir):
     need("FAIL [recording-analysis]" in dropped.stdout,
          "a dropped capture produced no failed assertion line")
 
+    # A stream with fewer than two frames cannot be compared; it must record an
+    # explicit failure instead of breaking the two-value contract.
+    single = os.path.join(workdir, "single-frame")
+    os.makedirs(os.path.join(single, "frames"))
+    solid_png(os.path.join(single, "frames", "000000.jpg"), PALETTE[0], width=192, height=108)
+    with open(os.path.join(single, "frames.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("1700000000000\t000000.jpg\n")
+    lonely = run([sys.executable, ANALYSER, single])
+    need(lonely.returncode != 0, "a single-frame stream was accepted as a recording")
+    need("FAIL [recording-analysis]" in lonely.stdout,
+         f"a single-frame stream produced no failed assertion: {lonely.stdout[-400:]}")
+    need("at least two" in lonely.stdout,
+         f"the single-frame failure does not say why: {lonely.stdout[-400:]}")
+    with open(os.path.join(single, "findings.json"), encoding="utf-8") as handle:
+        recorded = json.load(handle)["recording"]
+    need("at least two" in (recorded.get("error") or ""),
+         f"the bundle did not record why the analysis failed: {recorded!r}")
+
 
 def status_fields(evidence, required=REQUIRED_LENSES):
     result = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
@@ -427,6 +445,11 @@ def check_panel_stages(workdir):
          "the report header did not use recording.tsv: %r" % (run_metadata.get("recording"),))
     with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
         merged = json.load(handle)
+    analysis = next((capability for capability in merged.get("capabilities") or []
+                     if capability.get("stage") == "deterministic analysis"), {})
+    need(analysis.get("status") == "complete"
+         and "1 finding" in (analysis.get("detail") or ""),
+         f"the deterministic analysis stage is not labelled by its outcome: {analysis!r}")
     lenses = merged.get("lenses") or []
     need(len(lenses) == 6, f"the panel recorded {len(lenses)} lenses instead of six")
     need(all(lens.get("status") == "unavailable" for lens in lenses),
@@ -496,6 +519,25 @@ def check_panel_stages(workdir):
     need(fields.get("lenses_required_missing") == "",
          f"a fully answered panel reported missing lenses: {fields.get('lenses_required_missing')!r}")
     need("reason=" not in status.stdout, "a fully answered panel still reported a blocking reason")
+
+    # Known-broken: without findings.json the analysis stage used to be labelled
+    # complete anyway. It must be a declared gap that names the missing file.
+    os.remove(os.path.join(evidence, "findings.json"))
+    unanalysed = subprocess.run(["bash", DESIGN_PANEL, evidence], capture_output=True, text=True,
+                                env=dict(os.environ, WID_PANEL_SKIP_MODELS="1"), timeout=300)
+    need(unanalysed.returncode == 0,
+         f"design-panel.sh exited {unanalysed.returncode}: {unanalysed.stderr[-400:]}")
+    with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
+        without_analysis = json.load(handle)
+    analysis = next((capability for capability in without_analysis.get("capabilities") or []
+                     if capability.get("stage") == "deterministic analysis"), {})
+    need(analysis.get("status") == "declared gap",
+         f"a missing analysis was labelled {analysis.get('status')!r} instead of a declared gap")
+    need("findings.json is missing" in (analysis.get("detail") or ""),
+         f"the gap does not name the reason: {analysis.get('detail')!r}")
+    need(any("deterministic analysis did not run" in gap
+             for gap in without_analysis.get("declared_gaps") or []),
+         f"the bundle does not declare the missing analysis: {without_analysis.get('declared_gaps')!r}")
 
     # Known-broken: every prompt answered with the Rams review. That is one review
     # repeated, so no lens may count and the six-lens gate must stay blocked.

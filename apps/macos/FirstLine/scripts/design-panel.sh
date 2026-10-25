@@ -12,11 +12,15 @@
 #          Exit 0 when every stage is complete or its gap is declared; exit 2 on a
 #          usage error.
 # [POS] apps/macos/FirstLine/scripts/design-panel.sh - the review stage that runs on
-#       a recorded acceptance bundle: deterministic findings first, then short clips
-#       for the flagged windows, then one design review per lens.
-# [PROTOCOL] The deterministic analysis (scripts/vm/analyse-recording.py) is the
-#            assertion source and runs before any model. Models only read captures:
-#            they never choose an action and never gate a run. A model route that is
+#       a recorded acceptance bundle: it reads the deterministic findings the journey
+#       wrote, cuts short clips for the flagged windows, then runs one design review
+#       per lens.
+# [PROTOCOL] vm-journey.sh runs scripts/vm/analyse-recording.py before this stage and
+#            this script reads its findings.json; the deterministic analysis is the
+#            assertion source and is labelled by its actual outcome, complete with its
+#            finding count or a declared gap with the reason, never as complete
+#            unconditionally. Models only read captures: they never choose an action
+#            and never gate a run. A model route that is
 #            unavailable is recorded as a declared gap with its exact error, never
 #            skipped silently, and never turns into a failure of the recording. A
 #            flagged clip is seeked from the recording's own time origin (the first
@@ -133,9 +137,13 @@ json.dump({"findings": data.get("findings", []),
            "recording_analysis": data.get("recording", {})}, open(sys.argv[2], "w"),
           indent=2, sort_keys=True)
 PY
+  analysis_status='complete'
+  analysis_detail="$(jq -r '"\(.findings | length) finding(s) from scripts/vm/analyse-recording.py, no model"' "$evidence/findings.json")"
 else
   note 'no findings.json in the bundle: the deterministic analysis did not run for this evidence'
   printf '{"findings": [], "recording_analysis": {"error": "findings.json missing"}}\n' >"$panel/stage-01-findings.json"
+  analysis_status='declared gap'
+  analysis_detail='findings.json is missing from the bundle, so the deterministic analysis did not run and this recording has no assertion source'
 fi
 
 # --- flagged clips --------------------------------------------------------------
@@ -340,6 +348,8 @@ jq -n --argjson lenses "$lens_stage" '{lenses: $lenses}' >"$panel/stage-04-lense
 
 # --- capability matrix and declared gaps ----------------------------------------
 gaps=()
+[[ "$analysis_status" == 'complete' ]] \
+  || gaps+=("The deterministic analysis did not run for this bundle: $analysis_detail")
 capabilities='[]'
 capabilities="$(jq -c --arg model "$review_model" --arg skip "$skip_models" \
   '. + [{stage: "reviewer model", status: ($model | if . == "" then "declared gap" else "complete" end), model: $model, detail: (if $model != "" then "answered the readiness probe" elif $skip == "1" then "model stages disabled by WID_PANEL_SKIP_MODELS=1" else "no candidate route answered; see panel/model-probes.tsv" end)}]' <<<"$capabilities")"
@@ -348,7 +358,8 @@ while IFS=$'\t' read -r probed_model probed_detail _probed_soft; do
   capabilities="$(jq -c --arg model "$probed_model" --arg detail "$probed_detail" \
     '. + [{stage: "reviewer candidate", status: "declared gap", route: $model, detail: $detail}]' <<<"$capabilities")"
 done <"$probe_log"
-capabilities="$(jq -c '. + [{stage: "deterministic analysis", status: "complete", model: "", detail: "scripts/vm/analyse-recording.py, no model"}]' <<<"$capabilities")"
+capabilities="$(jq -c --arg status "$analysis_status" --arg detail "$analysis_detail" \
+  '. + [{stage: "deterministic analysis", status: $status, model: "", detail: $detail}]' <<<"$capabilities")"
 if [[ "$skip_models" != '1' ]]; then
   for route in cursor/gemini-3.8-flash cursor/gemini-4-argon; do
     probe_out="$answers/probe-$(printf '%s' "$route" | tr '/' '-').jsonl"

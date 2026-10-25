@@ -9,6 +9,48 @@ Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current accept
 - Read-only mount confirms the release configuration: service `https://licenses.writeitdown.app`, product `prod_VUeTDTehcGAqJK`, base64 Ed25519 public key `ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=`, checkout `https://writeitdown.app/mac.html`, `$4.99`, version 1.0 (build 1), copyright Trefoil Studio.
 - Not run: `scripts/dmg-journey.sh` (needs an approved GUI test machine plus the clean-login evidence directory), any real-window session, and any Finder install or activation. Installed-DMG TEST acceptance remains pending with the maintainer; this record makes no GUI, purchase or payment claim.
 
+## 2026-10-25: Sparkle 1.1 auto-update, release signing fix, no real-window acceptance
+
+This batch adds Sparkle 2.10.0 (opt-in checks, room guard), fixes the release signing so Sparkle's
+plain-Mach-O helpers are Developer ID signed, and adds the appcast/ZIP release path. No native window
+journey was run here: this machine has Command Line Tools only (no Xcode, so no universal build) and
+no Developer ID identity, and GUI journeys are prohibited on the Mini.
+
+- `swift build`: pass. `swift test`: 299 tests, with exactly the two failures that already fail on the
+  pristine base commit `1446b4a` (`EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and
+  `EditorFocusTests.imeMovementStaysWithinMarkedRange`, both `engine.lastDenyAt == nil`): a headless
+  CLI test process has no active app, so `NSApp.sendAction` never delivers the movement command to the
+  editor. Proven pre-existing by stashing this batch and running the same filters. New and changed
+  tests pass: `UpdatePolicyTests`, `SettingsUpdateTests`, `UpdateMenuTests`, `SnapshotTests`.
+- Captures (`WID_SNAPSHOT_DIR`, 1040x720 AppKit content snapshots, not live windows):
+  `settings-updates-light.png` and `settings-updates-dark.png`. Inspected: the `Updates` section header
+  aligns with the `Appearance` header's left edge; the checkbox box shares that edge; the label uses
+  the same 13 pt control style as `Fullscreen focus`; the 28 pt section rhythm is unchanged above and
+  below; About now reads `Version 1.1` from the tracked `Info.plist`. No text is clipped, no row
+  shifts when the section is absent (bare executable) and `settings-light.png` is unchanged.
+- Release tooling proof without Xcode, in `/tmp/wid-sparkle-proof` (disposable): a universal app was
+  assembled by hand (arm64 and x86_64 lipo'd, Sparkle.framework via `ditto`), signed with
+  `Apple Development: Ziying WANG (N42F4QZ48V)` through `scripts/sign-nested.sh`. The team gate passes
+  (`4BNUMV44F8` on the app, framework, Updater.app, both XPCs and `Autoupdate`), every helper carries
+  `flags=0x10000(runtime)` plus a secure timestamp, and `codesign --verify --deep --strict` prints
+  `valid on disk`. The Sparkle ZIP payload is 8,507,080 bytes and keeps `Versions/Current`.
+  `scripts/publish-appcast.sh` (disposable key file, `WID_SPARKLE_KEY_FILE`) wrote a signed feed for
+  `sparkle:version 2`, `1.1`, `minimumSystemVersion 14.0`, no `hardwareRequirements`, with
+  `sign_update --verify` exit 0 and a one-byte-tampered copy exit 1. An arm64-only build is refused by
+  the feed check, which is the negative control for the universal requirement.
+- `python3 scripts/test-release-config.py`: exit 0. It now also proves the release is blocked by a
+  placeholder `SUPublicEDKey`, an unsafe appcast URL, a non-integer build number, and a build number
+  that is not greater than `dist/updates/last-build.txt`.
+- Site: `cd writeitdown && npm ci && npx playwright test` - 460 passed, 36 skipped. Root landing
+  `npm test` - 2 passed. The download page gained one `#release-notes` line inside the download card,
+  so the Install/Activate/Refunds structure the journey asserts is unchanged.
+- Pending, not claimed: notarization of a build carrying the re-signed Sparkle helpers (needs the
+  Developer ID identity and notary credentials), the universal `swift build` through
+  `scripts/package-app.sh` (needs Xcode), Gatekeeper verdicts on the new bundle, and every real-window
+  Sparkle behaviour - no consent prompt on launch, no check before the toggle, the alert deferred out
+  of a running session and shown after it, and the alert's buttons. Those belong to the release-Mac
+  acceptance in `docs/RELEASE_CHECKLIST.md`. No DMG build, upload, deployment or merge was performed.
+
 ## 2026-10-23: Configured purchase build, no real-window acceptance
 
 - `swift build && swift test`: exit 0, 198 tests in 16 suites. Existing signed Ed25519 fixtures exercise activation, product/device binding, expiry, persistence and revocation through the unchanged token verifier and HTTP client. The exhausted-trial Buy test now clicks the enabled control through an injected URL opener and verifies the public purchase page; it never opens a real checkout.

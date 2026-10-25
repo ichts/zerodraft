@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState
- * [OUTPUT]: AppKit 菜单，包含 Cmd+N 新篇、Cmd+C 成稿复制、Cmd+W 关窗和 Cmd+, Settings。
+ * [OUTPUT]: AppKit 菜单，包含 Cmd+N 新篇、Cmd+C 成稿复制、Cmd+W 关窗、Cmd+, Settings 与 Check for Updates…。
  * [POS]: 菜单 target-action 桥接 AppDelegate，动态命令由 validateMenuItem 验证。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -9,7 +9,8 @@ import AppKit
 
 enum MainMenuBuilder {
     @MainActor
-    static func buildMenu(appState: AppState, validationOwner: NSMenuItemValidation & AnyObject) -> NSMenu {
+    static func buildMenu(appState: AppState, validationOwner: NSMenuItemValidation & AnyObject,
+                          showsUpdateCheck: Bool = false) -> NSMenu {
         let mainMenu = NSMenu()
         mainMenu.autoenablesItems = false
 
@@ -26,6 +27,19 @@ enum MainMenuBuilder {
         )
         aboutItem.target = validationOwner
         appMenu.addItem(aboutItem)
+
+        // Check for Updates… sits where macOS users look for it: under About. It is the only
+        // visible affordance for the update feature; automatic checks stay off until the writer
+        // turns them on in Settings.
+        if showsUpdateCheck {
+            let updateItem = NSMenuItem(
+                title: "Check for Updates…",
+                action: #selector(FirstLineAppDelegate.checkForUpdates(_:)),
+                keyEquivalent: ""
+            )
+            updateItem.target = validationOwner
+            appMenu.addItem(updateItem)
+        }
 
         appMenu.addItem(.separator())
 

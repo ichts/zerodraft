@@ -27,6 +27,7 @@ Required before opening LIVE sales, not before releasing the free trial. Current
 - [ ] Confirm config path and absence of draft files on a clean machine
 
 ## Signing
+- [ ] The update signing key exists on the release Mac and `SUPublicEDKey` in `Sources/FirstLine/Info.plist` is the printed public key, not the placeholder, and the private key is backed up per [`docs/RELEASE_KEY.md`](RELEASE_KEY.md).
 - [x] Account Holder installed a valid Developer ID Application identity in the login keychain. Configured DMG signing and notarization evidence, and the pending installed-DMG acceptance, are recorded in `MANUAL_QA.md`.
 - [x] Assemble the local release app with `scripts/package-app.sh --adhoc`; the packaged resource bundle is under `Contents/Resources/` and the icon is compiled to `.icns`.
 - [ ] Verify the release configuration against [Release configuration](LICENSE_PAYMENT_SPEC.md#release-configuration); that section owns required fields and staging restrictions.
@@ -35,6 +36,22 @@ Required before opening LIVE sales, not before releasing the free trial. Current
 ## Notarization
 - [x] Save validated App Store Connect API credentials in the login keychain as `writeitdown-notary` (no app-specific password)
 - [ ] Confirm the live artifacts from `scripts/release-dmg.sh` match its header: stapled app and DMG, WID volume icon, and checksum sidecar.
+- [ ] Confirm the signed app's nested code all carries one TeamIdentifier (`scripts/sign-nested.sh` proves it before the notary wait) and that `Sparkle.framework/Versions/B/Autoupdate` is Developer ID signed, not ad-hoc. This is what fails notarization if the plain-Mach-O pass is ever removed.
+
+## Updates (Sparkle)
+
+Owned by `scripts/release-dmg.sh` (payload and gates) and `scripts/publish-appcast.sh` (feed). The
+key procedure is `docs/RELEASE_KEY.md`; hosting and routing are owned by
+[`writeitdown/README.md`](../../../../writeitdown/README.md#mac-download-release).
+
+- [ ] `CFBundleVersion` is a positive integer greater than `dist/updates/last-build.txt`; `release-dmg.sh` refuses otherwise. Delete that file only for a deliberate rebuild of the same build number.
+- [ ] `dist/updates/WriteItDown-<version>.zip` exists and contains the stapled app (the script writes it after `stapler validate`). Staging runs must produce no ZIP.
+- [ ] `scripts/publish-appcast.sh` exits 0: the feed carries exactly one item for the new build, names a minimum system version, carries no `sparkle:hardwareRequirements` (the release must stay one universal app), and its enclosure signature verifies with `sign_update --verify`.
+- [ ] The archive and every `.delta` are uploaded before `appcast.xml`. A feed that points at a missing payload shows every user a failed update.
+- [ ] `curl -sSI https://writeitdown.app/download/appcast.xml` returns 200 `application/xml`, and a missing file under `/download/updates/` returns 404, never 200 HTML from the site's catch-all.
+- [ ] `lipo -info` on `Contents/MacOS/WriteItDown` and on `Sparkle.framework/Versions/B/Sparkle` shows `x86_64 arm64`.
+- [ ] The download page's DMG name and published SHA-256 are updated in the same deploy as the DMG upload, and `npm run release-check -- --download` passes (`--live` after the install).
+- [ ] Real-window evidence for the first Sparkle release (update alert not shown inside a running session, deferred alert after the session, consent-free default with the toggle off) is recorded in `MANUAL_QA.md`. Until then the room guard is proven by unit tests only.
 
 ## Release packaging
 - [ ] Name release artifact consistently

@@ -431,3 +431,28 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` carry the accepted placement.
 - Supersedes: D-031's "above the 'How long?' card" placement only; its rules-page copy, question-mark
   control and dismissal rules stand.
+
+## D-037: Updates are opt-in, and never enter the writing room
+
+- Date: 2026-10-25
+- Decision: Write It Down 1.1 ships Sparkle 2.10.0 with automatic checks OFF by default.
+  `SUEnableAutomaticChecks` is false, so the app never prompts and never schedules a check; the only
+  two triggers are `Settings > Updates > Check for updates automatically` and `Check for Updates…`
+  in the app menu. The standard Sparkle UI is used, and no update window may appear while a writing
+  session is running: a scheduled update found during a session is remembered and brought back once
+  the session ends, and the menu command is disabled in the room. Update archives are EdDSA-signed
+  ZIP payloads served from `https://writeitdown.app/download/updates/` with the feed at
+  `https://writeitdown.app/download/appcast.xml`; the DMG stays the public installer. The captain
+  creates and holds the signing key (`apps/macos/FirstLine/docs/RELEASE_KEY.md`), and the build ships
+  a placeholder the release script refuses. The privacy promise in `WRITEITDOWN_PLAN.md` and
+  `writeitdown/privacy.html` is amended to state exactly this: no check runs unless the writer turns
+  it on or asks. 1.0 users learn about 1.1 from a release-notes line on the download page; the first
+  automatic delivery lands with 1.2.
+- Reason: 1.0 shipped with no update channel, so IME and room fixes could never reach installed
+  copies, and "free updates included" stayed an empty promise. The captain chose the least invasive
+  version of it: no network traffic the writer did not ask for, no window that can steal focus from
+  an eight-second silence deadline, and no key material in the repository.
+- Supersedes: the 2026-10-24 privacy sentence "no update checks are added" in
+  `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` section 7, and the download page's single-version
+  release-notes absence. All other room decisions stand: update UI is never part of the room and the
+  room's strings, geometry, and motion are unchanged.

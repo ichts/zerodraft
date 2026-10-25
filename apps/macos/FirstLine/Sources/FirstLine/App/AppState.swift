@@ -30,6 +30,9 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
+    /// Marketing version shown in Settings > About; the same configuration source as the price,
+    /// so a bare executable (swift run, tests) reports the tracked Info.plist instead of a placeholder.
+    static var displayVersion: String { configuration["CFBundleShortVersionString"] as? String ?? "" }
     static var licenseProductID: String { configuration["WIDLicenseProductID"] as? String ?? "" }
     static var configuredLicenseClient: WaffoLicenseClient {
         WaffoLicenseClient(baseURL: (configuration["WIDLicenseServiceURL"] as? String).flatMap(URL.init(string:)),

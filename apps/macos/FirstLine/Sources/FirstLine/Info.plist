@@ -7,9 +7,9 @@
     <key>CFBundleName</key>
     <string>Write It Down</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
+    <string>1.1</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>WIDDisplayPrice</key>
     <string>$4.99</string>
     <key>WIDCheckoutURL</key>
@@ -20,6 +20,21 @@
     <string>prod_VUeTDTehcGAqJK</string>
     <key>WIDLicensePublicKey</key>
     <string>ZjyVb5Twq4UPWjattEuyWZdSr0nsAYslV41RJtFtBsw=</string>
+    <!-- Updates (Sparkle 2.10.0). The feed and its archives live under https://writeitdown.app/download/. -->
+    <key>SUFeedURL</key>
+    <string>https://writeitdown.app/download/appcast.xml</string>
+    <!-- PLACEHOLDER: the captain replaces this with the key printed by generate_keys for the
+         writeitdown account on the release Mac (see docs/RELEASE_KEY.md). It is a well-formed
+         32-byte key so the app starts cleanly, and no one holds its private key, so no update can
+         ever verify against it. scripts/release-dmg.sh refuses to build a release while this value
+         is unchanged. -->
+    <key>SUPublicEDKey</key>
+    <string>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</string>
+    <!-- Off by default: no check runs until the writer turns it on in Settings or asks from the menu. -->
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUScheduledCheckInterval</key>
+    <integer>86400</integer>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>

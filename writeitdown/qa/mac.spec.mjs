@@ -416,7 +416,7 @@ test('legal pages state the 3-session trial and the local counter', async ({ pag
 
 test('DMG release packaging refuses unconfigured builds', () => {
   test.skip(test.info().project.name !== '1440-dark-no-preference', 'configuration gate, one project is enough');
-  expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete safe configuration');
+  expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete license and update configuration');
 });
 
 test('installer installs the complete purchase bundle and rejects symlinks', () => {

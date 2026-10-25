@@ -69,6 +69,10 @@ captain decisions, not chat history:
   and to the real-window recording that proves it.
 - `docs/ui-quality.md` - the cross-surface quality bar every user-visible change is measured against
   before hands-on testing; each rule names its measurement or capture.
+- `docs/feature-flow.md` - the eight-step flow every new captain-tier feature follows, from the idea
+  and its rejection bar to the two-minute retro; tiny changes skip steps 1 to 5 as the fast path.
+- `docs/feature-card-template.md` - the one-page card the agent fills at step 6 of that flow, with the
+  Chinese headings the captain reads and an English gloss for each.
 
 These records sit at L1 because they bind both surfaces. Module detail stays in
 `apps/macos/FirstLine/AGENTS.md`, `apps/macos/FirstLine/docs/`, `design/DESIGN.md` and the web

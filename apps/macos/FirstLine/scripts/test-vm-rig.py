@@ -740,6 +740,90 @@ def check_launchd_forwarding(workdir):
          "the launchd job would receive variables nobody asked it to forward")
 
 
+def check_review_record_extra_lens(workdir):
+    evidence = os.path.join(workdir, "seven lenses")
+    os.makedirs(evidence)
+    with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
+        handle.write("artifact: fixture\nverdict: accepted\n")
+    with open(os.path.join(evidence, "recording.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("12.4\t48\t1234567\t310\n")
+    with open(os.path.join(evidence, "findings.json"), "w", encoding="utf-8") as handle:
+        json.dump({"recording": {"frames": 48, "span_ms": 11750}, "findings": []}, handle)
+    bindir = os.path.join(workdir, "bin")
+    os.makedirs(bindir)
+    write_pi_stub(os.path.join(bindir, "pi"),
+                  "found = re.search(r'lens identifier is \"([a-z]+)\"', prompt)\n"
+                  "answer = dict({\"lens\": 'rams', \"verdict\": \"sound\", \"summary\": \"quiet\", "
+                  "\"findings\": []}, lens=found.group(1) if found else '')\n")
+    extra = REQUIRED_LENSES + ["contrast"]
+    completed = subprocess.run(
+        ["bash", DESIGN_PANEL, evidence], capture_output=True, text=True, timeout=300,
+        env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"],
+                 WID_PANEL_MODEL="stub/model",
+                 WID_PANEL_LENSES=" ".join(extra),
+                 WID_PANEL_REQUIRED=" ".join(REQUIRED_LENSES)))
+    need(completed.returncode == 0,
+         f"design-panel.sh exited {completed.returncode}: {completed.stderr[-400:]}")
+    with open(os.path.join(evidence, "acceptance.txt"), encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    need("panel: complete" in lines,
+         f"an extra lens turned a complete review into a refusal: {lines!r}")
+    need("panel_lenses_complete: 7/7" in lines,
+         f"the record does not carry every lens it ran: {lines!r}")
+    need("sign_off: accepted" in lines,
+         f"a complete review over the six required lenses did not sign off: {lines!r}")
+    need(not any(line.startswith("panel_not_run:") for line in lines),
+         f"a complete review carried a refusal reason: {lines!r}")
+
+    with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
+        handle.write("artifact: fixture\nverdict: rejected\n")
+    recorded = subprocess.run([sys.executable, PANEL_LIB, "record", evidence],
+                              capture_output=True, text=True, timeout=120)
+    need(recorded.returncode == 0, f"record failed: {recorded.stderr[:300]}")
+    with open(os.path.join(evidence, "acceptance.txt"), encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    need("sign_off: not accepted - an assertion or the recording failed" in lines,
+         f"a rejected run recorded an accepted sign-off: {lines!r}")
+
+
+def check_declared_gap_remedy(workdir):
+    evidence = os.path.join(workdir, "a bundle with spaces")
+    os.makedirs(evidence)
+    with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
+        handle.write("artifact: fixture\nverdict: accepted\n")
+    with open(os.path.join(evidence, "recording.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("12.4\t48\t1234567\t310\n")
+    with open(os.path.join(evidence, "findings.json"), "w", encoding="utf-8") as handle:
+        json.dump({"recording": {"frames": 48, "span_ms": 11750}, "findings": []}, handle)
+    bindir = os.path.join(workdir, "bin")
+    os.makedirs(bindir)
+    failing = os.path.join(bindir, "pi")
+    with open(failing, "w", encoding="utf-8") as handle:
+        handle.write("#!/bin/bash\nexit 1\n")
+    os.chmod(failing, 0o755)
+    blocked = subprocess.run(
+        ["bash", DESIGN_PANEL, evidence], capture_output=True, text=True, timeout=300,
+        env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"],
+                 WID_PANEL_MODEL="stub/model", WID_PANEL_ALTERNATES="stub/alternate",
+                 WID_PANEL_ATTEMPTS="1", WID_PANEL_BACKOFF="0"))
+    need(blocked.returncode == 0,
+         f"design-panel.sh exited {blocked.returncode}: {blocked.stderr[-400:]}")
+    with open(os.path.join(evidence, "panel", "panel.json"), encoding="utf-8") as handle:
+        gaps = json.load(handle).get("declared_gaps") or []
+    gap = next((text for text in gaps if "Re-run: " in text), "")
+    need(gap, f"the no-reviewer gap carries no remedy: {gaps!r}")
+    remedy = gap.split("Re-run: ", 1)[1]
+    parsed = subprocess.run(["/bin/sh", "-c", "set -- " + remedy + '; printf \'%s\\n\' "$@"'],
+                            capture_output=True, text=True, timeout=60)
+    arguments = parsed.stdout.split("\n")[:-1]
+    need(arguments == ["bash", DESIGN_PANEL, os.path.realpath(evidence)],
+         f"the declared-gap remedy does not survive a shell parse: {arguments!r}")
+    with open(os.path.join(evidence, "acceptance.txt"), encoding="utf-8") as handle:
+        lines = handle.read().splitlines()
+    need("panel_command: " + remedy in lines,
+         f"the bundle carries two different remedies: {lines!r} vs {remedy!r}")
+
+
 def check_review_record_remedy(workdir):
     evidence = os.path.join(workdir, "a bundle with spaces")
     os.makedirs(evidence)
@@ -827,6 +911,8 @@ CHECKS = [
     ("design panel writes its stages from a bundle", check_panel_stages),
     ("a blocked review record is refreshed by its printed remedy", check_review_record_remedy),
     ("the launchd job receives the panel's environment", check_launchd_forwarding),
+    ("an extra lens still records and signs off the same review", check_review_record_extra_lens),
+    ("the declared-gap remedy is one pasteable command", check_declared_gap_remedy),
 ]
 
 

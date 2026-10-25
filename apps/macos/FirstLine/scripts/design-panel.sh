@@ -367,6 +367,7 @@ jq -n --argjson lenses "$lens_stage" '{lenses: $lenses}' >"$panel/stage-04-lense
 
 # --- capability matrix and declared gaps ----------------------------------------
 gaps=()
+remedy="$(python3 "$here/vm/panel-lib.py" command "$evidence")"
 [[ "$analysis_status" == 'complete' ]] \
   || gaps+=("The deterministic analysis did not complete for this bundle: $analysis_detail")
 capabilities='[]'
@@ -394,7 +395,7 @@ if [[ "$skip_models" != '1' ]]; then
   done
 fi
 if [[ -z "$review_model" && "$skip_models" != '1' ]]; then
-  gaps+=("No reviewer model answered from this lane. Every candidate is listed with its exact error in panel/model-probes.tsv and in the capability matrix; the deterministic analysis and the report were still produced. Re-run: bash apps/macos/FirstLine/scripts/design-panel.sh $(printf '%s' "$evidence")")
+  gaps+=("No reviewer model answered from this lane. Every candidate is listed with its exact error in panel/model-probes.tsv and in the capability matrix; the deterministic analysis and the report were still produced. Re-run: $remedy")
 fi
 [[ "$skip_models" == '1' ]] && gaps+=("Model stages were disabled by WID_PANEL_SKIP_MODELS=1; only the deterministic analysis ran.")
 jq -n --argjson capabilities "$capabilities" --argjson gaps "$(printf '%s\n' "${gaps[@]:-}" | jq -R . | jq -sc '[.[] | select(. != "")]')" \

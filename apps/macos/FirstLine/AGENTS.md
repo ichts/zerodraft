@@ -21,7 +21,7 @@ Sources/FirstLine/App/FirstLineMain.swift: 纯 AppKit @main 入口；持有 AppS
 Sources/FirstLine/App/MainMenuBuilder.swift: NSApp.mainMenu 构建（Settings Cmd+,、新篇 Cmd+N、成稿复制 Cmd+C、关窗 Cmd+W）。
 Sources/FirstLine/App/RootWindowController.swift: 主窗口 NSWindowController；窗口只 size 一次，contentViewController 是常驻 RootContainerViewController；观察 AppState.selectedSurface（切 surface）、settings.theme（窗口 appearance）；启用鼠标移动事件供专注模式悬停显示计时/字数，原生退出全屏时同步关闭写作中的专注偏好，导航导致的退出则保留偏好；所有会话相位留在同一个房间。
 Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控制器；各 surface 以子 VC 原地切换（addChild/removeFromParent + 视图 autoresize 填充），把窗口尺寸与 surface 解耦，避免每次换 contentViewController 触发的 0x0 fitting-size / 递归 layout。
-Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 产品/设备/实例/有效期门槛（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
+Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 产品/设备/实例/有效期门槛（本地校验通过即授权，后台校验不阻塞、不闪现激活页）（@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
 Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前“How long?”白卡片；顶部为 split-W lockup，右上角一个小而安静的“?”打开规则页；五个时长分段按钮 + 三个静默分段只做选择并持久化，单个 Begin 启动选中时长；无副标题；默认 Begin 获焦点；通过 Observation 更新异步许可状态与试用计数。
 Sources/FirstLine/App/RulesViewController.swift: 由选择器“?”打开的规则 sheet；复用 landing “How it works”的文案与顺序（No way back / Eight seconds of silence / Reach zero, keep it），Done 或 Return 关闭，Esc 取消，明暗皆用 After 卡片。
 Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；AppIcon 使用 A split-W 标记，AppIcon `.icns` 只含浅色稿，图标内不出现红色；尺寸与配色规则见 `../../../design/DESIGN.md` §11。

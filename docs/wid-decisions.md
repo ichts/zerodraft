@@ -431,3 +431,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` carry the accepted placement.
 - Supersedes: D-031's "above the 'How long?' card" placement only; its rules-page copy, question-mark
   control and dismissal rules stand.
+
+## D-037: A stored license opens the picker; revalidation never holds access
+
+- Date: 2026-10-25
+- Decision: Entitlement at launch is decided by the stored token alone: an active status, a present
+  order key and install id, the configured product, and a token whose signature, product, install
+  label and seven-day lifetime verify locally, with the last validation inside the seven-day offline
+  grace. The online revalidation runs in the background and may not withhold access; only a definitive
+  revocation (service refusal) or an invalid/renewed token marks the license revoked or invalid, and
+  only then does the picker yield to the license card. Trial and unlicensed launch paths are unchanged.
+- Reason: The captain reported that every launch of the shipped app showed the license card first and
+  only then said the Mac was already active. `hasFullAccess` included "no validation in flight", so
+  the launch window presented the activation card until the network round trip finished.
+  Case 58 of `docs/wid-mac-behavior.md` carries the behaviour; the binding test opens a Mac with a
+  stored signed fixture license and asserts the picker is the first presented surface.
+- Supersedes: the "cached key is blocked until validation" launch behaviour; it stands only as the
+  local-verification requirement, not as a network hold.

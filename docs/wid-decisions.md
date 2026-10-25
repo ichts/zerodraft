@@ -679,7 +679,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the Mac moved (35% anchor, `Type to start`, stepped fade, grouped warning, one bar, the stopped
   screen, the kept top block, the two-step exit) and the web room did not, so the same product showed
   two different rooms.
-- Supersedes: the web-only room values that D-014, D-020, D-021, D-025 to D-030 and D-031 set for the
+- Supersedes: the web-only room values that D-014, D-020, D-021 and D-025 to D-030 set for the
   trial where they differ from the list above. It does not change any Mac decision.
 
 ## D-044: The landing demo shows the result screens without their controls

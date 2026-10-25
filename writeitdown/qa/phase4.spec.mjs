@@ -511,6 +511,7 @@ test('exit needs two acts, inks the inline confirmation on the footer row, and t
   await settle(page);
   await page.keyboard.press('Escape');
   await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+  await expect(page.locator('#status')).toHaveText('');
   await expect(page.locator('#room')).toBeVisible();
   const row = await page.evaluate(() => ({
     exit: window.__run(document.querySelector('#exit'), 'text'),
@@ -746,6 +747,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await capture(page, info, 'demo-warn');
   await seek(WARN_END + 100);
   await expect(page.locator('#paper')).toHaveClass(/cut/);
+  await expect(page.locator('#count')).toHaveText('0 words');
   await capture(page, info, 'demo-cut');
   await seek(CUT_END + 300);
   await expect(page.locator('#demo-stopped')).toBeVisible();
@@ -761,6 +763,13 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await capture(page, info, 'demo-report');
   await seek(CUT_END + 2700);
   await expect(page.locator('#cur')).not.toHaveText('');
+});
+
+test('the demo danger group stays hidden until the warn stage', async ({ page }) => {
+  await page.route('**/demo.js', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
+  await page.reload();
+  await expect(page.locator('#warn')).toBeHidden();
+  await expect(page.locator('#warn-caption')).toBeHidden();
 });
 
 test('the room wears the landing design system', async ({ page }) => {

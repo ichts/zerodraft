@@ -202,7 +202,6 @@ function requestExit() {
   if (exitArmedAt !== null && performance.now() - exitArmedAt <= CONFIRM_MS) { clearExitHint(); exit(); return; }
   exitArmedAt = performance.now();
   $('exit-hint').textContent = EXIT_HINT;
-  announce(EXIT_HINT);
   clearTimeout(exitTimer);
   exitTimer = setTimeout(clearExitHint, CONFIRM_MS);
 }

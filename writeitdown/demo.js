@@ -210,6 +210,7 @@ import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
       stoppedEl.hidden = true;
       put(reportEl, "rep", "");
       renderDraft({ done: [], cur: "" });
+      put(countEl, "count", "0 words");
       put(clockEl, "clock", "1:00");
     } else {
       // The failure screen: the same headline and red receipt the room and the Mac show.

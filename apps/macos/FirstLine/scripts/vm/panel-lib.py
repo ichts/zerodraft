@@ -6,16 +6,17 @@
         and, for a lens, the lens that was asked. `clip` reads the assembled
         recording plus the frame manifest. `status` and `record` read
         <evidence>/panel/stage-*.json, <evidence>/acceptance.txt and the lens names
-        their caller requires; `record` also writes the derived review lines.
+        their caller requires; `record` also writes the derived review lines, and
+        `command` prints the one pasteable re-run command.
         `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
         script wrote.
 [OUTPUT] The terminal state of a model turn, one JSON verdict per model turn (either
          `{"status": "complete", "answer": <validated answer>}` or `{"status":
          "unavailable", "error": "<reason>"}`); a JSON clip record (origin, seek and
          the extracted frame names); the lens summary lines the host verdict reads;
-         the derived review lines of acceptance.txt, with re-run provenance; or a
-         self-contained static HTML report whose images are inlined so the bundle can
-         be read on its own.
+         the pasteable re-run command for a bundle; the derived review lines of
+         acceptance.txt, with re-run provenance; or a self-contained static HTML report
+         whose images are inlined so the bundle can be read on its own.
 [POS] apps/macos/FirstLine/scripts/vm/panel-lib.py - the small, boring part of
       design-panel.sh and vm-journey.sh: model-answer parsing and validation, clip
       cutting, lens summary and report rendering.
@@ -322,6 +323,13 @@ def sign_off_text(verdict, state):
     return "accepted"
 
 
+def panel_command_text(evidence):
+    """The one pasteable re-run command for a bundle."""
+    design_panel = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "design-panel.sh")
+    return "bash %s %s" % (shlex.quote(design_panel), shlex.quote(os.path.abspath(evidence)))
+
+
 def review_record(argv):
     """Rewrite the derived review lines in acceptance.txt from the panel stages."""
     parser = argparse.ArgumentParser(prog="panel-lib.py record")
@@ -345,14 +353,12 @@ def review_record(argv):
                          if line.startswith("panel_lenses_required:")), [])
     state = panel_state(evidence, required or None)
     panel_line = "complete" if not state["blocked"] else "not run"
-    design_panel = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                                "design-panel.sh")
     derived = [
         "analysis: %s" % state["analysis"],
         "panel: %s" % panel_line,
         "panel_lenses_complete: %d/%d" % (state["complete_count"], state["total"]),
         "panel_lenses_required: %s" % " ".join(state["required"]),
-        "panel_command: bash %s %s" % (shlex.quote(design_panel), shlex.quote(evidence)),
+        "panel_command: %s" % panel_command_text(evidence),
     ]
     derived.extend("panel_lens: %s\t%s\t%s\t%d" % (
         lens.get("lens") or "?", lens.get("status") or "unavailable",
@@ -578,7 +584,7 @@ def report():
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: panel-lib.py turn|verdict|clip|status|record|report", file=sys.stderr)
+        print("usage: panel-lib.py turn|verdict|clip|status|record|command|report", file=sys.stderr)
         return 2
     command = sys.argv[1]
     if command == "turn":
@@ -599,6 +605,12 @@ def main():
         return lens_status(arguments[0], rest[1:])
     if command == "record":
         return review_record(sys.argv[2:])
+    if command == "command":
+        if len(sys.argv) < 3:
+            print("usage: panel-lib.py command <evidence-dir>", file=sys.stderr)
+            return 2
+        print(panel_command_text(sys.argv[2]))
+        return 0
     if command == "report":
         return report()
     print(f"unknown command {command}", file=sys.stderr)

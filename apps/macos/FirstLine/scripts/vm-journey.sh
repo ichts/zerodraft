@@ -320,8 +320,8 @@ fi
 # is a stage of the run, not a separate command: its lens results are part of the
 # sign-off, and a run whose panel did not run is declared and blocked, never silently
 # passed.
-panel_command="bash $(printf '%q' "$scripts/design-panel.sh") $(printf '%q' "$evidence")"
 required_lenses='rams norman spiekermann kare matas vignelli'
+panel_command="$(python3 "$scripts/vm/panel-lib.py" command "$evidence")"
 panel_status=0
 WID_PANEL_REQUIRED="$required_lenses" bash "$scripts/design-panel.sh" "$evidence" \
   >>"$evidence/panel.log" 2>&1 || panel_status=$?
@@ -329,42 +329,31 @@ if ! grep -q '^sign_off:' "$evidence/acceptance.txt"; then
   python3 "$scripts/vm/panel-lib.py" record "$evidence" --require $required_lenses \
     >>"$evidence/panel.log" 2>&1 || log 'ERROR: could not write the review record into acceptance.txt'
 fi
-panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" --require $required_lenses 2>/dev/null)"
-analysis_line="$(sed -n 's/^analysis=//p' <<<"$panel_summary")"
-analysis_line="${analysis_line:-not recorded: the panel produced no status}"
-panel_total="$(sed -n 's/^lenses_total=//p' <<<"$panel_summary")"
-panel_complete="$(sed -n 's/^lenses_complete=//p' <<<"$panel_summary")"
-panel_missing="$(sed -n 's/^lenses_required_missing=//p' <<<"$panel_summary")"
-panel_total="${panel_total:-0}"
-panel_complete="${panel_complete:-0}"
-panel_reason="$(sed -n 's/^reason=//p' <<<"$panel_summary")"
-panel_state='complete'
-if [[ "$panel_status" -ne 0 ]]; then
-  panel_state='not run'
-  panel_reason="design-panel.sh exited $panel_status; see panel/panel.log"
-elif [[ "$panel_total" -ne 6 || -n "${panel_missing:-}" ]]; then
-  panel_state='not run'
-  panel_reason="${panel_reason:-the six-lens review is incomplete: $panel_total lens(es) recorded, $panel_complete complete, missing: ${panel_missing:-none}}"
-fi
+panel_state="$(sed -n 's/^panel: //p' "$evidence/acceptance.txt" | tail -1)"
+panel_state="${panel_state:-not run}"
+panel_reason="$(sed -n 's/^panel_not_run: //p' "$evidence/acceptance.txt" | tail -1)"
+panel_counts="$(sed -n 's/^panel_lenses_complete: //p' "$evidence/acceptance.txt" | tail -1)"
+panel_counts="${panel_counts:-unknown}"
+analysis_line="$(sed -n 's/^analysis: //p' "$evidence/acceptance.txt" | tail -1)"
+analysis_line="${analysis_line:-not recorded}"
+sign_off="$(sed -n 's/^sign_off: //p' "$evidence/acceptance.txt" | tail -1)"
+sign_off="${sign_off:-not recorded}"
 if [[ "$panel_state" != 'complete' ]]; then
   {
     printf '\n## Six-lens review incomplete - this bundle cannot sign off\n\n'
-    printf -- '- Reason: %s\n' "$panel_reason"
-    printf -- '- Lenses complete: %s of %s\n' "$panel_complete" "$panel_total"
+    printf -- '- Reason: %s\n' "${panel_reason:-the record states no reason}"
+    printf -- '- Lenses complete: %s\n' "$panel_counts"
     printf -- '- Re-run for this bundle: `%s`\n' "$panel_command"
   } >>"$evidence/notes.md"
 fi
-
-sign_off="$(sed -n 's/^sign_off: //p' "$evidence/acceptance.txt" | tail -1)"
-sign_off="${sign_off:-not recorded}"
 cat "$evidence/acceptance.txt"
 
-log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); analysis: $analysis_line; panel: $panel_state ($panel_complete/$panel_total lenses); sign-off: $sign_off"
+log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); analysis: $analysis_line; panel: $panel_state ($panel_counts lenses); sign-off: $sign_off"
 if [[ "$verdict" == 'rejected' ]]; then
   exit 1
 fi
 if [[ "$panel_state" != 'complete' ]]; then
-  log 'ERROR: the six-lens review did not complete, so this bundle cannot sign off'
+  log "ERROR: the six-lens review did not complete, so this bundle cannot sign off (record: ${panel_reason:-no reason}; panel exit: $panel_status)"
   exit 79
 fi
 if [[ "$verdict" == 'accepted-with-declared-defect' ]]; then

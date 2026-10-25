@@ -103,6 +103,12 @@ async function run(size, browser) {
       const [r, g, b] = c.match(/\d+/g).map(Number);
       ok(r > 150 && g < 100 && b < 100, `colour ${c} is not red`);
     });
+    await step('subheadline states the rule under the H1', async () => {
+      const sub = page.locator('#landing header.hero p.sub');
+      ok(await sub.count() === 1, `${await sub.count()} subheadlines in the hero`);
+      const t = (await sub.innerText()).replace(/\s+/g, ' ').trim();
+      ok(t === 'Forward only. Pause and the draft disappears. Keep going and you get to keep it.', `subheadline is "${t}"`);
+    });
     await step('top bar: one Download for Mac pill routed to /download/', async () => {
       const pill = landingNav.locator('a', { hasText: /^download for mac$/i });
       ok(await pill.count() === 1, `${await pill.count()} pills in the visible landing nav`);
@@ -127,7 +133,22 @@ async function run(size, browser) {
       ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
+      const note = cta.locator('.cta-note');
+      ok(await note.count() === 1, `${await note.count()} lines of reassurance under the door`);
+      ok((await note.innerText()).replace(/\s+/g, ' ').trim() === 'No account. Nothing is saved. Just the timer.', `the line under the door is "${await note.innerText()}"`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
+    });
+    await step('three one-sentence points sit below the first viewport', async () => {
+      const band = page.locator('#landing > .points'), items = await band.locator('> li').allInnerTexts();
+      const want = [
+        'You can only write forward, and if you stop for a few seconds the draft is deleted, so the only way out is through.',
+        "Use it when you've been circling a thought for days and still haven't said it plainly.",
+        'Nothing you write is saved, on the web or on the Mac.',
+      ];
+      const got = items.map(t => t.replace(/\s+/g, ' ').trim());
+      ok(got.length === 3 && want.every((w, i) => got[i] === w), `points are ${JSON.stringify(got)}`);
+      const b = await band.boundingBox();
+      ok(b.y >= size.height, `the points start at ${Math.round(b.y)} px, inside the ${size.height} px first viewport`);
     });
     await step('no waived sign-in feature offered', async () => {
       const bad = await waivedOffers(page); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);

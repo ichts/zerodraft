@@ -129,6 +129,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(hero.locator('h1 .hand')).toHaveText('write it down');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
   await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Newsreader/);
+  await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Forward only. Pause and the draft disappears. Keep going and you get to keep it.');
   const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
   expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
   expect(families.every(f => ['Newsreader', 'Reenie Beanie', 'IBM Plex Mono'].includes(f)), families.join(', ')).toBe(true);
@@ -159,8 +160,9 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('.cta');
-  await expect(cta.locator('> *')).toHaveCount(1);
+  await expect(cta.locator('> a'), 'the only entrance under the demo is the 60-second door').toHaveCount(1);
   await expect(cta).not.toContainText('Stop typing for 8 seconds');
+  await expect(cta.locator('.cta-note'), 'one line of reassurance under the door').toHaveText('No account. Nothing is saved. Just the timer.');
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
@@ -174,6 +176,17 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(layout.door.top, 'the room button sits under the demo card').toBeGreaterThan(layout.card.bottom);
   expect(layout.door.bottom, 'the room button is on the first screen').toBeLessThanOrEqual(layout.vh);
   expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred under the sheet').toBeLessThan(1);
+  // The three below-the-fold points, in the captain's words, as one sentence per column.
+  await expect(page.locator('.points > li')).toHaveText([
+    'You can only write forward, and if you stop for a few seconds the draft is deleted, so the only way out is through.',
+    "Use it when you've been circling a thought for days and still haven't said it plainly.",
+    'Nothing you write is saved, on the web or on the Mac.',
+  ]);
+  const pointsBand = await page.evaluate(() => {
+    const b = document.querySelector('.points').getBoundingClientRect();
+    return { top: b.top, vh: innerHeight };
+  });
+  expect(pointsBand.top, 'the points start below the first viewport').toBeGreaterThanOrEqual(pointsBand.vh);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
   await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);

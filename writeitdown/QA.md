@@ -28,8 +28,10 @@ moved to October 25, 2026. No page was added to the sitemap; no other surface ch
   opt-in.`, `Check for updates automatically`, `Check for Updates…`); the page is still in the
   shipped-file list and the sitemap/SEO checks still see it.
 - `npm run release-check -- --download`: passes locally. The published SHA-256 still names the live
-  1.0 DMG, so the note, the DMG name and the checksum must flip together in the deploy that uploads
-  1.1 (see `README.md`, "Mac download release").
+  1.0 DMG, so the DMG link name, the Install card's `shasum` filename, the note and the checksum
+  must flip together in the deploy that uploads 1.1 (see `README.md`, "Mac download release"). The
+  release gate now refuses an Install command that names a different DMG than the link;
+  `qa/mac.spec.mjs` covers the rendered Install command and that rejection.
 - Captures: `download-desk.png` (1440x900, full page) and `download-mobile.png` (390x844, full page),
   plus a crop of the card footer. Inspected: the note sits 16 px under the last requirement row, wraps
   to three lines on desktop and four on mobile, stays inside the card, and neither eats the card's

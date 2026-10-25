@@ -6,6 +6,7 @@ import { join } from 'node:path';
 
 const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
 const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
+const dmgFile = new URL(dmgURL).pathname.split('/').pop();
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
 
@@ -114,6 +115,8 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
     [{ download: download.replace('data-launch="sha256"', 'data-launch-pending="sha256"') }, 'SHA-256: not published'],
     [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
+    [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
+    [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
   ];
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
@@ -617,6 +620,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('#requirements')).toContainText('macOS 14 Sonoma or later');
   await expect(page.locator('#requirements')).toContainText('One universal app for Apple silicon and Intel Macs.');
   await expect(main).toContainText('Ziying WANG (Developer ID)');
+  await expect(page.locator('#install')).toContainText(`shasum -a 256 ${dmgFile}`);
   await expect(main).toContainText('Free updates included.');
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
   await expect(page.locator('main a[href="../mac.html#buy"]').first()).toBeVisible();

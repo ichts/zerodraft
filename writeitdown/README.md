@@ -73,6 +73,10 @@ dist/updates/appcast.xml                  the signed feed
 dist/updates/last-build.txt               the last released CFBundleVersion
 ```
 
+Every release run requires `last-build.txt` to exist and hold exactly one build number. On a
+fresh release machine or checkout, create it with the last released build number (1 for the 1.0
+release) before packaging; a rebuilt artifact ships with a higher number, never the same one.
+
 Host layout: `/var/www/writeitdown.app/download/` keeps `index.html`, the DMG and its sidecar, and
 `appcast.xml`; `/var/www/writeitdown.app/download/updates/` holds the ZIP archives and their deltas
 (create it once with `install -d -m 0755`). `install.sh` neither creates nor prunes `updates/`, so

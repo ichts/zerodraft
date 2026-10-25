@@ -4,7 +4,8 @@
 #         public key in Info.plist, plus the Sparkle feed URL, the real (non-placeholder)
 #         update signing key and the signed-feed policy (SURequireSignedFeed,
 #         SUVerifyUpdateBeforeExtraction and a zero SUSignedFeedFailureExpirationInterval).
-#         TEST and LIVE use the same app configuration.
+#         TEST and LIVE use the same app configuration. A release also requires
+#         dist/updates/last-build.txt to hold exactly the last released CFBundleVersion.
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
 #          A release run also writes dist/updates/WriteItDown-<version>.zip (the Sparkle update
@@ -94,13 +95,23 @@ except (ValueError, TypeError) as error:
 PY
 
 # Sparkle compares CFBundleVersion; a reused or lower number reaches no installed copy. Staging
-# neither enters the update feed nor records a build, so it is not held to the last release. A
-# release whose record cannot be read as a build number is refused, never treated as a first run.
+# neither enters the update feed nor records a build, so it is not held to the last release.
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
 last_build_file="$PWD/dist/updates/last-build.txt"
-if [[ "$mode" != '--staging' && ( -e "$last_build_file" || -L "$last_build_file" ) ]]; then
-  if ! last_build="$(tr -cd '0-9' < "$last_build_file" 2>/dev/null)" || [[ ! "$last_build" =~ ^[0-9]+$ ]]; then
-    echo 'Release blocked: dist/updates/last-build.txt does not hold the last released build number. Repair it, or delete it only to rebuild that same build number.' >&2
+if [[ "$mode" != '--staging' ]]; then
+  if [[ ! -e "$last_build_file" && ! -L "$last_build_file" ]]; then
+    printf 'Release blocked: %s is missing. Record the last released CFBundleVersion there; on a fresh release machine write the last shipped build number (1 for the 1.0 release) first.\n' "$last_build_file" >&2
+    exit 1
+  fi
+  if [[ ! -f "$last_build_file" || ! -r "$last_build_file" ]]; then
+    printf 'Release blocked: %s is unreadable; it must record the last released CFBundleVersion.\n' "$last_build_file" >&2
+    exit 1
+  fi
+  last_build=''
+  IFS= read -r -d '' last_build < "$last_build_file" || true
+  last_build="${last_build%$'\n'}"
+  if [[ ! "$last_build" =~ ^[0-9]+$ ]]; then
+    printf 'Release blocked: %s must hold one build number, found "%s".\n' "$last_build_file" "${last_build//$'\n'/\\n}" >&2
     exit 1
   fi
   if (( build <= 10#$last_build )); then

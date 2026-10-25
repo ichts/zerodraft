@@ -47,6 +47,9 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         return subprocess.run(['bash', str(root / 'scripts/release-dmg.sh'), *args],
                               env=env, capture_output=True, text=True)
 
+    updates = root / 'dist/updates'
+    updates.mkdir(parents=True, exist_ok=True)
+    (updates / 'last-build.txt').write_text('1\n')
     accepted = run(signed)
     assert accepted.returncode == 42 and 'CONFIGURATION_ACCEPTED' in accepted.stdout, accepted.stderr
     for missing in [keys, *[[key] for key in keys], update_keys, *[[key] for key in update_keys]]:
@@ -84,30 +87,30 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
 
     # A build number that is not greater than the last release reaches no installed copy, while a
     # staging run neither enters the feed nor records a build, so it is not held to that number.
-    updates = root / 'dist/updates'
-    updates.mkdir(parents=True)
     (updates / 'last-build.txt').write_text('7\n')
     repeated = run(signed)
     assert repeated.returncode == 1 and 'not greater than the last release' in repeated.stderr, repeated.stderr
+    (updates / 'last-build.txt').write_text('2\n')
     staging = run({**config, **dict.fromkeys(keys, '')}, '--staging')
     assert staging.returncode == 42, staging.stderr
     (updates / 'last-build.txt').write_text('1\n')
     advanced = run(signed)
     assert advanced.returncode == 42, advanced.stderr
-    # The record either names the last released build or refuses the release; it never fails open.
-    for broken in ['', '\n', 'not-a-number\n']:
+    # The record must be exactly one build number and must exist; anything else refuses the release.
+    for broken in ['', '\n', 'v2\n', 'not-2\n', '12abc\n', '2 (build)\n', '2\nextra\n', '2\n\n', ' 2\n']:
         (updates / 'last-build.txt').write_text(broken)
         refused = run(signed)
-        assert refused.returncode == 1 and 'last-build.txt does not hold' in refused.stderr, refused.stderr
+        assert refused.returncode == 1 and 'must hold one build number' in refused.stderr, refused.stderr
         assert 'CONFIGURATION_ACCEPTED' not in refused.stdout
     (updates / 'last-build.txt').write_text('5\n')
     (updates / 'last-build.txt').chmod(0)
     unreadable = run(signed)
     (updates / 'last-build.txt').chmod(0o644)
-    assert unreadable.returncode == 1 and 'last-build.txt does not hold' in unreadable.stderr, unreadable.stderr
+    assert unreadable.returncode == 1 and 'is unreadable' in unreadable.stderr, unreadable.stderr
     (updates / 'last-build.txt').unlink()
-    first_release = run(signed)
-    assert first_release.returncode == 42, first_release.stderr
+    absent = run(signed)
+    assert absent.returncode == 1 and 'is missing' in absent.stderr, absent.stderr
+    assert 'CONFIGURATION_ACCEPTED' not in absent.stdout
 
     # The feed gate: the signing key must be the pair the shipped bundle trusts, and it must be
     # proven before generate_appcast writes anything.
@@ -156,6 +159,7 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     reaching_tools = publish(base64.b64encode(seed_public).decode())
     assert reaching_tools.returncode == 1 and generated.exists(), reaching_tools.stderr
 print('PASS: release requires complete license and update configuration including the signed-feed')
-print('      policy; a placeholder update key, an unsafe feed, an unchecksummed build number and')
-print('      staging with sale config are refused; staging ignores last-build.txt; publish refuses')
-print('      a signing key whose public half is not the bundled SUPublicEDKey before generating.')
+print('      policy; a placeholder update key, an unsafe feed, a missing or non-numeric build record,')
+print('      an unchecksummed build number and staging with sale config are refused; staging ignores')
+print('      last-build.txt; publish refuses a signing key whose public half is not the bundled')
+print('      SUPublicEDKey before generating.')

@@ -7,10 +7,10 @@ Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current accept
 Second review round on the same branch head. No window journey, DMG build, upload, deployment or
 merge was performed.
 
-- `release-dmg.sh` refuses a release whose `dist/updates/last-build.txt` exists but cannot be read as
-  a build number (empty, non-numeric or unreadable); only a missing file still means "first release".
-  `--staging` stays outside the comparison because it records no build, and its mode check is still
-  the only way to reach that branch.
+- `release-dmg.sh` parses `dist/updates/last-build.txt` strictly: after stripping at most one
+  trailing newline the whole content must match `^[0-9]+$`, and a missing, unreadable or non-numeric
+  record refuses the release. `--staging` stays outside the comparison because it records no build,
+  and its mode check is still the only way to reach that branch.
 - `release-check.mjs` now refuses a DMG link whose file name does not carry its version as
   `Write-It-Down-<version>.dmg`; previously that made the release-note version comparison fall
   through and accept any newer note.
@@ -23,10 +23,10 @@ merge was performed.
 - `scripts/publish-appcast.sh` tool lookup is only `.build/artifacts/sparkle/Sparkle/bin` (after
   `swift package resolve`) or `WID_SPARKLE_BIN`; the host `/Applications` candidate is gone.
 - `python3 scripts/test-release-config.py`: PASS (exit 0), now also covering a zero interval, a
-  missing interval, empty/non-numeric/unreadable `last-build.txt`, the first-release path with no
-  record, and the staging exemption with a record present. Known-broken proof: the same test fails on
-  commit `0dc0137` at the empty `last-build.txt` case (it exited 42 and packaged) and at the interval
-  case.
+  missing interval, empty/partly numeric/unreadable/missing `last-build.txt`, and the staging
+  exemption with a record holding the same build number (2). Known-broken proof: the same test
+  fails on commit `e87bf5a` at the partly numeric records (`v2`, `12abc`, `2 (build)`, `2\nextra`)
+  and the missing-record case, which it treated as a first release and packaged.
 - `node writeitdown/release-check.mjs --download`: PASS on the current page. Known-broken proof: a
   page whose DMG link is renamed to `Write-It-Down.dmg` passes the previous checker and is refused by
   this one with `DMG URL: the file name does not carry the version`.
@@ -52,7 +52,7 @@ window journey was run, and no DMG, upload, deployment or merge was performed.
   refuses that mark once its version is the linked download. The download page keeps its 1.0 facts
   and states that 1.1 is not released yet.
 - `python3 scripts/test-release-config.py`: PASS (exit 0). It now also covers the two policy keys,
-  staging with an existing `dist/updates/last-build.txt` set to 7, the Ed25519 public-key derivation
+  staging with an existing `dist/updates/last-build.txt` set to 2, the Ed25519 public-key derivation
   (RFC 8032 seed/public vector, 96-byte export), and `publish-appcast.sh` refusing a mismatched key
   before `generate_appcast` runs. Known-broken proof: the same test fails on `7932fe0`'s
   `release-dmg.sh` at the `SURequireSignedFeed` case, and fails with

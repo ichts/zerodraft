@@ -96,9 +96,9 @@ PY
 
 # Sparkle compares CFBundleVersion; a reused or lower number reaches no installed copy. Staging
 # neither enters the update feed nor records a build, so it is not held to the last release.
-build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
 last_build_file="$PWD/dist/updates/last-build.txt"
 if [[ "$mode" != '--staging' ]]; then
+  build="$(python3 scripts/plist-value.py "$plist" CFBundleVersion)"
   if [[ ! -e "$last_build_file" && ! -L "$last_build_file" ]]; then
     printf 'Release blocked: %s is missing. Record the last released CFBundleVersion there; on a fresh release machine write the last shipped build number (1 for the 1.0 release) first.\n' "$last_build_file" >&2
     exit 1
@@ -135,7 +135,7 @@ notarize "$work/app.zip"
 xcrun stapler staple "$app"
 xcrun stapler validate "$app"
 
-version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")"
+version="$(python3 scripts/plist-value.py "$app/Contents/Info.plist" CFBundleShortVersionString)"
 suffix=''
 if [[ "$mode" == '--staging' ]]; then suffix='-staging'; fi
 

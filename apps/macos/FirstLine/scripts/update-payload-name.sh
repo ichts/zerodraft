@@ -11,6 +11,7 @@
 set -euo pipefail
 
 plist="${1:-Sources/FirstLine/Info.plist}"
-version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
-build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+reader="$(dirname "$0")/plist-value.py"
+version="$(python3 "$reader" "$plist" CFBundleShortVersionString)"
+build="$(python3 "$reader" "$plist" CFBundleVersion)"
 printf 'WriteItDown-%s-%s.zip\n' "$version" "$build"

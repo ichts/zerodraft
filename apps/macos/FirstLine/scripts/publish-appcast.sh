@@ -46,8 +46,8 @@ if [[ ! -d "$updates_dir" ]]; then
   exit 1
 fi
 
-version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
-build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
+version="$(python3 scripts/plist-value.py "$plist" CFBundleShortVersionString)"
+build="$(python3 scripts/plist-value.py "$plist" CFBundleVersion)"
 archive="$(scripts/update-payload-name.sh "$plist")"
 if [[ ! -f "$updates_dir/$archive" ]]; then
   echo "Missing update payload $updates_dir/$archive; scripts/release-dmg.sh writes it from the stapled app." >&2

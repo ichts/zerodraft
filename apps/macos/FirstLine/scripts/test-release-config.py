@@ -28,7 +28,8 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     (root / 'scripts').mkdir()
     (root / 'Sources/FirstLine').mkdir(parents=True)
     (root / 'bin').mkdir()
-    for script in ['release-dmg.sh', 'publish-appcast.sh', 'sparkle-key.py', 'update-payload-name.sh']:
+    for script in ['release-dmg.sh', 'publish-appcast.sh', 'sparkle-key.py', 'plist-value.py',
+                   'update-payload-name.sh']:
         shutil.copyfile(module / 'scripts' / script, root / 'scripts' / script)
         (root / 'scripts' / script).chmod(0o755)
     package = root / 'scripts/package-app.sh'

@@ -149,9 +149,11 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
 /* nav */
 .home-nav{height:var(--nav-h);display:flex;align-items:center;justify-content:space-between;gap:var(--s4)}
-/* The wordmark is the A split-W lockup, drawn as a mask so the site's own ink token colours it in both themes.
+/* The brand is the A split-W lockup: the app-icon chip (a squircle plate with the split W knocked out of it)
+   and the wordmark, drawn as one mask so the site's own ink token paints it in both themes. The chip's hole
+   shows the page, so the tile inverts with the ink token instead of carrying a second colour.
    One vector asset, one colour, no duplicate light/dark markup. */
-.brand{position:relative;display:inline-block;flex:none;width:6.083em;height:.772em;font-size:21px;line-height:1;color:var(--ink)}
+.brand{position:relative;display:inline-block;flex:none;width:7.467em;height:1.046em;font-size:21px;line-height:1;color:var(--ink)}
 .brand:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl,8px)}
 .brand::before{content:"";position:absolute;inset:0;background:currentColor;
   -webkit-mask:url(logo/write-it-down-lockup.svg) no-repeat left center/contain;
@@ -292,7 +294,11 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .callback p{margin:18px auto 28px;max-width:44ch;color:var(--mute);font:italic 400 19px/1.4 var(--serif)}
 @media (max-width:820px){
   .brand{font-size:19px}
-  .home .btn-quiet{font-size:13px;padding:0 14px}
+  /* The lockup now carries the chip, so the mobile header trades a few pixels of gap for it and keeps
+     the theme button on the page's right gutter at 390 px. */
+  .home-nav{gap:var(--s3)}
+  .nav-end{gap:6px}
+  .home .btn-quiet{font-size:13px;padding:0 12px}
   .home .hero{padding-top:8px}
   .home .h1{flex-direction:column;align-items:center;font-size:clamp(34px,10.5vw,44px)}
   .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 4.6));margin-top:.02em}

@@ -28,10 +28,11 @@ This directory is the independent writeitdown.app deployment, not the root Zero 
 - `og.png`: 1200×630 light-theme social share card with the split-W lockup, referenced by landing and download metadata.
 - `logo/write-it-down-lockup.svg`, `favicon.svg`, `favicon-16.png`, `favicon-32.png`, `favicon-dark.svg`,
   `favicon-dark-16.png`, `favicon-dark-32.png`, `apple-touch-icon.png`: the A split-W lockup and the brand favicon
-  set. `site.css` draws the wordmark as a `currentColor` mask from the lockup SVG, so one vector serves light and
-  dark; the default favicon is the full-bleed bone square with the ink split W, and the dark `prefers-color-scheme`
-  links use the ink square with the bone split W. The usage rules and optical sizes are owned by
-  `../design/DESIGN.md` §11.
+  set. The lockup is the header and footer brand: the app-icon chip (a squircle plate with the split W knocked out
+  of it) then the wordmark, drawn by `site.css` as one `currentColor` mask, so the plate is ink on the light page
+  and bone on the dark page; the default favicon is the full-bleed bone square with the ink split W, and the dark
+  `prefers-color-scheme` links use the ink square with the bone split W. The usage rules and optical sizes are
+  owned by `../design/DESIGN.md` §11.
   `install.sh` and `qa/test-install.py` list the eight files exactly, so a deploy and the installer acceptance
   cannot drift.
 - `robots.txt`, `sitemap.xml`, `llms.txt`, and the Google/Bing verification files: crawl discovery and ownership for the apex site. Content and deployment requirements live in `README.md`, "Discovery files and answer pages".

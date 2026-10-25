@@ -218,13 +218,14 @@ the mark.
 ### 11.1 The mark and the wordmark
 
 The mark is the split W: Newsreader's W with a vertical notch through its middle peak. The wordmark is
-`Write It Down` in Newsreader 500, with the same split W. The wordmark is the lockup; the W inside the name is the
-mark, so the mark is never set beside the wordmark as a second object.
+`Write It Down` in Newsreader 500, with the same split W. The web header sets the mark as its own object beside
+the wordmark (11.6); the Mac start screen and the social card keep the wordmark lockup, whose W already carries
+the notch.
 
-- Site header and footer: `writeitdown/logo/write-it-down-lockup.svg` at 21 px on desktop and 19 px on mobile.
-  The site draws it as a CSS mask over `currentColor`, so one vector serves the light and dark themes and the
-  brand follows the site's ink token. Minimum lockup width: 19 px type; the 16 px favicon is the smallest use of
-  the mark.
+- Site header and footer: `writeitdown/logo/write-it-down-lockup.svg` - the app-icon chip, a gap, and the
+  wordmark, at 21 px type on desktop and 19 px on mobile. The site draws it as one CSS mask over `currentColor`,
+  so one vector serves the light and dark themes and the brand follows the site's ink token. Minimum lockup width:
+  19 px type; the 16 px favicon is the smallest use of the mark.
 - App icon and favicon: the mark alone on the bone plate with the ink W. The full-bleed favicon is the bone
   square with the ink W. The ink plate with the bone W is the dark-appearance variant for the favicon's
   `prefers-color-scheme: dark` links. A macOS `.icns` app icon has no appearance switch, so the shipped `.icns`
@@ -232,8 +233,8 @@ mark, so the mark is never set beside the wordmark as a second object.
 - Mac start screen: `Sources/FirstLine/Resources/write-it-down-lockup.svg` at 21 px type (128x16.25), tinted with
   the app ink token. The app icon and volume icon carry the mark.
 - The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
-- Social card: `writeitdown/og.png` at 1200x630 uses the lockup on the light page; it is the link preview for the
-  landing and `/download/`.
+- Social card: `writeitdown/og.png` at 1200x630 uses the wordmark lockup on the light page; it is the link preview
+  for the landing and `/download/`.
 
 ### 11.2 Palette and type
 
@@ -243,8 +244,9 @@ mark, so the mark is never set beside the wordmark as a second object.
   the W.
 - The app icon plate is bone with the ink mark. The favicon is the bone square with the ink mark, with dark links
   pointing at the ink square with the bone mark. The volume icon is a bone sheet with the ink mark on a dark disc.
-  The light app icon and favicon are self-contained; the dark favicon is not the default, and it is never used in
-  the light appearance.
+  The light app icon and favicon are self-contained; the dark favicon link is not the default, and it is never
+  used in the light appearance. The header chip (11.6) is not a plate colour at all: its plate is the ink token
+  and its W is a hole, so it is ink on the light page and bone on the dark page.
 - The mark itself is flat: no gradient, outline, shadow, bevel, or second colour. The app icon's plate gets the
   system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface.
 
@@ -258,8 +260,13 @@ mark, so the mark is never set beside the wordmark as a second object.
   use the same optical split drawings as the small app icons on the bone plate. `favicon-dark.svg` and the dark
   16/32 PNG are the `prefers-color-scheme: dark` links; `apple-touch-icon.png` is 180 on the bone plate. The
   favicon is the full-bleed square, not the app icon's transparent-margin squircle.
-- Site header: 21 px desktop, 19 px mobile; the lockup's clear space is at least a quarter of the cap height on
-  all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the lockup.
+- Site header: 21 px desktop, 19 px mobile; the chip is 1.5 cap heights (1.046 em: 22 px at 21 px type,
+  19.9 px at 19 px), the gap to the wordmark is 0.34 em, and the lockup box is 7.467 x 1.046 em. The lockup's
+  clear space is at least a quarter of the cap height on all sides (about 5 px at 21 px). The header link may
+  extend its hit area without enlarging the lockup.
+- Site header, mobile: the lockup takes 141.9 px of the 19 px row, so the mobile header keeps 12 px between the
+  brand and the page action and 6 px inside the action group; that is what puts the theme button back on the
+  page's right gutter at 390 px.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
@@ -270,9 +277,12 @@ mark, so the mark is never set beside the wordmark as a second object.
 ### 11.4 Do not
 
 - Put red, the old red underscore, or the old `WID` sheet in the mark.
-- Use the ink plate as the default; it is the dark-appearance favicon alternate only. Do not put the light plate
-  behind a dark-appearance link or the dark plate in the light header.
-- Put the split W beside the wordmark; the wordmark already contains it.
+- Give the header chip a second colour. It is one ink-only mask: the plate is `currentColor` and the W is a hole,
+  so the tile is ink on the light page and bone on the dark page without a light/dark pair of files.
+- Separate the chip from the wordmark inside one SVG (no line, no rule, no caption) or set the chip alone above,
+  below, or after the wordmark.
+- Use the ink plate as the favicon default; it is the dark-appearance favicon alternate only. Do not put the light
+  plate behind a dark-appearance link.
 - Round the favicon square, add a border to the app icon plate, or add a caption or tagline to the lockup.
 - Use the mark on a busy, photographic, or low-contrast surface, or below 16 px.
 - Replace the root `ZERO_DRAFT` logotype with this lockup.
@@ -285,7 +295,26 @@ mark, so the mark is never set beside the wordmark as a second object.
 - Plate decision: the light plate passes at 16 and 32 px. The static 16/32 inspection and the light/dark
   start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real Dock and Finder captures
   remain pending. The dark plate remains the favicon alternate.
-- Site header: 21 px desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
+- Site header: `qa/mac.spec.mjs` "the header lockup shows the A mark chip beside the wordmark" reads the shipped
+  mask at the rendered header size and requires the plate to cover the top of the chip, the W to be knocked out
+  of it, the split to survive at 2x, and the wordmark to follow it; it fails on a wordmark-only lockup. 21 px
+  desktop and 19 px mobile, light and dark, with no clipping and no shift in the nav.
+
+### 11.6 The web header chip
+
+The header and footer lockup opens with the mark as a chip: the app icon's squircle plate at 1.5 cap heights, the
+split W knocked out of it, the wordmark 0.34 em to its right on the same baseline. At 21 px the notch inside the
+wordmark is invisible, so a wordmark-only lockup reads as plain words and the product has no logo in the corner;
+the chip makes the mark an object while staying one colour and one file.
+
+- The chip is the app icon's drawing: the 824/1024 macOS squircle plate around the master split W, at the app
+  icon's 620/824 W share, with the plate optically centred on the wordmark's cap band.
+- The chip is the small-size variant of the mark: its notch is 180 word-units (11% of the W) instead of the
+  master's 90, the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
+- Because the W is a hole, the tile takes the page colour where the light falls through it: dark tile with a light
+  W on the light page, bone tile with a dark W on the dark page. That is the app icon's two appearances without a
+  second palette, a second file, or a theme switch in CSS.
+- Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.
 - Mac: the split-W lockup on the start screen in light and dark; the app icon at 16/32 (optical), 128 (Dock), and
   1024; the volume icon at 128 and 1024. Static asset inspection, the deterministic view test and the light/dark
   start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; Dock and Finder captures on light

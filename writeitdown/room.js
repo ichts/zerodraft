@@ -295,6 +295,11 @@ editor.addEventListener('pointerup', () => { if (compositionBase === null) endCa
 $('exit').addEventListener('click', requestExit);
 $('begin-again').addEventListener('click', restart);
 $('restart').addEventListener('click', restart);
+paper.addEventListener('pointerdown', event => {
+  if (state.phase === 'kept' || event.target.closest('button, a, textarea, input, select, label')) return;
+  event.preventDefault();
+  editor.focus({ preventScroll: true });
+});
 // Switching theme from the room header hands the keyboard straight back to the writing.
 room.querySelector('[data-theme-toggle]').addEventListener('click', () => {
   if (state.phase !== 'kept') editor.focus({ preventScroll: true });

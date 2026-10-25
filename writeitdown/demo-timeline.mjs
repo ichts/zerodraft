@@ -4,7 +4,7 @@
 // times. The text is the Gemini demo script picked blind ("option 1",
 // work/imposter; options 2 and 3 were not used). The typist writes a false
 // start ("prete"), tries Backspace once - the "deny" event: nothing is
-// deleted, the sheet shakes and a blocked Backspace keycap shows - then
+// deleted, the sheet shakes and a red hairline flashes - then
 // carries on forward, and stops mid-sentence so the silence warning plays.
 // Every event only ever appends: the demo is forward-only like the room.
 export var LINES = [
@@ -40,7 +40,7 @@ export function buildTimeline() {
   type("i'm just prete");
   beat(380, 80); // notice the false start
   push("deny"); // tries Backspace: blocked, nothing changes
-  beat(900, 100); // the blocked keycap holds, then on
+  beat(900, 100); // the refusal holds, then on
   type(" pretending.");
   newline(650);
   type(LINES[3]);

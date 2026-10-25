@@ -67,7 +67,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .danger{position:absolute;left:20px;right:20px;top:var(--danger-top,0);display:flex;flex-direction:column;align-items:center;pointer-events:none;text-align:center}
 .danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--red);font-variant-numeric:tabular-nums}
 .danger .caption{margin:var(--caption-gap,20px) 0 0;font:500 13px/1.5 var(--sans);letter-spacing:.04em;color:var(--ink)}
-.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--red)}
+.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--red);pointer-events:none}
 
 .paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
 .report{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
@@ -82,7 +82,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .theme-toggle,.paper-foot button{min-height:44px;padding:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
-.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow)}
+.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:hidden}
 .room .wash{transition:opacity 120ms linear;opacity:0}
 .room-paper-wash{background:var(--red-soft);border-radius:inherit}
 .room[data-phase="typing"]{--chrome:var(--mute);--timer:var(--mute)}
@@ -102,9 +102,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 #editor:focus-visible{outline:none}
 /* The result screens: the fixed top block (headline, receipt, controls) and a draft that scrolls
    below it, so a long draft never hides the actions. */
-.room-top{position:absolute;z-index:2;left:32px;right:32px;top:72px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.room-top{position:absolute;z-index:2;left:32px;right:32px;top:72px;display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
 .room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em;max-width:62ch}
-.room-top .room-secondary{margin-top:20px}
+.room-top .room-secondary{margin-top:20px;pointer-events:auto}
 #kept{position:absolute;inset:72px 36px;display:flex;flex-direction:column;align-items:center}
 .kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
 #kept h1{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em}

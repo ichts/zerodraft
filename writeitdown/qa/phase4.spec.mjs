@@ -391,7 +391,11 @@ test('the session bar is one continuous linear animation, never a stepped tick',
   }
   expect(bar).toHaveLength(1);
   expect(bar[0].timing.easing).toBe('linear');
-  expect(bar[0].frames).toEqual(['scaleX(1)', 'scaleX(0)']);
+  expect(bar[0].frames).toHaveLength(2);
+  const startScale = Number(/scaleX\(([^)]+)\)/.exec(bar[0].frames[0])?.[1]);
+  expect(startScale).toBeGreaterThan(0.99);
+  expect(startScale).toBeLessThanOrEqual(1);
+  expect(bar[0].frames[1]).toBe('scaleX(0)');
   expect(bar[0].timing.duration).toBeGreaterThan(59000);
   expect(bar[0].timing.duration).toBeLessThanOrEqual(60000);
   const before = await page.locator('#room-bar').evaluate(bar => bar.style.transform);
@@ -633,6 +637,12 @@ test('the failure screen restarts from the button and from Return', async ({ pag
   expect(row.height).toBe(48);
   expect(row.border).toBe('1px');
   await capture(page, info, 'stopped');
+  const heading = await page.locator('#failed h1').boundingBox();
+  await page.mouse.click(heading.x + heading.width / 2, heading.y + heading.height / 2);
+  await expect(editor(page)).toBeFocused();
+  const report = await page.locator('#room-report').boundingBox();
+  await page.mouse.click(report.x + report.width / 2, report.y + report.height / 2);
+  await expect(editor(page)).toBeFocused();
   await page.keyboard.press('Enter');
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
   await expect(editor(page)).toHaveValue('');

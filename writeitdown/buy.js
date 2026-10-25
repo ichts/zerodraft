@@ -23,6 +23,7 @@
     buy.disabled = true;
     buy.textContent = 'Opening checkout...';
     buy.setAttribute('aria-busy', 'true');
+    checkoutStatus.setAttribute('role', 'status');
     checkoutStatus.textContent = 'Opening checkout...';
     try {
       const response = await fetch(form.action, { ...options, method: 'POST', headers: { Accept: 'application/json' } });

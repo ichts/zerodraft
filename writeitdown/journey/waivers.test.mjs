@@ -51,7 +51,7 @@ for (const [engine, device] of [[webkit, devices['iPhone 14']], [chromium, {}]])
     try {
       const context = await browser.newContext({ ...device, recordVideo: { dir: path.join(out, engine.name()) } });
       const page = await context.newPage();
-      await page.setContent('<main><a href="/download/">DOWNLOAD FREE TRIAL</a><button>COPY TEXT</button><form action="https://licenses.writeitdown.app/api/v1/checkout"><button>BUY - $4.99</button></form><button>COPY LICENSE KEY</button></main>');
+      await page.setContent('<main><a href="/download/">DOWNLOAD FREE TRIAL</a><button>COPY TEXT</button><form action="https://licenses.writeitdown.app/api/v1/checkout"><button>Buy for $4.99 once</button></form><button>COPY LICENSE KEY</button></main>');
       await assertNoWaivedOffers(page);
       for (const control of [
         '<a href="/sign-in/">Continue</a>',

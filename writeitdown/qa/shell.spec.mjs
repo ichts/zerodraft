@@ -11,6 +11,9 @@ const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.h
 const documentPages = ['mac.html', 'support.html', 'privacy.html', 'terms.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
+const service = 'https://licenses.writeitdown.app/api/v1';
+const licenseKey = 'WID-TEST-PRICE-KEY';
+const pricePattern = /(?<![\d.])(?:USD\s*)?\$?\s*4\.99(?:\s*(?:once|one-time))?(?!\d)/gi;
 
 const readShell = page => page.evaluate(async () => {
   await document.fonts.ready;
@@ -157,13 +160,62 @@ test('landing on #buy puts the heading and the price row in view', async ({ page
   expect(boxes.height).toBe(view.height);
 });
 
-test('the purchase page states one price string', async ({ page }) => {
+test('the purchase path states one price string', async ({ page, context }) => {
+  await page.route('https://fonts.googleapis.com/**', route => route.abort());
+  await page.route('https://fonts.gstatic.com/**', route => route.abort());
+  const check = async label => {
+    const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+    const mentions = [...text.matchAll(pricePattern)].map(match => match[0].trim());
+    for (const mention of mentions)
+      expect(mention, `${label}: price mention "${mention}"`).toBe('$4.99 once');
+  };
+
+  for (const path of pages) {
+    await page.goto(path);
+    await check(path);
+  }
+
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const checkout = `${service}/checkout`;
+  const buy = page.locator('#buy-form button');
+
   await page.goto('mac.html');
   await expect(page.locator('#price')).toHaveText('$4.99 once');
   await expect(page.getByRole('button', { name: 'Buy for $4.99 once', exact: true })).toBeVisible();
-  const text = await page.locator('main').innerText();
-  for (const stale of ['USD $4.99', 'BUY - $4.99', '$4.99 ONCE', 'USD 4.99'])
-    expect(text, `stale price string "${stale}"`).not.toContain(stale);
+
+  let finishPending;
+  const pending = new Promise(resolve => { finishPending = resolve; });
+  await page.route(checkout, async route => {
+    await pending;
+    await route.abort();
+  });
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  await check('mac.html pending');
+  finishPending();
+  await expect(page.locator('#checkout-status')).toHaveAttribute('role', 'alert');
+  await page.unroute(checkout);
+
+  await page.route(checkout, route => route.fulfill({ status: 503, json: {} }));
+  await page.goto('mac.html');
+  await buy.click();
+  await expect(page.locator('#checkout-status')).toHaveAttribute('role', 'alert');
+  await check('mac.html error');
+  await page.unroute(checkout);
+
+  await page.route(`${service}/license?session_id=cs_test_price_ready`, route => route.fulfill({ json: { licenseKey } }));
+  await page.goto('mac.html?session_id=cs_test_price_ready');
+  await expect(page.locator('#license-key')).toHaveText(licenseKey);
+  await check('mac.html ready');
+  await page.getByRole('button', { name: 'Copy license key', exact: true }).click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  await check('mac.html copied');
+  await page.unroute(`${service}/license?session_id=cs_test_price_ready`);
+
+  await page.route(`${service}/license?session_id=cs_test_price_unpaid`, route => route.fulfill({ status: 404, json: { error: 'not_found' } }));
+  await page.goto('mac.html?session_id=cs_test_price_unpaid');
+  await expect(page.locator('#license-status')).toHaveText('Your license is not ready yet.');
+  await check('mac.html unpaid');
 });
 
 test('the ghost pill keeps one text treatment on the buy path and the landing', async ({ page }) => {

@@ -220,11 +220,11 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Eight seconds of silence', 'Reach zero, keep it']);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
-  await expect(mac.locator('.facts')).toContainText('$4.99');
+  await expect(mac.locator('.facts')).toContainText('$4.99 once');
   await expect(mac.locator('.facts')).toContainText('2 Macs');
   await expect(mac.locator('.facts')).toContainText('14 days');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
-  await expect(mac.locator('a[href="mac.html#buy"]')).toHaveText('Buy for $4.99');
+  await expect(mac.locator('a[href="mac.html#buy"]')).toHaveText('Buy for $4.99 once');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
   for (const label of ['Support', 'Privacy', 'Terms']) await expect(page.locator('.home-foot nav a', { hasText: label })).toBeVisible();
@@ -629,7 +629,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
     expect(schemaProperties(graph)).not.toContain(property);
 
   await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
-  await expect(page.locator('#mac a[href="mac.html#buy"]')).toHaveText('Buy for $4.99');
+  await expect(page.locator('#mac a[href="mac.html#buy"]')).toHaveText('Buy for $4.99 once');
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mac.html#buy'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
@@ -667,7 +667,7 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await page.goto('privacy.html');
   const privacy = page.locator('#mac + p');
   await expect(privacy).toContainText('Your first 3 writing sessions are free.');
-  await expect(privacy).toContainText('USD 4.99 one-time license covers 2 Macs, with a 14-day refund');
+  await expect(privacy).toContainText('license covers 2 Macs for $4.99 once, with a 14-day refund');
   await expect(privacy).toContainText('Free updates included.');
   await expect(privacy).toContainText('local trial session counter in its settings file on the Mac');
   await expect(privacy).toContainText('That counter is not sent anywhere.');
@@ -680,13 +680,13 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');
   await expect(terms).toContainText('The Mac app includes 3 free writing sessions.');
-  await expect(terms).toContainText('USD 4.99 once for two Macs, with a 14-day refund');
+  await expect(terms).toContainText('$4.99 once for two Macs, with a 14-day refund');
   await expect(terms).toContainText('Free updates included.');
 
   await page.goto('support.html');
   const support = page.locator('#mac + p');
   await expect(support).toContainText('your first 3 writing sessions are free.');
-  await expect(support).toContainText('USD 4.99 one-time license covers 2 Macs, with a 14-day refund');
+  await expect(support).toContainText('license covers 2 Macs for $4.99 once, with a 14-day refund');
   await expect(support).toContainText('Free updates included.');
 
   await page.goto('mac.html');

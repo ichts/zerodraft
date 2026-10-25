@@ -232,3 +232,29 @@ for (const failure of ['network', 'http', 'invalid-url']) {
     await noKey(page);
   });
 }
+
+test('a checkout retry announces Opening checkout as status, not alert', async ({ page }) => {
+  let finishRetry;
+  const retryPending = new Promise(resolve => { finishRetry = resolve; });
+  let calls = 0;
+  await page.route(`${service}/checkout`, async route => {
+    calls += 1;
+    if (calls === 1) return route.fulfill({ status: 503, json: {} });
+    await retryPending;
+    return route.abort();
+  });
+  await page.goto('mac.html');
+  const buy = page.locator('#buy-form button');
+  const status = page.locator('#checkout-status');
+  await buy.click();
+  await expect(status).toHaveText('Checkout is unavailable. Please try again in a moment.');
+  await expect(status).toHaveAttribute('role', 'alert');
+  await buy.click();
+  await expect(status).toHaveText('Opening checkout...');
+  await expect(status).toHaveAttribute('role', 'status');
+  await expect(buy).toBeDisabled();
+  finishRetry();
+  await expect(status).toHaveText('Checkout is unavailable. Please try again in a moment.');
+  await expect(status).toHaveAttribute('role', 'alert');
+  expect(calls).toBe(2);
+});

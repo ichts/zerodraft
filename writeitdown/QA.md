@@ -76,8 +76,8 @@ and theme.
 | Q-17 | PASS | 17 px / 1.6 body with the serif reserved for headings; no rendered pitch changed. |
 | Q-18 | N/A | Mac launch state; no web surface. |
 | Q-19 | PASS | Header sweep and 360 px point samples now run over all twelve pages; no overflow, 6 px+ gutter, one plate token. |
-| Q-20 | PASS | No copy was added to describe a page; the stale `$4.99`/`USD $4.99` strings collapsed into `$4.99 once`, and the 1.1 note left the 1.0 card. |
-| Q-21 | PASS | `shell.spec.mjs` (the new rule) is green on all twelve pages. |
+| Q-20 | PASS | No copy was added to describe a page. Every price mention on all twelve pages and in the six buy states is exactly `$4.99 once`; `shell.spec.mjs` enforces it. The 1.1 note left the 1.0 card. |
+| Q-21 | PASS | `shell.spec.mjs` enforces one price string, `$4.99 once`, on every shipped page and every buy state; the shell rule is green on all twelve pages. |
 
 ## Known-broken proofs for the new gates
 
@@ -89,6 +89,9 @@ and theme.
 - Old purchase page: `mac.html#buy` landed on the button with no `#buy-heading` and no price row
   (`heading: null`, `price: null`), and the three actions were 308.7 / 261.9 / 159 px square mono
   buttons.
+- Price guard: planting `USD $4.99` in the `mac.html` buy-card paragraph made `shell.spec.mjs`
+  `the purchase path states one price string` fail with `mac.html: price mention "USD $4.99"`; the
+  plant was removed and the committed tree passes.
 - Old failure path: `mac.html?session_id=...` with a 404 licence response kept `session_id` in the URL
   and offered no retry.
 - Old route server: `journey/serve-local.mjs` answered a missing page with the landing page and

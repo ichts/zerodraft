@@ -211,9 +211,9 @@ The captain decided on 2026-09-24: "可以是签名的 DMG 直接下载 要收�
 
 - Distribution is a Developer ID signed, hardened-runtime, notarized, stapled DMG downloaded from writeitdown.app. There is no Mac App Store build. This matches the existing `docs/RELEASE_CHECKLIST.md`.
 - `LICENSE_PAYMENT_SPEC.md` owns current Mac licensing and purchase acceptance; `services/license/README.md` owns provider readiness. Historical batch records below are not the current provider contract.
-- The price is USD $4.99, paid once. Every piece of copy that names a price reads `$4.99`.
+- The price is $4.99, paid once. Every piece of copy that names a price reads `$4.99 once`.
 - In batch 3, the Upgrade placeholder displays the price from one Swift constant; checkout is disabled. Batch 6 moves the display price (`$4.99`) and checkout URL to two `Info.plist` keys, `WIDDisplayPrice` and `WIDCheckoutURL`, through one accessor in `AppState`. The charged amount lives in the selected payment adapter. Once checkout is live, price changes must update its billing configuration, app configuration, and the site's Mac copy together.
-- The 2026-10-21 Mole-model decision supersedes the 2026-10-18 activation-first policy: free download, three native sessions, then USD $4.99 once for two Macs with a 14-day refund. A session is spent on its first nonempty input, including IME activity. Exhaustion uses the existing activation screen; existing license records and refunds never fall back to trial access. `LICENSE_PAYMENT_SPEC.md` owns the persisted-counter and signature boundaries. Current website purchase integration and bundle release requirements are owned by [`writeitdown/README.md`](../../../../writeitdown/README.md#mac-page-release-order).
+- The 2026-10-21 Mole-model decision supersedes the 2026-10-18 activation-first policy: free download, three native sessions, then $4.99 once for two Macs with a 14-day refund. A session is spent on its first nonempty input, including IME activity. Exhaustion uses the existing activation screen; existing license records and refunds never fall back to trial access. `LICENSE_PAYMENT_SPEC.md` owns the persisted-counter and signature boundaries. Current website purchase integration and bundle release requirements are owned by [`writeitdown/README.md`](../../../../writeitdown/README.md#mac-page-release-order).
 
 ### 8.0 Auto-update (1.1, D-041)
 

@@ -4,11 +4,15 @@
 // On a tall sheet those Mac offsets are used exactly; when the group cannot fit above
 // the footer it moves above the writing line, and the failure block and receipt clamp
 // above the footer, so nothing is clipped or laid over the active line or the controls.
-// The footer top excludes the transient exit-hint row, so arming the confirmation
-// does not reflow the status slot or the kept result screen.
+// The footer top reserves the wrapped confirmation row and excludes the live hint
+// content, so arming the confirmation neither reflows nor overlaps a result screen.
 // Placement is cached on the three strings and re-anchored only when the caller marks
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
+
+// Paper heights below this use the compact result typography. The reservation of
+// the confirmation row is handled in the placement, not in this threshold.
+const COMPACT_BELOW = 480;
 
 const ink = (() => {
   let context;
@@ -34,7 +38,7 @@ function fontOf(el) {
     size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
 }
 
-export function statusSlot({ paper, line, pitches, numeral, caption, receipt, block, kept }) {
+export function statusSlot({ paper, line, pitches, numeral, caption, receipt, block }) {
   let placed = null;
   let dirty = true;
   return {
@@ -55,12 +59,15 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const receiptFont = fontOf(receipt);
       const footer = paper.querySelector('.paper-foot');
       let footerTop = paperHeight - 60;
+      let confirmRow = 0;
       if (footer) {
         const footerRect = footer.getBoundingClientRect();
+        const hint = footer.querySelector('.exit-hint');
+        if (hint && getComputedStyle(hint).flexBasis === '100%') confirmRow = parseFloat(getComputedStyle(hint).lineHeight);
         const stableChildren = [...footer.children].filter(child => !child.classList.contains('exit-hint'));
         const stableHeight = stableChildren.length
           ? Math.max(...stableChildren.map(child => child.getBoundingClientRect().height)) : 44;
-        footerTop = footerRect.bottom - stableHeight - paperTop;
+        footerTop = footerRect.bottom - stableHeight - paperTop - confirmRow;
       }
       const gap = 8;
       const captionInk = ink(caption.textContent, captionFont.css, captionFont.lineHeight);
@@ -80,17 +87,13 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
         const blockHeight = block.getBoundingClientRect().height;
         paper.style.setProperty('--room-top', `${Math.max(gap, Math.min(72, receiptTop - gap - blockHeight))}px`);
       }
+      const compact = paperHeight < COMPACT_BELOW;
+      const keptBottom = confirmRow || compact
+        ? Math.max(0, paperHeight - footerTop + gap)
+        : Math.max(0, paperHeight - footerTop - 24);
       const compactVars = ['--kept-title', '--kept-receipt-gap', '--kept-actions-gap', '--kept-scroll-gap'];
-      let compact = false;
-      if (kept && !kept.root.hidden) {
-        compactVars.forEach(name => paper.style.removeProperty(name));
-        const headHeight = kept.head.getBoundingClientRect().height;
-        const scrollGap = parseFloat(getComputedStyle(kept.scroll).marginTop);
-        const textLine = parseFloat(getComputedStyle(kept.text).lineHeight);
-        compact = footerTop - 48 < headHeight + scrollGap + textLine;
-      }
       paper.style.setProperty('--kept-top', `${compact ? 8 : 72}px`);
-      paper.style.setProperty('--kept-bottom', `${compact ? Math.max(0, paperHeight - footerTop + gap) : Math.max(0, paperHeight - footerTop - 24)}px`);
+      paper.style.setProperty('--kept-bottom', `${keptBottom}px`);
       if (compact) {
         paper.style.setProperty('--kept-title', 'var(--t-kept-compact)');
         paper.style.setProperty('--kept-receipt-gap', '6px');

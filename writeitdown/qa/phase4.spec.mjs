@@ -423,7 +423,7 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     { width: 390, height: 844 },
     { width: 1440, height: 620 },
   ];
-  const compactSizes = new Set(['1440x350', '844x390']);
+  const compactSizes = new Set(['1440x350', '844x390', '667x375']);
   for (const size of sizes) {
     const compact = compactSizes.has(`${size.width}x${size.height}`);
     await page.setViewportSize(size);
@@ -431,7 +431,7 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     await page.keyboard.insertText('This draft survives on a short sheet.\n');
     for (let second = 0; second < 57; second += 3) {
       await page.clock.fastForward(3000);
-      await page.keyboard.insertText('Keep going. ');
+      await page.keyboard.insertText('Keep going. Keep going. ');
     }
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
@@ -452,6 +452,7 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     expect(kept.heading.top).toBeGreaterThanOrEqual(kept.paper.top);
     expect(kept.receipt.bottom).toBeLessThanOrEqual(kept.actions.top);
     expect(kept.actions.bottom).toBeLessThanOrEqual(kept.scroll.top);
+    expect(await page.locator('.kept-scroll').evaluate(e => e.scrollHeight > e.clientHeight), 'the kept box is filled for the clearance check').toBe(true);
     if (compact) {
       expect(kept.top, 'the compact kept layout starts at 8 px').toBe(8);
       expect(kept.title, 'the compact kept title uses the compact token').toBe('34px');
@@ -465,12 +466,20 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     const hinted = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-      return { scroll: box('.kept-scroll'), top: box('#kept').top - box('.room-paper').top,
+      return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll'), actions: box('.kept-actions'),
+        heading: box('#kept h1'), receipt: box('#receipt'),
+        top: box('#kept').top - box('.room-paper').top,
         title: getComputedStyle(document.querySelector('#kept h1')).fontSize };
     });
     expect(hinted.top, 'the confirmation does not change the kept layout mode').toBe(kept.top);
     expect(hinted.title, 'the confirmation does not change the kept title').toBe(kept.title);
+    expect(hinted.heading.top).toBeCloseTo(kept.heading.top, 0);
+    expect(hinted.receipt.top).toBeCloseTo(kept.receipt.top, 0);
+    expect(hinted.actions.top).toBeCloseTo(kept.actions.top, 0);
+    expect(hinted.scroll.top).toBeCloseTo(kept.scroll.top, 0);
     expect(hinted.scroll.bottom, 'the confirmation does not move the kept placement').toBeCloseTo(kept.scroll.bottom, 0);
+    if (size.width <= 767 || compact) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
+    else expect(hinted.scroll.bottom - hinted.footer.top, 'the tall kept bottom keeps its 24 px footer allowance').toBeCloseTo(24, 0);
     await page.keyboard.press('Escape');
     await expect(page.locator('#landing')).toBeVisible();
   }

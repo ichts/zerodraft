@@ -24,7 +24,7 @@ The existing app is already pure AppKit: every source file under `apps/macos/Fir
 
 ### 2.2 The live writeitdown.app site
 
-Observed on 2026-09-24 with a Playwright script against https://writeitdown.app in headless Chrome at 1440x900, light appearance. The full log is `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/wid-live-2026-09-24.log` and the screenshots are `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/shots/wid-*.png`. The live behavior matched the source in `writeitdown/`.
+Observed on 2026-09-24 with a Playwright script against https://writeitdown.app in headless Chrome at 1440x900, light appearance. The full log is `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/wid-live-2026-09-24.log` and the screenshots are `/Users/ichts/firstmate-homes/first-line/data/zd-wid-mac-plan/shots/wid-*.png`. This section records that day's observation, not the current web contract: the web room and its landing demo were brought to the shipped Mac room on 2026-10-25 (`docs/wid-decisions.md` D-040 to D-043), and `writeitdown/README.md` owns the current strings, timing and geometry.
 
 - The CTA `Give it sixty seconds.` opens the `#trial` room and focuses the editor. The empty writing line holds only the caret; the bottom-right count slot reads `Type to start` until the first keystroke. The clock reads `1:00`.
 - The clock does not start on entry. After two idle seconds it still read `1:00`; it started on the first keystroke (`writeitdown/session.mjs`, `append`).

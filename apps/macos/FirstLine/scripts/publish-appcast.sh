@@ -5,12 +5,11 @@
 #         exported private key file instead of the Keychain, for a disposable test feed),
 #         WID_UPDATES_DIR (archives directory; default dist/updates).
 # [OUTPUT] dist/updates/appcast.xml plus a .delta per previous release archive, verified after
-#          generation (build number, marketing version, enclosure signature), and the exact
-#          upload commands. Exit 0 only when every assertion holds. This script never uploads and
-#          never touches the host.
-# [POS] apps/macos/FirstLine/scripts/publish-appcast.sh — the step after release-dmg.sh; the
-#       archive and its deltas are uploaded before the feed, so a user never sees a feed that
-#       points at a missing payload.
+#          generation (build number, marketing version, enclosure signature). Exit 0 only when every
+#          assertion holds. This script never uploads and never touches the host; the upload order
+#          and routing checks are owned by writeitdown/README.md.
+# [POS] apps/macos/FirstLine/scripts/publish-appcast.sh — the step after release-dmg.sh; it only
+#       writes and verifies the signed feed and payloads on the release machine.
 # [PROTOCOL] The update signing key never enters this repository: it stays in the release Mac's
 #            login Keychain (docs/RELEASE_KEY.md). Archive names are space-free so the appcast
 #            URLs stay readable.
@@ -85,14 +84,3 @@ PY
 deltas="$(find "$updates_dir" -maxdepth 1 -name '*.delta' -print | wc -l | tr -d ' ')"
 printf 'Appcast: %s\n' "$updates_dir/appcast.xml"
 printf 'Archive: %s (%s bytes), delta files: %s\n' "$archive" "$(wc -c < "$updates_dir/$archive" | tr -d ' ')" "$deltas"
-cat <<EOF
-
-Upload from the release machine, payload first and feed last. Nothing in this repository deploys.
-  rsync -av '$updates_dir'/*.zip '$updates_dir'/*.delta host:/var/www/writeitdown.app/download/updates/
-  rsync -av '$updates_dir'/appcast.xml host:/var/www/writeitdown.app/download/appcast.xml
-
-Then prove the routing before announcing the release:
-  curl -sSI https://writeitdown.app/download/appcast.xml | grep -Ei '^(HTTP|content-type)'
-  curl -sSI $appcast_url_prefix$archive | head -1
-  curl -sSI ${appcast_url_prefix}missing.zip | head -1   # must be 404, never 200 HTML
-EOF

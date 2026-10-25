@@ -1,29 +1,36 @@
 /**
- * [INPUT]: 依赖 AppKit、Sparkle 的 SPUStandardUserDriverDelegate 与 SUAppcastItem、Update/UpdatePolicy
- * [OUTPUT]: UpdateUserDriver：标准 Sparkle 界面的 gentle reminder delegate，记录被推迟的定时更新并在安全时机请回
- * [POS]: 更新界面与写作房间之间的闸门；只在会话结束且 Sparkle 空闲时把推迟的更新交给标准界面
+ * [INPUT]: 依赖 AppKit、Sparkle 的 SPUStandardUserDriver/SPUStandardUserDriverDelegate 与 SUAppcastItem、Update/UpdatePolicy
+ * [OUTPUT]: UpdateUserDriver（定时更新的 gentle reminder 委托）与 RoomAwareStandardUserDriver（标准 Sparkle 界面的房间闸门）
+ * [POS]: 更新界面与写作房间之间的唯一闸门：Session surface 显示时拒绝或推迟任何更新窗口，窗口已经出现时通过 Sparkle 自己的取消/回复路径结束它
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * Sparkle 在主线程回调这些方法，但协议本身不是 @MainActor，因此以 nonisolated 实现并在内部
  * MainActor.assumeIsolated 里读写状态：状态归属仍然是主 actor，没有第二份并发真相。
  */
 
-import Foundation
+import AppKit
 import Sparkle
 
 @MainActor
 final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
-    private let sessionIsRunning: () -> Bool
+    private let roomIsShown: () -> Bool
     private var deferral = UpdateDeferralPolicy()
 
-    init(sessionIsRunning: @escaping () -> Bool) {
-        self.sessionIsRunning = sessionIsRunning
+    /// 定时检查到的更新由本 delegate 负责展示；控制器在这里把已经建好的标准窗口请回前台。
+    var onScheduledUpdateReady: (() -> Void)?
+
+    init(roomIsShown: @escaping () -> Bool) {
+        self.roomIsShown = roomIsShown
         super.init()
     }
 
-    /// 会话结束或应用回到前台后，由 UpdateController 询问是否可以把推迟的更新请回一次。
+    func deferUpdate() {
+        deferral.deferUpdate()
+    }
+
+    /// 离开房间或应用回到前台后，由 UpdateController 询问是否可以把推迟的更新请回一次。
     func takePresentationRequest(canCheckForUpdates: Bool) -> Bool {
-        deferral.takePresentationRequest(sessionIsRunning: sessionIsRunning(), canCheckForUpdates: canCheckForUpdates)
+        deferral.takePresentationRequest(roomIsShown: roomIsShown(), canCheckForUpdates: canCheckForUpdates)
     }
 
     // MARK: - SPUStandardUserDriverDelegate（Sparkle 在主线程调用）
@@ -31,14 +38,13 @@ final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
     /// 只有声明支持 gentle reminder，Sparkle 才会把定时检查到的更新交给 delegate 决定是否展示。
     nonisolated var supportsGentleScheduledUpdateReminders: Bool { true }
 
+    /// 定时更新一律由本 delegate 决定何时展示。让标准 driver 自己处理时，它会把窗口推迟到下一次
+    /// applicationDidBecomeActive，那时房间可能已经重新出现。
     nonisolated func standardUserDriverShouldHandleShowingScheduledUpdate(
         _ update: SUAppcastItem,
         andInImmediateFocus immediateFocus: Bool
     ) -> Bool {
-        // 该回调必须无副作用：返回 NO 表示 delegate 负责展示，记录发生在 willHandleShowingUpdate。
-        MainActor.assumeIsolated {
-            UpdatePolicy.mayPresentUpdateUI(sessionIsRunning: sessionIsRunning())
-        }
+        false
     }
 
     nonisolated func standardUserDriverWillHandleShowingUpdate(
@@ -46,16 +52,160 @@ final class UpdateUserDriver: NSObject, SPUStandardUserDriverDelegate {
         forUpdate update: SUAppcastItem,
         state: SPUUserUpdateState
     ) {
+        // 用户发起的检查由 RoomAwareStandardUserDriver 在展示时闸门。
+        guard !handleShowingUpdate else { return }
         MainActor.assumeIsolated {
-            if handleShowingUpdate {
-                deferral.clear()
+            if let onScheduledUpdateReady {
+                onScheduledUpdateReady()
             } else {
                 deferral.deferUpdate()
             }
         }
     }
+}
 
-    nonisolated func standardUserDriverWillFinishUpdateSession() {
-        MainActor.assumeIsolated { deferral.clear() }
+/// 标准 Sparkle 界面的房间闸门。真正展示前检查当前 surface；房间出现时终止已经展示的更新会话。
+/// 终止走 Sparkle 自己的 reply / cancellation，始终让一个更新会话有明确结局，而不是把窗口丢在原地。
+@MainActor
+final class RoomAwareStandardUserDriver: SPUStandardUserDriver {
+    private let roomIsShown: () -> Bool
+    private let onDeferred: () -> Void
+    private var activeCloser: (() -> Void)?
+
+    init(
+        hostBundle: Bundle,
+        delegate: SPUStandardUserDriverDelegate,
+        roomIsShown: @escaping () -> Bool,
+        onDeferred: @escaping () -> Void
+    ) {
+        self.roomIsShown = roomIsShown
+        self.onDeferred = onDeferred
+        super.init(hostBundle: hostBundle, delegate: delegate)
+    }
+
+    /// 房间接管窗口时调用：结束当前更新界面，并把更新记成待办。
+    func endPresentationForRoom() {
+        guard let closer = activeCloser else { return }
+        activeCloser = nil
+        onDeferred()
+        closer()
+    }
+
+    override func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {
+        guard !roomIsShown() else {
+            onDeferred()
+            cancellation()
+            return
+        }
+        let tracked = trackCancellation(cancellation)
+        activeCloser = { tracked() }
+        super.showUserInitiatedUpdateCheck(cancellation: tracked)
+    }
+
+    override func showUpdateFound(
+        with appcastItem: SUAppcastItem,
+        state: SPUUserUpdateState,
+        reply: @escaping (SPUUserUpdateChoice) -> Void
+    ) {
+        guard !roomIsShown() else {
+            onDeferred()
+            reply(.dismiss)
+            return
+        }
+        let tracked = trackReply(reply)
+        activeCloser = { tracked(.dismiss) }
+        super.showUpdateFound(with: appcastItem, state: state, reply: tracked)
+    }
+
+    override func showUpdateNotFoundWithError(_ error: any Error, acknowledgement: @escaping () -> Void) {
+        guard !roomIsShown() else {
+            acknowledgement()
+            return
+        }
+        activeCloser = nil
+        super.showUpdateNotFoundWithError(error, acknowledgement: acknowledgement)
+    }
+
+    override func showUpdaterError(_ error: any Error, acknowledgement: @escaping () -> Void) {
+        guard !roomIsShown() else {
+            acknowledgement()
+            return
+        }
+        activeCloser = nil
+        super.showUpdaterError(error, acknowledgement: acknowledgement)
+    }
+
+    override func showDownloadInitiated(cancellation: @escaping () -> Void) {
+        guard !roomIsShown() else {
+            onDeferred()
+            cancellation()
+            return
+        }
+        let tracked = trackCancellation(cancellation)
+        activeCloser = { tracked() }
+        super.showDownloadInitiated(cancellation: tracked)
+    }
+
+    override func showDownloadDidStartExtractingUpdate() {
+        guard !roomIsShown() else {
+            onDeferred()
+            dismissUpdateInstallation()
+            return
+        }
+        // 下载已经结束，下载取消不再有效；提取期间房间出现时先关掉状态窗，安装询问会再次经过房间闸门。
+        activeCloser = { [weak self] in self?.dismissUpdateInstallation() }
+        super.showDownloadDidStartExtractingUpdate()
+    }
+
+    override func showReady(toInstallAndRelaunch reply: @escaping (SPUUserUpdateChoice) -> Void) {
+        guard !roomIsShown() else {
+            onDeferred()
+            reply(.dismiss)
+            return
+        }
+        let tracked = trackReply(reply)
+        activeCloser = { tracked(.dismiss) }
+        super.showReady(toInstallAndRelaunch: tracked)
+    }
+
+    override func showInstallingUpdate(
+        withApplicationTerminated applicationTerminated: Bool,
+        retryTerminatingApplication: @escaping () -> Void
+    ) {
+        activeCloser = nil
+        super.showInstallingUpdate(withApplicationTerminated: applicationTerminated,
+                                   retryTerminatingApplication: retryTerminatingApplication)
+    }
+
+    override func dismissUpdateInstallation() {
+        activeCloser = nil
+        super.dismissUpdateInstallation()
+    }
+
+    override func showUpdateInFocus() {
+        guard !roomIsShown() else { return }
+        super.showUpdateInFocus()
+    }
+
+    private func trackCancellation(_ cancellation: @escaping () -> Void) -> () -> Void {
+        var used = false
+        return { [weak self] in
+            guard !used else { return }
+            used = true
+            self?.activeCloser = nil
+            cancellation()
+        }
+    }
+
+    private func trackReply(
+        _ reply: @escaping (SPUUserUpdateChoice) -> Void
+    ) -> (SPUUserUpdateChoice) -> Void {
+        var used = false
+        return { [weak self] choice in
+            guard !used else { return }
+            used = true
+            self?.activeCloser = nil
+            reply(choice)
+        }
     }
 }

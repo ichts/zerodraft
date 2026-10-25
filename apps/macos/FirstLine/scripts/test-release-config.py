@@ -12,9 +12,9 @@ config = plistlib.loads((module / 'Sources/FirstLine/Info.plist').read_bytes())
 keys = ['WIDCheckoutURL', 'WIDLicenseServiceURL', 'WIDLicenseProductID', 'WIDLicensePublicKey']
 update_keys = ['SUFeedURL', 'SUPublicEDKey']
 PLACEHOLDER_UPDATE_KEY = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
-# The tracked Info.plist holds the build placeholder until the captain creates the key and the real
-# public key afterwards (docs/RELEASE_KEY.md). Either value must be a raw 32-byte Ed25519 key, and the
-# release gate below must refuse the placeholder in both cases.
+# The tracked Info.plist carries the captain's real public key (docs/RELEASE_KEY.md). The release
+# gate below still refuses the pre-key placeholder: a build signed with a throwaway key could never
+# be updated by the captain's key.
 tracked_update_key = config['SUPublicEDKey']
 assert len(base64.b64decode(tracked_update_key, validate=True)) == 32, 'SUPublicEDKey must be the raw 32-byte Ed25519 public key'
 real_update_key = (tracked_update_key if tracked_update_key != PLACEHOLDER_UPDATE_KEY

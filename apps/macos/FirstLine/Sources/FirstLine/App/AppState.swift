@@ -250,6 +250,11 @@ final class AppState {
         sessionEngine.phase == .writing || sessionEngine.phase == .danger
     }
 
+    /// 整个 Session 房间：空房间、写作、警告、失败和成稿都算。更新界面绝不在这个 surface 上出现。
+    var isShowingWritingRoom: Bool {
+        selectedSurface == .session
+    }
+
     func updateDefaultDuration(_ duration: TimeInterval) {
         guard !sessionIsRunning else { return }
         settings.defaultDuration = SessionEngine.validDuration(duration)

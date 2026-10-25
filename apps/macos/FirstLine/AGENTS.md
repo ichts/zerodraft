@@ -51,7 +51,7 @@ Sources/FirstLine/DesignSystem/Spacing.swift: 4-pt 间距与 ctl/sheet/card/stag
 Sources/FirstLine/DesignSystem/SurfaceViews.swift: FirstLineShadowView（sheet-shadow 的 ring + 多层 ink/black 阴影）与 FirstLineCardView（白/暗 sheet + shadow + content insets）。
 Sources/FirstLine/DesignSystem/Controls.swift: After 语言 seg control、status 和 fill bar；原生可聚焦按钮与 appearance-aware 颜色。
 Sources/FirstLine/DesignSystem/BundledResources.swift: 统一的 SwiftPM/打包应用资源 bundle 入口；字体注册与 split-W lockup 共用，避免重复 bundle 名与回退逻辑。
-Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用的 split-W lockup，与 `writeitdown/logo/write-it-down-lockup.svg` 同一矢量；模板着色为应用 ink token。
+Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用的 wordmark-only split-W lockup，是 Mac 自己的副本；不要与 Web 的两层掩膜同步（`writeitdown/logo/write-it-down-lockup.svg` 现在是 chip W 加词标的 glyph 层），否则开始屏会出现重复的 W。模板着色为应用 ink token。
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。
 Tests/FirstLineTests/BatchFiveTests.swift: 时长选择、设置持久化和键盘动作验收。

@@ -537,3 +537,23 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-038's reason and DESIGN 11.6 "Each plate sits one step off its wall" claim, in that the paper
   plate alone does not separate from the wall and the edge does. The plate-token correction above, the chip
   drawing, the two aligned masks, the theme polarity, the responsive sizes and D-039 stand.
+
+### Correction to D-039: the header holds its gutter at every width
+
+- Date: 2026-10-25
+- Decision: The 16 px narrow-phone lockup covers 390 px and below, the 19 px step runs from 391 to 820 px, and
+  above 820 px keeps 21 px. Below 360 px the widest header cannot hold one row under the wider-font action
+  model, so `.home-nav` stacks into two rows with the action group right-aligned; the mark stays at 16 px and
+  the action stays. The room paper fills the stage as a flex child instead of subtracting `--nav-h`,
+  so the taller stacked header cannot clip it at 320 px. The gate is a sweep of `/download/` from 320 to 1440 px
+  in 1 px steps under the 164 px wider-font action model, requiring no horizontal overflow, at least 6 px of
+  right gutter, the page action visible, and the 36 px theme button at every width; the 360/375/390 px point
+  samples stay for the visual checks.
+- Reason: the old 380 px step left 381-390 px on the 19 px lockup while the wider-font action needs the 16 px
+  step; at 381 px the theme button had 1.1 px of gutter, under the 6 px bar. The gate sampled only 360, 375 and
+  390 px, so it stepped over the band. Below 360 px the one-row header cannot hold the wider-font
+  action plus the 36 px button (the landing already overflowed at 320 px), and stacking preserves the mark,
+  the action and the button instead of shrinking any of them.
+- Supersedes: D-039's "at 380 px and below" step and the D-039 corrections' band wording down to 380 px, plus
+  the D-039 reason's sampled gutter figures; the 16 px lockup, the two aligned masks, the theme polarity, the
+  `--brand-plate` token, the plate hairline, the 6 px action-group gap and D-038 stand.

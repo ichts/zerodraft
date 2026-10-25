@@ -408,9 +408,9 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
   }
 });
 
-// Narrow phones: /download/ carries the widest header (brand, page action, theme button), so 360 px decides
-// the narrow lockup step, and landing and mac share that one rule instead of diverging. The chip also has to
-// stay legible at the step the narrowest phone gets.
+// Narrow phones: /download/ carries the widest header (brand, page action, theme button), so it decides the
+// responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
+// below owns the every-width fit.
 for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
@@ -445,6 +445,29 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
     }
     expect(new Set(lockups).size, `${width}px: landing, room, download and mac share one lockup step`).toBe(1);
   }
+});
+
+// A breakpoint that moves leaves a band where the row no longer fits, and sampled widths can step over it. Sweep
+// every width on the widest header page under the wider-font action model, so a hole fails instead of passing
+// between samples.
+test('the header holds its gutter at every width from 320 to 1440 px', async ({ page }) => {
+  await page.goto('download/');
+  await page.addStyleTag({ content: 'nav .btn-quiet { min-width: 164px }' });
+  const failures = [];
+  for (let width = 320; width <= 1440; width += 1) {
+    await page.setViewportSize({ width, height: 844 });
+    const state = await page.evaluate(() => {
+      const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(nav => nav.getClientRects().length);
+      const button = nav.querySelector('.theme-btn'), action = nav.querySelector('.btn-quiet');
+      const box = button.getBoundingClientRect();
+      return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        gutter: innerWidth - box.right, button: Math.min(box.width, box.height),
+        action: !!action && action.getClientRects().length > 0 };
+    });
+    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || !state.action)
+      failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}`);
+  }
+  expect(failures, failures.slice(0, 16).join('; ')).toEqual([]);
 });
 
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {

@@ -36,7 +36,9 @@ for (const control of cases) {
     }
   }
   await fs.mkdir(path.join(site, 'logo'), { recursive: true });
-  await fs.copyFile(path.join(root, 'logo/write-it-down-lockup.svg'), path.join(site, 'logo/write-it-down-lockup.svg'));
+  for (const asset of await fs.readdir(path.join(root, 'logo'))) {
+    await fs.copyFile(path.join(root, 'logo', asset), path.join(site, 'logo', asset));
+  }
   if (control.from) {
     assert.equal(original.split(control.from).length, 2, `mutation boundary for ${control.name}`);
     await fs.writeFile(path.join(site, source), original.replace(control.from, control.to));

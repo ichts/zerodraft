@@ -148,7 +148,7 @@ async function run(size, browser) {
       const r = await ctx.request.get(url('/og.png')); ok(r.status() === 200 && /image\/png/.test(r.headers()['content-type'] || ''), `og.png ${r.status()} ${r.headers()['content-type']}`);
     });
     await step('lockup and favicon SVGs use the image content type', async () => {
-      for (const asset of ['/logo/write-it-down-lockup.svg', '/favicon.svg', '/favicon-dark.svg']) {
+      for (const asset of ['/logo/write-it-down-lockup.svg', '/logo/write-it-down-lockup-plate.svg', '/favicon.svg', '/favicon-dark.svg']) {
         const r = await ctx.request.get(url(asset));
         const type = (r.headers()['content-type'] || '').split(';')[0].trim();
         ok(r.status() === 200 && type === 'image/svg+xml', `${asset} ${r.status()} ${r.headers()['content-type']}`);

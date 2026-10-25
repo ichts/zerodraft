@@ -448,3 +448,146 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   stored signed fixture license and asserts the picker is the first presented surface.
 - Supersedes: the "cached key is blocked until validation" launch behaviour; it stands only as the
   local-verification requirement, not as a network hold.
+
+## D-038: The web header opens with the A mark chip
+
+- Date: 2026-10-25
+- Decision: The writeitdown.app header and footer lockup is the A mark as a chip (the app icon's squircle plate
+  with the split W painted on it) followed by the wordmark on the same baseline. Two aligned alpha masks share
+  one viewBox: `writeitdown/logo/write-it-down-lockup.svg` supplies the W and wordmark in `currentColor`;
+  `writeitdown/logo/write-it-down-lockup-plate.svg` supplies the plate in the existing paper-surface token
+  (`--sheet`, falling back to `--paper`). Light appearance has a paper plate with ink W; dark has an ink plate
+  with bone W. The Mac start screen and the social card keep the wordmark-only lockup. The mobile header trades
+  gap for it (12 px between the brand and the page action, 6 px inside the action group) so the theme button
+  stays on the 390 px right gutter.
+- Reason: The captain read the live header as plain words: the shipped lockup was the wordmark alone and its
+  split W is invisible at 21 px, so the product had no logo in the corner. A mark set beside the wordmark as a
+  bare letter reads as a repeated W; the paper-surface plate makes the small mark an object against the wall. Details are
+  in `design/DESIGN.md` section 11.6.
+- Supersedes: section 11.1/11.4 of the split-W logo decision shipped in
+  https://github.com/ichts/zerodraft/pull/59, which made the wordmark the whole lockup and forbade setting the
+  mark beside it. The favicon set, the app icon, the volume icon, the Mac start screen, the og card, the palette
+  and the "no red in the logo" rule stand.
+
+## D-039: The narrow-phone header steps the lockup to 16 px type
+
+- Date: 2026-10-25
+- Decision: At 380 px wide and below the writeitdown.app header lockup is 16 px type (the chip is 16.7 px)
+  instead of 19 px, on every page that uses `.brand`: the landing, the trial room, `/download/` and `mac.html`.
+  It is one rule, so those pages never diverge. Nothing changes above 380 px: 19 px up to 820 px, 21 px above.
+- Reason: `/download/` carries the widest header (the brand, `Try it in your browser` and the theme button), and
+  the chip widened the lockup by 1.384 em, so at 360 px a 19 px lockup pushed the theme button 12.3 px past the
+  right edge and the page scrolled 15 px sideways. The mark and every control stay; only the lockup size gives.
+  17 px still leaves 2.6 px of the 20 px page gutter at 360 px, so 16 px is the largest whole-pixel step that
+  clears the 6 px bar: 10.0 px of gutter at 360, 17.6 at 375, 20 at 390. The chip carries the small-size notch
+  widening (DESIGN 11.6), so the split still reads as a plate with a W at 16.7 px on a 3x phone render.
+- Supersedes: D-038's mobile gap trade ("the mobile header trades gap for it ... so the theme button stays on the
+  390 px right gutter") only, in that the 12 px/6 px gap trade now stops at 380 px and the lockup itself steps
+  down below it. The chip, the single mask file, the palette and the rest of D-038 stand.
+
+### Correction to D-039: mask layers and mobile gaps
+
+- Date: 2026-10-25
+- Decision: D-039 changes only the lockup size at 380 px and below. The mobile gaps remain in effect there;
+  the implementation uses two aligned masks, as defined in `design/DESIGN.md` section 11.6.
+- Reason: D-039's closing sentence retained the earlier single-mask description and incorrectly said the mobile
+  gap trade stopped at 380 px. Neither describes the shipped CSS.
+- Supersedes: D-039's "single mask file" and "12 px/6 px gap trade now stops at 380 px" wording only.
+
+### Correction to D-039: narrow-phone spacing across system fonts
+
+- Date: 2026-10-25
+- Decision: At 380 px and below, keep the 16 px lockup and use the existing 8 px spacing token between the
+  brand and action group. The internal action gap stays 6 px. All shared headers use the same rule.
+- Reason: Linux system-font metrics made the download action wider than on macOS, leaving only 3.125 px of
+  right gutter at 360 px in CI. The 8 px gap restores the 6 px minimum without shrinking the mark or changing
+  the action. Browser acceptance covers native metrics and a 164 px action width on both platforms.
+- Supersedes: The earlier D-039 correction's claim that the 12 px mobile header gap remains at 380 px and below.
+  The 16 px lockup, two mask layers, theme polarity and 6 px action-group gap stand.
+
+### Correction to D-038: one plate token for every page
+
+- Date: 2026-10-25
+- Decision: The chip plate is the single `--brand-plate` token, one value per theme, owned with the other root
+  colour roles in `writeitdown/tokens.css` (`#ffffff` light, `#26231c` dark). `.brand` consumes the token
+  directly; the `var(--sheet, var(--paper))` fallback chain is gone, so the landing, the trial room,
+  `/download/` and `mac.html` paint one plate.
+- Reason: The fallback resolved `--sheet` on the landing and `/download/` but fell through to `--paper` on
+  `mac.html`, whose page colour is `#f7f4ea` light and `#211f18` dark. The same lockup was a chip on two pages
+  and a bare mark on the third, which the "one rule for every page" contract forbids.
+  `writeitdown/qa/mac.spec.mjs` "the header chip paints one plate colour on every page" failed on the
+  `mac.html` plate before the token and passes after it.
+- Supersedes: D-038's "`--sheet`, falling back to `--paper`" plate source only. The chip drawing, the two aligned
+  masks, the light-plate/ink-W and dark-plate/bone-W polarity, the responsive sizes and D-039 stand.
+
+### Correction to D-038: the plate carries the header hairline
+
+- Date: 2026-10-25
+- Decision: The header chip keeps the paper plate `#ffffff` with the ink W in light and the ink plate `#26231c`
+  with the bone W in dark, and `.brand::before` adds the existing `--hair-2` hairline as a 1 px border on the
+  chip square, with a corner radius matching the squircle. It is the same boundary `.theme-btn` draws, with no
+  new token, shadow, or second colour, and it is one shared rule in `writeitdown/site.css`, so the landing, the
+  trial room, `/download/` and `mac.html` agree.
+- Reason: The paper plate `#ffffff` against the `#f7f7f5` page wall is 1.07:1, so in the default light theme the
+  chip collapsed into a bare split W beside the wordmark's own W - the repeated-letter reading D-038 exists to
+  prevent. A hairline is the boundary the header controls already use, and it makes the 21 px chip an object
+  without inventing a surface treatment. `writeitdown/qa/mac.spec.mjs` "the header chip paints one plate colour
+  on every page" now reads the rendered plate border and requires the 1 px solid `--hair-2` edge to equal the
+  theme button's boundary on every page.
+- Supersedes: D-038's reason and DESIGN 11.6 "Each plate sits one step off its wall" claim, in that the paper
+  plate alone does not separate from the wall and the edge does. The plate-token correction above, the chip
+  drawing, the two aligned masks, the theme polarity, the responsive sizes and D-039 stand.
+
+### Correction to D-039: the header holds its gutter at every width
+
+- Date: 2026-10-25
+- Decision: The 16 px narrow-phone lockup covers 390 px and below, the 19 px step runs from 391 to 820 px, and
+  above 820 px keeps 21 px. Below 360 px the widest header cannot hold one row under the wider-font action
+  model, so `.home-nav` stacks into two rows with the action group right-aligned; the mark stays at 16 px and
+  the action stays. The room paper fills the stage as a flex child instead of subtracting `--nav-h`,
+  so the taller stacked header cannot clip it at 320 px. The gate is a sweep of `/download/` from 320 to 1440 px
+  in 1 px steps under the 164 px wider-font action model, requiring no horizontal overflow, at least 6 px of
+  right gutter, the page action visible, and the 36 px theme button at every width; the 360/375/390 px point
+  samples stay for the visual checks.
+- Reason: the old 380 px step left 381-390 px on the 19 px lockup while the wider-font action needs the 16 px
+  step; at 381 px the theme button had 1.1 px of gutter, under the 6 px bar. The gate sampled only 360, 375 and
+  390 px, so it stepped over the band. Below 360 px the one-row header cannot hold the wider-font
+  action plus the 36 px button (the landing already overflowed at 320 px), and stacking preserves the mark,
+  the action and the button instead of shrinking any of them.
+- Supersedes: D-039's "at 380 px and below" step and the D-039 corrections' band wording down to 380 px, plus
+  the D-039 reason's sampled gutter figures; the 16 px lockup, the two aligned masks, the theme polarity, the
+  `--brand-plate` token, the plate hairline, the 6 px action-group gap and D-038 stand.
+
+### Correction to the D-039 correction: the room keeps main's dvh sizing
+
+- Date: 2026-10-25
+- Decision: The trial room's vertical sizing is main's again: `.room{...min-height:0}`, the `.room-paper`
+  `100vh`/`100dvh` calc pair, `.room.home{min-height:0}` and the `.room-nav` padding shorthand are restored
+  verbatim. The stacked header at 360 px and below carries `--nav-h: 77px`, its min-height, so the unchanged
+  paper calc still pins the sheet to `100dvh`. The header work (the 390 px narrow-phone step, the two-row
+  header and the 320-1440 px sweep) stands.
+- Reason: The flex-filled paper removed the room's `dvh` minimum, so an expanded mobile toolbar let `100vh` win
+  and pushed EXIT and the word count out of the un-scrollable trial. The paper calc takes `--nav-h` as its
+  header input, so the header tier must carry the actual stacked header height.
+- Supersedes: The previous D-039 correction's "room paper fills the stage as a flex child" sentence only. The
+  header step, the two-row header, the sweep, the plate hairline and the rest of D-039/D-038 stand.
+
+### Correction to D-039: below 380 px the header keeps the mark and the theme button
+
+- Date: 2026-10-25
+- Decision: Below 380 px one shared rule hides the nav page action on every page (`nav[aria-label="Main"]
+  .btn-quiet`): the landing, the trial room and `/download/` show the brand lockup and the 36 px theme button,
+  and `mac.html`, which has no nav action, is unchanged. Each page keeps its call to action in the body. The
+  16 px lockup step still covers 390 px and below; the narrow header stays one 56 px row at and below 820 px,
+  and the `--nav-h: 77px` stacked tier is gone. The 320-1440 px sweep runs 1 px steps from 320 to 420 and 8 px steps
+  from 420 to 1440 under the wider-font action model, with the page action expected at 380 px and above and
+  absent below 380 px, and carries its own 120 s timeout.
+- Reason: The two-row header was a compromise that changed the header height and needed a room token. The nav
+  action is redundant because every page already carries its call to action in the body, so dropping it is one
+  uniform rule that keeps the mark at 16 px and the theme button without touching the room's sizing. The
+  short-viewport gate now asserts the room's `min-height: 0` boundary and the paper's
+  `calc(100dvh - var(--nav-h) - var(--room-gut))` minimum, which fails if the room returns to the flex-only
+  paper.
+- Supersedes: The previous D-039 corrections' stacked tier, their `--nav-h: 77px` sentence and their
+  "stacking preserves..." reason only. The room's restored dynamic-viewport sizing, the 390 px step, the two
+  aligned masks, the theme polarity, the `--brand-plate` token, the plate hairline and D-038 stand.

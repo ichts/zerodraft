@@ -3,7 +3,7 @@ set -eu
 
 TARGET=/var/www/writeitdown.app
 SOURCE=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
-FILES='download/index.html site.css tokens.css reenie-beanie.woff2 OFL-ReenieBeanie.txt theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js buy.js privacy.html terms.html support.html mac.html what-is-write-it-down.html write-it-down-mac-vs-web.html write-it-down-free-trial.html write-it-down-price.html delete-a-draft.html is-my-writing-saved.html index.html og.png robots.txt sitemap.xml llms.txt BingSiteAuth.xml google7787e5a0693832e8.html 1bcb6b66144003eb070fe87774217f86.txt logo/write-it-down-lockup.svg favicon.svg favicon-16.png favicon-32.png favicon-dark.svg favicon-dark-16.png favicon-dark-32.png apple-touch-icon.png'
+FILES='download/index.html site.css tokens.css reenie-beanie.woff2 OFL-ReenieBeanie.txt theme.js demo.js demo-timeline.mjs feedback.js session.mjs room.js buy.js privacy.html terms.html support.html mac.html what-is-write-it-down.html write-it-down-mac-vs-web.html write-it-down-free-trial.html write-it-down-price.html delete-a-draft.html is-my-writing-saved.html index.html og.png robots.txt sitemap.xml llms.txt BingSiteAuth.xml google7787e5a0693832e8.html 1bcb6b66144003eb070fe87774217f86.txt logo/write-it-down-lockup.svg logo/write-it-down-lockup-plate.svg favicon.svg favicon-16.png favicon-32.png favicon-dark.svg favicon-dark-16.png favicon-dark-32.png apple-touch-icon.png'
 
 [ "$(id -u)" -eq 0 ] || { echo 'Run this installer as root.' >&2; exit 1; }
 [ -d /var/www ] || { echo '/var/www must already exist.' >&2; exit 1; }

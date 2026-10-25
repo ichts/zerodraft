@@ -252,6 +252,229 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
   });
 }
 
+const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
+  const box = el.getBoundingClientRect();
+  const scale = 2;
+  const width = Math.round(box.width * scale), height = Math.round(box.height * scale);
+  const raster = async (pseudo) => {
+    const style = getComputedStyle(el, pseudo);
+    const image = new Image();
+    image.src = (style.maskImage || style.webkitMaskImage).match(/url\("?([^"\)]+)"?\)/)[1];
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext('2d');
+    const w = parseFloat(style.width), h = parseFloat(style.height);
+    const size = style.maskSize || style.webkitMaskSize;
+    const ratio = size === 'contain' ? Math.min(w / image.width, h / image.height)
+      : size === 'cover' ? Math.max(w / image.width, h / image.height)
+      : w / image.width;
+    const dw = image.width * ratio, dh = image.height * ratio;
+    const x = parseFloat(style.left), y = parseFloat(style.top) + (h - dh) / 2;
+    context.drawImage(image, x * scale, y * scale, dw * scale, dh * scale);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    return { alpha: (x, y) => pixels[(y * width + x) * 4 + 3], color: style.backgroundColor };
+  };
+  const plate = await raster('::before'), glyph = await raster('::after');
+  const chip = Math.round(box.height * scale);
+  let chipInk = 0, chipHole = 0;
+  const glyphBounds = [chip, chip, -1, -1], holeBounds = [chip, chip, -1, -1];
+  const extend = (bounds, x, y) => {
+    bounds[0] = Math.min(bounds[0], x); bounds[1] = Math.min(bounds[1], y);
+    bounds[2] = Math.max(bounds[2], x); bounds[3] = Math.max(bounds[3], y);
+  };
+  for (let y = 0; y < chip; y += 1) for (let x = 0; x < chip; x += 1) {
+    if (glyph.alpha(x, y) > 127) extend(glyphBounds, x, y);
+    if (plate.alpha(x, y) > 127 && glyph.alpha(x, y) > 127) {
+      chipHole += 1; extend(holeBounds, x, y);
+    } else if (plate.alpha(x, y) > 127) chipInk += 1;
+  }
+  const columns = [];
+  for (let x = Math.round(chip / 3); x < Math.round(2 * chip / 3); x += 1) {
+    let ink = 0, total = 0;
+    for (let y = Math.round(chip * 0.45); y < Math.round(chip * 0.95); y += 1) {
+      total += 1; if (glyph.alpha(x, y) > 215) ink += 1;
+    }
+    columns.push(ink / total);
+  }
+  const floor = Math.min(...columns), margin = 0.04;
+  let best = { length: 0, left: floor, right: floor };
+  for (let start = 1; start < columns.length - 1; start += 1) {
+    if (columns[start] > floor + margin) continue;
+    let end = start;
+    while (end + 1 < columns.length && columns[end + 1] <= floor + margin) end += 1;
+    if (end + 1 >= columns.length) break;
+    const length = end - start + 1;
+    const left = Math.max(...columns.slice(0, start)), right = Math.max(...columns.slice(end + 1));
+    if (left > floor + margin && right > floor + margin && length > best.length) best = { length, left, right };
+    start = end;
+  }
+  let wordInk = 0, wordTotal = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = Math.min(width, chip + Math.round(box.height * 0.3 * scale)); x < width; x += 1) {
+      wordTotal += 1; if (glyph.alpha(x, y) > 127) wordInk += 1;
+    }
+  }
+  const luminance = color => {
+    const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(c => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const plateLight = luminance(plate.color), glyphLight = luminance(glyph.color);
+  return {
+    box: { width: +box.width.toFixed(2), height: +box.height.toFixed(2) },
+    chipInkShare: chipInk / (chip * chip), chipHoleShare: chipHole / (chip * chip),
+    glyphBounds, holeBounds,
+    splitLength: best.length, splitContrast: +(Math.min(best.left, best.right) - floor).toFixed(2),
+    topOfChipIsPlate: plate.alpha(Math.round(chip / 2), Math.round(chip * 0.06)) > 127,
+    wordInkShare: wordInk / wordTotal, polarity: plateLight - glyphLight,
+  };
+});
+
+// The captain's report: the header read as plain words because the lockup was the wordmark alone, and the
+// split W inside it is invisible at 21 px. The header must show the A mark as its own chip beside the
+// wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
+// solid tile without the split.
+test('the header lockup shows the A mark chip beside the wordmark', async ({ page }, info) => {
+  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+    await page.goto(path);
+    const brands = page.locator('.brand:visible');
+    expect(await brands.count(), `${path}: visible lockup`).toBeGreaterThan(0);
+    for (let index = 0; index < await brands.count(); index += 1) {
+      const mark = await measureHeaderMark(brands.nth(index));
+      const at = `${path} at ${mark.box.width}x${mark.box.height}:`;
+      expect(mark.chipInkShare, `${at} the left square is the plate, not a bare letter`).toBeGreaterThan(0.6);
+      expect(mark.chipInkShare, `${at} the W leaves visible plate around it`).toBeLessThan(0.95);
+      expect(mark.chipHoleShare, `${at} the W strokes occupy the chip`).toBeGreaterThan(0.05);
+      expect(mark.chipHoleShare, `${at} the W leaves most of the plate visible`).toBeLessThan(0.4);
+      for (let axis = 0; axis < 4; axis += 1)
+        expect(Math.abs(mark.glyphBounds[axis] - mark.holeBounds[axis]), `${at} the W stays aligned with the plate`).toBeLessThanOrEqual(3);
+      const direction = info.project.use.colorScheme === 'light' ? 1 : -1;
+      expect(mark.polarity * direction, `${at} light plate with dark glyphs, dark plate with light glyphs`).toBeGreaterThan(0.6);
+      if (path === 'index.html' && index === 0) {
+        await page.screenshot({ path: info.outputPath('header.png'), clip: { x: 0, y: 0, width: page.viewportSize().width, height: 110 } });
+      }
+      expect(mark.topOfChipIsPlate, `${at} the plate covers the top of the chip`).toBe(true);
+      expect(mark.box.height, `${at} the chip is square and sits inside the lockup box`).toBeGreaterThan(16);
+      expect(mark.box.width, `${at} the lockup is the chip plus the wordmark`).toBeGreaterThan(mark.box.height * 5);
+      expect(mark.splitLength, `${at} the split survives at header size`).toBeGreaterThanOrEqual(2);
+      expect(mark.splitContrast, `${at} the split has a W stroke on each side`).toBeGreaterThan(0.05);
+      expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeGreaterThan(0.06);
+      expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeLessThan(0.4);
+    }
+  }
+});
+
+// One brand rule for every page: the chip plate is a single `--brand-plate` token per theme, resolved where the
+// other colour roles live (tokens.css). A per-page fallback let mac.html resolve its own paper colour, so the
+// same lockup read as a chip on the landing and as a bare mark on the mac page. This reads the rendered
+// ::before background, so a page-level override or a reintroduced fallback chain fails here.
+test('the header chip paints one plate colour on every page', async ({ page }) => {
+  const samples = [];
+  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+    await page.goto(path);
+    const brand = page.locator('.brand:visible').first();
+    expect(await brand.count(), `${path}: visible lockup`).toBeGreaterThan(0);
+    const controlEdge = await page.locator('nav[aria-label="Main"]:visible .theme-btn').first().evaluate(button => {
+      const style = getComputedStyle(button);
+      return `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`;
+    });
+    samples.push(await brand.evaluate((el, [pagePath, edge]) => {
+      const plate = getComputedStyle(el, '::before');
+      return {
+        path: pagePath,
+        theme: document.documentElement.dataset.theme,
+        plate: plate.backgroundColor,
+        token: getComputedStyle(el).getPropertyValue('--brand-plate').trim(),
+        edge: `${plate.borderTopWidth} ${plate.borderTopStyle} ${plate.borderTopColor}`,
+        controlEdge: edge,
+      };
+    }, [path, controlEdge]));
+  }
+  const theme = samples[0].theme;
+  expect(new Set(samples.map(s => s.theme)).size, 'every page renders the same stored theme').toBe(1);
+  const plates = new Set(samples.map(s => s.plate));
+  expect(plates.size, `${theme}: one plate colour, not ${samples.map(s => `${s.path}=${s.plate}`).join(', ')}`).toBe(1);
+  expect(samples[0].plate, `${theme}: the plate is opaque`).toMatch(/^rgba?\(.*, 1\)$|^rgb\(/);
+  const tokens = new Set(samples.map(s => s.token));
+  expect(tokens.size, `${theme}: one --brand-plate token, not ${samples.map(s => `${s.path}=${s.token || '(unset)'}`).join(', ')}`).toBe(1);
+  expect(samples[0].token, `${theme}: the plate resolves the --brand-plate token, not a page-local fallback`).not.toBe('');
+  for (const sample of samples) {
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is a solid 1 px line`).toMatch(/^1px solid /);
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is the theme button's hairline`).toBe(sample.controlEdge);
+    expect(sample.edge, `${theme} ${sample.path}: the plate edge is visible`).not.toMatch(/,\s*0\)$/);
+  }
+});
+
+// Narrow phones: /download/ carries the widest header (brand, page action, theme button), so it decides the
+// responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
+// below owns the every-width fit.
+for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
+  for (const width of [360, 375, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const lockups = [];
+    for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
+      await page.goto(path);
+      // Linux system fonts make the download action wider than macOS does. Exercise that layout on either OS.
+      if (actionWidth) await page.addStyleTag({ content: `nav .btn-quiet { min-width: ${actionWidth}px }` });
+      const nav = page.locator('nav[aria-label="Main"]:visible').first();
+      const header = await nav.evaluate(nav => {
+        const brand = nav.querySelector('.brand');
+        const button = nav.querySelector('.theme-btn');
+        return {
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          gutter: window.innerWidth - button.getBoundingClientRect().right,
+          lockup: parseFloat(getComputedStyle(brand).fontSize),
+          gap: nav.querySelector('.nav-end').getBoundingClientRect().left - brand.getBoundingClientRect().right,
+        };
+      });
+      const at = `${path} at ${width}px:`;
+      lockups.push(header.lockup);
+      expect(header.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
+      expect(header.gap, `${at} the brand and controls never overlap`).toBeGreaterThanOrEqual(0);
+      expect(header.gutter, `${at} the theme button keeps the 6 px right gutter`).toBeGreaterThanOrEqual(6);
+      if (width !== 360) continue;
+      await page.screenshot({ path: info.outputPath(`header-360-${path.replace(/[^a-z0-9]/gi, '-')}.png`), clip: { x: 0, y: 0, width, height: 110 } });
+      const mark = await measureHeaderMark(nav.locator('.brand'));
+      expect(mark.box.height, `${at} the chip is at least 16 px tall`).toBeGreaterThanOrEqual(16);
+      expect(mark.chipInkShare, `${at} the smallest lockup is still a plate`).toBeGreaterThan(0.6);
+      expect(mark.splitLength, `${at} the split survives at the smallest lockup`).toBeGreaterThanOrEqual(2);
+      expect(mark.splitContrast, `${at} the split has a W stroke on each side`).toBeGreaterThan(0.05);
+    }
+    expect(new Set(lockups).size, `${width}px: landing, room, download and mac share one lockup step`).toBe(1);
+  }
+});
+
+// A breakpoint that moves leaves a band where the row no longer fits, and sampled widths can step over it. Sweep
+// every width on the widest header page under the wider-font action model, so a hole fails instead of passing
+// between samples.
+test('the header holds its gutter at every width from 320 to 1440 px', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.goto('download/');
+  await page.addStyleTag({ content: 'nav .btn-quiet { min-width: 164px }' });
+  const widths = [];
+  for (let width = 320; width <= 420; width += 1) widths.push(width);
+  for (let width = 428; width <= 1440; width += 8) widths.push(width);
+  const failures = [];
+  for (const width of widths) {
+    await page.setViewportSize({ width, height: 844 });
+    const state = await page.evaluate(() => {
+      const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(nav => nav.getClientRects().length);
+      const button = nav.querySelector('.theme-btn'), action = nav.querySelector('.btn-quiet');
+      const box = button.getBoundingClientRect();
+      return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        gutter: innerWidth - box.right, button: Math.min(box.width, box.height),
+        action: !!action && action.getClientRects().length > 0 };
+    });
+    const wantsAction = width >= 380;
+    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || state.action !== wantsAction)
+      failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}`);
+  }
+  expect(failures, failures.slice(0, 16).join('; ')).toEqual([]);
+});
+
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
   for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
     await page.goto(path);
@@ -266,7 +489,7 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       await expect(brand, `${path} brand ${index}: keyboard focus`).toBeFocused();
       const state = await brand.evaluate(el => {
         const style = getComputedStyle(el);
-        const mark = getComputedStyle(el, '::before');
+        const mark = getComputedStyle(el, '::after');
         const probe = document.createElement('span');
         probe.style.color = 'var(--ink)';
         el.parentElement.appendChild(probe);

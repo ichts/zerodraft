@@ -163,6 +163,24 @@ test('the purchase page states one price string', async ({ page }) => {
     expect(text, `stale price string "${stale}"`).not.toContain(stale);
 });
 
+test('the ghost pill keeps one text treatment on the buy path and the landing', async ({ page }) => {
+  const decoration = async (path, selector) => {
+    await page.goto(path);
+    return page.locator(selector).evaluate(element => getComputedStyle(element).textDecorationLine);
+  };
+  const buy = await decoration('mac.html', '#buy a.btn-ghost');
+  const landing = await decoration('index.html', '#mac a.btn-ghost');
+  expect(buy, 'the buy card ghost pill').toBe('none');
+  expect(landing, 'the landing Mac card ghost pill').toBe('none');
+  expect(buy).toBe(landing);
+});
+
+test('the landing hand keeps its write-on reveal and drops it under reduced motion', async ({ page }, info) => {
+  await page.goto('index.html');
+  const name = await page.locator('.home .h1 .hand').evaluate(element => getComputedStyle(element).animationName);
+  expect(name, 'the reveal keeps its named animation').toBe(info.project.use.reducedMotion === 'reduce' ? 'none' : 'wid-write');
+});
+
 test('the release route server answers a missing page with 404', async ({ request }, info) => {
   test.skip(info.project.name !== '1440-light-no-preference', 'one server run per suite');
   const port = await new Promise((resolve, reject) => {

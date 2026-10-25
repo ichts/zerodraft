@@ -66,7 +66,7 @@ and theme.
 | Q-07 | PASS | The migrated pages carry no new labels or helper sentences; the download badge that repeated the facts is gone. |
 | Q-08 | PASS | `shell.spec.mjs` compares brand y, plate, family, canvas and footer across all twelve pages; D-053 records the change. |
 | Q-09 | PASS | Every page and every purchase state captured in light and dark; the plate and canvas are the same per theme. |
-| Q-10 | PASS | No room motion changed; the landing's write-on reveal was removed, so a load no longer moves. |
+| Q-10 | PASS | No room motion changed; the landing's write-on reveal is unchanged, and the hover lift is pointer-gated. |
 | Q-11 | PASS | Hover lift is gated to `(hover:hover) and (pointer:fine)`; `:active` stays; `motion-regression.spec.mjs` and `phase4.spec.mjs` are green. |
 | Q-12 | PASS | `Type to start` / `0 words` assertions in `phase4.spec.mjs` are green. |
 | Q-13 | PASS | Ink focus ring (2 px) on the lockup of all twelve pages; every buy/licence control is a real button. |

@@ -258,7 +258,7 @@ async function run(size, browser) {
       const h = await link.getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
     await step('published SHA-256 present; terms, button, DMG link, sha all on screen', async () => {
-      await page.evaluate(() => { const t = document.querySelector('#requirements').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
+      await page.evaluate(() => { const t = document.querySelector('.dlbox').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
       const checksum = page.locator('#sha256 code');
       ok(await checksum.count() === 1, `${await checksum.count()} published checksums`);
       sha = (await checksum.innerText({ timeout: 2000 })).trim().toLowerCase();

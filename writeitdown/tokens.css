@@ -41,7 +41,7 @@
   --press:inset 0 1px 0 rgba(255,255,255,.14),0 1px 1px rgba(0,0,0,.2),0 8px 16px -6px rgba(28,25,23,.35);
   /* motion: feedback fast, entrances slow, expo ease-out */
   --ease-out:cubic-bezier(.22,1,.36,1);
-  --d-feedback:.16s;--d-enter:.6s;
+  --d-feedback:.16s;--d-enter:.6s;--d-write:.9s;
 }
 :root:not([data-theme="light"]){--page:#15140f;--brand-plate:#26231c}
 :root:not([data-theme="light"]) .home{

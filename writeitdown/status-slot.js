@@ -33,6 +33,32 @@ const ink = (() => {
   };
 })();
 
+// The kept screen shows the returned draft, so it owes the writer at least one full line
+// of it. Its fixed block (title, receipt, controls) and the confirmation row reserved above
+// the footer are measured, not assumed: a fallback font that wraps one of them taller would
+// otherwise eat the draft's only line, which is what the Linux runner did at 320 px (a
+// two-line confirmation reservation left 30.4 px of a 33.6 px line). The kept screen's own
+// gaps give way instead, nearest the draft first, and the shrink stops as soon as a line
+// fits, so a comfortable sheet keeps its designed rhythm.
+const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
+
+function keepDraftLine(paper) {
+  const scroll = paper.querySelector('.kept-scroll');
+  const text = paper.querySelector('.kept-text');
+  if (!scroll || !text || scroll.getBoundingClientRect().height === 0) return;
+  const line = parseFloat(getComputedStyle(text).lineHeight);
+  if (!(line > 0)) return;
+  for (const [selector, name] of KEPT_GAPS) {
+    const short = line - scroll.getBoundingClientRect().height;
+    if (short <= 0.5) return;
+    const el = paper.querySelector(selector);
+    if (!el) continue;
+    const gap = parseFloat(getComputedStyle(el).marginTop) || 0;
+    if (gap <= 0) continue;
+    paper.style.setProperty(name, `${Math.max(0, gap - short)}px`);
+  }
+}
+
 function fontOf(el) {
   const style = getComputedStyle(el);
   return { css: `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`,
@@ -126,6 +152,7 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       } else {
         compactVars.forEach(name => paper.style.removeProperty(name));
       }
+      keepDraftLine(paper);
       placed = key;
       dirty = false;
     }

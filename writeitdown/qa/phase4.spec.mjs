@@ -473,6 +473,29 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
       expect(kept.title, 'the tall kept title uses the Mac token').toBe(kept.token);
     }
     await capture(page, info, `kept-${size.width}x${size.height}`);
+    // A fallback font can wrap the receipt onto a second line, making the fixed block
+    // above the draft taller: the Linux runner reserved one extra line and left 30.4 px
+    // of a 33.6 px draft line. The draft keeps a full line anyway - the kept screen's
+    // own gaps give way - and the stress is undone before the confirmation checks below.
+    if (size.width === 320) {
+      const squeezed = await page.evaluate(() => {
+        const receipt = document.querySelector('.kept-receipt');
+        const lineBox = parseFloat(getComputedStyle(receipt).lineHeight);
+        receipt.style.paddingTop = `${lineBox}px`;
+        window.dispatchEvent(new Event('resize'));
+        const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
+        return { scroll: box('.kept-scroll'), lineBox,
+          lineHeight: parseFloat(getComputedStyle(document.querySelector('.kept-text')).lineHeight),
+          receipt: box('#receipt'), actions: box('.kept-actions') };
+      });
+      expect(squeezed.receipt.height, 'the stress adds one receipt line above the draft').toBeGreaterThanOrEqual(20.8 + squeezed.lineBox - 1);
+      expect(squeezed.scroll.height, 'a taller fixed block still leaves one line of the kept draft')
+        .toBeGreaterThanOrEqual(squeezed.lineHeight - 0.5);
+      await page.locator('.kept-receipt').evaluate(e => { e.style.paddingTop = ''; });
+      await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+      const restored = await page.evaluate(() => document.querySelector('.kept-scroll').getBoundingClientRect().height);
+      expect(restored, 'undoing the stress restores the kept geometry').toBeCloseTo(kept.scroll.height, 0);
+    }
     await page.keyboard.press('Escape');
     await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));

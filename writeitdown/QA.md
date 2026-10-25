@@ -62,6 +62,13 @@ version.
   keep the Mac 72 px offset and the token title size. The compact
   threshold is a 480 px paper; 667x375, 390x844 and 1440x620 cover the boundary. The Mac 44 px ink
   offsets are unchanged.
+- Kept draft line, metric-independent: the kept screen owes the writer one full line of the returned
+  draft, so `status-slot.js` measures the rendered line box against the measured scroll box and, only
+  when the title, receipt, controls or the reserved confirmation row squeeze it, gives way through the
+  screen's own gaps (draft gap, then actions gap, then receipt gap) until a line fits. The guarantee is
+  therefore not a font constant: the Linux runner wraps the phone confirmation row one line taller and
+  left 30.4 px of a 33.6 px draft line, which this test now reproduces deterministically on every
+  platform by adding one receipt line above the draft at 320 px.
 - Not re-run here: the whole suite in a single final pass, the pre-deploy journey against a real DMG
   (`npm run journey --expect-sha`, needs the artifact), and real-device IME/iOS checks.
 

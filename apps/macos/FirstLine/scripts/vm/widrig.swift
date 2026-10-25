@@ -10,13 +10,12 @@
 //            inside the prepared VM image (scripts/vm/prepare-guest.sh seeds them
 //            once). Nothing here presses buttons through AXPress: input is always
 //            CGEventPost(kCGHIDEventTap), so the app sees real keyboard and mouse.
-//            Subcommands: trusted, tree, text, find, wait, watch, window, frontmost,
-//            type, key, click, move, pxdiff, csreq.
+//            Subcommands: trusted, tree, text, find, wait, watch, frontmost, type,
+//            key, click, pxdiff.
 
 import AppKit
 import ApplicationServices
 import Foundation
-import Security
 
 func emit(_ value: Any) {
     guard let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes]) else {
@@ -34,7 +33,7 @@ func die(_ message: String, _ code: Int32 = 2) -> Never {
 
 var arguments = Array(CommandLine.arguments.dropFirst())
 guard let command = arguments.first else {
-    die("usage: widrig <trusted|tree|text|find|wait|watch|window|frontmost|type|key|click|move|pxdiff|csreq> [...]")
+    die("usage: widrig <trusted|tree|text|find|wait|watch|frontmost|type|key|click|pxdiff> [...]")
 }
 arguments.removeFirst()
 
@@ -264,9 +263,7 @@ func bitmap(_ path: String) -> NSBitmapImageRep {
 
 switch command {
 case "trusted":
-    let prompt = flag("prompt")
-    let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: prompt] as CFDictionary
-    emit(["accessibility": AXIsProcessTrustedWithOptions(options), "prompt": prompt])
+    emit(["accessibility": AXIsProcessTrusted()])
 
 case "tree":
     let nodes = collect(application(resolvePID()))
@@ -274,21 +271,6 @@ case "tree":
 
 case "text":
     emit(["text": joinedText(collect(application(resolvePID())))])
-
-case "window":
-    let app = application(resolvePID())
-    let windows = (attribute(app, kAXWindowsAttribute) as? [AXUIElement]) ?? []
-    var objects: [[String: Any]] = []
-    for window in windows {
-        var object: [String: Any] = [
-            "title": text(attribute(window, kAXTitleAttribute)),
-            "role": text(attribute(window, kAXRoleAttribute)),
-            "subrole": text(attribute(window, kAXSubroleAttribute)),
-        ]
-        if let frame = elementFrame(window) { object["frame"] = frame }
-        objects.append(object)
-    }
-    emit(["windows": objects])
 
 case "find", "wait":
     // --text is optional: without it the first element with --role matches, which
@@ -385,11 +367,6 @@ case "click":
     }
     emit(["clicked": ["x": x, "y": y], "count": max(1, count)])
 
-case "move":
-    let point = CGPoint(x: Double(requiredOption("x"))!, y: Double(requiredOption("y"))!)
-    postMouse(.mouseMoved, at: point, clickState: 0)
-    emit(["moved": ["x": point.x, "y": point.y]])
-
 case "pxdiff":
     let first = bitmap(requiredOption("first"))
     let second = bitmap(requiredOption("second"))
@@ -420,23 +397,6 @@ case "pxdiff":
     let fraction = sampled == 0 ? 0 : Double(changed) / Double(sampled)
     emit(["comparable": true, "sampled": sampled, "changedPixels": changed, "changedFraction": fraction])
     exit(fraction > 0.02 ? 0 : 1)
-
-case "csreq":
-    let path = requiredOption("binary")
-    var code: SecStaticCode?
-    guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &code) == errSecSuccess, let code else {
-        die("cannot read static code for \(path)")
-    }
-    var requirement: SecRequirement?
-    guard SecCodeCopyDesignatedRequirement(code, [], &requirement) == errSecSuccess, let requirement else {
-        die("cannot read designated requirement for \(path)")
-    }
-    var data: CFData?
-    guard SecRequirementCopyData(requirement, [], &data) == errSecSuccess, let data else {
-        die("cannot encode designated requirement for \(path)")
-    }
-    let hex = (data as Data).map { String(format: "%02x", $0) }.joined()
-    emit(["binary": path, "csreq": hex])
 
 default:
     die("unknown command \(command)")

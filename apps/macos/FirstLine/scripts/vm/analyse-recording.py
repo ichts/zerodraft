@@ -114,7 +114,7 @@ def frame_size(evidence, frames):
 def frame_deltas(evidence, frames):
     """Mean absolute luminance difference between each frame and the previous one."""
     if len(frames) < 2:
-        return []
+        return [], []
     per_frame = frame_size(evidence, frames)
     pattern = os.path.join(evidence, "frames", "%06d.jpg")
     command = [
@@ -375,10 +375,14 @@ def main(argv):
     deltas = []
     similarities = []
     analysis_error = None
-    try:
-        deltas, similarities = frame_deltas(evidence, frames)
-    except RuntimeError as error:
-        analysis_error = str(error)
+    if len(frames) < 2:
+        analysis_error = ("the frame stream holds %d captured frame(s); at least two are needed "
+                          "to compare anything" % len(frames))
+    else:
+        try:
+            deltas, similarities = frame_deltas(evidence, frames)
+        except RuntimeError as error:
+            analysis_error = str(error)
     if deltas:
         findings.extend(video_findings(frames, deltas, similarities, steps))
     findings.extend(launch_findings(evidence, steps))

@@ -627,7 +627,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
 
-test('legal pages state the 3-session trial and the local counter', async ({ page }) => {
+test('legal pages state the 3-session trial, the local counter and the opt-in updates', async ({ page }) => {
   await page.goto('privacy.html');
   const privacy = page.locator('#mac + p');
   await expect(privacy).toContainText('Your first 3 writing sessions are free.');
@@ -635,6 +635,11 @@ test('legal pages state the 3-session trial and the local counter', async ({ pag
   await expect(privacy).toContainText('Free updates included.');
   await expect(privacy).toContainText('local trial session counter in its settings file on the Mac');
   await expect(privacy).toContainText('That counter is not sent anywhere.');
+  const updateNotice = page.locator('#mac ~ p').filter({ hasText: 'Updates are opt-in.' });
+  await expect(updateNotice).toHaveCount(1);
+  await expect(updateNotice).toContainText('No check runs unless you turn on');
+  await expect(updateNotice).toContainText('Check for updates automatically');
+  await expect(updateNotice).toContainText('Check for Updates…');
 
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');

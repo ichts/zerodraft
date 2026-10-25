@@ -8,7 +8,7 @@ scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto`
 scripts/sign-nested.sh: package-app.sh 与 release-dmg.sh 共用的 inside-out 签名：先签每个普通 Mach-O（Sparkle 的 Autoupdate），再由深到浅签 bundle，最后签 app，并校验 `codesign --verify --deep --strict`；Developer ID 模式还要求每个可执行文件的 TeamIdentifier 与 app 一致（公证前的失败门槛）。
 packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、非整数或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>.zip` 更新载荷并记录 `last-build.txt`（staging 不产 ZIP）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。
-scripts/publish-appcast.sh: 用 Sparkle 的 generate_appcast 生成签名 appcast 与 delta，并机械校验（新 build 唯一一条、有 minimumSystemVersion、无 hardwareRequirements、enclosure 签名 `sign_update --verify` 通过），最后打印先载荷后 feed 的上传命令；脚本本身不上传。
+scripts/publish-appcast.sh: 用 Sparkle 的 generate_appcast 生成签名 appcast 与 delta，并机械校验（新 build 唯一一条、有 minimumSystemVersion、无 hardwareRequirements、enclosure 签名 `sign_update --verify` 通过）；脚本本身不上传，上传顺序与 curl 验证步骤只由 `writeitdown/README.md` 拥有。
 scripts/test-release-config.py: 沙箱执行 release-dmg.sh 的配置门槛，验证正式包拒绝缺项、非 HTTPS 地址、无效公钥、占位/无效更新公钥、unsafe appcast、非递增 build number，且 staging 不得带销售配置；不构建、不签名，供网页 QA 单次调用。
 scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
 scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用、末次擦除报告及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
@@ -58,9 +58,9 @@ Sources/FirstLine/Resources/write-it-down-lockup.svg: 开写前选择面使用�
 Tests/FirstLineTests/SessionEngineTests.swift: Session engine 状态流转与时长截止测试。
 Tests/FirstLineTests/SilenceLimitTests.swift: 三档静默警告/删除、恢复及平局裁决。
 Tests/FirstLineTests/BatchFiveTests.swift: 时长选择、设置持久化和键盘动作验收。
-Sources/FirstLine/Update/UpdatePolicy.swift: 更新界面的时机真相源（纯 Swift，无 Sparkle 类型）：会话运行中永不展示更新 UI，菜单命令只在有更新器且不在房间内可用，`UpdateDeferralPolicy` 记录被推迟的定时更新并至多请回一次。
-Sources/FirstLine/Update/UpdateUserDriver.swift: SPUStandardUserDriverDelegate 的 gentle reminder 实现；在房间内拒绝展示并记住 appcast item，会话结束或 Sparkle 空闲时才允许请回。
-Sources/FirstLine/Update/UpdateController.swift: Sparkle 标准更新器入口（仅在真实 .app 内启动）；Settings 开关写 `updater.automaticallyChecksForUpdates`，菜单动作是唯一手动检查入口，并在会话结束时把推迟的更新请回。`UpdateSettings` 是 Settings 面依赖的最小接口。
+Sources/FirstLine/Update/UpdatePolicy.swift: 更新界面的时机真相源（纯 Swift，无 Sparkle 类型）：Session 房间（空、写作、警告、失败、成稿）显示时永不展示更新 UI，菜单命令只在有更新器且不在房间内可用，`UpdateDeferralPolicy` 记录被推迟的更新并至多请回一次。
+Sources/FirstLine/Update/UpdateUserDriver.swift: `SPUStandardUserDriverDelegate` 的 gentle reminder 实现（定时更新一律由 delegate 决定展示时机），以及继承 `SPUStandardUserDriver` 的房间闸门：展示前检查当前 surface，房间显示时取消检查/下载、回复 dismiss 已出现的窗口、只留下待办标记；不保存 appcast item。
+Sources/FirstLine/Update/UpdateController.swift: Sparkle 标准更新器入口（仅在真实 .app 内启动，直接构造 `SPUUpdater` 以使用房间闸门）；Settings 开关写 `updater.automaticallyChecksForUpdates`，菜单动作是唯一手动检查入口；观察 Session surface 与应用激活，进房间结束已有更新窗口，离开房间或回到前台时把推迟的更新请回。`UpdateSettings` 是 Settings 面依赖的最小接口。
 Tests/FirstLineTests/RoomTests.swift: 房间 live 文案、无 pill、时钟、wash 恢复/cut 收尾/减少动态效果、deny、复制状态跨 tick/hover/字体刷新与新会话重置、居中 kept 与两步退出（含 2 秒过期和输入取消）、真实 NSTextInputClient 组合/删除序列、wipe 后用真实 Apple Pinyin input context 验证首键、失败屏标题/Begin again/Return/红收据、kept 无滚动条但可滚动、复制按钮焦点/反馈测试。
 Tests/FirstLineTests/BrandTests.swift: 开始屏 split-W lockup、“?”规则页的 landing 文案/顺序/Done/Return/Esc，开始屏无副标题。
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
@@ -76,7 +76,7 @@ Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功�
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入许可 gate 交互。
 Tests/FirstLineTests/LicenseEntitlementTests.swift: 试用耗尽激活页、网页链接、菜单绕过、旧解锁标记无效、合法激活及重启回归。
 Tests/FirstLineTests/TrialReleaseTests.swift: 三次试用、首输入及 IME 扣次、失败重启、末次成稿、读写失败关闭访问、激活和退款不恢复次数。
-Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、推迟/请回状态机、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
+Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、Session surface 闸门、推迟/请回状态机、标准 driver 在房间内的取消/acknowledge 行为、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
 Tests/FirstLineTests/WaffoLicenseClientTests.swift: URLProtocol HTTP 合约、真实 Ed25519 签名失败、token 续期、持久化旧缓存、首次未激活拦截、退款和精确七天边界；不触外网。
 Tests/FirstLineTests/MockLicenseClient.swift: 仅测试目标的状态机替身，不随应用发布，不证明真实签名或购买。
 Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mock 许可 fixture；许可测试直接构造 AppState，不使用此快捷设置。
@@ -87,7 +87,7 @@ Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mo
 对外暴露
 可执行目标 `WriteItDown`
 
-法则: After 视觉契约见 `docs/WRITEITDOWN_PLAN.md` 第 6 节；草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；Begin 启动选中时长；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；房间无顶部时长 pill，Esc 或 ESC - EXIT 首次只显示 2 秒内再次确认的提示，输入即取消；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home（门槛见 `docs/LICENSE_PAYMENT_SPEC.md#entitlement-and-persisted-state`）；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；更新只走 Sparkle 2.10.0 且默认不检查（`SUEnableAutomaticChecks=false`），只有 Settings 开关或 `Check for Updates…` 菜单会发起检查，写作会话运行中绝不展示更新窗口（推迟到会话结束），私钥只属于船长且不入库；license 激活只走 `docs/LICENSE_PAYMENT_SPEC.md` 定义的签名许可服务，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；真实 TEST 订单和已安装发布 DMG 的窗口激活通过前不得开启 LIVE 收款；购买页、密钥交付和 TEST-to-LIVE 门槛见 `../../../writeitdown/README.md`；in-app Buy 与回退的契约见 `docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/tokens.css` 的 red token
+法则: After 视觉契约见 `docs/WRITEITDOWN_PLAN.md` 第 6 节；草稿只在内存中，许可与设置仍可持久化；Mac 前三次会话免费，之后 USD $4.99 一次付费，2 Macs，14-day refund；首个非空输入（含组字）前持久扣次，读写失败关闭试用；已有许可记录不可回退试用；耗尽后呈现许可入口及完整网页试用链接；开写前时长 1/5/10/20/30 分钟、静默清空 5/8/12 秒，写作中锁定两者；Begin 启动选中时长；首输入启动倒计时，只有截止时间能成功，失败留在原房间且下次输入重启；房间无顶部时长 pill，Esc 或 ESC - EXIT 首次只显示 2 秒内再次确认的提示，输入即取消；保持 macOS native only；编辑器必须 append-only 且不破坏 IME；有试用余次或激活/启动校验通过后可进入极简 Home（门槛见 `docs/LICENSE_PAYMENT_SPEC.md#entitlement-and-persisted-state`）；末次试用可完成及复制，下一会话才设门槛；无余次且无许可不允许 Home/Settings/房间或菜单绕过，不提供 intro / warm-up onboarding；无侧边栏，单一写作房间承载 rest/typing/warn/wipe/kept，导航通过 AppState.selectedSurface 路由；kept 阶段仅允许复制、重来或退出，不暴露 Library / 文件操作；失败即失去当前段落，不提供恢复或 fossil；不扩大到 AI / 同步 / WebView；更新只走 Sparkle 2.10.0 且默认不检查（`SUEnableAutomaticChecks=false`），只有 Settings 开关或 `Check for Updates…` 菜单会发起检查，Session 房间（空、写作、警告、失败、成稿）显示期间绝不展示更新窗口（用户发起的检查与所有展示路径都拒绝或推迟，已出现的窗口在进房间时结束并留下待办），私钥只属于船长且不入库；license 激活只走 `docs/LICENSE_PAYMENT_SPEC.md` 定义的签名许可服务，Mac app 只内置 Ed25519 公钥，不含 merchant/developer API key；无订单号或无合法签名 token 的旧状态不能解锁；真实 TEST 订单和已安装发布 DMG 的窗口激活通过前不得开启 LIVE 收款；购买页、密钥交付和 TEST-to-LIVE 门槛见 `../../../writeitdown/README.md`；in-app Buy 与回退的契约见 `docs/LICENSE_PAYMENT_SPEC.md#in-app-checkout`；danger 契约：清空前最后三秒出现 wash 与倒计时，选定阈值清空草稿并显示房间内报告，警告色使用 `writeitdown/tokens.css` 的 red token
 
 [PROTOCOL]: 目录结构或核心约束变化时更新本文件，并检查 `../AGENTS.md` 与根目录 `AGENTS.md` 是否仍准确。
 

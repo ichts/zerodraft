@@ -51,7 +51,7 @@ key procedure is `docs/RELEASE_KEY.md`; hosting and routing are owned by
 - [ ] `curl -sSI https://writeitdown.app/download/appcast.xml` returns 200 `application/xml`, and a missing file under `/download/updates/` returns 404, never 200 HTML from the site's catch-all.
 - [ ] `lipo -info` on `Contents/MacOS/WriteItDown` and on `Sparkle.framework/Versions/B/Sparkle` shows `x86_64 arm64`.
 - [ ] The download page's DMG name and published SHA-256 are updated in the same deploy as the DMG upload, and `npm run release-check -- --download` passes (`--live` after the install).
-- [ ] Real-window evidence for the first Sparkle release (update alert not shown inside a running session, deferred alert after the session, consent-free default with the toggle off) is recorded in `MANUAL_QA.md`. Until then the room guard is proven by unit tests only.
+- [ ] Real-window evidence for the first Sparkle release (update UI absent whenever the Session room is shown, deferred alert returned after leaving the room, consent-free default with the toggle off) is recorded in `MANUAL_QA.md`. Until then the room guard is proven by unit tests only.
 
 ## Release packaging
 - [ ] Name release artifact consistently

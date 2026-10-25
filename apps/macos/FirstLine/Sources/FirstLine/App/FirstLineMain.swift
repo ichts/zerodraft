@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder、Update/UpdateController
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，写作会话中禁用 Check for Updates…
+ * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -90,9 +90,9 @@ extension FirstLineAppDelegate: NSMenuItemValidation {
         case #selector(openSettings), #selector(newPiece):
             return appState.canUseApp
         case #selector(checkForUpdates):
-            // Available even when the trial is used up; never while a session is running.
+            // Available even when the trial is used up; never on the Session surface.
             return UpdatePolicy.mayRunUserInitiatedCheck(hasUpdater: updateController != nil,
-                                                         sessionIsRunning: appState.sessionIsRunning)
+                                                         roomIsShown: appState.isShowingWritingRoom)
         case #selector(closeWindow):
             return true
         case #selector(openWriting), #selector(goHome):

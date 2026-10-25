@@ -47,9 +47,10 @@ no Developer ID identity, and GUI journeys are prohibited on the Mini.
 - Pending, not claimed: notarization of a build carrying the re-signed Sparkle helpers (needs the
   Developer ID identity and notary credentials), the universal `swift build` through
   `scripts/package-app.sh` (needs Xcode), Gatekeeper verdicts on the new bundle, and every real-window
-  Sparkle behaviour - no consent prompt on launch, no check before the toggle, the alert deferred out
-  of a running session and shown after it, and the alert's buttons. Those belong to the release-Mac
-  acceptance in `docs/RELEASE_CHECKLIST.md`. No DMG build, upload, deployment or merge was performed.
+  Sparkle behaviour - no consent prompt on launch, no check before the toggle, the update UI refused or
+  deferred whenever the Session room is shown (empty, writing, warning, failure and kept) and returned
+  after leaving it, and the alert's buttons. Those belong to the release-Mac acceptance in
+  `docs/RELEASE_CHECKLIST.md`. No DMG build, upload, deployment or merge was performed.
 
 ## 2026-10-23: Configured purchase build, no real-window acceptance
 

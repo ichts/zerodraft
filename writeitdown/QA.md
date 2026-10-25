@@ -17,12 +17,16 @@ Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unver
 # 2026-10-25: Download-page release note and update-feed hosting (local only)
 
 The Mac 1.1 release adds Sparkle auto-update (see `../docs/wid-decisions.md` D-040). The site change
-is small: one `#release-notes` line inside the download card, and one scoped spacing rule in
-`site.css`. No page was added to the sitemap; no other surface changed.
+is small: one `#release-notes` line inside the download card, one scoped spacing rule in
+`site.css`, and the Mac section of `privacy.html` gains the opt-in update paragraph with `UPDATED`
+moved to October 25, 2026. No page was added to the sitemap; no other surface changed.
 
 - `cd writeitdown && npm ci && npx playwright test`: 460 passed, 36 skipped across the eight
   viewport/theme/motion projects. The Install/Activate/Refunds structure, the single DMG link, the
-  published SHA-256 slot and the canonical/og metadata the journey asserts are unchanged.
+  published SHA-256 slot and the canonical/og metadata the journey asserts are unchanged. The
+  legal-page check now also asserts the opt-in update disclosure in `privacy.html` (`Updates are
+  opt-in.`, `Check for updates automatically`, `Check for Updates…`); the page is still in the
+  shipped-file list and the sitemap/SEO checks still see it.
 - `npm run release-check -- --download`: passes locally. The published SHA-256 still names the live
   1.0 DMG, so the note, the DMG name and the checksum must flip together in the deploy that uploads
   1.1 (see `README.md`, "Mac download release").

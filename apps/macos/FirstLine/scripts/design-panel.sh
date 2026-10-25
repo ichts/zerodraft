@@ -297,6 +297,7 @@ for lens in $lenses; do
   prompt="$panel/lens-$lens-prompt.txt"
   {
     printf 'You are %s\n\n' "$(lens_brief "$lens")"
+    printf 'Your lens identifier is "%s"; put exactly that value in the "lens" field.\n' "$lens"
     printf 'Before you look at any capture, read these product records in full, in this order:\n'
     for document in "${available_documents[@]}"; do printf -- '- %s\n' "$document"; done
     printf '\nThen read these screenshots of a recorded acceptance run of the shipped macOS app:\n'
@@ -310,7 +311,7 @@ contradicts a recorded decision or quality rule (quote the rule) or is simply yo
 judgement. Do not propose product changes outside this app's contract.
 
 Answer with one JSON object and nothing else:
-{"lens": "<name>", "verdict": "sound" | "needs work" | "blocked",
+{"lens": "<your lens identifier>", "verdict": "sound" | "needs work" | "blocked",
  "summary": "two sentences",
  "findings": [{"severity": "blocker" | "major" | "minor" | "nit",
                "title": "short claim",
@@ -322,7 +323,7 @@ RULES
   answer_file="$answers/lens-$lens.jsonl"
   command_line="pi --model $review_model --print --no-session --tools read --mode json \"\$(cat $prompt)\""
   pi --model "$review_model" --print --no-session --tools read --mode json "$(cat "$prompt")" >"$answer_file" 2>&1
-  answer_result="$(python3 "$here/vm/panel-lib.py" verdict lens <"$answer_file")"
+  answer_result="$(python3 "$here/vm/panel-lib.py" verdict lens "$lens" <"$answer_file")"
   if [[ "$(jq -r '.status // empty' <<<"$answer_result" 2>/dev/null)" != 'complete' ]]; then
     reason="$(jq -r '.error // empty' <<<"$answer_result" 2>/dev/null)"
     lens_stage="$(jq -c --arg lens "$lens" --arg error "${reason:-no answer}" --arg command "$command_line" \

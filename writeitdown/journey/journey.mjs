@@ -125,43 +125,35 @@ async function run(size, browser) {
       ok(/^\d:\d\d$/.test((await page.locator('#clock').innerText()).trim()), 'clock');
       ok(await page.locator('#demo .paper').isVisible(), 'sheet hidden');
     });
-    await step('the only entrance under the demo is the 60-second door', async () => {
+    await step('the door is the only entrance, and it sits above the demo', async () => {
       const cta = page.locator('#landing > .cta'), demo = page.locator('#demo');
-      ok(await cta.count() === 1, `${await cta.count()} entrance bands under the demo`);
+      ok(await cta.count() === 1, `${await cta.count()} entrance bands`);
       const c = await cta.boundingBox(), d = await demo.boundingBox();
-      ok(c.y >= d.y + d.height - 2, 'the entrance band is not below the demo');
+      ok(c.y + c.height <= d.y + 2, 'the entrance band is not above the demo');
       ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
-      ok(await cta.locator('> *').count() === 2, `${await cta.locator('> *').count()} elements in the entrance band`);
+      ok(await cta.locator('> *').count() === 1, `${await cta.locator('> *').count()} elements in the entrance band`);
+      ok(await page.locator('#landing a.btn-primary[href="#trial"]').count() === 1, 'more than one 60-second door on the page');
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
-      const note = cta.locator('.cta-note');
-      ok(await note.count() === 1, `${await note.count()} lines of reassurance under the door`);
-      ok((await note.innerText()).replace(/\s+/g, ' ').trim() === 'No account. Nothing is saved. Just the timer.', `the line under the door is "${await note.innerText()}"`);
       const screen = await page.evaluate(() => {
         const pin = document.createElement('style');
         pin.textContent = '.home{--sans:Arial, sans-serif}';
         document.head.append(pin);
         const r = s => document.querySelector(s).getBoundingClientRect();
-        const door = r('#landing > .cta a[href="#trial"]'), note = r('#landing > .cta .cta-note');
+        const door = r('#landing > .cta a[href="#trial"]'), paper = r('#demo .paper');
         pin.remove();
-        return { doorBottom: door.bottom, noteTop: note.top, noteBottom: note.bottom };
+        return { doorBottom: door.bottom, paperTop: paper.top, hiddenBelowFold: innerHeight - paper.top };
       });
       ok(screen.doorBottom <= size.height, `the door ends at ${Math.round(screen.doorBottom)} px, past the ${size.height} px first screen`);
-      ok(screen.noteTop >= screen.doorBottom, 'the line of reassurance is not under the door');
-      ok(screen.noteBottom <= size.height, `the line under the door ends at ${Math.round(screen.noteBottom)} px, past the ${size.height} px first screen`);
+      ok(screen.doorBottom <= screen.paperTop, 'the door is not above the demo sheet');
+      ok(screen.hiddenBelowFold / size.height >= 0.6, `only ${Math.round(screen.hiddenBelowFold / size.height * 100)}% of the first screen is sheet`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
-    await step('three one-sentence points sit below the first viewport', async () => {
-      const band = page.locator('#landing > .points'), items = await band.locator('> li').allInnerTexts();
-      const want = [
-        'You can only write forward, and if you stop for a few seconds the draft is deleted, so the only way out is through.',
-        "Use it when you've been circling a thought for days and still haven't said it plainly.",
-        'Nothing you write is saved, on the web or on the Mac.',
-      ];
-      const got = items.map(t => t.replace(/\s+/g, ' ').trim());
-      ok(got.length === 3 && want.every((w, i) => got[i] === w), `points are ${JSON.stringify(got)}`);
-      const b = await band.boundingBox();
-      ok(b.y >= size.height, `the points start at ${Math.round(b.y)} px, inside the ${size.height} px first viewport`);
+    await step('the trimmed blocks are gone: no reassurance line, no points band, no facts table, no closing block', async () => {
+      ok(await page.locator('#landing .cta-note, #landing .points, #landing #facts, #landing .callback').count() === 0, 'a removed block is still on the page');
+      const text = await page.locator('#landing').innerText();
+      for (const gone of ['No account. Nothing is saved. Just the timer.', 'Real rules, real numbers', 'Straight answers, taken from how the app works today.', 'A native writing room.'])
+        ok(!text.includes(gone), `the page still says "${gone}"`);
     });
     await step('no waived sign-in feature offered', async () => {
       const bad = await waivedOffers(page); ok(bad.length === 0, `found ${JSON.stringify(bad)}`);
@@ -197,9 +189,9 @@ async function run(size, browser) {
     await step('heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ', async () => {
       const tree = (await page.locator('#landing h1, #landing h2, #landing h3').evaluateAll(els => els.map(e => e.tagName.toLowerCase() + ' ' + e.textContent.replace(/\s+/g, ' ').trim()))).join('\n');
       const h = tree.split('\n'); ok(h.filter(x => x.startsWith('h1 ')).length === 1, 'need exactly one h1 in the landing');
-      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h3 No way back/, /^h3 Eight seconds of silence/, /^h3 Reach zero, keep it/, /^h2 Real rules, real numbers/, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
+      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h3 No way back/, /^h3 Eight seconds of silence/, /^h3 Reach zero, keep it/, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
       order.forEach((re, i) => ok(re.test(h[i] || ''), `heading ${i}: "${h[i]}" does not match ${re}`));
-      ok(h.slice(9, 17).every(x => x.startsWith('h3 ')) && h.length === 18 && /^h2 We force you to write it down$/.test(h[17]), `FAQ/callback headings: ${JSON.stringify(h.slice(9))}`);
+      ok(h.slice(8, 16).every(x => x.startsWith('h3 ')) && h.length === 16, `FAQ headings: ${JSON.stringify(h.slice(8))}`);
     });
   });
   await block('landing/core-rule', async () => {
@@ -213,18 +205,7 @@ async function run(size, browser) {
       ok(t.length === 3 && /no way back/i.test(t[0]) && /eight seconds/i.test(t[1]) && /reach zero/i.test(t[2]), `cards ${JSON.stringify(t)}`);
     });
   });
-  await block('landing/facts', async () => {
-    await step('ledger: six rows incl. blocked, pressure, privacy, length, price, maker', async () => {
-      await show('#facts'); const t = (await page.locator('#facts .ledger b').allInnerTexts()).map(x => x.toLowerCase());
-      ok(['blocked', 'pressure', 'privacy', 'length', 'price', 'maker'].every((k, i) => t[i] === k), `rows ${JSON.stringify(t)}`);
-      ok(/\$4\.99/.test(await page.locator('#facts').innerText()), 'price row');
-    });
-  });
   await block('landing/mac-block', async () => {
-    await step('USD 4.99 / 2 Macs / 14 days / macOS 14 and free updates', async () => {
-      await show('#mac'); const t = await page.locator('#mac').innerText();
-      ok(/3 sessions/i.test(t) && /\$4\.99/.test(t) && /2 Macs/.test(t) && /14 days/.test(t) && /macOS 14/.test(t), 'facts missing'); ok(/free updates/i.test(t), 'free updates missing');
-    });
     await step('Download free trial link reaches /download/ (200, real page)', async () => {
       const h = await page.locator('#mac a', { hasText: /^download free trial$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
       const r = await ctx.request.get(url('/download/')); ok(r.status() === 200 && /<h1>Write It Down for Mac<\/h1>/.test(await r.text()), 'download page is not the real page');
@@ -247,12 +228,6 @@ async function run(size, browser) {
       const q = (await ldGraph()).find(x => x['@type'] === 'FAQPage'); ok(q && q.mainEntity.length === 8, 'FAQPage needs 8 questions');
       const vis = await page.locator('#faq details').evaluateAll(els => els.map(e => [e.querySelector('summary h3').textContent.replace(/\s+/g, ' ').trim(), e.querySelector('p').textContent.replace(/\s+/g, ' ').trim()]));
       q.mainEntity.forEach((m, i) => { ok(vis[i][0] === m.name, `Q${i + 1} "${vis[i][0]}" != JSON-LD "${m.name}"`); ok(vis[i][1] === m.acceptedAnswer.text.replace(/\s+/g, ' ').trim(), `A${i + 1} differs from JSON-LD`); });
-    });
-  });
-  await block('landing/callback', async () => {
-    await step('call-back band repeats the line and the 60-second door', async () => {
-      await show('.callback'); const t = (await page.locator('.callback').innerText()).replace(/\s+/g, ' ');
-      ok(/we force you to write it down/i.test(t) && /8 seconds/.test(t), 'band text'); ok(await page.locator('.callback a[href="#trial"]').count() === 1, 'door missing');
     });
   });
   await block('landing/footer', async () => {

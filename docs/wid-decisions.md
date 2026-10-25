@@ -719,3 +719,27 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Reason: One product, one answer to a blocked key. The tone was web-only, undocumented, and forced
   nothing about the browser.
 - Supersedes: none.
+
+## D-047: The landing keeps the door, the demo and the facts a reader needs
+
+- Date: 2026-10-25
+- Decision: The landing drops five blocks and moves one. The `Give it 60 seconds` door stands between
+  the subheadline and the demo sheet in one vertical rhythm (24 px under the subheadline, 48 px above
+  the sheet on the desktop; 16 px and 24 px on a phone, both read from the page's own spacing scale),
+  so the reader meets the way in before the preview. Deleted: the reassurance line under the old door,
+  the three below-the-fold points, the `The facts` / `Real rules, real numbers` table, the Mac block's
+  native-room paragraph and its `macOS 14 ... 14-day refund` meta line, and the closing block with its
+  repeated headline, italic line and second door. The page now ends with the FAQ and the footer, and
+  the header's `Download for Mac` is the way to the Mac surface. The copy rule behind those cuts is
+  recorded as Q-20 in `docs/ui-quality.md`: copy states a mechanism, a number, a price or a
+  requirement, and never explains, announces or vouches for the page carrying it.
+- Reason: The captain read the page as too long and too eager - the reassurance line, the points band
+  and the closing block repeat what the headline, the cards and the FAQ already say, and the facts
+  table and the Mac paragraph duplicate what `mac.html` and `/download/` own. The door belongs above
+  the demo because the reader decides whether to type before watching a preview. Nothing factual left
+  the site: the price, refund, trial and requirement facts stay on `mac.html`, `/download/` and the
+  landing's Mac card, and the eight-second rule, the blocked edits and the 60-second length stay in
+  the cards and the FAQ.
+- Supersedes: D-040 for the reassurance line, the three points and the 390x844/1440x900 fold assertion
+  on the door and its line; D-044's "one entrance under the sheet" wording, since the one entrance is
+  now above the sheet. The wordmark, subheadline, cards, FAQ and Mac facts are unchanged.

@@ -8,8 +8,8 @@
 #         dist/updates/last-build.txt to hold exactly the last released CFBundleVersion.
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
-#          A release run also writes dist/updates/WriteItDown-<version>.zip (the Sparkle update
-#          payload, made from the same stapled app) and records dist/updates/last-build.txt.
+#          A release run also writes dist/updates/WriteItDown-<version>-<build>.zip (the Sparkle
+#          update payload, made from the same stapled app) and records dist/updates/last-build.txt.
 #          The app is notarized and stapled on its own before the DMG, so it keeps a ticket
 #          after it is copied out of the disk image.
 # [POS] apps/macos/FirstLine/scripts/release-dmg.sh - release packaging on top of
@@ -143,7 +143,7 @@ if [[ "$mode" == '--staging' ]]; then suffix='-staging'; fi
 # before stapling, and never for staging, so a staging build can never enter the feed.
 if [[ "$mode" != '--staging' ]]; then
   mkdir -p dist/updates
-  update_zip="$PWD/dist/updates/WriteItDown-$version.zip"
+  update_zip="$PWD/dist/updates/$(scripts/update-payload-name.sh "$plist")"
   rm -f "$update_zip"
   ditto -c -k --sequesterRsrc --keepParent "$app" "$update_zip"
 fi

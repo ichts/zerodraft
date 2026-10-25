@@ -5,7 +5,7 @@
 #          Contents/Frameworks/Sparkle.framework and Sparkle's MIT notice at
 #          Contents/Resources/Sparkle-LICENSE.txt; exit 0 only when the bundle builds,
 #          assembles, and (in --adhoc mode) verifies.
-# [POS] apps/macos/FirstLine/scripts/package-app.sh — the single packager every
+# [POS] apps/macos/FirstLine/scripts/package-app.sh - the single packager every
 #       release and QA path calls; release-dmg.sh drives it with --unsigned.
 # [PROTOCOL] Signing is delegated to scripts/sign-nested.sh (inside-out, plain Mach-O
 #            first) so the ad-hoc QA build and the Developer ID release cannot drift.
@@ -39,7 +39,7 @@ cp -R "$bin_dir/WriteItDown_WriteItDown.bundle" "$app/Contents/Resources/"
 # cp -R: the framework carries Versions/Current symlinks and breaking them breaks the signature.
 framework="$bin_dir/Sparkle.framework"
 if [[ ! -d "$framework" ]]; then
-  framework="$(find .build -maxdepth 6 -type d -name Sparkle.framework -print -quit 2>/dev/null || true)"
+  framework="$(find .build -type d -name Sparkle.framework -print 2>/dev/null | head -n 1 || true)"
 fi
 if [[ ! -d "$framework" ]]; then
   echo "Sparkle.framework was not found next to $bin_dir/WriteItDown; run swift package resolve first." >&2

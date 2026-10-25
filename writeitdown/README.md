@@ -67,11 +67,18 @@ Artifacts a release run produces on the release Mac (`apps/macos/FirstLine/`):
 ```
 dist/Write-It-Down-<version>.dmg          the public installer (stays the advertised download)
 dist/Write-It-Down-<version>.dmg.sha256
-dist/updates/WriteItDown-<version>.zip    the update payload, from the same stapled app
-dist/updates/*.delta                      binary deltas generate_appcast builds from older archives
-dist/updates/appcast.xml                  the signed feed
-dist/updates/last-build.txt               the last released CFBundleVersion
+dist/updates/WriteItDown-<version>-<build>.zip   the update payload, from the same stapled app
+dist/updates/*.delta                             binary deltas generate_appcast builds from older archives
+dist/updates/appcast.xml                         the signed feed
+dist/updates/last-build.txt                      the last released CFBundleVersion
 ```
+
+The payload name carries both the marketing version and the build number (`scripts/update-payload-name.sh`
+is its only definition), so a rebuild that only raises the build number gets a new URL. Upload mapping:
+`dist/updates/appcast.xml` goes to `/var/www/writeitdown.app/download/appcast.xml`, while the payload
+ZIP and its deltas go to `/var/www/writeitdown.app/download/updates/`. Do not upload the feed into
+`updates/`: `SUFeedURL` and the Caddy handlers below read `/download/appcast.xml`, and a 404 there
+leaves every installed copy silently unable to update.
 
 Every release run requires `last-build.txt` to exist and hold exactly one build number. On a
 fresh release machine or checkout, create it with the last released build number (1 for the 1.0
@@ -108,7 +115,7 @@ writeitdown.app {
 
 	@updatefiles path /download/updates/*
 	handle @updatefiles {
-		# Archive names carry the version, so a given payload never changes.
+		# Archive names carry the version and build number, so a given payload never changes.
 		header Cache-Control "public, max-age=31536000, immutable"
 		file_server
 	}

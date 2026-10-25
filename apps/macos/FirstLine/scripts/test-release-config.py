@@ -28,8 +28,9 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
     (root / 'scripts').mkdir()
     (root / 'Sources/FirstLine').mkdir(parents=True)
     (root / 'bin').mkdir()
-    for script in ['release-dmg.sh', 'publish-appcast.sh', 'sparkle-key.py']:
+    for script in ['release-dmg.sh', 'publish-appcast.sh', 'sparkle-key.py', 'update-payload-name.sh']:
         shutil.copyfile(module / 'scripts' / script, root / 'scripts' / script)
+        (root / 'scripts' / script).chmod(0o755)
     package = root / 'scripts/package-app.sh'
     package.write_text('#!/bin/sh\necho CONFIGURATION_ACCEPTED\nexit 42\n')
     package.chmod(0o755)
@@ -144,7 +145,17 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
                        ('generate_keys', f'#!/bin/sh\necho "{base64.b64encode(seed_public).decode()}"\n')]:
         (sparkle / tool).write_text(body)
         (sparkle / tool).chmod(0o755)
-    (updates / 'WriteItDown-1.1.zip').write_bytes(b'payload')
+    payload = root / 'scripts/update-payload-name.sh'
+
+    def payload_name(build):
+        plist_path.write_bytes(plistlib.dumps({**signed, 'CFBundleVersion': build}))
+        return subprocess.run(['bash', str(payload), str(plist_path)], env=env, capture_output=True, text=True)
+
+    first_build = payload_name('2')
+    next_build = payload_name('3')
+    assert first_build.returncode == 0 and first_build.stdout.strip() == 'WriteItDown-1.1-2.zip', first_build.stderr
+    assert next_build.returncode == 0 and next_build.stdout.strip() == 'WriteItDown-1.1-3.zip', next_build.stderr
+
     publish_env = {**env, 'WID_SPARKLE_BIN': str(sparkle)}
 
     def publish(public_key):
@@ -152,6 +163,15 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
         generated.unlink(missing_ok=True)
         return subprocess.run(['bash', str(root / 'scripts/publish-appcast.sh')],
                               env=publish_env, capture_output=True, text=True)
+
+    # A payload named by version alone can be overwritten by a rebuild under an immutable URL, so
+    # the feed step must look for the build-qualified name and refuse the old one.
+    (updates / 'WriteItDown-1.1.zip').write_bytes(b'payload')
+    stale_name = publish(base64.b64encode(seed_public).decode())
+    assert stale_name.returncode == 1 and 'WriteItDown-1.1-2.zip' in stale_name.stderr, stale_name.stderr
+    assert not generated.exists(), 'generate_appcast ran without the build-qualified payload'
+    (updates / 'WriteItDown-1.1.zip').unlink()
+    (updates / 'WriteItDown-1.1-2.zip').write_bytes(b'payload')
 
     refused = publish(base64.b64encode(bytes(32)).decode())
     assert refused.returncode == 1 and 'does not match SUPublicEDKey' in refused.stderr, refused.stderr
@@ -161,5 +181,6 @@ with tempfile.TemporaryDirectory(prefix='release-config-', dir=module) as direct
 print('PASS: release requires complete license and update configuration including the signed-feed')
 print('      policy; a placeholder update key, an unsafe feed, a missing or non-numeric build record,')
 print('      an unchecksummed build number and staging with sale config are refused; staging ignores')
-print('      last-build.txt; publish refuses a signing key whose public half is not the bundled')
-print('      SUPublicEDKey before generating.')
+print('      last-build.txt; a rebuild of the same version gets its own payload name and the feed')
+print('      refuses the version-only name; publish refuses a signing key whose public half is not the')
+print('      bundled SUPublicEDKey before generating.')

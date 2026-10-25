@@ -16,7 +16,8 @@
 #            login Keychain (docs/RELEASE_KEY.md). The bundle opts into a signed feed
 #            (SURequireSignedFeed + SUVerifyUpdateBeforeExtraction), so generate_appcast embeds the
 #            feed signature and sign_update --verify <appcast.xml> can prove the feed was not
-#            rewritten after signing. Archive names are space-free so the appcast URLs stay readable.
+#            rewritten after signing. Archive names are space-free and carry the build number, so a
+#            rebuilt payload gets a new immutable URL.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -47,7 +48,7 @@ fi
 
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")"
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
-archive="WriteItDown-$version.zip"
+archive="$(scripts/update-payload-name.sh "$plist")"
 if [[ ! -f "$updates_dir/$archive" ]]; then
   echo "Missing update payload $updates_dir/$archive; scripts/release-dmg.sh writes it from the stapled app." >&2
   exit 1

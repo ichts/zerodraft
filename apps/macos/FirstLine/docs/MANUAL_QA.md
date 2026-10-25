@@ -2,6 +2,39 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: Immutable update payload URLs, portable framework lookup, feed path
+
+Third review round on the same branch. No DMG build, notarization, upload, deployment or merge was
+performed.
+
+- The update payload name now carries the build number (`WriteItDown-<version>-<build>.zip`), defined
+  once in `scripts/update-payload-name.sh` and used by both `release-dmg.sh` (writer) and
+  `publish-appcast.sh` (looker-up). A rebuild that only raises `CFBundleVersion` therefore gets a new
+  URL, so the host's `max-age=31536000, immutable` rule on `/download/updates/*` stays honest.
+- `package-app.sh` finds a misplaced `Sparkle.framework` with POSIX `find` primaries piped to
+  `head -n 1` instead of `-maxdepth`/`-quit`, which macOS 14's BSD find does not provide.
+- `writeitdown/README.md` now states the upload mapping: `dist/updates/appcast.xml` goes to
+  `download/appcast.xml`, while the payload ZIP and deltas go to `download/updates/`.
+
+Evidence:
+
+- `python3 scripts/test-release-config.py`: PASS (exit 0). It now also executes
+  `scripts/update-payload-name.sh` for builds 2 and 3 of version 1.1 (`WriteItDown-1.1-2.zip` and
+  `WriteItDown-1.1-3.zip`) and proves `publish-appcast.sh` refuses a directory holding only the
+  version-only `WriteItDown-1.1.zip`, naming the expected build-qualified payload. Known-broken
+  proof: the same test fails on `66f673c` because that publish step accepts the version-only name.
+- Real Sparkle 2.10.0 tools (pinned artifacts, read-only) with a disposable RFC 8032 key: two
+  ad-hoc-signed apps with the same `CFBundleShortVersionString` 1.1 and builds 2 and 3 were zipped
+  under the names the helper prints. `scripts/publish-appcast.sh` exited 0 for both and wrote
+  enclosures `.../updates/WriteItDown-1.1-2.zip` and `.../updates/WriteItDown-1.1-3.zip`, so the
+  enclosure URL changes with the build while the feed and enclosure signatures still verify.
+- `node writeitdown/release-check.mjs --download`: PASS both before and after the rename; the
+  download page names only the DMG and its checksum, so payload renames cannot change its facts.
+- Framework fallback: the exact command from `package-app.sh` resolves
+  `.build/apple/Products/Release/Sparkle.framework` in a fixture tree.
+- Not run: a full `scripts/release-dmg.sh` (needs the Developer ID identity and notary), `swift
+  build`/`swift test`, and every real-window Sparkle behaviour below.
+
 ## 2026-10-25: Fail-closed release gates and library-backed key derivation
 
 Second review round on the same branch head. No window journey, DMG build, upload, deployment or

@@ -36,7 +36,8 @@ const slot = statusSlot({
   pitches: 2,
   numeral: $('room-numeral'),
   caption: $('room-warning'),
-  receipt: $('room-report')
+  receipt: $('room-report'),
+  block: $('failed')
 });
 
 function placeStatus() {
@@ -102,6 +103,7 @@ function fitEditor({ animate = false } = {}) {
 function render(now = performance.now()) {
   const previous = room.dataset.phase;
   room.dataset.phase = state.phase;
+  if (previous !== state.phase) slot.invalidate();
   const failed = state.phase === 'wipe';
   const kept = state.phase === 'kept';
   const cut = failed && now - state.ended < 200;

@@ -358,6 +358,44 @@ test('the short trial sheet keeps its dynamic viewport minimum', async ({ page }
   expect(room.footBottom).toBeLessThanOrEqual(room.viewport);
 });
 
+test('short sheets keep the warning and result slots inside the paper', async ({ page }, info) => {
+  for (const size of [{ width: 844, height: 390 }, { width: 1440, height: 350 }]) {
+    await page.setViewportSize(size);
+    await enter(page);
+    await page.keyboard.insertText('A');
+    await page.clock.fastForward(8350);
+    await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
+    const failure = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), block: box('#failed'), receipt: box('#room-report') };
+    });
+    expect(failure.block.top).toBeGreaterThanOrEqual(failure.paper.top);
+    expect(failure.block.bottom).toBeLessThanOrEqual(failure.receipt.top);
+    expect(failure.receipt.top).toBeGreaterThanOrEqual(failure.paper.top);
+    expect(failure.receipt.bottom).toBeLessThanOrEqual(failure.footer.top);
+    await capture(page, info, `short-failure-${size.width}x${size.height}`);
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
+    await page.keyboard.insertText('A');
+    await page.clock.fastForward(5200);
+    await expect(page.locator('#room')).toHaveAttribute('data-phase', 'warn');
+    const warning = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      const line = document.querySelector('#editor');
+      const lineHeight = parseFloat(getComputedStyle(line).lineHeight);
+      const lineTop = line.getBoundingClientRect().top + 2 * lineHeight;
+      return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), danger: box('#room-danger'), caption: box('#room-warning'), lineTop, lineBottom: lineTop + lineHeight };
+    });
+    expect(warning.danger.top).toBeGreaterThanOrEqual(warning.paper.top);
+    expect(warning.caption.bottom).toBeLessThanOrEqual(warning.lineTop);
+    expect(warning.danger.bottom).toBeLessThanOrEqual(warning.footer.top);
+    await capture(page, info, `short-warn-${size.width}x${size.height}`);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#landing')).toBeVisible();
+  }
+});
+
 test('short rooms keep the writing aperture below the clock', async ({ page }, info) => {
   await page.setViewportSize({ width: info.project.use.viewport.width, height: 350 });
   await enter(page);
@@ -628,6 +666,7 @@ test('the failure screen restarts from the button and from Return', async ({ pag
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
   await expect(page.locator('#failed h1')).toHaveText('You stopped.');
   await expect(page.locator('#room-count')).toHaveText('0 words');
+  expect(await page.locator('#failed').evaluate(el => el.getBoundingClientRect().top - el.closest('.room-paper').getBoundingClientRect().top), 'the failure block keeps the Mac offset on a tall sheet').toBe(72);
   const row = await page.evaluate(() => {
     const button = document.querySelector('#begin-again');
     const box = button.getBoundingClientRect();
@@ -723,6 +762,8 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   const bars = await page.evaluate(() => [...document.querySelectorAll('#demo .bar, #demo .meter')].map(e => e.getBoundingClientRect().height));
   expect(bars).toEqual([2]);
   await capture(page, info, 'demo-typing');
+  await expect(page.locator('#warn')).toBeHidden();
+  await expect(page.locator('#demo-stopped')).toBeHidden();
   if (info.project.use.reducedMotion === 'reduce') {
     await page.clock.fastForward(30000);
     await expect(page.locator('#clock')).toHaveText('1:00');
@@ -747,11 +788,15 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await capture(page, info, 'demo-warn');
   await seek(WARN_END + 100);
   await expect(page.locator('#paper')).toHaveClass(/cut/);
+  await expect(page.locator('#warn')).toBeHidden();
+  await expect(page.locator('#demo-stopped')).toBeHidden();
   await expect(page.locator('#count')).toHaveText('0 words');
   await capture(page, info, 'demo-cut');
   await seek(CUT_END + 300);
   await expect(page.locator('#demo-stopped')).toBeVisible();
+  await expect(page.locator('#warn')).toBeHidden();
   await expect(page.locator('#demo-stopped .stopped')).toHaveText('You stopped.');
+  expect(await page.locator('#demo-stopped').evaluate(el => el.getBoundingClientRect().top - el.closest('.paper').getBoundingClientRect().top), 'the demo failure block keeps the Mac offset on a tall sheet').toBe(72);
   const reportLook = await page.evaluate(() => {
     const probe = name => {
       const i = document.createElement('i');
@@ -780,11 +825,51 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await expect(page.locator('#cur')).not.toHaveText('');
 });
 
-test('the demo danger group stays hidden until the warn stage', async ({ page }) => {
-  await page.route('**/demo.js', route => route.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
-  await page.reload();
+test('the demo danger group clears when a new loop reaches typing', async ({ page }, info) => {
+  test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo never loops');
+  await page.clock.fastForward(SILENT_END + 150);
+  await expect(page.locator('#warn')).toBeVisible();
+  await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
+  await page.locator('#landing .cta a[href="#trial"]').click();
+  await expect(page.locator('#room')).toBeVisible();
+  await page.clock.fastForward(CUT_END + 2000 - (SILENT_END + 150) + 1000);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#landing')).toBeVisible();
+  await page.clock.runFor(100);
   await expect(page.locator('#warn')).toBeHidden();
-  await expect(page.locator('#warn-caption')).toBeHidden();
+  await expect(page.locator('#warn-caption')).toHaveText('');
+  await expect(page.locator('#demo-stopped')).toBeHidden();
+});
+
+test('short demo sheets keep the status slot inside the paper', async ({ page }, info) => {
+  test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo has no warning or report');
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.reload();
+  await page.evaluate(() => document.fonts.ready);
+  await page.clock.fastForward(SILENT_END + 150);
+  await expect(page.locator('#warn')).toBeVisible();
+  const warning = await page.evaluate(() => {
+    const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+    const line = document.querySelector('.script');
+    const lineTop = line.getBoundingClientRect().top;
+    return { paper: box('#paper'), footer: box('#paper .paper-foot'), danger: box('#warn'), caption: box('#warn-caption'),
+      lineTop, lineBottom: lineTop + parseFloat(getComputedStyle(line).lineHeight) };
+  });
+  expect(warning.danger.top).toBeGreaterThanOrEqual(warning.paper.top);
+  expect(warning.danger.bottom <= warning.lineTop || warning.danger.top >= warning.lineBottom, 'the warning group does not cover the active line').toBe(true);
+  expect(warning.danger.bottom).toBeLessThanOrEqual(warning.footer.top);
+  await page.clock.fastForward(CUT_END - (SILENT_END + 150) + 300);
+  await expect(page.locator('#demo-stopped')).toBeVisible();
+  const report = await page.evaluate(() => {
+    const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+    return { paper: box('#paper'), footer: box('#paper .paper-foot'), block: box('#demo-stopped'), receipt: box('#report') };
+  });
+  expect(report.block.top).toBeGreaterThanOrEqual(report.paper.top);
+  expect(report.block.bottom).toBeLessThanOrEqual(report.receipt.top);
+  expect(report.receipt.top).toBeGreaterThanOrEqual(report.paper.top);
+  expect(report.receipt.bottom).toBeLessThanOrEqual(report.footer.top);
+  await capture(page, info, 'short-demo-report');
 });
 
 test('the room wears the landing design system', async ({ page }) => {

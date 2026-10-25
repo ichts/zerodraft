@@ -50,7 +50,8 @@ import { statusSlot } from './status-slot.js';
     pitches: 0,
     numeral: numeralEl,
     caption: captionEl,
-    receipt: reportEl
+    receipt: reportEl,
+    block: stoppedEl
   });
   function placeStatus() {
     if (document.getElementById('landing').hidden) return;
@@ -82,6 +83,7 @@ import { statusSlot } from './status-slot.js';
   function setPhase(name) {
     if (seen.ph === name) return;
     seen.ph = name;
+    slot.invalidate();
     paper.className = "paper " + name;
   }
   function setWash(k) {

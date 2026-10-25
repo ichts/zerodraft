@@ -82,13 +82,14 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .theme-toggle,.paper-foot button{min-height:44px;padding:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
-.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:hidden}
+.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip}
 .room .wash{transition:opacity 120ms linear;opacity:0}
 .room-paper-wash{background:var(--red-soft);border-radius:inherit}
 .room[data-phase="typing"]{--chrome:var(--mute);--timer:var(--mute)}
 .room[data-phase="warn"] .wash,.room[data-cut="true"] .wash{transition:none}
 .room[data-cut="true"] .room-paper-wash{background:var(--red-deep)}
 .writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.room[data-phase="wipe"] .writing-area{opacity:0}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
 /* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
    gradient: one uniform opacity per visual line (100 / 22 / 7 / gone), the Mac's D-027 treatment.
@@ -102,7 +103,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 #editor:focus-visible{outline:none}
 /* The result screens: the fixed top block (headline, receipt, controls) and a draft that scrolls
    below it, so a long draft never hides the actions. */
-.room-top{position:absolute;z-index:2;left:32px;right:32px;top:72px;display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
+.room-top{position:absolute;z-index:2;left:32px;right:32px;top:var(--room-top,72px);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
 .room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em;max-width:62ch}
 .room-top .room-secondary{margin-top:20px;pointer-events:auto}
 #kept{position:absolute;inset:72px 36px;display:flex;flex-direction:column;align-items:center}
@@ -204,6 +205,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .paper > .wash{border-radius:inherit}
 /* demo.js marks the report phase with the .report class on the sheet too; keep the sheet's own type. */
 .home .paper.report{font:inherit;letter-spacing:normal;color:inherit}
+.home .paper.report .anchor-wrap,.home .paper.report .prev-band{opacity:0}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:flex-end;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);color:var(--ink)}
 .home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--chrome)}

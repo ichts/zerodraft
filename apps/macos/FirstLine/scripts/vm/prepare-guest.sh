@@ -4,6 +4,7 @@
 #         WID_VM_GOLDEN (default wid-golden)  WID_VM_CPUS (default 4)
 #         WID_VM_MEMORY (default 8192)        WID_VM_DISPLAY (default 1440x900)
 #         WID_VM_BASE_IMAGE (default ghcr.io/cirruslabs/macos-tahoe-base:latest)
+#         WID_VM_NO_LAUNCHD=1 to keep setup in the caller's process tree.
 # [OUTPUT] A golden macOS VM: SSH key auth for the rig, /usr/local/wid-rig/bin/widrig
 #          and the license fixture installed, a tidied desktop, and a verification
 #          pass proving Accessibility, Screen Recording and HID input work from an
@@ -27,6 +28,11 @@ cpus="${WID_VM_CPUS:-4}"
 memory="${WID_VM_MEMORY:-8192}"
 display="${WID_VM_DISPLAY:-1440x900}"
 repo_scripts="$(cd "$(dirname "$0")" && pwd)"
+# Same launchd transport as scripts/vm-journey.sh: guest setup also talks to the
+# VM's address, which macOS Local Network Privacy blocks for an ungranted app.
+# shellcheck source=vm/launchd-host.sh
+. "$repo_scripts/vm/launchd-host.sh"
+wid_launchd_reexec "$0" "$@"
 
 log() { printf '%s\n' "prepare-guest: $*"; }
 die() { printf '%s\n' "prepare-guest: ERROR: $*" >&2; exit 1; }

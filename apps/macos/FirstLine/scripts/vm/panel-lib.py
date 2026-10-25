@@ -39,6 +39,7 @@ import json
 import math
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -351,7 +352,7 @@ def review_record(argv):
         "panel: %s" % panel_line,
         "panel_lenses_complete: %d/%d" % (state["complete_count"], state["total"]),
         "panel_lenses_required: %s" % " ".join(state["required"]),
-        "panel_command: bash %s %s" % (design_panel, evidence),
+        "panel_command: bash %s %s" % (shlex.quote(design_panel), shlex.quote(evidence)),
     ]
     derived.extend("panel_lens: %s\t%s\t%s\t%d" % (
         lens.get("lens") or "?", lens.get("status") or "unavailable",

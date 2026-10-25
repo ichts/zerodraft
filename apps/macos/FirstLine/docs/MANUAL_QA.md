@@ -2,6 +2,43 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: Recorded VM acceptance of the shipped 1.0 DMG, and the launch-flash fix proven live
+
+Recorded acceptance now runs on the Mac mini inside a Tart macOS virtual machine: the guest boots headless, the
+DMG is installed inside it the way a person installs it, the app is driven with CGEvent keyboard and mouse input,
+and the guest screen is captured as a timestamped frame stream that the host assembles into one continuous
+`screen.mov`. The Mini's own screen, login keychain and signing identity are never used.
+
+- Entry point: `bash apps/macos/FirstLine/scripts/vm-journey.sh <dmg> <evidence-directory>` (from the repository
+  root, on the Mini). `scripts/vm/prepare-guest.sh` prepares the golden image once; `scripts/design-panel.sh`
+  adds the analysis and review stages to an evidence bundle.
+- PASS, shipped `Write-It-Down-1.0.dmg` (`5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`):
+  signature, notarization ticket and `spctl` acceptance of both disk image and installed app; clean-clone install
+  with the browser-download quarantine flag and the Gatekeeper first-launch question answered by a real click;
+  first launch on the untouched 3-of-3 free trial; session 1 typing and the two-act exit back to 2 of 3; session 2
+  silence wipe with the restart receipt and a zeroed count; session 3 written through a real one-minute deadline
+  with the exact kept draft, the `1 MINUTE. N WORDS.` receipt, COPY TEXT flipping to COPIED and the exact
+  clipboard contents; RUN IT AGAIN reaching the activation page with no writable editor left. One continuous
+  `screen.mov` of 125.7 s over 355 captured frames, largest frame gap 1.31 s.
+- DECLARED KNOWN DEFECT on that artifact, reproduced twice in one bundle: `licensed-launch-no-activation-page`.
+  On a licensed Mac whose trial is spent, the launch presented the activation card until the license revalidation
+  returned, because entitlement required that no validation be in flight and the launch validation always starts
+  in flight. Both the guest's launch watcher (a 50 ms AX read armed before the process exists) and the
+  deterministic analyser saw it: the first frame of the relaunch was the unlicensed card, the licensed home
+  followed 184 ms later against the loopback fixture. Fixed on main by PR 62
+  (https://github.com/ichts/zerodraft/pull/62). The rig excuses exactly that assertion id on exactly that
+  artifact checksum, prints the declaration in `acceptance.txt` and in the bundle's `notes.md`, and fails the run
+  if the assertion passes with the declaration still in place.
+- PASS, fix proven live: a locally built `.app` from current main (ad-hoc signed by `scripts/package-app.sh`,
+  the app sources at that commit, no Developer ID, no notarization) installed into a fresh clone and driven by the
+  same launcher, activated against the loopback fixture, then relaunched three times with the watcher armed. All
+  three relaunches went straight to the licensed home; zero activation frames; verdict `accepted`.
+- PASS, deterministic analysis with a known-broken-state proof: `scripts/vm/analyse-recording.py` reproduces the
+  1.0 launch flash from the 1.0 launch frames ("a forbidden surface appeared for 184 ms during launch") and
+  passes on the same frames with that state removed; a 5.3 s capture gap and a frozen screen over 20 s each fail
+  the run, and a gapped or truncated frame stream fails before the verdict.
+- NOT RUN: the offline re-verification and revocation paths of case 58, real purchase and payment, and any
+  Finder install or first launch outside the prepared VM image. No claim is made for those here.
 ## 2026-10-25: The update gate follows a live writing session
 
 Fourth review round on the same branch. No DMG build, notarization, upload, deployment or merge was
@@ -558,5 +595,5 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 - PASS after the fix, same harness and same 2.5 s responder: 30 frames over 6.2 s, the picker from frame 001 to frame 030, zero frames containing `Activate Write It Down`. Evidence: `capture-after/` (`frame-001.png`, `summary.json`).
 - PASS deterministic, with a known-broken-state proof: `swift test --filter LicenseEntitlementTests/launchWithAStoredSignedLicensePresentsThePickerFirst` records 4 failures against the pre-fix source (`hasFullAccess == false`, `selectedSurface == .upgrade`, `RootContainerViewController` child is the activation card) and passes with the fix, including the in-flight assertion that the window is built while the revalidation is still running.
 - PASS suite: `swift test` 287 tests. All license, trial, smoke and entitlement suites pass after their stale "blocked until validation" expectations were updated to the new contract (immediate access on a locally verified token, silent background revalidation). Two pre-existing failures are excluded from this change's claim because they reproduce identically on the unmodified source: `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and `EditorFocusTests.imeMovementStaysWithinMarkedRange` both expect a deny that needs an active host app/key window, which this headless session does not provide. `RoomTests.firstPinyinKeyAfterAWipeThroughTheInputContext` passes with its recorded known issue. No IME, VoiceOver or full-screen session was run.
-- PENDING: the real-window first-frame recording of case 58 - repeat launch with an activated license, offline re-verification, and the revocation path - is still pending recorded VM acceptance on an approved GUI machine. `scripts/qa-window.sh` and the cua-driver daemon are not permitted here; the independent capture review by a different model family is arranged by firstmate.
+- RECORDED: the first-frame half of case 58 now runs as recorded VM acceptance - see the 2026-10-25 section above. The launch with an activated license is recorded at 50 ms AX sampling before the process exists, and the pre-fix build (the shipped 1.0 DMG) reproduces the activation card on the first frame while a build of current main does not, over three relaunches. Still PENDING: the offline re-verification and revocation paths of that case, which the rig does not yet exercise.
 - Observed, pre-existing, not part of this change: on this machine the picker window measures 980x1079 pt (`CGWindowListCopyWindowInfo`) instead of the 1040x720 contract, and the pre-fix build shows the same size on both the trial path and after the card flips to the picker, so the license fix neither causes nor removes it. The launch captures therefore differ in window size between the card (1040x720) and the picker (980x1079) in the before set and are uniform in the after set. Window sizing is owned by `RootWindowController` and needs its own bounded investigation before it is treated as a shipped defect.

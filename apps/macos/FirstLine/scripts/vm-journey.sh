@@ -45,18 +45,19 @@ golden="${WID_VM_GOLDEN:-wid-golden}"
 ssh_user="${WID_VM_SSH_USER:-admin}"
 keep="${WID_VM_KEEP:-0}"
 scripts="$(cd "$(dirname "$0")" && pwd)"
+die() { printf 'vm-journey: ERROR: %s\n' "$*" >&2; exit 2; }
 # macOS Local Network Privacy blocks the guest address for an app that was never
 # granted local network access, and every connection then fails with EHOSTUNREACH
 # even though the VM is up. A launchd job is not blocked, so the run moves there.
 # shellcheck source=vm/launchd-host.sh
-. "$scripts/vm/launchd-host.sh"
+. "$scripts/vm/launchd-host.sh" || die "could not load $scripts/vm/launchd-host.sh"
+command -v wid_launchd_reexec >/dev/null || die "wid_launchd_reexec is missing from $scripts/vm/launchd-host.sh"
 wid_launchd_reexec "$0" "$@"
 run_id="$(date +%Y%m%d-%H%M%S)"
 vm="wid-run-$run_id"
 evidence="${2:-$root/evidence/$run_id}"
 key="$root/ssh/id_ed25519"
 
-die() { printf 'vm-journey: ERROR: %s\n' "$*" >&2; exit 2; }
 log() { printf 'vm-journey: %s\n' "$*"; }
 
 if [[ "$artifact_kind" == 'app' ]]; then

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # [INPUT] Mode: (none) configured release or --staging (empty checkout/license config only).
 #         Release requires the complete HTTPS license service, product and raw Ed25519
-#         public key in Info.plist, plus the Sparkle feed URL and the real (non-placeholder)
-#         update signing key. TEST and LIVE use the same app configuration.
+#         public key in Info.plist, plus the Sparkle feed URL, the real (non-placeholder)
+#         update signing key and the signed-feed policy (SURequireSignedFeed and
+#         SUVerifyUpdateBeforeExtraction). TEST and LIVE use the same app configuration.
 # [OUTPUT] dist/Write-It-Down-<version>[-staging].dmg containing the notarized, stapled
 #          universal app, an Applications symlink and the WID volume icon, plus a .sha256 sidecar.
 #          A release run also writes dist/updates/WriteItDown-<version>.zip (the Sparkle update
 #          payload, made from the same stapled app) and records dist/updates/last-build.txt.
 #          The app is notarized and stapled on its own before the DMG, so it keeps a ticket
 #          after it is copied out of the disk image.
-# [POS] apps/macos/FirstLine/scripts/release-dmg.sh — release packaging on top of
+# [POS] apps/macos/FirstLine/scripts/release-dmg.sh - release packaging on top of
 #       scripts/package-app.sh; both modes require the owner's Developer ID. The appcast is a
 #       separate step: scripts/publish-appcast.sh.
 # [PROTOCOL] Signing is scripts/sign-nested.sh (plain Mach-O first, then nested bundles, then
@@ -77,6 +78,10 @@ try:
         raise ValueError('SUPublicEDKey must be the raw 32-byte Ed25519 public key')
     if config.get('SUEnableAutomaticChecks') is not False:
         raise ValueError('SUEnableAutomaticChecks must be false: no check runs until the writer turns it on')
+    if config.get('SURequireSignedFeed') is not True:
+        raise ValueError('SURequireSignedFeed must be true: installed copies must refuse a rewritten feed')
+    if config.get('SUVerifyUpdateBeforeExtraction') is not True:
+        raise ValueError('SUVerifyUpdateBeforeExtraction must be true: Sparkle requires it together with a signed feed')
     build = str(config.get('CFBundleVersion', '')).strip()
     if not build.isdigit() or int(build) <= 0:
         raise ValueError('CFBundleVersion must be a positive integer: Sparkle compares it, not the marketing version')
@@ -84,10 +89,11 @@ except (ValueError, TypeError) as error:
     sys.exit(f'Release blocked: configure the update feed in Info.plist: {error}')
 PY
 
-# Sparkle compares CFBundleVersion; a reused or lower number reaches no installed copy.
+# Sparkle compares CFBundleVersion; a reused or lower number reaches no installed copy. Staging
+# neither enters the update feed nor records a build, so it is not held to the last release.
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")"
 last_build_file="$PWD/dist/updates/last-build.txt"
-if [[ -f "$last_build_file" ]]; then
+if [[ "$mode" != '--staging' && -f "$last_build_file" ]]; then
   last_build="$(tr -cd '0-9' < "$last_build_file")"
   if [[ -n "$last_build" ]] && (( build <= 10#$last_build )); then
     echo "Release blocked: CFBundleVersion $build is not greater than the last release ($last_build in dist/updates/last-build.txt)." >&2

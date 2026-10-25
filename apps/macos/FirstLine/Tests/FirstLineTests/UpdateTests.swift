@@ -52,6 +52,9 @@ struct UpdatePolicyTests {
         #expect(url.lastPathComponent == "appcast.xml")
         let key = try #require(values["SUPublicEDKey"] as? String)
         #expect(Data(base64Encoded: key)?.count == 32)
+        // Both keys together: Sparkle refuses a signed-feed updater that skips pre-extraction checks.
+        #expect(values["SURequireSignedFeed"] as? Bool == true)
+        #expect(values["SUVerifyUpdateBeforeExtraction"] as? Bool == true)
         let build = try #require(values["CFBundleVersion"] as? String)
         #expect(Int(build).map { $0 > 0 } == true)
     }

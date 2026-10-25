@@ -2,6 +2,49 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-25: Signed appcast feed, key-pair gate, staging and page-version gates
+
+Review round on `fm/wid-autoupdate-mini` (base `5964110`) that closes four release-path defects. No
+window journey was run, and no DMG, upload, deployment or merge was performed.
+
+- Client: `Info.plist` now sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` together
+  (Sparkle 2.10.0 refuses to start an updater that sets the first without the second).
+- Generator: `scripts/publish-appcast.sh` proves the signing key's public half equals
+  `SUPublicEDKey` through the new `scripts/sparkle-key.py` before generating anything, and after
+  generation verifies the embedded feed signature (`sign_update --verify appcast.xml`) as well as the
+  enclosure. The script self-locates the pinned Sparkle tools under
+  `.build/artifacts/sparkle/Sparkle/bin` (running `swift package resolve` when absent) and only
+  falls back to `WID_SPARKLE_BIN`/`/Applications/Sparkle-2.10.0/bin`.
+- Gates: `release-dmg.sh` refuses a release whose plist lacks the signed-feed policy and no longer
+  applies the build-number increase to `--staging`; `release-check.mjs` refuses a release note that
+  announces a version newer than the linked DMG unless it is marked `data-launch-pending`, and
+  refuses that mark once its version is the linked download. The download page keeps its 1.0 facts
+  and states that 1.1 is not released yet.
+- `python3 scripts/test-release-config.py`: PASS (exit 0). It now also covers the two policy keys,
+  staging with an existing `dist/updates/last-build.txt` set to 7, the Ed25519 public-key derivation
+  (RFC 8032 seed/public vector, 96-byte export), and `publish-appcast.sh` refusing a mismatched key
+  before `generate_appcast` runs. Known-broken proof: the same test fails on `7932fe0`'s
+  `release-dmg.sh` at the `SURequireSignedFeed` case, and fails with
+  `CFBundleVersion 2 is not greater than the last release (7 ...)` when only the staging boundary is
+  reverted.
+- Real Sparkle 2.10.0 tools (read-only pinned artifacts) with a disposable RFC 8032 key in `/tmp`:
+  an app declaring the signed-feed policy produced a feed with a `sparkle-signatures` block;
+  `sign_update --verify appcast.xml` exited 0; changing `minimumSystemVersion 14.0` to `14.1` made it
+  exit 1. The same app without the policy produced no signature block and verification reported
+  "Is the appcast signed?". A full `scripts/publish-appcast.sh` run exited 0 on the signed bundle and
+  exited 1 on the unsigned one, which is the pre-fix failure mode.
+- `node writeitdown/release-check.mjs --download`: PASS on the current page. The pre-fix page
+  (`7932fe0`) passes the pre-fix checker (exit 0) and is refused by the new one ("the note announces
+  1.1 but the download is 1.0"). `writeitdown/qa/mac.spec.mjs` gained four rejection cases; the four
+  inputs were executed against `release-check.mjs` directly and each was blocked with its expected
+  message. `npx playwright test` was not run in this round because `writeitdown/node_modules` is not
+  installed here.
+- Not run: `swift build`/`swift test` (the Swift change is `Info.plist` data only), notarization,
+  real-key signing, and every real-window Sparkle behaviour listed below.
+- Correction to the 2026-10-25 Sparkle record below: that run's feed was **not** signed, because the
+  bundle did not declare `SURequireSignedFeed` yet; the signature verified there was the ZIP
+  enclosure's. The feed signature is first proven in this record.
+
 ## 2026-10-25: Release artifact for the aligned room and the split-W logo
 
 - Source: `origin/main` commit `1446b4af694e31f08d019f6fece189702e6ebfa7` (the merged writing-room/After alignment and split-W logo PRs), in a fresh clone on the Mac mini, built with `scripts/release-dmg.sh` (configured release, not `--staging`). Signing and notarization ran in the captain's own unlocked terminal on that Mac; an SSH session with a locked login keychain cannot sign.

@@ -7,14 +7,15 @@ Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；
 scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/sign-nested.sh: package-app.sh 与 release-dmg.sh 共用的 inside-out 签名：先签每个普通 Mach-O（Sparkle 的 Autoupdate），再由深到浅签 bundle，最后签 app，并校验 `codesign --verify --deep --strict`；Developer ID 模式还要求每个可执行文件的 TeamIdentifier 与 app 一致（公证前的失败门槛）。
 packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
-scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、非整数或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>.zip` 更新载荷并记录 `last-build.txt`（staging 不产 ZIP）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。
-scripts/publish-appcast.sh: 用 Sparkle 的 generate_appcast 生成签名 appcast 与 delta，并机械校验（新 build 唯一一条、有 minimumSystemVersion、无 hardwareRequirements、enclosure 签名 `sign_update --verify` 通过）；脚本本身不上传，上传顺序与 curl 验证步骤只由 `writeitdown/README.md` 拥有。
-scripts/test-release-config.py: 沙箱执行 release-dmg.sh 的配置门槛，验证正式包拒绝缺项、非 HTTPS 地址、无效公钥、占位/无效更新公钥、unsafe appcast、非递增 build number，且 staging 不得带销售配置；不构建、不签名，供网页 QA 单次调用。
+scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、false/缺失的 `SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`、非整数或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>.zip` 更新载荷并记录 `last-build.txt`（staging 既不产 ZIP 也不记 build，因此也不受递增门槛约束）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。
+scripts/sparkle-key.py: 更新签名密钥与 `SUPublicEDKey` 是否同一对的唯一证明（Keychain 走 `generate_keys -p`，密钥文件走 Ed25519 公钥推导）；`generate_appcast` 对不匹配只告警、`sign_update --verify` 自签自验，都不能替代它。
+scripts/publish-appcast.sh: 先用 `sparkle-key.py` 证明密钥对，再用 Sparkle 的 generate_appcast 生成带内嵌签名的 appcast 与 delta，并机械校验（新 build 唯一一条、有 minimumSystemVersion、无 hardwareRequirements、enclosure 签名与 feed 内嵌签名都 `sign_update --verify` 通过）；默认自定位 `.build/artifacts/sparkle/Sparkle/bin`（必要时 `swift package resolve`），`WID_SPARKLE_BIN` 可覆盖；脚本本身不上传，上传顺序与 curl 验证步骤只由 `writeitdown/README.md` 拥有。
+scripts/test-release-config.py: 沙箱执行 release-dmg.sh 与 publish-appcast.sh 的门槛，验证正式包拒绝缺项、非 HTTPS 地址、无效公钥、占位/无效更新公钥、未开启的 signed-feed 策略、unsafe appcast、非递增 build number，staging 不得带销售配置且不受 `last-build.txt` 约束，以及签名密钥不匹配时在 generate_appcast 之前就失败；不构建、不签名，供网页 QA 单次调用。
 scripts/dmg-journey.sh: 真实发布 DMG 的签名、安装副本和三次试用 AX 验收；执行与证据契约见 `../../../writeitdown/README.md` 的 "Shipped Mac journey"。禁止在 Mini 屏幕运行 GUI journey。
 scripts/qa-window.sh: cua-driver 真实窗口验收，自行打包并隔离用户配置；WID_QA_LICENSE_ONLY=1 从无配置首次启动检查三次试用、末次擦除报告及耗尽重启、签名 fixture 激活、离线及退款；不证明真实购买。scripts/qa-license-fixture.go 是仅 loopback 的临时签名服务。
 docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计划（产品规则映射、时长选择器、删除清单、分批验收、已定的签名 DMG 付费分发）；与下列历史 Zero Draft 文档冲突时以它为准。
-docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单，含 Updates（Sparkle）一节：build number 递增、ZIP 载荷、appcast 校验、先载荷后 feed、feed 200 与缺失文件 404、universal 与真实窗口证据。
-docs/RELEASE_KEY.md: 船长在发布 Mac 上创建、备份与轮换更新签名私钥的完整步骤（generate_keys、公钥进 Info.plist、导出后存 1Password 再删除、绝不入库）。
+docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单，含 Updates（Sparkle）一节：build number 递增、signed-feed 策略、ZIP 载荷、密钥对与 feed/签名校验、先载荷后 feed、feed 200 与缺失文件 404、下载页发布说明版本、universal 与真实窗口证据。
+docs/RELEASE_KEY.md: 船长在发布 Mac 上创建、备份更新签名私钥的完整步骤（generate_keys、公钥进 Info.plist、导出后存 1Password 再删除、绝不入库），以及签名 feed 后该密钥即为永久信任锚、不存在“换钥恢复”路径的契约。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
 docs/LICENSE_PAYMENT_SPEC.md: 签名许可服务、Mac 激活及真实订单发布门槛；支付适配器契约见 `services/license/README.md`。
 docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前签名许可服务。
@@ -27,7 +28,7 @@ Sources/FirstLine/App/RootContainerViewController.swift: 常驻窗口内容控�
 Sources/FirstLine/App/AppState.swift: 顶层导航、三次会话首个非空输入持久扣次、试用耗尽后会话启动及首输入签名许可门槛（拒绝启动先清空会话再进激活页）、Info.plist 价格/HTTPS checkout 配置、license 激活/启动校验入口及签名 token 访问门槛（契约见 `docs/LICENSE_PAYMENT_SPEC.md#entitlement-and-persisted-state`；@Observable，来自 Observation，非 SwiftUI）；所有会话正文只在内存。
 Sources/FirstLine/App/HomeViewController.swift: 无营销文案的开写前“How long?”白卡片；顶部为 split-W lockup，右上角一个小而安静的“?”打开规则页；五个时长分段按钮 + 三个静默分段只做选择并持久化，单个 Begin 启动选中时长；无副标题；默认 Begin 获焦点；通过 Observation 更新异步许可状态与试用计数。
 Sources/FirstLine/App/RulesViewController.swift: 由选择器“?”打开的规则 sheet；复用 landing “How it works”的文案与顺序（No way back / Eight seconds of silence / Reach zero, keep it），Done 或 Return 关闭，Esc 取消，明暗皆用 After 卡片。
-Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；含 Sparkle 的 `SUFeedURL`、`SUPublicEDKey`（船长的更新签名公钥，私钥只在 Mac mini login Keychain）、`SUEnableAutomaticChecks=false`（默认不检查、也不弹许可提示）与 `SUScheduledCheckInterval=86400`；AppIcon 使用 A split-W 标记，AppIcon `.icns` 只含浅色稿，图标内不出现红色；尺寸与配色规则见 `../../../design/DESIGN.md` §11。
+Sources/FirstLine/Info.plist / Assets.xcassets/: 应用元数据与图标资源；含 Sparkle 的 `SUFeedURL`、`SUPublicEDKey`（船长的更新签名公钥，私钥只在 Mac mini login Keychain）、`SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`（成对开启，app 必须拒绝被改写的 feed）、`SUEnableAutomaticChecks=false`（默认不检查、也不弹许可提示）与 `SUScheduledCheckInterval=86400`；AppIcon 使用 A split-W 标记，AppIcon `.icns` 只含浅色稿，图标内不出现红色；尺寸与配色规则见 `../../../design/DESIGN.md` §11。
 Sources/FirstLine/Editor/AppendOnlyTextView.swift: 自定义 NSTextView，append-only、IME 安全（wipe 时丢弃 input context 的 marked 组合；过期替换范围忽略）、非空输入前试用授权、居中 zen 排版、当前行固定在纸张 35% 锚点、固定 1.6 行距（中文/英文/混排一致）、逐行不透明度（当前 100%/上一行 22%/再上一行 7%，更早隐藏）、caret 锚点；由 SessionViewController 直接以 NSScrollView 托管。
 Sources/FirstLine/Editor/AppendOnlyInputPolicy.swift: append-only 输入守卫的单一可测来源（被屏蔽命令选择器 + UTF-16 末尾选区重定向），供 SessionViewController 的 NSTextViewDelegate 与 EditorFocusTests 共用。
 Sources/FirstLine/Infrastructure/AppPaths.swift: Application Support/WriteItDown 配置路径规范；不导入旧 First Line 目录，草稿不落盘。
@@ -76,7 +77,7 @@ Tests/FirstLineTests/SmokeFlowTests.swift: 端到端 smoke tests，覆盖成功�
 Tests/FirstLineTests/LicenseFlowTests.swift: license 激活成功/失败路径、validate 7-day 离线宽限、active/revoked 与首输入许可 gate 交互。
 Tests/FirstLineTests/LicenseEntitlementTests.swift: 试用耗尽激活页、网页链接、菜单绕过、旧解锁标记无效、合法激活及重启回归。
 Tests/FirstLineTests/TrialReleaseTests.swift: 三次试用、首输入及 IME 扣次、失败重启、末次成稿、读写失败关闭访问、激活和退款不恢复次数。
-Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、Session surface 闸门、推迟待办策略、标准 driver 在房间内的取消/acknowledge 行为、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
+Tests/FirstLineTests/UpdateTests.swift: 更新时机策略、Session surface 闸门、推迟待办策略、标准 driver 在房间内的取消/acknowledge 行为、Info.plist 更新契约（默认不检查、HTTPS feed、32 字节公钥、signed-feed 策略成对开启、正整数 build）、Settings 更新开关（替身实现 UpdateSettings）与菜单项位置/可用性。
 Tests/FirstLineTests/WaffoLicenseClientTests.swift: URLProtocol HTTP 合约、真实 Ed25519 签名失败、token 续期、持久化旧缓存、首次未激活拦截、退款和精确七天边界；不触外网。
 Tests/FirstLineTests/MockLicenseClient.swift: 仅测试目标的状态机替身，不随应用发布，不证明真实签名或购买。
 Tests/FirstLineTests/LicensedTestState.swift: 编辑器/导航测试的显式 mock 许可 fixture；许可测试直接构造 AppState，不使用此快捷设置。

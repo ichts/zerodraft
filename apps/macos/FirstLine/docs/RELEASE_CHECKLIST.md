@@ -27,7 +27,7 @@ Required before opening LIVE sales, not before releasing the free trial. Current
 - [ ] Confirm config path and absence of draft files on a clean machine
 
 ## Signing
-- [ ] The update signing key exists on the release Mac and `SUPublicEDKey` in `Sources/FirstLine/Info.plist` is the printed public key, not the placeholder, and the private key is backed up per [`docs/RELEASE_KEY.md`](RELEASE_KEY.md).
+- [ ] The update signing key exists on the release Mac and `SUPublicEDKey` in `Sources/FirstLine/Info.plist` is the printed public key, not the placeholder, the private key is backed up per [`docs/RELEASE_KEY.md`](RELEASE_KEY.md), and `scripts/sparkle-key.py` proves the signing key's public half is that key.
 - [x] Account Holder installed a valid Developer ID Application identity in the login keychain. Configured DMG signing and notarization evidence, and the pending installed-DMG acceptance, are recorded in `MANUAL_QA.md`.
 - [x] Assemble the local release app with `scripts/package-app.sh --adhoc`; the packaged resource bundle is under `Contents/Resources/` and the icon is compiled to `.icns`.
 - [ ] Verify the release configuration against [Release configuration](LICENSE_PAYMENT_SPEC.md#release-configuration); that section owns required fields and staging restrictions.
@@ -45,12 +45,13 @@ key procedure is `docs/RELEASE_KEY.md`; hosting and routing are owned by
 [`writeitdown/README.md`](../../../../writeitdown/README.md#mac-download-release).
 
 - [ ] `CFBundleVersion` is a positive integer greater than `dist/updates/last-build.txt`; `release-dmg.sh` refuses otherwise. Delete that file only for a deliberate rebuild of the same build number.
-- [ ] `dist/updates/WriteItDown-<version>.zip` exists and contains the stapled app (the script writes it after `stapler validate`). Staging runs must produce no ZIP.
-- [ ] `scripts/publish-appcast.sh` exits 0: the feed carries exactly one item for the new build, names a minimum system version, carries no `sparkle:hardwareRequirements` (the release must stay one universal app), and its enclosure signature verifies with `sign_update --verify`.
+- [ ] `Sources/FirstLine/Info.plist` sets `SURequireSignedFeed` and `SUVerifyUpdateBeforeExtraction` to true; `release-dmg.sh` refuses a release without both. The feed signature, not only the archive signature, is what stops a rewritten feed.
+- [ ] `scripts/publish-appcast.sh` exits 0: it proves the signing key's public half equals `SUPublicEDKey` before generating, the feed carries exactly one item for the new build, names a minimum system version, carries no `sparkle:hardwareRequirements` (the release must stay one universal app), and both the enclosure signature and the embedded feed signature verify with `sign_update --verify`.
+- [ ] `dist/updates/WriteItDown-<version>.zip` exists and contains the stapled app (the script writes it after `stapler validate`). Staging runs must produce no ZIP and are not held to `last-build.txt`.
 - [ ] The archive and every `.delta` are uploaded before `appcast.xml`. A feed that points at a missing payload shows every user a failed update.
 - [ ] `curl -sSI https://writeitdown.app/download/appcast.xml` returns 200 `application/xml`, and a missing file under `/download/updates/` returns 404, never 200 HTML from the site's catch-all.
 - [ ] `lipo -info` on `Contents/MacOS/WriteItDown` and on `Sparkle.framework/Versions/B/Sparkle` shows `x86_64 arm64`.
-- [ ] The download page's DMG name and published SHA-256 are updated in the same deploy as the DMG upload, and `npm run release-check -- --download` passes (`--live` after the install).
+- [ ] The download page's DMG name and published SHA-256 are updated in the same deploy as the DMG upload, and `npm run release-check -- --download` passes (`--live` after the install). Its release note declares `data-release-note`; a note newer than the linked DMG is refused unless it is marked `data-launch-pending`, and that mark is refused once its version is the linked download.
 - [ ] Real-window evidence for the first Sparkle release is recorded in `MANUAL_QA.md`: an update window already on screen ends when the Session room opens, the deferred update returns after the room closes, no window appears in any room state, the default is consent-free with the toggle off, and the alert's buttons behave. Unit tests prove the update policy, the Session-surface mapping, and the driver's refusal of a new check, download and not-found presentation; they do not prove the found-update/ready-to-install alerts, the already-shown-window dismissal, or the deferred return.
 
 ## Release packaging

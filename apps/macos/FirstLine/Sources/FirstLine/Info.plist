@@ -30,6 +30,12 @@
          come back by accident. -->
     <key>SUPublicEDKey</key>
     <string>JpTnddys5uriQSSGWPOy6MN4vc3scZ28fl5OI+1DGLs=</string>
+    <!-- Both keys are required together: Sparkle 2.10.0 refuses to start an updater that asks for
+         a signed feed without verifying payloads before extraction. -->
+    <key>SURequireSignedFeed</key>
+    <true/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
     <!-- Off by default: no check runs until the writer turns it on in Settings or asks from the menu. -->
     <key>SUEnableAutomaticChecks</key>
     <false/>

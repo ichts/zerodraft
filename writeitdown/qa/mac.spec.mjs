@@ -117,6 +117,10 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
     [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
     [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
+    [{ download: download.replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 1.1 but the download is 1.0'],
+    [{ download: download.replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note is marked not yet released, but 1.1 is already the linked download'],
+    [{ download: download.replace(' data-release-note="1.1"', '') }, 'Release notes: the note does not declare its version'],
+    [{ download: download.replace('data-release-note="1.1"', 'data-release-note="2.0"').replace(' data-launch-pending="release-notes"', '') }, 'Release notes: the note announces 2.0 but the download is 1.0'],
   ];
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });

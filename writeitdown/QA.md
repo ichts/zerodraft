@@ -6,6 +6,22 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-25: Download-page release-note version gate (local)
+
+The download card keeps its 1.0 facts and now says the 1.1 update check is not released yet. The note
+declares the version it describes in `data-release-note` and carries `data-launch-pending` while that
+version is not the linked download. `release-check.mjs` refuses a note newer than the linked DMG
+without that mark, a pending mark once its version is the linked download, and a note without a
+version.
+
+- `node writeitdown/release-check.mjs --download`: STATIC CHECK PASSED on the current page.
+- Known-broken proof: the pre-fix page at `7932fe0` passes the pre-fix checker (exit 0) and is refused
+  by the new one with `the note announces 1.1 but the download is 1.0`.
+- `qa/mac.spec.mjs` gained four rejection cases (pending mark removed, DMG advanced to 1.1 while the
+  note stays pending, missing `data-release-note`, current-tense 2.0 note). Those exact inputs were
+  executed against `release-check.mjs` and each was blocked with its expected message. The full
+  Playwright suite was not run in this round (`writeitdown/node_modules` is not installed here).
+
 # 2026-10-25: Aligned-room build and split-W logo (local)
 
 - Source `1446b4a` (the merged writing-room/After alignment and split-W logo PRs). The download page and the `journey:live` expectation publish the rebuilt DMG's SHA-256 `5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4`.

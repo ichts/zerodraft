@@ -1,31 +1,41 @@
 # The update signing key (captain, Mac mini release machine only)
 
-Write It Down 1.1 ships Sparkle 2.10.0. Every update archive carries an EdDSA (Ed25519)
-signature, and the app verifies it against `SUPublicEDKey` in `Sources/FirstLine/Info.plist`.
-The private half of that key never exists in this repository, on the web host, or in CI: it lives
-in the login Keychain of the Mac mini release machine. This file is the exact, complete procedure.
+Write It Down 1.1 ships Sparkle 2.10.0. Two EdDSA (Ed25519) signatures protect every update, and
+the app checks both against `SUPublicEDKey` in `Sources/FirstLine/Info.plist`:
 
-`Info.plist` now carries the captain's real public key. Until it existed, the build shipped a
-deliberate placeholder (`AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`, a well-formed 32-byte key
-whose private half nobody holds), so the app started cleanly and no update could verify. Both
+- every update archive carries an enclosure signature, verified before extraction;
+- the appcast feed carries its own embedded signature (`SURequireSignedFeed`), so a rewritten feed
+  cannot point at an older archive, a different release-notes page or a critical update.
+
+Sparkle 2.10.0 refuses to start an updater that sets `SURequireSignedFeed` without
+`SUVerifyUpdateBeforeExtraction`, so `Info.plist` enables both together. `scripts/release-dmg.sh`
+refuses a release where either one is missing or false, and `scripts/publish-appcast.sh` verifies
+the signed feed and the enclosure after generating them.
+
+The private half of the key never exists in this repository, on the web host, or in CI: it lives in
+the login Keychain of the Mac mini release machine. This file is the exact, complete procedure.
+
+`Info.plist` carries the captain's real public key. Until it existed, the build shipped a deliberate
+placeholder (`AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=`, a well-formed 32-byte key whose private
+half nobody holds), so the app started cleanly and no update could verify. Both
 `scripts/release-dmg.sh` and `scripts/test-release-config.py` still refuse that exact placeholder, so
 a reverted or forgotten key cannot reach a shipped DMG and cannot pass QA silently.
 
 ## 1. Get Sparkle's tools on the Mac mini
 
-Download `Sparkle-2.10.0.tar.xz` from
-https://github.com/sparkle-project/Sparkle/releases/tag/2.10.0 and unpack it (for example to
-`/Applications/Sparkle-2.10.0`). The tools are `bin/generate_keys`, `bin/generate_appcast` and
-`bin/sign_update`. Nothing else from that archive is needed; the framework the app embeds comes
-from SwiftPM (`Package.resolved` pins 2.10.0).
+The release scripts find the pinned tools without any configuration: `swift package resolve` inside
+`apps/macos/FirstLine/` materialises Sparkle 2.10.0 (the version `Package.resolved` pins) under
+`.build/artifacts/sparkle/Sparkle/bin`, which holds `generate_keys`, `generate_appcast` and
+`sign_update`. Set `WID_SPARKLE_BIN` only to point at a different Sparkle 2.10.0 `bin` directory, for
+example the one from the `Sparkle-2.10.0.tar.xz` release archive. Nothing else from that archive is
+needed; the framework the app embeds comes from SwiftPM.
 
 ## 2. Create the key pair
 
-From the unpacked Sparkle directory, on the Mac mini release machine, in the captain's own login
-session:
+On the Mac mini release machine, in the captain's own login session, from the repository root:
 
 ```sh
-./bin/generate_keys --account writeitdown
+apps/macos/FirstLine/.build/artifacts/sparkle/Sparkle/bin/generate_keys --account writeitdown
 ```
 
 It prints the public key and stores the private key in the login Keychain as a generic password:
@@ -42,41 +52,51 @@ Put the printed value in `apps/macos/FirstLine/Sources/FirstLine/Info.plist` (th
 <string>THE_PRINTED_BASE64_KEY</string>
 ```
 
-Commit it. The public key is public; it is what installed copies pin their trust to. Change it only
-as part of a deliberate key rotation (step 6), never to "fix" a failing signature check.
+Commit it. The public key is public; it is what installed copies pin their trust to.
 
 ## 4. Back up the private key, then remove the export
 
 ```sh
-./bin/generate_keys --account writeitdown -x ~/writeitdown-update-key.txt
+apps/macos/FirstLine/.build/artifacts/sparkle/Sparkle/bin/generate_keys --account writeitdown -x ~/writeitdown-update-key.txt
 ```
 
 That file is the base64 seed. Move it into the captain's password manager (1Password), verify the
 entry, then delete the file with `rm -P ~/writeitdown-update-key.txt`. Never leave it on the Desktop,
 in iCloud Drive or in any synced folder, and never put it in a shell history line, a commit, a chat,
-a report, or a server.
+a report, or a server. This backup is the only copy besides the Keychain.
 
-## 5. Prove both halves agree
+## 5. Prove the key, the feed and the bundle agree
 
 ```sh
-./bin/generate_keys --account writeitdown -p     # prints the same public key again
-cd apps/macos/FirstLine && python3 scripts/test-release-config.py
+apps/macos/FirstLine/.build/artifacts/sparkle/Sparkle/bin/generate_keys --account writeitdown -p
+cd apps/macos/FirstLine && python3 scripts/sparkle-key.py --plist Sources/FirstLine/Info.plist \
+  --generate-keys .build/artifacts/sparkle/Sparkle/bin/generate_keys --account writeitdown
 ```
 
-`test-release-config.py` asserts that the tracked `SUPublicEDKey` is a raw 32-byte key and that a
-release still refuses the placeholder value; it needs no edit when the key changes. Then run
-`scripts/release-dmg.sh` and confirm it does not stop with `SUPublicEDKey is still the build
-placeholder`.
+`scripts/sparkle-key.py` derives the public half of the signing key (Keychain, or an exported seed
+file with `WID_SPARKLE_KEY_FILE`) and compares it byte for byte with `SUPublicEDKey`; it is the gate
+`scripts/publish-appcast.sh` runs before generating a feed, because `generate_appcast` only prints a
+warning on a mismatch and `sign_update --verify` would confirm the key against itself. Then run
+`python3 scripts/test-release-config.py`, `scripts/release-dmg.sh` and `scripts/publish-appcast.sh`;
+the last one also fails if the feed was not signed.
 
-## 6. Rules that protect the key
+## 6. What this means for rotation
 
-- Losing the private key stops delivery of further updates until a rotate-out release ships; treat
-  it like the Developer ID certificate.
-- One release may change either the Developer ID certificate or the EdDSA key, never both. Keep the
-  ZIP enclosure and the default `SUVerifyUpdateBeforeExtraction = NO`, so a lost key is recoverable
-  by shipping a new key inside a release signed with the same Developer ID certificate.
-- A compromised web host can rewrite the feed but cannot forge an archive, because it has no
-  private key. A compromised release Mac can sign anything, exactly as with the Developer ID key.
+- One release may change either the Developer ID certificate or the EdDSA key, never both. The
+  `SUVerifyUpdateBeforeExtraction` fallback is what lets an older copy install an archive signed with
+  a new EdDSA key when that archive is Developer ID signed by the same team; the fallback is not a
+  rotation plan by itself.
+- The EdDSA key is the permanent trust anchor for 1.1 and later: an installed copy only accepts a
+  feed and an archive signed with this key, so losing the private key ends update delivery to it. The
+  DMG stays the distribution path for new installs. Treat the key exactly like the Developer ID
+  certificate and never plan on "shipping a new key" to recover a lost one.
+- Key rotation needs its own reviewed procedure (a feed signed with the outgoing key, an archive
+  signed with the new key, and the bundle's new `SUPublicEDKey`). It is not one of the steps above,
+  and `scripts/publish-appcast.sh` refuses a feed that does not verify against the key the shipping
+  bundle declares, so that procedure must be merged before any rotation starts.
+- A compromised web host can rewrite neither the feed nor an archive, because it has no private key.
+  A compromised release Mac can sign anything, exactly as with the Developer ID key.
 - For a disposable test feed (not production), pass `WID_SPARKLE_KEY_FILE` to
   `scripts/publish-appcast.sh` with an exported seed of a throwaway key, and point the test build's
-  `SUFeedURL` at a test path. Never let a test key into `Info.plist` of a released build.
+  `SUFeedURL`/`SUPublicEDKey` at that test pair. Never let a test key into `Info.plist` of a released
+  build.

@@ -431,3 +431,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `apps/macos/FirstLine/docs/WRITEITDOWN_PLAN.md` carry the accepted placement.
 - Supersedes: D-031's "above the 'How long?' card" placement only; its rules-page copy, question-mark
   control and dismissal rules stand.
+
+## D-037: The web header opens with the A mark chip
+
+- Date: 2026-10-25
+- Decision: The writeitdown.app header and footer lockup is the A mark as a chip (the app icon's squircle plate
+  with the split W knocked out of it, one ink-only vector) followed by the wordmark on the same baseline. It is
+  one mask file, `writeitdown/logo/write-it-down-lockup.svg`, painted with `currentColor`, so the plate is ink on
+  the light page and bone on the dark page and the W takes the page colour. The Mac start screen and the social
+  card keep the wordmark-only lockup. The mobile header trades gap for it (12 px between the brand and the page
+  action, 6 px inside the action group) so the theme button stays on the 390 px right gutter.
+- Reason: The captain read the live header as plain words: the shipped lockup was the wordmark alone and its
+  split W is invisible at 21 px, so the product had no logo in the corner. A mark set beside the wordmark as a
+  bare letter reads as a repeated W; the chip makes the mark an object in one colour and one file. Details are
+  in `design/DESIGN.md` section 11.6.
+- Supersedes: section 11.1/11.4 of the split-W logo decision shipped in
+  https://github.com/ichts/zerodraft/pull/59, which made the wordmark the whole lockup and forbade setting the
+  mark beside it. The favicon set, the app icon, the volume icon, the Mac start screen, the og card, the palette
+  and the "no red in the logo" rule stand.

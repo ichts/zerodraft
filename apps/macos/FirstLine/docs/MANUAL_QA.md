@@ -10,14 +10,14 @@ performed.
 - The gate is one predicate, `AppState.isWritingSessionActive`: the Session room in any phase, or a
   session that keeps running after the writer opens Settings. Every presentation entry point uses it:
   the menu command, the scheduled-check path, the deferred return on surface change or app
-  activation, and every standard-driver hook. D-041 records the rule and supersedes D-040's
+  activation, and every standard-driver hook. D-042 records the rule and supersedes D-041's
   surface-only gate wording.
 - `sparkle-key.py` detects whether `openssl` can derive Ed25519. macOS ships LibreSSL, which cannot,
   so it prints a warning naming that limit and uses the built-in RFC 8032 derivation instead of
   failing, skipping or silently passing the key-pair proof.
 - `test-release-config.py` derives the expected payload names from the tracked
   `CFBundleShortVersionString` instead of hardcoding 1.1, so the release gate survives the 1.2 bump.
-- The root `AGENTS.md` update paragraph now points at D-040/D-041 and describes the live-session gate.
+- The root `AGENTS.md` update paragraph now points at D-041/D-042 and describes the live-session gate.
 
 Evidence:
 

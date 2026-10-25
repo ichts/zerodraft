@@ -36,7 +36,7 @@ version.
 
 # 2026-10-25: Download-page release note and update-feed hosting (local only)
 
-The Mac 1.1 release adds Sparkle auto-update (see `../docs/wid-decisions.md` D-040). The site change
+The Mac 1.1 release adds Sparkle auto-update (see `../docs/wid-decisions.md` D-041). The site change
 is small: one `#release-notes` line inside the download card, one scoped spacing rule in
 `site.css`, and the Mac section of `privacy.html` gains the opt-in update paragraph with `UPDATED`
 moved to October 25, 2026. No page was added to the sitemap; no other surface changed.

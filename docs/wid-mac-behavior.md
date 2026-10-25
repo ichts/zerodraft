@@ -118,7 +118,7 @@ count both. `RoomTests.inputClientCompositionNeverDenies` remains the broader NS
 
 ## 9. Updates (1.1)
 
-The update gate follows a live writing session, not the visible surface (D-040, D-041). A case passes
+The update gate follows a live writing session, not the visible surface (D-041, D-042). A case passes
 only when its bound tests drive the policy and the driver hooks; the real-window recordings are listed
 in `apps/macos/FirstLine/docs/RELEASE_CHECKLIST.md` (Updates) and stay pending until a signed DMG can
 be exercised on the release Mac.

@@ -222,11 +222,11 @@ The mark is the split W: Newsreader's W with a vertical notch through its middle
 the wordmark (11.6); the Mac start screen and the social card keep the wordmark lockup, whose W already carries
 the notch.
 
-- Site header and footer: `writeitdown/logo/write-it-down-lockup.svg` - the app-icon chip, a gap, and the
-  wordmark, at 21 px type on desktop, 19 px below 820 px, and 16 px at 380 px and below. The site draws it as one
-  CSS mask over `currentColor`, so one vector serves the light and dark themes and the brand follows the site's
-  ink token. Minimum lockup width: 16 px type, the narrow-phone step; the 16 px favicon is the smallest use of
-  the mark.
+- Site header and footer: `writeitdown/logo/write-it-down-lockup.svg` supplies the split W and wordmark;
+  `writeitdown/logo/write-it-down-lockup-plate.svg` supplies the app-icon plate on the same viewBox. The two
+  aligned CSS masks use the existing ink and paper-surface tokens: paper plate with ink W in light appearance,
+  ink plate with bone W in dark appearance. Type is 21 px on desktop, 19 px below 820 px, and 16 px at 380 px
+  and below. Minimum lockup width: 16 px type; the 16 px favicon is the smallest use of the mark.
 - App icon and favicon: the mark alone on the bone plate with the ink W. The full-bleed favicon is the bone
   square with the ink W. The ink plate with the bone W is the dark-appearance variant for the favicon's
   `prefers-color-scheme: dark` links. A macOS `.icns` app icon has no appearance switch, so the shipped `.icns`
@@ -246,8 +246,8 @@ the notch.
 - The app icon plate is bone with the ink mark. The favicon is the bone square with the ink mark, with dark links
   pointing at the ink square with the bone mark. The volume icon is a bone sheet with the ink mark on a dark disc.
   The light app icon and favicon are self-contained; the dark favicon link is not the default, and it is never
-  used in the light appearance. The header chip (11.6) is not a plate colour at all: its plate is the ink token
-  and its W is a hole, so it is ink on the light page and bone on the dark page.
+  used in the light appearance. The header chip (11.6) uses the existing paper surface for its plate and ink for
+  its W: paper plate with ink W in light appearance, ink plate with bone W in dark appearance.
 - The mark itself is flat: no gradient, outline, shadow, bevel, or second colour. The app icon's plate gets the
   system shadow; the volume icon may carry the Finder/disk shadow as a packaging surface.
 
@@ -273,7 +273,9 @@ the notch.
   edge: 10 px of gutter at 360 px, 17.6 at 375 px, 20 at 390 px. One rule for every page that uses `.brand`, so
   `/download/` does not diverge from the landing and `mac.html`.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
-- The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
+- The site lockup layers are `writeitdown/logo/write-it-down-lockup.svg` (W and wordmark) and
+  `writeitdown/logo/write-it-down-lockup-plate.svg` (plate), with identical viewBoxes and geometric precision.
+  The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
   `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The legal, support, and answer pages use the
   mono `WRITE_IT_DOWN` logotype; the Mac start screen uses the bundled lockup. The app icon `.icns` is the light
@@ -282,8 +284,8 @@ the notch.
 ### 11.4 Do not
 
 - Put red, the old red underscore, or the old `WID` sheet in the mark.
-- Give the header chip a second colour. It is one ink-only mask: the plate is `currentColor` and the W is a hole,
-  so the tile is ink on the light page and bone on the dark page without a light/dark pair of files.
+- Add a palette colour, border, shadow, or gradient to the header chip. Its two masks use only the existing
+  paper-surface and ink tokens. Do not put the dark plate in the light header or the light plate in the dark header.
 - Separate the chip from the wordmark inside one SVG (no line, no rule, no caption) or set the chip alone above,
   below, or after the wordmark.
 - Use the ink plate as the favicon default; it is the dark-appearance favicon alternate only. Do not put the light
@@ -301,8 +303,10 @@ the notch.
   start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; real Dock and Finder captures
   remain pending. The dark plate remains the favicon alternate.
 - Site header: `qa/mac.spec.mjs` "the header lockup shows the A mark chip beside the wordmark" reads the shipped
-  mask at the rendered header size and requires the plate to cover the top of the chip, the W to be knocked out
-  of it, the split to survive at 2x, and the wordmark to follow it; it fails on a wordmark-only lockup.
+  masks at the rendered header size and requires the plate to cover the top of the chip, the W strokes to sit
+  inside it with matching bounds, the split to survive at 2x, and the wordmark to follow it. Computed colours
+  must give a lighter plate than W in light appearance and a darker plate than W in dark appearance.
+  It fails on a wordmark-only lockup or inverted polarity.
   "the header keeps its right gutter and a legible chip at 360 px" repeats it at 360 px and requires no
   horizontal overflow, at least 6 px of right gutter, one lockup step across landing, `/download/` and `mac.html`,
   and a chip of at least 16 px with the split still reading. 21 px desktop, 19 px below 820 px, 16 px below
@@ -311,17 +315,18 @@ the notch.
 ### 11.6 The web header chip
 
 The header and footer lockup opens with the mark as a chip: the app icon's squircle plate at 1.5 cap heights, the
-split W knocked out of it, the wordmark 0.34 em to its right on the same baseline. At 21 px the notch inside the
-wordmark is invisible, so a wordmark-only lockup reads as plain words and the product has no logo in the corner;
-the chip makes the mark an object while staying one colour and one file.
+split W painted on it, the wordmark 0.34 em to its right on the same baseline. At 21 px the notch inside the
+wordmark is invisible, so a wordmark-only lockup reads as plain words and the product has no logo in the corner.
+The chip makes the mark an object using two aligned alpha-only mask files, not theme-specific assets.
 
 - The chip is the app icon's drawing: the 824/1024 macOS squircle plate around the master split W, at the app
   icon's 620/824 W share, with the plate optically centred on the wordmark's cap band.
 - The chip is the small-size variant of the mark: its notch is 180 word-units (11% of the W) instead of the
   master's 90, the same optical widening the 16/32 favicons use, so the split still reads at 22 px.
-- Because the W is a hole, the tile takes the page colour where the light falls through it: dark tile with a light
-  W on the light page, bone tile with a dark W on the dark page. That is the app icon's two appearances without a
-  second palette, a second file, or a theme switch in CSS.
+- The plate uses `--brand-plate:var(--sheet,var(--paper))`; the W and wordmark use `currentColor` from
+  `--ink`. Light appearance gives a paper plate with ink W, dark gives an ink plate with bone W. The paper
+  surface keeps the small chip visible against the wall. Both layers share one viewBox, with no theme-specific
+  CSS or new palette colour. The glyph layer retains the split strokes with `fill-rule="evenodd"`.
 - Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.
 - On narrow phones the lockup steps to 16 px type (DESIGN 11.3) instead of letting the header push the theme
   button past the page gutter; the chip's widened notch is what keeps the split readable at 16.7 px.

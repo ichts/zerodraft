@@ -252,88 +252,119 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
   });
 }
 
-// Read the shipped lockup mask the way a 2x display draws it: the plate square, the W knocked out of it, and
-// the plate strip the split leaves between the two light V shapes.
 const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
-      const url = (getComputedStyle(el, '::before').maskImage || getComputedStyle(el, '::before').webkitMaskImage)
-        .match(/url\("?([^"\)]+)"?\)/)[1];
-      const box = el.getBoundingClientRect();
-      const scale = 2;                       // read at a 2x display, the size the captain checks
-      const image = new Image();
-      image.src = url;
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(box.width * scale);
-      canvas.height = Math.round(box.height * scale);
-      const context = canvas.getContext('2d');
-      context.drawImage(image, 0, 0, canvas.width, canvas.height);
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      const width = canvas.width, height = canvas.height;
-      const alpha = (x, y) => pixels[(y * width + x) * 4 + 3];
-      const chip = Math.round(box.height * scale);     // the plate is square: its side is the box height
-      let chipInk = 0, chipHole = 0;
-      for (let y = 0; y < chip; y += 1) for (let x = 0; x < chip; x += 1) (alpha(x, y) > 127 ? chipInk++ : chipHole++);
-      // Transparency per column across the lower half of the chip. The split reads as a strip of plate ink
-      // between the two light V shapes, so the widest interior strip at the window's own floor must have
-      // lighter columns on both sides of it; a plain W tile or a solid tile has neither. The comparison is
-      // against that floor, not a fixed cutoff: at 16-19 px type one raster row is about 5% of the sample, so
-      // an absolute cutoff sits on rounding noise while the flanked strip is the shape the eye actually reads.
-      const columns = [];
-      for (let x = Math.round(chip / 3); x < Math.round(2 * chip / 3); x += 1) {
-        let clear = 0, total = 0;
-        for (let y = Math.round(chip * 0.45); y < Math.round(chip * 0.95); y += 1) { total += 1; if (alpha(x, y) < 40) clear += 1; }
-        columns.push(clear / total);
-      }
-      const floor = Math.min(...columns);
-      const margin = 0.04;                              // one raster row at the smallest header size
-      let best = { length: 0, left: floor, right: floor };
-      for (let start = 1; start < columns.length - 1; start += 1) {
-        if (columns[start] > floor + margin) continue;
-        let end = start;
-        while (end + 1 < columns.length && columns[end + 1] <= floor + margin) end += 1;
-        if (end + 1 >= columns.length) break;          // the plate strip must have the W on both sides
-        const length = end - start + 1;
-        const left = Math.max(...columns.slice(0, start));
-        const right = Math.max(...columns.slice(end + 1));
-        if (left > floor + margin && right > floor + margin && length > best.length) best = { length, left, right };
-        start = end;
-      }
-      let wordInk = 0, wordTotal = 0;
-      for (let y = 0; y < height; y += 1) {
-        for (let x = Math.min(width, chip + Math.round(box.height * 0.3 * scale)); x < width; x += 1) {
-          wordTotal += 1;
-          if (alpha(x, y) > 127) wordInk++;
-        }
-      }
-      return {
-        box: { width: +box.width.toFixed(2), height: +box.height.toFixed(2) },
-        chipSide: chip, canvasWidth: width,
-        chipInkShare: chipInk / (chip * chip), chipHoleShare: chipHole / (chip * chip),
-        splitLength: best.length, splitContrast: +(Math.min(best.left, best.right) - floor).toFixed(2),
-        topOfChipIsPlate: alpha(Math.round(chip / 2), Math.round(chip * 0.06)) > 127,
-        wordInkShare: wordInk / wordTotal,
-      };
+  const box = el.getBoundingClientRect();
+  const scale = 2;
+  const width = Math.round(box.width * scale), height = Math.round(box.height * scale);
+  const raster = async (pseudo) => {
+    const style = getComputedStyle(el, pseudo);
+    const image = new Image();
+    image.src = (style.maskImage || style.webkitMaskImage).match(/url\("?([^"\)]+)"?\)/)[1];
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const context = canvas.getContext('2d');
+    const w = parseFloat(style.width), h = parseFloat(style.height);
+    const size = style.maskSize || style.webkitMaskSize;
+    const ratio = size === 'contain' ? Math.min(w / image.width, h / image.height) : w / image.width;
+    const dw = image.width * ratio, dh = image.height * ratio;
+    const x = parseFloat(style.left), y = parseFloat(style.top) + (h - dh) / 2;
+    context.drawImage(image, x * scale, y * scale, dw * scale, dh * scale);
+    const pixels = context.getImageData(0, 0, width, height).data;
+    return { alpha: (x, y) => pixels[(y * width + x) * 4 + 3], color: style.backgroundColor };
+  };
+  const plate = await raster('::before'), glyph = await raster('::after');
+  const chip = Math.round(box.height * scale);
+  let chipInk = 0, chipHole = 0;
+  const glyphBounds = [chip, chip, -1, -1], holeBounds = [chip, chip, -1, -1];
+  const extend = (bounds, x, y) => {
+    bounds[0] = Math.min(bounds[0], x); bounds[1] = Math.min(bounds[1], y);
+    bounds[2] = Math.max(bounds[2], x); bounds[3] = Math.max(bounds[3], y);
+  };
+  for (let y = 0; y < chip; y += 1) for (let x = 0; x < chip; x += 1) {
+    if (glyph.alpha(x, y) > 127) extend(glyphBounds, x, y);
+    if (plate.alpha(x, y) > 127 && glyph.alpha(x, y) > 127) {
+      chipHole += 1; extend(holeBounds, x, y);
+    } else if (plate.alpha(x, y) > 127) chipInk += 1;
+  }
+  const columns = [];
+  for (let x = Math.round(chip / 3); x < Math.round(2 * chip / 3); x += 1) {
+    let ink = 0, total = 0;
+    for (let y = Math.round(chip * 0.45); y < Math.round(chip * 0.95); y += 1) {
+      total += 1; if (glyph.alpha(x, y) > 215) ink += 1;
+    }
+    columns.push(ink / total);
+  }
+  const floor = Math.min(...columns), margin = 0.04;
+  let best = { length: 0, left: floor, right: floor };
+  for (let start = 1; start < columns.length - 1; start += 1) {
+    if (columns[start] > floor + margin) continue;
+    let end = start;
+    while (end + 1 < columns.length && columns[end + 1] <= floor + margin) end += 1;
+    if (end + 1 >= columns.length) break;
+    const length = end - start + 1;
+    const left = Math.max(...columns.slice(0, start)), right = Math.max(...columns.slice(end + 1));
+    if (left > floor + margin && right > floor + margin && length > best.length) best = { length, left, right };
+    start = end;
+  }
+  let wordInk = 0, wordTotal = 0;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = Math.min(width, chip + Math.round(box.height * 0.3 * scale)); x < width; x += 1) {
+      wordTotal += 1; if (glyph.alpha(x, y) > 127) wordInk += 1;
+    }
+  }
+  const luminance = color => {
+    const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(c => {
+      const s = c / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const plateLight = luminance(plate.color), glyphLight = luminance(glyph.color);
+  const wallLight = luminance(getComputedStyle(el.closest('.home') || document.body).backgroundColor);
+  return {
+    box: { width: +box.width.toFixed(2), height: +box.height.toFixed(2) },
+    chipInkShare: chipInk / (chip * chip), chipHoleShare: chipHole / (chip * chip),
+    glyphBounds, holeBounds,
+    splitLength: best.length, splitContrast: +(Math.min(best.left, best.right) - floor).toFixed(2),
+    topOfChipIsPlate: plate.alpha(Math.round(chip / 2), Math.round(chip * 0.06)) > 127,
+    wordInkShare: wordInk / wordTotal, polarity: plateLight - glyphLight,
+    plateWallContrast: (Math.max(plateLight, wallLight) + 0.05) / (Math.min(plateLight, wallLight) + 0.05),
+  };
 });
 
 // The captain's report: the header read as plain words because the lockup was the wordmark alone, and the
 // split W inside it is invisible at 21 px. The header must show the A mark as its own chip beside the
 // wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
 // solid tile without the split.
-test('the header lockup shows the A mark chip beside the wordmark', async ({ page }) => {
-  for (const path of ['index.html', 'download/', 'mac.html']) {
+test('the header lockup shows the A mark chip beside the wordmark', async ({ page }, info) => {
+  for (const path of ['index.html', 'index.html#trial', 'download/', 'mac.html']) {
     await page.goto(path);
-    const mark = await measureHeaderMark(page.locator('nav[aria-label="Main"] .brand').first());
-    const at = `${path} at ${mark.box.width}x${mark.box.height}:`;
-    expect(mark.chipInkShare, `${at} the left square is the plate, not a bare letter`).toBeGreaterThan(0.6);
-    expect(mark.chipInkShare, `${at} the plate keeps the W knocked out`).toBeLessThan(0.95);
-    expect(mark.chipHoleShare, `${at} the W is a hole in the plate`).toBeGreaterThan(0.05);
-    expect(mark.topOfChipIsPlate, `${at} the plate covers the top of the chip`).toBe(true);
-    expect(mark.box.height, `${at} the chip is square and sits inside the lockup box`).toBeGreaterThan(16);
-    expect(mark.box.width, `${at} the lockup is the chip plus the wordmark`).toBeGreaterThan(mark.box.height * 5);
-    expect(mark.splitLength, `${at} the split survives at header size`).toBeGreaterThanOrEqual(2);
-    expect(mark.splitContrast, `${at} the split keeps a lighter W on each side of the plate strip`).toBeGreaterThan(0.05);
-    expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeGreaterThan(0.06);
-    expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeLessThan(0.4);
+    const brands = page.locator('.brand:visible');
+    expect(await brands.count(), `${path}: visible lockup`).toBeGreaterThan(0);
+    for (let index = 0; index < await brands.count(); index += 1) {
+      const mark = await measureHeaderMark(brands.nth(index));
+      const at = `${path} at ${mark.box.width}x${mark.box.height}:`;
+      expect(mark.chipInkShare, `${at} the left square is the plate, not a bare letter`).toBeGreaterThan(0.6);
+      expect(mark.chipInkShare, `${at} the W leaves visible plate around it`).toBeLessThan(0.95);
+      expect(mark.chipHoleShare, `${at} the W strokes occupy the chip`).toBeGreaterThan(0.05);
+      expect(mark.chipHoleShare, `${at} the W leaves most of the plate visible`).toBeLessThan(0.4);
+      for (let axis = 0; axis < 4; axis += 1)
+        expect(Math.abs(mark.glyphBounds[axis] - mark.holeBounds[axis]), `${at} the W stays aligned with the plate`).toBeLessThanOrEqual(3);
+      const direction = info.project.use.colorScheme === 'light' ? 1 : -1;
+      expect(mark.polarity * direction, `${at} light plate with dark glyphs, dark plate with light glyphs`).toBeGreaterThan(0.6);
+      if (path === 'index.html' && index === 0) {
+        console.log(`${info.project.name}: plate/wall contrast ${mark.plateWallContrast.toFixed(2)}:1`);
+        await page.screenshot({ path: info.outputPath('header.png'), clip: { x: 0, y: 0, width: page.viewportSize().width, height: 110 } });
+      }
+      expect(mark.topOfChipIsPlate, `${at} the plate covers the top of the chip`).toBe(true);
+      expect(mark.box.height, `${at} the chip is square and sits inside the lockup box`).toBeGreaterThan(16);
+      expect(mark.box.width, `${at} the lockup is the chip plus the wordmark`).toBeGreaterThan(mark.box.height * 5);
+      expect(mark.splitLength, `${at} the split survives at header size`).toBeGreaterThanOrEqual(2);
+      expect(mark.splitContrast, `${at} the split has a W stroke on each side`).toBeGreaterThan(0.05);
+      expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeGreaterThan(0.06);
+      expect(mark.wordInkShare, `${at} the wordmark follows the chip`).toBeLessThan(0.4);
+    }
   }
 });
 
@@ -365,7 +396,7 @@ test('the header keeps its right gutter and a legible chip at 360 px', async ({ 
       expect(mark.box.height, `${at} the chip is at least 16 px tall`).toBeGreaterThanOrEqual(16);
       expect(mark.chipInkShare, `${at} the smallest lockup is still a plate`).toBeGreaterThan(0.6);
       expect(mark.splitLength, `${at} the split survives at the smallest lockup`).toBeGreaterThanOrEqual(2);
-      expect(mark.splitContrast, `${at} the split keeps a lighter W on each side`).toBeGreaterThan(0.05);
+      expect(mark.splitContrast, `${at} the split has a W stroke on each side`).toBeGreaterThan(0.05);
     }
     expect(new Set(lockups).size, `${width}px: landing, download and mac share one lockup step`).toBe(1);
   }
@@ -385,7 +416,7 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       await expect(brand, `${path} brand ${index}: keyboard focus`).toBeFocused();
       const state = await brand.evaluate(el => {
         const style = getComputedStyle(el);
-        const mark = getComputedStyle(el, '::before');
+        const mark = getComputedStyle(el, '::after');
         const probe = document.createElement('span');
         probe.style.color = 'var(--ink)';
         el.parentElement.appendChild(probe);

@@ -2,8 +2,9 @@
 """Helpers for the design panel and for the acceptance verdict.
 
 [INPUT] `turn` and `verdict` read the JSONL stream `pi --mode json` prints on stdin;
-        `verdict` also takes the stage it has to answer (`lens`, `clip` or `vision`).
-        `clip` reads the assembled recording plus the frame manifest. `status` reads
+        `verdict` also takes the stage it has to answer (`lens`, `clip` or `vision`)
+        and, for a lens, the lens that was asked. `clip` reads the assembled
+        recording plus the frame manifest. `status` reads
         <evidence>/panel/stage-*.json and the lens names its caller requires.
         `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
         script wrote.
@@ -19,11 +20,13 @@
 [PROTOCOL] The recording's own time origin is the first timestamp in frames.tsv,
            because that frame is time zero of the assembled video. A model turn
            counts only when its last turn_end ended with stopReason stop and its text
-           carries a JSON object shaped for that stage; anything else is recorded as
-           unavailable with the exact reason. Report rendering never invents content:
-           a stage that did not run is rendered as a declared gap with its recorded
-           reason, and a lens with no answer is rendered as unavailable rather than
-           omitted.
+           carries a JSON object shaped for that stage; a lens answer counts only when
+           the lens it declares is the lens that was asked. Anything else is recorded
+           as unavailable with the exact reason. The blocked sign-off reason is the
+           observed failure of a requested lens or the required lens that is missing,
+           never a fixed probe result. Report rendering never invents content: a stage
+           that did not run is rendered as a declared gap with its recorded reason, and
+           a lens with no answer is rendered as unavailable rather than omitted.
 """
 
 import argparse
@@ -106,20 +109,23 @@ def normalised_text(value):
     return value.strip() if isinstance(value, str) else ""
 
 
-def lens_answer(value):
-    name = normalised_text(value.get("lens"))
-    if not name:
+def lens_answer(value, expected):
+    declared = normalised_text(value.get("lens"))
+    if not declared:
         return None, "the answer names no lens"
+    if declared.lower() != expected.lower():
+        return None, f"the answer declared lens {declared!r} instead of {expected!r}"
     verdict = normalised_text(value.get("verdict")).lower()
     if verdict not in LENS_VERDICTS:
         return None, f"the answer has no lens verdict (got {value.get('verdict')!r})"
     if not isinstance(value.get("findings"), list):
         return None, "the answer has no findings list"
-    return {"lens": name, "verdict": verdict, "summary": normalised_text(value.get("summary")),
+    return {"lens": expected, "verdict": verdict,
+            "summary": normalised_text(value.get("summary")),
             "findings": [item for item in value["findings"] if isinstance(item, dict)]}, ""
 
 
-def clip_answer(value):
+def clip_answer(value, _expected):
     verdict = normalised_text(value.get("verdict")).lower()
     if verdict not in CLIP_VERDICTS:
         return None, f"the answer has no clip verdict (got {value.get('verdict')!r})"
@@ -133,7 +139,7 @@ def clip_answer(value):
             "what_to_fix": normalised_text(value.get("what_to_fix"))}, ""
 
 
-def vision_answer(value):
+def vision_answer(value, _expected):
     valid = value.get("next_step_valid")
     if not isinstance(valid, bool):
         return None, "the answer does not say whether the next step is valid"
@@ -168,8 +174,12 @@ def turn():
 def verdict(argv):
     """Validate one model turn against the stage it was asked to answer."""
     stage = argv[0] if argv else ""
+    expected = argv[1] if len(argv) > 1 else ""
     if stage not in ANSWERS:
         print(f"panel-lib: unknown answer stage {stage!r}", file=sys.stderr)
+        return 2
+    if stage == "lens" and not expected:
+        print("panel-lib: verdict lens needs the lens that was asked", file=sys.stderr)
         return 2
     seen, stop_reason, text, error_message = model_turn(sys.stdin)
 
@@ -185,7 +195,7 @@ def verdict(argv):
     answer_object = first_json_object(text)
     if not isinstance(answer_object, dict):
         return unavailable("the answer contains no JSON object")
-    normalised, problem = ANSWERS[stage](answer_object)
+    normalised, problem = ANSWERS[stage](answer_object, expected)
     if problem:
         return unavailable(problem)
     print(json.dumps({"status": "complete", "answer": normalised}, sort_keys=True))
@@ -242,6 +252,7 @@ def lens_status(evidence, required):
         with open(lens_stage, encoding="utf-8") as handle:
             lenses = json.load(handle).get("lenses") or []
     complete = [lens for lens in lenses if lens.get("status") == "complete"]
+    incomplete = [lens for lens in lenses if lens.get("status") != "complete"]
     complete_names = {lens.get("lens") for lens in complete}
     missing = [name for name in required if name not in complete_names]
     print(f"lenses_total={len(lenses)}")
@@ -255,15 +266,11 @@ def lens_status(evidence, required):
             answer_object.get("verdict") or "-", len(answer_object.get("findings") or []),
             " ".join((lens.get("error") or "").split())))
     if len(complete) < len(lenses) or missing:
-        reason = next((lens.get("error") for lens in lenses
-                       if lens.get("status") != "complete" and lens.get("error")), "")
-        if not reason:
-            capability_stage = os.path.join(panel_dir, "stage-05-capabilities.json")
-            gaps = []
-            if os.path.exists(capability_stage):
-                with open(capability_stage, encoding="utf-8") as handle:
-                    gaps = json.load(handle).get("declared_gaps") or []
-            reason = gaps[0] if gaps else ""
+        reason = ""
+        if incomplete:
+            reason = " ".join(str(incomplete[0].get("error") or "").split())
+            if not reason:
+                reason = "the panel recorded no answer for %s" % (incomplete[0].get("lens") or "?")
         if not reason and missing:
             reason = "the panel recorded no result for %s" % " ".join(missing)
         print("reason=%s" % " ".join(str(reason or "the panel recorded no lens result").split()))

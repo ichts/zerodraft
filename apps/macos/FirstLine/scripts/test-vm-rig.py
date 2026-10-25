@@ -5,12 +5,14 @@
         rig itself requires.
 [OUTPUT] One PASS/FAIL line per check on stdout; exit 0 only when every check passes.
 [POS] apps/macos/FirstLine/scripts/test-vm-rig.py - drives the pieces the VM journey
-      and the design panel share: the panel answer parser, the recording-relative clip
-      seek, the analyser's frame alignment, and the lens summary the host verdict reads.
-[PROTOCOL] Every check runs the real executable on a fixture and asserts its observable
-           output; nothing here greps the scripts' source. The known-broken cases feed
-           the previous behaviour (a manifest whose first stamp is the pre-recording
-           span, a dropped capture, the old jq content filter) and must fail, so a
+      and the design panel share: the panel answer validation, the recording-relative
+      clip seek, the analyser's frame alignment, the lens summary the host verdict
+      reads, and the tracked-file guard.
+[PROTOCOL] Every check runs the real executable or git on a fixture and asserts its
+           observable output; nothing here greps the scripts' source. The known-broken
+           cases feed the previous behaviour (a manifest whose first stamp is the
+           pre-recording span, a dropped capture, the old jq content filter, one review
+           repeated for every lens, a tracked bytecode cache) and must fail, so a
            regression reopens the finding.
 """
 
@@ -32,6 +34,13 @@ REQUIRED_LENSES = ["rams", "norman", "spiekermann", "kare", "matas", "vignelli"]
 # JPEG compression and an H.264 round trip.
 PALETTE = ["000000", "ffffff", "cc2214", "1f8f3c", "2b46c8", "e0c020",
            "b02f9a", "159fa8", "e07a1e", "6b2fa0", "808080", "144d28"]
+BYTECODE_SUFFIXES = (".pyc", ".pyo")
+
+
+def tracked_bytecode(paths):
+    """Tracked paths that are interpreter build artifacts, not sources."""
+    return [path for path in paths
+            if "__pycache__/" in path or path.endswith(BYTECODE_SUFFIXES)]
 
 
 def need(condition, message):
@@ -104,9 +113,12 @@ def write_answer_stream(path, text, stop_reason="stop"):
             handle.write(json.dumps(record) + "\n")
 
 
-def model_verdict(stream, stage):
+def model_verdict(stream, stage, expected=None):
+    command = [sys.executable, PANEL_LIB, "verdict", stage]
+    if expected is not None:
+        command.append(expected)
     with open(stream, encoding="utf-8") as handle:
-        result = run([sys.executable, PANEL_LIB, "verdict", stage], stdin=handle.read())
+        result = run(command, stdin=handle.read())
     need(result.returncode == 0, f"verdict {stage} failed: {result.stderr[:200]}")
     return json.loads(result.stdout)
 
@@ -116,17 +128,30 @@ def check_answer_validation(workdir):
     payload = {"lens": "rams", "verdict": "sound", "summary": "quiet and ordered",
                "findings": []}
     write_answer_stream(stream, json.dumps(payload))
-    accepted = model_verdict(stream, "lens")
+    accepted = model_verdict(stream, "lens", "rams")
     need(accepted["status"] == "complete",
          f"a well-formed lens review was rejected: {accepted}")
     need(accepted["answer"]["lens"] == "rams" and accepted["answer"]["verdict"] == "sound",
          f"the validated answer lost its fields: {accepted['answer']}")
 
+    # The lens that answered must be the lens that was asked, whatever the casing.
+    capitalised = os.path.join(workdir, "capitalised.jsonl")
+    write_answer_stream(capitalised, json.dumps(dict(payload, lens="Rams")))
+    need(model_verdict(capitalised, "lens", "rams")["status"] == "complete",
+         "a lens answer with different casing was rejected")
+    mismatched = os.path.join(workdir, "mismatched.jsonl")
+    write_answer_stream(mismatched, json.dumps(dict(payload, lens="norman")))
+    wrong = model_verdict(mismatched, "lens", "rams")
+    need(wrong["status"] == "unavailable",
+         f"an answer for another lens counted as this lens: {wrong}")
+    need("norman" in wrong["error"] and "rams" in wrong["error"],
+         f"the rejection does not name both lenses: {wrong['error']!r}")
+
     # Any JSON object used to count as a completed lens. It must not: this is not a
     # lens review, and a lens may only count once it answered as a lens.
     not_a_review = os.path.join(workdir, "not-a-review.jsonl")
     write_answer_stream(not_a_review, json.dumps({"error": "cannot read images"}))
-    rejected = model_verdict(not_a_review, "lens")
+    rejected = model_verdict(not_a_review, "lens", "rams")
     need(rejected["status"] == "unavailable",
          f"a non-lens JSON object counted as a reviewed lens: {rejected}")
     need("lens" in rejected["error"],
@@ -135,7 +160,7 @@ def check_answer_validation(workdir):
     # A turn that ended abnormally is not an answer even when its JSON parses.
     truncated = os.path.join(workdir, "truncated.jsonl")
     write_answer_stream(truncated, json.dumps(payload), stop_reason="length")
-    cut = model_verdict(truncated, "lens")
+    cut = model_verdict(truncated, "lens", "rams")
     need(cut["status"] == "unavailable" and "length" in cut["error"],
          f"a truncated turn counted as a lens review: {cut}")
 
@@ -233,54 +258,88 @@ def check_analyser_alignment(workdir):
          "a dropped capture produced no failed assertion line")
 
 
+def status_fields(evidence, required=REQUIRED_LENSES):
+    result = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
+    need(result.returncode == 0, f"status failed: {result.stderr[:200]}")
+    return result, dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+
+
+def write_lenses(panel, lenses):
+    with open(os.path.join(panel, "stage-04-lenses.json"), "w", encoding="utf-8") as handle:
+        json.dump({"lenses": lenses}, handle)
+
+
+def complete_lens(name, verdict="needs work"):
+    return {"lens": name, "status": "complete", "model": "fixture",
+            "answer": {"lens": name, "verdict": verdict, "findings": []}}
+
+
+def write_pi_stub(path, body):
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("#!/usr/bin/env python3\nimport json, re, sys\nprompt = sys.argv[-1]\n")
+        handle.write(body)
+        handle.write("print(json.dumps({'type': 'turn_end', 'message': {'stopReason': 'stop',"
+                     " 'content': [{'type': 'text', 'text': json.dumps(answer)}]}}))\n")
+    os.chmod(path, 0o755)
+
+
 def check_lens_status(workdir):
     evidence = os.path.join(workdir, "panel-evidence")
     panel = os.path.join(evidence, "panel")
     os.makedirs(panel)
     required = REQUIRED_LENSES
-    stage = {"lenses": [
-        {"lens": "rams", "status": "complete", "model": "fixture",
-         "answer": {"verdict": "sound", "findings": [{"severity": "nit", "title": "x"}]}},
-        {"lens": "norman", "status": "unavailable", "error": "no reviewer model answered"},
-    ]}
-    with open(os.path.join(panel, "stage-04-lenses.json"), "w", encoding="utf-8") as handle:
-        json.dump(stage, handle)
     with open(os.path.join(panel, "stage-05-capabilities.json"), "w", encoding="utf-8") as handle:
         json.dump({"declared_gaps": [
             "Gemini route cursor/gemini-4-argon is unavailable on this machine: no answer."]}, handle)
-    partial = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
-    need(partial.returncode == 0, f"status failed: {partial.stderr[:200]}")
-    fields = dict(line.split("=", 1) for line in partial.stdout.splitlines() if "=" in line)
+
+    # One lens failed while the others answered: that failure is the reason, not the
+    # routine route gap that sits in the same bundle.
+    write_lenses(panel, [
+        complete_lens("rams", "sound"),
+        {"lens": "norman", "status": "unavailable", "error": "the answer names no lens"},
+    ])
+    result, fields = status_fields(evidence)
     need(fields.get("lenses_total") == "2", f"wrong total: {fields.get('lenses_total')!r}")
     need(fields.get("lenses_complete") == "1", f"wrong completed count: {fields.get('lenses_complete')!r}")
     need(fields.get("lenses_required_missing") == "norman spiekermann kare matas vignelli",
          f"the required set is not checked by name: {fields.get('lenses_required_missing')!r}")
-    need("no reviewer model answered" in fields.get("reason", ""),
-         "an incomplete lens stage reported no reason")
+    need(fields.get("reason") == "the answer names no lens",
+         f"the blocked reason is not the observed lens failure: {fields.get('reason')!r}")
     need("Gemini" not in fields.get("reason", ""),
          f"the blocking reason named an unrelated capability gap: {fields.get('reason')!r}")
-    rams = [line for line in partial.stdout.splitlines() if line.startswith("lens=rams")]
-    need(rams and rams[0].split("\t")[1:] == ["complete", "sound", "1", ""],
+    rams = [line for line in result.stdout.splitlines() if line.startswith("lens=rams")]
+    need(rams and rams[0].split("\t")[1:] == ["complete", "sound", "0", ""],
          f"the rams lens line is wrong: {rams!r}")
 
-    stage["lenses"][1] = {"lens": "norman", "status": "unavailable"}
-    with open(os.path.join(panel, "stage-04-lenses.json"), "w", encoding="utf-8") as handle:
-        json.dump(stage, handle)
-    gapped = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
-    fields = dict(line.split("=", 1) for line in gapped.stdout.splitlines() if "=" in line)
-    need(fields.get("reason", "").startswith("Gemini route"),
-         f"the declared gap is not the fallback reason: {fields.get('reason')!r}")
+    # No lens could run at all: the recorded no-model reason wins over the route gap.
+    write_lenses(panel, [{"lens": name, "status": "unavailable",
+                          "error": "no reviewer model answered"} for name in required])
+    _, fields = status_fields(evidence)
+    need(fields.get("reason") == "no reviewer model answered",
+         f"the no-lens reason is not the actual cause: {fields.get('reason')!r}")
 
-    stage["lenses"] = [{"lens": name, "status": "complete",
-                        "answer": {"verdict": "needs work", "findings": []}}
-                       for name in required]
-    with open(os.path.join(panel, "stage-04-lenses.json"), "w", encoding="utf-8") as handle:
-        json.dump(stage, handle)
-    complete = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *required])
-    fields = dict(line.split("=", 1) for line in complete.stdout.splitlines() if "=" in line)
+    # A lens failed without an error of its own: its name is the reason, not the gap
+    # and not the missing-required-name sentence.
+    write_lenses(panel, [complete_lens(name) for name in required]
+                 + [{"lens": "extra", "status": "unavailable"}])
+    _, fields = status_fields(evidence)
+    need(fields.get("reason") == "the panel recorded no answer for extra",
+         f"an errored-out lens was masked: {fields.get('reason')!r}")
+
+    # All recorded lenses answered, but the required name is absent (a renamed list).
+    # The missing name is the reason; the route gap must not stand in for it.
+    write_lenses(panel, [complete_lens(name) for name in required[:-1]])
+    _, fields = status_fields(evidence)
+    need(fields.get("lenses_required_missing") == required[-1],
+         f"the missing required name is wrong: {fields.get('lenses_required_missing')!r}")
+    need(fields.get("reason") == "the panel recorded no result for %s" % required[-1],
+         f"the missing required name was masked by a gap: {fields.get('reason')!r}")
+
+    write_lenses(panel, [complete_lens(name) for name in required])
+    result, fields = status_fields(evidence)
     need(fields.get("lenses_required_missing") == "",
          f"a complete required set reported missing lenses: {fields.get('lenses_required_missing')!r}")
-    need("reason=" not in complete.stdout,
+    need("reason=" not in result.stdout,
          "a complete lens stage still reported a blocking reason")
 
 
@@ -377,8 +436,8 @@ def check_panel_stages(workdir):
     need(fields.get("reason"), "a model-free panel reported no blocking reason")
 
     # The reviewer answers with a turn_end text content element, shaped for the stage
-    # its prompt asks about. A stub `pi` on PATH keeps this offline and deterministic
-    # while exercising the real panel stages and their validation.
+    # its prompt asks about and for the lens that prompt named. A stub `pi` on PATH
+    # keeps this offline and deterministic while exercising the real panel stages.
     lens_answer = {"lens": "rams", "verdict": "sound", "summary": "quiet and ordered",
                    "findings": []}
     clip_answer = {"verdict": "expected", "severity": "minor",
@@ -387,20 +446,15 @@ def check_panel_stages(workdir):
                      "reason": "the next scripted step still fits this screen"}
     bindir = os.path.join(workdir, "bin")
     os.makedirs(bindir)
-    stub = os.path.join(bindir, "pi")
-    with open(stub, "w", encoding="utf-8") as handle:
-        handle.write("#!/usr/bin/env python3\n")
-        handle.write("import json, sys\n")
-        handle.write("prompt = sys.argv[-1]\n")
-        handle.write("if 'next_step_valid' in prompt:\n")
-        handle.write("    answer = " + repr(vision_answer) + "\n")
-        handle.write("elif 'what_to_fix' in prompt:\n")
-        handle.write("    answer = " + repr(clip_answer) + "\n")
-        handle.write("else:\n")
-        handle.write("    answer = " + repr(lens_answer) + "\n")
-        handle.write("print(json.dumps({'type': 'turn_end', 'message': {'stopReason': 'stop',"
-                     " 'content': [{'type': 'text', 'text': json.dumps(answer)}]}}))\n")
-    os.chmod(stub, 0o755)
+    write_pi_stub(
+        os.path.join(bindir, "pi"),
+        "if 'next_step_valid' in prompt:\n"
+        "    answer = " + repr(vision_answer) + "\n"
+        "elif 'what_to_fix' in prompt:\n"
+        "    answer = " + repr(clip_answer) + "\n"
+        "else:\n"
+        "    found = re.search(r'lens identifier is \"([a-z]+)\"', prompt)\n"
+        "    answer = dict(" + repr(lens_answer) + ", lens=found.group(1) if found else '')\n")
     with_answer = subprocess.run(
         ["bash", DESIGN_PANEL, evidence], capture_output=True, text=True, timeout=300,
         env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"],
@@ -413,6 +467,11 @@ def check_panel_stages(workdir):
     need(all(lens.get("status") == "complete" for lens in lenses),
          "a reviewer answer was not parsed into a completed lens: "
          + json.dumps([lens.get("error") for lens in lenses]))
+    need([lens.get("lens") for lens in lenses] == REQUIRED_LENSES,
+         "the lens stage recorded another lens set: " + json.dumps([lens.get("lens") for lens in lenses]))
+    need(all((lens.get("answer") or {}).get("lens") == lens.get("lens") for lens in lenses),
+         "a lens record kept an answer for another lens: "
+         + json.dumps([(lens.get("lens"), (lens.get("answer") or {}).get("lens")) for lens in lenses]))
     need((lenses[0].get("answer") or {}).get("verdict") == "sound",
          "the lens stage did not keep the reviewer's answer")
     need(all(len((lens.get("answer") or {}).get("findings") or []) == 0 for lens in lenses),
@@ -433,9 +492,51 @@ def check_panel_stages(workdir):
          f"a fully answered panel reported missing lenses: {fields.get('lenses_required_missing')!r}")
     need("reason=" not in status.stdout, "a fully answered panel still reported a blocking reason")
 
+    # Known-broken: every prompt answered with the Rams review. That is one review
+    # repeated, so no lens may count and the six-lens gate must stay blocked.
+    fixed_bindir = os.path.join(workdir, "fixed-bin")
+    os.makedirs(fixed_bindir)
+    write_pi_stub(os.path.join(fixed_bindir, "pi"),
+                  "answer = " + repr(dict(lens_answer, lens="rams")) + "\n")
+    repeated = subprocess.run(
+        ["bash", DESIGN_PANEL, evidence], capture_output=True, text=True, timeout=300,
+        env=dict(os.environ, PATH=fixed_bindir + os.pathsep + os.environ["PATH"],
+                 WID_PANEL_MODEL="stub/model"))
+    need(repeated.returncode == 0,
+         f"design-panel.sh exited {repeated.returncode}: {repeated.stderr[-400:]}")
+    with open(os.path.join(panel, "panel.json"), encoding="utf-8") as handle:
+        repeated_panel = json.load(handle)
+    lenses = repeated_panel.get("lenses") or []
+    need(len(lenses) == 6 and [lens.get("status") for lens in lenses]
+         == ["complete"] + ["unavailable"] * 5,
+         "one review repeated for every lens counted as the six lenses: "
+         + json.dumps([(lens.get("lens"), lens.get("status")) for lens in lenses]))
+    status = run([sys.executable, PANEL_LIB, "status", evidence, "--require", *REQUIRED_LENSES])
+    fields = dict(line.split("=", 1) for line in status.stdout.splitlines() if "=" in line)
+    need(fields.get("lenses_complete") == "1",
+         f"a repeated single-lens answer reported {fields.get('lenses_complete')} completed lenses")
+    need(fields.get("lenses_required_missing") == " ".join(REQUIRED_LENSES[1:]),
+         f"the repeated answer satisfied the required set: {fields.get('lenses_required_missing')!r}")
+
+
+def check_tracked_bytecode(_workdir):
+    listing = subprocess.run(["git", "-C", HERE, "ls-files"], capture_output=True, text=True)
+    need(listing.returncode == 0, f"git ls-files failed: {listing.stderr[:200]}")
+    tracked = listing.stdout.split("\n")
+    offenders = tracked_bytecode(tracked)
+    need(not offenders,
+         "generated bytecode is tracked: " + ", ".join(offenders[:5]))
+    # Known-broken: the tree that prompted this guard listed both caches.
+    stale = ["apps/macos/FirstLine/scripts/vm/__pycache__/panel-lib.cpython-314.pyc",
+             "apps/macos/FirstLine/scripts/vm/analyse-recording.py",
+             "tools/x.pyc"]
+    need(tracked_bytecode(stale) == [stale[0], stale[2]],
+         "the tracked-bytecode guard does not catch a cache file: %r" % (tracked_bytecode(stale),))
+
 
 CHECKS = [
     ("model answers are validated before they count", check_answer_validation),
+    ("generated bytecode is not tracked", check_tracked_bytecode),
     ("flagged clip lands on the flagged second", check_clip_origin),
     ("analyser fails on a dropped capture", check_analyser_alignment),
     ("launch assertion ids are keyed to their stream", check_launch_assertion_ids),

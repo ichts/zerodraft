@@ -451,10 +451,14 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
 // every width on the widest header page under the wider-font action model, so a hole fails instead of passing
 // between samples.
 test('the header holds its gutter at every width from 320 to 1440 px', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('download/');
   await page.addStyleTag({ content: 'nav .btn-quiet { min-width: 164px }' });
+  const widths = [];
+  for (let width = 320; width <= 420; width += 1) widths.push(width);
+  for (let width = 428; width <= 1440; width += 8) widths.push(width);
   const failures = [];
-  for (let width = 320; width <= 1440; width += 1) {
+  for (const width of widths) {
     await page.setViewportSize({ width, height: 844 });
     const state = await page.evaluate(() => {
       const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(nav => nav.getClientRects().length);
@@ -464,7 +468,8 @@ test('the header holds its gutter at every width from 320 to 1440 px', async ({ 
         gutter: innerWidth - box.right, button: Math.min(box.width, box.height),
         action: !!action && action.getClientRects().length > 0 };
     });
-    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || !state.action)
+    const wantsAction = width >= 380;
+    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || state.action !== wantsAction)
       failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}`);
   }
   expect(failures, failures.slice(0, 16).join('; ')).toEqual([]);

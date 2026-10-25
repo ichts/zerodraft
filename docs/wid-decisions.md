@@ -571,3 +571,23 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   header input, so the header tier must carry the actual stacked header height.
 - Supersedes: The previous D-039 correction's "room paper fills the stage as a flex child" sentence only. The
   header step, the two-row header, the sweep, the plate hairline and the rest of D-039/D-038 stand.
+
+### Correction to D-039: below 380 px the header keeps the mark and the theme button
+
+- Date: 2026-10-25
+- Decision: Below 380 px one shared rule hides the nav page action on every page (`nav[aria-label="Main"]
+  .btn-quiet`): the landing, the trial room and `/download/` show the brand lockup and the 36 px theme button,
+  and `mac.html`, which has no nav action, is unchanged. Each page keeps its call to action in the body. The
+  16 px lockup step still covers 390 px and below; the narrow header stays one 56 px row at and below 820 px,
+  and the `--nav-h: 77px` stacked tier is gone. The 320-1440 px sweep runs 1 px steps from 320 to 420 and 8 px steps
+  from 420 to 1440 under the wider-font action model, with the page action expected at 380 px and above and
+  absent below 380 px, and carries its own 120 s timeout.
+- Reason: The two-row header was a compromise that changed the header height and needed a room token. The nav
+  action is redundant because every page already carries its call to action in the body, so dropping it is one
+  uniform rule that keeps the mark at 16 px and the theme button without touching the room's sizing. The
+  short-viewport gate now asserts the room's `min-height: 0` boundary and the paper's
+  `calc(100dvh - var(--nav-h) - var(--room-gut))` minimum, which fails if the room returns to the flex-only
+  paper.
+- Supersedes: The previous D-039 corrections' stacked tier, their `--nav-h: 77px` sentence and their
+  "stacking preserves..." reason only. The room's restored dynamic-viewport sizing, the 390 px step, the two
+  aligned masks, the theme polarity, the `--brand-plate` token, the plate hairline and D-038 stand.

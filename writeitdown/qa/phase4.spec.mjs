@@ -202,6 +202,27 @@ test('mobile dynamic viewport keeps EXIT and word count visible with expanded to
   }
 });
 
+test('the short trial sheet keeps its dynamic viewport minimum', async ({ page }, info) => {
+  test.skip(info.project.use.viewport.width !== 390, 'Mobile trial geometry');
+  await page.setViewportSize({ width: 390, height: 560 });
+  await enter(page);
+  const room = await page.evaluate(() => {
+    const room = document.querySelector('#room');
+    const paper = room.querySelector('.room-paper');
+    const sheet = paper.getBoundingClientRect();
+    const nav = room.querySelector('.home-nav').getBoundingClientRect();
+    const foot = room.querySelector('.paper-foot').getBoundingClientRect();
+    return { viewport: innerHeight, nav: nav.height, gutter: parseFloat(getComputedStyle(room).paddingBottom),
+      roomMin: parseFloat(getComputedStyle(room).minHeight), paperMin: parseFloat(getComputedStyle(paper).minHeight),
+      paperBottom: sheet.bottom, footBottom: foot.bottom };
+  });
+  expect(room.roomMin, 'the room clears the landing min-height').toBe(0);
+  expect(room.paperMin, 'the trial sheet subtracts the header and bottom gutter from the dynamic viewport')
+    .toBeCloseTo(room.viewport - room.nav - room.gutter, 0);
+  expect(room.paperBottom).toBeLessThanOrEqual(room.viewport);
+  expect(room.footBottom).toBeLessThanOrEqual(room.viewport);
+});
+
 test('short rooms keep the writing aperture below the clock', async ({ page }, info) => {
   await page.setViewportSize({ width: info.project.use.viewport.width, height: 350 });
   await enter(page);

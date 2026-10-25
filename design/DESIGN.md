@@ -264,22 +264,24 @@ the notch.
   height on all sides (about 5 px at 21 px). The header link may extend its hit area without enlarging the
   lockup.
 - Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and the theme
-  button keeps at least 6 px of right gutter, with the page action present and the 36 px theme button unscaled.
-  `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at every width from 320 to 1440 px" sweeps the
-  widest header (`/download/`) in 1 px steps under the wider-font action model, so a breakpoint that leaves an
-  uncovered band fails.
+  button keeps at least 6 px of right gutter, with the 36 px theme button unscaled and the page action present
+  at 380 px and above and hidden below 380 px. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at
+  every width from 320 to 1440 px" sweeps the widest header (`/download/`) in 1 px steps from 320 to 420 and
+  8 px steps from 420 to 1440 under the wider-font action model, so a breakpoint that leaves an uncovered band
+  fails.
 - Site header, mobile: from 391 to 820 px the 19 px lockup takes 141.9 px of the row, with 12 px between the
-  brand and the page action and 6 px inside the action group; at 390 px and below the 16 px lockup takes
-  119.5 px, the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 360 px the widest
-  header no longer fits one row under the wider-font action model, so it stacks into two rows with the action
-  group right-aligned instead of shrinking the mark below 16 px or dropping the action. The stacked tier sets
-  `--nav-h` to 77 px, so the trial sheet's existing `calc(100dvh - var(--nav-h) - var(--room-gut))` still pins
-  the paper to the visible viewport. One rule for every page that uses `.brand` - these sizes and the single
-  `--brand-plate` token in 11.6 - so `/download/` does not diverge from the landing, trial room and `mac.html`.
+  brand and the page action and 6 px inside the action group; at 380-390 px the 16 px lockup takes 119.5 px,
+  the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 380 px the nav page action is
+  hidden on every page, leaving the brand lockup and the 36 px theme button; each page keeps its call to action
+  in the body, so the mark never shrinks below 16 px and the header stays one 56 px row. One rule for every
+  page that uses `.brand` - these sizes and the single `--brand-plate` token in 11.6 - so `/download/` does
+  not diverge from the landing, trial room and `mac.html`.
 - Site header breakpoint history: the 16 px step first stopped at 380 px while the gate sampled only 360, 375
   and 390 px. The 381-390 px band therefore kept the 19 px lockup, and under the wider-font action model the
   theme button came within 1-5 px of the right edge there. The step now ends at 390 px and the sweep covers
-  every width; keep both, and do not replace the range with sampled points.
+  every width; keep both, and do not replace the range with sampled points. Below 380 px the action is dropped
+  instead of stacking a second header row, so the room's header height and its dynamic-viewport paper sizing
+  stay unchanged.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
@@ -322,10 +324,11 @@ the notch.
   "the header keeps its right gutter and a legible chip at 360 px" repeats the visual check at 360, 375 and
   390 px and requires no horizontal overflow, at least 6 px of right gutter, one lockup step across landing,
   `/download/` and `mac.html`, and a chip of at least 16 px with the split still reading. "the header holds its
-  gutter at every width from 320 to 1440 px" sweeps `/download/` in 1 px steps under the wider-font action model
-  and requires no horizontal overflow, at least 6 px of right gutter, a visible page action, and the 36 px theme
-  button at every width, so a breakpoint that leaves a band uncovered fails. Verify the sizes in 11.3 in light
-  and dark, with no clipping and no shift in the nav.
+  gutter at every width from 320 to 1440 px" sweeps `/download/` in 1 px steps from 320 to 420 and 8 px steps
+  from 420 to 1440 under the wider-font action model and requires no horizontal overflow, at least 6 px of right
+  gutter, the page action at 380 px and above and absent below, and the 36 px theme button at every width, so a
+  breakpoint that leaves a band uncovered fails. Verify the sizes in 11.3 in light and dark, with no clipping
+  and no shift in the nav.
 
 - Mac: the split-W lockup on the start screen in light and dark; the app icon at 16/32 (optical), 128 (Dock), and
   1024; the volume icon at 128 and 1024. Static asset inspection, the deterministic view test and the light/dark

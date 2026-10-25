@@ -316,10 +316,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .brand{font-size:16px}
   .home-nav{gap:var(--s2)}
 }
-/* Below 360 px the brand and the right-aligned action group stack into two rows. */
-@media (max-width:359px){
-  .home-nav{height:auto;min-height:var(--nav-h);flex-wrap:wrap;align-content:center;padding:var(--s2) 0}
-  .nav-end{margin-left:auto}
+/* Below 380 px the header keeps the brand and the theme button; every page carries its action in the body. */
+@media (max-width:379px){
+  nav[aria-label="Main"] .btn-quiet{display:none}
 }
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .btn{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}

@@ -61,21 +61,18 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .chrome-row{position:absolute;top:20px;left:20px;right:20px;display:flex;align-items:flex-start;justify-content:flex-end;gap:12px}
 .clock{flex:none;font-family:var(--mono);font-weight:500;font-size:16px;line-height:1;font-variant-numeric:tabular-nums;color:var(--timer)}
 
-.prev-band{position:absolute;left:20px;right:20px;bottom:calc(62% + 42px);height:round(down, calc(38% - 98px), var(--lh));overflow:hidden;pointer-events:none}
-.prev-stack{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column-reverse;align-items:center}
-.prev-line{width:100%;max-width:62ch;font-family:var(--serif);font-weight:400;font-size:var(--script);line-height:var(--lh);color:var(--ink);text-align:center}
-.prev-line:first-child{opacity:.22}
-.prev-line:nth-child(2){opacity:.07}
+/* The warning group and the wipe receipt share one status slot under the writing line.
+   Both are placed by ink (--danger-top / --receipt-top, set from font metrics in JS), so the
+   numeral's ink top sits 44 px under the baseline and the caption 20 px under the numeral's ink. */
+.danger{position:absolute;left:20px;right:20px;top:var(--danger-top,0);display:flex;flex-direction:column;align-items:center;pointer-events:none;text-align:center}
+.danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--red);font-variant-numeric:tabular-nums}
+.danger .caption{margin:var(--caption-gap,20px) 0 0;font:500 13px/1.5 var(--sans);letter-spacing:.04em;color:var(--ink)}
+.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--red)}
 
-.anchor-wrap{position:absolute;left:20px;right:20px;top:calc(38% - 42px);display:flex;justify-content:center}
-.script{margin:0;width:100%;max-width:62ch;font-family:var(--serif);font-weight:400;font-size:var(--script);line-height:var(--lh);color:var(--ink);text-align:center}
-.caret{display:inline-block;width:1px;height:1em;margin-left:1px;vertical-align:-.12em;background:var(--ink);animation:wid-caret 1.06s steps(1,end) infinite}
-
-.numeral-band{position:absolute;left:20px;right:20px;top:calc(38% + 18px);bottom:44px;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:var(--num);line-height:.82;font-variant-numeric:tabular-nums;color:var(--alarm);pointer-events:none}
-
-.paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:baseline;justify-content:space-between;gap:20px}
+.paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
 .report{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
-.count{flex:none;white-space:nowrap;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.5;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
+.count{flex:none;white-space:nowrap;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.6;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
+.hairline{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;box-shadow:inset 0 0 0 1px var(--red)}
 
 .foot{padding:var(--gut);display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap}
 .foot-note{font-family:var(--mono);font-weight:400;font-size:13px;line-height:1.9;letter-spacing:.08em;color:var(--mute)}
@@ -91,25 +88,43 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-phase="typing"]{--chrome:var(--mute);--timer:var(--mute)}
 .room[data-phase="warn"] .wash,.room[data-cut="true"] .wash{transition:none}
 .room[data-cut="true"] .room-paper-wash{background:var(--red-deep)}
-.writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center}
+.writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
-#editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 8px;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(transparent,rgba(0,0,0,.07) 10%,rgba(0,0,0,.22) 30%,#000 40%,#000 60%,rgba(0,0,0,.22) 70%,rgba(0,0,0,.07) 90%,transparent)}
+/* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
+   gradient: one uniform opacity per visual line (100 / 22 / 7 / gone), the Mac's D-027 treatment.
+   Its stops follow the fixed pitch, so the bands can never drift from the rendered lines. */
+#editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 0;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(to bottom,rgba(0,0,0,.07) 0 calc(var(--lh)),rgba(0,0,0,.22) calc(var(--lh)) calc(var(--lh) * 2),#000 calc(var(--lh) * 2) calc(var(--lh) * 3),rgba(0,0,0,0) calc(var(--lh) * 3))}
+/* Only the writing surface itself takes the pointer; the rest of the aperture stays
+   transparent so the result screens' controls above it stay clickable. */
+#editor{pointer-events:auto}
 #editor::-webkit-scrollbar{display:none}
-#editor::placeholder{color:var(--mute);font-style:italic}
 #editor:focus{outline:none}
 #editor:focus-visible{outline:none}
-.room-danger{position:absolute;top:68%;bottom:76px;left:20px;right:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;pointer-events:none}
-#room-numeral{font:italic 400 min(18vh,170px)/1 var(--serif);color:var(--red)}
-#room-warning{text-align:center;color:var(--ink)}
-.room-report{position:absolute;bottom:76px;left:20px;right:20px;text-align:center}
-.room[data-phase="kept"] .writing-area{align-items:safe center;overflow:auto}
-#kept{width:100%;max-width:62ch;text-align:center}
-#kept h1{font:500 clamp(32px,5vw,48px)/1.1 var(--serif);margin:0 0 24px}
-.kept-text{font:400 var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
-.kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
-.kept-actions .mini-link{min-height:44px;padding:0}
-#report{position:absolute;inset:0 20px;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:none}
-.paper.report .caret{visibility:hidden}
+/* The result screens: the fixed top block (headline, receipt, controls) and a draft that scrolls
+   below it, so a long draft never hides the actions. */
+.room-top{position:absolute;z-index:2;left:32px;right:32px;top:72px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em;max-width:62ch}
+.room-top .room-secondary{margin-top:20px}
+#kept{position:absolute;inset:72px 36px;display:flex;flex-direction:column;align-items:center}
+.kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
+#kept h1{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:-.02em}
+.kept-receipt{margin:12px 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--mute)}
+.kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:20px}
+.kept-scroll{flex:1;min-height:0;width:100%;margin-top:24px;overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
+.kept-scroll::-webkit-scrollbar{display:none}
+.kept-text{width:100%;max-width:62ch;margin:auto 0;text-align:center;font:400 var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
+/* Room controls: the live trial's 48 pt ink pill and 48 pt outlined secondary (the Mac's
+   FirstLineButtons primary/secondary), one light inner ring on the pill edge (D-024). */
+.home .room-primary,.home .room-secondary{display:inline-flex;align-items:center;justify-content:center;height:48px;border-radius:var(--r-pill);font:600 15px/1.6 var(--sans);letter-spacing:.04em;transition:transform var(--d-feedback) var(--ease-out)}
+.home .room-primary{padding:0 24px;background:var(--ink);color:var(--on-ink);border:0}
+.home .room-secondary{padding:0 20px;background:var(--sheet);color:var(--ink);border:1px solid var(--hair-2)}
+.home .room-primary:hover,.home .room-secondary:hover{transform:translateY(-1px)}
+.home .room-primary:active,.home .room-secondary:active{transform:scale(.97)}
+.home .room-primary:focus,.home .room-primary:focus-visible{outline:2px solid var(--on-ink);outline-offset:-2px}
+.home .room-secondary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+/* The two-step exit: the inline confirmation is on the footer row's own 1.6 line box, so its
+   baseline meets ESC - EXIT and the count instead of sitting a few points lower (case 37). */
+.exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:500 13px/1.6 var(--sans);letter-spacing:0;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .paper > .paper-foot{justify-content:flex-end}
 .legal{max-width:760px;width:100%;margin:0 auto;padding:56px var(--gut);font:400 21px/1.6 var(--serif)}
 .legal h1{font-weight:500;font-size:48px;line-height:1.1}
@@ -134,9 +149,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media(max-width:767px){
   .nav{gap:12px}.foot-links{gap:20px}.foot-links a{min-height:44px;display:flex;align-items:center}
   .room{--room-gut:12px}.writing-area{inset:64px 20px}
-  #room-numeral{font-size:min(14vh,110px)}
-  .room-danger{bottom:108px;gap:12px}
-  .room-report{bottom:76px;font-size:11px}
 }
 @media (prefers-reduced-motion: reduce){.caret{animation:none!important;opacity:1}.room .wash{transition:none}}
 
@@ -189,32 +201,26 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .stagewrap{position:relative;--wash-wall:var(--red-soft);--deep-wall:var(--red-deep)}
 /* No desk behind the sheet, so the warning wash lives on the sheet only. */
 .stagewrap > .wash{display:none}
-.home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-wall:var(--red-soft);--wash-paper:var(--red-soft);--deep-wall:var(--red-deep);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:var(--lh-write);--num:clamp(110px,16vw,190px)}
+.home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-wall:var(--red-soft);--wash-paper:var(--red-soft);--deep-wall:var(--red-deep);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:var(--lh-write)}
 .home .paper > .wash{border-radius:inherit}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:flex-end;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);color:var(--ink)}
-.home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.5 var(--sans);color:var(--chrome)}
-.home .count{font:400 var(--t-small)/1.5 var(--sans);letter-spacing:0;text-transform:lowercase;color:var(--chrome)}
-.home .prev-band,.home .anchor-wrap{left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px)}
-/* The active line is centred at --write-anchor (39%) of the sheet, the same ratio as the trial room. */
+.home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--chrome)}
+.home .count{font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--chrome)}
+.home .prev-band{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);overflow:hidden;pointer-events:none}
+.home .prev-stack{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column-reverse;align-items:center}
+.home .prev-line{width:100%;max-width:62ch;font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
+.home .anchor-wrap{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);display:flex;justify-content:center}
+.home .script{margin:0;width:100%;max-width:62ch;font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
+.home .caret{display:inline-block;width:1.5px;height:1em;margin-left:1px;vertical-align:-.12em;background:var(--ink);animation:wid-caret 1.06s steps(1,end) infinite}
+.home .paper.cut .caret{background:transparent}
+/* The active line is centred at --write-anchor (35%) of the sheet, the same ratio as the trial room. */
 .home .anchor-wrap{top:calc(var(--write-anchor) - var(--lh) / 2)}
 .home .prev-band{bottom:calc(100% - var(--write-anchor) + var(--lh) / 2);height:calc(2 * var(--lh))}
-.home .prev-line:first-child{opacity:.36}
-.home .prev-line:nth-child(2){opacity:.22}
-.home .caret{width:2px;height:.95em}
-.home .numeral-band{top:calc(var(--write-anchor) + var(--lh) / 2 + 8px);bottom:36px;font:italic 400 var(--num)/1 var(--serif);color:var(--red)}
-.home .paper.warn .anchor-wrap,.home .paper.warn .prev-band{opacity:.14}
-/* The demo's blocked Backspace: a keycap with a no-sign under the active line, shown by demo.js. */
-.deny-key{position:absolute;left:50%;top:calc(var(--write-anchor) + var(--lh) / 2 + 28px);transform:translateX(-50%);pointer-events:none;animation:wid-pop var(--d-feedback) var(--ease-out)}
-.deny-key .key{min-width:64px;font-size:22px}
-.deny-key .no-sign{position:absolute;right:-14px;top:-14px;color:var(--red);background:var(--sheet);border-radius:50%}
-@keyframes wid-pop{from{opacity:0;transform:translateX(-50%) scale(.9)}}
-/* demo.js marks the report phase with the .report class on the sheet too; keep the sheet's own type. */
-.home .paper.report{font:inherit;letter-spacing:normal;color:inherit}
-.home #report{font:500 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--red)}
-.bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:1}
-.meter{position:absolute;left:0;right:0;bottom:0;height:3px}
-.meter i{display:block;height:100%;width:0;background:var(--red)}
+/* Stepped per-line history, the same ladder as the Mac room (D-027): one line up 22%, two up 7%, older gone. */
+.home .prev-line:first-child{opacity:.22}
+.home .prev-line:nth-child(2){opacity:.07}
+.bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:2}
 /* the one button under the demo */
 .cta{display:flex;justify-content:center;align-items:center;padding:22px var(--gut) 0;text-align:center}
 /* sections */
@@ -306,7 +312,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .foot-grid{grid-template-columns:1fr 1fr}
   .home .callback h2{flex-direction:column;align-items:center}
 }
-@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.deny-key{animation:none}.home .btn{transition:none}}
+@media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.home .caret{animation:none;opacity:1}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
 .dl-page .dlhead .sub{max-width:60ch}
@@ -330,12 +336,16 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* ---------- Trial room (#room): the landing design system ----------
    The room carries .home, so it reads the same tokens as the landing: page background A, the white sheet with
    the only shadow, Newsreader for the writing, the system UI stack for the tool, red for the stakes. The wash
-   lives on the sheet only (no desk behind it). Zen geometry and the 39% anchor are defined with the room above. */
+   lives on the sheet only (no desk behind it). Zen geometry and the 35% anchor are defined with the room above. */
 .room.home{min-height:0;--script:var(--t-write);--lh:var(--lh-write);font:400 var(--t-ui)/1.5 var(--sans)}
 .room-nav{flex:none;padding:0 calc(var(--gut) - var(--room-gut))}
-.room .mini-link{font:500 var(--t-small)/1.5 var(--sans);letter-spacing:.04em;color:var(--chrome)}
-.room #room-warning{color:var(--ink)}
-.room .report{font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.02em;color:var(--red)}
-.room #receipt{margin:20px 0;color:var(--mute)}
-.room .paper-foot{left:22px;right:22px;bottom:16px;align-items:center}
-@media(max-width:767px){.room .paper-foot{left:16px;right:16px}}
+.room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--chrome)}
+.room .paper-foot{gap:12px;left:22px;right:22px;bottom:16px;align-items:center}
+.room .count{letter-spacing:0}
+@media(max-width:767px){
+  .room .paper-foot{left:16px;right:16px}
+  /* A truncated destructive confirmation is not acceptable on a phone: the inline hint takes its
+     own line above ESC - EXIT and the count instead of being clipped. */
+  .room .paper-foot{flex-wrap:wrap;row-gap:0}
+  .room .exit-hint{order:-1;flex:1 0 100%;margin:0;white-space:normal;text-align:center;overflow:visible}
+}

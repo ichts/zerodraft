@@ -305,7 +305,7 @@ async function run(size, browser) {
       ok(Date.now() - started >= 60000, 'session finished before sixty seconds');
       ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
       ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
-      ok(/0:00.*WORDS? KEPT\./.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
+      ok(/^1 MINUTE\. \d+ WORDS?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
       ok((await page.locator('#room-report').textContent()).trim() === '', 'deletion report present after completion');
       ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
       await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
@@ -313,6 +313,12 @@ async function run(size, browser) {
       await page.getByRole('button', { name: 'COPIED', exact: true }).waitFor({ state: 'visible' });
       const copied = await page.evaluate(() => navigator.clipboard.readText());
       ok(copied === typed, 'clipboard differs from the finished draft');
+      await page.locator('#exit').click();
+      ok((await page.locator('#exit-hint').innerText()).trim() === 'Press Esc again to leave and delete the draft.', 'exit confirmation missing');
+      ok(await page.locator('#room').isVisible(), 'one exit act left the room');
+      await page.locator('#exit').click();
+      await page.locator('#room').waitFor({ state: 'hidden' });
+      ok(await page.locator('#landing').isVisible(), 'the second exit act did not return to the landing');
     });
   });
   await block('silence-wipe', async () => {
@@ -329,6 +335,9 @@ async function run(size, browser) {
       ok(await page.locator('#editor').inputValue() === '', 'silent draft was not deleted');
       ok(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/.test(await page.locator('#room-report').innerText()), 'deletion receipt missing');
       ok(!await page.locator('#kept').isVisible(), 'silent session incorrectly kept');
+      ok((await page.locator('#failed h1').innerText()).trim() === 'You stopped.', 'failure headline missing');
+      ok(await page.getByRole('button', { name: 'Begin again', exact: true }).isVisible(), 'Begin again missing');
+      ok((await page.locator('#room-count').innerText()).trim() === '0 words', 'wiped count is not 0 words');
     });
   });
   await block('legal', async () => {

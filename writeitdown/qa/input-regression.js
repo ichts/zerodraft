@@ -13,13 +13,13 @@ async () => {
     editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType, isComposing }));
   };
   reset();
-  check('empty', count.textContent === '0 WORDS');
+  check('empty room carries the prompt in the count slot', count.textContent === 'Type to start');
   input('hello world');
-  check('Latin', count.textContent === '2 WORDS');
+  check('Latin', count.textContent === '2 words');
   input(' 中文测试');
-  check('mixed Latin and Chinese', count.textContent === '6 WORDS');
+  check('mixed Latin and Chinese', count.textContent === '6 words');
   input('，！？ 👨‍👩‍👧‍👦 👍🏽');
-  check('punctuation and emoji excluded, graphemes retained', count.textContent === '6 WORDS' && editor.value.endsWith('👍🏽'));
+  check('punctuation and emoji excluded, graphemes retained', count.textContent === '6 words' && editor.value.endsWith('👍🏽'));
   const original = editor.value;
   for (const type of ['deleteContentBackward', 'insertFromPaste', 'historyUndo', 'insertFromDrop']) {
     const event = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: type });
@@ -36,13 +36,13 @@ async () => {
   check('composition starts session', room.dataset.phase === 'typing');
   editor.value = '你';
   editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: '你', inputType: 'insertCompositionText', isComposing: true }));
-  check('composition replacement not denied', editor.value === '你' && count.textContent === '1 WORD');
+  check('composition replacement not denied', editor.value === '你' && count.textContent === '1 word');
   editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '你' }));
   input('好');
-  check('composition commit plus next character', editor.value === '你好' && count.textContent === '2 WORDS');
+  check('composition commit plus next character', editor.value === '你好' && count.textContent === '2 words');
   reset();
   input(' \n\t');
-  check('whitespace excluded', count.textContent === '0 WORDS');
+  check('whitespace excluded', count.textContent === '0 words');
   reset();
   check('no horizontal overflow', document.documentElement.scrollWidth === innerWidth);
   check('entry/restart focuses editor', document.activeElement === editor);

@@ -153,7 +153,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(nav).toHaveAttribute('href', 'download/');
   const card = page.locator('#paper');
   await expect(card.locator('#clock')).toBeVisible();
-  await expect(card.locator('#count')).toHaveText(/\d+ WORDS?/);
+  await expect(card.locator('#count')).toHaveText(/^(Type to start|\d+ words?)$/);
   // Journey: the sheet carries no tag and no saved label; under it there is only the button.
   await expect(card.locator('.tag, .saved')).toHaveCount(0);
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);

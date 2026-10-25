@@ -16,7 +16,14 @@ async () => {
   check('symmetric two-line padding centers active line', Math.abs(parseFloat(css.paddingTop) - 2 * line) < 1 && css.paddingTop === css.paddingBottom);
   check('editor has no user-scrollable overflow or scrollbar', css.overflowY === 'hidden' && css.scrollbarWidth === 'none');
   check('latest line pinned to center', Math.abs(editor.scrollHeight - editor.clientHeight - editor.scrollTop) < 2);
-  check('surrounding lines masked, active band opaque', css.maskImage.includes('40%') && css.maskImage.includes('60%'));
+  const mask = css.maskImage || css.webkitMaskImage;
+  const bands = [...mask.matchAll(/(rgba?\([^)]*\))\s+([\d.]+)px/g)].map(m => ({ color: m[1], px: parseFloat(m[2]) }));
+  check('stepped per-line mask, not a continuous gradient', bands.length === 7);
+  check('two back 7%, one back 22%, active 100%, nothing below',
+    /0, 0, 0, 0.07/.test(bands[0].color) && /0, 0, 0, 0.22/.test(bands[2].color) &&
+    /^rgb\(0, 0, 0\)$/.test(bands[4].color) && /0, 0, 0, 0\)$/.test(bands[6].color));
+  const ladder = [0, 1, 1, 2, 2, 3, 3];
+  check('mask stops follow the fixed pitch', bands.every((band, i) => Math.abs(band.px - ladder[i] * line) < 1.1));
   check('page has no vertical or horizontal overflow', document.documentElement.scrollHeight === innerHeight && document.documentElement.scrollWidth === innerWidth);
   const top = editor.scrollTop;
   for (const key of ['Backspace', 'Delete', 'ArrowUp', 'PageUp']) {
@@ -28,7 +35,11 @@ async () => {
   editor.dispatchEvent(cut);
   check('cut blocked', cut.defaultPrevented && editor.value === text);
   const animations = editor.closest('.room-paper').getAnimations();
-  check('deny feedback holds for 280ms without restarting on repeat', animations.length > 0 && animations.every(a => a.effect.getTiming().duration === 280));
-  check('reduced motion has no spatial deny', !matchMedia('(prefers-reduced-motion: reduce)').matches || animations.every(a => a.effect.getKeyframes().every(frame => !frame.transform)));
+  const hairline = document.querySelector('#room-hairline').getAnimations();
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  check('refusal: 200 ms transform-only shake, or none under Reduce Motion',
+    reduced ? animations.length === 0 : animations.length === 1 && animations.every(a => a.effect.getTiming().duration === 200 && a.effect.getKeyframes().every(frame => !frame.opacity)));
+  check('refusal: 220 ms opacity-only hairline flash', hairline.length === 1 && hairline.every(a => a.effect.getTiming().duration === 220 && a.effect.getKeyframes().every(frame => !frame.transform)));
+  check('reduced motion has no spatial deny', !reduced || animations.length === 0);
   return results;
 }

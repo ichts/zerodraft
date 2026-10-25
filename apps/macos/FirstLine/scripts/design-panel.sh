@@ -2,14 +2,20 @@
 # [INPUT] <evidence-dir> from scripts/vm-journey.sh. Env: WID_PANEL_MODEL (default
 #         anthropic/claude-opus-5-5), WID_PANEL_ALTERNATES (comma separated
 #         fallbacks across families, because a rate-limited or unreachable family
-#         must not silently cost a lens), WID_PANEL_LENSES (default the six lenses), WID_PANEL_ATTEMPTS
+#         must not silently cost a lens), WID_PANEL_LENSES (default the six lenses), WID_PANEL_REQUIRED
+#         (the lens names the acceptance contract requires; vm-journey.sh passes its six here,
+#         and a standalone re-run reads them back from the record), WID_PANEL_ATTEMPTS
 #         and WID_PANEL_BACKOFF for rate-limited model calls, WID_PANEL_SKIP_MODELS=1
 #         to produce the deterministic report without model stages.
 # [OUTPUT] <evidence-dir>/panel/: report.html (static, self-contained), panel.json,
 #          per-stage answers, the exact command of every model call, and thumbnails.
-#          vm-journey.sh runs this as the last stage of a recorded run, so the six
-#          lenses land in the same bundle and their completeness is part of sign-off.
-#          Exit 0 when every stage is complete or its gap is declared; exit 2 on a
+#          It also rewrites the derived review lines of <evidence-dir>/acceptance.txt
+#          (analysis, panel state and counts, per-lens results, sign_off) from the
+#          stages it just wrote, so a standalone re-run makes the record describe the
+#          artifact beside it; that re-run carries provenance and repairs the review
+#          artifact only. vm-journey.sh runs this as the last stage of a recorded run,
+#          so the six lenses land in the same bundle and their completeness is part of
+#          sign-off. Exit 0 when every stage is complete or its gap is declared; exit 2 on a
 #          usage error.
 # [POS] apps/macos/FirstLine/scripts/design-panel.sh - the review stage that runs on
 #       a recorded acceptance bundle: it reads the deterministic findings the journey
@@ -412,6 +418,13 @@ print("panel.json written")
 PY
 report="$(python3 "$here/vm/panel-lib.py" report "$evidence")"
 note "report: $report"
+if [[ -n "${WID_PANEL_REQUIRED:-}" ]]; then
+  python3 "$here/vm/panel-lib.py" record "$evidence" --require $WID_PANEL_REQUIRED \
+    >>"$evidence/panel.log" 2>&1 || note 'could not write the review record into acceptance.txt'
+else
+  python3 "$here/vm/panel-lib.py" record "$evidence" \
+    >>"$evidence/panel.log" 2>&1 || note 'could not write the review record into acceptance.txt'
+fi
 if [[ "${#gaps[@]}" -gt 0 ]]; then
   for gap in "${gaps[@]}"; do note "declared gap: $gap"; done
 fi

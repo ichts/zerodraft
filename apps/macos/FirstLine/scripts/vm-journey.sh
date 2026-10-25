@@ -321,9 +321,14 @@ fi
 # sign-off, and a run whose panel did not run is declared and blocked, never silently
 # passed.
 panel_command="bash $(printf '%q' "$scripts/design-panel.sh") $(printf '%q' "$evidence")"
-panel_status=0
-bash "$scripts/design-panel.sh" "$evidence" >>"$evidence/panel.log" 2>&1 || panel_status=$?
 required_lenses='rams norman spiekermann kare matas vignelli'
+panel_status=0
+WID_PANEL_REQUIRED="$required_lenses" bash "$scripts/design-panel.sh" "$evidence" \
+  >>"$evidence/panel.log" 2>&1 || panel_status=$?
+if ! grep -q '^sign_off:' "$evidence/acceptance.txt"; then
+  python3 "$scripts/vm/panel-lib.py" record "$evidence" --require $required_lenses \
+    >>"$evidence/panel.log" 2>&1 || log 'ERROR: could not write the review record into acceptance.txt'
+fi
 panel_summary="$(python3 "$scripts/vm/panel-lib.py" status "$evidence" --require $required_lenses 2>/dev/null)"
 analysis_line="$(sed -n 's/^analysis=//p' <<<"$panel_summary")"
 analysis_line="${analysis_line:-not recorded: the panel produced no status}"
@@ -341,18 +346,6 @@ elif [[ "$panel_total" -ne 6 || -n "${panel_missing:-}" ]]; then
   panel_state='not run'
   panel_reason="${panel_reason:-the six-lens review is incomplete: $panel_total lens(es) recorded, $panel_complete complete, missing: ${panel_missing:-none}}"
 fi
-{
-  printf 'analysis: %s\n' "$analysis_line"
-  printf 'panel: %s\n' "$panel_state"
-  printf 'panel_lenses_complete: %s/%s\n' "$panel_complete" "$panel_total"
-  printf 'panel_lenses_required: %s\n' "$required_lenses"
-  printf 'panel_command: %s\n' "$panel_command"
-  while IFS=$'\t' read -r lens_name lens_state lens_verdict lens_findings _lens_error; do
-    [[ -n "${lens_name:-}" ]] || continue
-    printf 'panel_lens: %s\t%s\t%s\t%s\n' "$lens_name" "$lens_state" "$lens_verdict" "$lens_findings"
-  done < <(sed -n 's/^lens=//p' <<<"$panel_summary")
-  [[ "$panel_state" == 'complete' ]] || printf 'panel_not_run: %s\n' "$panel_reason"
-} >>"$evidence/acceptance.txt"
 if [[ "$panel_state" != 'complete' ]]; then
   {
     printf '\n## Six-lens review incomplete - this bundle cannot sign off\n\n'
@@ -362,15 +355,8 @@ if [[ "$panel_state" != 'complete' ]]; then
   } >>"$evidence/notes.md"
 fi
 
-sign_off='accepted'
-if [[ "$verdict" == 'rejected' ]]; then
-  sign_off='not accepted - an assertion or the recording failed'
-elif [[ "$panel_state" != 'complete' ]]; then
-  sign_off="blocked - the six-lens review did not run ($panel_reason)"
-elif [[ "$verdict" == 'accepted-with-declared-defect' ]]; then
-  sign_off='not accepted - the declared known defect reproduced on this artifact'
-fi
-printf 'sign_off: %s\n' "$sign_off" >>"$evidence/acceptance.txt"
+sign_off="$(sed -n 's/^sign_off: //p' "$evidence/acceptance.txt" | tail -1)"
+sign_off="${sign_off:-not recorded}"
 cat "$evidence/acceptance.txt"
 
 log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_failures, other: $other_failures); analysis: $analysis_line; panel: $panel_state ($panel_complete/$panel_total lenses); sign-off: $sign_off"

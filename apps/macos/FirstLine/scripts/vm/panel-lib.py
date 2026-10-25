@@ -4,15 +4,17 @@
 [INPUT] `turn` and `verdict` read the JSONL stream `pi --mode json` prints on stdin;
         `verdict` also takes the stage it has to answer (`lens`, `clip` or `vision`)
         and, for a lens, the lens that was asked. `clip` reads the assembled
-        recording plus the frame manifest. `status` reads
-        <evidence>/panel/stage-*.json and the lens names its caller requires.
+        recording plus the frame manifest. `status` and `record` read
+        <evidence>/panel/stage-*.json, <evidence>/acceptance.txt and the lens names
+        their caller requires; `record` also writes the derived review lines.
         `report` reads <evidence>/panel/panel.json plus the thumbnails the panel
         script wrote.
 [OUTPUT] The terminal state of a model turn, one JSON verdict per model turn (either
          `{"status": "complete", "answer": <validated answer>}` or `{"status":
          "unavailable", "error": "<reason>"}`); a JSON clip record (origin, seek and
-         the extracted frame names); the lens summary lines the host verdict reads; or
-         a self-contained static HTML report whose images are inlined so the bundle can
+         the extracted frame names); the lens summary lines the host verdict reads;
+         the derived review lines of acceptance.txt, with re-run provenance; or a
+         self-contained static HTML report whose images are inlined so the bundle can
          be read on its own.
 [POS] apps/macos/FirstLine/scripts/vm/panel-lib.py - the small, boring part of
       design-panel.sh and vm-journey.sh: model-answer parsing and validation, clip
@@ -39,6 +41,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 
 SEVERITY_ORDER = {"blocker": 0, "major": 1, "minor": 2, "nit": 3, "info": 4}
 # A flagged clip covers the window plus this much either side, sampled at this rate
@@ -50,6 +53,11 @@ CLIP_MAX_FRAMES = 60
 LENS_VERDICTS = {"sound", "needs work", "blocked"}
 CLIP_VERDICTS = {"defect", "expected"}
 CLIP_SEVERITIES = {"blocker", "major", "minor", "nit"}
+# The lines of acceptance.txt this module owns: it rewrites them from the panel stages
+# so the record always describes the review artifact beside it.
+DERIVED_RECORD_KEYS = ("analysis:", "panel:", "panel_lenses_complete:", "panel_lenses_required:",
+                       "panel_command:", "panel_lens:", "panel_not_run:", "sign_off:",
+                       "review:", "review_lenses:")
 
 
 def first_json_object(text):
@@ -243,8 +251,8 @@ def clip(argv):
     return 0
 
 
-def lens_status(evidence, required):
-    """Shell-readable summary of the panel stages the host verdict reads."""
+def panel_state(evidence, required=None):
+    """The one derivation of what the review artifact holds."""
     panel_dir = os.path.join(os.path.abspath(evidence), "panel")
     lenses = []
     lens_stage = os.path.join(panel_dir, "stage-04-lenses.json")
@@ -257,35 +265,121 @@ def lens_status(evidence, required):
         with open(capability_stage, encoding="utf-8") as handle:
             analysis = next((capability for capability in json.load(handle).get("capabilities") or []
                              if capability.get("stage") == "deterministic analysis"), {})
-    if analysis:
-        print("analysis=%s" % " ".join(("%s (%s)" % (
-            analysis.get("status") or "not recorded",
-            analysis.get("detail") or "")).split()))
-    else:
-        print("analysis=not recorded: the panel wrote no deterministic analysis status")
+    if required is None:
+        required = [lens.get("lens") for lens in lenses if lens.get("lens")]
     complete = [lens for lens in lenses if lens.get("status") == "complete"]
     incomplete = [lens for lens in lenses if lens.get("status") != "complete"]
     complete_names = {lens.get("lens") for lens in complete}
     missing = [name for name in required if name not in complete_names]
-    print(f"lenses_total={len(lenses)}")
-    print(f"lenses_complete={len(complete)}")
+    blocked = len(complete) < len(lenses) or bool(missing)
+    reason = ""
+    if incomplete:
+        reason = " ".join(str(incomplete[0].get("error") or "").split())
+        if not reason:
+            reason = "the panel recorded no answer for %s" % (incomplete[0].get("lens") or "?")
+    if not reason and missing:
+        reason = "the panel recorded no result for %s" % " ".join(missing)
+    if blocked:
+        reason = " ".join(str(reason or "the panel recorded no lens result").split())
+    if analysis:
+        analysis_line = " ".join(("%s (%s)" % (
+            analysis.get("status") or "not recorded",
+            analysis.get("detail") or "")).split())
+    else:
+        analysis_line = "not recorded: the panel wrote no deterministic analysis status"
+    return {"lenses": lenses, "required": list(required), "missing": missing,
+            "complete_count": len(complete), "total": len(lenses), "blocked": blocked,
+            "reason": reason, "analysis": analysis_line}
+
+
+def lens_status(evidence, required):
+    """Shell-readable summary of the panel stages the host verdict reads."""
+    state = panel_state(evidence, required)
+    print("analysis=%s" % state["analysis"])
+    print("lenses_total=%d" % state["total"])
+    print("lenses_complete=%d" % state["complete_count"])
     if required:
-        print("lenses_required_missing=%s" % " ".join(missing))
-    for lens in lenses:
+        print("lenses_required_missing=%s" % " ".join(state["missing"]))
+    for lens in state["lenses"]:
         answer_object = lens.get("answer") or {}
         print("lens=%s\t%s\t%s\t%d\t%s" % (
             lens.get("lens") or "?", lens.get("status") or "unavailable",
             answer_object.get("verdict") or "-", len(answer_object.get("findings") or []),
             " ".join((lens.get("error") or "").split())))
-    if len(complete) < len(lenses) or missing:
-        reason = ""
-        if incomplete:
-            reason = " ".join(str(incomplete[0].get("error") or "").split())
-            if not reason:
-                reason = "the panel recorded no answer for %s" % (incomplete[0].get("lens") or "?")
-        if not reason and missing:
-            reason = "the panel recorded no result for %s" % " ".join(missing)
-        print("reason=%s" % " ".join(str(reason or "the panel recorded no lens result").split()))
+    if state["blocked"]:
+        print("reason=%s" % state["reason"])
+    return 0
+
+
+def sign_off_text(verdict, state):
+    if verdict == "rejected":
+        return "not accepted - an assertion or the recording failed"
+    if state["blocked"]:
+        return "blocked - the six-lens review did not run (%s)" % state["reason"]
+    if verdict == "accepted-with-declared-defect":
+        return "not accepted - the declared known defect reproduced on this artifact"
+    return "accepted"
+
+
+def review_record(argv):
+    """Rewrite the derived review lines in acceptance.txt from the panel stages."""
+    parser = argparse.ArgumentParser(prog="panel-lib.py record")
+    parser.add_argument("evidence")
+    parser.add_argument("--require", nargs="*", default=[])
+    options = parser.parse_args(argv)
+    evidence = os.path.abspath(options.evidence)
+    acceptance = os.path.join(evidence, "acceptance.txt")
+    if not os.path.exists(acceptance):
+        print(f"panel-lib: {acceptance} does not exist", file=sys.stderr)
+        return 1
+    with open(acceptance, encoding="utf-8") as handle:
+        lines = [line for line in handle.read().split("\n") if line]
+    base = [line for line in lines if not line.startswith(DERIVED_RECORD_KEYS)]
+    previous = any(line.startswith(("panel:", "sign_off:")) for line in lines)
+    verdict = next((line.split(":", 1)[1].strip() for line in lines
+                    if line.startswith("verdict:")), "")
+    required = list(options.require)
+    if not required:
+        required = next((line.split(":", 1)[1].split() for line in lines
+                         if line.startswith("panel_lenses_required:")), [])
+    state = panel_state(evidence, required or None)
+    panel_line = "complete" if not state["blocked"] else "not run"
+    design_panel = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                "design-panel.sh")
+    derived = [
+        "analysis: %s" % state["analysis"],
+        "panel: %s" % panel_line,
+        "panel_lenses_complete: %d/%d" % (state["complete_count"], state["total"]),
+        "panel_lenses_required: %s" % " ".join(state["required"]),
+        "panel_command: bash %s %s" % (design_panel, evidence),
+    ]
+    derived.extend("panel_lens: %s\t%s\t%s\t%d" % (
+        lens.get("lens") or "?", lens.get("status") or "unavailable",
+        (lens.get("answer") or {}).get("verdict") or "-",
+        len((lens.get("answer") or {}).get("findings") or [])) for lens in state["lenses"])
+    if state["blocked"]:
+        derived.append("panel_not_run: %s" % state["reason"])
+    derived.append("sign_off: %s" % sign_off_text(verdict, state))
+    timestamp = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    lens_results = " ".join("%s=%s:%s" % (
+        lens.get("lens") or "?", lens.get("status") or "unavailable",
+        (lens.get("answer") or {}).get("verdict") or "-") for lens in state["lenses"])
+    if previous:
+        derived.append("review: updated by a design-panel re-run at %s; this repairs the review "
+                       "artifact only and does not re-validate the product" % timestamp)
+        derived.append("review_lenses: %s" % lens_results)
+    temporary = acceptance + ".writing"
+    with open(temporary, "w", encoding="utf-8") as handle:
+        handle.write("\n".join(base + derived) + "\n")
+    os.replace(temporary, acceptance)
+    if previous:
+        with open(os.path.join(evidence, "notes.md"), "a", encoding="utf-8") as handle:
+            handle.write("\n## Review record updated after the run\n\n")
+            handle.write("- %s design-panel re-run: panel %s, %d of %d lenses complete.\n" % (
+                timestamp, panel_line, state["complete_count"], state["total"]))
+            handle.write("- Lens results: %s\n" % lens_results)
+            handle.write("- This repairs the review artifact only; the run verdict is unchanged.\n")
+    print("review record written to %s" % acceptance)
     return 0
 
 
@@ -483,7 +577,7 @@ def report():
 
 def main():
     if len(sys.argv) < 2:
-        print("usage: panel-lib.py turn|verdict|clip|status|report", file=sys.stderr)
+        print("usage: panel-lib.py turn|verdict|clip|status|record|report", file=sys.stderr)
         return 2
     command = sys.argv[1]
     if command == "turn":
@@ -502,6 +596,8 @@ def main():
             print(f"panel-lib: unknown status option {rest[0]!r}", file=sys.stderr)
             return 2
         return lens_status(arguments[0], rest[1:])
+    if command == "record":
+        return review_record(sys.argv[2:])
     if command == "report":
         return report()
     print(f"unknown command {command}", file=sys.stderr)

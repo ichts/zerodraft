@@ -26,11 +26,13 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PANEL_LIB = os.path.join(HERE, "vm", "panel-lib.py")
 ANALYSER = os.path.join(HERE, "vm", "analyse-recording.py")
 DESIGN_PANEL = os.path.join(HERE, "design-panel.sh")
+WIDRIG = os.path.join(HERE, "vm", "widrig.swift")
 PREPARE_GUEST = os.path.join(HERE, "vm", "prepare-guest.sh")
 VM_JOURNEY = os.path.join(HERE, "vm-journey.sh")
 # The acceptance contract's lens set, as vm-journey.sh states it.
@@ -774,6 +776,34 @@ def check_review_record_extra_lens(workdir):
          f"a complete review over the six required lenses did not sign off: {lines!r}")
     need(not any(line.startswith("panel_not_run:") for line in lines),
          f"a complete review carried a refusal reason: {lines!r}")
+    gate = run([sys.executable, PANEL_LIB, "gate", evidence])
+    need(gate.stdout.strip() == "0",
+         f"a complete seven-lens review would fail the panel gate: {gate.stdout!r}")
+
+    renamed = os.path.join(workdir, "renamed lens")
+    os.makedirs(renamed)
+    with open(os.path.join(renamed, "acceptance.txt"), "w", encoding="utf-8") as handle:
+        handle.write("artifact: fixture\nverdict: accepted\n")
+    with open(os.path.join(renamed, "recording.tsv"), "w", encoding="utf-8") as handle:
+        handle.write("12.4\t48\t1234567\t310\n")
+    with open(os.path.join(renamed, "findings.json"), "w", encoding="utf-8") as handle:
+        json.dump({"recording": {"frames": 48, "span_ms": 11750}, "findings": []}, handle)
+    renamed_run = subprocess.run(
+        ["bash", DESIGN_PANEL, renamed], capture_output=True, text=True, timeout=300,
+        env=dict(os.environ, PATH=bindir + os.pathsep + os.environ["PATH"],
+                 WID_PANEL_MODEL="stub/model",
+                 WID_PANEL_LENSES=" ".join(["rams", "norman", "spiekermann", "kare",
+                                            "matas", "vigneli"]),
+                 WID_PANEL_REQUIRED=" ".join(REQUIRED_LENSES)))
+    need(renamed_run.returncode == 0,
+         f"design-panel.sh exited {renamed_run.returncode}: {renamed_run.stderr[-400:]}")
+    with open(os.path.join(renamed, "acceptance.txt"), encoding="utf-8") as handle:
+        renamed_lines = handle.read().splitlines()
+    need("panel: not run" in renamed_lines,
+         f"a renamed lens list signed off without its required name: {renamed_lines!r}")
+    gate = run([sys.executable, PANEL_LIB, "gate", renamed])
+    need(gate.stdout.strip() == "79",
+         f"a review missing a required lens would pass the panel gate: {gate.stdout!r}")
 
     with open(os.path.join(evidence, "acceptance.txt"), "w", encoding="utf-8") as handle:
         handle.write("artifact: fixture\nverdict: rejected\n")
@@ -784,6 +814,26 @@ def check_review_record_extra_lens(workdir):
         lines = handle.read().splitlines()
     need("sign_off: not accepted - an assertion or the recording failed" in lines,
          f"a rejected run recorded an accepted sign-off: {lines!r}")
+    gate = run([sys.executable, PANEL_LIB, "gate", evidence])
+    need(gate.stdout.strip() == "0",
+         f"a rejected run with a complete review broke the panel gate: {gate.stdout!r}")
+
+
+def check_widrig_timeout(workdir):
+    binary = os.path.join(workdir, "widrig")
+    build = subprocess.run(["swiftc", "-O", "-target", "arm64-apple-macos14.0", "-o", binary,
+                            WIDRIG], capture_output=True, text=True, timeout=300)
+    need(build.returncode == 0, f"widrig did not build: {build.stderr[-400:]}")
+    started = time.monotonic()
+    found = subprocess.run([binary, "find", "--pid", "999999", "--role", "AXButton",
+                            "--timeout", "1"], capture_output=True, text=True, timeout=30)
+    elapsed = time.monotonic() - started
+    need(found.returncode == 1,
+         f"find on a missing element exited {found.returncode}: {found.stderr[-200:]!r}")
+    need(json.loads(found.stdout) == {"found": False},
+         f"find did not report a timeout result: {found.stdout!r}")
+    need(elapsed >= 0.9,
+         f"find took a one-shot snapshot instead of waiting its timeout: {elapsed:.2f}s")
 
 
 def check_declared_gap_remedy(workdir):
@@ -911,8 +961,9 @@ CHECKS = [
     ("design panel writes its stages from a bundle", check_panel_stages),
     ("a blocked review record is refreshed by its printed remedy", check_review_record_remedy),
     ("the launchd job receives the panel's environment", check_launchd_forwarding),
-    ("an extra lens still records and signs off the same review", check_review_record_extra_lens),
+    ("the review record and the panel gate agree", check_review_record_extra_lens),
     ("the declared-gap remedy is one pasteable command", check_declared_gap_remedy),
+    ("widrig find waits for its timeout", check_widrig_timeout),
 ]
 
 

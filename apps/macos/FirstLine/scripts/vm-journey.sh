@@ -352,9 +352,11 @@ log "verdict: $verdict; assertions failed: $fail_total (declared: $declared_fail
 if [[ "$verdict" == 'rejected' ]]; then
   exit 1
 fi
-if [[ "$panel_state" != 'complete' ]]; then
+panel_gate="$(python3 "$scripts/vm/panel-lib.py" gate "$evidence")"
+panel_gate="${panel_gate:-79}"
+if [[ "$panel_gate" -ne 0 ]]; then
   log "ERROR: the six-lens review did not complete, so this bundle cannot sign off (record: ${panel_reason:-no reason}; panel exit: $panel_status)"
-  exit 79
+  exit "$panel_gate"
 fi
 if [[ "$verdict" == 'accepted-with-declared-defect' ]]; then
   log 'ERROR: this artifact is accepted only with a declared known defect; it is not a clean pass'

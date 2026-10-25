@@ -37,7 +37,13 @@ const slot = statusSlot({
   numeral: $('room-numeral'),
   caption: $('room-warning'),
   receipt: $('room-report'),
-  block: $('failed')
+  block: $('failed'),
+  kept: {
+    root: $('kept'),
+    head: document.querySelector('.kept-head'),
+    scroll: document.querySelector('.kept-scroll'),
+    text: $('kept-text')
+  }
 });
 
 function placeStatus() {

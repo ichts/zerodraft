@@ -122,7 +122,6 @@ async function assertRoom(page) {
     expect(Math.abs(band.start - index * geometry.line)).toBeLessThan(1.1);
   });
   expect(bands[3].start, 'nothing below the active line: the mask stops at the third band').toBeCloseTo(3 * geometry.line, 0);
-  void 0;
 
   expect(geometry.pageHeight).toBe(geometry.viewportHeight);
   expect(geometry.pageWidth).toBe(geometry.viewportWidth);
@@ -415,9 +414,18 @@ test('short sheets keep the warning and result slots inside the paper', async ({
   }
 });
 
-test('short kept screens keep the controls above the paper foot', async ({ page }, info) => {
+test('kept screens keep the controls and draft clear of the paper foot', async ({ page }, info) => {
   test.skip(info.project.name !== '1440-light-no-preference', 'layout check, one project is enough');
-  for (const size of [{ width: 1440, height: 350 }, { width: 844, height: 390 }, { width: 667, height: 375 }]) {
+  const sizes = [
+    { width: 1440, height: 350 },
+    { width: 844, height: 390 },
+    { width: 667, height: 375 },
+    { width: 390, height: 844 },
+    { width: 1440, height: 620 },
+  ];
+  const compactSizes = new Set(['1440x350', '844x390']);
+  for (const size of sizes) {
+    const compact = compactSizes.has(`${size.width}x${size.height}`);
     await page.setViewportSize(size);
     await enter(page);
     await page.keyboard.insertText('This draft survives on a short sheet.\n');
@@ -429,23 +437,41 @@ test('short kept screens keep the controls above the paper foot', async ({ page 
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
     const kept = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
+      const probe = document.createElement('i');
+      probe.style.fontSize = 'var(--t-kept)';
+      document.querySelector('.room-paper').append(probe);
+      const token = getComputedStyle(probe).fontSize;
+      probe.remove();
       return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), actions: box('.kept-actions'),
         scroll: box('.kept-scroll'), heading: box('#kept h1'), receipt: box('#receipt'),
-        line: parseFloat(getComputedStyle(document.querySelector('.kept-text')).lineHeight) };
+        top: box('#kept').top - box('.room-paper').top, title: getComputedStyle(document.querySelector('#kept h1')).fontSize,
+        token, line: parseFloat(getComputedStyle(document.querySelector('.kept-text')).lineHeight) };
     });
     expect(kept.actions.bottom).toBeLessThanOrEqual(kept.footer.top);
     expect(kept.scroll.height).toBeGreaterThanOrEqual(kept.line - 0.5);
     expect(kept.heading.top).toBeGreaterThanOrEqual(kept.paper.top);
     expect(kept.receipt.bottom).toBeLessThanOrEqual(kept.actions.top);
     expect(kept.actions.bottom).toBeLessThanOrEqual(kept.scroll.top);
-    await capture(page, info, `short-kept-${size.width}x${size.height}`);
+    if (compact) {
+      expect(kept.top, 'the compact kept layout starts at 8 px').toBe(8);
+      expect(kept.title, 'the compact kept title uses the compact token').toBe('34px');
+    } else {
+      expect(kept.top, 'the tall kept layout keeps the Mac 72 px offset').toBe(72);
+      expect(kept.title, 'the tall kept title uses the Mac token').toBe(kept.token);
+    }
+    await capture(page, info, `kept-${size.width}x${size.height}`);
     await page.keyboard.press('Escape');
     await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
     const hinted = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-      return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll') };
+      return { footer: box('.room-paper .paper-foot'), scroll: box('.kept-scroll'),
+        top: box('#kept').top - box('.room-paper').top };
     });
-    expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
+    if (hinted.top === 8) expect(hinted.scroll.bottom).toBeLessThanOrEqual(hinted.footer.top);
+    else {
+      expect(hinted.top, 'the tall kept layout keeps the Mac offset when the hint is armed').toBe(72);
+      expect(hinted.scroll.bottom - hinted.footer.top, 'the tall kept bottom keeps its 24 px footer allowance').toBeCloseTo(24, 0);
+    }
     await page.keyboard.press('Escape');
     await expect(page.locator('#landing')).toBeVisible();
   }

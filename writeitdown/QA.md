@@ -35,7 +35,7 @@ version.
   with `1 MINUTE. N WORDS.`, two-step exit with an inline confirmation, 200 ms/220 ms refusal. The root
   Zero Draft landing (`/index.html`) is out of scope: it is the separate outward brand.
 - The delivered spec now includes `short sheets keep the warning and result slots inside the paper`,
-  `short kept screens keep the controls above the paper foot`, `the demo danger group clears when a new
+  `kept screens keep the controls and draft clear of the paper foot`, `the demo danger group clears when a new
   loop reaches typing`, `short demo sheets keep the status slot inside the paper`, and the 5-test
   `qa/motion-regression.spec.mjs`. The full eight-project `npx playwright test` gate for this revision
   is the repository acceptance command and runs in the pipeline test step; focused review runs of the
@@ -52,9 +52,11 @@ version.
   2 pt bar; demo history 0.36/0.22 -> 0.22/0.07; count `0 WORDS` -> `Type to start` / `0 words`; kept
   receipt `0:00 - N WORDS KEPT.` -> `1 MINUTE. N WORDS.`; exit row baselines equal within 0 pt on
   desktop (a phone wraps the confirmation onto its own line instead of truncating it).
-- Short-sheet follow-up: at 1440x350, 844x390 and 667x375 the warning group, failure block and kept
-  layout clamp above the paper foot, the kept actions stay clear of the footer, and at least one kept
-  draft line remains visible; a tall sheet keeps the Mac 72 px block offset and the 44 px ink offsets.
+- Short-sheet follow-up: at the compact sizes 1440x350 and 844x390 the warning group, failure block
+  and kept layout clamp above the paper foot, the kept actions stay clear of the footer, and at least
+  one kept draft line remains visible. Tall kept screens keep the Mac 72 px offset, the 24 px footer
+  allowance and the token title size, and follow a wrapped exit hint; 667x375, 390x844 and 1440x620
+  cover the fit boundary. The Mac 44 px ink offsets are unchanged.
 - Not re-run here: the whole suite in a single final pass, the pre-deploy journey against a real DMG
   (`npm run journey --expect-sha`, needs the artifact), and real-device IME/iOS checks.
 

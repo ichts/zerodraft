@@ -8,8 +8,6 @@
 // the geometry dirty (resize, font load, route or visibility change), so the 50 ms
 // render can ask for it without forcing style or layout reads when nothing changed.
 
-const COMPACT_BELOW = 480;
-
 const ink = (() => {
   let context;
   return (text, font, lineHeight) => {
@@ -34,7 +32,7 @@ function fontOf(el) {
     size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
 }
 
-export function statusSlot({ paper, line, pitches, numeral, caption, receipt, block }) {
+export function statusSlot({ paper, line, pitches, numeral, caption, receipt, block, kept }) {
   let placed = null;
   let dirty = true;
   return {
@@ -73,13 +71,25 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
         const blockHeight = block.getBoundingClientRect().height;
         paper.style.setProperty('--room-top', `${Math.max(gap, Math.min(72, receiptTop - gap - blockHeight))}px`);
       }
-      const compact = paperHeight < COMPACT_BELOW;
+      const compactVars = ['--kept-title', '--kept-receipt-gap', '--kept-actions-gap', '--kept-scroll-gap'];
+      let compact = false;
+      if (kept && !kept.root.hidden) {
+        compactVars.forEach(name => paper.style.removeProperty(name));
+        const headHeight = kept.head.getBoundingClientRect().height;
+        const scrollGap = parseFloat(getComputedStyle(kept.scroll).marginTop);
+        const textLine = parseFloat(getComputedStyle(kept.text).lineHeight);
+        compact = footerTop - 48 < headHeight + scrollGap + textLine;
+      }
       paper.style.setProperty('--kept-top', `${compact ? 8 : 72}px`);
-      paper.style.setProperty('--kept-bottom', `${compact ? Math.max(0, paperHeight - footerTop + gap) : 36}px`);
-      paper.style.setProperty('--kept-title', compact ? 'var(--t-kept-compact)' : 'var(--t-kept)');
-      paper.style.setProperty('--kept-receipt-gap', compact ? '6px' : '12px');
-      paper.style.setProperty('--kept-actions-gap', compact ? '8px' : '20px');
-      paper.style.setProperty('--kept-scroll-gap', compact ? '4px' : '24px');
+      paper.style.setProperty('--kept-bottom', `${compact ? Math.max(0, paperHeight - footerTop + gap) : Math.max(0, paperHeight - footerTop - 24)}px`);
+      if (compact) {
+        paper.style.setProperty('--kept-title', 'var(--t-kept-compact)');
+        paper.style.setProperty('--kept-receipt-gap', '6px');
+        paper.style.setProperty('--kept-actions-gap', '8px');
+        paper.style.setProperty('--kept-scroll-gap', '4px');
+      } else {
+        compactVars.forEach(name => paper.style.removeProperty(name));
+      }
       placed = key;
       dirty = false;
     }

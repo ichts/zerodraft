@@ -15,13 +15,13 @@ a:hover{color:var(--ink)}
 button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 :root{
   color-scheme:dark;
-  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--alarm:#f2a93b;--hand:#e4604a;
+  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--hand:#e4604a;
   --wash-paper:#3a1c15;--deep-paper:#4a2318;
   --lift:0 1px 0 rgba(0,0,0,.25),0 24px 48px -32px rgba(0,0,0,.65);
 }
 :root[data-theme="light"]{
   color-scheme:light;
-  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--alarm:#8f4405;--hand:#9a2a1f;
+  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--hand:#9a2a1f;
   --wash-paper:#ebdfce;--deep-paper:#decab3;
   --lift:0 1px 0 rgba(26,24,19,.10),0 24px 48px -32px rgba(26,24,19,.35);
 }
@@ -155,7 +155,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* ---------- Landing: design system v2 components ("Paper in light", approved 2026-10-22) ----------
    Shared design roles come from tokens.css; its header owns their scope. The hero sheet is the real demo.js preview;
    the writing room itself is #room and keeps its own styles. */
-.home{--alarm:var(--red);min-height:100vh;background:var(--page);color:var(--ink);font:400 var(--t-body)/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+.home{min-height:100vh;background:var(--page);color:var(--ink);font:400 var(--t-body)/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 .home a{color:inherit;text-decoration:none}
 .home :focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-ctl)}
 .home .wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}

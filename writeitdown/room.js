@@ -1,5 +1,6 @@
 import { fresh, advance, append, clock, wordCount } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
+import { statusSlot } from './status-slot.js';
 
 const $ = id => document.getElementById(id);
 const room = $('room');
@@ -29,50 +30,17 @@ function announce(text) {
   if ($('status').textContent !== text) $('status').textContent = text;
 }
 
-// --- Typography ink -----------------------------------------------------------
-// The warning numeral, its caption and the wipe receipt are placed by ink, not by
-// label frames: the numeral's ink top sits 44 px under the writing baseline and the
-// caption's ink top 20 px under the numeral's ink (the Mac's case 34). A canvas
-// measurement gives the ink offset inside a line box for one font.
-const ink = (() => {
-  let context;
-  return (text, font, lineHeight) => {
-    context ??= document.createElement('canvas').getContext('2d');
-    context.font = font;
-    const metrics = context.measureText(text || '0');
-    const ascent = metrics.fontBoundingBoxAscent;
-    const descent = metrics.fontBoundingBoxDescent;
-    const inkAscent = metrics.actualBoundingBoxAscent;
-    return {
-      ascent,
-      halfLeading: (lineHeight - (ascent + descent)) / 2,
-      inkTop: (lineHeight - (ascent + descent)) / 2 + ascent - inkAscent,
-      inkHeight: inkAscent + metrics.actualBoundingBoxDescent
-    };
-  };
-})();
-
-function fontOf(el) {
-  const style = getComputedStyle(el);
-  return { css: `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`,
-    size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
-}
+const slot = statusSlot({
+  paper,
+  line: editor,
+  pitches: 2,
+  numeral: $('room-numeral'),
+  caption: $('room-warning'),
+  receipt: $('room-report')
+});
 
 function placeStatus() {
-  if (room.hidden) return;
-  const writing = fontOf(editor);
-  const writingInk = ink('H', writing.css, writing.lineHeight);
-  // The active line is the middle band of the five-line aperture: two line pitches of
-  // padding above it. Its baseline is measured, never assumed from a frame centre.
-  const baseline = editor.getBoundingClientRect().top - paper.getBoundingClientRect().top
-    + 2 * writing.lineHeight + writingInk.halfLeading + writingInk.ascent;
-  const numeral = fontOf($('room-numeral'));
-  const numeralInk = ink($('room-numeral').textContent, numeral.css, numeral.lineHeight);
-  const caption = fontOf($('room-warning'));
-  const receipt = fontOf($('room-report'));
-  paper.style.setProperty('--danger-top', `${baseline + 44 - numeralInk.inkTop}px`);
-  paper.style.setProperty('--caption-gap', `${numeralInk.inkTop + numeralInk.inkHeight + 20 - numeral.size - ink($('room-warning').textContent, caption.css, caption.lineHeight).inkTop}px`);
-  paper.style.setProperty('--receipt-top', `${baseline + 44 - ink($('room-report').textContent, receipt.css, receipt.lineHeight).inkTop}px`);
+  if (!room.hidden) slot.place();
 }
 
 // --- Bar, history shift, session state ---------------------------------------
@@ -232,6 +200,7 @@ function route() {
   document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;
   room.hidden = !active;
+  slot.invalidate();
   reset();
   if (active) { fitEditor(); editor.focus({ preventScroll: true }); }
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
@@ -335,8 +304,9 @@ $('copy').addEventListener('click', async () => {
   announce(copied ? 'Copied.' : 'Copy failed. Select your kept text and copy it manually.');
 });
 
-window.addEventListener('resize', () => { fitEditor(); placeStatus(); });
-document.fonts.ready.then(() => { fitEditor(); placeStatus(); });
+window.addEventListener('resize', () => { slot.invalidate(); fitEditor(); placeStatus(); });
+window.visualViewport?.addEventListener('resize', () => { slot.invalidate(); fitEditor(); placeStatus(); });
+document.fonts.ready.then(() => { slot.invalidate(); fitEditor(); placeStatus(); });
 reduced.addEventListener('change', tick);
 window.addEventListener('hashchange', route);
 window.addEventListener('pagehide', reset);

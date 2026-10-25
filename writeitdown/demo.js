@@ -1,6 +1,7 @@
 import { LINES, TIMELINE } from './demo-timeline.mjs';
 import { clock, wordCount } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
+import { statusSlot } from './status-slot.js';
 
 (function () {
   "use strict";
@@ -43,43 +44,17 @@ import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
   var visible = false;
   var resuming = true;
 
-  // The status slot is placed by ink, exactly as in the trial room (Mac case 34/35):
-  // the numeral's ink top 44 px under the writing baseline, the caption's ink top
-  // 20 px under the numeral's ink, and the wipe receipt in the numeral's slot.
-  var ink = (function () {
-    var context;
-    return function (text, font, lineHeight) {
-      if (!context) context = document.createElement("canvas").getContext("2d");
-      context.font = font;
-      var metrics = context.measureText(text || "0");
-      var ascent = metrics.fontBoundingBoxAscent, descent = metrics.fontBoundingBoxDescent;
-      var inkAscent = metrics.actualBoundingBoxAscent;
-      return {
-        ascent: ascent,
-        halfLeading: (lineHeight - (ascent + descent)) / 2,
-        inkTop: (lineHeight - (ascent + descent)) / 2 + ascent - inkAscent,
-        inkHeight: inkAscent + metrics.actualBoundingBoxDescent
-      };
-    };
-  })();
-  function fontOf(el) {
-    var style = getComputedStyle(el);
-    return { css: style.fontStyle + " " + style.fontWeight + " " + style.fontSize + " " + style.fontFamily,
-      size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
-  }
+  var slot = statusSlot({
+    paper: paper,
+    line: scriptEl,
+    pitches: 0,
+    numeral: numeralEl,
+    caption: captionEl,
+    receipt: reportEl
+  });
   function placeStatus() {
-    var script = fontOf(scriptEl);
-    var scriptInk = ink("H", script.css, script.lineHeight);
-    var baseline = scriptEl.getBoundingClientRect().top - paper.getBoundingClientRect().top
-      + scriptInk.halfLeading + scriptInk.ascent;
-    var numeral = fontOf(numeralEl);
-    var numeralInk = ink(numeralEl.textContent, numeral.css, numeral.lineHeight);
-    var caption = fontOf(captionEl);
-    var report = fontOf(reportEl);
-    paper.style.setProperty("--danger-top", (baseline + 44 - numeralInk.inkTop) + "px");
-    paper.style.setProperty("--caption-gap",
-      (numeralInk.inkTop + numeralInk.inkHeight + 20 - numeral.size - ink(captionEl.textContent, caption.css, caption.lineHeight).inkTop) + "px");
-    paper.style.setProperty("--receipt-top", (baseline + 44 - ink(reportEl.textContent, report.css, report.lineHeight).inkTop) + "px");
+    if (document.getElementById('landing').hidden) return;
+    slot.place();
   }
 
   function draftAt(t) {
@@ -253,6 +228,7 @@ import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
     }
     resuming = !visible;
     visible = true;
+    if (resuming) slot.invalidate();
     if (reducedMq.matches) { renderReduced(); return; }
     render((Date.now() - t0) % LOOP);
   }
@@ -261,6 +237,7 @@ import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
   setInterval(tick, 50);
   if (reducedMq.addEventListener) reducedMq.addEventListener("change", tick);
   document.addEventListener('visibilitychange', tick);
-  document.fonts.ready.then(function () { placeStatus(); });
-  window.addEventListener("resize", placeStatus);
+  document.fonts.ready.then(function () { slot.invalidate(); placeStatus(); });
+  window.addEventListener("resize", function () { slot.invalidate(); placeStatus(); });
+  window.visualViewport?.addEventListener("resize", function () { slot.invalidate(); placeStatus(); });
 })();

@@ -244,7 +244,8 @@ test('empty room shows only the caret and the count prompt; after a wipe the rec
   await capture(page, info, 'wipe-report');
 });
 
-test('history is stepped per line and a new line shifts it exactly one pitch', async ({ page }) => {
+test('history is stepped per line and a new line shifts it exactly one pitch', async ({ page }, info) => {
+  const reduced = info.project.use.reducedMotion === 'reduce';
   await enter(page);
   await page.keyboard.insertText('First line');
   await settle(page);
@@ -253,14 +254,32 @@ test('history is stepped per line and a new line shifts it exactly one pitch', a
   await settle(page);
   expect(await editor(page).evaluate(e => e.scrollTop), 'same-line typing moves nothing').toBe(topology.scroll);
   for (const line of [2, 3, 4]) {
+    const start = topology.scroll + (line - 2) * topology.line;
     await page.keyboard.insertText('\n');
     await page.keyboard.insertText(`Line ${line}`);
+    if (reduced) {
+      expect(await editor(page).evaluate(e => e.scrollTop), `line ${line} snaps under Reduce Motion`).toBeCloseTo(start + topology.line, 0);
+    } else {
+      await page.clock.runFor(90);
+      const mid = await editor(page).evaluate(e => e.scrollTop);
+      expect(mid, `line ${line} is shifting, not snapping`).toBeGreaterThan(start + 0.5);
+      expect(mid, `line ${line} is shifting, not snapping`).toBeLessThan(start + topology.line - 0.5);
+    }
     await settle(page);
     expect(await editor(page).evaluate(e => e.scrollTop), `line ${line} shifted the history one pitch`)
-      .toBeCloseTo(topology.scroll + (line - 1) * topology.line, 0);
+      .toBeCloseTo(start + topology.line, 0);
   }
   // One fixed pitch for every script: a Chinese line advances exactly one line box too.
+  const cjkStart = topology.scroll + 3 * topology.line;
   await page.keyboard.insertText('\n中文继续写。');
+  if (reduced) {
+    expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line snaps under Reduce Motion').toBeCloseTo(cjkStart + topology.line, 0);
+  } else {
+    await page.clock.runFor(90);
+    const cjkMid = await editor(page).evaluate(e => e.scrollTop);
+    expect(cjkMid, 'a CJK line is shifting, not snapping').toBeGreaterThan(cjkStart + 0.5);
+    expect(cjkMid, 'a CJK line is shifting, not snapping').toBeLessThan(cjkStart + topology.line - 0.5);
+  }
   await settle(page);
   expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line keeps the same pitch').toBeCloseTo(topology.scroll + 4 * topology.line, 0);
   await expect(page.locator('#room-count')).toHaveText(`${wordCount('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。')} words`);
@@ -392,6 +411,35 @@ test('short sheets keep the warning and result slots inside the paper', async ({
     await capture(page, info, `short-warn-${size.width}x${size.height}`);
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
+    await expect(page.locator('#landing')).toBeVisible();
+  }
+});
+
+test('short kept screens keep the controls above the paper foot', async ({ page }, info) => {
+  test.skip(info.project.name !== '1440-light-no-preference', 'layout check, one project is enough');
+  for (const size of [{ width: 1440, height: 350 }, { width: 844, height: 390 }]) {
+    await page.setViewportSize(size);
+    await enter(page);
+    await page.keyboard.insertText('This draft survives on a short sheet.\n');
+    for (let second = 0; second < 57; second += 3) {
+      await page.clock.fastForward(3000);
+      await page.keyboard.insertText('Keep going. ');
+    }
+    await page.clock.fastForward(3000);
+    await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+    const kept = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
+      return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), actions: box('.kept-actions'),
+        scroll: box('.kept-scroll'), heading: box('#kept h1'), receipt: box('#receipt'),
+        line: parseFloat(getComputedStyle(document.querySelector('.kept-text')).lineHeight) };
+    });
+    expect(kept.actions.bottom).toBeLessThanOrEqual(kept.footer.top);
+    expect(kept.scroll.height).toBeGreaterThanOrEqual(kept.line - 0.5);
+    expect(kept.heading.top).toBeGreaterThanOrEqual(kept.paper.top);
+    expect(kept.receipt.bottom).toBeLessThanOrEqual(kept.actions.top);
+    await capture(page, info, `short-kept-${size.width}x${size.height}`);
+    await page.locator('#exit').click();
+    await page.locator('#exit').click();
     await expect(page.locator('#landing')).toBeVisible();
   }
 });

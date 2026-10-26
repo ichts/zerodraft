@@ -52,56 +52,63 @@ struct SnapshotTests {
 
             let rest = roomState(appearance: appearance)
             try snapshot(rest.room, name: "room-rest-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660))
 
             let typed = roomState(appearance: appearance)
             typeDraft(typed)
             try snapshot(typed.room, name: "room-typing-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660))
 
             let exitHint = roomState(appearance: appearance)
             typeDraft(exitHint)
             exitHint.room.exitConfirmation = ExitConfirmation(window: 60)
             exitHint.room.requestExit()
             try snapshot(exitHint.room, name: "room-exit-hint-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660))
         }
 
         try snapshot(activationError(), name: "activation-error-light", appearance: .aqua,
                      output: output, sheetPoint: NSPoint(x: 250, y: 360))
-        try snapshot(warningState(reducesMotion: false).room, name: "room-warning-light", appearance: .aqua, output: output)
-        try snapshot(warningState(reducesMotion: true).room, name: "room-warning-reduced-light", appearance: .aqua, output: output)
+        // The warn state is the one room state whose sheet is not the plain tone: it is measured against the
+        // wash tint at the fraction the tick produced (idle 5.6 s of the 8 s standard limit = 0.2).
+        try snapshot(warningState(reducesMotion: false).room, name: "room-warning-light", appearance: .aqua,
+                     output: output, washPoint: (NSPoint(x: 520, y: 120), 0.2))
+        try snapshot(warningState(reducesMotion: true).room, name: "room-warning-reduced-light", appearance: .aqua,
+                     output: output, washPoint: (NSPoint(x: 520, y: 120), 1))
         try snapshot(warningState(reducesMotion: false, appearance: .darkAqua).room, name: "room-warning-dark",
                      appearance: .darkAqua, output: output)
         let deletedLight = deletedState(appearance: .aqua)
         try snapshot(deletedLight, name: "room-deleted-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
         let deletedDark = deletedState(appearance: .darkAqua)
         try snapshot(deletedDark, name: "room-deleted-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
         let keptLight = keptState(appearance: .aqua, copy: false)
         try snapshot(keptLight, name: "room-kept-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
         let copiedLight = keptState(appearance: .aqua, copy: true)
         try snapshot(copiedLight, name: "room-copied-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
         let copiedDark = keptState(appearance: .darkAqua, copy: true)
         try snapshot(copiedDark, name: "room-copied-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
         let keptDark = keptState(appearance: .darkAqua, copy: false)
         try snapshot(keptDark, name: "room-kept-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 520, y: 660))
     }
 
     /// The grain is texture on the sheet, not an image that reacts to the writer: typing changes the words
     /// and nothing about the paper. The region is sampled from real window frames, before and after input.
+    /// Typing never regenerates the field. The clock stays inside the reading window here on purpose: past five
+    /// seconds of silence the wash is a *state* on the sheet, and that change is measured by
+    /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-058).
     @Test func paperStaysStillWhileTyping() throws {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let name = appearance == .aqua ? "light" : "dark"
             let fixture = roomState(appearance: appearance)
             let before = try paperPixels(fixture.room, appearance: appearance)
             typeDraft(fixture)
-            fixture.clock.now = 6
+            fixture.clock.now = 3
             fixture.room.tick()
             let after = try paperPixels(fixture.room, appearance: appearance)
             #expect(before == after, "\(name): the paper changed under the writer's keys")
@@ -147,7 +154,7 @@ struct SnapshotTests {
                 let room = keptState(appearance: appearance, copy: copied)
                 let label = copied ? "copied" : "copy"
                 try snapshot(room, name: "room-\(label)-focus-\(suffix)", appearance: appearance,
-                             output: output, paperPoint: NSPoint(x: 170, y: 360), focus: true)
+                             output: output, paperPoint: NSPoint(x: 520, y: 660), focus: true)
             }
         }
     }
@@ -302,6 +309,7 @@ struct SnapshotTests {
 
     private func snapshot(_ controller: NSViewController, name: String, appearance: NSAppearance.Name,
                           output: URL?, sheetPoint: NSPoint? = nil, paperPoint: NSPoint? = nil,
+                          washPoint: (point: NSPoint, fraction: CGFloat)? = nil,
                           focus: Bool = false) throws {
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -346,6 +354,11 @@ struct SnapshotTests {
             try assertPaper(rep, around: NSPoint(x: paperPoint.x * scale, y: paperPoint.y * scale),
                             in: appearance, name: name)
         }
+        if let washPoint {
+            let scale = CGFloat(rep.pixelsWide) / size.width
+            try assertWash(rep, around: NSPoint(x: washPoint.point.x * scale, y: washPoint.point.y * scale),
+                           fraction: washPoint.fraction, in: appearance, name: name)
+        }
         if focus { window.orderOut(nil) }
         SnapshotWindowKeeper.windows.append(window)
     }
@@ -372,19 +385,55 @@ struct SnapshotTests {
         let count = Double(samples.count)
         try #require(count > 0)
         let mean = (sum.r / count, sum.g / count, sum.b / count)
-        // The lamp only ever lifts the paper; the dark settle can drop it. Anything outside this band
-        // means the texture has changed the tone rather than lit it (D-056).
+        // The exact two-level tone assertion runs on the field the view draws, in
+        // `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone`, where the pixels are the ones the sheet is
+        // made of. This window bitmap round-trips through the window's own colour space and the sheet's shadow,
+        // so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
+        // assertion guards the value itself (D-058).
         let lift = [mean.0 - Double(expected.redComponent),
                     mean.1 - Double(expected.greenComponent),
                     mean.2 - Double(expected.blueComponent)]
         let variance = samples.reduce(0.0) { $0 + pow($1.0 - mean.0, 2) } / count
         let spread = variance.squareRoot()
-        let outOfBand = lift.contains { $0 >= 0.10 || $0 <= -0.05 }
+        let outOfBand = lift.contains { abs($0) > 0.06 }
         if outOfBand || spread <= 0.002 {
             print("PAPERFAIL \(name) mean=\(mean) expected=\(expected) lift=\(lift) spread=\(spread)")
         }
         #expect(!outOfBand, "\(name): the paper's tone left the locked band, lift=\(lift)")
         #expect(spread > 0.002, "\(name): the paper carries no grain")
+    }
+
+    /// The warning sheet is measured too: the rendered patch must be the paper tone mixed toward the locked
+    /// wash colour by the state's own fraction, warmed against the plain sheet and painted with grain. The plain
+    /// tone band cannot hold here, because the alarm is a state on the sheet rather than a second paper (D-058).
+    private func assertWash(_ rep: NSBitmapImageRep, around point: NSPoint, fraction: CGFloat,
+                            in appearance: NSAppearance.Name, name: String) throws {
+        let base = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance)?.usingColorSpace(.sRGB))
+        let target = try #require(appearanceColor(FirstLineColors.paperWashNSColor, appearance)?.usingColorSpace(.sRGB))
+        let expected = (r: base.redComponent + (target.redComponent - base.redComponent) * fraction,
+                        g: base.greenComponent + (target.greenComponent - base.greenComponent) * fraction,
+                        b: base.blueComponent + (target.blueComponent - base.blueComponent) * fraction)
+        let side = 24
+        var sum = (r: 0.0, g: 0.0, b: 0.0)
+        var count = 0.0
+        for y in Int(point.y)..<Int(point.y) + side {
+            for x in Int(point.x)..<Int(point.x) + side {
+                guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                sum.r += Double(colour.redComponent)
+                sum.g += Double(colour.greenComponent)
+                sum.b += Double(colour.blueComponent)
+                count += 1
+            }
+        }
+        try #require(count > 0)
+        let mean = (r: sum.r / count, g: sum.g / count, b: sum.b / count)
+        let lift = (mean.r - Double(expected.r), mean.g - Double(expected.g), mean.b - Double(expected.b))
+        // Same tolerance as the plain-tone patch: this bitmap round-trips through the window's colour space,
+        // while the exact wash value is asserted on the paper wash view and in `PaperContrastTests`.
+        #expect(abs(lift.0) < 0.06 && abs(lift.1) < 0.06 && abs(lift.2) < 0.06,
+                "\(name): the washed sheet is not the locked wash tint, lift=\(lift)")
+        #expect(Double(base.redComponent - base.greenComponent) < mean.0 - mean.1,
+                "\(name): the wash does not warm the sheet")
     }
 
     private func assertPixel(_ rep: NSBitmapImageRep, at point: NSPoint, equals token: NSColor,

@@ -45,7 +45,7 @@ The page around the paper keeps its white identity (D-056): the wall, the chrome
 
 The paper is textured, not flat (D-056): grain 70 of 100 at size 1.00, generated once per sheet size and theme - device-pixel tooth, a coarser pulp cloud upscaled with smoothing, short fibres and sparse pigment flecks - painted under the words and never regenerated while the writer types. Its tone stays in CSS so a wash can still tint it.
 
-Every word on the paper is measured against the paper's own tone, not against white: the history ladder steps by contrast, 13.78 -> 9.2 -> 7.2:1, and nothing on the sheet reads below 7:1.
+Every reading role on the paper is measured against the paper's own tone, not against white: ink 13.78:1, the quiet role 7.35:1, the pen red 10.1:1 - nothing that carries reading reads below 7:1. The completed lines above the writing line keep D-027's fade (100/22/7 of the ink): it is the zen step, not a reading role, and D-058 records the trade.
 
 The wash exists only during warn, seconds 5-8:
 

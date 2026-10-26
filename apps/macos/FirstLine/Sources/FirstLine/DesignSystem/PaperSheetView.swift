@@ -1,7 +1,7 @@
 /**
  * [INPUT]: the paper's laid-out size, the window's backing scale, the effective appearance (light/dark),
  *          and the locked paper constants (D-056: tone Note #dbe6ec / #21272a, grain 70 of 100, size 1.00).
- * [OUTPUT]: PaperSheetView - the writing sheet: tone, two-scale mottle, lamp light and grain, rendered once
+ * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone, two-scale mottle and grain, rendered once
  *           into a cached CGImage per size and appearance, with the sheet ring and rounded clip the room needs.
  * [POS]: The Mac half of the sheet the web renders in writeitdown/paper.js; the room, its failure screen and
  *        the kept sheet all sit on this one paper. Cards, fields and controls keep FirstLineColors.sheetNSColor.
@@ -109,7 +109,7 @@ final class PaperSheetView: NSView {
             ctx.addPath(CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
             ctx.clip()
         }
-        // The field is generated bottom-left-up; flip once so the lamp stays at the top of the sheet.
+        // The field is generated bottom-left-up; flip once so the image and the sheet share one origin.
         ctx.translateBy(x: 0, y: rect.height)
         ctx.scaleBy(x: 1, y: -1)
         // A window drag reuses the last field stretched and rebuilds once when the drag ends, so the
@@ -176,8 +176,9 @@ enum PaperField {
         String(format: "#%02x%02x%02x", Int(tone.r), Int(tone.g), Int(tone.b))
     }
 
-    /// A luminance delta becomes an alpha over black or white, so pale and dark deviations stay
-    /// symmetric and the sheet's tone never drifts as the grain is layered on.
+    /// A deviation becomes an alpha over black or white that shifts the sheet's own channel by exactly that
+    /// much, so pale and dark specks weigh the same in sRGB and the sheet's mean stays on the locked tone as
+    /// the grain is layered on (D-058).
     private static func alpha(delta: Double, tone: (r: Double, g: Double, b: Double)) -> Double {
         let average = (tone.r + tone.g + tone.b) / 3
         let room = delta > 0 ? 255 - average : average
@@ -246,8 +247,6 @@ enum PaperField {
             paper.draw(image, in: full)
         }
 
-        drawLight(into: paper, width: width, height: height, dark: dark)
-
         // The grain is one layer, composited at the locked strength so the tone stays the base layer's.
         guard let grainContext = makeContext(width: width, height: height), let plain = paper.makeImage() else { return nil }
         var random = Random(seed: seed("tooth" + hex(colour) + "1.0"))
@@ -277,26 +276,47 @@ enum PaperField {
         paper.interpolationQuality = .none
         paper.draw(grainLayer, in: full)
         paper.restoreGState()
+        correctMean(of: paper, to: colour, in: full)
         guard let image = paper.makeImage() else { return nil }
         return Sheet(image: image, grain: grainLayer)
     }
 
-    private static func drawLight(into ctx: CGContext, width: Int, height: Int, dark: Bool) {
-        let space = CGColorSpace(name: CGColorSpace.sRGB)!
-        let center = CGPoint(x: Double(width) * 0.5, y: Double(height) * 1.12)
-        let core = CGColor(srgbRed: 1, green: dark ? 226 / 255 : 252 / 255,
-                           blue: dark ? 186 / 255 : 245 / 255, alpha: dark ? 0.20 : 0.16)
-        let edge = CGColor(srgbRed: 1, green: 240 / 255, blue: 210 / 255, alpha: 0)
-        if let gradient = CGGradient(colorsSpace: space, colors: [core, edge] as CFArray, locations: [0, 1]) {
-            ctx.drawRadialGradient(gradient, startCenter: center, startRadius: Double(height) * 0.04,
-                                   endCenter: center, endRadius: Double(height) * (dark ? 0.95 : 0.8), options: [])
+    /// The locked tone wins over the texture: the finished sheet is shifted by whatever the noise layers moved
+    /// its mean, so what reaches the screen measures the token itself and not a slightly warmer or greyer paper
+    /// (D-058). The shift is one additive and one subtractive flat fill, so the grain's own contrast is untouched.
+    private static func correctMean(of context: CGContext, to tone: (r: Double, g: Double, b: Double),
+                                    in rect: CGRect) {
+        guard let raw = context.data else { return }
+        let width = context.width
+        let height = context.height
+        guard width > 1, height > 1 else { return }
+        let pixels = raw.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var sums = (r: 0.0, g: 0.0, b: 0.0)
+        for index in 0..<(width * height) {
+            let alpha = Double(pixels[index * 4 + 3]) / 255
+            guard alpha > 0.5 else { continue }
+            sums.r += Double(pixels[index * 4])
+            sums.g += Double(pixels[index * 4 + 1])
+            sums.b += Double(pixels[index * 4 + 2])
         }
-        guard dark else { return }
-        let clear = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0)
-        let settle = CGColor(srgbRed: 0, green: 0, blue: 0, alpha: 0.26)
-        if let gradient = CGGradient(colorsSpace: space, colors: [clear, settle] as CFArray, locations: [0, 1]) {
-            ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: Double(height) * 0.75),
-                                   end: CGPoint(x: 0, y: 0), options: [])
+        let count = Double(width * height)
+        let delta = (r: tone.r - sums.r / count, g: tone.g - sums.g / count, b: tone.b - sums.b / count)
+        guard abs(delta.r) + abs(delta.g) + abs(delta.b) > 0.05 else { return }
+        let up = (r: max(delta.r, 0) / 255, g: max(delta.g, 0) / 255, b: max(delta.b, 0) / 255)
+        if up.r + up.g + up.b > 0 {
+            context.saveGState()
+            context.setBlendMode(.plusLighter)
+            context.setFillColor(CGColor(srgbRed: up.r, green: up.g, blue: up.b, alpha: 1))
+            context.fill(rect)
+            context.restoreGState()
+        }
+        let down = (r: max(-delta.r, 0) / 255, g: max(-delta.g, 0) / 255, b: max(-delta.b, 0) / 255)
+        if down.r + down.g + down.b > 0 {
+            context.saveGState()
+            context.setBlendMode(.plusDarker)
+            context.setFillColor(CGColor(srgbRed: 1 - down.r, green: 1 - down.g, blue: 1 - down.b, alpha: 1))
+            context.fill(rect)
+            context.restoreGState()
         }
     }
 
@@ -336,8 +356,8 @@ enum PaperField {
             let y = random.next() * Double(height)
             let pale = random.next() < 0.14
             let pigment: (r: Double, g: Double, b: Double) = pale
-                ? (255, 250, 240)
-                : (random.next() < 0.7 ? (36, 29, 21) : (91, 67, 39))
+                ? (255, 255, 255)
+                : (random.next() < 0.7 ? (26, 26, 26) : (74, 74, 74))
             ctx.setFillColor(CGColor(srgbRed: pigment.r / 255, green: pigment.g / 255, blue: pigment.b / 255, alpha: 1))
             ctx.setAlpha((pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46) * (dark ? 0.5 : 1))
             let radius = (0.4 + random.next() * 1.0) * dpr * max(0.7, size * 0.85)

@@ -82,23 +82,6 @@
     ctx.drawImage(small, 0, 0, width, height);
   };
 
-  /* Light is topographic: a shallow top light in the light theme, a lamp pool plus a darker
-     settle toward the floor in the dark theme. Flat tone never reads as paper. */
-  const drawLight = (ctx, width, height, dark) => {
-    const glow = ctx.createRadialGradient(width * 0.5, -height * 0.12, height * 0.04,
-      width * 0.5, -height * 0.12, height * (dark ? 0.95 : 0.8));
-    glow.addColorStop(0, `rgba(255,${dark ? 226 : 252},${dark ? 186 : 245},${dark ? 0.20 : 0.16})`);
-    glow.addColorStop(1, 'rgba(255,240,210,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height);
-    if (!dark) return;
-    const settle = ctx.createLinearGradient(0, height * 0.25, 0, height);
-    settle.addColorStop(0, 'rgba(0,0,0,0)');
-    settle.addColorStop(1, 'rgba(0,0,0,0.26)');
-    ctx.fillStyle = settle;
-    ctx.fillRect(0, 0, width, height);
-  };
-
   /* Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches. */
   const drawFibres = (ctx, width, height, dpr, tone, rnd, dark) => {
     const count = Math.round((width * height) / (dpr * dpr) * 0.0026);
@@ -182,6 +165,23 @@
   /* The renderer: texture only, for a given CSS size, pixel ratio and theme. The canvas stays
      transparent - the sheet's tone is the element's own CSS background, so a state wash can still
      tint the paper and the sheet never shows a colour the texture cannot be laid over. */
+  /* The texture's own mean, alpha-weighted: what the canvas adds to the sheet's CSS tone. */
+  const textureDelta = (ctx, width, height, tone) => {
+    const data = ctx.getImageData(0, 0, width, height).data;
+    const count = width * height;
+    const shift = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3] / 255;
+      shift[0] += a * (data[i] - tone[0]);
+      shift[1] += a * (data[i + 1] - tone[1]);
+      shift[2] += a * (data[i + 2] - tone[2]);
+    }
+    return shift.map(total => total / count);
+  };
+
+  /* The locked tone wins over the texture (D-058): the sheet's own tone is shifted by exactly what the grain
+     moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
+     correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {
     const dark = theme === 'dark';
     const tone = hexToRgb(TONES[theme]);
@@ -193,9 +193,10 @@
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
     mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 34, 9.0, 'coarse');
     mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 9, 4.5, 'fine');
-    drawLight(ctx, canvasWidth, canvasHeight, dark);
     drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, dark);
-    return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now() };
+    const shift = textureDelta(ctx, canvasWidth, canvasHeight, tone);
+    const corrected = tone.map((channel, index) => Math.max(0, Math.min(255, channel - shift[index])));
+    return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now(), base: rgbToHex(corrected) };
   }
 
   /* Repaint only when the sheet itself changed: a new size, theme or pixel ratio. Typing changes
@@ -214,7 +215,12 @@
     if (painted && painted.width === Math.round(width * dpr)
       && painted.height === Math.round(height * dpr)
       && painted.theme === theme && painted.dpr === dpr) return;
-    sheet.painted = render(sheet.canvas, width, height, dpr, theme);
+    const next = render(sheet.canvas, width, height, dpr, theme);
+    if (next.base && next.base !== sheet.base) {
+      sheet.base = next.base;
+      sheet.element.style.setProperty('--paper-tone', next.base);
+    }
+    sheet.painted = next;
   }
 
   function mount(element) {

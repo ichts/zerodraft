@@ -20,8 +20,10 @@
      9:1 then 7:1, and the pen red is deepened until the numeral and the wipe receipt clear it too. */
   --paper-tone:#dbe6ec;
   --paper-quiet:#464746;
-  --paper-history-1:.847;
-  --paper-history-2:.769;
+  /* One uniform opacity per completed logical line: the current line full, one line up 22 %, two up 7 %,
+     older gone (D-027). Fixed for both themes so a theme switch can never leave a stale step (D-058). */
+  --paper-history-1:.22;
+  --paper-history-2:.07;
   --paper-danger:#63140b;
   /* The warn wash of the sheet: the root landing's `color-mix(in oklab, paper 88%, #C8392F)` and its
      76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-056). */
@@ -67,8 +69,8 @@
   --sheet:#26231c;
   --paper-tone:#21272a;
   --paper-quiet:#b8b5ac;
-  --paper-history-1:.846;
-  --paper-history-2:.727;
+  --paper-history-1:.22;
+  --paper-history-2:.07;
   --paper-danger:#ffb4a2;
   --paper-wash:#352c2c;
   --paper-wash-deep:#49302e;

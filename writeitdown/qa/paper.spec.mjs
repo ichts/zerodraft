@@ -1,8 +1,8 @@
 // The Note paper on the writeitdown site (D-056): tone, grain and ink, measured rather than eyeballed,
 // on the landing demo sheet and in the room, light and dark.
 //
-// Fails before the change: the sheet was #ffffff, the ink #1c1917 on a surface with no texture at all, the
-// quiet chrome sat at 4.5:1, the pen red at 5.2:1, and the faded history lines at 1.2:1.
+// Fails before the change: the sheet was #ffffff with no texture at all, the quiet chrome sat at 4.5:1 and the
+// pen red at 5.2:1 against the sheet.
 import { test, expect } from '@playwright/test';
 
 const TONES = { light: '#dbe6ec', dark: '#21272a' };
@@ -46,6 +46,18 @@ const toHex = ({ r, g, b }) =>
 /** How warm a colour reads: red ahead of green. The Note sheet is slightly cool, so this is what "the
  *  paper turns red" means on a paper that is not white. */
 const warmth = ({ r, g }) => (r - g) / 255;
+
+const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+
+/** The sheet's tone, measured within the two levels the texture's correction is allowed to leave behind. */
+const expectTone = (measured, expected, label) => {
+  const a = measured.map(Math.round);
+  const b = channels(expected);
+  a.forEach((value, index) => {
+    expect(Math.abs(value - b[index]), `${label}: channel ${index} of ${a.join(',')} against ${expected}`)
+      .toBeLessThanOrEqual(2);
+  });
+};
 
 const theme = page => page.evaluate(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 const style = (page, selector, property) =>
@@ -108,12 +120,35 @@ async function waitForPaper(page, selector) {
   }, selector);
 }
 
+/** What the screen shows where the sheet is empty: the sheet's own tone composited with the texture's mean,
+ *  which is the pixel value the captain locked, not the CSS constant behind it. */
+async function sheetTone(page, selector) {
+  return page.evaluate(sel => {
+    const element = document.querySelector(sel);
+    const value = getComputedStyle(element).backgroundColor;
+    const parts = value.match(/rgba?\(([^)]+)\)/)[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    const base = [parts[0], parts[1], parts[2]];
+    const canvas = element.querySelector('.sheet-paper');
+    if (!canvas || canvas.width < 2) return base;
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    const count = canvas.width * canvas.height;
+    const shift = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+      shift[0] += alpha * (data[i] - base[0]);
+      shift[1] += alpha * (data[i + 1] - base[1]);
+      shift[2] += alpha * (data[i + 2] - base[2]);
+    }
+    return base.map((channel, index) => channel + shift[index] / count);
+  }, selector);
+}
+
 test.describe('the sheet', () => {
   test('the demo sheet and the room carry the locked tone, ink and grain', async ({ page }) => {
     await page.goto('./');
     const mode = await theme(page);
     const paper = parseColour(await style(page, '#paper', 'backgroundColor'));
-    expect(toHex(paper)).toBe(TONES[mode]);
+    expectTone(await sheetTone(page, '#paper'), TONES[mode], 'the demo sheet');
 
     // The words on the demo sheet are the locked ink.
     expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
@@ -124,7 +159,7 @@ test.describe('the sheet', () => {
     expect(demoGrain.distinct).toBeGreaterThan(40);
 
     await enterRoom(page);
-    expect(toHex(parseColour(await style(page, '.room-paper', 'backgroundColor')))).toBe(TONES[mode]);
+    expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
     expect(toHex(parseColour(await style(page, '#editor', 'color')))).toBe(INK[mode]);
 
     // The texture is device-exact: one canvas pixel per device pixel, so it cannot shimmer.
@@ -138,7 +173,7 @@ test.describe('the sheet', () => {
     expect(exact.height).toBe(Math.round(exact.css[1] * exact.dpr));
   });
 
-  test('every word on the sheet clears 7:1, including the faded history lines', async ({ page }) => {
+  test('every reading role on the sheet clears 7:1, and the history keeps its recorded fade', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
@@ -158,9 +193,12 @@ test.describe('the sheet', () => {
     });
     expect(alphas[0]).toBeGreaterThan(0);
     expect(alphas[1]).toBeGreaterThan(0);
+    // The fade is D-027's ladder, one uniform opacity per completed logical line, not a contrast-solved
+    // ladder: 22 % one line up, 7 % two lines up. It is a deliberate fade toward the sheet, so this asserts
+    // the recorded steps and that they still fade (they sit below the reading floor by design, D-058).
+    expect(alphas).toEqual([0.22, 0.07]);
     const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
-    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThanOrEqual(9);
-    expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
+    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(ladder[1]);
 
     // The quiet chrome and the pen red on the sheet.
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
@@ -215,7 +253,7 @@ test.describe('the sheet', () => {
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
-    expect(toHex(paper)).toBe(TONES[await theme(page)]);
+    expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
     const grain = await patch(page, '.room-paper', 0.5);
     expect(grain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
     expect(contrast(parseColour(await style(page, '#kept-text', 'color')), paper),

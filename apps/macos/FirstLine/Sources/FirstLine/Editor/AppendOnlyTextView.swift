@@ -21,10 +21,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
-    /// One uniform ink step per completed line, closest line first; older lines are gone.
-    /// The stops are solved from the ink and the paper tone so the second line keeps 9:1 and the
-    /// oldest visible line keeps 7:1 on the Note sheet (D-056), in both appearances.
-    var historyLineOpacities: [CGFloat] { [1] + FirstLineColors.paperHistoryAlphas(for: effectiveAppearance) }
+    /// One uniform ink step per completed line, closest line first, older lines gone (D-027). The ladder is
+    /// fixed and appearance-independent, so a theme switch cannot leave a stale step in a completed line.
+    var historyLineOpacities: [CGFloat] { FirstLineColors.paperHistoryOpacities }
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
@@ -541,6 +540,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             textStorage.addAttribute(.foregroundColor,
                                       value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
                                       range: clipped)
+            textStorage.addAttribute(.shadow, value: Self.inkSpread(step: alpha), range: clipped)
         }
     }
 
@@ -769,14 +769,22 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return paragraph
     }
 
-    /// The ink's imperfection (D-056). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
+    /// The ink's imperfection (D-058). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
     /// a live NSTextView cannot be re-rasterised per keystroke without moving the caret with it, so the Mac
     /// keeps the transferable half - a hair of ink spread, so the strokes are thicker than a print engine's -
-    /// and leaves the hand to its own writing face (docs/wid-decisions.md D-056 records the trade).
-    private var inkSpread: NSShadow {
+    /// and leaves the hand to its own writing face.
+    ///
+    /// The spread is quantised to the line's own ladder step, never interpolated: fading a line fades its whole
+    /// rendered layer, exactly as the web fades the element that carries the displacement, so a completed line
+    /// cannot keep the live line's ink and the same text always renders identically.
+    static let inkSpreadAlphaAtFullStep: CGFloat = 0.55
+    private static let inkSpreadBlurRadius: CGFloat = 0.35
+
+    /// One of exactly four fixed spreads: the live step, the two history steps, and none.
+    static func inkSpread(step: CGFloat) -> NSShadow {
         let spread = NSShadow()
-        spread.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
-        spread.shadowBlurRadius = 0.35
+        spread.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(inkSpreadAlphaAtFullStep * step)
+        spread.shadowBlurRadius = inkSpreadBlurRadius
         spread.shadowOffset = .zero
         return spread
     }
@@ -786,7 +794,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             .font: sessionFont,
             .foregroundColor: FirstLineColors.inkNSColor,
             .paragraphStyle: paragraph,
-            .shadow: inkSpread,
+            .shadow: Self.inkSpread(step: 1),
         ]
     }
 

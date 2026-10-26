@@ -1175,3 +1175,41 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the sheet below the 60-61% contract, so the container now carries the fraction floor.
 - Supersedes: D-058's width/height scoping rule and its 340 px constant; its intent (the door and the
   preview share the first screen) and the 300 px floor stand.
+
+## D-058: The fade stays D-027's, the locked tone wins over the renderer, and the ink spread steps with the line
+
+- Date: 2026-10-26
+- Decision: Three corrections to D-056, recorded here because D-056 authorised the paper's tone, grain and ink
+  and nothing more.
+  1. **The history fade is D-027's ladder, unchanged**: one uniform opacity per completed logical line - the
+     current line 1.0, one line up 0.22, two lines up 0.07, older 0 - identical in both appearances and on both
+     surfaces. All rows of one logical sentence share one opacity, and the partially visible line at the
+     aperture is clipped by the mask rather than given a different alpha. These two lines therefore
+     deliberately sit below the 7:1 reading floor: the fade is the zen step, not a text role. Every role that
+     carries reading on the sheet still clears 7:1 (ink 13.78:1, quiet chrome 7.35:1, pen red 10.1:1).
+  2. **The locked tone wins over the renderer.** The lamp light and the dark settle are gone, and the texture's
+     own mean is cancelled out of the base the sheet is drawn on, so the pixels on screen measure the locked
+     tone: `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone` renders the field and asserts its mean is
+     `#dbe6ec` in light and `#21272a` in dark within two levels per channel. On the web the same correction
+     rides on the sheet's own tone token, so the wash still mixes from the corrected base
+     (`tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` measure the sheet's tone composited with the
+     texture, not the CSS constant behind it).
+  3. **The ink spread steps with the line.** The Mac's 0.35 pt ink spread is quantised to the line's ladder step
+     (`inkSpread(step:)`, alpha 0.55 x step, never interpolated), so a faded line fades its whole rendered layer
+     exactly as the web fades the element that carries the displacement, the same text always renders
+     identically, and a completed line cannot keep the live line's ink.
+- Reason: The pipeline review of the Mac half found that the contrast-solved ladder (13.78 / 9.2 / 7.2:1) had
+  silently replaced D-027's recorded 100/22/7 fade, that the ink shadow did not step with the ladder (so the
+  faded lines rendered at roughly 11:1 and 9.6:1 while their opacity claimed 0.847 and 0.769), and that the lamp
+  light lifted the rendered dark sheet by 25 levels off the value the captain locked. The captain's lock is the
+  sheet, the grain and the ink; the fade was never his to change. Wheat remains the considered alternative for
+  the paper itself (D-056).
+- Tests: `PaperContrastTests` (`theRenderedFieldStaysOnTheLockedTone`,
+  `everyTextRoleClearsSevenToOneOnTheSheet` now asserting the recorded ladder and its fade direction,
+  `theWashIsTheWebsPaperMixNotAPalePink`, `theFieldIsDeterministic`), `EditorFocusTests` (the ladder is fixed and
+  appearance-independent), `tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` (tone measured as the
+  rendered composite, the ladder's two steps).
+- Supersedes: D-056's sentence that the sheet's per-line history ladder is a contrast ladder (13.78 -> 9.2 ->
+  7.2:1) and its claim that "nothing on the sheet reads below 7:1", which applied the reading floor to the zen
+  fade; D-056's paper tone, grain, wash, ink and quiet/pen roles stand unchanged, and D-027's ladder is restored
+  exactly.

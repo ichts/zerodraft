@@ -44,11 +44,10 @@ enum FirstLineColors {
     /// the same colour instead of the Mac tinting a blue-grey sheet with a pale pink meant for white.
     static var paperWashNSColor: NSColor { adaptive(light: 0xDDD3D5, dark: 0x352C2C) }
     static var paperWashDeepNSColor: NSColor { adaptive(light: 0xDDC0BE, dark: 0x49302E) }
-    /// Per-line history alphas: the ink composited at these stops keeps 9:1 and 7:1 on the paper,
-    /// solved from the ink and the sheet tone by `PaperContrastTests`.
-    static func paperHistoryAlphas(for appearance: NSAppearance) -> [CGFloat] {
-        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? [0.846, 0.727] : [0.847, 0.769]
-    }
+    /// Per-logical-line history opacity: the current line full, one line up 22 %, two lines up 7 %, older
+    /// lines gone (D-027). One fixed ladder for both appearances: a theme switch can never leave a stale
+    /// step baked into a completed line (D-058).
+    static let paperHistoryOpacities: [CGFloat] = [1, 0.22, 0.07]
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }
     static var chromeNSColor: NSColor { adaptive(light: 0x5C564D, dark: 0xA39D8E) }
@@ -59,8 +58,6 @@ enum FirstLineColors {
     static var tagBackgroundNSColor: NSColor { adaptive(light: 0xF2F2F0, dark: 0x2E2A22) }
     static var segmentTrackNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.06, darkAlpha: 0.10) }
     static var redNSColor: NSColor { adaptive(light: 0xB02A1E, dark: 0xE4604A) }
-    static var redSoftNSColor: NSColor { adaptive(light: 0xF6E2DC, dark: 0x3A1C15) }
-    static var redDeepNSColor: NSColor { adaptive(light: 0xEBC8BD, dark: 0x4A2318) }
     static var onInkNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x15140F) }
     static var shadowNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0x000000) }
     static var separatorNSColor: NSColor { hairNSColor }

@@ -75,14 +75,16 @@ struct PaperContrastTests {
             let quiet = try resolved(FirstLineColors.paperQuietNSColor, appearance)
             let danger = try resolved(FirstLineColors.paperDangerNSColor, appearance)
 
-            // The words: the active line, and the two faded lines above it.
+            // The words: the active line carries the ink at full strength.
             #expect(contrast(ink, paper) >= 7, "\(name): the ink on the sheet")
-            for (index, alpha) in FirstLineColors.paperHistoryAlphas(for: NSAppearance(named: appearance)!).enumerated() {
-                let line = composited(ink, alpha: Double(alpha), over: paper)
-                let target = index == 0 ? 9.0 : 7.0
-                #expect(contrast(line, paper) >= target,
-                        "\(name): history step \(index + 1) is \(contrast(line, paper)):1, wanted \(target):1")
+            // The two faded lines are D-027's deliberate fade: 22 % and 7 % of the ink, one uniform step per
+            // logical line. They are below the reading floor by design, so this asserts the recorded ladder
+            // and that the sheet still reads at full strength rather than pretending the fade clears 7:1.
+            #expect(FirstLineColors.paperHistoryOpacities == [1, 0.22, 0.07])
+            let faded = FirstLineColors.paperHistoryOpacities.dropFirst().map {
+                contrast(composited(ink, alpha: Double($0), over: paper), paper)
             }
+            #expect(faded[0] > faded[1], "\(name): the second history step is not dimmer than the first")
             // The quiet chrome (clock, count, exit link, receipt) and the pen red (numeral, wipe report).
             #expect(contrast(quiet, paper) >= 7, "\(name): the quiet chrome on the sheet")
             #expect(contrast(danger, paper) >= 7, "\(name): the pen red on the sheet")
@@ -118,6 +120,46 @@ struct PaperContrastTests {
             #expect(warmth(wash) > warmth(paper) + 0.05, "the wash does not warm the paper")
             #expect(warmth(deep) > warmth(wash), "the cut is not deeper than the ramp")
         }
+    }
+
+    /// The locked tone wins over the renderer: what reaches the screen must be the token within +-2 levels, in
+    /// both appearances. A lamp light or a one-sided grain would lift the mean away from the value the captain
+    /// locked, so this measures the rendered pixels rather than the intended constant (D-058).
+    @Test func theRenderedFieldStaysOnTheLockedTone() throws {
+        let expectations: [(name: String, dark: Bool, tone: (Double, Double, Double))] = [
+            ("light", false, (219, 230, 236)),
+            ("dark", true, (33, 39, 42)),
+        ]
+        for entry in expectations {
+            let image = try #require(PaperField.render(width: 600, height: 400, scale: 2, dark: entry.dark))
+            let mean = try meanColour(of: image)
+            print("MEAN \(entry.name): r=\(mean.r) g=\(mean.g) b=\(mean.b) tone=\(entry.tone)")
+            #expect(abs(mean.r - entry.tone.0) <= 2, "\(entry.name): rendered red mean \(mean.r) against \(entry.tone.0)")
+            #expect(abs(mean.g - entry.tone.1) <= 2, "\(entry.name): rendered green mean \(mean.g) against \(entry.tone.1)")
+            #expect(abs(mean.b - entry.tone.2) <= 2, "\(entry.name): rendered blue mean \(mean.b) against \(entry.tone.2)")
+        }
+    }
+
+    private func meanColour(of image: CGImage) throws -> (r: Double, g: Double, b: Double) {
+        let width = image.width
+        let height = image.height
+        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                             bytesPerRow: width * 4,
+                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let raw = try #require(context.data)
+        let pixels = raw.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var sums = (r: 0.0, g: 0.0, b: 0.0)
+        let count = width * height
+        for index in 0..<count {
+            let alpha = Double(pixels[index * 4 + 3]) / 255
+            guard alpha > 0.1 else { continue }
+            sums.r += Double(pixels[index * 4]) / alpha
+            sums.g += Double(pixels[index * 4 + 1]) / alpha
+            sums.b += Double(pixels[index * 4 + 2]) / alpha
+        }
+        return (sums.r / Double(count), sums.g / Double(count), sums.b / Double(count))
     }
 
     @Test func theFieldIsDeterministic() throws {

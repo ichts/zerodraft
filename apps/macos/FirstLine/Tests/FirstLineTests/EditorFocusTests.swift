@@ -231,6 +231,50 @@ struct EditorFocusTests {
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
     }
 
+    /// The ink's imperfection steps with the line: the live line, one back and two back each carry their own
+    /// fixed spread, so a faded line cannot keep the live line's ink and the same text always renders
+    /// identically (D-058).
+    @Test func inkSpreadIsQuantisedToTheLineStep() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.loadRestoredText("one\ntwo\nthree")
+
+        func spread(_ index: Int) throws -> (alpha: CGFloat, blur: CGFloat) {
+            let storage = try #require(textView.textStorage)
+            let layout = try #require(textView.layoutManager)
+            let container = try #require(textView.textContainer)
+            layout.ensureLayout(for: container)
+            var lines: [NSRange] = []
+            layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: storage.length)) { _, _, _, glyphRange, _ in
+                lines.append(layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil))
+            }
+            let line = try #require(lines.indices.contains(index) ? lines[index] : nil)
+            let shadow = try #require(storage.attribute(.shadow, at: line.location, effectiveRange: nil) as? NSShadow)
+            let colour = try #require(shadow.shadowColor?.usingColorSpace(.sRGB))
+            return (colour.alphaComponent, shadow.shadowBlurRadius)
+        }
+
+        let live = try spread(2)
+        let oneBack = try spread(1)
+        let twoBack = try spread(0)
+        // Exactly the ladder, quantised: one fixed value per step, and never the live line's spread.
+        #expect(abs(live.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep) < 0.001)
+        #expect(abs(oneBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * 0.22) < 0.001)
+        #expect(abs(twoBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * 0.07) < 0.001)
+        #expect(oneBack.alpha < live.alpha && twoBack.alpha < oneBack.alpha)
+        // The blur belongs to the sheet, not to the fade: the step moves the ink's weight only.
+        #expect(abs(live.blur - oneBack.blur) < 0.001)
+
+        // Deterministic: the same text rendered again carries the same attributes.
+        let again = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        again.configureSessionTypography()
+        again.loadRestoredText("one\ntwo\nthree")
+        let replayed = try #require(again.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
+        let original = try #require(textView.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
+        #expect(replayed.shadowBlurRadius == original.shadowBlurRadius)
+        #expect(replayed.shadowColor?.alphaComponent == original.shadowColor?.alphaComponent)
+    }
+
     @Test
     func completedLinesDoNotMoveWhenTheCurrentLineGrows() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

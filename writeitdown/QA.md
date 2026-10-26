@@ -24,11 +24,11 @@ on the right like the room, the download page and the rest of the site.
 
 ## Commands and results
 
-- `cd writeitdown && npx playwright test` (8 projects): 864 tests, 791 passed, 0 failed, 73 skipped
-  (17.3 min). After `origin/main` merged its sheet lane (paper.js, the Note tones), the same command
-  on the merged head ran 904 tests: 831 passed, 0 failed, 73 skipped (10.6 min). The fold, the
-  download shapes and the room rules above are unchanged by that merge; this round's decision numbers
-  moved to D-058 to D-068 so `D-056` (the sheet) and `D-057` (the type set) stay theirs.
+- `cd writeitdown && npx playwright test` (8 projects) on the head rebased onto `origin/main` after
+  the sheet lane (#71) and the shared type set (#72): 960 tests, 887 passed, 0 failed, 73 skipped
+  (9.2 min). The two merges kept main's paper, type and grain rules and put this round's room, fold
+  and download rules on top; this round's decision numbers are D-058 to D-068 and its quality rows
+  Q-24 to Q-29, so `D-056`/`Q-22` (the sheet) and `D-057`/`Q-23` (the type set) stay theirs.
 - `cd writeitdown && npx playwright test --project=... --grep "kept screen: headline"` with the copy
   floor removed: `the pill keeps one width across labels` fails (137.33 -> 107.64 px), so the gate is
   still sensitive to a jumping pill.

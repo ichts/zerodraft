@@ -39,6 +39,7 @@ final class SessionKeptView: NSView {
     private let copyTitleLabel = PassThroughLabel(labelWithString: "")
     private let restartTitleLabel = PassThroughLabel(labelWithString: "")
     private var selectedDraft = ""
+    private var copyWidthFloor: NSLayoutConstraint?
     private var renderedWordCount: Int?
     private var renderedDuration: TimeInterval?
     private let reducesMotion: () -> Bool
@@ -125,12 +126,19 @@ final class SessionKeptView: NSView {
         document.addSubview(body)
 
         // The pill hugs its label; the title change may resize it (the row re-centres).
+        // The pill hugs its label, but never below the resting label's width: a state
+        // change must not move a control out from under the pointer (D-030, D-056).
         setCopyTitle("COPY TEXT")
+        copyWidthFloor = copyButton.widthAnchor.constraint(
+            greaterThanOrEqualToConstant: copyButton.intrinsicContentSize.width)
+        copyWidthFloor?.isActive = true
         NSLayoutConstraint.activate([
             header.topAnchor.constraint(equalTo: topAnchor),
-            header.centerXAnchor.constraint(equalTo: centerXAnchor),
-            header.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor),
-            header.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor),
+            // The block spans the sheet's inner width, so its centre is the paper's
+            // centre at every window size. Sizing it from its widest child put the
+            // whole kept block 43 pt right of the axis the room uses (problem 4).
+            header.leadingAnchor.constraint(equalTo: leadingAnchor),
+            header.trailingAnchor.constraint(equalTo: trailingAnchor),
             scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 24),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -179,8 +187,9 @@ final class SessionKeptView: NSView {
 
     /// The copy label keeps the pill's 1.6 line box and sits on the pill's optical
     /// centre. It is a pass-through label so it can sit there while the button's own
-    /// transparent title keeps its width and AX name; the pill hugs the label, so the
-    /// row re-centres when the title changes.
+    /// transparent title keeps its width and AX name. The pill hugs the label down to
+    /// the resting `COPY TEXT` width floor, so `COPIED` never narrows the control and
+    /// the row never shifts under the pointer.
     func setCopyTitle(_ title: String) {
         copyButton.title = title
         let font = NSFont.systemFont(ofSize: 15, weight: .medium)

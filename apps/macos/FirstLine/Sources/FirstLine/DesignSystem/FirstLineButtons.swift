@@ -218,9 +218,19 @@ private final class FirstLineButton: FirstLineInkFocusButton {
         layer?.cornerRadius = bounds.height > 0 ? bounds.height / 2 : role.height / 2
         effectiveAppearance.performAsCurrentDrawingAppearance {
             guard isEnabled else {
-                layer?.borderWidth = 0
-                layer?.borderColor = nil
-                layer?.backgroundColor = FirstLineColors.inkNSColor.withAlphaComponent(0.06).cgColor
+                // A disabled control keeps its own shape: the outline pill stays an
+                // outline with a hairline edge and mute label, so an unavailable action
+                // is never a heavier object than the available one beside it.
+                switch role {
+                case .primary:
+                    layer?.borderWidth = 0
+                    layer?.borderColor = nil
+                    layer?.backgroundColor = FirstLineColors.inkNSColor.withAlphaComponent(0.06).cgColor
+                case .secondary:
+                    layer?.borderWidth = 1
+                    layer?.borderColor = FirstLineColors.hairNSColor.cgColor
+                    layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
+                }
                 return
             }
             switch role {

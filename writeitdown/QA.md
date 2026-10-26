@@ -6,6 +6,63 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-26: Document content sits on the header grid (PR 70 review round)
+
+The captain read the PR 70 preview of `mac.html#buy` and saw the page as a narrow column stuck to the
+logo with an empty band on the right. The measurement matched the eye: the ten document pages put a
+62ch measure inside a 1120 px container that was itself flush with the header, so every paragraph
+started on the header's left edge and stopped 392 px short of its right edge at 1440. `main.doc` now
+owns the measure and is centred in the header container, and the per-block `max-width`s of `h1`,
+`h2`, `p`, `.qa`, `.doc-buy` and `.license-card` are gone, so the H1, the lede, the questions, the
+purchase card and the licence card share two edges that are equidistant from the header's own. This
+is the landing's composition (a centred object inside the header container, like the 760 px sheet
+under the 1120 px header), not a new one. D-055 records the decision.
+
+## Commands and results
+
+- `npx playwright test qa/shell.spec.mjs qa/mac.spec.mjs` (8 projects): 258 passed, 0 failed,
+  46 skipped.
+- `npx playwright test` (whole writeitdown suite, 8 projects): 695 passed, 0 failed, 73 skipped
+  (6.7 min).
+
+## Measured (content edges inset from the header container)
+
+| Surface | 1440 | 1024 | 390 |
+| Ten document pages, all text blocks | 196 / 196.1 px | 148 / 148.1 px | 0 / 0 px |
+| `mac.html` buy card (border box) | column-wide, 196 px inset | 148 px inset | gutter-width, 0 inset |
+| `mac.html` buy card (text inside its padding) | 236 / 236.1 px | 188 / 188.1 px | 24 / 24 px |
+| `/download/` and the landing | unchanged, container-flush (0 / 0) | 0 / 0 | 0 / 0 |
+
+The header container spans 192-1248 at 1440, 32-992 at 1024 and 20-370 at 390, so the document
+column sits symmetrically inside it at every width and never narrower than one gutter at 390.
+
+## Known-broken proof for the new gate
+
+With the pre-fix `site.css` restored (the tree at `21565be`), `qa/shell.spec.mjs` `every page puts
+its content on the header grid at 1440, 1024 and 390` failed with:
+
+```
+mac.html @1440 h1 starts 0 px and ends 211 px from the header's edges: flush with the header container or centred in it
+Expected: <= 1   Received: 211
+```
+
+and the paragraph blocks reported the same 0 / 392.1 px split at 1440 and 0 / 296.1 px at 1024. With
+the fix the same test passes on all twelve pages at all three widths. The failing run's artifacts
+are in the task evidence directory (`known-broken-grid/`).
+
+## Captures
+
+`captures/mac-buy-{before,after}-{1440,1024,390}-{light,dark}.png`: `mac.html#buy` before and after at
+the three widths in both themes. `captures/{landing,support,download,mac}-grid-*` and
+`*-grid-before-*`: full pages at 1440 and 390 in both themes, landing beside a migrated page.
+
+## UI quality checklist
+
+| Rule | Result | Basis |
+| Q-14 | PASS | Content edges are 196 / 196.1 px inside the header container at 1440, 148 / 148.1 at 1024 and 0 / 0 at 390 on all ten document pages; the landing and `/download/` stay container-flush. Pinned by the shell geometry test (D-055), which fails at 211 px asymmetry on the pre-fix tree. |
+| Q-16 | PASS | The misalignment was found by the captain on the preview; the measurement now ships as an assertion so a reviewer is not the first to see it. |
+| Q-19 | PASS | No horizontal overflow at 390: the column keeps both gutters (20 / 370 in a 390 viewport). |
+
 # 2026-10-25: One design system across the site, and a purchase page a buyer can trust
 
 Every shipped page moved onto the landing's design system (D-053): the nine help/legal/answer pages

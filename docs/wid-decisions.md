@@ -874,3 +874,23 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   than the artifact it links.
 - Supersedes: D-041's download-page release-note clause and the `data-launch-pending` gate. D-041's
   opt-in update rules stand.
+
+## D-055: Page content sits on the header's grid, centred or flush, never flush on one side
+
+- Date: 2026-10-26
+- Decision: On every shipped page each block of page content starts and ends at the same distance
+  inside the header container. Two compositions are allowed and no third: a block flush with the
+  container's edges (the landing's full-bleed bands and `/download/`) or a block centred in it (a
+  document's 62ch measure). A document page centres its measure inside the header container instead
+  of running it from the header's left edge, so the H1, the lede, the questions, the purchase card
+  and the licence card share those two edges. `qa/shell.spec.mjs` pins the geometry at 1440, 1024
+  and 390 on all twelve pages, and document blocks may not reach past the container at all.
+- Reason: the captain read the PR 70 preview of `mac.html#buy` and described the page as a narrow
+  block stuck to the logo with an empty band on the right. The measurement agreed with his eye: the
+  column was inset 0 px on the left and 392 px on the right at 1440, 0 and 296 at 1024 - a 62ch
+  text measure inside a 1120 px container, left-aligned, under a header that spans the container.
+  The landing itself never does that: its objects are either container-wide bands or the centred
+  760 px sheet.
+- Supersedes: the 2026-10-25 QA row Q-14 wording "one left edge shared with the footer on every
+  document page", which read the flush-left column as the deliberate alignment. The one measure in
+  the 17 px face is unchanged.

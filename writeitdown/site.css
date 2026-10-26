@@ -325,12 +325,17 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    The nine support/answer pages and mac.html put .home on <body>, so they resolve the same tokens, the same
    header lockup and theme plate, and the same footer as the landing. Long copy keeps one 62ch measure in the
    17 px system face; Newsreader is reserved for headings and quoted text. There is no reading-mode exception:
-   a support page is the same product as the page that sold it. */
-.home main.doc{max-width:var(--maxw);margin:0 auto;padding:clamp(40px,6vw,72px) var(--gut) var(--s9)}
-.home .doc h1{margin:0;max-width:24ch;font:500 clamp(34px,4.3vw,58px)/1.06 var(--serif);letter-spacing:-.02em}
-.home .doc h2{margin:var(--s7) 0 var(--s3);max-width:62ch;text-align:left;font:500 var(--t-h3)/1.2 var(--serif);letter-spacing:-.01em}
+   a support page is the same product as the page that sold it.
+   Composition: the landing centres its single-column objects inside the header's container (the demo sheet is
+   760 px centred under a 1120 px header), and a document is one such object. main.doc is that column and owns
+   the measure, so every block - H1, lede, cards, headings, copy - starts and ends on the same two edges, and
+   those edges are equidistant from the header's two edges. A left-flush column under a full-width header
+   leaves one empty band and reads as a mistake (D-055); qa/shell.spec.mjs measures it at three widths. */
+.home main.doc{max-width:calc(62ch + 2 * var(--gut));margin:0 auto;padding:clamp(40px,6vw,72px) var(--gut) var(--s9)}
+.home .doc h1{margin:0;font:500 clamp(34px,4.3vw,58px)/1.06 var(--serif);letter-spacing:-.02em}
+.home .doc h2{margin:var(--s7) 0 var(--s3);text-align:left;font:500 var(--t-h3)/1.2 var(--serif);letter-spacing:-.01em}
 .home .doc h3{margin:var(--s5) 0 var(--s2);font:500 20px/1.3 var(--serif);letter-spacing:-.01em}
-.home .doc p,.home .doc li{margin:0 0 var(--s4);max-width:62ch;font:400 var(--t-body)/1.6 var(--sans);color:var(--ink)}
+.home .doc p,.home .doc li{margin:0 0 var(--s4);font:400 var(--t-body)/1.6 var(--sans);color:var(--ink)}
 .home .doc .doc-lede{margin-top:var(--s4);color:var(--mute)}
 .home .doc .doc-note{margin:0;font:400 var(--t-ui)/1.5 var(--sans);color:var(--mute)}
 .home .doc .doc-meta,.home .doc .doc-status{margin:var(--s3) 0 0;font:400 var(--t-small)/1.6 var(--sans);color:var(--mute)}
@@ -344,18 +349,18 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .doc-crumbs a{color:var(--mute)}
 .home .doc-crumbs [aria-current]{color:var(--ink)}
 /* Answer pages: one question per block, question in the serif at heading rank so it never reads as body. */
-.home .doc .qa{margin:0 0 var(--s5);max-width:62ch}
+.home .doc .qa{margin:0 0 var(--s5)}
 .home .doc .qa h3{margin:0 0 6px}
 .home .doc .qa p{margin:0}
 /* Purchase: the section itself is the #buy anchor, so the heading and the price land in view. */
-.home .doc-buy{max-width:var(--measure);padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
+.home .doc-buy{padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
 .home .doc-buy h2{margin:0}
 .home .price-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s2) var(--s3);margin:var(--s4) 0 0}
 .home .price-row .doc-price{margin:0;font:500 32px/1.1 var(--serif);letter-spacing:-.01em;color:var(--ink)}
 .home .doc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .home .doc-actions form{margin:0;display:flex}
 /* The licence card is the buyer's return surface: pending, ready, copied and unpaid all live here. */
-.home .license-card{max-width:var(--measure);margin-top:var(--s5);padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
+.home .license-card{margin-top:var(--s5);padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
 .home .license-card h2{margin:0}
 .home .license-key{margin:var(--s4) 0;padding:var(--s4);border:1px solid var(--hair);border-radius:var(--r-ctl);background:var(--tag-bg);font:500 var(--t-ui)/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
 .home .license-key code{font:inherit;color:var(--ink)}

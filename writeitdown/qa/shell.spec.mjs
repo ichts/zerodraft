@@ -304,3 +304,55 @@ test('every document page still uses the landing measure, not a second reading m
     expect(doc.ink, `${path}: body copy wears the ink role`).toBe(landing.ink);
   }
 });
+
+// The grid: the landing composes its single-column objects inside the header's container (`.wrap`, 1120 px
+// with its gutters), so a document is one more such object. Every block of page content therefore starts
+// and ends at the same two edges inside the header - either flush with the container or centred in it -
+// at every width. A 62ch column left-flush under a full-width header is the defect this pins: the captain
+// read mac.html#buy as a narrow block stuck to the logo with an empty band on the right (D-055).
+test('every page puts its content on the header grid at 1440, 1024 and 390', async ({ page }, info) => {
+  test.skip(info.project.name !== '1440-light-no-preference', 'the test drives its own three widths');
+  const read = () => page.evaluate(() => {
+    const edges = element => {
+      const box = element.getBoundingClientRect();
+      const css = getComputedStyle(element);
+      return { left: box.left + parseFloat(css.paddingLeft), right: box.right - parseFloat(css.paddingRight) };
+    };
+    const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(element => element.getClientRects().length);
+    const header = edges(nav);
+    const blocks = [...document.querySelector('main').children]
+      .filter(child => child.getClientRects().length)
+      .map(child => {
+        const box = edges(child);
+        return {
+          tag: child.tagName.toLowerCase() + (child.className ? `.${String(child.className).split(' ')[0]}` : ''),
+          left: +(box.left - header.left).toFixed(1),
+          right: +(header.right - box.right).toFixed(1),
+          width: +(box.right - box.left).toFixed(1),
+        };
+      });
+    return { headerWidth: +(header.right - header.left).toFixed(1), blocks };
+  });
+
+  for (const width of [1440, 1024, 390]) {
+    await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
+    for (const path of pages) {
+      await page.goto(path);
+      await page.evaluate(() => document.fonts.ready);
+      const { headerWidth, blocks } = await read();
+      expect(headerWidth, `${path} @${width}: the header container has real width`).toBeGreaterThan(200);
+      expect(blocks.length, `${path} @${width}: the page has content blocks`).toBeGreaterThan(1);
+      for (const block of blocks) {
+        const at = `${path} @${width} ${block.tag} starts ${block.left} px and ends ${block.right} px from the header's edges`;
+        expect(block.width, `${at}: a block with real width`).toBeGreaterThan(0);
+        expect(Math.abs(block.left - block.right), `${at}: flush with the header container or centred in it`).toBeLessThanOrEqual(1);
+        if (documentPages.includes(path)) {
+          // A document is a centred measure inside the container; only the landing and the download page
+          // run a full-bleed band, so only those two may reach past the container's edges.
+          expect(block.left, `${at}: a document block may not sit left of the header container`).toBeGreaterThanOrEqual(-0.5);
+          expect(block.right, `${at}: a document block may not sit right of the header container`).toBeGreaterThanOrEqual(-0.5);
+        }
+      }
+    }
+  }
+});

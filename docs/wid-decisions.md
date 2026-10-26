@@ -847,12 +847,12 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   icon, and the Mac link moves into the exit row. The download page carries no 1.1 note until 1.1
   ships; the note returns with that release.
 - Reason: the captain read the live site and found the colours wrong on `support.html` and the design
-  system wrong on the page buyers reach before paying. Two support pages and nine help pages were still
-  a retired beige/mono document style, and `mac.html` was a third system: a 48 px left-aligned serif
-  heading, 21 px serif body, square mono buttons and a transparent theme button, while `/download/` two
-  links away was 60 px centred, 17 px sans and pill-shaped. A buyer paid from the page that matched the
-  least. On a phone, the room nav's filled pill was louder than the clock above it, and D-045's
-  reachability reason survives without it because the Mac link stays in the exit row.
+  system wrong on the page buyers reach before paying. The nine support, legal and answer pages were
+  still a retired beige/mono document style, and `mac.html` was a third system: a 48 px left-aligned
+  serif heading, 21 px serif body, square mono buttons and a transparent theme button, while
+  `/download/` two links away was 60 px centred, 17 px sans and pill-shaped. A buyer paid from the page
+  that matched the least. On a phone, the room nav's filled pill was louder than the clock above it, and
+  D-045's reachability reason survives without it because the Mac link stays in the exit row.
 - Supersedes: D-045's room-nav clause (the nav row is still kept on the landing room at every width,
   but a phone shows only the lockup and the theme icon; the Mac link moves into the exit row). It also
   supersedes the canvas-only adoption recorded for `mac.html` in the `tokens.css` header.

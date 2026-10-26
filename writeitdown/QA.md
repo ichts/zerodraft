@@ -75,7 +75,7 @@ and theme.
 | Q-16 | PASS | Basic polish fixed in this pass: the wrapped exit row had eaten a line of the kept draft, and the error status now reads at ink weight. |
 | Q-17 | PASS | 17 px / 1.6 body with the serif reserved for headings; no rendered pitch changed. |
 | Q-18 | N/A | Mac launch state; no web surface. |
-| Q-19 | PASS | Header sweep and 360 px point samples now run over all twelve pages; no overflow, 6 px+ gutter, one plate token. |
+| Q-19 | PASS | The 360 px point samples now run over every shipped page and the room, and the width sweep still covers `/download/`; no overflow, 6 px+ gutter, one plate token. |
 | Q-20 | PASS | No copy was added to describe a page. Every price mention on all twelve pages and in the six buy states is exactly `$4.99 once`; `shell.spec.mjs` enforces it. The 1.1 note left the 1.0 card. |
 | Q-21 | PASS | `shell.spec.mjs` enforces one price string, `$4.99 once`, on every shipped page and every buy state; the shell rule is green on all twelve pages. |
 

@@ -210,10 +210,10 @@ The test: if a frame would hang comfortably in any of these rooms, keep deleting
 
 This is the brand for writeitdown.app and the native Mac app. It is a sibling of the root Zero Draft landing: the
 `ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the root landing.
-The primary web header is the landing, the room, `/download/`, and `mac.html`; those surfaces use the
-chip-and-wordmark lockup (11.6). The social card keeps the wordmark-only lockup. The legal, support, and answer
-pages keep the mono `WRITE_IT_DOWN` logotype and adopt the favicon. The native Mac app's in-app start screen
-uses the wordmark-only lockup; the app icon and volume icon carry the mark.
+Every shipped writeitdown.app page - the landing, the room, `/download/`, `mac.html`, and the legal, support and
+answer pages - uses the chip-and-wordmark lockup (11.6), so no page keeps a mono logotype (D-053). The social card
+keeps the wordmark-only lockup. The native Mac app's in-app start screen uses the wordmark-only lockup; the app
+icon and volume icon carry the mark.
 
 ### 11.1 The mark and the wordmark
 
@@ -265,10 +265,11 @@ the notch.
   its hit area without enlarging the lockup.
 - Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and the theme
   button keeps at least 6 px of right gutter, with the 36 px theme button unscaled and the page action present
-  at 380 px and above and hidden below 380 px. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at
-  every width from 320 to 1440 px" sweeps the widest header (`/download/`) in 1 px steps from 320 to 420 and
-  8 px steps from 420 to 1440 under the wider-font action model, so a breakpoint that leaves an uncovered band
-  fails; keep the range sweep instead of sampled widths.
+  at 380 px and above and hidden below 380 px. The room drops it sooner on phones; see the mobile rule
+  below. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at every width from 320 to 1440 px"
+  sweeps the widest header (`/download/`) in 1 px steps from 320 to 420 and 8 px steps from 420 to 1440
+  under the wider-font action model, so a breakpoint that leaves an uncovered band fails; keep the range
+  sweep instead of sampled widths.
 - Site header, mobile: from 391 to 820 px the 19 px lockup takes 141.9 px of the row, with 12 px between the
   brand and the page action and 6 px inside the action group; at 380-390 px the 16 px lockup takes 119.5 px,
   the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 380 px the nav page action is
@@ -277,12 +278,13 @@ the notch.
   rather than stacked into a second header row, so the room's header height and its dynamic-viewport paper
   sizing stay unchanged. One rule for every page that uses `.brand` - these sizes and the single
   `--brand-plate` token in 11.6 - so `/download/` does not diverge from the landing, trial room and `mac.html`.
+  The room drops the action sooner: from 767 px down its nav keeps only the lockup and the theme icon, and the
+  Mac link moves into the exit row, so nothing in the header competes with the clock (D-053).
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
-  `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The legal, support, and answer pages use the
-  mono `WRITE_IT_DOWN` logotype; the Mac start screen uses the bundled lockup. The app icon `.icns` is the light
-  plate; there is no dark app-icon alternate in the app icon set.
+  `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The Mac start screen uses the bundled
+  lockup. The app icon `.icns` is the light plate; there is no dark app-icon alternate in the app icon set.
 
 ### 11.4 Do not
 
@@ -311,15 +313,14 @@ the notch.
   inside it with matching bounds, the split to survive at 2x, and the wordmark to follow it. Computed colours
   must give a lighter plate than W in light appearance and a darker plate than W in dark appearance.
   It fails on a wordmark-only lockup or inverted polarity.
-  "the header chip paints one plate colour on every page" reads the rendered `::before` background on the
-  landing, the trial room, `/download/` and `mac.html` and requires one `--brand-plate` value per theme, so a
-  page-local fallback cannot make the chip diverge again. The same test reads the plate's rendered border and
-  requires the 1 px solid `--hair-2` edge to equal the theme button's boundary on every page, so a missing or
-  per-page edge fails.
+  "the header chip paints one plate colour on every page" reads the rendered `::before` background on every
+  shipped page and the room and requires one `--brand-plate` value per theme, so a page-local fallback cannot
+  make the chip diverge again. The same test reads the plate's rendered border and requires the 1 px solid
+  `--hair-2` edge to equal the theme button's boundary on every page, so a missing or per-page edge fails.
   "the header keeps its right gutter and a legible chip at 360 px" repeats the visual check at 360, 375 and
-  390 px and requires no horizontal overflow, at least 6 px of right gutter and one lockup step across the
-  landing, the trial room, `/download/` and `mac.html`; at 360 px it also requires a chip of at least 16 px with
-  the split still reading. "the header holds its gutter at every width from 320 to 1440 px" sweeps `/download/`
+  390 px and requires no horizontal overflow, at least 6 px of right gutter and one lockup step across every
+  shipped page and the room; at 360 px it also requires a chip of at least 16 px with the split still
+  reading. "the header holds its gutter at every width from 320 to 1440 px" sweeps `/download/`
   in 1 px steps from 320 to 420 and 8 px steps from 420 to 1440 under the wider-font action model and requires
   no horizontal overflow, at least 6 px of right gutter, the page action at 380 px and above and absent below,
   and the 36 px theme button at every width, so a breakpoint that leaves a band uncovered fails. Verify the
@@ -349,9 +350,9 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
   token; the W and wordmark paint `currentColor` from `--ink`. `--brand-plate` has one value per theme and is
   owned with the other root colour roles in `writeitdown/tokens.css`, so `.brand` consumes it directly with no
   page-local fallback: light is the paper plate `#ffffff` with the ink W, dark is the ink plate `#26231c` with
-  the bone W, on the landing, the trial room, `/download/` and `mac.html` alike. Paper against the page wall
-  is 1.07:1, so the plate carries one 1 px edge in `--hair-2` - the same boundary `.theme-btn` draws - on the
-  chip square, with a corner radius that matches the squircle; that edge is what keeps the 21 px chip an
+  the bone W, on every shipped page and the room alike. Paper against the page wall is 1.07:1, so the plate
+  carries one 1 px edge in `--hair-2` - the same boundary `.theme-btn` draws - on the chip square, with a
+  corner radius that matches the squircle; that edge is what keeps the 21 px chip an
   object. No other border, shadow, or colour. Both layers share one viewBox and
   `shape-rendering="geometricPrecision"`, with no theme-specific CSS or new palette colour. The glyph layer
   retains the split strokes with `fill-rule="evenodd"`.

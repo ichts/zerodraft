@@ -508,7 +508,7 @@ struct RoundThreeTests {
         }
     }
 
-    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
+    @Test func stoppedScreenHoldsTheDeletionValueAndAControlFreeBlock() throws {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })
         let state = licensedTestState(sessionEngine: engine,
@@ -518,7 +518,6 @@ struct RoundThreeTests {
         let room = SessionViewController(appState: state)
         let window = makeWindow(room)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
-        let paper = try #require(editor.enclosingScrollView?.superview)
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
         now.now = 9
         room.tick()
@@ -526,17 +525,53 @@ struct RoundThreeTests {
         room.view.layoutSubtreeIfNeeded()
         room.viewDidLayout()
         room.view.layoutSubtreeIfNeeded()
-        let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
+        let fields = descendants(of: room.view, of: NSTextField.self).filter { !$0.isHiddenOrHasHiddenAncestor }
+        // The instruments carry the deletion: the clock froze at the unused time and the bar
+        // holds that same fraction, so no sentence has to repeat it (D-056).
+        #expect(fields.contains { $0.stringValue == "0:52" })
+        #expect(!fields.contains { $0.stringValue == "1:00" })
+        let bar = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
+        #expect(abs(bar.fraction - CGFloat(52.0 / 60.0)) < 0.01)
         #expect(!descendants(of: room.view, of: NSTextField.self).contains { $0.stringValue == "Start typing." })
-        let receiptRect = paper.convert(receipt.bounds, from: receipt)
-        let receiptFont = try #require(receipt.font)
+        // The block stays on the Mac offset at a tall sheet, and the writing line stays put.
+        let block = try #require(fields.first { $0.stringValue == "You stopped." })
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        let blockFrame = paper.convert(block.bounds, from: block)
+        let topFromPaper = paper.bounds.maxY - blockFrame.maxY
+        #expect(abs(topFromPaper - 72) <= 0.5, "the stopped block sits at \(topFromPaper) pt from the paper top")
         let baseline = try #require(editor.currentInsertionBaseline())
         let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: editor).y
-        let receiptInkTop = receiptRect.maxY - receipt.firstBaselineOffsetFromTop + receiptFont.capHeight
-        let drop = baselineInPaper - receiptInkTop
-        #expect(drop >= 40 && drop <= 48,
-                "the receipt ink top is \(drop) pt under the writing baseline, outside the status slot")
+        let note = try #require(fields.first { $0.stringValue == "Draft deleted." })
+        let noteFrame = paper.convert(note.bounds, from: note)
+        #expect(noteFrame.minY - baselineInPaper > 40, "the block never reaches the writing line")
+        window.orderOut(nil)
+    }
+
+    @Test func restartRefillsTheInstrumentsTheStoppedScreenFroze() throws {
+        let now = MutableRoundClock(0)
+        let engine = SessionEngine(now: { now.now })
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: tempRoot()),
+                                      installIDStore: InstallIDStore(configDirectory: tempRoot()))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = makeWindow(room)
+        let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
+        editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+        now.now = 9
+        room.tick()
+        let bar = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
+        #expect(abs(bar.fraction - CGFloat(52.0 / 60.0)) < 0.01)
+        let beginAgain = try #require(descendants(of: room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
+        beginAgain.performClick(nil)
+        room.view.layoutSubtreeIfNeeded()
+        let fields = descendants(of: room.view, of: NSTextField.self).filter { !$0.isHiddenOrHasHiddenAncestor }
+        #expect(fields.contains { $0.stringValue == "1:00" })
+        #expect(!fields.contains { $0.stringValue == "0:52" })
+        #expect(abs(bar.fraction - 1) < 0.01, "a new session refills the bar")
+        #expect(descendants(of: room.view, of: NSTextField.self)
+            .allSatisfy { $0.stringValue != "Draft deleted." || $0.isHiddenOrHasHiddenAncestor })
         window.orderOut(nil)
     }
 

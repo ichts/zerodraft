@@ -196,7 +196,7 @@ async function run(size, browser) {
   });
   await block('landing/core-rule', async () => {
     await step('three moments: writing, warning 3, deleted', async () => {
-      await show('#core'); ok(await page.locator('#core .mo').count() === 3, 'need 3 states'); ok(/DRAFT DELETED/.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
+      await show('#core'); ok(await page.locator('#core .mo').count() === 3, 'need 3 states'); ok(/You stopped\./.test(await page.locator('.mo.m3').innerText()) && /Draft deleted\./.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
     });
   });
   await block('landing/how-it-works', async () => {
@@ -315,7 +315,6 @@ async function run(size, browser) {
       ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
       ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
       ok(/^1 MINUTE\. \d+ WORDS?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
-      ok((await page.locator('#room-report').textContent()).trim() === '', 'deletion report present after completion');
       ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
       await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
       await page.locator('#copy').click();
@@ -342,11 +341,18 @@ async function run(size, browser) {
       ok(await page.locator('#editor').inputValue() === text, 'fresh session did not accept the sentence');
       await page.waitForTimeout(8100);
       ok(await page.locator('#editor').inputValue() === '', 'silent draft was not deleted');
-      ok(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/.test(await page.locator('#room-report').innerText()), 'deletion receipt missing');
+      ok(/^Draft deleted\.$/.test((await page.locator('#failure-note').innerText()).trim()), 'deletion sentence missing');
+      ok(!/TYPE TO START AGAIN|DRAFT DELETED AT/.test(await page.locator('#room').innerText()), 'the retired receipt is still on the failure screen');
       ok(!await page.locator('#kept').isVisible(), 'silent session incorrectly kept');
       ok((await page.locator('#failed h1').innerText()).trim() === 'You stopped.', 'failure headline missing');
       ok(await page.getByRole('button', { name: 'Begin again', exact: true }).isVisible(), 'Begin again missing');
       ok((await page.locator('#room-count').innerText()).trim() === '0 words', 'wiped count is not 0 words');
+      // The clock and the bar are the receipt: both hold the value the session stopped at.
+      const stoppedAt = (await page.locator('#room-clock').innerText()).trim();
+      ok(/^0:\d\d$/.test(stoppedAt), `the frozen clock reads ${stoppedAt}`);
+      const unused = Number(stoppedAt.split(':')[1]);
+      const barScale = await page.locator('#room-bar').evaluate(bar => Number(/scaleX\(([^)]+)\)/.exec(bar.style.transform)?.[1]));
+      ok(Math.abs(barScale - unused / 60) < 0.005, `the bar holds ${barScale}, the clock ${stoppedAt}`);
     });
   });
   await block('legal', async () => {

@@ -13,11 +13,11 @@ struct RoomTests {
         #expect(RoomPresentation.clock(0) == "0:00")
     }
 
-    @Test func wipeReportUsesUnusedTimeAndLiveSentence() {
-        #expect(RoomPresentation.wipeReport(unused: 52, canRestart: true) ==
-            "DRAFT DELETED AT 0:52. TYPE TO START AGAIN.")
-        #expect(RoomPresentation.wipeReport(unused: 52, canRestart: false) ==
-            "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.")
+    @Test func stoppedScreenAnnouncementCarriesTheFrozenValue() {
+        #expect(RoomPresentation.failureAnnouncement(unused: 52) ==
+            "You stopped. Draft deleted. 0:52 unused.")
+        #expect(RoomPresentation.failureAnnouncement(unused: 0) ==
+            "You stopped. Draft deleted. 0:00 unused.")
     }
 
     @Test func keptReceiptMirrorsTheFailureReceipt() {
@@ -214,29 +214,90 @@ struct RoomTests {
         #expect(!exit.isHiddenOrHasHiddenAncestor)
     }
 
-    @Test func deletedStateShowsUnusedSentenceAndCountWithoutAHint() throws {
+    @Test func stoppedScreenStatesTheDeletionAndFreezesTheClockAndBar() throws {
         let fixture = try roomFixture()
         fixture.editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.clock.now = 8.1
         fixture.room.tick()
+        fixture.room.endCutAnimation()
+        fixture.room.view.layoutSubtreeIfNeeded()
         #expect(fixture.engine.phase == .failure)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        let report = try #require(fields.first { $0.stringValue == "DRAFT DELETED AT 0:52. TYPE TO START AGAIN." })
-        #expect(!report.isHiddenOrHasHiddenAncestor)
-        #expect(sameColor(report.textColor, FirstLineColors.redNSColor))
-        #expect(!fields.contains { $0.stringValue == "Start typing." },
+        let visible = fields.filter { !$0.isHiddenOrHasHiddenAncestor }
+        // The block says what happened, once: no receipt sentence and no second instruction.
+        #expect(!visible.contains { $0.stringValue.hasPrefix("DRAFT DELETED AT") })
+        #expect(!visible.contains { $0.stringValue.contains("TYPE TO START AGAIN") })
+        #expect(!visible.contains { $0.stringValue == "Start typing." },
                 "the wiped room must not add an under-line hint")
-        #expect(fields.contains { $0.stringValue == "1:00" })
-        #expect(fields.contains { $0.stringValue == "0 words" })
-        // The wiped screen is the kept screen's counterpart: a headline, a real
-        // restart button and the red receipt as the detail.
-        let heading = try #require(fields.first { $0.stringValue == "You stopped." })
+        let heading = try #require(visible.first { $0.stringValue == "You stopped." })
+        let note = try #require(visible.first { $0.stringValue == "Draft deleted." })
+        #expect((note.font?.pointSize ?? 0) == 15)
+        #expect(sameColor(note.textColor, FirstLineColors.muteNSColor))
         #expect(!heading.isHiddenOrHasHiddenAncestor)
-        let buttons = descendants(fixture.room.view, of: NSButton.self)
-        let beginAgain = try #require(buttons.first { $0.title == "Begin again" })
+        // No red text survives on the stopped screen; red is the pen and the deadline only.
+        for field in visible {
+            #expect(!sameColor(field.textColor, FirstLineColors.redNSColor),
+                    "\"\(field.stringValue)\" is red on the stopped screen")
+        }
+        // The instruments are the receipt: the clock and the bar hold the stop value, and the
+        // count returns to the words it can state.
+        #expect(visible.contains { $0.stringValue == "0:52" })
+        #expect(!visible.contains { $0.stringValue == "1:00" })
+        #expect(visible.contains { $0.stringValue == "0 words" })
+        let bar = try #require(descendants(fixture.room.view, of: FirstLineFillBar.self).first)
+        #expect(abs(bar.fraction - CGFloat(52.0 / 60.0)) < 0.01, "the bar holds \(bar.fraction)")
+        let beginAgain = try #require(descendants(fixture.room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
         #expect(!beginAgain.isHiddenOrHasHiddenAncestor)
         #expect(beginAgain.keyEquivalent == "\r")
-        #expect(report.stringValue.hasPrefix("DRAFT DELETED AT"))
+    }
+
+    @Test func stoppedScreenRestartIsAQuietTextLinkWithA44PointTarget() throws {
+        let fixture = try roomFixture(typed: false)
+        fixture.editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.clock.now = 8.1
+        fixture.room.tick()
+        fixture.room.endCutAnimation()
+        fixture.room.view.layoutSubtreeIfNeeded(); fixture.room.viewDidLayout(); fixture.room.view.layoutSubtreeIfNeeded()
+        let editor = fixture.editor
+        let paper = try #require(editor.enclosingScrollView?.superview)
+        let button = try #require(descendants(fixture.room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
+        let note = try #require(descendants(fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue == "Draft deleted." })
+        let label = try #require(descendants(button, of: NSTextField.self)
+            .first { $0.stringValue == "Begin again" })
+        let key = try #require(descendants(button, of: NSTextField.self)
+            .first { $0.stringValue == "RETURN" })
+        // One row, two type styles: the consequence line's 15 pt mute ink and the key caption in
+        // the room's 11 pt chrome tracking, held by a shared baseline rather than frame centres.
+        let labelFont = try #require(label.attributedStringValue.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        let keyFont = try #require(key.attributedStringValue.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        #expect(labelFont.pointSize == 15)
+        #expect(keyFont.pointSize == 11)
+        let labelInk = label.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        let keyInk = key.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        #expect(sameColor(labelInk, FirstLineColors.muteNSColor))
+        #expect(sameColor(keyInk, FirstLineColors.chromeNSColor))
+        let keyKern = key.attributedStringValue.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat ?? 0
+        #expect(abs(keyKern - 0.44) < 0.01, "the key caption keeps the room's 0.04em tracking")
+        let labelFrame = paper.convert(label.bounds, from: label)
+        let keyFrame = paper.convert(key.bounds, from: key)
+        #expect(abs(keyFrame.minX - labelFrame.maxX - 12) < 1, "the key sits 12 pt after the label")
+        func baseline(_ field: NSTextField) -> CGFloat {
+            paper.convert(NSPoint(x: 0, y: field.firstBaselineOffsetFromTop), from: field).y
+        }
+        #expect(abs(baseline(label) - baseline(key)) < 1, "the row shares one baseline")
+        #expect(abs(baseline(note) - baseline(label) - 44) < 1.5,
+                "the link row sits one gap under the consequence line (\(baseline(note) - baseline(label)))")
+        // A real 44 pt target that draws nothing but the room's ink ring.
+        let buttonFrame = paper.convert(button.bounds, from: button)
+        #expect(abs(buttonFrame.height - 44) < 1)
+        #expect((button.layer?.borderWidth ?? 0) == 0)
+        #expect(button.layer?.backgroundColor == nil)
+        #expect(button.isBordered == false)
+        let ring = try #require(button as? FirstLineInkFocusRinging)
+        #expect(!ring.showsInkFocusRing, "the ring appears on keyboard focus, not at rest")
     }
 
     @Test func keptStateMatchesTheLiveCopyAndReceipt() throws {

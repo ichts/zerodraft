@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
- * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, wash and numeral, live deletion sentence, the stopped screen (headline, `Begin again`, red receipt), kept heading/copy receipt, two-step exit.
- * [POS]: Centered writing above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, wash and numeral, the stopped screen (`You stopped.` / `Draft deleted.` / the quiet `Begin again` link whose key is `RETURN`), the frozen clock and bar as its receipt, kept heading/copy receipt, two-step exit.
+ * [POS]: Centered writing above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, the deletion value held by the clock and bar, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -70,14 +70,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
     private var countLabel: NSTextField!
-    private var reportLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!
     private var exitButton: NSButton!
     private var exitHintLabel: NSTextField!
     private var failureHeadlineLabel: NSTextField!
-    private var failureRestartButton: NSButton!
+    private var failureNoteLabel: NSTextField!
+    private var failureRestartButton: FirstLineInkFocusButton!
     private var failureRestartLabel: FailureRestartLabel!
+    private var failureRestartKey: FailureRestartLabel!
     private var keptView: SessionKeptView!
     private var keyMonitor: Any?
     private var keyObserver: NSObjectProtocol?
@@ -94,7 +95,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var denyWork: DispatchWorkItem?
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
-    private var reportTop: NSLayoutConstraint!
     private var chromeHover = false
     /// Cadence for the stepped Reduce Motion bar; the normal bar is one continuous
     /// Core Animation over the remaining time.
@@ -243,9 +243,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
-        reportLabel = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
-        reportLabel.maximumNumberOfLines = 0
-        reportLabel.isHidden = true
         numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
                              color: FirstLineColors.redNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
@@ -268,38 +265,62 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         failureHeadlineLabel.lineBreakMode = .byWordWrapping
         failureHeadlineLabel.isHidden = true
         failureHeadlineLabel.stringValue = "You stopped."
-        failureRestartButton = FirstLineButtons.secondary(title: "Begin again", target: self,
-                                                          action: #selector(restart), height: 48)
+        // The consequence line: the same 15 pt quiet ink the live trial uses, on the sheet's
+        // own 1.6 line box, 8 pt under the headline.
+        let noteFont = NSFont.systemFont(ofSize: 15)
+        failureNoteLabel = label(font: noteFont, color: FirstLineColors.muteNSColor)
+        failureNoteLabel.attributedStringValue = FirstLineTypography.trackedText(
+            "Draft deleted.", font: noteFont, color: FirstLineColors.muteNSColor, kernEm: 0)
+        failureNoteLabel.isHidden = true
+        // The way back is a text link, not a pill: `Begin again` in the consequence line's own
+        // face and ink with the key named beside it, a real 44 pt target, and the room's ink ring
+        // on keyboard focus. The 12 pt gap keeps the row on one baseline.
+        let linkFont = NSFont.systemFont(ofSize: 15)
+        let keyFont = NSFont.systemFont(ofSize: 11, weight: .medium)
+        // A borderless ink-focus button: the stopped screen's way back draws only its type
+        // (and the room's ink ring when it holds the keyboard).
+        failureRestartButton = FirstLineInkFocusButton(frame: .zero)
+        failureRestartButton.target = self
+        failureRestartButton.action = #selector(restart)
+        failureRestartButton.translatesAutoresizingMaskIntoConstraints = false
         failureRestartButton.title = "Begin again"
+        failureRestartButton.isBordered = false
+        failureRestartButton.bezelStyle = .inline
+        failureRestartButton.font = linkFont
         failureRestartButton.keyEquivalent = "\r"
+        failureRestartButton.contentTintColor = FirstLineColors.muteNSColor
+        failureRestartButton.inkFocusRingInset = 3
+        failureRestartButton.inkFocusRingCornerRadius = 4
         failureRestartButton.setAccessibilityLabel("Begin again")
-        failureRestartButton.isHidden = true
-        let restartFont = NSFont.systemFont(ofSize: 15, weight: .medium)
-        failureRestartButton.font = restartFont
+        failureRestartButton.setAccessibilityHelp("Return starts a new session.")
         failureRestartButton.attributedTitle = FirstLineTypography.trackedText(
-            "Begin again", font: restartFont, color: .clear, kernEm: 0.04, lineHeightMultiple: 1.6)
+            "Begin again", font: linkFont, color: .clear, kernEm: 0)
+        failureRestartButton.isHidden = true
         failureRestartLabel = FailureRestartLabel(labelWithString: "Begin again")
-        failureRestartLabel.translatesAutoresizingMaskIntoConstraints = false
-        failureRestartLabel.isEditable = false
-        failureRestartLabel.isSelectable = false
-        failureRestartLabel.isBezeled = false
-        failureRestartLabel.drawsBackground = false
-        failureRestartLabel.alignment = .center
-        failureRestartLabel.maximumNumberOfLines = 1
-        failureRestartLabel.lineBreakMode = .byClipping
-        failureRestartLabel.setAccessibilityElement(false)
+        failureRestartLabel.font = linkFont
+        failureRestartLabel.textColor = FirstLineColors.muteNSColor
         failureRestartLabel.attributedStringValue = FirstLineTypography.trackedText(
-            "Begin again", font: restartFont, color: FirstLineColors.inkNSColor, kernEm: 0.04,
-            lineHeightMultiple: 1.6)
-        failureRestartButton.addSubview(failureRestartLabel)
-        NSLayoutConstraint.activate([
-            failureRestartLabel.centerXAnchor.constraint(equalTo: failureRestartButton.centerXAnchor),
-            failureRestartLabel.centerYAnchor.constraint(equalTo: failureRestartButton.centerYAnchor,
-                                                          constant: -5.25),
-        ])
+            "Begin again", font: linkFont, color: FirstLineColors.muteNSColor, kernEm: 0)
+        failureRestartKey = FailureRestartLabel(labelWithString: "RETURN")
+        failureRestartKey.font = keyFont
+        failureRestartKey.textColor = FirstLineColors.chromeNSColor
+        failureRestartKey.attributedStringValue = FirstLineTypography.trackedText(
+            "RETURN", font: keyFont, color: FirstLineColors.chromeNSColor, kernEm: 0.04)
+        for run in [failureRestartLabel!, failureRestartKey!] {
+            run.translatesAutoresizingMaskIntoConstraints = false
+            run.isEditable = false
+            run.isSelectable = false
+            run.isBezeled = false
+            run.drawsBackground = false
+            run.alignment = .center
+            run.maximumNumberOfLines = 1
+            run.lineBreakMode = .byClipping
+            run.setAccessibilityElement(false)
+            failureRestartButton.addSubview(run)
+        }
 
-        for element in [timerLabel!, countLabel!, reportLabel!, numeralLabel!, warningHint!, exitButton!,
-                        exitHintLabel!, failureHeadlineLabel!, failureRestartButton!] {
+        for element in [timerLabel!, countLabel!, numeralLabel!, warningHint!, exitButton!,
+                        exitHintLabel!, failureHeadlineLabel!, failureNoteLabel!, failureRestartButton!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -318,7 +339,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let safe = view.safeAreaLayoutGuide
         numeralTop = numeralLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         captionTop = warningHint.topAnchor.constraint(equalTo: paper.topAnchor)
-        reportTop = reportLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         NSLayoutConstraint.activate([
             paperShadow.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
             paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
@@ -358,15 +378,25 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             captionTop,
             warningHint.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
             warningHint.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
-            reportLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            reportTop,
-            reportLabel.widthAnchor.constraint(lessThanOrEqualTo: paper.widthAnchor, constant: -44),
             failureHeadlineLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             failureHeadlineLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 72),
             failureHeadlineLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 32),
             failureHeadlineLabel.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -32),
+            failureNoteLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            failureNoteLabel.topAnchor.constraint(equalTo: failureHeadlineLabel.bottomAnchor, constant: 8),
+            failureNoteLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 32),
+            failureNoteLabel.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -32),
             failureRestartButton.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
-            failureRestartButton.topAnchor.constraint(equalTo: failureHeadlineLabel.bottomAnchor, constant: 20),
+            failureRestartButton.heightAnchor.constraint(equalToConstant: 44),
+            failureRestartLabel.leadingAnchor.constraint(equalTo: failureRestartButton.leadingAnchor),
+            failureRestartLabel.trailingAnchor.constraint(equalTo: failureRestartKey.leadingAnchor, constant: -12),
+            failureRestartKey.trailingAnchor.constraint(equalTo: failureRestartButton.trailingAnchor),
+            failureRestartLabel.centerYAnchor.constraint(equalTo: failureRestartButton.centerYAnchor),
+            failureRestartKey.firstBaselineAnchor.constraint(equalTo: failureRestartLabel.firstBaselineAnchor),
+            // One gap under the consequence line, measured from the baselines the way the live
+            // trial measures it: its 24 px line box plus the 20 px gap (D-056).
+            failureRestartLabel.firstBaselineAnchor.constraint(equalTo: failureNoteLabel.firstBaselineAnchor,
+                                                              constant: 44),
             keptView.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: 36),
             keptView.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -36),
             keptView.topAnchor.constraint(equalTo: paper.topAnchor, constant: SessionKeptView.verticalInset),
@@ -486,13 +516,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let captionInkTop = numeralInkTop + numeralInkHeight + 20
         let captionTopConstant = round(captionInkTop - captionBearing)
         if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
-
-        // The wipe receipt is the result the writer must see; with no hint on the line
-        // it takes the first status slot under the writing line.
-        let reportFont = reportLabel.font ?? FirstLineTypography.smallNSFont
-        let reportBearing = reportLabel.firstBaselineOffsetFromTop - reportFont.capHeight
-        let reportTopConstant = round(numeralInkTop - reportBearing)
-        if abs(reportTop.constant - reportTopConstant) > 0.5 { reportTop.constant = reportTopConstant }
     }
 
     // MARK: - State
@@ -568,8 +591,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         if phase == .failure, lastPhase != .failure {
             showCut()
-            // The deleted state says TYPE TO START AGAIN; keep the editor first responder
-            // so the caret is visible there exactly as in the empty room.
+            // The stopped screen keeps the editor first responder so the caret and Return both
+            // sit where the writing was, exactly as in the empty room.
             focusForPhase()
         }
         if phase == .success, lastPhase != .success {
@@ -584,7 +607,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             announce("Keep typing or the draft is deleted. Three seconds left.")
         }
         if phase == .failure, lastPhase != .failure {
-            announce(wipeReport)
+            announce(RoomPresentation.failureAnnouncement(unused: engine.unusedSeconds ?? 0))
         }
         if phase == .success, lastPhase != .success {
             announce("You wrote it down. Copy your text before you leave. Nothing is saved.")
@@ -596,6 +619,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.isHidden = isKept
         textView.isEditable = !isKept
         failureHeadlineLabel.isHidden = !showFailure
+        failureNoteLabel.isHidden = !showFailure
         failureRestartButton.isHidden = !showFailure
         if showFailure { updateFailureHeadingFont() }
         view.window?.defaultButtonCell = showFailure ? failureRestartButton.cell as? NSButtonCell : nil
@@ -603,16 +627,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             DispatchQueue.main.async { [weak self] in self?.focusForPhase() }
         }
         if (phase == .failure || phase == .idle), !textView.string.isEmpty { textView.clearWipedText() }
-        reportLabel.isHidden = phase != .failure
-        if phase == .failure {
-            reportLabel.attributedStringValue = FirstLineTypography.trackedText(
-                wipeReport, font: FirstLineTypography.smallMediumNSFont,
-                color: FirstLineColors.redNSColor, kernEm: 0.02)
-        }
-        let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
+        // The clock is the receipt after a wipe: it holds the unused time the session stopped at,
+        // and a new session puts it back to the full duration (D-056).
+        let seconds = phase == .failure ? (engine.unusedSeconds ?? 0) : max(0, Int(ceil(engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
-        timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
+        timerLabel.setAccessibilityLabel(phase == .failure
+            ? "Session stopped. \(timerLabel.stringValue) unused"
+            : "Time remaining \(timerLabel.stringValue)")
         let writing = phase == .writing
         let chrome = writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
         // Empty room: the bottom-right count slot itself carries the instruction.
@@ -648,14 +670,16 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// re-anchored on a real state change (first input, new session, resize, window
     /// key, Reduce Motion change). Ticks never step the bar.
     private func syncProgressBar(phase: SessionPhase, force: Bool = false) {
-        let sessionEnded = phase == .failure || phase == .success
         let running = phase == .writing || phase == .danger
         let sessionChanged = barSessionID != engine.sessionID
         barSessionID = engine.sessionID
         let bounds = progressBar.bounds.size
         let resized = barBounds != bounds
         barBounds = bounds
-        let target = sessionEnded ? 0
+        // A wipe stops the bar where the session stopped, so the clock and the bar carry the
+        // deletion; the next session refills it (D-056).
+        let target = phase == .failure ? failureFraction
+            : phase == .success ? 0
             : (engine.duration > 0 ? min(max(engine.remaining / engine.duration, 0), 1) : 0)
 
         if reducesMotion {
@@ -664,11 +688,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                 progressBar.setFraction(target, reducesMotion: true)
                 lastBarUpdate = now
             }
-            barRunning = false
-            return
-        }
-        if sessionEnded {
-            progressBar.setFraction(0)
             barRunning = false
             return
         }
@@ -685,8 +704,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    private var wipeReport: String {
-        RoomPresentation.wipeReport(unused: engine.unusedSeconds ?? 0, canRestart: appState.canStartSession)
+    /// The fraction of the session the writer did not use: the value the bar holds from the
+    /// wipe until the next session starts.
+    private var failureFraction: CGFloat {
+        guard engine.duration > 0 else { return 0 }
+        return min(max(CGFloat(engine.unusedSeconds ?? 0) / engine.duration, 0), 1)
     }
 
     private func updateKeptContent() {
@@ -944,5 +966,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 }
 
 private final class FailureRestartLabel: NSTextField {
+    /// A label contributes no alignment padding of its own: the restart row's 12 pt gap is
+    /// the gap a person sees, and the two runs share one frame edge (D-056).
+    override var alignmentRectInsets: NSEdgeInsets { NSEdgeInsets() }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }

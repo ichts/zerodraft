@@ -195,7 +195,9 @@ struct SnapshotTests {
 
     /// Static PNGs show the bar's model; the live room runs a CA animation.
     private func settleBar(_ fixture: RoomFixture) {
-        let fraction: CGFloat = (fixture.engine.phase == .failure || fixture.engine.phase == .success) ? 0
+        let frozen = CGFloat(fixture.engine.unusedSeconds ?? 0) / max(fixture.engine.duration, 1)
+        let fraction: CGFloat = fixture.engine.phase == .failure ? frozen
+            : fixture.engine.phase == .success ? 0
             : (fixture.engine.hasStarted ? CGFloat(fixture.engine.remaining / max(fixture.engine.duration, 1)) : 1)
         for bar in allViews(in: fixture.room.view, of: FirstLineFillBar.self) {
             bar.settleForRendering(fraction)

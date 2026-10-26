@@ -1,6 +1,6 @@
 /*
- * [INPUT]: Deadline and idle values from SessionEngine, plus whether the next session may restart.
- * [OUTPUT]: Room clock, unused-time deletion sentence with restart/activation copy, word count, kept receipt, chosen-limit wash strength, copy, exit-confirmation timing, and deny state.
+ * [INPUT]: Deadline and idle values from SessionEngine.
+ * [OUTPUT]: Room clock, the stopped screen's spoken sentence, word count, kept receipt, chosen-limit wash strength, copy, exit-confirmation timing, and deny state.
  * [POS]: Stateless presentation rules shared by the AppKit room and its tests; the live room sentences match writeitdown/room.js, while the kept receipt is the Mac's own quiet counterpart (D-030).
  * [PROTOCOL]: Keep the live strings and wash timing aligned with writeitdown/room.js and the consistency table; check nearest AGENTS.md.
  */
@@ -16,9 +16,10 @@ enum RoomPresentation {
         String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
-    /// `DRAFT DELETED AT 0:52. TYPE TO START AGAIN.` uses the session's unused seconds, like the web.
-    static func wipeReport(unused: Int, canRestart: Bool) -> String {
-        "DRAFT DELETED AT \(clock(unused)). \(canRestart ? "TYPE TO START AGAIN." : "ACTIVATE TO KEEP WRITING.")"
+    /// `You stopped. Draft deleted. 0:52 unused.` The stopped screen prints no sentence, so the
+    /// deletion and the value the clock froze at are announced once, like the live trial (D-056).
+    static func failureAnnouncement(unused: Int) -> String {
+        "You stopped. Draft deleted. \(clock(unused)) unused."
     }
 
     static func wordLabel(_ count: Int) -> String {

@@ -15,6 +15,9 @@ import { statusSlot } from './status-slot.js';
   var SILENCE_MS = 5000, WARN_MS = 3000, CUT_MS = 200, REPORT_HOLD_MS = 2000;
   var SILENT_END = TYPE_END + SILENCE_MS, WARN_END = SILENT_END + WARN_MS,
       CUT_END = WARN_END + CUT_MS, LOOP = CUT_END + REPORT_HOLD_MS;
+  // The instruments stop at the wipe, not at the end of the loop: the clock holds the unused
+  // seconds the session stopped at and the bar holds that same fraction (D-056).
+  var STOP_UNUSED = Math.max(0, 60 - Math.floor(WARN_END / 1000));
   var EVENTS = TIMELINE.events;
   var DENY = EVENTS.filter(function (e) { return e.kind === "deny"; })[0];
 
@@ -29,7 +32,6 @@ import { statusSlot } from './status-slot.js';
   var numeralEl = document.getElementById("numeral");
   var captionEl = document.getElementById("warn-caption");
   var stoppedEl = document.getElementById("demo-stopped");
-  var reportEl = document.getElementById("report");
   var countEl = document.getElementById("count");
   var barEl = document.getElementById("bar");
 
@@ -50,7 +52,6 @@ import { statusSlot } from './status-slot.js';
     pitches: 0,
     numeral: numeralEl,
     caption: captionEl,
-    receipt: reportEl,
     block: stoppedEl
   });
   function placeStatus() {
@@ -155,7 +156,7 @@ import { statusSlot } from './status-slot.js';
       if (barAnimation) barAnimation.cancel();
       barAnimation = null;
       barDeadline = null;
-      barEl.style.transform = 'scaleX(0)';
+      barEl.style.transform = 'scaleX(' + STOP_UNUSED / 60 + ')';
     }
     if (t < SILENT_END) {
       setPhase("type");
@@ -164,7 +165,6 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft(t < TYPE_END ? draftAt(t) : full());
       put(clockEl, "clock", clockAt(t));
     } else if (t < WARN_END) {
@@ -174,7 +174,6 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "KEEP TYPING OR THE DRAFT IS DELETED.";
       warnEl.hidden = false;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft(full());
       put(clockEl, "clock", clockAt(t));
       placeStatus();
@@ -185,22 +184,21 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", "1:00");
+      put(clockEl, "clock", clock(STOP_UNUSED));
     } else {
-      // The failure screen: the same headline and red receipt the room and the Mac show.
+      // The failure screen: the room's block, with the clock and the bar frozen at the stop.
+      // The demo is watch-only, so it carries no restart link (D-044, D-056).
       setPhase("report");
       setWash(null);
       numeralEl.textContent = "";
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = false;
-      put(reportEl, "rep", "DRAFT DELETED AT " + clock(60 - Math.round(CUT_END / 1000)) + ". TYPE TO START AGAIN.");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", "1:00");
+      put(clockEl, "clock", clock(STOP_UNUSED));
       placeStatus();
     }
   }
@@ -217,7 +215,6 @@ import { statusSlot } from './status-slot.js';
     captionEl.textContent = "";
     warnEl.hidden = true;
     stoppedEl.hidden = true;
-    put(reportEl, "rep", "");
     renderDraft(full());
     put(clockEl, "clock", "1:00");
   }

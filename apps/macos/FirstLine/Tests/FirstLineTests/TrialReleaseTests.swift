@@ -201,9 +201,14 @@ struct TrialReleaseTests {
             #expect(state.selectedSurface == .session)
             #expect(field.string.isEmpty)
             #expect(state.settings.trialSessionsUsed == used)
-            let expected = used == 3 ? "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING."
-                                     : "DRAFT DELETED AT 0:52. TYPE TO START AGAIN."
-            #expect(descendants(room.view, of: NSTextField.self).contains { $0.stringValue == expected && !$0.isHidden })
+            // Every exhausted and non-exhausted wipe shows the same block; the clock and the bar
+            // hold 0:52 and the way back is the quiet link, gated on the next session (D-056).
+            let fields = descendants(room.view, of: NSTextField.self).filter { !$0.isHidden }
+            #expect(fields.contains { $0.stringValue == "Draft deleted." })
+            #expect(fields.contains { $0.stringValue == "You stopped." && !$0.isHidden })
+            #expect(fields.contains { $0.stringValue == "0:52" })
+            #expect(!fields.contains { $0.stringValue.hasPrefix("DRAFT DELETED AT") })
+            #expect(!fields.contains { $0.stringValue.contains("ACTIVATE TO KEEP WRITING") })
         }
         field.insertText("fourth", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(field.string.isEmpty)

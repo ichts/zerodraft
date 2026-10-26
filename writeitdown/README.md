@@ -25,6 +25,40 @@ Demo and trial sheets use dynamic viewport minimum heights in `site.css`, with `
 
 Transfer and extract the tested deployment bundle on the target host, then run `sh writeitdown/install.sh` as root. It writes only the production files listed in `install.sh` under `/var/www/writeitdown.app/`, preserves an existing `index.html.dc-bak2`, and creates that backup from the current index if absent. It does not touch server configuration or remove other files.
 
+### Operator deploy script
+
+`writeitdown/bundle.sh` and `writeitdown/deploy.sh` are the operator's instruments for that host. They run from the machine that has VPS access; no agent runs them against a live host, and nothing in this repository deploys on its own.
+
+```sh
+# 1. package the tested tree (writes writeitdown-deploy.tar.gz and MANIFEST)
+sh writeitdown/bundle.sh --tree writeitdown --out /tmp/wid-deploy
+
+# 2. see the whole plan without writing anything
+sh writeitdown/deploy.sh --bundle /tmp/wid-deploy/writeitdown-deploy.tar.gz --host deploy@example.com --dry-run
+
+# 3. deploy
+sh writeitdown/deploy.sh --bundle /tmp/wid-deploy/writeitdown-deploy.tar.gz --host deploy@example.com
+```
+
+`bundle.sh` packs exactly the files `install.sh` lists plus `install.sh` itself, in that order, through `gzip -n`, so the same tested tree always produces the same bytes. It refuses a missing or symlinked production file and writes `MANIFEST` beside the tarball: the tarball's name and sha256, then one `<sha256>  <path>` line per deployed file.
+
+`deploy.sh` needs `--bundle` and `--host`; it never guesses a host and never reads a credential. In order, each step stopping before the next: it checks the tarball against the manifest hash (or `--sha256`), checks every file inside it against the manifest, and refuses a bundle that carries a file the manifest omits or omits a file the manifest lists; confirms `install.sh`'s `TARGET` equals `--live-root`; inspects the host over ssh in BatchMode; checks the published site; reads the live tree; uploads to `--staging-dir` and re-hashes there; snapshots the live tree to `--snapshot-dir` and prints the archive path; extracts; runs `install.sh` as root (through `sudo -n` when the ssh user is not root); then verifies every live hash against the manifest and re-checks `llms.txt` (content type) plus one page per class (landing, `/support.html`, an answer page, `/download/`). Any mismatch restores the snapshot, re-verifies the tree file for file, and exits non-zero with the exact difference. The snapshot is never deleted on success: it is the rollback.
+
+Defaults: live root `/var/www/writeitdown.app`, snapshots `/var/backups/writeitdown.app`, staging `/var/tmp/writeitdown-deploy`, published base `https://writeitdown.app`. Only the staging directory, the snapshot directory, and the live tree are written, and the live tree is only ever updated by `install.sh` and by a rollback that extracts the snapshot and deletes just the files that run introduced.
+
+Exit codes:
+
+| code | meaning |
+| --- | --- |
+| 0 | deployed and verified, or a dry run that changed nothing |
+| 1 | usage or precondition error (missing input, relative remote path, unusable host) |
+| 2 | bundle or manifest integrity failure; the host was not touched |
+| 3 | a remote step or the install failed; the host is untouched when no snapshot existed yet, otherwise the snapshot was restored |
+| 4 | post-install verification failed; the snapshot was restored and re-verified |
+| 5 | the rollback did not reproduce the pre-deploy tree; the host needs attention |
+
+`sh writeitdown/test-deploy.sh` (also `npm run test:deploy` from this directory) exercises every path against a local fixture host with a fake ssh command: good bundle, tampered bundle, a file missing from the manifest, bundle bytes that disagree with the manifest, a live hash mismatch with rollback, a published check that fails after install, a failed install, a pre-broken site, a dry run that changes nothing, usage errors, an unreachable host, the non-root path, and `bundle.sh`'s own refusals. It also removes each check in a mutated copy of `deploy.sh` and requires the matching case to fail, so every gate is proven to be load-bearing. It writes only inside a temporary directory and needs no host, no network, and no root.
+
 The legal pages disclose Google Fonts requests, possible hosting access logs, payment data handling, and retention of previously collected Mac waitlist addresses. The public contact is contact@trefoilstudio.com (Trefoil Studio).
 
 ### Discovery files and answer pages

@@ -220,15 +220,15 @@ This is the brand for writeitdown.app and the native Mac app. It is a sibling of
 `ZERO_DRAFT` logotype in `index.html` is unchanged, and the Write It Down lockup is not placed on the root landing.
 Every shipped writeitdown.app page - the landing, the room, `/download/`, `mac.html`, and the legal, support and
 answer pages - uses the chip-and-wordmark lockup (11.6), so no page keeps a mono logotype (D-053). The social card
-keeps the wordmark-only lockup. The native Mac app's in-app start screen uses the wordmark-only lockup; the app
-icon and volume icon carry the mark.
+keeps the wordmark-only lockup. The native Mac app's in-app start screen carries the same chip-and-wordmark lockup
+as the site header (D-075); the app icon and volume icon carry the mark.
 
 ### 11.1 The mark and the wordmark
 
 The mark is the split W: Newsreader's W with a vertical notch through its middle peak. The wordmark is
-`Write It Down` in Newsreader 500, with the same split W. The web header sets the mark as its own object beside
-the wordmark (11.6); the Mac start screen and the social card keep the wordmark lockup, whose W already carries
-the notch.
+`Write It Down` in Newsreader 500, with the same split W. The web header and the Mac start screen set the mark as
+its own object beside the wordmark (11.6); the social card keeps the wordmark lockup, whose W already carries the
+notch.
 
 - Site header and footer: the chip-and-wordmark lockup uses the two aligned masks defined in 11.6, at the
   responsive sizes in 11.3.
@@ -236,8 +236,10 @@ the notch.
   square with the ink W. The ink plate with the bone W is the dark-appearance variant for the favicon's
   `prefers-color-scheme: dark` links. A macOS `.icns` app icon has no appearance switch, so the shipped `.icns`
   is the light plate.
-- Mac start screen: `Sources/FirstLine/Resources/write-it-down-lockup.svg` at 21 px type (128x16.25), tinted with
-  the app ink token. The app icon and volume icon carry the mark.
+- Mac start screen: the chip-and-wordmark lockup at 21 px type (156.8 x 22 pt) - the page-token plate with its
+  1 px hair-2 edge around the split W, then the split W and wordmark from `Sources/FirstLine/Resources/write-it-down-lockup.svg` (the web's
+  `writeitdown/logo/write-it-down-lockup.svg`, byte for byte), both in the app ink token (`BrandChipLockupView`, D-075). The picker's lockup sits on the sheet card, so the
+  plate takes the page role the web chip has behind it; the app icon and volume icon carry the mark.
 - The volume icon: the bone sheet with the ink W on the dark disc, as the DMG volume composition.
 - Social card: `writeitdown/og.png` at 1200x630 uses the wordmark lockup on the light page; it is the link preview
   for the landing and `/download/`.
@@ -295,8 +297,9 @@ the notch.
 - Volume icon: `packaging/VolumeIcon.icns`, all Finder sizes from 16 to 1024.
 - The source set is `writeitdown/logo/`, `writeitdown/favicon*`, `writeitdown/apple-touch-icon.png`, and
   `writeitdown/og.png` for the site; the app icon set, `packaging/VolumeIcon.icns`, and
-  `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The Mac start screen uses the bundled
-  lockup. The app icon `.icns` is the light plate; there is no dark app-icon alternate in the app icon set.
+  `Sources/FirstLine/Resources/write-it-down-lockup.svg` for the Mac. The Mac start screen composes the chip plate
+  from the page and hair-2 tokens under that bundled glyph layer. The app icon `.icns` is the light plate; there is
+  no dark app-icon alternate in the app icon set.
 
 ### 11.4 Do not
 
@@ -338,10 +341,13 @@ the notch.
   and the 36 px theme button at every width, so a breakpoint that leaves a band uncovered fails. Verify the
   sizes in 11.3 in light and dark, with no clipping and no shift in the nav.
 
-- Mac: the split-W lockup on the start screen in light and dark; the app icon at 16/32 (optical), 128 (Dock), and
-  1024; the volume icon at 128 and 1024. Static asset inspection, the deterministic view test and the light/dark
-  start-screen captures are recorded in `apps/macos/FirstLine/docs/MANUAL_QA.md`; Dock and Finder captures on light
-  and dark remain separate independent acceptance.
+- Mac: the chip-and-wordmark lockup on the start screen in light and dark; `BrandTests.pickerLockupShowsTheChipTheWebHeaderUses`
+  requires the chip to be square and open the lockup, the 1.046 em share, the 22.33% plate radius, the page/hair-2
+  plate roles and the ink polarity, and it reads the rendered lockup for plate pixels under the W and wordmark ink
+  right of it. The app icon at 16/32 (optical), 128 (Dock), and 1024; the volume icon at 128 and 1024. Static asset
+  inspection, the deterministic view test and the light/dark start-screen captures are recorded in
+  `apps/macos/FirstLine/docs/MANUAL_QA.md`; Dock and Finder captures on light and dark remain separate independent
+  acceptance.
 - `grep` for the old `WID` icon, the red underscore, and the `.brand i` caret returns nothing in the shipped
   surfaces. The logo files contain no `<text>` and no red token.
 
@@ -368,7 +374,10 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
   object. No other border, shadow, or colour. Both layers share one viewBox and
   `shape-rendering="geometricPrecision"`, with no theme-specific CSS or new palette colour. The glyph layer
   retains the split strokes with `fill-rule="evenodd"`.
-- Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.
+- The native Mac picker draws the same chip at 21 px type from the same two roles - the page-token plate with its
+  one 1 px hair-2 edge and the ink W and wordmark - so the Mac front door and the site open with one object
+  (`BrandChipLockupView`, D-075). The plate takes the page role because the picker's lockup sits on the sheet
+  card; the social card keeps the wordmark-only lockup.
 - On narrow phones the lockup steps to 16 px type (DESIGN 11.3) instead of letting the header push the theme
   button past the page gutter; the chip's widened notch is what keeps the split readable at 16.7 px.
 

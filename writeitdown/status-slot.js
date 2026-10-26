@@ -39,13 +39,15 @@ const ink = (() => {
 // otherwise eat the draft's only line, which is what the Linux runner did at 320 px (a
 // two-line confirmation reservation left 30.4 px of a 33.6 px line). The kept screen's own
 // gaps give way instead, nearest the draft first, and the shrink stops as soon as a line
-// fits, so a comfortable sheet keeps its designed rhythm.
+// fits, so a comfortable sheet keeps its designed rhythm. A fixed block taller than the line
+// they can give crushes the draft to zero height before they are asked; the gap shrink is
+// what recovers it, so only the screen not being rendered (hidden) skips the measurement.
 const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
 
 function keepDraftLine(paper) {
   const scroll = paper.querySelector('.kept-scroll');
   const text = paper.querySelector('.kept-text');
-  if (!scroll || !text || scroll.getBoundingClientRect().height === 0) return;
+  if (!scroll || !text || scroll.getClientRects().length === 0) return;
   const line = parseFloat(getComputedStyle(text).lineHeight);
   if (!(line > 0)) return;
   for (const [selector, name] of KEPT_GAPS) {

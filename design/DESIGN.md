@@ -367,3 +367,40 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
 - Do not carry the chip to the Mac start screen or the social card; both keep the wordmark lockup.
 - On narrow phones the lockup steps to 16 px type (DESIGN 11.3) instead of letting the header push the theme
   button past the page gutter; the chip's widened notch is what keeps the split readable at 16.7 px.
+
+## 12. Faces on writeitdown.app and the Mac app (D-057)
+
+Section 2 owns the root Zero Draft landing's type pairing. This section owns the faces of the product
+surfaces - every shipped writeitdown.app page and the native Mac app - which share one set, with the Mac
+as the reference. A web role that leaves this set, or a Mac role that drifts from the web's numbers, is a
+defect, and `writeitdown/qa/typography.spec.mjs` and
+`apps/macos/FirstLine/Tests/FirstLineTests/TypographyParityTests.swift` fail on it rather than a captain
+noticing that the two do not look alike.
+
+| Role | Face | Web spec | Mac spec |
+| --- | --- | --- | --- |
+| writing text, and every heading | Newsreader (bundled variable, `wght` 200-800, `opsz` 6-72) | `--serif`; 400 at `--t-write` 28/1.6; headings 500 | `Newsreader16pt-Regular`; `NewsreaderRoman-Medium` for the kept heading and failure headline |
+| the same roles in Chinese | Zhuque Fangsong | `--cjk`, second in the writing stack, GB2312 slices in `fonts-cjk.css` | bundled cascade on the writing font |
+| everything the tool says | the system sans | `--sans` at 13/15/17 px | `.systemFont` at 13/15/17 pt, `.semibold` where the pill needs it |
+| the clock | the system sans with tabular digits | `600 15px/1`, `font-variant-numeric: tabular-nums` | `monospacedDigitSystemFont(15, .semibold)` |
+| literal machine strings | the system monospace | `ui-monospace` on `code` only (a shell command, a SHA-256) | none: the app has no code surface |
+| the hand accent (exception) | Reenie Beanie | the landing's `write it down` hero word and its two section headings, nowhere else | never |
+
+Rules that follow from the table:
+
+- **Tracking.** The kept heading and the failure headline are untracked on both surfaces. The machine
+  voice's own tracking stays where the Mac has it: `.02em` on the receipts and the wipe report, `.04em` on
+  the warning caption and the pill labels.
+- **Every face is served by the site.** `writeitdown/fonts/` holds the woff2 files and their OFL texts,
+  `writeitdown/fonts/build-fonts.py` builds them from the app's bundled faces, and `fonts.css` /
+  `fonts-cjk.css` are generated from it. No page requests a font host: a third-party font that fails must
+  not change what a page renders, and a page that sells privacy must not leak a visitor to a font provider.
+- **The declared exception.** The hand accent is the one face outside the product's set. It is a
+  marketing voice for the page that sells the product, chosen by the captain on 2026-10-25 (option B of
+  the typography inventory). It lives on the landing only: never in the room, never in a copy or result
+  state, never on the Mac, and not added to any new surface without a new dated decision. Reenie Beanie has
+  one weight, no CJK, and a script face at 13 px would fight the native control look, so the app must not
+  gain it.
+- **The writing measure is fixed.** One pitch for every script (D-026); the CJK subset must never carry
+  altered vertical metrics, because the room's line pitch is fixed in CSS and where a glyph sits inside it
+  comes from those metrics.

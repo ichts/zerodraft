@@ -894,3 +894,55 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the 2026-10-25 QA row Q-14 wording "one left edge shared with the footer on every
   document page", which read the flush-left column as the deliberate alignment. The one measure in
   the 17 px face is unchanged.
+
+## D-056: The Note paper and its ink are locked for every writing sheet
+
+- Date: 2026-10-26
+- Decision: The writing sheet is the **Note** paper on every surface, and the page around it keeps its
+  white identity. Light: the sheet is `#dbe6ec`; dark: `#21272a` (the lamp version of the same paper,
+  not an inversion of the light values). Ink is `#1c1917` in light at full strength (weight 100) with
+  the tuner's imperfection on - measured 13.78:1 on the sheet - and `#ece7d9` in dark. Grain is **70 of
+  100** at size **1.00**, generated per sheet size from integer-stable seeds, two scales (device-pixel
+  tooth plus a coarser pulp cloud), with pulp fibres and pigment flecks; it is drawn once per size and
+  theme and never while typing. The sheet's other roles are measured against the paper rather than
+  against white, because the paper is no longer white: quiet chrome (clock, count, exit link, receipt,
+  hint) `#464746` / `#b8b5ac` at 7.35:1, the per-line history ladder at 9.2:1 then 7.2:1, and the pen red
+  (numeral, wipe receipt, exit hint) `#63140b` / `#ffb4a2`, which clears 7:1 on the sheet *and* on the
+  warn wash the numeral actually sits on. Considered alternative: **Wheat** `#e0d5b8` (dark `#342e24`),
+  the runner-up the captain liked; it was not chosen. Platen's paper was the earlier round's favourite
+  and is what prompted this round.
+- Reason: The captain locked these values from the live tuner at
+  `http://100.110.226.112:8099/?tone=note#trial` (theme light, warm 0, depth 0, sheet as rendered
+  `#dbe6ec`, grain 70 at size 1.00, ink weight 100 with imperfection on, 13.78:1, sound all off), after
+  saying of the earlier round `我觉得 platen 的很好看 你可以试试`. A paper that reads as paper cannot
+  be the plain white sheet the constitution was written around, so the sheet's text roles had to be
+  re-derived from measurement: on `#dbe6ec` the old quiet grey sits at 4.5:1, the old pen red at 5.2:1,
+  and the old 100/22/7 opacity ladder put the faded history lines at 1.2:1 - all below the 7:1 floor
+  the captain set. The fade therefore steps by *contrast* (13.78 -> 9.2 -> 7.2) instead of by opacity,
+  which keeps the depth cue and the readable floor at once.
+- Mac: the same tone, grain and ink, rendered by `PaperSheetView`/`PaperField` with the web renderer's
+  seeds and amplitudes. The one technique that does not transfer is the web's 2 px glyph displacement:
+  a live `NSTextView` cannot be re-rasterised per keystroke without moving the caret with the glyphs, so
+  the Mac keeps the transferable half (a 0.35 pt ink spread) and leaves the hand to its own writing
+  face. Both surfaces are asserted on the measured result: tone, contrast ladder, grain presence and
+  grain stillness.
+- The warn wash is the sheet's, not the wall's: `color-mix(in oklab, paper 88%, #c8392f)` resolved as
+  `#ddd3d5` light / `#352c2c` dark, and the eighth second's deeper step at 76% as `#ddc0be` / `#49302e`.
+  All three writing surfaces paint that mix, so the alarm tints the same paper the same way. The pale
+  tint the product used before (`#f6e2dc` / `#4a2318`) was tuned for a white sheet: over the Note paper
+  its mid-ramp lands on neutral grey, and the Mac's rendered warning frame measured 0.017 of warmth - no
+  tint at all - which is why the Mac now takes the paper mix instead of its own pale overlay. Captured:
+  `site-warn-*`, `root-trial-warn-*`, `mac-snapshot-room-warning-light`.
+- The texture cannot arrive late: the landing's renderer mounts a sheet's canvas in the same task the
+  sheet enters the document (a `MutationObserver` in the document head, not a `DOMContentLoaded`
+  handler). A per-frame probe proves no rendered frame ever showed the sheet plain
+  (`tests/paper.spec.mjs`, `the demo sheet at rest`); deferring the mount to `DOMContentLoaded` fails
+  that assertion, and did before this change.
+- Tests: `tests/paper.spec.mjs` (landing demo sheet, trial sheet, kept sheet, wash),
+  `writeitdown/qa/paper.spec.mjs` (site demo sheet and room, light and dark, 1440 and 390, plus the
+  warn wash and the numeral on its deepest step), `FirstLineTests/PaperContrastTests` (tones, roles,
+  ladder, the wash mix, determinism) and `SnapshotTests.paperStaysStillWhileTyping` plus the
+  `paperPoint` region checks on every room state.
+- Supersedes: the white writing sheet (`--sheet #ffffff` / `#26231c`, `--paper #ffffff` on the landing),
+  the landing's `--ink #17150f`, and D-027's 100/22/7 *opacity* numbers (its stepped-per-line intent and
+  the one-pitch shift stand unchanged).

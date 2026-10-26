@@ -5,9 +5,8 @@
 //                                      placeholder input.
 //   node release-check.mjs --download  only the free-trial download page: the DMG link,
 //                                      the Install card's DMG filename and its published
-//                                      SHA-256, and the release note's declared version,
-//                                      which may only exceed the linked DMG while it is
-//                                      marked data-launch-pending.
+//                                      SHA-256, and, when present, the release note,
+//                                      which declares the version of the linked DMG.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -74,7 +73,8 @@ export function blockers({ mac, support, plist }) {
   const mail = contact.match(/href="mailto:([^"?]+)"/)?.[1];
   if (!mail || PLACEHOLDER_HOST.test(mail.split('@')[1] || '')) found.push('Support address: not listed in support.html#contact');
   const price = plistValue(plist, 'WIDDisplayPrice');
-  if (!price || !mac.includes(`${price} ONCE.`)) found.push(`Price: mac.html does not show the app price ${price || '(empty)'}`);
+  if (!price || !mac.toLowerCase().includes(`${price.toLowerCase()} once`))
+    found.push(`Price: mac.html does not show the app price ${price || '(empty)'} once`);
   const canonical = mac.match(/<link\s+rel="canonical"\s+href="([^"]+)"/)?.[1];
   if (!realURL(canonical) || plistValue(plist, 'WIDCheckoutURL') !== canonical)
     found.push('Checkout URL: Info.plist WIDCheckoutURL differs from mac.html');
@@ -101,22 +101,21 @@ export function downloadBlockers({ download }) {
   else if (linkedFile && installFile !== linkedFile)
     found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
 
-  // The release note is the page's claim about a version. A note newer than the DMG on offer is
-  // only honest while it says that version is not released yet, and a note that is still marked
-  // not released once its version is the download contradicts the card.
-  const noteTag = download.match(/<p[^>]*\sid="release-notes"[^>]*>/i)?.[0] ?? '';
-  const noteVersion = attr(noteTag, 'data-release-note') ?? '';
-  const notePending = Boolean(attr(noteTag, 'data-launch-pending'));
+  // The release note is optional: when present it is the page's visible claim about the version it
+  // links, and it declares that version in data-release-note. A note ahead of or behind the linked
+  // DMG is a page and artifact that disagree.
   const linkedVersion = linkedFile.match(/^Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/)?.[1] ?? '';
-  if (!linkedVersion) {
-    found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
-  } else if (!VERSION.test(noteVersion)) {
-    found.push('Release notes: the note does not declare its version in data-release-note');
-  } else {
-    if (versionOrder(noteVersion, linkedVersion) > 0 && !notePending)
-      found.push(`Release notes: the note announces ${noteVersion} but the download is ${linkedVersion}; publish that DMG or mark the note data-launch-pending`);
-    else if (versionOrder(noteVersion, linkedVersion) === 0 && notePending)
-      found.push(`Release notes: the note is marked not yet released, but ${noteVersion} is already the linked download`);
+  if (linkedFile && !linkedVersion) found.push('DMG URL: the file name does not carry the version as Write-It-Down-<version>.dmg');
+  const noteTag = download.match(/<p[^>]*\sid="release-notes"[^>]*>/i)?.[0] ?? '';
+  if (noteTag) {
+    const noteVersion = attr(noteTag, 'data-release-note') ?? '';
+    if (attr(noteTag, 'data-launch-pending') !== undefined)
+      found.push('Release notes: data-launch-pending is retired; the note declares the linked version');
+    if (!VERSION.test(noteVersion)) {
+      found.push('Release notes: the note does not declare its version in data-release-note');
+    } else if (linkedVersion && versionOrder(noteVersion, linkedVersion) !== 0) {
+      found.push(`Release notes: the note declares ${noteVersion} but the download is ${linkedVersion}`);
+    }
   }
   return found;
 }

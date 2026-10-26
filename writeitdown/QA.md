@@ -6,6 +6,164 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-26: Document content sits on the header grid (PR 70 review round)
+
+The captain read the PR 70 preview of `mac.html#buy` and saw the page as a narrow column stuck to the
+logo with an empty band on the right. The measurement matched the eye: the ten document pages put a
+62ch measure inside a 1120 px container that was itself flush with the header, so every paragraph
+started on the header's left edge and stopped 392 px short of its right edge at 1440. `main.doc` now
+owns the measure and is centred in the header container, and the per-block `max-width`s of `h1`,
+`h2`, `p`, `.qa`, `.doc-buy` and `.license-card` are gone, so the H1, the lede, the questions, the
+purchase card and the licence card share two edges that are equidistant from the header's own. This
+is the landing's composition (a centred object inside the header container, like the 760 px sheet
+under the 1120 px header), not a new one. D-055 records the decision.
+
+## Commands and results
+
+- `npx playwright test qa/shell.spec.mjs qa/mac.spec.mjs` (8 projects): 258 passed, 0 failed,
+  46 skipped.
+- `npx playwright test` (whole writeitdown suite, 8 projects): 695 passed, 0 failed, 73 skipped
+  (6.7 min).
+
+## Measured (content edges inset from the header container)
+
+| Surface | 1440 | 1024 | 390 |
+| Ten document pages, all text blocks | 196 / 196.1 px | 148 / 148.1 px | 0 / 0 px |
+| `mac.html` buy card (border box) | column-wide, 196 px inset | 148 px inset | gutter-width, 0 inset |
+| `mac.html` buy card (text inside its padding) | 236 / 236.1 px | 188 / 188.1 px | 24 / 24 px |
+| `/download/` and the landing | unchanged, container-flush (0 / 0) | 0 / 0 | 0 / 0 |
+
+The header container spans 192-1248 at 1440, 32-992 at 1024 and 20-370 at 390, so the document
+column sits symmetrically inside it at every width and never narrower than one gutter at 390.
+
+## Known-broken proof for the new gate
+
+With the pre-fix `site.css` restored (the tree at `21565be`), `qa/shell.spec.mjs` `every page puts
+its content on the header grid at 1440, 1024 and 390` failed with:
+
+```
+mac.html @1440 h1 starts 0 px and ends 211 px from the header's edges: flush with the header container or centred in it
+Expected: <= 1   Received: 211
+```
+
+and the paragraph blocks reported the same 0 / 392.1 px split at 1440 and 0 / 296.1 px at 1024. With
+the fix the same test passes on all twelve pages at all three widths. The failing run's artifacts
+are in the task evidence directory (`known-broken-grid/`).
+
+## Captures
+
+`captures/mac-buy-{before,after}-{1440,1024,390}-{light,dark}.png`: `mac.html#buy` before and after at
+the three widths in both themes. `captures/{landing,support,download,mac}-grid-*` and
+`*-grid-before-*`: full pages at 1440 and 390 in both themes, landing beside a migrated page.
+
+## UI quality checklist
+
+| Rule | Result | Basis |
+| Q-14 | PASS | Content edges are 196 / 196.1 px inside the header container at 1440, 148 / 148.1 at 1024 and 0 / 0 at 390 on all ten document pages; the landing and `/download/` stay container-flush. Pinned by the shell geometry test (D-055), which fails at 211 px asymmetry on the pre-fix tree. |
+| Q-16 | PASS | The misalignment was found by the captain on the preview; the measurement now ships as an assertion so a reviewer is not the first to see it. |
+| Q-19 | PASS | No horizontal overflow at 390: the column keeps both gutters (20 / 370 in a 390 viewport). |
+
+# 2026-10-25: One design system across the site, and a purchase page a buyer can trust
+
+Every shipped page moved onto the landing's design system (D-053): the nine help/legal/answer pages
+and `mac.html` now carry the A mark lockup with its plate, the theme button, the shared footer, 17 px
+system-face body copy at the 62ch measure, the v2 pill and underlined-link treatments, and the same
+canvas. `mac.html#buy` is a section with its heading and `$4.99 once` price row in view, pending and
+error states, and a licence card for ready/copied/unpaid; `session_id` is cleared from the URL and
+history when the licence response arrives, on success and failure, with `Check again` as the in-page
+retry. The 1.1 note left the download card, and the page no longer requests IBM Plex Mono; every
+shipped page now loads only Newsreader and Reenie Beanie. Evidence: `/Users/ichts/firstmate-homes/wid/data/wid-web-shell/`.
+
+## Commands and results
+
+- `node --test buy.test.mjs session.test.mjs`: 22 pass, 0 fail.
+- `npx playwright test` (writeitdown suite, 8 projects, run on a private port because another lane
+  held 8015): 670 passed, 0 failed, 66 skipped.
+- `node release-check.mjs`: STATIC CHECK PASSED.
+- `npm test` at the repository root (Zero Draft landing/trial harness): unchanged by this work; see
+  that run's result in the delivery report.
+
+## Measured (captures/measurements.json)
+
+| Surface | Measure | Value |
+| --- | --- | --- |
+| All 10 document pages, both sizes and themes | brand top / height | 21 / 22 px (1440), 19.6 / 16.7 px (390) |
+| All 10 document pages | theme plate | `rgb(255,255,255)` light, `rgb(38,35,28)` dark; 1 px edge |
+| All 12 shipped pages | body family | one system-UI stack; 17 px |
+| All 10 document pages | body measure | 664 px at 1440 (62ch), 350 px at 390 |
+| All 10 document pages | legacy shell classes | 0 |
+| All 12 shipped pages | horizontal overflow | 0 |
+| `#buy` at 1440 / 390 | heading box | 57.2-87.2 / 41.3-71.3 px (viewport 900 / 844) |
+| `#buy` at 1440 / 390 | price row box | 173.6-208.8 / 212.1-300.3 px |
+| `#buy` | scroll margin | 16 px |
+| pending | button label / opacity / cursor / aria-busy | `Opening checkout...` / 0.6 / progress / true |
+| error | button / status role | `Try again` / `alert` |
+| ready | URL | credential removed when the response arrives (`.../mac.html`) |
+| unpaid | URL / retry | credential removed on response / visible, key hidden |
+| phone room nav | visible controls | lockup + theme icon only |
+| phone room exit row | Mac link box | inside the footer row (772-816 px in a 751-816 px row) |
+
+## Captures
+
+`captures/`: 12 pages x 1440/390 x light/dark full-page PNGs (48), purchase states (default, `#buy`,
+pending, error, ready, copied, unpaid) at both sizes and themes (28), room empty and exit-confirmation
+at 390 in both themes (4), and `measurements.json`. Compared against the landing page at the same size
+and theme.
+
+## UI quality checklist (docs/ui-quality.md)
+
+| Rule | Result | Basis |
+| --- | --- | --- |
+| Q-01 | PASS | Room phone nav shows the lockup and theme icon only; the Mac link sits in the exit row (`shell.spec.mjs`, `measurements.json`). |
+| Q-02 | PASS | Warning numeral, caption and receipt placement assertions in `phase4.spec.mjs` are green; no change to the ink slot. |
+| Q-03 | PASS | Empty caret/count prompt assertions in `phase4.spec.mjs` are green; the room was not restyled. |
+| Q-04 | PASS | 35% anchor and centring assertions in `phase4.spec.mjs` are green. |
+| Q-05 | PASS | Exit-hint baseline and type-style assertion in `phase4.spec.mjs` is green; the buy row shares one baseline (captures). |
+| Q-06 | PASS | State-change geometry assertions are green; `status-slot.js` now reserves the whole wrapped exit row (see below). |
+| Q-07 | PASS | The migrated pages carry no new labels or helper sentences; the download badge that repeated the facts is gone. |
+| Q-08 | PASS | `shell.spec.mjs` compares brand y, plate, family, canvas and footer across all twelve pages; D-053 records the change. |
+| Q-09 | PASS | Every page and every purchase state captured in light and dark; the plate and canvas are the same per theme. |
+| Q-10 | PASS | No room motion changed; the landing's write-on reveal is unchanged, and the hover lift is pointer-gated. |
+| Q-11 | PASS | Hover lift is gated to `(hover:hover) and (pointer:fine)`; `:active` stays; `motion-regression.spec.mjs` and `phase4.spec.mjs` are green. |
+| Q-12 | PASS | `Type to start` / `0 words` assertions in `phase4.spec.mjs` are green. |
+| Q-13 | PASS | Ink focus ring (2 px) on the lockup of all twelve pages; every buy/licence control is a real button. |
+| Q-14 | PASS | Brand y 21, measure 664 px, one left edge shared with the footer on every document page. |
+| Q-15 | PASS | The purchase states follow the platform convention for a working submit (disabled + `aria-busy`) and a failed one (`Try again` + `role=alert`); no novel interaction was invented. |
+| Q-16 | PASS | Basic polish fixed in this pass: the wrapped exit row had eaten a line of the kept draft, and the error status now reads at ink weight. |
+| Q-17 | PASS | 17 px / 1.6 body with the serif reserved for headings; no rendered pitch changed. |
+| Q-18 | N/A | Mac launch state; no web surface. |
+| Q-19 | PASS | The 360 px point samples now run over every shipped page and the room, and the width sweep still covers `/download/`; no overflow, 6 px+ gutter, one plate token. |
+| Q-20 | PASS | No copy was added to describe a page. Every price mention on all twelve pages and in the six buy states is exactly `$4.99 once`; `shell.spec.mjs` enforces it. The 1.1 note left the 1.0 card. |
+| Q-21 | PASS | `shell.spec.mjs` enforces one price string, `$4.99 once`, on every shipped page and every buy state; the shell rule is green on all twelve pages. |
+
+## Known-broken proofs for the new gates
+
+- Old shell (`known-broken-old-shell.txt`): on `support.html` there is no A mark lockup, the
+  `WRITE_IT_DOWN` logotype sits at y 48, the theme button is transparent, body copy is 21 px
+  Newsreader on `rgb(216,210,195)`, and the footer is absent. The new `shell.spec.mjs` fails on the old
+  tree (`known-broken-shell-spec.txt`), including `support.html: "Give it 60 seconds" is 3.57:1 on
+  rgb(216,210,195)`.
+- Old purchase page: `mac.html#buy` landed on the button with no `#buy-heading` and no price row
+  (`heading: null`, `price: null`), and the three actions were 308.7 / 261.9 / 159 px square mono
+  buttons.
+- Price guard: planting `USD $4.99` in the `mac.html` buy-card paragraph made `shell.spec.mjs`
+  `the purchase path states one price string` fail with `mac.html: price mention "USD $4.99"`; the
+  plant was removed and the committed tree passes.
+- Old failure path: `mac.html?session_id=...` with a 404 licence response kept `session_id` in the URL
+  and offered no retry.
+- Old route server: `journey/serve-local.mjs` answered a missing page with the landing page and
+  HTTP 200; it now answers 404, and `shell.spec.mjs`'s release server test pins that.
+
+## Remaining limits
+
+- The release journey (`npm run journey`) was not run: it needs Playwright WebKit and the real DMG;
+  its purchase block was updated for the new labels, credential cleanup and retry control but is not
+  claimed as run here.
+- No deployment. The live site still serves the old files until the bundle is installed on the host.
+- The room's `Download for Mac` link in the exit row still discards an open draft in one click, as the
+  nav pill did before it; the two-act exit guard covers `ESC - EXIT` only. That is audit item 13, not
+  in this migration's scope.
+
 # 2026-10-25: Download-page release-note version gate (local)
 
 The download card keeps its 1.0 facts and now says the 1.1 update check is not released yet. The note

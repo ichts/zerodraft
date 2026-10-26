@@ -14,9 +14,9 @@ const source = purchase ? 'buy.js' : 'room.js';
 const original = await fs.readFile(path.join(root, source), 'utf8');
 const cases = purchase ? [
   { name: 'no-checkout', scenarios: 'mac-purchase', from: 'location.assign(hosted.href);', to: 'buy.disabled = false;', failure: 'mac-purchase: Buy follows harness checkout and Back permits another checkout' },
-  { name: 'no-url-cleanup', scenarios: 'mac-purchase', from: "history.replaceState(history.state, '', clean.href);", to: '', failure: 'mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', message: 'credential retained after delivery' },
-  { name: 'no-key', scenarios: 'mac-purchase', from: 'key.textContent = licenseKey;', to: "key.textContent = '';", failure: 'mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', message: 'fixture key missing' },
-  { name: 'unpaid-key', scenarios: 'mac-purchase', from: "status.textContent = 'Your licence is not ready yet. Reload in a moment.';", to: "status.textContent = 'Your licence is not ready yet. Reload in a moment.'; key.textContent = 'INVALID-UNPAID-FIXTURE'; document.getElementById('license-result').hidden = false;", failure: 'mac-purchase: unpaid fixture shows neutral notice, no key, and retains retry URL', message: 'unpaid key visible' },
+  { name: 'no-url-cleanup', scenarios: 'mac-purchase', from: "history.replaceState(history.state, '', clean.href);", to: '', failure: ['mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', 'mac-purchase: unpaid fixture shows neutral notice, no key, and clears the credential'], message: ['credential retained after delivery', 'credential retained after a failed delivery'] },
+  { name: 'no-key', scenarios: 'mac-purchase', from: 'key.textContent = deliveredKey;', to: "key.textContent = '';", failure: 'mac-purchase: paid fixture delivers key, copy control and activation sentence, cleans URL', message: 'fixture key missing' },
+  { name: 'unpaid-key', scenarios: 'mac-purchase', from: "status.textContent = 'Your license is not ready yet.';", to: "status.textContent = 'Your license is not ready yet.'; key.textContent = 'INVALID-UNPAID-FIXTURE'; document.getElementById('license-result').hidden = false;", failure: 'mac-purchase: unpaid fixture shows neutral notice, no key, and clears the credential', message: 'unpaid key visible' },
   { name: 'good', scenarios: 'mac-purchase' },
 ] : [
   { name: 'no-finish', scenarios: 'full-session', from: 'state = advance(state, now);', to: "const next = advance(state, now); state = next.phase === 'kept' ? state : next;", failure: 'full-session: finished draft and real clipboard equal typed text' },
@@ -68,11 +68,17 @@ for (const control of cases) {
     console.log(`CONTROL ${control.name}: exit ${code}; ${failures.map(result => `${result.tag}: ${result.name} (${result.msg})`).join('; ') || 'all named scenarios passed'}`);
     assert.equal(code, control.failure ? 1 : 0, `${control.name} exit code`);
     if (control.failure) {
-      assert.equal(failures.length, 2, `${control.name} must fail on both viewports`);
+      const expected = [].concat(control.failure);
+      assert.equal(failures.length, expected.length * 2, `${control.name} must fail on both viewports`);
       assert.deepEqual(new Set(failures.map(result => result.tag)), new Set(['phone', 'desktop']));
-      for (const failure of failures) {
-        assert.equal(failure.name, control.failure);
-        if (control.message) assert.equal(failure.msg, control.message);
+      for (const tag of ['phone', 'desktop'])
+        assert.deepEqual(failures.filter(result => result.tag === tag).map(result => result.name), expected);
+      if (control.message) {
+        const messages = [].concat(control.message);
+        for (const failure of failures) {
+          const message = messages[expected.indexOf(failure.name)];
+          if (message) assert.equal(failure.msg, message);
+        }
       }
     } else {
       for (const tag of ['phone', 'desktop']) {

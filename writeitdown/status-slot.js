@@ -39,13 +39,15 @@ const ink = (() => {
 // otherwise eat the draft's only line, which is what the Linux runner did at 320 px (a
 // two-line confirmation reservation left 30.4 px of a 33.6 px line). The kept screen's own
 // gaps give way instead, nearest the draft first, and the shrink stops as soon as a line
-// fits, so a comfortable sheet keeps its designed rhythm.
+// fits, so a comfortable sheet keeps its designed rhythm. A fixed block taller than the line
+// they can give crushes the draft to zero height before they are asked; the gap shrink is
+// what recovers it, so only the screen not being rendered (hidden) skips the measurement.
 const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
 
 function keepDraftLine(paper) {
   const scroll = paper.querySelector('.kept-scroll');
   const text = paper.querySelector('.kept-text');
-  if (!scroll || !text || scroll.getBoundingClientRect().height === 0) return;
+  if (!scroll || !text || scroll.getClientRects().length === 0) return;
   const line = parseFloat(getComputedStyle(text).lineHeight);
   if (!(line > 0)) return;
   for (const [selector, name] of KEPT_GAPS) {
@@ -91,10 +93,17 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       if (footer) {
         const footerRect = footer.getBoundingClientRect();
         const hint = footer.querySelector('.exit-hint');
-        const stableChildren = [...footer.children].filter(child => !child.classList.contains('exit-hint'));
-        const stableHeight = stableChildren.length
-          ? Math.max(...stableChildren.map(child => child.getBoundingClientRect().height)) : 44;
-        const stableTop = footerRect.bottom - stableHeight;
+        const stableChildren = [...footer.children]
+          .filter(child => !child.classList.contains('exit-hint'))
+          .map(child => child.getBoundingClientRect())
+          .filter(rect => rect.height > 0);
+        // The stable controls can wrap onto more than one row on a narrow sheet, so the block is
+        // measured as a whole: the topmost control to the footer's bottom edge. Reserving only the
+        // tallest single control let a wrapped row eat a line of the kept draft.
+        const stableTop = stableChildren.length
+          ? Math.min(...stableChildren.map(rect => rect.top))
+          : footerRect.bottom - 44;
+        const stableHeight = footerRect.bottom - stableTop;
         if (hint) {
           const text = hint.dataset.hint || hint.textContent;
           if (text) {

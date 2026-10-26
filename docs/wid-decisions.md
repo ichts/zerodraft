@@ -831,3 +831,66 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   cannot be used to decide a release.
 - Supersedes: D-048's exit-78 sentence only as it applies to a run whose panel did not complete. Its six named
   lenses, its assertion ownership and its declared-defect keying stand.
+
+## D-053: Every shipped page is one design system, and the phone room nav yields to the clock
+
+- Date: 2026-10-25
+- Decision: the landing's design system governs all twelve writeitdown.app pages. The nine
+  help/legal/answer pages and `mac.html` move onto the shared document shell: the A mark lockup on its
+  paper plate, the theme button, the same footer, 17 px system-face body copy at the 62ch measure,
+  Newsreader headings, token-only colours, and the v2 pill and underlined-link treatments. There is no
+  reading-mode exception. `mac.html#buy` becomes a section with the heading and the `$4.99 once` price
+  row in view, the buy form's pending and error states, and a licence card for the ready, copied and
+  unpaid states; the `session_id` credential is cleared from the address bar and history on success and
+  failure alike, with `Check again` as the in-page retry. One price string, `$4.99 once`, appears
+  wherever the Mac page names the price. On a phone the room nav keeps only the lockup and the theme
+  icon, and the Mac link moves into the exit row. The download page carries no 1.1 note until 1.1
+  ships; the note returns with that release.
+- Reason: the captain read the live site and found the colours wrong on `support.html` and the design
+  system wrong on the page buyers reach before paying. The nine support, legal and answer pages were
+  still a retired beige/mono document style, and `mac.html` was a third system: a 48 px left-aligned
+  serif heading, 21 px serif body, square mono buttons and a transparent theme button, while
+  `/download/` two links away was 60 px centred, 17 px sans and pill-shaped. A buyer paid from the page
+  that matched the least. On a phone, the room nav's filled pill was louder than the clock above it, and
+  D-045's reachability reason survives without it because the Mac link stays in the exit row.
+- Supersedes: D-045's room-nav clause (the nav row is still kept on the landing room at every width,
+  but a phone shows only the lockup and the theme icon; the Mac link moves into the exit row). It also
+  supersedes the canvas-only adoption recorded for `mac.html` in the `tokens.css` header.
+
+## D-054: The download card may carry a release note only for the artifact it links
+
+- Date: 2026-10-25
+- Decision: `download/index.html` carries no hidden release-note placeholder. A release note in
+  `#release-notes` is optional; when present it declares the artifact version it links in
+  `data-release-note`, and that version must equal the linked DMG's version. The release gate
+  refuses a note that runs ahead of or behind the linked DMG, a note without a valid declared
+  version, and any `data-launch-pending` mark. Publishing a version adds the visible note naming
+  that version. The DMG link name, the Install command's filename and the SHA-256 slot stay always
+  gated, so a version bump cannot ship half-flipped.
+- Reason: the design migration removed the 1.1 note from the card and relaxed the gate to accept a
+  page with no note, which reversed D-041's recorded commitment that 1.0 users learn about 1.1 from
+  the download page without recording a supersession. The note is product content the captain owns:
+  a published version carries a visible note naming it, and a page without one claims nothing newer
+  than the artifact it links.
+- Supersedes: D-041's download-page release-note clause and the `data-launch-pending` gate. D-041's
+  opt-in update rules stand.
+
+## D-055: Page content sits on the header's grid, centred or flush, never flush on one side
+
+- Date: 2026-10-26
+- Decision: On every shipped page each block of page content starts and ends at the same distance
+  inside the header container. Two compositions are allowed and no third: a block flush with the
+  container's edges (the landing's full-bleed bands and `/download/`) or a block centred in it (a
+  document's 62ch measure). A document page centres its measure inside the header container instead
+  of running it from the header's left edge, so the H1, the lede, the questions, the purchase card
+  and the licence card share those two edges. `qa/shell.spec.mjs` pins the geometry at 1440, 1024
+  and 390 on all twelve pages, and document blocks may not reach past the container at all.
+- Reason: the captain read the PR 70 preview of `mac.html#buy` and described the page as a narrow
+  block stuck to the logo with an empty band on the right. The measurement agreed with his eye: the
+  column was inset 0 px on the left and 392 px on the right at 1440, 0 and 296 at 1024 - a 62ch
+  text measure inside a 1120 px container, left-aligned, under a header that spans the container.
+  The landing itself never does that: its objects are either container-wide bands or the centred
+  760 px sheet.
+- Supersedes: the 2026-10-25 QA row Q-14 wording "one left edge shared with the footer on every
+  document page", which read the flush-left column as the deliberate alignment. The one measure in
+  the 17 px face is unchanged.

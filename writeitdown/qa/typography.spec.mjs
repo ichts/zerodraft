@@ -39,6 +39,9 @@ const census = () => {
     const style = getComputedStyle(element);
     rows.push({
       tag: element.tagName.toLowerCase(),
+      // A literal machine string keeps its monospace inside the element that declares it: the hash's
+      // two unbroken halves and the install command's argument are spans inside their `code` block.
+      inCode: element.closest('code, pre, kbd, samp') !== null,
       id: element.id,
       classes: element.className && typeof element.className === 'string' ? element.className : '',
       family: style.fontFamily,
@@ -71,7 +74,7 @@ test('every text role on every shipped page stays in the shared type set', async
     });
     expect(stray.map(row => `${path} ${row.tag}.${row.classes}: ${row.family}`), `${path}: a text role left the shared set`).toEqual([]);
     const machine = rows.filter(row => faceOf(row) === 'machine');
-    expect(machine.every(row => row.tag === 'code'), `${path}: monospace is reserved for code, found ${machine.map(r => r.tag).join(',')}`).toBe(true);
+    expect(machine.every(row => row.tag === 'code' || row.inCode), `${path}: monospace is reserved for code, found ${machine.map(r => `${r.tag}${r.inCode ? ' (in code)' : ''}`).join(',')}`).toBe(true);
   }
   // The census is only a guard if it actually sees the shared faces on the pages that carry them.
   expect([...found.keys()].sort(), 'the shared faces are present and named').toEqual(['accent', 'machine', 'tool', 'writing']);

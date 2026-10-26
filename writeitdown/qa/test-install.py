@@ -12,7 +12,7 @@ source = Path(__file__).resolve().parents[1]
 files = {
     'download/index.html', 'index.html', 'mac.html', 'privacy.html',
     'terms.html', 'support.html', 'site.css', 'tokens.css',
-    'reenie-beanie.woff2', 'OFL-ReenieBeanie.txt', 'theme.js', 'paper.js', 'demo.js',
+'theme.js', 'paper.js', 'demo.js',
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
     'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html',
     'write-it-down-free-trial.html', 'write-it-down-price.html',
@@ -22,6 +22,11 @@ files = {
     'logo/write-it-down-lockup.svg', 'logo/write-it-down-lockup-plate.svg', 'favicon.svg', 'favicon-16.png', 'favicon-32.png',
     'favicon-dark.svg', 'favicon-dark-16.png', 'favicon-dark-32.png', 'apple-touch-icon.png',
 }
+fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/reenie-beanie.woff2',
+         'fonts/newsreader-latin.woff2', 'fonts/newsreader-latin-italic.woff2',
+         'fonts/OFL-Newsreader.txt', 'fonts/OFL-ZhuqueFangsong.txt', 'fonts/OFL-ReenieBeanie.txt'}
+fonts |= {f'fonts/zhuque-fangsong-{index:02d}.woff2' for index in range(1, 14)}
+files |= fonts
 
 
 class LocalReferences(HTMLParser):

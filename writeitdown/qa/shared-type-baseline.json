@@ -1,0 +1,46 @@
+{
+  "note": "The shared type set's measured advances (D-057). One committed value per role, asserted by writeitdown/qa/typography.spec.mjs in the browser and by apps/macos/FirstLine/Tests/FirstLineTests/TypographyParityTests.swift through CoreText. The Mac is the reference: its numbers are in points, and the web must agree within 0.05 %, which is far tighter than a face substitution moves an advance (1-9 %) and far looser than OS text-stack updates (measured agreement is 0.005 %).",
+  "tolerance": 0.0005,
+  "roles": [
+    {
+      "role": "writing-latin",
+      "string": "promotion. i want time",
+      "size": 28,
+      "face": "Newsreader16pt-Regular",
+      "cssFamily": "Newsreader",
+      "cssWeight": "400",
+      "cssStyle": "normal",
+      "advancePt": 264.486
+    },
+    {
+      "role": "writing-cjk",
+      "string": "我写中文草稿",
+      "size": 28,
+      "face": "ZhuqueFangsong-Regular",
+      "cssFamily": "Zhuque Fangsong",
+      "cssWeight": "400",
+      "cssStyle": "normal",
+      "advancePt": 168
+    },
+    {
+      "role": "kept-heading",
+      "string": "You wrote it down.",
+      "size": 48,
+      "face": "NewsreaderRoman-Medium",
+      "cssFamily": "Newsreader",
+      "cssWeight": "500",
+      "cssStyle": "normal",
+      "advancePt": 395.869
+    },
+    {
+      "role": "warning-numeral",
+      "string": "3",
+      "size": 162,
+      "face": "Newsreader16pt-Italic",
+      "cssFamily": "Newsreader",
+      "cssWeight": "400",
+      "cssStyle": "italic",
+      "advancePt": 97.2
+    }
+  ]
+}

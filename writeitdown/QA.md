@@ -6,6 +6,73 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-26: One shared type set with the Mac app, served by the site itself
+
+Every shipped page now draws text with the same faces the Mac app does (D-057): Newsreader for what
+the writer writes and for every heading, Zhuque Fangsong for the same roles in Chinese, the system
+sans for everything the tool says, and the system monospace for literal code strings only. The
+landing's Reenie Beanie hand accent stays as the one declared exception. All faces are served from
+`fonts/`; no page requests a font host, and the ten pages that still carried the retired IBM Plex
+Mono identity now use the shared set. Evidence: `fonts/` (the build step and its OFL texts),
+`qa/typography.spec.mjs`, `qa/shared-type-baseline.json`, `design/DESIGN.md` section 12.
+
+## Commands and results
+
+- `npx playwright test` (whole writeitdown suite, 8 projects, private port 8117 because another
+  lane held 8015): 751 passed, 0 failed, 73 skipped (16.0 min).
+- `npx playwright test qa/typography.spec.mjs`: 56 passed, 0 failed.
+- `npm test` at the repository root (the landing/trial harness): 2 passed, 0 failed.
+- `python3 -m http.server 8017`: `index.html` requests `fonts.css`, `fonts-cjk.css`,
+  `fonts/newsreader-latin.woff2`, `fonts/reenie-beanie.woff2` and nothing from another origin.
+
+## Measured (browser-computed, light and dark agree)
+
+| Role | Family as computed | Size / weight / tracking |
+| Writing text and kept text | `Newsreader, "Zhuque Fangsong", Georgia, ...` | 28 px / 400 / normal, 1.6 pitch |
+| Kept heading, failure headline | the same stack | 48 px / 500 / **normal** (was `-.02em`) |
+| Chinese draft (platform face) | `Zhuque Fangsong (technical preview)` -> `ZhuqueFangsong-Regular`, 6 glyphs | 28 px / 400 |
+| Clock | system sans | 15 px / 600 / normal, `font-variant-numeric: tabular-nums` |
+| Count | system sans | 13 px / 400 / normal |
+| Kept receipt, wipe report | system sans | 13 px / 500 / `0.26px` (.02em) |
+| Warning caption, quiet link | system sans | 13 px / 500 / `0.52px` (.04em) |
+| Room pills | system sans | 15 px / 600 / `0.6px` (.04em) |
+| Hand accent (landing only) | `"Reenie Beanie", "Segoe Print", cursive` | 108.36 px / 400 |
+| With `fonts.googleapis.com` and `fonts.gstatic.com` refused | writing face is still `Newsreader 16pt` (bundled), the editor stack unchanged | 28 px / 400 |
+
+Face payload: Newsreader upright 137,436 B, italic 154,240 B, the hand accent 17,936 B, and 13
+Zhuque Fangsong slices 2,726,540 B in total (48,668-358,692 B each). A page that renders no Chinese
+fetches 309,612 B of faces plus `fonts.css` (1,127 B); `fonts-cjk.css` (47,824 B) is linked by
+`index.html` alone and a Chinese slice downloads only when a character in it reaches the screen.
+
+## Captures
+
+60 PNGs at `/Users/ichts/firstmate-homes/wid/data/wid-font-fix/captures/`: the landing, `mac.html`,
+`download/`, support, privacy, terms and the price page at 1440x900 and 390x844 in light and dark;
+the room empty, typing, warning, wiped, kept and exit-confirmation in both themes and sizes; the room
+with a mixed Chinese draft; and the landing and room with both font hosts refused. Face measurement
+JSON sits beside them (`measurements.json`, `cjk-face.json`).
+
+## Known-broken proofs for the new gates
+
+- **Chinese falls back to the system CJK face again.** Removing `var(--cjk)` from `--serif` (the
+  pre-change stack exactly) makes `qa/typography.spec.mjs` `chinese in the room draws in the Mac
+  room's fangsong` fail with `Received string: "Newsreader, Georgia, \"Times New Roman\", serif"`;
+the plant was removed and the committed tree passes.
+- **The mono identity comes back.** Adding `font-family:ui-monospace,...` to `.home .doc h2` makes
+  `every text role on every shipped page stays in the shared type set` fail with
+  `mac.html: monospace is reserved for code, found h2,h2,h2,h2,h2,h2`; the plant was removed and the
+  committed tree passes.
+- The same guard was shown failing in the pre-change values the inventory measured: headings at
+  `-.02em` (`kept h1` advance 378.594 vs the Mac's 395.869) and a proportional clock
+  (`1:00` 31.391 px, `0:59` 33.859 px on a 15 px face).
+
+## UI quality checklist (docs/ui-quality.md)
+
+| Rule | Result | Basis |
+| Q-17 | PASS | The writing pitch is unchanged on both surfaces: 28 px / 1.6 = 44.8; only the face behind the glyph changed. `EditorFocusTests.linePitchIsFixedForChineseEnglishAndMixed` and the shipping 28/1.6 room both hold, and the subset build refuses a subset that moved the em box. |
+| Q-19 | PASS | No horizontal overflow at 320-1440 px after the face changes; `qa/shell.spec.mjs`'s width sweep stays green. |
+| Q-23 | PASS | The shared type set is measured, not eyeballed: the role census on twelve pages, the self-hosted proof with the font hosts refused, the Chinese platform face, clock width stability, the untracked headings, the receipt's 13 px medium and tracking, and the shared advances against the Mac's own numbers (`shared-type-baseline.json`, tolerance 0.05 %); in the current run 56 of 56 typography assertions pass. |
+
 # 2026-10-26: Document content sits on the header grid (PR 70 review round)
 
 The captain read the PR 70 preview of `mac.html#buy` and saw the page as a narrow column stuck to the

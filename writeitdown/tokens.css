@@ -5,8 +5,11 @@
    sit on :root so any page that links this sheet can map the canvas, and every shipped page (landing, download, room,
    the help/legal/answer pages and mac.html) puts .home on <body> or its main surface to take the full role set. The
    header brand plate (--brand-plate) also sits on :root because every page that carries the lockup must resolve one
-   value. Faces: Newsreader (what you write, headlines), Reenie Beanie (the pen), and the system UI stack for the tool
-   (no webfont). Newsreader loads with the site's existing font link. Dark keeps the same names. */
+   value. Faces (D-057): Newsreader is what the writer writes and what the site sets headings in, Zhuque Fangsong is
+   the same roles in Chinese, Reenie Beanie is the landing's hand accent alone, and everything the tool says - labels,
+   nav, buttons, clock, count, captions, receipts, quiet links - is the system sans. No monospace face carries text.
+   Every face is served from this site: fonts.css declares them (fonts/build-fonts.py generates it), fonts-cjk.css
+   holds the Chinese slices and is linked by index.html alone. Dark keeps the same names. */
 :root{--page:#f7f7f5;--stage-a:var(--page);--stage-b:var(--page);--brand-plate:#ffffff}
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
@@ -33,8 +36,11 @@
   --red-soft:#f6e2dc;--red-deep:#ebc8bd;
   --tag-bg:#f2f2f0;
   --on-ink:#ffffff;
-  /* type: serif = written text and display, hand = the pen, sans = the tool */
-  --serif:'Newsreader',Georgia,'Times New Roman',serif;
+  /* type: serif = written text and display, cjk = the same roles in Chinese, hand = the landing's pen
+     accent (D-057), sans = the tool. --cjk is one family name so the guard can read it and so the
+     Chinese face is named in exactly one place. */
+  --cjk:'Zhuque Fangsong';
+  --serif:'Newsreader',var(--cjk),Georgia,'Times New Roman',serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
   --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
   /* writing size and placement for the web room: 28pt, active line at 35% of the sheet (the Mac's D-025

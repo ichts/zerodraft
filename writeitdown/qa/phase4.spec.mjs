@@ -853,6 +853,20 @@ test('demo is forward-only: every event appends, Backspace is tried once and blo
   await page.locator('body').click({ position: { x: 5, y: 5 } });
   await page.keyboard.press('Backspace');
   await expect(page.locator('#cur')).toHaveText(deny.cur);
+  // Playwright's clock controls the demo's timers, not WAAPI's document timeline, so runner latency
+  // can consume a 200 ms refusal before it is read. Freeze the refusal in the native key event.
+  await page.evaluate(() => {
+    document.addEventListener('keydown', () => {
+      for (const animation of document.getAnimations()) {
+        if (['paper', 'demo-hairline'].includes(animation.effect.target?.id)) {
+          animation.pause();
+          animation.currentTime = 60;
+        }
+      }
+    }, { once: true });
+  });
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#cur')).toHaveText(deny.cur);
   await seek(deny.t + 55);
   await expect(page.locator('#cur')).toHaveText(deny.cur);
   // The refusal is the room's refusal: a 200 ms transform-only shake and a 220 ms

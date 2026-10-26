@@ -6,6 +6,160 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-10-26: The room, the fold and the download head hold their numbers (web audit round)
+
+The captain's site audit (sections 9.3 to 9.5) and the design review named eleven basic defects on
+the writeitdown.app surfaces; each one now carries an assertion that fails on the pre-fix tree. The
+kept screen's primary reserves its own label width and `.home :focus-visible` is a ring only
+(D-059); the kept screen prints one count in the red receipt and one caption (D-062); the wiped room
+keeps the caret on the empty line and holds the clock at the minute the draft died (D-063, D-065);
+EXIT and the brand arm the same two-act confirmation for a thumb and both Mac links open in a new tab
+(D-061, D-067); the landing's first screen is one flex column whose sheet follows a fraction floor
+instead of a width or height breakpoint (D-068); the watch-only demo carries no caret and no typing
+prompt (D-064); seconds read one way and both clocks use tabular numerals (D-066); and `/download/`'s
+head, deck, hash and install command are fixed shapes with no scroll container (D-060, including the
+two distinct copy labels). In the same round the landing header began spanning the page container
+(`.home .first-screen > .wrap{width:100%}`), so the brand sits on the left gutter and the theme button
+on the right like the room, the download page and the rest of the site.
+
+## Commands and results
+
+- `cd writeitdown && npx playwright test` (8 projects): 864 tests, 791 passed, 0 failed, 73 skipped
+  (17.3 min). After `origin/main` merged its sheet lane (paper.js, the Note tones), the same command
+  on the merged head ran 904 tests: 831 passed, 0 failed, 73 skipped (10.6 min). The fold, the
+  download shapes and the room rules above are unchanged by that merge; this round's decision numbers
+  moved to D-058 to D-068 so `D-056` (the sheet) and `D-057` (the type set) stay theirs.
+- `cd writeitdown && npx playwright test --project=... --grep "kept screen: headline"` with the copy
+  floor removed: `the pill keeps one width across labels` fails (137.33 -> 107.64 px), so the gate is
+  still sensitive to a jumping pill.
+- The merge with the sheet lane exposed one real conflict the suite did not cover: the new not-saved
+  caption was still `--mute` (4.25:1 light, 4.34:1 dark on the Note paper, under the sheet's 7:1
+  floor). It now uses `--paper-quiet` (7.35 / 7.38), and `qa/paper.spec.mjs` measures `#kept-note`
+  with the draft and the receipt at the same floor. The paper specs plus the kept test pass on all
+  eight projects (64 passed).
+- Afterwards CI failed twice on a machine whose system sans is wider than the one this round was
+  tuned on: the pill's `6.25em` floor was measured on this Mac's face, so `COPY TEXT` (146.5 px) and
+  `COPIED` at the floor (141.75 px) differed by 4.77 px. The floor is now measured from the widest of
+  the three labels in the face the device renders (`room.js` `sizeCopyFloor`, re-run on
+  `document.fonts.ready` and on resize), so the rule no longer depends on a hand-measured constant;
+  the `em` value stays as the no-script fallback. The probe measures on `<body>` because the room is
+  hidden until the writer opens it, and a hidden descendant reports width 0: that is why the first
+  measurement silently fell back to the `em` constant on CI, where `document.fonts.ready` resolved
+  while the room was still closed. The kept test now asserts the floor exists before the room opens. The two failing tests now load and assert the
+  page's faces (`document.fonts.status` plus a loaded `Newsreader` and `Reenie Beanie`) before any
+  width is measured, and the fold's 61% check allows one rendering pixel of `vh` rounding instead of
+  an exact ratio. Locally: those two tests 16 passed on the eight Chromium projects, the fold test
+  passed on WebKit at 1440 and 390, and with the floor removed the pill jumps 137.33 -> 107.64 px and
+  `the pill keeps one width across labels` fails, while a face 1 px wider per character still holds
+  one width because the floor is measured.
+- `node journey/journey.mjs --base http://127.0.0.1:8035 --expect-sha 5b8483bd... --dmg-file
+  Write-It-Down-1.0.dmg`: 80 pass, 0 fail, 2 waived (sign-in, test-payment), on the phone's WebKit
+  with the iPhone 14 profile and on desktop Chromium, one continuous video per viewport under
+  `/Users/ichts/firstmate-homes/wid/data/wid-room-fixes/journey-r10/{phone,desktop}/`.
+- `node writeitdown/release-check.mjs --download`: STATIC CHECK PASSED.
+- Root `npm test` (Zero Draft landing and trial): the root `index.html` is not in this diff and was
+  not re-run.
+
+## Measured (what each assertion now holds)
+
+| Item | Surface | Measured | Assertion |
+| Q-24 copy press | kept screen, 1440 and 390 | COPY TEXT -> COPIED keeps the pill's width and left edge, deltas 0.00 px; RUN IT AGAIN left, top and width deltas 0.00 px; the pointer is still over the copy control after the relabel and a second press at the same point leaves the phase `kept` with the draft intact; the row does not wrap at 390 (`stacked: false`). The label's floor is the widest of `COPY TEXT`, `COPIED` and `TRY AGAIN` measured in the rendered face, so a wider system face changes the pill's size but never its stability | `phase4.spec.mjs` "kept screen: headline, quiet receipt, action row above a scrollable draft" |
+| Q-24 focus shape | kept pill, focus ring, 1440 and 390 | focused pill 141.75x48 px with radius 999 px and a 2 px ink outline, width and height deltas 0; the Tab-reached EXIT keeps radius 0 px with the same ring | `phase4.spec.mjs` "focus is a ring, never a re-cut of the control it lands on" |
+| Q-25 wipe caret | room, wipe phase | `caret-color` `rgb(28, 25, 23)` at alpha 1, no ancestor below opacity 1 (writing area opacity 1), editor focused with a collapsed `Caret` selection, editor text colour transparent | `phase4.spec.mjs` "empty room shows only the caret and the count prompt; after a wipe the receipt carries it" |
+| Q-25 wipe clock | room, wipe phase | corner clock `0:52` equals the receipt's `DRAFT DELETED AT 0:52.`, still `0:52` after 1.5 s, back to `1:00` only on the next keystroke | same test |
+| Q-25 phone exit | room at 390 with touch | one tap on EXIT or on the brand keeps phase `typing` with the draft and reads `Tap EXIT again to leave and delete the draft.`; two taps leave; both Mac links are `_blank` with `noopener` and the draft survives them | `phase4.spec.mjs` "nothing in the room can throw a live draft away in one act" and "a thumb gets the same two acts as a keyboard" |
+| Q-25 kept count and caption | room, kept phase | corner count empty, receipt `1 MINUTE. 44 WORDS.`, caption `Nothing here is saved. Copy it before you leave.` under the actions, both controls on one line at 390 | `phase4.spec.mjs` "kept screen: headline, quiet receipt, action row above a scrollable draft" |
+| Q-28 fold | landing first screen | nav, hero, door and sheet are one flex column with `min-height:100vh` / `100svh` (vh first, svh second), `.stagewrap` floors the sheet at `max(300px, 61vh)` / `max(300px, 61svh)` and `.home .paper` fills it (`flex:1;min-height:300px`), with no width or height breakpoint; measured 390x844 530.9 px = 0.629 of the viewport, 375x667 406.9 px = 0.610, 320x700 427 px = 0.610, 375x812 495.3 px = 0.610, 320x568 346.5 px at the 300 px floor with the page scrolling; the door and its note sit fully inside the fold at every size and the sheet ends on the first-screen edge (0 px); no horizontal overflow | `phase4.spec.mjs` "the door and the sheet it opens share one first screen on a short phone" |
+| Q-26 demo | landing demo | 0 caret elements, no `contenteditable` and no input, the count slot empty at load then `1 word` / `17 words`, the report frame holds clock `0:39` with `DRAFT DELETED AT 0:39.` for its two seconds and re-arms at the loop's `1:00` | `phase4.spec.mjs` "the watch-only demo advertises no input, and its count speaks like the room" and "demo loop: warning group, cut, and the failure screen in the status slot" |
+| Q-27 seconds | landing copy and schema | moments `0:47 · writing` / `3 s left · warning` / `8 s · deleted`, card markers `5 s · warning` / `8 s · deleted`, FAQ states the three-second lead-in and matches the JSON-LD answer word for word | `phase4.spec.mjs` "the landing states the warning lead-in and never labels a moment with another moment" |
+| Q-27 tabular clock | room and demo | clock width constant at 33.625 px across `1:00`, `0:58` and `0:11`; `font-variant-numeric: tabular-nums` on the room clock, the demo clock and both counts | `phase4.spec.mjs` "the clock does not breathe: tabular numerals on the room and the demo" |
+| Q-28 download head, hash and command | `/download/` at 1440, 390, 375, 320 | H1 `Write It Down` / `for Mac` as two two-word lines on phones (one centred line at 1440); deck ink left 20.00 px on the H1's ink left 20.00 px at 390/375/320, 34ch cap; the hash's two 32-character halves share one 13 px line at 1440 and wrap as two unbroken lines at 390/375 (13 px) and 320 (12 px); the install command splits at its argument with `Write-It-Down-1.0.dmg` whole; 0 scroll containers, no fade; COPY returns the joined 64-hex value and the one-line command; the two controls carry distinct names (`Copy the SHA-256`, `Copy the install command`) | `mac.spec.mjs` "the download head breaks without an orphan and its checksum block reads" |
+| Header | landing at 320, 375, 390, 768, 1024, 1440 | the nav box equals the page container at every width (1120 px centred at 160-1280 on 1440, full width below); the brand sits on the container's left padding (192 px from the viewport edge at 1440, 32 px at 1024, 20 px at 390) and the theme button's right edge on the right padding (1248 of 1440, 370 of 390, 355 of 375, 300 of 320); no horizontal overflow | `mac.spec.mjs` "the landing header spans the page container at every width" |
+
+## Known-broken proofs for the new gates
+
+Each assertion was run against the pre-fix tree; the recorded failure text is the item's own.
+
+- Copy press: with the label floor removed the pill shrinks, `the pill keeps the COPY TEXT width` fails.
+- Focus shape: `a square control stays square` fails while the room-wide focus rule still sets `border-radius`.
+- Wipe caret: the caret-state deep equality fails while the writing area keeps `opacity: 0`.
+- Wipe clock: `toHaveText` fails with `1:00` against the receipt's `0:52`.
+- Phone exit: two `toBeVisible` failures while one tap leaves the room.
+- Kept count: `the corner count is silent on the kept screen` fails while both counts print.
+- Fold: `375x667: the sheet it opens ends on the first screen` fails on the breakpoint rule.
+- Demo: `toHaveCount` fails on the caret element and on the empty count slot.
+- Seconds: `the warning panel is labelled with its own numeral: 5 s · warning` fails.
+- Tabular clock: the width equality fails with two different clock widths.
+- Download: ``the line `Mac` holds more than one word`` fails on the phone head, and the pre-change
+  release gate reads a truncated install card (`Install command: the card does not name the DMG file
+  to hash`) and a card whose command hashes `Write-It-Down-0.9.dmg` while the page links 1.0 is
+  refused.
+- Header: removing `.home .first-screen > .wrap{width:100%}` shrinks the lockup and the new test fails
+  with `expected difference < 0.5, received 58.265625`; restoring the rule makes it pass.
+
+## Captures
+
+- This round's suite run wrote one directory per touched test at 1440 and 390 in both themes under
+  `/Users/ichts/firstmate-homes/wid/data/wid-room-fixes/qa-r10/artifacts2/`, covering the kept,
+  copied and focused room, the wipe, the phone exit confirmation, the armed brand, the demo
+  typing/warn/report, the fold, the download head and hash, and the landing header.
+- The live Chrome drive behind the measured table is
+  `/Users/ichts/.no-mistakes/evidence/01M5WCJ7JM97Y38TNTSA45D0KH/live-r9/` (`room-report.json`,
+  `fold-report.json`, `header-report.json`, `report.json`, `demo-report.json`, `phone-report.json`,
+  and `room-copied-1440.png`, `room-kept-primary-focus-1440.png`, `room-wipe-1440.png`,
+  `phone-room-brand-armed.png`, `demo-report-1440.png`, `download-hash-1440.png`, `download-390.png`,
+  `fold2-375x667.png`, `fold2-320x700.png`, `header-1440.png`, `header-390.png`).
+
+## UI quality checklist (docs/ui-quality.md)
+
+| Rule | Result | Basis |
+| Q-01 | PASS | No chrome was added on any state; `phase4.spec.mjs` "the session bar is one continuous linear animation" and the one-bar assertion inside `assertRoom` are green. |
+| Q-02 | PASS | "warning numeral, caption and wipe receipt are placed by ink under the writing line" is green; the receipt's slot did not move when the count left the corner. |
+| Q-03 | PASS | The wipe now holds the same caret state as the first-entry room: `caret-color` painted, editor focused and collapsed, writing area at opacity 1 (the deep-equality assertion). |
+| Q-04 | PASS | "demo and trial active-line placement: 35% of the sheet" is green on both surfaces. |
+| Q-05 | PASS | The kept row shares one baseline and one optical centre at 1440 and 390, and both controls stay on one line at 390 (`stacked: false`). |
+| Q-06 | PASS | The copy press and the focus ring move nothing: copy width, left and the restart rect all measure 0.00 px delta. |
+| Q-07 | PASS | One caption was added on the kept screen by the captain's decision (D-062); no other label or helper sentence was introduced. |
+| Q-08 | PASS | The web room and the landing demo now share the caret rule, the clock rule and the seconds vocabulary; the Mac differences are scoped and named in D-062, D-063 and D-065. |
+| Q-09 | PASS | Every touched state is captured at 1440 and 390 in light and dark in this round's evidence directory. |
+| Q-10 | PASS | Nothing new moves while typing: the clock keeps its width (tabular), the caret is static, and the demo's report holds still for its two seconds. |
+| Q-11 | PASS | No motion was added or changed; the reduced-motion projects of the touched tests are green in the full run. |
+| Q-12 | PASS | The room keeps `Type to start` and the wipe receipt keeps `TYPE TO START AGAIN.`; the watch-only demo no longer prints either (D-064). |
+| Q-13 | PASS | Every control keeps the ink ring; the ring no longer re-cuts the control's shape (radius 999 px pill, 0 px square). |
+| Q-14 | PASS | The kept row sits on one line at both widths, the deck starts on the headline's ink edge (20.00 / 20.00), and the header keeps the container's gutters at 320 to 1440. |
+| Q-15 | PASS | The two-act exit follows the platform's destructive-action confirmation; the copy controls follow the site's own ghost pill and a live-region status. |
+| Q-16 | PASS | These eleven defects were found by the audit and the design review, not by a tester; each now has an assertion. |
+| Q-17 | PASS | No type metric changed except the hash's 12 px step below 365 px, which is recorded in D-060. |
+| Q-18 | N/A | Mac launch state; no web surface. |
+| Q-19 | PASS | The landing header now spans the container at 320 to 1440 with no overflow, and `/download/` keeps its gutter sweep. |
+| Q-20 | PASS | One caption was added (D-062); the price string is unchanged and `shell.spec.mjs` still enforces `$4.99 once`. |
+| Q-21 | PASS | The twelve shipped pages keep one header, canvas and body family; `shell.spec.mjs` is green. |
+| Q-24 | PASS | Copy press and focus shape: see the measured table. |
+| Q-25 | PASS | Kept count and caption, wipe clock hold, wipe caret, and the two-act exit: see the measured table. |
+| Q-26 | PASS | The demo draws no caret, prints no typing prompt, and its count and receipt stay truthful. |
+| Q-27 | PASS | Seconds read one way and both clocks are tabular. |
+| Q-28 | PASS | The fold, the download head, the deck edge, the hash and the install command: see the measured table. |
+| Q-29 | PASS | Escape, EXIT and the brand arm one two-act confirmation, a single tap on a phone keeps the draft, typing cancels it, both Mac links open in a new tab, and the wording follows the input (D-061, D-067). |
+| Q-28 | PASS | The sheet's text roles clear 7:1 on the Note paper, including the not-saved caption (7.35 light, 7.38 dark) that the merge with the sheet lane found at 4.25; `qa/paper.spec.mjs` measures it with the draft and the receipt. |
+
+## Remaining limits
+
+- 320x568 still scrolls: the sheet keeps its 300 px floor and the door and note are inside the first
+  screen, but the demo's lower half is below the fold. That is D-068's decided outcome, not a defect.
+- Headless Chrome does not composite the native text caret, so the wiped room's caret is pinned by
+  its painted `caret-color`, the focused editor with a collapsed selection, the writing area at
+  opacity 1 and a frame burst over the writing line, not by a screenshot pixel.
+- Real OS IME, iOS Safari with the virtual keyboard, and human audio evaluation remain unverified;
+  Chrome viewport checks do not replace them.
+- Mac parity is not claimed for D-062, D-063 and D-065: the Mac kept screen still prints the count
+  twice and the Mac deleted screen still shows the re-armed clock. The Mac lane applies the same
+  rules under `docs/wid-mac-behavior.md` before the two surfaces are called one design.
+- The release journey needs Playwright WebKit and a real DMG; the run recorded above served the local
+  1.0 DMG, so a live-site journey is still the pre-release step on the host.
+- No deployment. writeitdown.app still serves the previous bundle until `sh writeitdown/install.sh`
+  runs on the host.
+
+
 # 2026-10-26: One shared type set with the Mac app, served by the site itself
 
 Every shipped page now draws text with the same faces the Mac app does (D-057): Newsreader for what

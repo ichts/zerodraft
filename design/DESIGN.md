@@ -277,7 +277,11 @@ the notch.
   below. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at every width from 320 to 1440 px"
   sweeps the widest header (`/download/`) in 1 px steps from 320 to 420 and 8 px steps from 420 to 1440
   under the wider-font action model, so a breakpoint that leaves an uncovered band fails; keep the range
-  sweep instead of sampled widths.
+  sweep instead of sampled widths. The landing's header also keeps the page container's left edge and width:
+  `writeitdown/qa/mac.spec.mjs` "the landing header spans the page container at every width" pins the nav's
+  left edge and width to the page container at 320, 375, 390, 768, 1024 and 1440, because `.wrap`'s auto
+  margins inside the first screen's flex column would otherwise shrink it to its content and centre it
+  (D-055, D-068).
 - Site header, mobile: from 391 to 820 px the 19 px lockup takes 141.9 px of the row, with 12 px between the
   brand and the page action and 6 px inside the action group; at 380-390 px the 16 px lockup takes 119.5 px,
   the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 380 px the nav page action is

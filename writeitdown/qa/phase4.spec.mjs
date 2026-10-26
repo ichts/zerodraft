@@ -7,7 +7,13 @@ const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`
 const editor = page => page.locator('#editor');
 const browserEvidence = new WeakMap();
 const demoGeometry = new WeakMap();
-const EXIT_HINT = 'Press Esc again to leave and delete the draft.';
+// The exit names the act the input can perform; width only decides layout (D-067).
+const EXIT_HINT = {
+  keyboard: 'Press Esc again to leave and delete the draft.',
+  touch: 'Tap EXIT again to leave and delete the draft.',
+};
+const touchInput = page => page.evaluate(() => matchMedia('(hover: none), (any-pointer: coarse)').matches);
+const exitHintFor = async page => ((await touchInput(page)) ? EXIT_HINT.touch : EXIT_HINT.keyboard);
 const SILENT_END = TIMELINE.typeEnd + 5000;
 const WARN_END = SILENT_END + 3000;
 const CUT_END = WARN_END + 200;
@@ -165,7 +171,20 @@ test.beforeEach(async ({ page }) => {
   await page.clock.install({ time: new Date('2026-09-16T12:00:00Z') });
   await page.clock.pauseAt(new Date('2026-09-16T12:00:01Z'));
   await page.goto('./');
-  await page.evaluate(() => document.fonts.ready);
+  // Every width measured below depends on the face the device renders, so the faces must be loaded
+  // first and the test asserts it instead of trusting a sleep (D-059). A face the page uses stays
+  // `unloaded` only when it is a variant nothing asked for; `loading` or `error` is a real failure,
+  // and the two families the page owns must each have a loaded face.
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return { status: document.fonts.status,
+      faces: [...document.fonts].map(face => ({ family: face.family.replace(/["']/g, ''), status: face.status })) };
+  });
+  expect(fonts.status, 'the declared faces are loaded before a width is measured').toBe('loaded');
+  expect(fonts.faces.filter(face => face.status !== 'loaded' && face.status !== 'unloaded'), JSON.stringify(fonts.faces)).toEqual([]);
+  for (const family of ['Newsreader', 'Reenie Beanie']) {
+    expect(fonts.faces.some(face => face.family === family && face.status === 'loaded'), `${family} loaded`).toBe(true);
+  }
   demoGeometry.set(page, await page.locator('.script').evaluate(e => {
     const rect = e.getBoundingClientRect();
     const paper = e.closest('.paper').getBoundingClientRect();
@@ -219,6 +238,23 @@ test('demo and trial active-line placement: 35% of the sheet on both surfaces', 
   console.log(info.project.name, JSON.stringify({ demo, ratios: Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v.ratio])) }));
 });
 
+// The insertion point as it is actually drawn: the caret's own colour survives, and no ancestor
+// fades or hides it (an `opacity: 0` writing area used to paint the caret away, D-065).
+const insertionPoint = page => page.evaluate(() => {
+  const e = document.querySelector('#editor');
+  let node = e, opacity = 1;
+  while (node && node !== document.body) { opacity *= parseFloat(getComputedStyle(node).opacity); node = node.parentElement; }
+  const style = getComputedStyle(e);
+  const painted = (color) => {
+    const match = color.match(/rgba?\(([^)]+)\)/);
+    if (!match) return false;
+    const parts = match[1].split(',').map(part => parseFloat(part));
+    return (parts.length < 4 ? 1 : parts[3]) > 0;
+  };
+  return { opacity, caret: painted(style.caretColor), ink: painted(style.color),
+    focused: document.activeElement === e, collapsed: e.selectionStart === e.selectionEnd };
+});
+
 test('empty room shows only the caret and the count prompt; after a wipe the receipt carries it', async ({ page }, info) => {
   await enter(page);
   await settle(page);
@@ -234,6 +270,8 @@ test('empty room shows only the caret and the count prompt; after a wipe the rec
   });
   expect(caret.caretColor).not.toBe('rgba(0, 0, 0, 0)');
   expect(Math.abs(caret.editorCentre - caret.paperCentre)).toBeLessThan(1);
+  const emptyPoint = await insertionPoint(page);
+  expect(emptyPoint).toEqual({ opacity: 1, caret: true, ink: true, focused: true, collapsed: true });
   await capture(page, info, 'empty-focused');
   await page.keyboard.insertText('i');
   await expect(page.locator('#room-count')).toHaveText('1 word');
@@ -244,9 +282,21 @@ test('empty room shows only the caret and the count prompt; after a wipe the rec
   await expect(page.locator('#failed h1')).toHaveText('You stopped.');
   await expect(page.locator('#begin-again')).toBeVisible();
   await expect(page.locator('#room-report')).toHaveText(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/);
-  // The wiped room keeps the caret on the line, exactly as the empty room does.
+  // The wiped room keeps the caret on the line, exactly as the empty room does: only the draft
+  // text is hidden, never the insertion point the receipt tells the writer to use (D-065).
   await expect(editor(page)).toBeFocused();
+  const wipedPoint = await insertionPoint(page);
+  expect(wipedPoint).toEqual({ ...emptyPoint, ink: false });
+  // The clock stops on the value the draft died with and holds it until the next session starts,
+  // so the corner and the red receipt cannot name two different moments (D-063).
+  const deletedAt = (await page.locator('#room-report').textContent()).match(/DRAFT DELETED AT (\d:\d\d)\./)[1];
+  await expect(page.locator('#room-clock')).toHaveText(deletedAt);
+  await page.clock.fastForward(1500);
+  await expect(page.locator('#room-clock')).toHaveText(deletedAt);
   await capture(page, info, 'wipe-report');
+  await page.keyboard.insertText('A');
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');
+  await expect(page.locator('#room-clock')).toHaveText('1:00');
 });
 
 test('history is stepped per line and a new line shifts it exactly one pitch', async ({ page }, info) => {
@@ -323,16 +373,18 @@ test('warning numeral, caption and wipe receipt are placed by ink under the writ
 
 test('mobile dynamic viewport keeps EXIT and word count visible with expanded toolbars', async ({ page }, info) => {
   test.skip(info.project.use.viewport.width !== 390, 'Mobile toolbar geometry');
-  await page.addStyleTag({ content: '.home { min-height: 844px; }' });
   for (const [state, height] of [['collapsed', 844], ['expanded', 664], ['collapsed-again', 844]]) {
     await page.setViewportSize({ width: 390, height });
     const demo = await page.locator('.script').evaluate(e => {
       const line = e.getBoundingClientRect();
       const sheet = e.closest('.paper').getBoundingClientRect();
-      return { height: sheet.height, viewport: innerHeight, ratio: (line.top + line.height / 2 - sheet.top) / sheet.height };
+      const first = document.querySelector('.first-screen').getBoundingClientRect();
+      return { height: sheet.height, bottom: sheet.bottom, firstBottom: first.bottom, firstHeight: first.height,
+        viewport: innerHeight, ratio: (line.top + line.height / 2 - sheet.top) / sheet.height };
     });
-    expect(demo.height / demo.viewport).toBeGreaterThanOrEqual(0.6);
-    expect(Math.abs(demo.height - (demo.viewport * 0.61 + 2))).toBeLessThan(1);
+    expect(demo.firstHeight, `${state}: the first screen fills the viewport`).toBeGreaterThanOrEqual(demo.viewport - 0.5);
+    expect(demo.height, `${state}: the sheet keeps its 300 px floor`).toBeGreaterThanOrEqual(300 - 0.5);
+    expect(Math.abs(demo.bottom - demo.firstBottom), `${state}: the sheet owns the space the door leaves`).toBeLessThanOrEqual(1);
     await enter(page);
     await page.keyboard.insertText('Keep writing.');
     await settle(page);
@@ -503,7 +555,7 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
       expect(restored, 'undoing the stress restores the kept geometry').toBeCloseTo(kept.scroll.height, 0);
     }
     await page.keyboard.press('Escape');
-    await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+    await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
     const hinted = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
@@ -668,7 +720,7 @@ test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ p
   await assertRoom(page);
   await capture(page, info, 'wipe-report');
   await page.locator('#exit').click();
-  await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+  await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
   await expect(page.locator('#room')).toBeVisible();
   await page.locator('#exit').click();
   await expect(page.locator('#landing .cta a[href="#trial"]')).toBeFocused();
@@ -680,7 +732,7 @@ test('exit needs two acts, inks the inline confirmation on the footer row, and t
   await page.keyboard.insertText('A draft worth keeping.');
   await settle(page);
   await page.keyboard.press('Escape');
-  await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+  await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
   await expect(page.locator('#status')).toHaveText('');
   await expect(page.locator('#room')).toBeVisible();
   const row = await page.evaluate(() => ({
@@ -709,7 +761,7 @@ test('exit needs two acts, inks the inline confirmation on the footer row, and t
   await expect(page.locator('#room')).toBeVisible();
   // The window expires: after 2 s a single request only re-arms it.
   await page.locator('#exit').click();
-  await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT);
+  await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
   await page.clock.fastForward(2100);
   await expect(page.locator('#exit-hint')).toHaveText('');
   await expect(page.locator('#room')).toBeVisible();
@@ -721,6 +773,10 @@ test('exit needs two acts, inks the inline confirmation on the footer row, and t
 
 test('kept screen: headline, quiet receipt, action row above a scrollable draft', async ({ page, context }, info) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  // The floor is measured while the room is still hidden, so a hidden descendant must not be the
+  // thing being measured (it would report 0 and fall back to the em constant).
+  expect(await page.locator('#copy-label').evaluate(label => getComputedStyle(label).getPropertyValue('--copy-floor').trim()),
+    'the floor is measured before the room opens').toMatch(/^\d+px$/);
   await enter(page);
   await page.keyboard.insertText('This draft survives. 中文继续写。\n');
   for (let second = 0; second < 57; second += 3) {
@@ -740,48 +796,107 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
     const paper = document.querySelector('.room-paper').getBoundingClientRect();
     const style = getComputedStyle(copy);
     return {
-      copy: window.__run(copy, 'text'), restart: window.__run(restart, 'text'),
+      restart: window.__run(restart, 'text'),
       copyBox: copy.getBoundingClientRect().toJSON(), restartBox: restart.getBoundingClientRect().toJSON(),
       draftTop: draft.getBoundingClientRect().top, headingBottom: heading.getBoundingClientRect().bottom,
+      note: document.querySelector('#kept-note').getBoundingClientRect().toJSON(),
+      noteText: document.querySelector('#kept-note').textContent,
+      count: document.querySelector('#room-count').textContent,
       paperCentre: paper.left + paper.width / 2,
       pill: { background: style.backgroundColor, radius: style.borderRadius, outlineOffset: style.outlineOffset,
         outlineWidth: style.outlineWidth, outlineColor: style.outlineColor, focused: copy.matches(':focus') },
       restartStyle: { height: getComputedStyle(restart).height, border: getComputedStyle(restart).borderWidth,
-        background: getComputedStyle(restart).backgroundColor },
+        background: getComputedStyle(restart).backgroundColor, radius: getComputedStyle(restart).borderRadius },
     };
   });
+  // One owner for the count: the red receipt prints the session's size, the corner stays silent,
+  // and one caption states that the text exists only in this tab (D-062).
+  expect(kept.count, 'the corner count is silent on the kept screen').toBe('');
+  expect(kept.noteText).toBe('Nothing here is saved. Copy it before you leave.');
+  expect(kept.note.top).toBeGreaterThan(kept.copyBox.bottom);
+  expect(kept.note.top).toBeLessThan(kept.draftTop);
   // The actions sit in the fixed top block, above the draft, so a long draft never hides them.
   expect(kept.copyBox.bottom).toBeLessThan(kept.draftTop);
   expect(kept.headingBottom).toBeLessThan(kept.copyBox.top);
-  // The pill hugs its label (24 px each side) and both controls share one 48 px row.
-  expect(kept.copyBox.width - kept.copy.width).toBeGreaterThan(46);
-  expect(kept.copyBox.width - kept.copy.width).toBeLessThan(50);
+  // The pill hugs its one label node with 24 px each side, and a font-derived floor keeps that
+  // box at the widest label's width without a second copy of the words (D-059).
+  const readCopy = () => page.evaluate(() => {
+    const copy = document.querySelector('#copy');
+    const label = document.querySelector('#copy-label');
+    const restart = document.querySelector('#restart');
+    const walker = document.createTreeWalker(copy, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) textNodes.push(node.nodeValue.trim());
+    return {
+      text: label.textContent.trim(), ink: window.__run(label, 'text').width,
+      domText: copy.textContent.replace(/\s+/g, ' ').trim(), textNodes,
+      before: getComputedStyle(copy, '::before').content,
+      copyBox: copy.getBoundingClientRect().toJSON(), labelBox: label.getBoundingClientRect().toJSON(),
+      labelClient: label.clientWidth, labelScroll: label.scrollWidth,
+      floor: getComputedStyle(label).getPropertyValue('--copy-floor').trim(),
+      restartBox: restart.getBoundingClientRect().toJSON(), paper: document.querySelector('.room-paper').getBoundingClientRect().toJSON(),
+    };
+  });
+  const expectOneLabel = state => {
+    expect(['none', 'normal'].includes(state.before), 'no generated content carries the label').toBe(true);
+    expect(state.textNodes, 'the button carries one text node').toEqual([state.text]);
+    expect(state.domText, 'the button carries one copy of its label').toBe(state.text);
+    expect(state.labelBox.width, 'the label box holds its own text').toBeGreaterThanOrEqual(state.ink - 0.5);
+    expect(state.labelScroll, 'the label never clips its text').toBeLessThanOrEqual(state.labelClient + 0.5);
+    // The floor is measured from the three labels in the rendered face, not a constant: a machine
+    // with a wider system face must still carry one (D-059).
+    expect(state.floor, 'the label carries a measured floor').toMatch(/^\d+px$/);
+    expect(state.copyBox.width - state.labelBox.width, 'the pill keeps 24 px of label padding').toBeCloseTo(48, 1);
+  };
+  const keptCopy = await readCopy();
+  await expect(page.locator('#copy')).toHaveAccessibleName(keptCopy.text);
+  expectOneLabel(keptCopy);
   expect(kept.copyBox.height).toBe(48);
   expect(kept.restartBox.height).toBe(48);
   // The draft can never push the actions: it scrolls in its own area under them.
   expect(await page.locator('.kept-scroll').evaluate(e => getComputedStyle(e).overflowY)).toBe('auto');
   const stacked = Math.abs(kept.copyBox.top - kept.restartBox.top) > 1;
-  if (stacked) expect(kept.restartBox.top).toBeGreaterThanOrEqual(kept.copyBox.bottom); // a phone wraps the row
+  if (stacked) expect(kept.restartBox.top).toBeGreaterThanOrEqual(kept.copyBox.bottom); // 320 wraps the row
   else expect(Math.abs(kept.copyBox.top - kept.restartBox.top)).toBeLessThan(1);
+  if (page.viewportSize().width === 390) expect(stacked, 'the 390 row holds both controls on one line').toBe(false);
   // One light ring on the pill edge: no dark margin outside an inset outline.
   expect(kept.pill.focused).toBe(true);
   expect(parseFloat(kept.pill.outlineOffset)).toBeLessThanOrEqual(-2);
   expect(kept.pill.outlineWidth).toBe('2px');
+  // Focus is a ring on the pill, never a re-cut into a rounded rectangle beside a capsule (D-059).
+  expect(kept.pill.radius).toBe('999px');
+  expect(kept.restartStyle.radius).toBe('999px');
   expect(kept.restartStyle.background).not.toBe(kept.pill.background);
   await capture(page, info, 'kept');
   await page.locator('#copy').click();
-  await expect(page.locator('#copy')).toHaveText('COPIED');
+  await expect(page.locator('#copy-label')).toHaveText('COPIED');
+  await expect(page.locator('#copy')).toHaveAccessibleName('COPIED');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await page.locator('#kept-text').textContent());
-  const copied = await page.evaluate(() => ({
-    copyBox: document.querySelector('#copy').getBoundingClientRect().toJSON(),
-    restartBox: document.querySelector('#restart').getBoundingClientRect().toJSON(),
-    paper: document.querySelector('.room-paper').getBoundingClientRect().toJSON(),
-  }));
-  expect(copied.copyBox.width, 'COPIED is narrower than COPY TEXT').toBeLessThan(kept.copyBox.width);
-  // The narrower pill re-centres the row (on a phone the two controls wrap instead).
+  const copied = await readCopy();
+  // The press swaps the label and moves nothing: the pill keeps its floor, the row keeps its
+  // anchor, and RUN IT AGAIN stays under no pointer at all (D-059).
+  expect(copied.copyBox.width, 'the pill keeps one width across labels').toBeCloseTo(keptCopy.copyBox.width, 1);
+  expectOneLabel(copied);
+  expect(copied.copyBox.left).toBeCloseTo(keptCopy.copyBox.left, 1);
+  expect(copied.restartBox.left, 'RUN IT AGAIN does not move').toBeCloseTo(keptCopy.restartBox.left, 1);
+  expect(copied.restartBox.top).toBeCloseTo(keptCopy.restartBox.top, 1);
+  expect(copied.restartBox.width).toBeCloseTo(keptCopy.restartBox.width, 1);
   if (!stacked) {
     expect(Math.abs((copied.copyBox.left + copied.restartBox.right) / 2 - (copied.paper.left + copied.paper.width / 2))).toBeLessThan(1);
   }
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', { value: () => Promise.reject(new Error('blocked')), configurable: true });
+    document.execCommand = () => false;
+  });
+  await page.locator('#copy').click();
+  await expect(page.locator('#copy-label')).toHaveText('TRY AGAIN');
+  await expect(page.locator('#copy')).toHaveAccessibleName('TRY AGAIN');
+  const failed = await readCopy();
+  expect(failed.text).toBe('TRY AGAIN');
+  expect(failed.copyBox.width, 'the failed label keeps the same pill width').toBeCloseTo(keptCopy.copyBox.width, 1);
+  expectOneLabel(failed);
+  expect(failed.copyBox.left).toBeCloseTo(keptCopy.copyBox.left, 1);
+  expect(failed.restartBox.left).toBeCloseTo(keptCopy.restartBox.left, 1);
   await capture(page, info, 'copied');
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
@@ -845,7 +960,9 @@ test('demo is forward-only: every event appends, Backspace is tried once and blo
   test.skip(info.project.use.reducedMotion === 'reduce', 'reduced motion renders the static draft');
   expect(await page.locator('#deny-key').count(), 'the demo carries no keycap affordance').toBe(0);
   const typed = count => `${count} ${count === 1 ? 'word' : 'words'}`;
-  await expect(page.locator('#count')).toHaveText('Type to start');
+  // The theatre takes no input, so its count slot never carries a typing prompt; it fills in with
+  // the room's own word string once the script produces a word (D-064).
+  await expect(page.locator('#count')).toHaveText('');
   let at = 0;
   const seek = async ms => { await page.clock.fastForward(ms - at); at = ms; };
   await seek(deny.t - 100);
@@ -966,7 +1083,8 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   });
   expect(reportLook.title).toBe(reportLook.ink);
   expect(reportLook.tracking).toBe('normal');
-  await expect(page.locator('#report')).toContainText(`DRAFT DELETED AT 0:${60 - Math.round(CUT_END / 1000)}. TYPE TO START AGAIN`);
+  await expect(page.locator('#report')).toHaveText(`DRAFT DELETED AT 0:${60 - Math.round(CUT_END / 1000)}.`);
+  await expect(page.locator('#paper')).not.toContainText(/TYPE TO START AGAIN|restart/i);
   await expect(page.locator('#count')).toHaveText('0 words');
   const receipt = await page.evaluate(() => {
     const script = window.__run(document.querySelector('.script'));
@@ -998,32 +1116,51 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
 
 test('short demo sheets keep the status slot inside the paper', async ({ page }, info) => {
   test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo has no warning or report');
-  await page.setViewportSize({ width: 844, height: 390 });
-  await page.reload();
-  await page.evaluate(() => document.fonts.ready);
-  await page.clock.fastForward(SILENT_END + 150);
-  await expect(page.locator('#warn')).toBeVisible();
-  const warning = await page.evaluate(() => {
-    const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-    const line = document.querySelector('.script');
-    const lineTop = line.getBoundingClientRect().top;
-    return { paper: box('#paper'), footer: box('#paper .paper-foot'), danger: box('#warn'), caption: box('#warn-caption'),
-      lineTop, lineBottom: lineTop + parseFloat(getComputedStyle(line).lineHeight) };
-  });
-  expect(warning.danger.top).toBeGreaterThanOrEqual(warning.paper.top);
-  expect(warning.danger.bottom <= warning.lineTop || warning.danger.top >= warning.lineBottom, 'the warning group does not cover the active line').toBe(true);
-  expect(warning.danger.bottom).toBeLessThanOrEqual(warning.footer.top);
-  await page.clock.fastForward(CUT_END - (SILENT_END + 150) + 300);
-  await expect(page.locator('#demo-stopped')).toBeVisible();
-  const report = await page.evaluate(() => {
-    const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-    return { paper: box('#paper'), footer: box('#paper .paper-foot'), block: box('#demo-stopped'), receipt: box('#report') };
-  });
-  expect(report.block.top).toBeGreaterThanOrEqual(report.paper.top);
-  expect(report.block.bottom).toBeLessThanOrEqual(report.receipt.top);
-  expect(report.receipt.top).toBeGreaterThanOrEqual(report.paper.top);
-  expect(report.receipt.bottom).toBeLessThanOrEqual(report.footer.top);
-  await capture(page, info, 'short-demo-report');
+  // The screen can be short two ways: a wide landscape window, or a small phone whose sheet now
+  // shares the first screen with the door (D-058). Both keep the group off the writing line.
+  for (const size of [{ width: 844, height: 390 }, { width: 1440, height: 350 }, { width: 375, height: 667 }, { width: 320, height: 700 }, { width: 375, height: 701 }]) {
+    await page.setViewportSize(size);
+    await page.reload();
+    await page.evaluate(() => document.fonts.ready);
+    await page.clock.fastForward(SILENT_END + 150);
+    await expect(page.locator('#warn')).toBeVisible();
+    const warning = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      const line = document.querySelector('.script');
+      const lineTop = line.getBoundingClientRect().top;
+      return { paper: box('#paper'), footer: box('#paper .paper-foot'), danger: box('#warn'), caption: box('#warn-caption'),
+        lineTop, lineBottom: lineTop + parseFloat(getComputedStyle(line).lineHeight) };
+    });
+    expect(warning.danger.top, `${size.width}x${size.height}: the group starts inside the paper`).toBeGreaterThanOrEqual(warning.paper.top);
+    expect(warning.danger.bottom <= warning.lineTop || warning.danger.top >= warning.lineBottom, `${size.width}x${size.height}: the warning group does not cover the active line`).toBe(true);
+    expect(warning.danger.bottom, `${size.width}x${size.height}: the group stays above the footer`).toBeLessThanOrEqual(warning.footer.top);
+    await page.clock.fastForward(CUT_END - (SILENT_END + 150) + 300);
+    await expect(page.locator('#demo-stopped')).toBeVisible();
+    const report = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
+      return { paper: box('#paper'), footer: box('#paper .paper-foot'), block: box('#demo-stopped'), receipt: box('#report'),
+        clock: document.querySelector('#clock').textContent, receiptText: document.querySelector('#report').textContent };
+    });
+    expect(report.block.top).toBeGreaterThanOrEqual(report.paper.top);
+    expect(report.block.bottom).toBeLessThanOrEqual(report.receipt.top);
+    expect(report.receipt.top).toBeGreaterThanOrEqual(report.paper.top);
+    expect(report.receipt.bottom).toBeLessThanOrEqual(report.footer.top);
+    // The corner and the receipt name one moment here too.
+    expect(report.clock, `${size.width}x${size.height}: the report clock holds the deletion value`).toBe(report.receiptText.match(/DRAFT DELETED AT (\d:\d\d)\./)[1]);
+    await capture(page, info, `short-demo-report-${size.width}x${size.height}`);
+  }
+});
+
+test('the short-viewport numeral shrinks the landing sheet only', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  const numeral = await page.evaluate(() => ({
+    demo: parseFloat(getComputedStyle(document.querySelector('#numeral')).fontSize),
+    room: parseFloat(getComputedStyle(document.querySelector('#room-numeral')).fontSize),
+    demoShort: Math.min(innerHeight * 0.15, 140),
+    roomMac: Math.min(innerHeight * 0.18, 170),
+  }));
+  expect(numeral.demo, 'the short landing sheet keeps its smaller numeral').toBeCloseTo(numeral.demoShort, 1);
+  expect(numeral.room, 'the room keeps the Mac numeral on a short sheet').toBeCloseTo(numeral.roomMac, 1);
 });
 
 test('the room wears the landing design system', async ({ page }) => {
@@ -1056,4 +1193,294 @@ test('the room wears the landing design system', async ({ page }) => {
   await expect(page.locator('#room .home-nav [data-theme-toggle]')).toBeVisible();
   await page.locator('#room [data-theme-toggle]').click();
   await expect(editor(page), 'switching theme hands focus back to the writing').toBeFocused();
+});
+
+test('focus is a ring, never a re-cut of the control it lands on', async ({ page }, info) => {
+  // Walk in with the keyboard, so every focus the page makes is a :focus-visible one - the state
+  // that used to re-cut the room's pill into an 8 px rectangle (D-059).
+  const shape = () => page.evaluate(() => {
+    const element = document.activeElement;
+    const style = getComputedStyle(element);
+    const box = element.getBoundingClientRect();
+    return { tag: element.tagName.toLowerCase(), id: element.id, text: (element.textContent || '').trim(),
+      ring: element.matches(':focus-visible'), radius: style.borderRadius,
+      outline: `${style.outlineWidth} ${style.outlineStyle}`, width: box.width, height: box.height };
+  });
+  const door = await (async () => {
+    for (let step = 0; step < 4; step += 1) await page.keyboard.press('Tab');
+    return page.evaluate(() => {
+      const element = document.activeElement;
+      const style = getComputedStyle(element);
+      return { text: (element.textContent || '').trim(), ring: element.matches(':focus-visible'),
+        radius: style.borderRadius, outline: `${style.outlineWidth} ${style.outlineStyle}`,
+        width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height };
+    });
+  })();
+  expect(door.text, 'the keyboard reaches the door last').toBe('Give it 60 seconds');
+  expect(door.ring).toBe(true);
+  expect(door.radius, 'the door keeps its pill under focus').toBe('999px');
+  expect(door.outline).toBe('2px solid');
+  expect(door.height).toBe(48);
+  await page.keyboard.press('Enter');
+  await expect(editor(page)).toBeFocused();
+  // One Tab from the writing line lands on the exit control; its own shape is a square text control.
+  await page.keyboard.press('Tab');
+  const exit = await shape();
+  expect(exit.id).toBe('exit');
+  expect(exit.ring, 'the ring is visible').toBe(true);
+  expect(exit.radius, 'a square control stays square').toBe('0px');
+  expect(exit.outline).toBe('2px solid');
+  await capture(page, info, 'focus-exit');
+});
+
+test('nothing in the room can throw a live draft away in one act', async ({ page }, info) => {
+  await enter(page);
+  await page.keyboard.insertText('A draft that has to survive a stray click.');
+  await settle(page);
+  const text = await editor(page).inputValue();
+  // The warning names the act this width can perform.
+  await expect(page.locator('#exit')).toHaveText((await touchInput(page)) ? 'EXIT' : 'ESC - EXIT');
+  // Both Mac links leave this document alone, so a click on them cannot take the draft down.
+  const macLinks = await page.evaluate(() => [...document.querySelectorAll('#room a[href="download/"]')]
+    .map(link => ({ target: link.target, rel: link.rel })));
+  expect(macLinks.length, 'the room carries the Mac link in the header or the exit row').toBeGreaterThan(0);
+  for (const link of macLinks) {
+    expect(link.target, 'the Mac link opens beside the room, not over it').toBe('_blank');
+    expect(link.rel).toContain('noopener');
+  }
+  // The brand is the same act as EXIT: the first click arms the confirmation and keeps the draft.
+  await page.locator('#room-brand').click();
+  await expect(page.locator('#room')).toBeVisible();
+  await expect(page.locator('#landing')).toBeHidden();
+  await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
+  await expect(editor(page)).toHaveValue(text);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');
+  await capture(page, info, 'brand-armed');
+  // The second act is the one that leaves.
+  await page.locator('#room-brand').click();
+  await expect(page.locator('#room')).toBeHidden();
+  await expect(page.locator('#landing')).toBeVisible();
+  await expect(page.locator('#landing .cta a[href="#trial"]')).toBeFocused();
+});
+
+test.describe('a thumb on the phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+  test('a thumb gets the same two acts as a keyboard', async ({ page }, info) => {
+    const loaded = await page.goto('./');
+    expect(loaded, 'the suite serves the page through its own baseURL').not.toBeNull();
+    expect(loaded.status(), 'the page loads from the suite origin').toBeLessThan(400);
+    expect(new URL(page.url()).protocol, 'the page has a real http(s) origin').toMatch(/^https?:$/);
+    await page.locator('#landing .cta a[href="#trial"]').tap();
+    await expect(editor(page)).toBeFocused();
+    await page.clock.runFor(50);
+    await page.keyboard.insertText('Typed with a thumb.');
+    await page.clock.runFor(50);
+    await expect(page.locator('#exit')).toHaveText('EXIT');
+    const tap = async selector => {
+      const box = await page.locator(selector).boundingBox();
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await page.clock.runFor(50);
+    };
+    // One tap on the brand arms the confirmation and keeps the draft.
+    await tap('#room-brand');
+    await expect(page.locator('#room')).toBeVisible();
+    await expect(page.locator('#exit-hint')).toHaveText('Tap EXIT again to leave and delete the draft.');
+    await expect(editor(page)).toHaveValue('Typed with a thumb.');
+    await capture(page, info, 'thumb-brand-armed');
+    // One tap on EXIT re-arms rather than leaving; the second tap is the act that leaves.
+    await page.clock.runFor(2100);
+    await expect(page.locator('#exit-hint')).toHaveText('');
+    await tap('#exit');
+    await expect(page.locator('#room')).toBeVisible();
+    await expect(page.locator('#exit-hint')).toHaveText('Tap EXIT again to leave and delete the draft.');
+    await expect(editor(page)).toHaveValue('Typed with a thumb.');
+    await tap('#exit');
+    await expect(page.locator('#room')).toBeHidden();
+    await expect(page.locator('#landing')).toBeVisible();
+  });
+});
+
+test.describe('a landscape phone', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 844, height: 390 } });
+  test('a wide touch screen still names the control it can press', async ({ page }) => {
+    expect(await touchInput(page), 'the touch profile reports coarse input').toBe(true);
+    await page.locator('#landing .cta a[href="#trial"]').tap();
+    await expect(editor(page)).toBeFocused();
+    await expect(page.locator('#exit')).toHaveText('EXIT');
+    const tap = async selector => {
+      const box = await page.locator(selector).boundingBox();
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+      await page.clock.runFor(50);
+    };
+    await tap('#exit');
+    await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT.touch);
+    await expect(page.locator('#room')).toBeVisible();
+    await tap('#exit');
+    await expect(page.locator('#room')).toBeHidden();
+    await expect(page.locator('#landing')).toBeVisible();
+  });
+});
+
+test.describe('a wide fine pointer', () => {
+  test.use({ hasTouch: false, isMobile: false, viewport: { width: 844, height: 390 } });
+  test('a wide fine pointer keeps the Escape wording', async ({ page }) => {
+    expect(await touchInput(page), 'the desktop profile reports a fine pointer').toBe(false);
+    await page.locator('#landing .cta a[href="#trial"]').click();
+    await expect(editor(page)).toBeFocused();
+    await expect(page.locator('#exit')).toHaveText('ESC - EXIT');
+    await page.locator('#exit').click();
+    await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT.keyboard);
+    await expect(page.locator('#room')).toBeVisible();
+    await page.locator('#exit').click();
+    await expect(page.locator('#room')).toBeHidden();
+    await expect(page.locator('#landing')).toBeVisible();
+  });
+});
+
+test('the door and the sheet it opens share one first screen on a short phone', async ({ page }, info) => {
+  const read = () => page.evaluate(() => {
+    const box = selector => { const rect = document.querySelector(selector).getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; };
+    return { viewport: innerHeight, viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+      first: box('.first-screen'), door: box('#landing .cta .btn'), note: box('.hero-sub'), sheet: box('#paper') };
+  });
+  const expectFold = (fold, label) => {
+    expect(fold.first.height, `${label}: the first screen fills the viewport`).toBeGreaterThanOrEqual(fold.viewport - 0.5);
+    expect(fold.sheet.height, `${label}: the sheet keeps its 300 px lower floor`).toBeGreaterThanOrEqual(300 - 0.5);
+    // The floor is `max(300px, 61vh)`, so the only shortfall a correct layout can show is the
+    // browser's own sub-pixel rounding of the vh unit: hold the ratio to one rendering pixel.
+    expect(fold.sheet.height, `${label}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(fold.viewport * 0.61 - 1);
+    expect(Math.abs(fold.sheet.bottom - fold.first.bottom), `${label}: the sheet owns the first screen's remaining space`).toBeLessThanOrEqual(1);
+    expect(fold.note.top, `${label}: the note starts on the first screen`).toBeGreaterThanOrEqual(0);
+    expect(fold.note.bottom, `${label}: the note is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+    expect(fold.door.top, `${label}: the door starts on the first screen`).toBeGreaterThanOrEqual(0);
+    expect(fold.door.bottom, `${label}: the whole door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+  };
+  // The hand word's write-on reveal is real time, not the fake clock: let it finish before the
+  // captures, so the evidence shows the resting headline.
+  await page.waitForTimeout(1500);
+  for (const size of [{ width: 375, height: 667 }, { width: 320, height: 700 }, { width: 375, height: 701 }]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expectFold(await read(), `${size.width}x${size.height}`);
+    await capture(page, info, `fold-${size.width}x${size.height}`);
+  }
+  // The same container plus floor at a taller phone and at 320x568: the sheet keeps 61% and the
+  // first screen grows when the content and the floor need more than the viewport.
+  for (const size of [{ width: 375, height: 812 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expectFold(await read(), `${size.width}x${size.height}`);
+  }
+  // The two documented targets stay at or above the 61% the landing contract measured.
+  for (const size of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(size);
+    const fold = await read();
+    expect(fold.sheet.height, `${size.width}x${size.height}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(fold.viewport * 0.61 - 1);
+  }
+  // The first screen has no seam on either axis: sweep the phone band and assert the door, its
+  // note and the sheet never overflow their containers.
+  if (info.project.name === '390-light-no-preference') {
+    for (let width = 320; width <= 430; width += 10) {
+      for (let height = 640; height <= 760; height += 20) {
+        await page.setViewportSize({ width, height });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        const fold = await read();
+        const label = `${width}x${height}`;
+        expect(fold.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(fold.viewportWidth);
+        expect(fold.sheet.height / fold.viewport, `${label}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(0.61 - 1 / fold.viewport);
+        expect(Math.abs(fold.sheet.bottom - fold.first.bottom), `${label}: the sheet stays inside the first screen`).toBeLessThanOrEqual(1);
+        expect(fold.note.top, `${label}: the note starts on the first screen`).toBeGreaterThanOrEqual(0);
+        expect(fold.note.bottom, `${label}: the note is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+        expect(fold.door.top, `${label}: the door starts on the first screen`).toBeGreaterThanOrEqual(0);
+        expect(fold.door.bottom, `${label}: the door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+      }
+    }
+  }
+  // 320x568 keeps the floor: the entrance is still reachable.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const smallest = await read();
+  expect(smallest.door.bottom, '320x568 keeps the door on the first screen').toBeLessThanOrEqual(smallest.viewport);
+});
+test('the watch-only demo advertises no input, and its count speaks like the room', async ({ page }, info) => {
+  // The theatre draws no insertion point and no typing prompt: neither exists in a preview that
+  // cannot take a keystroke (D-064).
+  await expect(page.locator('#paper .caret, #paper [data-caret]')).toHaveCount(0);
+  if (info.project.use.reducedMotion === 'reduce') {
+    // The static draft is the finished one; its count names that draft and never an instruction.
+    await expect(page.locator('#count')).toHaveText(/^\d+ words?$/);
+    return;
+  }
+  await expect(page.locator('#count')).toHaveText('');
+  const first = TIMELINE.events[0];
+  await page.clock.fastForward(first.t + 10);
+  // The first scripted word prints the same string the room prints for one word.
+  await expect(page.locator('#count')).toHaveText(`${wordCount(first.cur)} ${wordCount(first.cur) === 1 ? 'word' : 'words'}`);
+  await expect(page.locator('#count')).toHaveText('1 word');
+});
+
+test('the landing states the warning lead-in and never labels a moment with another moment', async ({ page }) => {
+  const copy = await page.evaluate(() => ({
+    moments: [...document.querySelectorAll('#core .mo small')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
+    numeral: document.querySelector('#core .mo .n').textContent.trim(),
+    receipt: document.querySelector('#core .mo .r').textContent.replace(/\s+/g, ' ').trim(),
+    marker: [...document.querySelectorAll('#how .line8 .lab span, #how .line8 .lab b')].map(e => e.textContent.trim()),
+    card: document.querySelectorAll('#how .card')[1].textContent.replace(/\s+/g, ' ').trim(),
+    faq: document.querySelector('#faq details p').textContent.replace(/\s+/g, ' ').trim(),
+    schema: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'][1].mainEntity[0].acceptedAnswer.text,
+  }));
+  expect(copy.moments[0]).toMatch(/^0:47\b/);
+  expect(copy.moments[2]).toMatch(/^8 s\b/);
+  // The middle panel's label and its numeral name the same quantity: three seconds left.
+  const label = copy.moments[1].match(/^(\d+) s left\b/);
+  expect(label, `the warning panel is labelled with its own numeral: ${copy.moments[1]}`).not.toBeNull();
+  expect(Number(label[1])).toBe(Number(copy.numeral));
+  expect(Number(label[1]), 'the warning leads the deletion by three seconds').toBe(3);
+  // The three panels obey the same rule: eight seconds of silence after the last keystroke.
+  const started = copy.moments[0].match(/^(\d):(\d\d)\b/);
+  const deleted = copy.receipt.match(/^DRAFT DELETED AT (\d):(\d\d)\./);
+  expect(started, `the writing panel names its clock: ${copy.moments[0]}`).not.toBeNull();
+  expect(deleted, `the receipt names the deletion moment: ${copy.receipt}`).not.toBeNull();
+  const seconds = ([, m, s]) => Number(m) * 60 + Number(s);
+  expect(seconds(started) - 8, 'the receipt is the writing clock minus the silence').toBe(seconds(deleted));
+  // One form for a silence mark everywhere.
+  expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
+  // The lead-in is stated once, on the card and in the answer the schema repeats word for word.
+  expect(copy.card).toMatch(/warning starts three seconds before/i);
+  expect(copy.faq).toMatch(/warning always starts three seconds before/i);
+  expect(copy.faq).toBe(copy.schema);
+});
+
+test('the clock does not breathe: tabular numerals on the room and the demo', async ({ page }) => {
+  const measure = () => page.evaluate(() => {
+    const widths = element => ['1:00', '0:58', '0:11'].map(text => {
+      const previous = element.textContent;
+      element.textContent = text;
+      const width = element.getBoundingClientRect().width;
+      element.textContent = previous;
+      return width;
+    });
+    return { demo: widths(document.querySelector('#clock')),
+      demoNumeric: getComputedStyle(document.querySelector('#clock')).fontVariantNumeric };
+  });
+  const demo = await measure();
+  expect(demo.demoNumeric).toBe('tabular-nums');
+  expect(new Set(demo.demo.map(width => width.toFixed(2))).size, `the demo clock's width never changes: ${demo.demo}`).toBe(1);
+  await enter(page);
+  const room = await page.evaluate(() => {
+    const element = document.querySelector('#room-clock');
+    return { widths: ['1:00', '0:58', '0:11'].map(text => {
+        const previous = element.textContent;
+        element.textContent = text;
+        const width = element.getBoundingClientRect().width;
+        element.textContent = previous;
+        return width;
+      }),
+      numeric: getComputedStyle(element).fontVariantNumeric,
+      countNumeric: getComputedStyle(document.querySelector('#room-count')).fontVariantNumeric };
+  });
+  expect(room.numeric).toBe('tabular-nums');
+  expect(new Set(room.widths.map(width => width.toFixed(2))).size, `the room clock's width never changes: ${room.widths}`).toBe(1);
+  // The count on the same row was already tabular: one tool face, one numeral metric.
+  expect(room.countNumeric).toBe('tabular-nums');
 });

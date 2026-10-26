@@ -15,6 +15,9 @@ import { statusSlot } from './status-slot.js';
   var SILENCE_MS = 5000, WARN_MS = 3000, CUT_MS = 200, REPORT_HOLD_MS = 2000;
   var SILENT_END = TYPE_END + SILENCE_MS, WARN_END = SILENT_END + WARN_MS,
       CUT_END = WARN_END + CUT_MS, LOOP = CUT_END + REPORT_HOLD_MS;
+  // The minute the draft died with: the clock holds this value through the cut and the failure
+  // screen, exactly as the room's clock holds its wipe value until the next session starts.
+  var CUT_CLOCK = clock(60 - Math.round(CUT_END / 1000));
   var EVENTS = TIMELINE.events;
   var DENY = EVENTS.filter(function (e) { return e.kind === "deny"; })[0];
 
@@ -137,7 +140,7 @@ import { statusSlot } from './status-slot.js';
       }
     }
     put(curEl, "cur", d.cur);
-    put(countEl, "count", d.done.length + d.cur.length ? words(d) : "Type to start");
+    put(countEl, "count", d.done.length + d.cur.length ? words(d) : "");
   }
 
   // The refusal is a pure function of t; it fires once as t crosses the deny beat
@@ -188,7 +191,7 @@ import { statusSlot } from './status-slot.js';
       put(reportEl, "rep", "");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", "1:00");
+      put(clockEl, "clock", CUT_CLOCK);
     } else {
       // The failure screen: the same headline and red receipt the room and the Mac show.
       setPhase("report");
@@ -197,10 +200,10 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = false;
-      put(reportEl, "rep", "DRAFT DELETED AT " + clock(60 - Math.round(CUT_END / 1000)) + ". TYPE TO START AGAIN.");
+      put(reportEl, "rep", "DRAFT DELETED AT " + CUT_CLOCK + ".");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", "1:00");
+      put(clockEl, "clock", CUT_CLOCK);
       placeStatus();
     }
   }

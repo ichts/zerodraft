@@ -222,5 +222,8 @@ test.describe('the sheet', () => {
       'the kept draft on the paper').toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#receipt', 'color')), paper),
       'the kept receipt on the paper').toBeGreaterThanOrEqual(7);
+    // The not-saved caption is a text role on the sheet, so it answers to the same floor (D-061).
+    expect(contrast(parseColour(await style(page, '#kept-note', 'color')), paper),
+      'the kept not-saved caption on the paper').toBeGreaterThanOrEqual(7);
   });
 });

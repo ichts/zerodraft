@@ -46,6 +46,20 @@ function realURL(value, { dmg = false } = {}) {
   return dmg ? url.pathname.endsWith('.dmg') : true;
 }
 
+function contentOf(html, tag) {
+  const name = /^<([a-z]+)/i.exec(tag)[1];
+  const start = html.indexOf(tag) + tag.length;
+  const re = new RegExp(`<${name}\\b|</${name}>`, 'gi');
+  re.lastIndex = start;
+  let depth = 1;
+  let match;
+  while ((match = re.exec(html))) {
+    depth += match[0].startsWith('</') ? -1 : 1;
+    if (depth === 0) return html.slice(start, match.index);
+  }
+  return '';
+}
+
 // One launch slot: exactly one live element and no pending notice.
 function slot(html, name) {
   const tags = html.match(/<[a-z]+\s[^>]*data-launch(-pending)?="[^"]+"[^>]*>/g) || [];
@@ -53,8 +67,7 @@ function slot(html, name) {
   const pending = tags.filter(tag => attr(tag, 'data-launch-pending') === name);
   if (pending.length || live.length !== 1) return null;
   const tag = live[0];
-  const after = html.slice(html.indexOf(tag) + tag.length);
-  return { tag, text: after.slice(0, after.search(/<\/[a-z]+>/)).replace(/<[^>]+>/g, '').trim() };
+  return { tag, text: contentOf(html, tag).replace(/<[^>]+>/g, '').trim() };
 }
 
 export function blockers({ mac, support, plist }) {
@@ -90,9 +103,19 @@ export function downloadBlockers({ download }) {
   else if (!realURL(attr(dmg.tag, 'href'), { dmg: true })) found.push('DMG URL: not a real https .dmg destination');
   const sha = slot(download, 'sha256');
   if (!sha) found.push('SHA-256: not published in download/index.html');
-  else if (!/^[0-9a-f]{64}$/.test(sha.text)) found.push('SHA-256: not 64 lowercase hex digits');
-  const install = download.match(/<div class="card" id="install">([\s\S]*?)<\/div>/)?.[1] ?? '';
-  const installFile = install.match(/shasum -a 256\s+([^\s<]+)/)?.[1];
+  else {
+    if (!/^[0-9a-f]{64}$/.test(sha.text)) found.push('SHA-256: not 64 lowercase hex digits');
+    if (!/^<span>([0-9a-f]{32})<\/span><span>([0-9a-f]{32})<\/span>$/.test(contentOf(download, sha.tag)))
+      found.push('SHA-256: the code element must hold two 32-character spans');
+  }
+  const installTag = /<div class="card" id="install">/i.exec(download)?.[0];
+  const install = installTag ? contentOf(download, installTag) : '';
+  const commandTag = /<code\b[^>]*>/i.exec(install)?.[0];
+  const commandContent = commandTag ? contentOf(install, commandTag) : '';
+  const command = commandContent.replace(/<[^>]+>/g, '').trim();
+  const installFile = command.match(/shasum -a 256\s+([^\s]+)/)?.[1];
+  if (!/^<span class="cmd-call">shasum -a 256 <\/span><span class="cmd-file">[^<]+<\/span>$/.test(commandContent))
+    found.push('Install command: the code element must hold the call span and the filename span');
   let linkedFile = '';
   if (dmg) {
     try { linkedFile = decodeURIComponent(new URL(attr(dmg.tag, 'href')).pathname.split('/').pop()); } catch {}

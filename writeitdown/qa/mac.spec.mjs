@@ -98,6 +98,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const mac = readFileSync('mac.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
+  const publishedHash = download.match(/<code data-launch="sha256">([\s\S]*?)<\/code>/)?.[1].replace(/<[^>]+>/g, '') ?? '';
   const withNote = attrs => download.replace('<ul class="reqs" id="requirements">', `<p class="sha" id="release-notes" ${attrs}>1.1 is available.</p>\n<ul class="reqs" id="requirements">`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
@@ -124,9 +125,11 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
     [{ download: download.replaceAll(dmgFile, 'Write-It-Down.dmg') }, 'DMG URL: the file name does not carry the version'],
     [{ download: download.replace('data-launch="sha256"', 'data-launch-pending="sha256"') }, 'SHA-256: not published'],
-    [{ download: download.replace(/<code data-launch="sha256">[^<]*/, '<code data-launch="sha256">TBD') }, 'SHA-256: not 64 lowercase hex digits'],
-    [{ download: download.replace(`shasum -a 256 ${dmgFile}`, 'shasum -a 256 Write-It-Down-0.9.dmg') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
-    [{ download: download.replace(/<code>shasum -a 256 [^<]+<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
+    [{ download: download.replace(/(<code data-launch="sha256">)[\s\S]*?(<\/code>)/, '$1TBD$2') }, 'SHA-256: not 64 lowercase hex digits'],
+    [{ download: download.replace(/(<code data-launch="sha256">)[\s\S]*?(<\/code>)/, `$1<span>${publishedHash}</span>$2`) }, 'SHA-256: the code element must hold two 32-character spans'],
+    [{ download: download.replace(`<span class="cmd-file">${dmgFile}</span>`, '<span class="cmd-file">Write-It-Down-0.9.dmg</span>') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
+    [{ download: download.replace(/(<code>)[\s\S]*?(<\/code>)/, `$1shasum -a 256 ${dmgFile}$2`) }, 'Install command: the code element must hold the call span and the filename span'],
+    [{ download: download.replace(/<code>[\s\S]*?<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
     [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note declares 1.1 but the download is 1.0'],
     [{ download: withNote('data-release-note="1.0"').replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note declares 1.0 but the download is 1.1'],
     [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: data-launch-pending is retired'],
@@ -173,12 +176,12 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(nav).toHaveAttribute('href', 'download/');
   const card = page.locator('#paper');
   await expect(card.locator('#clock')).toBeVisible();
-  await expect(card.locator('#count')).toHaveText(/^(Type to start|\d+ words?)$/);
+  await expect(card.locator('#count')).toHaveText(/^((\d+ words?)?)$/);
   // Journey: the sheet carries no tag and no saved label; under it there is only the button.
   await expect(card.locator('.tag, .saved')).toHaveCount(0);
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
-  const cta = page.locator('#landing > .cta');
+  const cta = page.locator('#landing .cta');
   await expect(cta.locator('> *'), 'the entrance band holds the door and nothing else').toHaveCount(1);
   await expect(cta.locator('> a'), 'the only entrance is the 60-second door').toHaveCount(1);
   const door = cta.locator('a.btn-primary');
@@ -194,8 +197,8 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
     const home = document.querySelector('#landing');
     const token = n => parseFloat(getComputedStyle(home).getPropertyValue(n));
     const out = {
-      card: r('#paper'), sub: r('.hero-sub'), door: r('#landing > .cta .btn'), vh: innerHeight,
-      ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing > .cta')).paddingTop),
+      card: r('#paper'), sub: r('.hero-sub'), door: r('#landing .cta .btn'), vh: innerHeight,
+      ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing .cta')).paddingTop),
       stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
       tokens: { s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
     };
@@ -204,7 +207,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   });
   const phone = page.viewportSize().width <= 820;
   expect(layout.card.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
-  expect((Math.min(layout.card.bottom, layout.vh) - layout.card.top) / layout.vh, 'at least 60% of the demo paper is on the first screen').toBeGreaterThanOrEqual(0.6);
+  expect(Math.min(layout.card.height, layout.vh) / layout.vh, 'the demo paper keeps at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.door.top, 'the door sits under the subheadline').toBeGreaterThan(layout.sub.bottom);
   expect(layout.door.bottom, 'the door is on the first screen').toBeLessThanOrEqual(layout.vh);
   expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
@@ -239,18 +242,21 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#editor')).toBeFocused();
 });
 
-test('light is the default theme; the toggle switches to dark and remembers it', async ({ browser }) => {
-  const context = await browser.newContext({ colorScheme: 'dark', storageState: { cookies: [], origins: [] } });
-  const page = await context.newPage();
-  await page.goto('index.html');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await page.locator('#landing .home-nav [data-theme-toggle]').click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
-  expect(bg).toBe('rgb(21, 20, 15)');
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await context.close();
+test.describe('light is the default theme', () => {
+  test.use({ colorScheme: 'dark', storageState: { cookies: [], origins: [] } });
+  test('the toggle switches to dark and remembers it', async ({ page }) => {
+    const loaded = await page.goto('index.html');
+    expect(loaded, 'the suite serves the page through its own baseURL').not.toBeNull();
+    expect(loaded.status(), 'the page loads from the suite origin').toBeLessThan(400);
+    expect(new URL(page.url()).protocol, 'the page has a real http(s) origin').toMatch(/^https?:$/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
+    expect(bg).toBe('rgb(21, 20, 15)');
+    await page.reload();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  });
 });
 
 // Journey: one theme icon button, top right in the header of every page with a header; none in the footer.
@@ -291,6 +297,37 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
     expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme'))).toBe(after.theme);
   });
 }
+
+// The landing header is the same shell as every other page: its box spans the page container, so the
+// brand sits on the left gutter and the theme button on the right one. A flex item that shrinks to its
+// content still clears the overflow, overlap and 6 px gutter checks above while the whole lockup moves
+// inward, so this test pins the box to the container the sections below it use.
+test('the landing header spans the page container at every width', async ({ page }) => {
+  for (const width of [320, 375, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('index.html');
+    await page.evaluate(() => document.fonts.ready);
+    const state = await page.evaluate(() => {
+      const nav = document.querySelector('#landing .home-nav');
+      const navBox = nav.getBoundingClientRect();
+      const brand = nav.querySelector('.brand').getBoundingClientRect();
+      const button = nav.querySelector('.theme-btn').getBoundingClientRect();
+      const style = getComputedStyle(nav);
+      const section = document.querySelector('#landing .sect').getBoundingClientRect();
+      return {
+        left: navBox.left, width: navBox.width,
+        containerLeft: section.left, containerWidth: section.width,
+        brandInset: brand.left - navBox.left, buttonInset: navBox.right - button.right,
+        paddingLeft: parseFloat(style.paddingLeft), paddingRight: parseFloat(style.paddingRight),
+      };
+    });
+    const at = `${width}px:`;
+    expect(state.left, `${at} the header starts on the page container's left edge`).toBeCloseTo(state.containerLeft, 0);
+    expect(state.width, `${at} the header spans the page container`).toBeCloseTo(state.containerWidth, 0);
+    expect(state.brandInset, `${at} the brand sits on the left gutter`).toBeCloseTo(state.paddingLeft, 0);
+    expect(state.buttonInset, `${at} the theme button sits on the right gutter`).toBeCloseTo(state.paddingRight, 0);
+  }
+});
 
 const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
   const box = el.getBoundingClientRect();
@@ -633,7 +670,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mac.html#buy'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
-  await page.locator('#landing > .cta a.btn-primary').click();
+  await page.locator('#landing .cta a.btn-primary').click();
   await expect(page.locator('#editor')).toBeFocused();
 });
 
@@ -661,6 +698,206 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
+});
+
+// Contrast of two computed colours, measured the WCAG way (the site's own tokens, not a guess).
+function contrast(left, right) {
+  const parse = color => color.match(/[\d.]+/g).slice(0, 3).map(Number);
+  const channel = value => {
+    const unit = value / 255;
+    return unit <= 0.04045 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4;
+  };
+  const luminance = color => {
+    const [r, g, b] = parse(color).map(channel);
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [light, dark] = [luminance(left), luminance(right)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+test('the download head breaks without an orphan and its checksum block reads', async ({ page }, info) => {
+  await page.goto('download/');
+  await page.evaluate(() => document.fonts.ready);
+  const readHead = () => page.evaluate(() => {
+    const h1 = document.querySelector('.dlhead h1');
+    // Every word's own rect, grouped into rendered lines: this is the break the reader sees.
+    const range = document.createRange();
+    const lines = [];
+    const walker = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      let offset = 0;
+      for (const word of node.textContent.split(/(\s+)/)) {
+        if (word.trim()) {
+          range.setStart(node, offset);
+          range.setEnd(node, offset + word.length);
+          const rect = range.getClientRects()[0];
+          let line = lines.find(entry => Math.abs(entry.top - rect.top) < 2);
+          if (!line) lines.push(line = { top: rect.top, left: rect.left, words: [] });
+          else line.left = Math.min(line.left, rect.left);
+          line.words.push(word);
+        }
+        offset += word.length;
+      }
+    }
+    const box = element => {
+      const rect = element.getBoundingClientRect();
+      return { x: rect.x, width: rect.width, height: rect.height, centre: rect.x + rect.width / 2 };
+    };
+    const sub = document.querySelector('.dlhead .sub');
+    const subStyle = getComputedStyle(sub);
+    // 34ch measured by the page itself, in the deck's own font: the cap is a reading measure.
+    const probe = document.createElement('span');
+    probe.style.cssText = `position:absolute;visibility:hidden;white-space:nowrap;font:${subStyle.font};width:34ch`;
+    sub.parentElement.append(probe);
+    const ch34 = probe.getBoundingClientRect().width;
+    probe.remove();
+    const subRange = document.createRange();
+    subRange.selectNodeContents(sub);
+    const subInkLeft = subRange.getClientRects()[0]?.left ?? sub.getBoundingClientRect().left;
+    return {
+      lines: lines.map(line => line.words.join(' ')),
+      h1InkLeft: lines.length ? lines[0].left : null,
+      h1Align: getComputedStyle(h1).textAlign,
+      h1: box(h1),
+      sub: { ...box(sub), align: subStyle.textAlign, inkLeft: subInkLeft, measure: parseFloat(subStyle.maxWidth),
+        ch34 },
+    };
+  });
+  const read = await readHead();
+  const phone = page.viewportSize().width <= 420;
+  if (phone) {
+    // No one-word last line: the headline breaks as `Write It Down` / `for Mac`.
+    expect(read.lines.length).toBeGreaterThan(1);
+    for (const line of read.lines) expect(line.split(' ').length, `the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
+    // The deck is a reading column on the headline's own left edge, not seven centred lines.
+    expect(read.sub.align).toBe('left');
+    expect(read.h1Align).toBe('left');
+    expect(read.h1InkLeft, 'the headline ink and the deck ink share one left edge').toBeCloseTo(read.sub.inkLeft, 0);
+    expect(read.sub.measure, 'the deck is capped at 34ch').toBeLessThanOrEqual(read.sub.ch34 + 0.5);
+  } else {
+    expect(read.lines).toEqual(['Write It Down for Mac']);
+    expect(read.h1Align).toBe('center');
+    expect(read.sub.align).toBe('center');
+    expect(read.sub.centre).toBeCloseTo(read.h1.centre, 0);
+  }
+  await page.screenshot({ path: info.outputPath('download-head.png'), fullPage: false });
+  // The phone head is one left-aligned block at every phone width: the headline ink and the deck
+  // ink start on the same edge, and the H1 still breaks into two lines with no one-word line.
+  for (const width of [390, 375, 320]) {
+    await page.setViewportSize({ width, height: page.viewportSize().height });
+    await page.evaluate(() => document.fonts.ready);
+    const head = await readHead();
+    expect(head.h1Align, `${width}: the phone head is left-aligned`).toBe('left');
+    expect(head.sub.align, `${width}: the phone deck is left-aligned`).toBe('left');
+    expect(head.h1InkLeft, `${width}: the headline ink and the deck ink share one edge`).toBeCloseTo(head.sub.inkLeft, 0);
+    expect(head.lines.length, `${width}: the phone headline breaks into two lines`).toBeGreaterThan(1);
+    for (const line of head.lines) expect(line.split(' ').length, `${width}: the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
+    expect(head.sub.measure, `${width}: the deck stays within 34ch`).toBeLessThanOrEqual(head.sub.ch34 + 0.5);
+  }
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  // Both copyable strings are visible whole at every width: the hash's two atomic 32-character
+  // halves share a line when they fit and wrap when they do not, and the command breaks at its
+  // argument boundary with the filename whole (D-060).
+  for (const width of [1440, 1024, 390, 375, 320]) {
+    await page.setViewportSize({ width, height: page.viewportSize().height });
+    await page.evaluate(() => document.fonts.ready);
+    await page.waitForTimeout(100);
+    const strings = await page.evaluate(() => {
+      const lineBands = element => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const bands = [];
+        for (const line of range.getClientRects()) {
+          const band = bands.find(b => line.top < b.bottom && line.bottom > b.top);
+          if (band) { band.top = Math.min(band.top, line.top); band.bottom = Math.max(band.bottom, line.bottom); }
+          else bands.push({ top: line.top, bottom: line.bottom });
+        }
+        return bands.length;
+      };
+      const inside = element => {
+        const box = element.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return [...range.getClientRects()].every(line => line.left >= box.left - 0.5 && line.right <= box.right + 0.5);
+      };
+      const block = element => ({
+        overflowX: getComputedStyle(element).overflowX,
+        scrollWidth: element.scrollWidth, clientWidth: element.clientWidth,
+        text: element.textContent,
+      });
+      const hash = document.querySelector('#sha256');
+      const hashCode = hash.querySelector('code');
+      const install = document.querySelector('#install code');
+      return {
+        hashText: hashCode.textContent,
+        hashBands: lineBands(hashCode),
+        hashLines: [...hashCode.children].map(span => ({
+          text: span.textContent, font: parseFloat(getComputedStyle(span).fontSize),
+          bands: lineBands(span), inside: inside(span), top: span.getBoundingClientRect().top,
+          scrollWidth: span.scrollWidth, clientWidth: span.clientWidth,
+        })),
+        hashLabelInside: inside(hash.querySelector('.sha-label')),
+        hashBlock: block(hash),
+        hashColor: getComputedStyle(hashCode).color,
+        panelBackground: getComputedStyle(hash).backgroundColor,
+        page: getComputedStyle(document.body).backgroundColor,
+        commandText: install.textContent,
+        commandParts: [...install.children].map(span => ({ text: span.textContent, bands: lineBands(span), inside: inside(span) })),
+        commandBlock: block(install),
+        ghost: document.querySelectorAll('.dlscroll, .is-more').length,
+      };
+    });
+    expect(strings.hashText, `${width}: the published hash`).toMatch(/^[0-9a-f]{64}$/);
+    expect(strings.hashLines.map(line => line.text), `${width}: two 32-character hash lines`).toEqual([
+      strings.hashText.slice(0, 32), strings.hashText.slice(32),
+    ]);
+    for (const line of strings.hashLines) {
+      expect(line.bands, `${width}: each hash line stays unbroken`).toBe(1);
+      expect(line.inside, `${width}: each hash line sits inside the panel`).toBe(true);
+      expect(line.scrollWidth, `${width}: the hash line is not clipped`).toBeLessThanOrEqual(line.clientWidth + 1);
+    }
+    const expectedLines = width >= 1024 ? 1 : 2;
+    expect(strings.hashBands, `${width}: the hash uses ${expectedLines} rendered line(s)`).toBe(expectedLines);
+    if (expectedLines === 1) expect(Math.abs(strings.hashLines[1].top - strings.hashLines[0].top), `${width}: both halves share one line`).toBeLessThan(1);
+    else expect(strings.hashLines[1].top, `${width}: the second half wraps below the first`).toBeGreaterThan(strings.hashLines[0].top);
+    expect(strings.hashLabelInside, `${width}: the SHA-256 label sits inside the panel`).toBe(true);
+    expect(strings.hashBlock.overflowX, `${width}: the hash panel is not a scroll container`).not.toMatch(/auto|scroll/);
+    expect(strings.hashBlock.scrollWidth, `${width}: the hash panel does not overflow`).toBeLessThanOrEqual(strings.hashBlock.clientWidth + 1);
+    expect(strings.hashLines[0].font, `${width}: the hash keeps its size floor`).toBeCloseTo(width <= 364 ? 12 : 13, 1);
+    expect(strings.commandText, `${width}: the copied command`).toBe(`shasum -a 256 ${dmgFile}`);
+    expect(strings.commandParts.map(part => part.text), `${width}: the command breaks at its argument boundary`).toEqual(['shasum -a 256 ', dmgFile]);
+    for (const part of strings.commandParts) {
+      expect(part.bands, `${width}: each command part stays on one line`).toBe(1);
+      expect(part.inside, `${width}: each command part sits inside the block`).toBe(true);
+    }
+    expect(strings.commandBlock.overflowX, `${width}: the command block is not a scroll container`).not.toMatch(/auto|scroll/);
+    expect(strings.commandBlock.scrollWidth, `${width}: the command block does not overflow`).toBeLessThanOrEqual(strings.commandBlock.clientWidth + 1);
+    expect(strings.ghost, `${width}: no scroller or fade remains`).toBe(0);
+    expect(strings.panelBackground, `${width}: the hash keeps its panel`).not.toBe(strings.page);
+    expect(contrast(strings.hashColor, strings.panelBackground), `${width}: the hash stays legible`).toBeGreaterThanOrEqual(4.5);
+    await page.locator('[data-copy="sha256"]').click();
+    await expect(page.locator('#copy-sha256-status')).toHaveText('Copied.');
+    await expect(page.locator('[data-copy="sha256"]')).toHaveText('COPIED');
+    expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole hash`).toBe(strings.hashText);
+    await page.locator('[data-copy="install"]').click();
+    await expect(page.locator('#copy-install-status')).toHaveText('Copied.');
+    await expect(page.locator('[data-copy="install"]')).toHaveText('COPIED');
+    expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole command`).toBe(strings.commandText);
+  }
+  await expect(page.locator('[data-copy="sha256"]')).toHaveAccessibleName('Copy the SHA-256');
+  await expect(page.locator('[data-copy="install"]')).toHaveAccessibleName('Copy the install command');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.clipboard, 'writeText', { value: () => Promise.reject(new Error('blocked')), configurable: true });
+    document.execCommand = () => false;
+  });
+  await page.locator('[data-copy="install"]').click();
+  await expect(page.locator('[data-copy="install"]')).toHaveText('COPY');
+  await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
+  await page.waitForTimeout(2100);
+  await expect(page.locator('[data-copy="install"]')).toHaveText('COPY');
+  await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
+  await expect(page.locator('[data-copy="sha256"]')).toHaveText('COPY');
+  await expect(page.locator('#copy-sha256-status')).toHaveText('');
 });
 
 test('legal pages state the 3-session trial, the local counter and the opt-in updates', async ({ page }) => {

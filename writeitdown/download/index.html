@@ -27,7 +27,7 @@
 <nav class="wrap home-nav" aria-label="Main"><a class="brand" href="../index.html" aria-label="Write It Down"></a><div class="nav-end"><a class="btn btn-quiet" href="../index.html#trial">Try it in your browser</a><button class="theme-btn" type="button" data-theme-toggle aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div></nav>
 <main class="wrap">
 <header class="dlhead">
-<h1>Write It Down for Mac</h1>
+<h1>Write It Down <span class="nw">for Mac</span></h1>
 <p class="sub">A native Mac writing room. Pick a session from one to thirty minutes and write forward. Deleting, pasting, cutting, and undo are blocked. Stop typing for too long and the draft is deleted. Reach the end of the clock and the text is yours to copy. Nothing is saved to disk or uploaded.</p>
 </header>
 <section class="card dlbox" aria-label="Download">
@@ -36,7 +36,11 @@
 <a class="btn btn-ghost" href="../mac.html#buy">Buy for $4.99 once</a>
 </div>
 <!-- Release gate: the next line is the published checksum of the DMG (one line). Run `npm run release-check -- --download --live` before installing the site. -->
-<p class="sha" id="sha256">SHA-256: <code data-launch="sha256">5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4</code></p>
+<div class="dlrow">
+<p class="sha" id="sha256"><span class="sha-label">SHA-256: </span><code data-launch="sha256"><span>5b8483bd210e5f4c697265fad0c447b4</span><span>bc88b9265a1999bd9a7566be74bf4bc4</span></code></p>
+<button class="btn btn-quiet dlcopy" type="button" data-copy="sha256" aria-label="Copy the SHA-256">COPY</button>
+</div>
+<p class="sr-only" id="copy-sha256-status" role="status" aria-live="polite"></p>
 <ul class="reqs" id="requirements">
 <li><b>macOS 14 Sonoma or later</b>One universal app for Apple silicon and Intel Macs.</li>
 <li><b>3 free sessions</b>A session counts once you type its first character.</li>
@@ -45,7 +49,7 @@
 </ul>
 </section>
 <section class="steps3" aria-label="Install, activate, refunds">
-<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image. To check the download, run <code>shasum -a 256 Write-It-Down-1.0.dmg</code> in Terminal and compare the result with the SHA-256 above.</p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
+<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image. To check the download, run this in Terminal and compare the result with the SHA-256 above:</p><div class="dlcmd"><code><span class="cmd-call">shasum -a 256 </span><span class="cmd-file">Write-It-Down-1.0.dmg</span></code><button class="btn btn-quiet dlcopy" type="button" data-copy="install" aria-label="Copy the install command">COPY</button></div><p class="sr-only" id="copy-install-status" role="status" aria-live="polite"></p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
 <div class="card" id="trial"><h2>Activate</h2><p>Your first 3 writing sessions are free. After the third, writing needs a license: $4.99 once for 2 Macs. <a href="../mac.html#buy">Buy a license</a>, then paste the key from the purchase page into the app.</p></div>
 <div class="card" id="refunds"><h2>Refunds</h2><p>You have 14 days from purchase to ask for a refund, no reason needed. The license then stops working on every Mac.</p></div>
 </section>
@@ -62,5 +66,39 @@
 </footer>
 </div>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "df0c43279d154d5eb9ee4ef8a7d92fec"}'></script><!-- End Cloudflare Web Analytics -->
+<script>
+(function () {
+  var timers = new WeakMap();
+  var statusOf = function (name) { return document.getElementById('copy-' + name + '-status'); };
+  var valueOf = function (name) {
+    return name === 'sha256' ? document.querySelector('[data-launch="sha256"]').textContent : document.querySelector('#install code').textContent;
+  };
+  document.querySelectorAll('[data-copy]').forEach(function (button) {
+    button.addEventListener('click', async function () {
+      clearTimeout(timers.get(button));
+      timers.delete(button);
+      var name = button.getAttribute('data-copy');
+      var value = valueOf(name);
+      var status = statusOf(name);
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (error) {
+        var field = document.createElement('textarea');
+        field.value = value;
+        field.setAttribute('readonly', '');
+        field.style.cssText = 'position:fixed;top:0;left:-9999px';
+        document.body.append(field);
+        field.select();
+        var copied = document.execCommand('copy');
+        field.remove();
+        if (!copied) { button.textContent = 'COPY'; status.textContent = 'Copy failed. Select the text and copy it.'; return; }
+      }
+      status.textContent = 'Copied.';
+      button.textContent = 'COPIED';
+      timers.set(button, setTimeout(function () { button.textContent = 'COPY'; status.textContent = ''; }, 2000));
+    });
+  });
+})();
+</script>
 </body>
 </html>

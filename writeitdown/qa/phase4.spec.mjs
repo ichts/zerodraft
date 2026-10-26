@@ -90,6 +90,7 @@ async function assertRoom(page) {
       activeCentre: write.centre, ratio: (write.centre - paper.top) / paper.height,
       paperHeight: paper.height, paperTop: paper.top,
       fallback: 44 + 2.5 * line,
+      history: [Number(style.getPropertyValue('--paper-history-1')), Number(style.getPropertyValue('--paper-history-2'))],
       apertureTop: write.top, chromeBottom: e.closest('.room-paper').querySelector('.chrome-row').getBoundingClientRect().bottom,
       pageHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight,
       pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
@@ -112,11 +113,16 @@ async function assertRoom(page) {
   expect(geometry.bars).toHaveLength(1);
   expect(geometry.bars[0].height).toBe(2);
   expect(Math.abs(geometry.bars[0].top - geometry.bars[0].paperTop)).toBeLessThan(1);
-  // Stepped per-line history, not a continuous gradient: 7% / 22% / 100% / gone,
-  // each band exactly one line pitch tall (D-027 parity).
+  // Stepped per-line history, not a continuous gradient: the theme's two history stops, then
+  // 100%, then gone - each band exactly one line pitch tall (D-027's intent, D-056's values:
+  // the stops are solved so the faded lines keep 9.2:1 and 7.2:1 on the paper).
   const bands = maskBands(geometry.mask);
   expect(bands.length, geometry.mask).toBe(4);
-  expect(bands.map(band => band.alpha)).toEqual([0.07, 0.22, 1, 0]);
+  // The browser serialises the mask stops to two decimals; the intent is the token itself.
+  const expectedAlphas = [geometry.history[1], geometry.history[0], 1, 0];
+  bands.forEach((band, index) => {
+    expect(band.alpha, `band ${index} of ${geometry.mask}`).toBeCloseTo(expectedAlphas[index], 1);
+  });
   bands.slice(0, 3).forEach((band, index) => {
     expect(Math.abs(band.end - band.start - geometry.line), `band ${index} of ${geometry.mask}`).toBeLessThan(1.1);
     expect(Math.abs(band.start - index * geometry.line)).toBeLessThan(1.1);
@@ -880,9 +886,17 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   if (info.project.use.reducedMotion !== 'reduce') await seek(typeEnd + 250);
   await expect(page.locator('#prev-0')).toHaveText(LINES[2]);
   await expect(page.locator('#cur')).toHaveText(LINES[3]);
-  // The history ladder is the room's ladder: 22% one line up, 7% two lines up.
-  const ladder = await page.evaluate(() => [...document.querySelectorAll('.prev-line')].map(e => getComputedStyle(e).opacity));
-  expect(ladder).toEqual(['0.22', '0.07']);
+  // The history ladder is the room's ladder: the theme's first history stop one line up, the second
+  // two lines up (D-056; the stops are contrast steps on the Note paper, not the old 22% / 7%).
+  const ladder = await page.evaluate(() => {
+    const sheet = getComputedStyle(document.querySelector('#paper'));
+    return {
+      stops: [sheet.getPropertyValue('--paper-history-1').trim(), sheet.getPropertyValue('--paper-history-2').trim()],
+      rendered: [...document.querySelectorAll('.prev-line')].map(e => getComputedStyle(e).opacity),
+    };
+  });
+  expect(Number(ladder.rendered[0])).toBeCloseTo(Number(ladder.stops[0]), 2);
+  expect(Number(ladder.rendered[1])).toBeCloseTo(Number(ladder.stops[1]), 2);
   // No second bar: the 3 pt silence meter is gone.
   await expect(page.locator('#meter')).toHaveCount(0);
   const bars = await page.evaluate(() => [...document.querySelectorAll('#demo .bar, #demo .meter')].map(e => e.getBoundingClientRect().height));
@@ -1010,13 +1024,15 @@ test('the room wears the landing design system', async ({ page }) => {
     };
     return {
       page: css('#room').backgroundColor, pageToken: probe('--page'),
-      sheet: css('.room-paper').backgroundColor, sheetToken: probe('--sheet'),
+      sheet: css('.room-paper').backgroundColor, sheetToken: probe('--paper-tone'),
       sheetShadow: css('.room-paper').boxShadow, roomShadow: css('#room').boxShadow,
       writing: css('#editor').fontFamily, tool: ['#room-clock', '#room-count', '#exit'].map(s => css(s).fontFamily),
       washes: document.querySelectorAll('#room .wash').length,
     };
   });
   expect(look.page).toBe(look.pageToken);
+  // D-056: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the
+  // plain surface for cards, controls and fields, so the room's paper equals `--paper-tone`.
   expect(look.sheet).toBe(look.sheetToken);
   expect(look.sheetShadow).not.toBe('none');
   expect(look.roomShadow).toBe('none');

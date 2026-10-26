@@ -56,30 +56,40 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    Both are placed by ink (--danger-top / --receipt-top, set from font metrics in JS), so the
    numeral's ink top sits 44 px under the baseline and the caption 20 px under the numeral's ink. */
 .danger{position:absolute;left:20px;right:20px;top:var(--danger-top,0);display:flex;flex-direction:column;align-items:center;pointer-events:none;text-align:center}
-.danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--red);font-variant-numeric:tabular-nums}
+.danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--paper-danger);font-variant-numeric:tabular-nums}
 .danger .caption{margin:var(--caption-gap,20px) 0 0;font:500 13px/1.5 var(--sans);letter-spacing:.04em;color:var(--ink)}
-.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--red);pointer-events:none}
+.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--paper-danger);pointer-events:none}
 
 .paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
-.count{flex:none;white-space:nowrap;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.6;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--chrome)}
+.count{flex:none;white-space:nowrap;font-family:var(--mono);font-weight:500;font-size:11px;line-height:1.6;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
 .hairline{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;box-shadow:inset 0 0 0 1px var(--red)}
 
 .theme-toggle,.paper-foot button{min-height:44px;padding:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
-.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip}
+.room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip}
+/* The sheet is the Note paper (D-056): its tone, grain and light are painted by paper.js into a
+   canvas that sits in the sheet's own stacking context behind every word. Nothing repaints while
+   the writer types - the texture only redraws when the sheet's size or the theme changes. */
+[data-paper]{background:var(--paper-tone);isolation:isolate}
+.sheet-paper{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:inherit;pointer-events:none}
 .room .wash{transition:opacity 120ms linear;opacity:0}
-.room-paper-wash{background:var(--red-soft);border-radius:inherit}
-.room[data-phase="typing"]{--chrome:var(--mute);--timer:var(--mute)}
+.room-paper-wash{background:var(--paper-wash);border-radius:inherit}
+.room[data-phase="typing"]{--chrome:var(--paper-quiet);--timer:var(--paper-quiet)}
 .room[data-phase="warn"] .wash,.room[data-cut="true"] .wash{transition:none}
-.room[data-cut="true"] .room-paper-wash{background:var(--red-deep)}
+.room[data-cut="true"] .room-paper-wash{background:var(--paper-wash-deep)}
 .writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .room[data-phase="wipe"] .writing-area{opacity:0}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
 /* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
    gradient: one uniform opacity per visual line (100 / 22 / 7 / gone), the Mac's D-027 treatment.
    Its stops follow the fixed pitch, so the bands can never drift from the rendered lines. */
-#editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 0;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(to bottom,rgba(0,0,0,.07) 0 calc(var(--lh)),rgba(0,0,0,.22) calc(var(--lh)) calc(var(--lh) * 2),#000 calc(var(--lh) * 2) calc(var(--lh) * 3),rgba(0,0,0,0) calc(var(--lh) * 3))}
+/* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
+   gradient: one contrast step per visual line, the Mac's D-027 ladder (D-056). The steps are alphas
+   solved from the ink and the paper tone so the second line keeps 9:1 and the oldest visible line
+   keeps 7:1 on the sheet; older lines are gone. Its stops follow the fixed pitch, so the bands can
+   never drift from the rendered lines. */
+#editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 0;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(to bottom,rgb(0 0 0 / var(--paper-history-2)) 0 calc(var(--lh)),rgb(0 0 0 / var(--paper-history-1)) calc(var(--lh)) calc(var(--lh) * 2),#000 calc(var(--lh) * 2) calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
 /* Only the writing surface itself takes the pointer; the rest of the aperture stays
    transparent so the result screens' controls above it stay clickable. */
 #editor{pointer-events:auto}
@@ -94,7 +104,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 #kept{position:absolute;top:var(--kept-top,72px);bottom:var(--kept-bottom,36px);left:36px;right:36px;display:flex;flex-direction:column;align-items:center}
 .kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
 #kept h1{margin:0;font:500 var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:-.02em}
-.kept-receipt{margin:var(--kept-receipt-gap,12px) 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--mute)}
+.kept-receipt{margin:var(--kept-receipt-gap,12px) 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--paper-quiet)}
 .kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:var(--kept-actions-gap,20px)}
 .kept-scroll{flex:1;min-height:0;width:100%;margin-top:var(--kept-scroll-gap,24px);overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
 .kept-scroll::-webkit-scrollbar{display:none}
@@ -110,7 +120,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .room-secondary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* The two-step exit: the inline confirmation is on the footer row's own 1.6 line box, so its
    baseline meets ESC - EXIT and the count instead of sitting a few points lower (case 37). */
-.exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:500 13px/1.6 var(--sans);letter-spacing:0;color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:500 13px/1.6 var(--sans);letter-spacing:0;color:var(--paper-danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The ink imperfection the captain locked (D-056): a 2 px displacement over two octaves of
+   fractal noise plus a hair of text stroke, so the words sit in the paper instead of on it. */
+.ink-imperfect,.home .script,.home .prev-line{filter:url(#wid-ink-wobble);-webkit-text-stroke:.14px currentColor}
 .paper > .paper-foot{justify-content:flex-end}
 @media(max-width:767px){
   .room{--room-gut:12px}.writing-area{inset:64px 20px}
@@ -168,15 +181,15 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .stagewrap{max-width:var(--maxw);margin:var(--s7) auto 0;padding:0 var(--gut)}
 /* The sheet sits straight on the page (background option A). The captain's rule: the demo sheet is at least 60% of the first viewport. */
 .stagewrap{position:relative}
-.home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;background:var(--sheet);border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-paper:var(--red-soft);--deep-paper:var(--red-deep);--script:var(--t-write);--lh:var(--lh-write)}
+.home .paper{min-height:max(320px,calc(61vh + 2px));min-height:max(320px,calc(61dvh + 2px));max-width:760px;margin:0 auto;border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);--chrome:inherit;--timer:var(--ink);--wash-paper:var(--paper-wash);--deep-paper:var(--paper-wash-deep);--script:var(--t-write);--lh:var(--lh-write)}
 .home .paper > .wash{border-radius:inherit}
 /* demo.js marks the report phase with the .report class on the sheet too; keep the sheet's own type. */
 .home .paper.report{font:inherit;letter-spacing:normal;color:inherit}
 .home .paper.report .anchor-wrap,.home .paper.report .prev-band{opacity:0}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:flex-end;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);color:var(--ink)}
-.home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--chrome)}
-.home .count{font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--chrome)}
+.home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--paper-quiet)}
+.home .count{font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--paper-quiet)}
 .home .prev-band{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);overflow:hidden;pointer-events:none}
 .home .prev-stack{position:absolute;left:0;right:0;bottom:var(--lh);display:flex;flex-direction:column-reverse;align-items:center}
 .home .prev-line{width:100%;max-width:62ch;font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
@@ -186,9 +199,11 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The active line is centred at --write-anchor (35%) of the sheet, the same ratio as the trial room. */
 .home .anchor-wrap{top:calc(var(--write-anchor) - var(--lh) / 2)}
 .home .prev-band{bottom:calc(100% - var(--write-anchor) - var(--lh) / 2);height:calc(3 * var(--lh))}
-/* Stepped per-line history, the same ladder as the Mac room (D-027): one line up 22%, two up 7%, older gone. */
-.home .prev-line:first-child{opacity:.22}
-.home .prev-line:nth-child(2){opacity:.07}
+/* Stepped per-line history, the same ladder as the Mac room (D-027): one line up at 9:1, two up at
+   7:1, older gone. The alphas are solved from ink and paper tone, so the fade is a contrast step
+   and never drops a line under the readable floor (D-056). */
+.home .prev-line:first-child{opacity:var(--paper-history-1)}
+.home .prev-line:nth-child(2){opacity:var(--paper-history-2)}
 .home .prev-line:nth-child(n+3){opacity:0}
 .bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:2}
 /* the one button between the headline and the demo, and nothing else */
@@ -310,7 +325,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    lives on the sheet only (no desk behind it). Zen geometry and the 35% anchor are defined with the room above. */
 .room.home{min-height:0;--script:var(--t-write);--lh:var(--lh-write);font:400 var(--t-ui)/1.5 var(--sans)}
 .room-nav{flex:none;padding:0 calc(var(--gut) - var(--room-gut))}
-.room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--chrome)}
+.room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet)}
 .room .paper-foot{gap:12px;left:22px;right:22px;bottom:16px;align-items:center}
 .room .count{letter-spacing:0}
 @media(max-width:767px){
@@ -372,5 +387,5 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room .room-mac{display:none}
 @media(max-width:767px){
   .room-nav .btn-quiet{display:none}
-  .room .paper-foot .room-mac{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--chrome)}
+  .room .paper-foot .room-mac{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet)}
 }

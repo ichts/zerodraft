@@ -25,26 +25,34 @@ Voice: short, plain sentences about mechanism and consequence. Machine captions 
 
 Tokens ship as CSS custom properties in the `:root` block of `index.html`. Values are never copied inline; if a value is not a token, it does not exist.
 
-### Color - six colors + one alarm
+### Color - the wall, the paper, ink, one alarm
 
 | Token | Value | Use |
 |---|---|---|
 | `--bone` | `#f1f0eb` | The wall. Environment, everywhere. |
-| `--paper` | `#ffffff` | The one object. Nothing else in the product is white. |
-| `--ink` | `#17150f` | Words, primary chrome, the door. |
-| `--dim` | `#6b665b` | Secondary chrome, reports, receipts. |
-| `--faint` | `#b3ada0` | Receded chrome while typing. The quietest legal text. |
+| `--paper` | `#dbe6ec` | The one object: the Note sheet (D-056). Nothing else is the paper. |
+| `--ink` | `#1c1917` | Words, primary chrome, the door. 13.78:1 on the paper. |
+| `--paper-quiet` | `#464746` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.35:1, measured, never assumed. |
+| `--paper-danger` | `#63140b` | The pen **on the paper**: the warn numeral and the wipe receipt. Clears 7:1 on the sheet and on the wash the numeral sits on. |
+| `--dim` | `#6b665b` | Secondary chrome **on the wall**. |
+| `--faint` | `#b3ada0` | Receded wall chrome, the quietest legal text on the wall. Never used on the paper. |
 | `--line` | `#dedcd5` | Hairlines only. 1px, never thicker. |
-| `--danger` | `#c8392f` | The warn numeral and the wipe cut. Nothing else. |
+| `--danger` | `#c8392f` | The wash mix and the deny hairline. |
 
-Red is a budget: it means "you are losing the draft". The logotype underscore is ink. No red on links, borders, emphasis, or decoration. No blue. Selection is an ink tint (`rgba(23,21,15,.18)`).
+Red is a budget: it means "you are losing the draft". The logotype underscore is ink. No red on links, borders, emphasis, or decoration. No blue. Selection is an ink tint (`rgba(28,25,23,.18)`).
+
+The page around the paper keeps its white identity (D-056): the wall, the chrome and the header are never tinted with the paper, and a surface that sits on the wall (cards, buttons, fields) stays `#ffffff`.
+
+The paper is textured, not flat (D-056): grain 70 of 100 at size 1.00, generated once per sheet size and theme - device-pixel tooth, a coarser pulp cloud upscaled with smoothing, short fibres and sparse pigment flecks - painted under the words and never regenerated while the writer types. Its tone stays in CSS so a wash can still tint it.
+
+Every word on the paper is measured against the paper's own tone, not against white: the history ladder steps by contrast, 13.78 -> 9.2 -> 7.2:1, and nothing on the sheet reads below 7:1.
 
 The wash exists only during warn, seconds 5-8:
 
 | Token | Value | Use |
 |---|---|---|
 | `--wash-wall` | `color-mix(in oklab, bone 88%, danger)` | The landing wall during warn. |
-| `--wash-paper` | `color-mix(in oklab, paper 88%, danger)` | The paper (and the trial room) during warn. |
+| `--wash-paper` | `color-mix(in oklab, paper 88%, danger)` (`#ddd3d5` light / `#352c2c` dark) | The paper (and the trial room) during warn. The sheet's own mix, not a pale tint meant for white: on the Note paper a white-sheet tint lands on grey at mid-ramp (D-056). |
 | `--wash-wall-deep` / `--wash-paper-deep` | color-mix at 76% | The eighth second goes one step deeper: at 8.0s the wash deepens to double the danger share for the wipe-cut beat, then exits. |
 | `--wash-*-1` / `--wash-*-2` | color-mix at 96% / 92% | Reduced-motion wash steps (see §6). |
 
@@ -57,7 +65,7 @@ Newsreader is the human. IBM Plex Mono is the machine. The machine never speaks 
 | display | Newsreader 500 · clamp(44px, 6vw, 72px)/1.04 · -.015em | Landing headline only |
 | deck | Newsreader italic 400 · 24/1.45 · `--dim` | "It's not supposed to be good yet." |
 | script | Newsreader 400 · 21/1.6 · measure <=62ch · never justified | The user's words. Typos survive. |
-| numeral | Plex Mono 600 · min(40vh, 360px) · tabular · `--danger` | Exists only while paused >=5s. The loudest object we own. |
+| numeral | Plex Mono 600 · min(40vh, 360px) · tabular · `--paper-danger` | Exists only while paused >=5s. The loudest object we own. |
 | timer | Plex Mono 500 · 16/1 · tabular | Always running during a session, never blinking |
 | label | Plex Mono 500 · 11/1.5 · caps · .16em | Rules, counts, captions |
 | system | Plex Mono 400 · 13/1.9 · caps · .08em | Reports and receipts |
@@ -109,7 +117,7 @@ The demo's numeral scales to its paper (the theater is a scale model of the room
 
 ### 3.3 Trial, typing - two objects
 
-The wall is gone; the paper is the room (the room is paper white). Objects: paper · clock. Chrome lives in the corners: rules TL · timer TR · exit BL · words BR. Idle chrome is full ink; while keys arrive it recedes to faint (the timer runs at dim). Nothing reacts to a keystroke - no sparks, no shake, no sound. The reward for writing is silence.
+The wall is gone; the paper is the room (the room is the Note paper, grain and all - D-056). Objects: paper · clock. Chrome lives in the corners: rules TL · timer TR · exit BL · words BR. Idle chrome is full ink; while keys arrive it recedes to the paper's quiet role (D-056). Nothing reacts to a keystroke - no sparks, no shake, no sound. The reward for writing is silence.
 
 The empty room carries one hint in faint mono caps: `Type here. The law is live: 5s warn, 8s wipe, 60s to keep.`
 
@@ -132,7 +140,7 @@ The only quiet surface. The clock stops at 0:00; the paper returns to the wall (
 | State | Environment (wall · paper) | Chrome (clock · rules · counts) | Voice | Reduced motion |
 |---|---|---|---|---|
 | IDLE - before the first key | bone wall, paper lifted, still | full ink; timer parked at 1:00 | label: rules on the paper's edge | identical |
-| TYPING - keys arriving | unchanged; the room never reacts to a keystroke | recedes to faint; timer runs at dim | the user's serif - the only mess allowed | identical |
+| TYPING - keys arriving | unchanged; the room never reacts to a keystroke, and the paper's grain is never regenerated | recedes to faint; timer runs at dim | the user's serif - the only mess allowed | identical |
 | PAUSE <5S - 0-5.0s still | nothing changes; restraint is deliberate | caret blinks; timer keeps running | - | identical |
 | WARN 5-8S - second 5.0 lands | wash ramps linearly, peaking at 8s; the only environmental motion | snaps to ink; numeral 3→2→1 in danger, min(40vh,360px); caption KEEP TYPING OR THE DRAFT IS DELETED | machine caps; states the consequence | wash steps once per second (96%, 92%, 88% mixes); numeral identical; nothing withheld |
 | WIPE @8S - second 8.0 lands | wash steps one step deeper for the <=200ms cut, then exits on the snap | text cut in one pass; timer rearms to 1:00 | DRAFT WIPED - 0:37 UNUSED. TYPE TO RESTART. | the cut is already a step |

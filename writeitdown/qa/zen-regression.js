@@ -19,8 +19,19 @@ async () => {
   const mask = css.maskImage || css.webkitMaskImage;
   const bands = [...mask.matchAll(/(rgba?\([^)]*\))\s+([\d.]+)px/g)].map(m => ({ color: m[1], px: parseFloat(m[2]) }));
   check('stepped per-line mask, not a continuous gradient', bands.length === 7);
-  check('two back 7%, one back 22%, active 100%, nothing below',
-    /0, 0, 0, 0.07/.test(bands[0].color) && /0, 0, 0, 0.22/.test(bands[2].color) &&
+  // D-056: the ladder is the theme's two history stops (contrast steps on the Note paper), then the
+  // active line at full ink, then nothing. The contrast floor itself is owned by qa/paper.spec.mjs.
+  const historyStops = [
+    Number(css.getPropertyValue('--paper-history-2')),
+    Number(css.getPropertyValue('--paper-history-1')),
+  ];
+  const bandAlpha = colour => {
+    const match = /rgba\(0, 0, 0, ([\d.]+)\)/.exec(colour);
+    return match ? Number(match[1]) : (/^rgb\(0, 0, 0\)$/.test(colour) ? 1 : 0);
+  };
+  check('two back the second history stop, one back the first, active 100%, nothing below',
+    Math.abs(bandAlpha(bands[0].color) - historyStops[0]) < 0.011 &&
+    Math.abs(bandAlpha(bands[2].color) - historyStops[1]) < 0.011 &&
     /^rgb\(0, 0, 0\)$/.test(bands[4].color) && /0, 0, 0, 0\)$/.test(bands[6].color));
   const ladder = [0, 1, 1, 2, 2, 3, 3];
   check('mask stops follow the fixed pitch', bands.every((band, i) => Math.abs(band.px - ladder[i] * line) < 1.1));

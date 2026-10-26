@@ -11,6 +11,19 @@
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
   --sheet:#ffffff;
+  /* The writing sheet is the Note paper (D-056), the one object the writer writes on; the page, the
+     cards and the controls keep the white identity. Quiet, history and danger are measured roles:
+     every word on the paper clears 7:1 against the paper's own tone, the history ladder sits at
+     9:1 then 7:1, and the pen red is deepened until the numeral and the wipe receipt clear it too. */
+  --paper-tone:#dbe6ec;
+  --paper-quiet:#464746;
+  --paper-history-1:.847;
+  --paper-history-2:.769;
+  --paper-danger:#63140b;
+  /* The warn wash of the sheet: the root landing's `color-mix(in oklab, paper 88%, #C8392F)` and its
+     76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-056). */
+  --paper-wash:#ddd3d5;
+  --paper-wash-deep:#ddc0be;
   --ink:#1c1917;
   --mute:#6b655c;
   --chrome:#5c564d;
@@ -46,6 +59,13 @@
 :root:not([data-theme="light"]){--page:#15140f;--brand-plate:#26231c}
 :root:not([data-theme="light"]) .home{
   --sheet:#26231c;
+  --paper-tone:#21272a;
+  --paper-quiet:#b8b5ac;
+  --paper-history-1:.846;
+  --paper-history-2:.727;
+  --paper-danger:#ffb4a2;
+  --paper-wash:#352c2c;
+  --paper-wash-deep:#49302e;
   --ink:#ece7d9;
   --mute:#a39d8e;
   --chrome:#a39d8e;

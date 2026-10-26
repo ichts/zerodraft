@@ -381,6 +381,9 @@ window.FirstLineLandingDemo = (() => {
     if (isTrial()) return;
     if (event?.currentTarget instanceof HTMLElement) internal.returnFocusElement = event.currentTarget;
     pushTrialRoute();
+    // The room's sheet is textured before the room becomes visible, so the paper never
+    // arrives plain and then grows a texture (D-056).
+    window.FirstLinePaper?.paintAll();
     emit("flentertrial");
     trialOverlay()?.setAttribute("aria-hidden", "false");
     setLandingInert(true);
@@ -654,6 +657,12 @@ window.FirstLineLandingDemo = (() => {
     };
     document.addEventListener("datastar-ready", initialRouteCheck, { once: true });
     window.setTimeout(initialRouteCheck, 500);
+
+    // The room and the kept sheet are only visible after a click, so their texture is
+    // rendered in idle time now: entering the room then costs no frame at all (D-056).
+    const preloadPaper = () => window.FirstLinePaper?.paintAll();
+    if (typeof requestIdleCallback === "function") requestIdleCallback(preloadPaper, { timeout: 2000 });
+    else window.setTimeout(preloadPaper, 400);
   }
 
   return {
@@ -685,10 +694,16 @@ if (document.readyState === "loading") {
   :root {
     /* Color - six colors + one alarm. */
     --bone: #f1f0eb;      /* the wall: environment, everywhere */
-    --paper: #ffffff;     /* the one object; nothing else is white */
-    --ink: #17150f;       /* words, primary chrome, the door */
+    /* The sheet is the Note paper (D-056): the one object, the only thing that is not the wall. */
+    --paper: #dbe6ec;
+    --ink: #1c1917;       /* words, primary chrome, the door: the product's one ink */
     --dim: #6b665b;       /* secondary chrome, reports, receipts */
     --faint: #b3ada0;     /* receded chrome while typing; the quietest legal text */
+    /* Sheet roles: measured against the paper's own tone, never eyeballed. Every word on the
+       paper clears 7:1 - the quiet chrome at 7.35, the danger numeral at 10.1 - because the tone
+       is darker than white and the wall's greys would sink into it (D-056). */
+    --paper-quiet: #464746;
+    --paper-danger: #63140b;  /* 10.1:1 on the sheet, 7.6:1 on the deepest wash */
     --line: #dedcd5;      /* hairlines only, 1px, never thicker */
     --danger: #c8392f;    /* the warn numeral and the wipe cut; nothing else */
     /* The wash exists only during warn, seconds 5-8: color-mix 88%. */
@@ -756,6 +771,25 @@ if (document.readyState === "loading") {
   }
 
   .room { position: relative; z-index: 1; }
+
+  /* ---------- the sheet ----------
+     The paper's tone is the element's own background (so the warn wash and the
+     wipe step still tint it); its texture is a canvas inside the element's own
+     stacking context, behind every word and never in front of one. The texture
+     is generated once per sheet size and never while typing (D-056). */
+  [data-paper] { position: relative; isolation: isolate; background: var(--paper); }
+  .sheet-paper {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+  /* The ink imperfection (D-056): a 2 px displacement over two octaves of fractal
+     noise plus a hair of text stroke, so the words sit in the paper. */
+  .ink-imperfect { filter: url(#fl-ink-wobble); -webkit-text-stroke: .14px currentColor; }
 
   /* ---------- caption form (one consistent machine voice) ----------
      Every caption is Plex Mono caps and carries its reading: it states what
@@ -874,7 +908,7 @@ if (document.readyState === "loading") {
     font-size: 16px;
     line-height: 1;
     font-variant-numeric: tabular-nums;
-    color: var(--dim);
+    color: var(--paper-quiet);
   }
   body.danger .rules, body.danger .demo-clock { color: var(--ink); }
   .demo-stage {
@@ -925,7 +959,7 @@ if (document.readyState === "loading") {
     font-weight: 600;
     font-size: clamp(96px, 16vh, 168px); /* the demo paper is a scale model */
     line-height: 1;
-    color: var(--danger);
+    color: var(--paper-danger);
     font-variant-numeric: tabular-nums;
   }
   .danger-caption { color: var(--ink); text-align: center; }
@@ -974,6 +1008,11 @@ if (document.readyState === "loading") {
   body.failed .trial-writing-surface,
   body.complete .trial-writing-surface { background: var(--bone); }
   body.wiping .trial-writing-surface { background: var(--wash-paper-deep); transition: none; }
+  /* The sheet's texture leaves with the sheet: when the room goes bone the paper is gone, so its
+     grain goes on the same 120ms snap instead of hanging over the wall (D-056). */
+  body.failed .trial-writing-surface > .sheet-paper,
+  body.complete .trial-writing-surface > .sheet-paper { opacity: 0; transition: opacity var(--snap) linear; }
+  body.wiping .trial-writing-surface > .sheet-paper { opacity: 1; transition: none; }
 
   /* Chrome lives in the corners: rules TL, timer TR, exit BL, words BR.
      Idle: full ink. While keys arrive (body.quiet): faint, the timer dim.
@@ -994,8 +1033,8 @@ if (document.readyState === "loading") {
     line-height: 1;
     font-variant-numeric: tabular-nums;
   }
-  body.quiet .chrome { color: var(--faint); }
-  body.quiet .chrome-tr { color: var(--dim); }
+  body.quiet .chrome { color: var(--paper-quiet); }
+  body.quiet .chrome-tr { color: var(--paper-quiet); }
   body.danger .chrome { color: var(--ink); }
   body.failed .chrome, body.complete .chrome { color: var(--faint); }
   body.failed .chrome-tr, body.complete .chrome-tr { color: var(--ink); }
@@ -1040,7 +1079,7 @@ if (document.readyState === "loading") {
     top: 24vh;
     left: var(--s4);
     right: var(--s4);
-    color: var(--faint);
+    color: var(--paper-quiet);
     pointer-events: none;
   }
   /* The hint yields to IME marked text (the editor subtree is data-ignore, so
@@ -1213,6 +1252,290 @@ if (document.readyState === "loading") {
   }
 </style>
 
+<script>
+/* Zero Draft - the Note sheet, on the landing and in the trial.
+   The same renderer as writeitdown/paper.js (D-056): this page must stay one deployable file, so
+   the sheet's texture is generated here instead of being fetched. Both copies are proven to
+   produce the same pixels by tests/paper.spec.mjs.
+   [INPUT] every element marked data-paper, its laid-out size, devicePixelRatio.
+   [OUTPUT] one static texture in a canvas child behind that element's content.
+   [PROTOCOL] paint once per size and never while typing; tone stays in CSS so the wash still tints;
+              mount on the sheet's insertion, never after it has been on screen once. */
+(function () {
+  'use strict';
+
+  /* The locked sheet (D-056): tone Note, grain 70 of 100 at size 1.00. */
+  const TONES = { light: '#dbe6ec', dark: '#21272a' };
+  const GRAIN = 0.70;
+  const SIZE = 1.00;
+  const TOOTH = 44;
+  const PULP = 24;
+
+  const hexToRgb = hex => {
+    const h = hex.replace('#', '');
+    return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+  };
+  const rgbToHex = rgb => '#' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v)))
+    .toString(16).padStart(2, '0')).join('');
+  const averageTone = tone => (tone[0] + tone[1] + tone[2]) / 3;
+
+  const prng = seed => () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
+  const seedFrom = text => {
+    let h = 2166136261;
+    for (const ch of text) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+    return h >>> 0;
+  };
+
+  /* A luminance delta becomes an alpha over black or white, so pale and dark deviations stay
+     symmetric and the sheet's own tone never drifts as the grain is layered on. */
+  const alphaFor = (delta, tone) => {
+    const pale = delta > 0;
+    const room = pale ? 255 - averageTone(tone) : averageTone(tone);
+    return Math.min(1, Math.abs(delta) / Math.max(10, room));
+  };
+
+  const canvasWith = (width, height) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, width);
+    canvas.height = Math.max(1, height);
+    return canvas;
+  };
+
+  const contextWith = (canvas, alpha) => canvas.getContext('2d', { alpha: alpha !== false });
+
+  const noiseLayer = (width, height, amount, tone, rnd) => {
+    const image = new ImageData(width, height);
+    const pixels = image.data;
+    for (let i = 0; i < width * height; i += 1) {
+      const value = ((rnd() + rnd() + rnd()) - 1.5) / 1.5 * amount;
+      const grey = value < 0 ? 0 : 255;
+      pixels[i * 4] = pixels[i * 4 + 1] = pixels[i * 4 + 2] = grey;
+      pixels[i * 4 + 3] = Math.round(255 * alphaFor(value, tone));
+    }
+    return image;
+  };
+
+  /* Low-frequency mottle: a coarse cloud and a fine one, each generated small and upscaled with
+     smoothing. One scale alone reads as sponge. */
+  const mottleLayer = (ctx, width, height, dpr, tone, cellCss, amplitude, salt) => {
+    const cell = Math.max(2, Math.round(cellCss * dpr));
+    const small = canvasWith(Math.max(2, Math.ceil(width / cell)), Math.max(2, Math.ceil(height / cell)));
+    const smallCtx = contextWith(small);
+    smallCtx.putImageData(noiseLayer(small.width, small.height, amplitude, tone, prng(seedFrom(salt + rgbToHex(tone)))), 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(small, 0, 0, width, height);
+  };
+
+  /* Light is topographic: a shallow top light in the light theme, a lamp pool plus a darker
+     settle toward the floor in the dark theme. Flat tone never reads as paper. */
+  const drawLight = (ctx, width, height, dark) => {
+    const glow = ctx.createRadialGradient(width * 0.5, -height * 0.12, height * 0.04,
+      width * 0.5, -height * 0.12, height * (dark ? 0.95 : 0.8));
+    glow.addColorStop(0, `rgba(255,${dark ? 226 : 252},${dark ? 186 : 245},${dark ? 0.20 : 0.16})`);
+    glow.addColorStop(1, 'rgba(255,240,210,0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, width, height);
+    if (!dark) return;
+    const settle = ctx.createLinearGradient(0, height * 0.25, 0, height);
+    settle.addColorStop(0, 'rgba(0,0,0,0)');
+    settle.addColorStop(1, 'rgba(0,0,0,0.26)');
+    ctx.fillStyle = settle;
+    ctx.fillRect(0, 0, width, height);
+  };
+
+  /* Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches. */
+  const drawFibres = (ctx, width, height, dpr, tone, rnd, dark) => {
+    const count = Math.round((width * height) / (dpr * dpr) * 0.0026);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < count; i += 1) {
+      const pale = rnd() < (dark ? 0.2 : 0.44);
+      const delta = (pale ? 1 : -1) * (12 + rnd() * 34) * (dark ? 0.32 : 1) * (pale ? 0.7 : 1);
+      ctx.globalAlpha = alphaFor(delta, tone) * (0.55 + rnd() * 0.45);
+      ctx.strokeStyle = pale ? '#ffffff' : '#000000';
+      ctx.lineWidth = (0.5 + rnd() * 0.7) * dpr;
+      const x = rnd() * width;
+      const y = rnd() * height;
+      const length = (2 + rnd() * 7) * SIZE * dpr;
+      const angle = rnd() * Math.PI * 2;
+      const bow = (rnd() - 0.5) * 2.2 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(
+        x + Math.cos(angle) * length * 0.5 - Math.sin(angle) * bow,
+        y + Math.sin(angle) * length * 0.5 + Math.cos(angle) * bow,
+        x + Math.cos(angle) * length,
+        y + Math.sin(angle) * length
+      );
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  /* Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones. */
+  const drawFlecks = (ctx, width, height, dpr, tone, rnd, dark) => {
+    const count = Math.round((width * height) / (dpr * dpr) * 0.0030 * (dark ? 0.22 : 1));
+    for (let i = 0; i < count; i += 1) {
+      const x = rnd() * width;
+      const y = rnd() * height;
+      const pale = rnd() < 0.14;
+      ctx.fillStyle = pale ? '#fffaf0' : (rnd() < 0.7 ? '#241d15' : '#5b4327');
+      ctx.globalAlpha = (pale ? 0.16 + rnd() * 0.24 : 0.26 + rnd() * 0.46) * (dark ? 0.5 : 1);
+      const radius = (0.4 + rnd() * 1.0) * dpr * Math.max(0.7, SIZE * 0.85);
+      const lobes = rnd() < 0.7 ? 1 : 2;
+      for (let lobe = 0; lobe < lobes; lobe += 1) {
+        const offsetX = (rnd() - 0.5) * radius * 1.6;
+        const offsetY = (rnd() - 0.5) * radius * 1.6;
+        ctx.beginPath();
+        ctx.ellipse(x + offsetX, y + offsetY, radius * (0.45 + rnd() * 0.7),
+          radius * (0.28 + rnd() * 0.5), rnd() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  };
+
+  /* Grain sits on its own layer and is composited once at the locked strength, so the sheet's
+     tone is decided by the base layer alone. */
+  const drawGrain = (ctx, width, height, dpr, tone, dark) => {
+    const layer = canvasWith(width, height);
+    const grain = contextWith(layer);
+    const rnd = prng(seedFrom('tooth' + rgbToHex(tone) + SIZE));
+    const lift = dark ? 0.4 : 1;
+    /* Two scales of surface: tooth at device-pixel size, then a coarser pulp cloud upscaled with
+       smoothing. One scale alone reads as dither or as sponge. */
+    grain.putImageData(noiseLayer(width, height, TOOTH * lift, tone, rnd), 0, 0);
+    const cell = Math.max(2, Math.round(dpr * 0.8));
+    const pulp = canvasWith(Math.max(2, Math.ceil(width / cell)), Math.max(2, Math.ceil(height / cell)));
+    contextWith(pulp).putImageData(noiseLayer(pulp.width, pulp.height, PULP * lift, tone, rnd), 0, 0);
+    grain.imageSmoothingEnabled = true;
+    grain.drawImage(pulp, 0, 0, width, height);
+    drawFibres(grain, width, height, dpr, tone, rnd, dark);
+    drawFlecks(grain, width, height, dpr, tone, rnd, dark);
+
+    ctx.save();
+    ctx.globalAlpha = GRAIN;
+    ctx.drawImage(layer, 0, 0);
+    ctx.restore();
+  };
+
+  const currentTheme = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+
+  const sheets = new WeakMap();
+  let resizeObserver = null;
+
+  /* The renderer: texture only, for a given CSS size, pixel ratio and theme. The canvas stays
+     transparent - the sheet's tone is the element's own CSS background, so a state wash can still
+     tint the paper and the sheet never shows a colour the texture cannot be laid over. */
+  function render(canvas, width, height, dpr, theme) {
+    const dark = theme === 'dark';
+    const tone = hexToRgb(TONES[theme]);
+    const canvasWidth = Math.max(1, Math.round(width * dpr));
+    const canvasHeight = Math.max(1, Math.round(height * dpr));
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = contextWith(canvas);
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 34, 9.0, 'coarse');
+    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 9, 4.5, 'fine');
+    drawLight(ctx, canvasWidth, canvasHeight, dark);
+    drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, dark);
+    return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now() };
+  }
+
+  /* Repaint only when the sheet itself changed: a new size, theme or pixel ratio. Typing changes
+     none of them, so the texture is never regenerated under the writer's hands.
+
+     The canvas stays transparent under the texture: the sheet's tone is the element's own CSS
+     background, so the warn wash and the ink-in-the-paper step still tint the paper, and the
+     sheet never shows a colour the texture cannot be laid over. */
+  function paint(sheet) {
+    const width = sheet.element.clientWidth;
+    const height = sheet.element.clientHeight;
+    if (width < 2 || height < 2) return;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const theme = currentTheme();
+    const painted = sheet.painted;
+    if (painted && painted.width === Math.round(width * dpr)
+      && painted.height === Math.round(height * dpr)
+      && painted.theme === theme && painted.dpr === dpr) return;
+    sheet.painted = render(sheet.canvas, width, height, dpr, theme);
+  }
+
+  function mount(element) {
+    if (!element || !element.dataset) return null;
+    const existing = sheets.get(element);
+    if (existing) return existing;
+    const canvas = document.createElement('canvas');
+    canvas.className = 'sheet-paper';
+    canvas.setAttribute('aria-hidden', 'true');
+    element.insertBefore(canvas, element.firstChild);
+    const sheet = { element, canvas, painted: null, redraw: () => paint(sheet) };
+    sheets.set(element, sheet);
+    if (resizeObserver) resizeObserver.observe(element);
+    paint(sheet);
+    return sheet;
+  }
+
+  const repaintAll = () => {
+    for (const element of document.querySelectorAll('[data-paper]')) mount(element).redraw();
+  };
+
+  function mountAll() {
+    for (const element of document.querySelectorAll('[data-paper]')) mount(element);
+  }
+
+  /* A size change (window resize, entering the room, a font that changes the sheet's height)
+     repaints; typing never does, because typing does not change the sheet. */
+  function watch() {
+    resizeObserver = new ResizeObserver(repaintAll);
+    for (const element of document.querySelectorAll('[data-paper]')) resizeObserver.observe(element);
+    window.addEventListener('resize', repaintAll);
+    new MutationObserver(repaintAll)
+      .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+
+  const api = {
+    TONES,
+    GRAIN,
+    SIZE,
+    render,
+    mount,
+    mountAll,
+    paintAll: repaintAll,
+    canvasFor(element) { const sheet = sheets.get(element); return sheet ? sheet.canvas : null; },
+    /* What the sheet was painted as, and when: size, pixel ratio, theme, and the moment it was textured. */
+    paintInfo(element) { const sheet = sheets.get(element); return sheet ? sheet.painted : null; }
+  };
+
+  window.FirstLinePaper = api;
+
+  /* The sheet must never be painted plain and then grow its texture. A canvas attached in the same
+     task that the sheet enters the document survives every frame, so this watches for `[data-paper]`
+     while the parser is still building the page instead of waiting for the document to finish: the
+     demo sheet is textured during parse, and the trial and kept sheets the moment they are parsed. */
+  const attach = node => {
+    if (node.nodeType !== 1) return;
+    if (node.matches('[data-paper]')) mount(node);
+    for (const element of node.querySelectorAll('[data-paper]')) mount(element);
+  };
+  new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) attach(node);
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
+  const ready = () => { mountAll(); watch(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once: true });
+  else ready();
+})();
+</script>
+
 </head>
 <body
   data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"wiping":false,"resultText":"","resultWordCount":0,"wipeReport":"","copied":false,"srStatus":"","denyActive":false,"denyHair":false}}'
@@ -1247,6 +1570,14 @@ if (document.readyState === "loading") {
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
   data-on:flroutecheck="(location.hash === '#trial' &amp;&amp; $_session.context !== 'trial') ? FirstLineLandingDemo.startTrial(null) : ((location.hash !== '#trial' &amp;&amp; $_session.context === 'trial') ? FirstLineLandingDemo.exitTrial() : '')"
 >
+  <!-- The ink's imperfection (D-056): a 2 px displacement over two octaves of fractal noise.
+       One filter, referenced by .ink-imperfect on every surface that carries writing. -->
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <filter id="fl-ink-wobble" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.06 0.075" numOctaves="2" seed="11" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </svg>
   <p class="sr-only" role="status" aria-live="polite" data-text="$_session.srStatus"></p>
   <div class="room">
     <header class="nav">
@@ -1260,14 +1591,14 @@ if (document.readyState === "loading") {
         <a class="door" href="#trial" data-trial-launch="" data-on:click__prevent="FirstLineLandingDemo.startTrial(evt)">Give it sixty seconds.</a>
       </section>
       <section class="demo" aria-label="Live demo: a draft is typed, stops, and is wiped after eight seconds of silence.">
-        <div class="demo-paper">
+        <div class="demo-paper" data-paper>
           <div class="paper-edge">
             <span class="rules label rules-full">Forward only / 5s warn / 8s wipe / 60s</span>
             <span class="rules label rules-compact">Fwd only / 5s / 8s / 60s</span>
             <span class="demo-clock">1:00</span>
           </div>
           <div class="demo-stage">
-            <p class="demo-text" aria-hidden="true"></p>
+            <p class="demo-text ink-imperfect" aria-hidden="true"></p>
             <p class="demo-report system" hidden aria-hidden="true"></p>
             <div class="danger-overlay" data-show="$_session.dangerActive &amp;&amp; $_session.context === 'demo'" aria-live="polite" aria-atomic="true">
               <span class="numeral" data-text="$_session.dangerSeconds">3</span>
@@ -1289,13 +1620,13 @@ if (document.readyState === "loading") {
     </footer>
   </div>
   <div class="trial-overlay" role="dialog" aria-modal="true" aria-label="Zero Draft writing trial" aria-hidden="true">
-    <div class="trial-writing-surface" data-class:denied="$_session.denyActive &amp;&amp; $_session.context === 'trial'" data-class:deny-hair="$_session.denyHair &amp;&amp; $_session.context === 'trial'">
+    <div class="trial-writing-surface" data-paper data-class:denied="$_session.denyActive &amp;&amp; $_session.context === 'trial'" data-class:deny-hair="$_session.denyHair &amp;&amp; $_session.context === 'trial'">
       <p class="chrome chrome-tl"><span class="label rules-full">Forward only / 5s warn / 8s wipe / 60s</span><span class="label rules-compact">Fwd only / 5s / 8s / 60s</span></p>
       <p class="chrome chrome-tr"><span class="trial-timer" data-text="$_session.clock">1:00</span></p>
       <p class="chrome chrome-bl"><button type="button" class="trial-exit" data-on:click="FirstLineLandingDemo.exitTrial()">Esc - Exit</button></p>
       <p class="chrome chrome-br"><span class="label" data-text="$_session.livewords + ' words'">0 words</span></p>
       <div class="trial-column">
-        <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
+        <div class="trial-editor ink-imperfect" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
         <p class="trial-hint label" data-show="$_session.context === 'trial' &amp;&amp; !$_session.failed &amp;&amp; !$_session.complete &amp;&amp; $_session.text.trim().length === 0">Type here. The law is live: 5s warn, 8s wipe, 60s to keep.</p>
       </div>
       <div class="danger-overlay trial-danger" data-show="$_session.dangerActive &amp;&amp; $_session.context === 'trial'" aria-live="assertive" aria-atomic="true">
@@ -1310,13 +1641,13 @@ if (document.readyState === "loading") {
       </section>
       <section class="trial-kept" data-show="$_session.complete &amp;&amp; $_session.context === 'trial'" aria-label="Draft kept">
         <div class="kept-inner">
-        <div class="kept-paper">
+        <div class="kept-paper" data-paper>
           <div class="paper-edge">
             <span class="rules label rules-full">Forward only / 5s warn / 8s wipe / 60s</span>
             <span class="rules label rules-compact">Fwd only / 5s / 8s / 60s</span>
             <span class="kept-clock">0:00</span>
           </div>
-          <article class="kept-text" data-text="$_session.resultText"></article>
+          <article class="kept-text ink-imperfect" data-text="$_session.resultText"></article>
           <div class="kept-receipt">
             <span class="receipt-line system" data-text="'0:00 - ' + $_session.resultWordCount + ' words kept.'">0:00 - 0 words kept.</span>
             <button type="button" class="copy-door" data-text="$_session.copied ? 'Copied' : 'Copy text'" data-class:is-copied="$_session.copied" data-on:click="FirstLineLandingDemo.copyText($_session.resultText)">Copy text</button>

@@ -208,7 +208,7 @@ struct RoomTests {
         let numeral = try #require(fields.first { $0.stringValue == "3" })
         #expect(!numeral.isHiddenOrHasHiddenAncestor)
         #expect((numeral.font?.pointSize ?? 0) > 100)
-        #expect(sameColor(numeral.textColor, FirstLineColors.redNSColor))
+        #expect(sameColor(numeral.textColor, FirstLineColors.paperDangerNSColor))
         #expect(fields.contains { $0.stringValue == "0:55" })
         let exit = try #require(exitButton(in: fixture.room))
         #expect(!exit.isHiddenOrHasHiddenAncestor)
@@ -223,7 +223,7 @@ struct RoomTests {
         let fields = descendants(fixture.room.view, of: NSTextField.self)
         let report = try #require(fields.first { $0.stringValue == "DRAFT DELETED AT 0:52. TYPE TO START AGAIN." })
         #expect(!report.isHiddenOrHasHiddenAncestor)
-        #expect(sameColor(report.textColor, FirstLineColors.redNSColor))
+        #expect(sameColor(report.textColor, FirstLineColors.paperDangerNSColor))
         #expect(!fields.contains { $0.stringValue == "Start typing." },
                 "the wiped room must not add an under-line hint")
         #expect(fields.contains { $0.stringValue == "1:00" })
@@ -334,18 +334,21 @@ struct RoomTests {
         #expect(kept.draft.isEmpty)
     }
 
+    /// The ramp moves the sheet's colour, not the view's alpha, so the paper keeps one grain layer under
+    /// the alarm; the recovery still leaves on the 120 ms fade (D-056).
     @Test func washRecoveryFadesOnceAndWarningInterruptsImmediately() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         fixture.clock.now = 6.5
         fixture.room.tick()
-        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
-            .first { $0.alphaValue == 0.5 })
+        let wash = try #require(descendants(fixture.room.view, of: PaperWashView.self)
+            .first { $0.fraction == 0.5 })
+        #expect(wash.alphaValue == 1)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
         let fade = try #require(wash.layer?.animation(forKey: "opacity") as? CABasicAnimation)
         #expect(fade.duration == 0.12)
-        #expect((fade.fromValue as? Float) == 0.5)
+        #expect((fade.fromValue as? Float) == 1)
         #expect((fade.toValue as? Float) == 0)
         var control: [Float] = [0, 0]
         fade.timingFunction?.getControlPoint(at: 1, values: &control)
@@ -354,7 +357,8 @@ struct RoomTests {
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
         fixture.clock.now = 13
         fixture.room.tick()
-        #expect(wash.alphaValue == 0.5)
+        #expect(wash.fraction == 0.5)
+        #expect(wash.alphaValue == 1)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.state.settings.reducedMotion = .always
         fixture.editor.insertText("y", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -390,7 +394,9 @@ struct RoomTests {
         #expect(abs((numeral.font?.pointSize ?? 0) - min(fixture.room.view.bounds.height * 0.18, 170)) < 1)
     }
 
-    @Test func countAndExitFollowTheLivePhaseTone() throws {
+    /// The count and the exit link sit on the Note sheet, so they take the sheet's one quiet role in
+    /// every phase: the wall's mute and chrome would sink below the 7:1 floor on the paper (D-056).
+    @Test func countAndExitKeepThePaperQuietRoleInEveryPhase() throws {
         for phase in [SessionPhase.writing, .danger] {
             let fixture = try roomFixture()
             advance(fixture, to: phase)
@@ -398,10 +404,9 @@ struct RoomTests {
             let count = try #require(fields.first { $0.stringValue.hasSuffix("words") })
             let exit = try #require(exitButton(in: fixture.room))
             let exitColor = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-            let expected = phase == .writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
             let countColor = count.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-            #expect(sameColor(countColor, expected))
-            #expect(sameColor(exitColor, expected))
+            #expect(sameColor(countColor, FirstLineColors.paperQuietNSColor))
+            #expect(sameColor(exitColor, FirstLineColors.paperQuietNSColor))
         }
     }
 

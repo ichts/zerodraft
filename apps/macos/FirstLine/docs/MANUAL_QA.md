@@ -686,3 +686,60 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 - PASS suite: `swift test` 287 tests. All license, trial, smoke and entitlement suites pass after their stale "blocked until validation" expectations were updated to the new contract (immediate access on a locally verified token, silent background revalidation). Two pre-existing failures are excluded from this change's claim because they reproduce identically on the unmodified source: `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and `EditorFocusTests.imeMovementStaysWithinMarkedRange` both expect a deny that needs an active host app/key window, which this headless session does not provide. `RoomTests.firstPinyinKeyAfterAWipeThroughTheInputContext` passes with its recorded known issue. No IME, VoiceOver or full-screen session was run.
 - RECORDED: the first-frame half of case 58 now runs as recorded VM acceptance - see the 2026-10-25 section above. The launch with an activated license is recorded at 50 ms AX sampling before the process exists, and the pre-fix build (the shipped 1.0 DMG) reproduces the activation card on the first frame while a build of current main does not, over three relaunches. Still PENDING: the offline re-verification and revocation paths of that case, which the rig does not yet exercise.
 - Observed, pre-existing, not part of this change: on this machine the picker window measures 980x1079 pt (`CGWindowListCopyWindowInfo`) instead of the 1040x720 contract, and the pre-fix build shows the same size on both the trial path and after the card flips to the picker, so the license fix neither causes nor removes it. The launch captures therefore differ in window size between the card (1040x720) and the picker (980x1079) in the before set and are uniform in the after set. Window sizing is owned by `RootWindowController` and needs its own bounded investigation before it is treated as a shipped defect.
+
+## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
+
+Scope: D-056. The writing sheet is the Note paper on the Mac room as on the web: tone `#dbe6ec` light /
+`#21272a` dark, grain 70 of 100 at size 1.00, ink `#1c1917` / `#ece7d9`, and the sheet's quiet, history and pen
+roles measured against the paper. `PaperSheetView`/`PaperField` render it once per size and appearance; nothing
+repaints while the writer types.
+
+- PASS deterministic: `swift test` (full suite) with `PaperContrastTests` (locked tones in both appearances, every
+  role on the paper >= 7:1, the history ladder at 9.2:1 / 7.2:1, the pen red on its warn wash, and the field's
+  determinism) and `SnapshotTests` (every surface in light and dark, the `paperPoint` region check on every room
+  state - the paper's mean tone inside the locked band and a real spread - plus `paperStaysStillWhileTyping`).
+- PASS live window, every room state the paper reaches in one run, both appearances: `captures/mac-window-room-`
+  `{rest,typing,warning,deleted}-{light,dark}.png`, captured through the cua-driver daemon on the packaged ad-hoc
+  bundle with an isolated `CFFIXED_USER_HOME` (theme preset from `settings.json`), 1040x720, at the 5 minute
+  Relaxed limit so the warn state could be held. Keys were delivered at the room's AX text area with
+  `delivery_mode: foreground`. Reduce Motion was on for the capture run, so the wash lands at full strength
+  instead of ramping - the text is typed for real, and the wipe is the product's own 12 s silence, not a fixture.
+- PASS paper parity, measured off those window captures (25 px patch average, mid-paper): rest light
+  `rgb(221,228,231)`, warning light `rgb(221,213,214)` = the web's `--wash-paper` `#ddd3d5` within the grain's
+  own lift; rest dark `rgb(58,60,58)`, warning dark `rgb(52,43,43)` = `#352c2c`. The Mac wash is the web's
+  `color-mix(in oklab, paper 88%, #c8392f)`, painted with the sheet's own grain on top, so the alarm tints
+  textured paper on both surfaces (`PaperWashView`, `PaperContrastTests.theWashIsTheWebsPaperMixNotAPalePink`).
+- Content snapshots of every other room state at the same 1040x720 size and both appearances -
+  `captures/mac-snapshot-room-*.png` (the `WID_SNAPSHOT_DIR` run of `SnapshotTests`): empty, typing, exit hint,
+  warning, deleted, kept, copied. These are AppKit content snapshots, not live window captures.
+- Checklist pass/fail for this round (every row whose subject touches the sheet; rows not listed are untouched
+  by the paper and were not re-measured):
+  - Q-02 PASS - the warning numeral, its caption and the wipe report keep the offsets asserted by
+    `RoundThreeTests.warningInkSitsUnderTheWritingLine`; the ink search threshold moved to 0.3 luma because the
+    washed sheet now carries grain and texture is not ink.
+  - Q-05 PASS - one face per role unchanged; the sheet's tones are the same role set in both appearances
+    (`PaperContrastTests.lockedTonesAreThePaperAndTheInk`).
+  - Q-06 PASS - `completedLinesDoNotMoveWhenTheCurrentLineGrows`, `emptyCaretAndCountPromptMatchAfterAWipe`, and the
+    window captures show the clock, count and writing anchor fixed through rest, typing, warning and wipe.
+  - Q-08 PASS - the Mac and the web now carry the same tone, ink, ladder and warn wash; the wash parity is measured
+    off the captures above and pinned by `PaperContrastTests.theWashIsTheWebsPaperMixNotAPalePink`.
+  - Q-09 PASS - `SnapshotTests.everySurfaceRendersInLightAndDark` plus the dark window captures; every role is
+    measured in both appearances.
+  - Q-10 PASS - `SnapshotTests.paperStaysStillWhileTyping`: the field is byte-identical before and after typing.
+  - Q-14 PASS - alignment assertions above plus the room captures; the sheet's ring, radius and shadow are unchanged.
+  - Q-16 PASS - this round's own defects found and fixed rather than shipped: the warn wash greying a cool sheet, the
+    wash hiding the Mac's grain, and the landing sheet able to paint plain for a frame.
+  - Q-17 PASS - type metrics unchanged: `linePitchIsFixedForChineseEnglishAndMixed`,
+    `punctuationCharactersUsePitchLightAtSmallerSize`, `completedLineOpacityIsUniformAndStepped` (now bound to the
+    ladder token instead of the old 22 % / 7 %).
+  - Q-20 PASS - no copy changed on either surface.
+  - Q-22 PASS - the row's full evidence: `PaperContrastTests`, `SnapshotTests.paperStaysStillWhileTyping` with the
+    `paperPoint` region on every room state, the window captures above, and `tests/paper.spec.mjs` +
+    `writeitdown/qa/paper.spec.mjs` for the web half.
+- PENDING: the independent review of the capture set, and a real-window recording of the kept screen (the kept
+  state was not held in the window run because the capture session used a 5 minute limit; it is covered by the
+  content snapshots and by `SnapshotTests.keptCopyFocusRendersInLightAndDark`).
+- Known, pre-existing: `scripts/qa-window.sh` does not run on this branch: it looks for an AX button labelled
+  `Begin writing` while the picker's button is labelled `Begin`, so it exits at `FAIL: no element token for Begin`
+  before any room stage. That mismatch predates this change (the picker was not touched); the window captures
+  above were taken with an equivalent direct cua-driver script instead.

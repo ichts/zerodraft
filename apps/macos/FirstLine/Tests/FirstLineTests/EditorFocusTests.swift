@@ -218,10 +218,12 @@ struct EditorFocusTests {
             }
             alphas.append(lineAlphas)
         }
-        // One uniform opacity per completed line; the current line full; older lines gone.
+        // One uniform ink step per completed line; the current line full; older lines gone. The step
+        // values themselves are the measured ladder (PaperContrastTests); this asserts the wiring.
+        let ladder = textView.historyLineOpacities
         #expect(alphas[3].allSatisfy { abs($0 - 1) < 0.001 })
-        #expect(alphas[2].allSatisfy { abs($0 - 0.22) < 0.001 })
-        #expect(alphas[1].allSatisfy { abs($0 - 0.07) < 0.001 })
+        #expect(alphas[2].allSatisfy { abs($0 - ladder[1]) < 0.001 })
+        #expect(alphas[1].allSatisfy { abs($0 - ladder[2]) < 0.001 })
         #expect(alphas[0].allSatisfy { $0 == 0 })
         #expect(textView.alignment == .center)
         let paragraph = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
@@ -254,7 +256,7 @@ struct EditorFocusTests {
         room.view.layoutSubtreeIfNeeded()
         let firstTop = try firstLineTop(in: editor, paper: paper)
         let firstAlpha = try lineAlpha(in: editor, lineIndex: 0)
-        #expect(abs(firstAlpha - 0.22) < 0.001)
+        #expect(abs(firstAlpha - editor.historyLineOpacities[1]) < 0.001)
 
         // A CJK character on the English current line used to inflate that line's
         // fragment and push the completed line up. With the fixed pitch it must not.
@@ -275,7 +277,7 @@ struct EditorFocusTests {
         let firstTopAfterNewLine = try firstLineTop(in: editor, paper: paper)
         #expect(abs((firstTop - firstTopAfterNewLine) - 44.8) <= 1,
                 "the history shifted \(firstTop - firstTopAfterNewLine) pt for a new line")
-        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - editor.historyLineOpacities[2]) < 0.001)
     }
 
     @Test
@@ -336,8 +338,8 @@ struct EditorFocusTests {
 
     private func assertTailLineOpacities(in textView: AppendOnlyTextView, lineCount: Int) throws {
         #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 1) - 1) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - 0.22) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - textView.historyLineOpacities[1]) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - textView.historyLineOpacities[2]) < 0.001)
         #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 4)) < 0.001)
     }
 
@@ -983,8 +985,8 @@ struct EditorFocusTests {
         let end = NSRange(location: (textView.string as NSString).length, length: 0)
         #expect(textView.selectedRange() == end)
         #expect(abs(try lineAlpha(in: textView, lineIndex: 3) - 1) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 0.22) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - textView.historyLineOpacities[1]) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - textView.historyLineOpacities[2]) < 0.001)
         #expect(abs(try lineAlpha(in: textView, lineIndex: 0)) < 0.001)
     }
 

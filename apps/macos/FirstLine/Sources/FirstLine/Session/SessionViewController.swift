@@ -7,7 +7,7 @@
 import AppKit
 import CoreText
 
-final class RoomWashView: NSView {
+class RoomWashView: NSView {
     var fillColor: NSColor { didSet { needsDisplay = true } }
     var cornerRadius: CGFloat = 0 { didSet { needsDisplay = true } }
     init(fillColor: NSColor) {
@@ -49,6 +49,62 @@ final class RoomWashView: NSView {
     }
 }
 
+/// The sheet's warn wash. It paints the paper tone mixed toward the locked wash colour and then the
+/// sheet's own grain over it, so the alarm tints textured paper on both surfaces: the web keeps its
+/// canvas above the wash background, and a flat overlay here would either hide the grain or, faded in
+/// by alpha, layer a second grain over the first (D-056).
+final class PaperWashView: RoomWashView {
+    var grain: CGImage? { didSet { needsDisplay = true } }
+
+    /// How far the sheet has warmed, 0...1: the ramp moves the colour, not the view's alpha.
+    var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
+    var deep = false { didSet { needsDisplay = true } }
+
+    /// The paper's tone mixed toward the locked wash colour, resolved for this view's appearance every
+    /// time it is read, so neither a theme switch nor a drawing-appearance left behind by another view
+    /// can bake a stale tint into the wash.
+    var tint: NSColor {
+        var resolved = NSColor.clear
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let target = (deep ? FirstLineColors.paperWashDeepNSColor : FirstLineColors.paperWashNSColor)
+                .usingColorSpace(.sRGB)
+            guard let target, let base = FirstLineColors.paperNSColor.usingColorSpace(.sRGB) else { return }
+            let t = min(max(fraction, 0), 1)
+            resolved = NSColor(srgbRed: base.redComponent + (target.redComponent - base.redComponent) * t,
+                               green: base.greenComponent + (target.greenComponent - base.greenComponent) * t,
+                               blue: base.blueComponent + (target.blueComponent - base.blueComponent) * t,
+                               alpha: 1)
+        }
+        return resolved
+    }
+
+    override var wantsUpdateLayer: Bool { false }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let rect = bounds
+            ctx.saveGState()
+            if cornerRadius > 0 {
+                ctx.addPath(CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
+                ctx.clip()
+            }
+            ctx.setFillColor(tint.cgColor)
+            ctx.fill(rect)
+            if let grain {
+                ctx.saveGState()
+                ctx.translateBy(x: 0, y: rect.height)
+                ctx.scaleBy(x: 1, y: -1)
+                ctx.interpolationQuality = .none
+                ctx.setAlpha(PaperField.grain)
+                ctx.draw(grain, in: rect)
+                ctx.restoreGState()
+            }
+            ctx.restoreGState()
+        }
+    }
+}
+
 @MainActor
 final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The live trial's kept block is `max-width:62ch` resolved against its 15 pt UI font.
@@ -63,9 +119,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var copyButton: NSButton { keptView.copyButton }
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
-    private var paper: FloodCanvasView!
+    private var paper: PaperSheetView!
     private var paperShadow: FirstLineShadowView!
-    private var paperWash: RoomWashView!
+    private var paperWash: PaperWashView!
     private var outline: RoomWashView!
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
@@ -105,7 +161,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var barBounds: CGSize = .zero
     var exitConfirmation = ExitConfirmation()
     private var exitHintWork: DispatchWorkItem?
-    private var quietLinkMuted: Bool?
 
     init(appState: AppState, pasteboard: NSPasteboard = .general,
          confirmationNow: @escaping () -> TimeInterval = { SessionEngine.continuousNowSeconds() }) {
@@ -146,6 +201,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     override func viewDidLayout() {
         super.viewDidLayout()
+        paperWash.grain = paper.grainForWash()
         prepareViewport()
         layoutWarning()
         syncProgressBar(phase: engine.phase)
@@ -175,11 +231,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func buildRoom() {
-        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.sheetNSColor)
+        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.paperNSColor)
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        paper = FloodCanvasView(fillColor: FirstLineColors.sheetNSColor)
+        // The paper is the Note sheet (D-056): tone, grain and light are rendered by the view itself.
+        paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet
         paper.clipsContent = true
@@ -213,7 +270,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         paper.addSubview(scrollView)
 
-        paperWash = RoomWashView(fillColor: FirstLineColors.redSoftNSColor)
+        paperWash = PaperWashView(fillColor: FirstLineColors.paperWashNSColor)
         paperWash.translatesAutoresizingMaskIntoConstraints = false
         paperWash.cornerRadius = FirstLineRadius.sheet
         paperWash.alphaValue = 0
@@ -236,28 +293,28 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         timerLabel.setAccessibilityRole(.staticText)
         timerLabel.setAccessibilityElement(true)
         timerLabel.setAccessibilityHidden(false)
-        countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.muteNSColor)
+        countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.paperQuietNSColor)
         countLabel.alignment = .right
         countLabel.toolTip = RoomPresentation.countRule
         countLabel.setAccessibilityHelp(RoomPresentation.countRule)
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
-        reportLabel = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
+        reportLabel = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         reportLabel.maximumNumberOfLines = 0
         reportLabel.isHidden = true
         numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
-                             color: FirstLineColors.redNSColor)
+                             color: FirstLineColors.paperDangerNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
         warningHint.maximumNumberOfLines = 0
         numeralLabel.isHidden = true
         warningHint.isHidden = true
 
         exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
-        styleQuietLink(exitButton, title: "ESC - EXIT", muted: false)
-        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
+        styleQuietLink(exitButton, title: "ESC - EXIT")
+        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         exitHintLabel.attributedStringValue = Self.quietRowText(Self.exitHintText,
-            color: FirstLineColors.redNSColor, truncates: true, kernEm: 0)
+            color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
@@ -607,14 +664,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if phase == .failure {
             reportLabel.attributedStringValue = FirstLineTypography.trackedText(
                 wipeReport, font: FirstLineTypography.smallMediumNSFont,
-                color: FirstLineColors.redNSColor, kernEm: 0.02)
+                color: FirstLineColors.paperDangerNSColor, kernEm: 0.02)
         }
         let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
-        let writing = phase == .writing
-        let chrome = writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
+        let chrome = FirstLineColors.paperQuietNSColor
         // Empty room: the bottom-right count slot itself carries the instruction.
         // After the first keystroke it becomes the word count; after a wipe the red
         // receipt carries the instruction and the slot shows the count.
@@ -627,7 +683,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.attributedStringValue = Self.rowText(
             typePrompt ? "Type to start" : wordLabel, font: FirstLineTypography.smallNSFont,
             color: chrome, alignment: .right, kernEm: 0)
-        refreshQuietLinks(muted: writing)
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
         warningHint.isHidden = !warning
@@ -731,18 +786,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         return text
     }
 
-    private func styleQuietLink(_ button: NSButton, title: String, muted: Bool) {
-        let color = muted ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
+    /// One quiet role on the paper: the exit link keeps 7.35:1 on the Note sheet in both appearances.
+    private func styleQuietLink(_ button: NSButton, title: String) {
+        let color = FirstLineColors.paperQuietNSColor
         button.title = title
         button.font = FirstLineTypography.smallMediumNSFont
         button.contentTintColor = color
         button.attributedTitle = Self.quietRowText(title, color: color)
-    }
-
-    private func refreshQuietLinks(muted: Bool) {
-        guard quietLinkMuted != muted else { return }
-        quietLinkMuted = muted
-        styleQuietLink(exitButton, title: "ESC - EXIT", muted: muted)
     }
 
     private func applyVisualSettings() {
@@ -767,12 +817,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         applyVisualSettings()
     }
 
-    private func setWash(_ opacity: CGFloat, cut: Bool) {
+    /// `fraction` is how warm the sheet is, 0...1. The view is fully visible whenever there is any wash and
+    /// the colour carries the ramp, so the paper keeps one grain layer instead of two (D-056).
+    private func setWash(_ fraction: CGFloat, cut: Bool) {
         if washIsCut != cut {
             washIsCut = cut
-            paperWash.fillColor = cut ? FirstLineColors.redDeepNSColor : FirstLineColors.redSoftNSColor
+            paperWash.deep = cut
         }
-        paperWash.setOpacity(opacity, reducesMotion: reducesMotion)
+        paperWash.fraction = fraction
+        paperWash.setOpacity(fraction > 0 ? 1 : 0, reducesMotion: reducesMotion)
     }
 
     private func showCut() {

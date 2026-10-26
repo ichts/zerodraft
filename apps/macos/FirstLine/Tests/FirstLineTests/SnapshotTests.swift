@@ -52,19 +52,19 @@ struct SnapshotTests {
 
             let rest = roomState(appearance: appearance)
             try snapshot(rest.room, name: "room-rest-\(suffix)", appearance: appearance,
-                         output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 170, y: 360))
 
             let typed = roomState(appearance: appearance)
             typeDraft(typed)
             try snapshot(typed.room, name: "room-typing-\(suffix)", appearance: appearance,
-                         output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 170, y: 360))
 
             let exitHint = roomState(appearance: appearance)
             typeDraft(exitHint)
             exitHint.room.exitConfirmation = ExitConfirmation(window: 60)
             exitHint.room.requestExit()
             try snapshot(exitHint.room, name: "room-exit-hint-\(suffix)", appearance: appearance,
-                         output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                         output: output, paperPoint: NSPoint(x: 170, y: 360))
         }
 
         try snapshot(activationError(), name: "activation-error-light", appearance: .aqua,
@@ -75,22 +75,66 @@ struct SnapshotTests {
                      appearance: .darkAqua, output: output)
         let deletedLight = deletedState(appearance: .aqua)
         try snapshot(deletedLight, name: "room-deleted-light", appearance: .aqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
         let deletedDark = deletedState(appearance: .darkAqua)
         try snapshot(deletedDark, name: "room-deleted-dark", appearance: .darkAqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
         let keptLight = keptState(appearance: .aqua, copy: false)
         try snapshot(keptLight, name: "room-kept-light", appearance: .aqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
         let copiedLight = keptState(appearance: .aqua, copy: true)
         try snapshot(copiedLight, name: "room-copied-light", appearance: .aqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
         let copiedDark = keptState(appearance: .darkAqua, copy: true)
         try snapshot(copiedDark, name: "room-copied-dark", appearance: .darkAqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
         let keptDark = keptState(appearance: .darkAqua, copy: false)
         try snapshot(keptDark, name: "room-kept-dark", appearance: .darkAqua,
-                     output: output, sheetPoint: NSPoint(x: 170, y: 360))
+                     output: output, paperPoint: NSPoint(x: 170, y: 360))
+    }
+
+    /// The grain is texture on the sheet, not an image that reacts to the writer: typing changes the words
+    /// and nothing about the paper. The region is sampled from real window frames, before and after input.
+    @Test func paperStaysStillWhileTyping() throws {
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let name = appearance == .aqua ? "light" : "dark"
+            let fixture = roomState(appearance: appearance)
+            let before = try paperPixels(fixture.room, appearance: appearance)
+            typeDraft(fixture)
+            fixture.clock.now = 6
+            fixture.room.tick()
+            let after = try paperPixels(fixture.room, appearance: appearance)
+            #expect(before == after, "\(name): the paper changed under the writer's keys")
+        }
+    }
+
+    /// A text-free band of the sheet, at the window's real size, as raw sRGB bytes.
+    private func paperPixels(_ controller: NSViewController, appearance: NSAppearance.Name) throws -> Data {
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: appearance)
+        window.contentViewController = controller
+        window.setContentSize(size)
+        window.contentView?.layoutSubtreeIfNeeded()
+        controller.view.layoutSubtreeIfNeeded()
+        controller.viewDidLayout()
+        controller.view.displayIfNeeded()
+        let rep = try #require(controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds))
+        controller.view.cacheDisplay(in: controller.view.bounds, to: rep)
+        SnapshotWindowKeeper.windows.append(window)
+        let scale = CGFloat(rep.pixelsWide) / size.width
+        let origin = NSPoint(x: 120 * scale, y: 280 * scale)
+        let side = Int(200 * scale)
+        var bytes = Data()
+        for y in Int(origin.y)..<(Int(origin.y) + side) {
+            for x in Int(origin.x)..<(Int(origin.x) + side) {
+                let colour = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                bytes.append(UInt8((colour.redComponent * 255).rounded()))
+                bytes.append(UInt8((colour.greenComponent * 255).rounded()))
+                bytes.append(UInt8((colour.blueComponent * 255).rounded()))
+            }
+        }
+        return bytes
     }
 
     @Test func keptCopyFocusRendersInLightAndDark() throws {
@@ -103,7 +147,7 @@ struct SnapshotTests {
                 let room = keptState(appearance: appearance, copy: copied)
                 let label = copied ? "copied" : "copy"
                 try snapshot(room, name: "room-\(label)-focus-\(suffix)", appearance: appearance,
-                             output: output, sheetPoint: NSPoint(x: 170, y: 360), focus: true)
+                             output: output, paperPoint: NSPoint(x: 170, y: 360), focus: true)
             }
         }
     }
@@ -257,7 +301,8 @@ struct SnapshotTests {
     // MARK: - Rendering
 
     private func snapshot(_ controller: NSViewController, name: String, appearance: NSAppearance.Name,
-                          output: URL?, sheetPoint: NSPoint? = nil, focus: Bool = false) throws {
+                          output: URL?, sheetPoint: NSPoint? = nil, paperPoint: NSPoint? = nil,
+                          focus: Bool = false) throws {
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: appearance)
@@ -296,8 +341,50 @@ struct SnapshotTests {
             try assertPixel(rep, at: NSPoint(x: sheetPoint.x * scale, y: sheetPoint.y * scale),
                             equals: FirstLineColors.sheetNSColor, in: appearance, name: name)
         }
+        if let paperPoint {
+            let scale = CGFloat(rep.pixelsWide) / size.width
+            try assertPaper(rep, around: NSPoint(x: paperPoint.x * scale, y: paperPoint.y * scale),
+                            in: appearance, name: name)
+        }
         if focus { window.orderOut(nil) }
         SnapshotWindowKeeper.windows.append(window)
+    }
+
+    /// The paper is measured, not eyeballed: a text-free region must average the locked tone and must
+    /// carry grain (a real spread), on every room state and in both appearances (D-056).
+    private func assertPaper(_ rep: NSBitmapImageRep, around point: NSPoint,
+                             in appearance: NSAppearance.Name, name: String) throws {
+        let resolved = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance))
+        let expected = try #require(resolved.usingColorSpace(.sRGB))
+        let side = 24
+        var sum = (r: 0.0, g: 0.0, b: 0.0)
+        var samples: [(Double, Double, Double)] = []
+        for y in Int(point.y)..<Int(point.y) + side {
+            for x in Int(point.x)..<Int(point.x) + side {
+                guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                let sample = (Double(colour.redComponent), Double(colour.greenComponent), Double(colour.blueComponent))
+                samples.append(sample)
+                sum.r += sample.0
+                sum.g += sample.1
+                sum.b += sample.2
+            }
+        }
+        let count = Double(samples.count)
+        try #require(count > 0)
+        let mean = (sum.r / count, sum.g / count, sum.b / count)
+        // The lamp only ever lifts the paper; the dark settle can drop it. Anything outside this band
+        // means the texture has changed the tone rather than lit it (D-056).
+        let lift = [mean.0 - Double(expected.redComponent),
+                    mean.1 - Double(expected.greenComponent),
+                    mean.2 - Double(expected.blueComponent)]
+        let variance = samples.reduce(0.0) { $0 + pow($1.0 - mean.0, 2) } / count
+        let spread = variance.squareRoot()
+        let outOfBand = lift.contains { $0 >= 0.10 || $0 <= -0.05 }
+        if outOfBand || spread <= 0.002 {
+            print("PAPERFAIL \(name) mean=\(mean) expected=\(expected) lift=\(lift) spread=\(spread)")
+        }
+        #expect(!outOfBand, "\(name): the paper's tone left the locked band, lift=\(lift)")
+        #expect(spread > 0.002, "\(name): the paper carries no grain")
     }
 
     private func assertPixel(_ rep: NSBitmapImageRep, at point: NSPoint, equals token: NSColor,

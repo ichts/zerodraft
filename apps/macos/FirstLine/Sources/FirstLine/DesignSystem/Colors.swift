@@ -30,7 +30,25 @@ enum FirstLineColors {
 
     // MARK: Roles (background A light, same names in dark)
     static var pageNSColor: NSColor { adaptive(light: 0xF7F7F5, dark: 0x15140F) }
+    /// Plain surfaces: cards, fields, buttons, controls.
     static var sheetNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x26231C) }
+    /* The writing sheet is the Note paper (D-056). Its roles are measured against the paper's own
+       tone, not against white: every word on it clears 7:1, so the quiet chrome is its own role
+       and the pen red is deep enough to read on the paper and on its warn wash. */
+    static var paperNSColor: NSColor { adaptive(light: 0xDBE6EC, dark: 0x21272A) }
+    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xB8B5AC) }
+    static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFB4A2) }
+    /// The sheet's warn wash: `color-mix(in oklab, paper 88%, #C8392F)` and its deeper 76% step of the
+    /// eighth second, the exact recipe the web paints (`--wash-paper`, `--wash-paper-deep`). The values
+    /// are the browser compositor's own output, so both surfaces warm through the same ramp and land on
+    /// the same colour instead of the Mac tinting a blue-grey sheet with a pale pink meant for white.
+    static var paperWashNSColor: NSColor { adaptive(light: 0xDDD3D5, dark: 0x352C2C) }
+    static var paperWashDeepNSColor: NSColor { adaptive(light: 0xDDC0BE, dark: 0x49302E) }
+    /// Per-line history alphas: the ink composited at these stops keeps 9:1 and 7:1 on the paper,
+    /// solved from the ink and the sheet tone by `PaperContrastTests`.
+    static func paperHistoryAlphas(for appearance: NSAppearance) -> [CGFloat] {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? [0.846, 0.727] : [0.847, 0.769]
+    }
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }
     static var chromeNSColor: NSColor { adaptive(light: 0x5C564D, dark: 0xA39D8E) }

@@ -21,8 +21,10 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
-    /// One uniform opacity per completed line, closest line first; older lines are gone.
-    static let historyLineOpacities: [CGFloat] = [1, 0.22, 0.07]
+    /// One uniform ink step per completed line, closest line first; older lines are gone.
+    /// The stops are solved from the ink and the paper tone so the second line keeps 9:1 and the
+    /// oldest visible line keeps 7:1 on the Note sheet (D-056), in both appearances.
+    var historyLineOpacities: [CGFloat] { [1] + FirstLineColors.paperHistoryAlphas(for: effectiveAppearance) }
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
@@ -528,8 +530,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             let alpha: CGFloat
             if distance <= 0 {
                 alpha = 1
-            } else if distance < Self.historyLineOpacities.count {
-                alpha = Self.historyLineOpacities[distance]
+            } else if distance < historyLineOpacities.count {
+                alpha = historyLineOpacities[distance]
             } else {
                 alpha = 0
             }
@@ -767,11 +769,24 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return paragraph
     }
 
+    /// The ink's imperfection (D-056). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
+    /// a live NSTextView cannot be re-rasterised per keystroke without moving the caret with it, so the Mac
+    /// keeps the transferable half - a hair of ink spread, so the strokes are thicker than a print engine's -
+    /// and leaves the hand to its own writing face (docs/wid-decisions.md D-056 records the trade).
+    private var inkSpread: NSShadow {
+        let spread = NSShadow()
+        spread.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(0.55)
+        spread.shadowBlurRadius = 0.35
+        spread.shadowOffset = .zero
+        return spread
+    }
+
     private func activeTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: sessionFont,
             .foregroundColor: FirstLineColors.inkNSColor,
             .paragraphStyle: paragraph,
+            .shadow: inkSpread,
         ]
     }
 

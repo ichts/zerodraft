@@ -2,6 +2,31 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-26: The app bundle carries only the shared type set (D-057)
+
+The app no longer ships `IBMPlexMono-Regular.ttf` (135,580 B) or its OFL text. No token resolved to the
+face after the machine mono chrome layer was retired, and the web retired its last references in the same
+decision. Nothing a writer sees changes: every role was already Newsreader, Zhuque Fangsong or the system
+sans, so there is no new window capture to take and no real-window check is pending. `SnapshotTests`
+still renders every surface in light and dark inside the same run.
+
+- `swift build` and `swift test` from `apps/macos/FirstLine/`: build clean, test run exit 0.
+- New guard `TypographyParityTests` (6 tests, green): every role resolves to the shared face; the bundle
+  carries only Newsreader upright and italic, Zhuque Fangsong and their two OFL texts; the writing
+  font's CJK cascade is `ZhuqueFangsong-Regular`; the clock is 15 pt semibold with digits that do not
+  change width; the kept heading is `NewsreaderRoman-Medium` with no kern while the receipt keeps
+  0.26 pt (0.02 em); and every shared role's advance matches `writeitdown/qa/shared-type-baseline.json`
+  within 0.05 % (measured agreement 0.005 %).
+- Planted divergence, run and recorded: setting the clock back to 16 pt proportional and the kept
+  heading back to regular Newsreader fails four of the six - `theClockUsesTabularDigitsAtTheMacsSize`
+  (16 vs 15, and 2.836 pt of width drift between `1:00` and `0:59`), `everyTypeRoleResolvesToTheSharedSet`,
+  `keptHeadingAndReceiptCarryTheMacsTracking`, and `sharedRolesAdvanceLikeTheWeb` (386.277 vs the
+  baseline's 395.869). The plant was removed; the committed tree is green.
+- Repaired in passing: `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and
+  `imeMovementStaysWithinMarkedRange` were red on `main`. Both built a detached `AppendOnlyTextView`
+  that never had the room's `onDeny` wired, so the engine recorded no deny (`engine.lastDenyAt` nil).
+  They now use the editor the controller builds; no product code changed.
+
 ## 2026-10-25: A frozen screen fails the run even when a step is stamped inside it, and a real recorded run on the mini under that rule
 
 Validation round for the recorded-acceptance rig, on the Mac mini (Mac16,10). The rig is unchanged in shape;

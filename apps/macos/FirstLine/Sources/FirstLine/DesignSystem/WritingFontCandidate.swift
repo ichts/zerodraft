@@ -4,10 +4,12 @@
  * [POS]: FirstLine writing-font layer; fonts register from the bundle and resolve by PostScript name
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
- * Flood design-system fonts are bundled (SIL Open Font License, see Resources/OFL-*.txt):
+ * The bundled faces are the shared type set the site serves too (D-057, SIL Open Font License, see
+ * Resources/OFL-*.txt):
  *   - Newsreader (variable upright + italic): human serif layer
- *   - IBM Plex Mono (Regular): machine mono layer
- *   - Zhuque Fangsong (Regular): CJK fangsong layer
+ *   - Zhuque Fangsong (Regular): CJK fangsong layer, the writing face's cascade fallback
+ * The retired IBM Plex Mono chrome layer no longer ships: no token resolved to it, and the web
+ * retired it in the same decision.
  * The legacy `pitchLight` case name is kept source-compatible but now resolves to bundled
  * Newsreader (latin); `zhuqueFangsong` resolves to bundled Zhuque Fangsong (CJK).
  */
@@ -25,14 +27,12 @@ enum BundledFonts {
     static let newsreaderUprightPostScript = "Newsreader16pt-Regular"
     static let newsreaderMediumPostScript = "NewsreaderRoman-Medium"
     static let newsreaderItalicPostScript = "Newsreader16pt-Italic"
-    static let plexMonoRegularPostScript = "IBMPlexMono-Regular"
     static let zhuquePostScript = "ZhuqueFangsong-Regular"
 
     // Resource basenames (without extension) shipped under Resources/.
     private static let fontResources = [
         "Newsreader-Variable",
         "Newsreader-Italic-Variable",
-        "IBMPlexMono-Regular",
         "ZhuqueFangsong-Regular",
     ]
 

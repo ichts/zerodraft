@@ -640,11 +640,22 @@ struct EditorFocusTests {
         #expect(abs(before - after) < 0.5)
     }
 
-    @Test func movementCommandsDenyAndKeepCaretAtEnd() {
+    @Test func movementCommandsDenyAndKeepCaretAtEnd() throws {
+        // The deny is registered through the room's own editor: the controller wires
+        // `onDeny` to the engine when it builds the room (SessionViewController.configure),
+        // so a detached AppendOnlyTextView would be denied without recording it.
         let engine = SessionEngine()
-        let controller = SessionViewController(appState: licensedTestState(sessionEngine: engine))
-        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        let state = licensedTestState(sessionEngine: engine)
+        state.startSession()
+        let controller = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        controller.view.layoutSubtreeIfNeeded()
+        RoomWindowKeeper.windows.append(window)
+        let editor = try #require(descendants(of: controller.view, as: AppendOnlyTextView.self).first)
         editor.loadRestoredText("hello world")
+        editor.setSelectedRange(NSRange(location: 0, length: 0))
         for selector in ["moveLeft:", "moveRight:", "moveUp:", "moveDown:",
                          "moveToBeginningOfDocument:", "moveToEndOfDocument:",
                          "moveToBeginningOfLine:", "moveToEndOfLine:",
@@ -666,10 +677,18 @@ struct EditorFocusTests {
 
     @Test
     func imeMovementStaysWithinMarkedRange() throws {
+        // Same reason as the movement test above: the deny reaches the engine through the room's
+        // own editor, so the editor has to be the one the controller built.
         let engine = SessionEngine()
-        let controller = SessionViewController(appState: licensedTestState(sessionEngine: engine))
-        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        editor.configureSessionTypography()
+        let state = licensedTestState(sessionEngine: engine)
+        state.startSession()
+        let controller = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled, .resizable], backing: .buffered, defer: false)
+        window.contentViewController = controller
+        controller.view.layoutSubtreeIfNeeded()
+        RoomWindowKeeper.windows.append(window)
+        let editor = try #require(descendants(of: controller.view, as: AppendOnlyTextView.self).first)
         editor.loadRestoredText("draft")
         editor.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: 0))

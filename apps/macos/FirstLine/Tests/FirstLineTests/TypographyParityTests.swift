@@ -78,7 +78,6 @@ struct TypographyParityTests {
     }
 
     @Test func theBundleCarriesOnlyTheSharedFaces() throws {
-        _ = FirstLineTypography.uiNSFont  // touches the bundle, which registers every face
         let files = try #require(BundledResources.bundle.urls(forResourcesWithExtension: "ttf", subdirectory: nil))
         #expect(Set(files.map { $0.deletingPathExtension().lastPathComponent })
             == ["Newsreader-Variable", "Newsreader-Italic-Variable", "ZhuqueFangsong-Regular"])
@@ -106,6 +105,9 @@ struct TypographyParityTests {
         let kept = SessionKeptView(copyTarget: nil, copyAction: NSSelectorFromString("copy:"),
                                    restartTarget: nil, restartAction: NSSelectorFromString("restart:"),
                                    reducesMotion: { false })
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = kept
         let writing = try writingFont(size: 28)
         kept.setContent(text: "the draft that survived", wordCount: 4, duration: 60, writingFont: writing)
 
@@ -114,7 +116,13 @@ struct TypographyParityTests {
         #expect(heading.font?.fontName == "NewsreaderRoman-Medium")
         #expect(heading.attributedStringValue.attribute(.kern, at: 0, effectiveRange: nil) == nil,
                 "the kept heading must stay untracked: the web now matches this value")
-        #expect(abs((heading.font?.pointSize ?? 0) - 36) < 0.001)
+        // The heading is clamp(32px, 5vw, 48px) against the window viewport, the web's --t-kept.
+        for (width, expected) in [(1040.0, 48.0), (800.0, 40.0), (600.0, 32.0)] {
+            window.setContentSize(NSSize(width: width, height: 720))
+            kept.layoutContent()
+            #expect(abs((heading.font?.pointSize ?? 0) - expected) < 0.001,
+                    "at a \(width) pt viewport the kept heading draws \(heading.font?.pointSize ?? 0) pt, not \(expected)")
+        }
 
         let receipt = try #require(descendants(kept, of: NSTextField.self)
             .first { $0.font == FirstLineTypography.smallMediumNSFont && !$0.stringValue.isEmpty })

@@ -1472,7 +1472,14 @@ if (document.readyState === "loading") {
     const next = render(sheet.canvas, width, height, dpr, theme);
     if (next.base && next.base !== sheet.base) {
       sheet.base = next.base;
-      sheet.element.style.setProperty('--paper', next.base);
+      /* The corrected base is the sheet's own tone, not a state change: it lands in one frame,
+         never through the sheet's snap transition, so no frame shows the texture on the wrong base. */
+      const style = sheet.element.style;
+      const transition = style.transition;
+      style.transition = 'none';
+      style.setProperty('--paper', next.base);
+      getComputedStyle(sheet.element).backgroundColor;
+      style.transition = transition;
     }
     sheet.painted = next;
   }

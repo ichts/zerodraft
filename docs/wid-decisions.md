@@ -1308,3 +1308,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   inside a Mac and stopped-screen change would widen the scope and pre-empt the captain's visual
   ruling, so the measured gap is recorded here as a bounded follow-up for that decision.
 - Supersedes: none.
+
+## D-072: The moment card's consequence line is ink; every moment-card text role is measured against its ground
+
+- Date: 2026-10-27
+- Decision: the landing's `Draft deleted.` line on the `m3` moment card paints in `--ink` instead of `--mute`.
+  The measured pair moves from 3.72:1 to 11.27:1 in light and 5.03:1 to 11.00:1 in dark, both on `--red-deep`.
+  The card ground, copy, size, weight and layout do not change. `writeitdown/qa/moments.spec.mjs` measures every
+  text element on the three cards (writing, warning, deleted) against its own rendered ground at 1440 and 390,
+  light and dark, with the WCAG floors: 4.5:1 for normal text, 3:1 for large text (24 px, or 18.66 px bold). The
+  150 px warning numeral is large text, so its floor is 3:1; its dark-theme red on the warning ground measures
+  4.47:1, which clears that floor but not 4.5:1, and is left for the captain to rule on rather than repainted here.
+- Reason: the captain's standing rule is that basic polish is fixed without asking and no product text reads
+  below its contrast floor. `--ink` is the token the card's headline already uses, and it clears the floor by a wide
+  margin in both themes. `--chrome` would also pass (4.68:1 light) but leaves little margin and mixes a second text
+  role into the card.
+- Supersedes: D-071's colour clause (`--mute` for the consequence line) and its open list of candidate remedies. D-071
+  held the colour until the captain decided; the captain's standing rule now decides it for this line.

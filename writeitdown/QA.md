@@ -187,7 +187,8 @@ Mono identity now use the shared set. Evidence: `fonts/` (the build step and its
 | Chinese draft (platform face) | `Zhuque Fangsong (technical preview)` -> `ZhuqueFangsong-Regular`, 6 glyphs | 28 px / 400 |
 | Clock | system sans | 15 px / 600 / normal, `font-variant-numeric: tabular-nums` |
 | Count | system sans | 13 px / 400 / normal |
-| Kept receipt, wipe report | system sans | 13 px / 500 / `0.26px` (.02em) |
+| Kept receipt | system sans | 13 px / 500 / `0.26px` (.02em) |
+| Stopped-screen line `Draft deleted.` | system sans | 15 px / 400 / normal |
 | Warning caption, quiet link | system sans | 13 px / 500 / `0.52px` (.04em) |
 | Room pills | system sans | 15 px / 600 / `0.6px` (.04em) |
 | Hand accent (landing only) | `"Reenie Beanie", "Segoe Print", cursive` | 108.36 px / 400 |
@@ -336,7 +337,7 @@ and theme.
 | Rule | Result | Basis |
 | --- | --- | --- |
 | Q-01 | PASS | Room phone nav shows the lockup and theme icon only; the Mac link sits in the exit row (`shell.spec.mjs`, `measurements.json`). |
-| Q-02 | PASS | Warning numeral, caption and receipt placement assertions in `phase4.spec.mjs` are green; no change to the ink slot. |
+| Q-02 | PASS | Warning numeral and caption placement assertions in `phase4.spec.mjs` are green, and the stopped screen is one group whose midpoint sits at 33% of the sheet (`the stopped screen is one group anchored at 33% of the sheet`, both widths); the wipe receipt is retired (D-070). |
 | Q-03 | PASS | Empty caret/count prompt assertions in `phase4.spec.mjs` are green; the room was not restyled. |
 | Q-04 | PASS | 35% anchor and centring assertions in `phase4.spec.mjs` are green. |
 | Q-05 | PASS | Exit-hint baseline and type-style assertion in `phase4.spec.mjs` is green; the buy row shares one baseline (captures). |
@@ -408,7 +409,7 @@ version.
 # 2026-10-25: Web room parity with the shipped Mac app (local, branch `fm/wid-parity-mini`)
 
 - Scope: `writeitdown/index.html`'s landing demo and `#trial` room brought to the Mac room's settled
-  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped  per-line history with a one-pitch 180 ms shift, ink-placed warning group and wipe receipt, one 2 pt
+  behaviour (D-043 to D-046): 35% anchor, caret-only empty room with `Type to start`/`0 words`, stepped  per-line history with a one-pitch 180 ms shift, ink-placed warning group, one 2 pt
   linear session bar and no bottom meter, `You stopped.` / `Begin again` failure screen, kept top block
   with `1 MINUTE. N WORDS.`, two-step exit with an inline confirmation, 200 ms/220 ms refusal. The root
   Zero Draft landing (`/index.html`) is out of scope: it is the separate outward brand.
@@ -572,3 +573,55 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
 - Real iOS Safari, its virtual keyboard, and physical IME candidate selection were not exercised. Mobile evidence is isolated Chrome emulation.
 - Clipboard read permission was denied by headless Chrome. Validation checked the actual write call's complete payload and success, and the fallback's selected full text and successful copy result.
 - The public contact address remains explicitly unconfigured, as requested. Hosting log retention has not been independently audited; Privacy does not claim otherwise.
+
+# 2026-10-26: The stopped screen is one composition (web + Mac, D-070)
+
+- Scope: the failure screen on the browser trial, the landing demo and the Mac room. The trial and
+  the Mac carry the `Begin again` pill; the watch-only demo shows only `You stopped.` and
+  `Draft deleted.`. The captain rejected the paused candidate-C screen (frozen clock and bar as a
+  receipt, `Begin again` as a text link, block pinned 72 px under the sheet's top edge) and locked a
+  composition in the live tuner: one group whose midpoint sits at 33% of the paper height, with a 9
+  px gap under the headline and, where the pill is present, the line above it and 24 px above the
+  pill, the session chrome off. Values and reasoning: `docs/wid-decisions.md` D-070.
+- Composition before the change, measured with the same probe the new test uses (1440: group top 72,
+  height 128.8, midpoint 16.97% of the 804 px sheet, 8 px and 20 px gaps, a 24 px / 15 px / 400 text
+  link, no pill, clock and bar visible; 390: midpoint 16.44%). The new assertions failed on 8 of 8
+  Playwright projects before the change, the first with
+  `group midpoint at 16.44% of the 776 px sheet`.
+- Web assertions (`qa/phase4.spec.mjs`): "the stopped screen is one group anchored at 33% of the
+  sheet" measures the anchor, both gaps, the order, the headline size for the width (48 px at 1440,
+  the role's own 32 px at 390), the line's 15 px / 400 in the sheet's quiet role (`--paper-quiet`, 7:1 or better on the sheet in both themes), the pill's 48 px height, 15 px / 600,
+  20 px padding and full radius, the chrome-off rule, and that neither the group nor its parts move
+  as time passes; "the stopped pill carries the keyboard and shows the room ink ring" holds the
+  visible focus ring and the `aria-keyshortcuts`; "Return and the pill start a fresh session and
+  bring the chrome back" holds the restart path; the demo test holds the 33% anchor, the 9 px gap and
+  the chrome-off rule on the landing preview, and the new "the demo takes its chrome off while the
+  stopped block shows" holds the rearm.
+- Mac assertions: `RoundThreeTests.stoppedScreenIsOneGroupAnchoredAtThirtyThreePercent` (light and
+  dark, at 1040x720 and at a smaller 760x560 sheet: order, the group midpoint on the room's one
+  anchor `RoomPresentation.paperAnchorFraction` (0.33 of the paper, the same constant that places the
+  active writing line, so the two cannot disagree), the two gaps as 9/48 and 24/48 of the pill-height
+  base, the headline's 1.1 line box, the line's 24/48 box (the web's 15/1.6), the line and pill label
+  as 15/48 of that base from the typography tokens with the size applied to the token, the group's
+  3.2875 base ratio sum, the pill at the base height with 20/48 sides, centred label, clock and bar
+  off, and a transparent writing layer with `alphaValue` 0 so no caret is drawn in the group) and
+  `RoundThreeTests.restartBringsTheChromeBackWithTheNewSession`.
+  `TrialReleaseTests.wipedSessionRestartSpendsAnotherButLastWipeDoesNotSellImmediately` holds the
+  pill's help at both wipe kinds (begin again, then activation), and
+  `RoomTests.stoppedScreenAnnouncementNamesOnlyTheReasonThatIsTrue` holds the reason branch: an
+  exhausted trial says the three free sessions are used, while licence residue, a trial-access error
+  or a cleanup failure only say a licence is needed. Before the change the same test
+  reported 10 pt and 18 pt gaps, a 21.4% midpoint, a 44 pt link at weight 400 and a missing timer.
+- Evidence: web `stopped-1440` / `stopped-390` in light and dark from the suite's own `page.screenshot`
+  (inspected individually); Mac content snapshots `room-deleted-light.png` and `room-deleted-dark.png`
+  from `WID_SNAPSHOT_DIR=... swift test --filter SnapshotTests`. These are real AppKit renders of the
+  room, not live window captures; a real-window recording is still pending.
+- Suite state: the eight-project `writeitdown` Playwright suite is green (800 tests, 77 skipped).
+  `swift test` is green except `EditorFocusTests.imeMovementStaysWithinMarkedRange` and
+  `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd`, which fail identically on the unchanged
+  baseline in this environment (the test host cannot activate a window, so `lastDenyAt` stays nil);
+  case 53 records the same host limitation as a known issue.
+- The window QA script (`apps/macos/FirstLine/scripts/qa-window.sh`), the shipped-DMG journey
+  (`scripts/dmg-journey.sh`) and the VM guest journey (`scripts/vm/guest-journey.sh`) now wait for
+  and assert the stopped group - `You stopped.`, `Draft deleted.`, `Begin again`, `0 words`, no
+  receipt sentence and no clock - instead of the retired `DRAFT DELETED AT …` receipt.

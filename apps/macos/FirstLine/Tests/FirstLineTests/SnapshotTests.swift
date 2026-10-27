@@ -193,9 +193,10 @@ struct SnapshotTests {
         settleBar(fixture)
     }
 
-    /// Static PNGs show the bar's model; the live room runs a CA animation.
+    /// Static PNGs show the bar's model; the live room runs a CA animation. The bar is off the
+    /// sheet on the stopped screen, so only the drained model is left to settle (D-070).
     private func settleBar(_ fixture: RoomFixture) {
-        let fraction: CGFloat = (fixture.engine.phase == .failure || fixture.engine.phase == .success) ? 0
+        let fraction: CGFloat = fixture.engine.phase == .failure || fixture.engine.phase == .success ? 0
             : (fixture.engine.hasStarted ? CGFloat(fixture.engine.remaining / max(fixture.engine.duration, 1)) : 1)
         for bar in allViews(in: fixture.room.view, of: FirstLineFillBar.self) {
             bar.settleForRendering(fraction)

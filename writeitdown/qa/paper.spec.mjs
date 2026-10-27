@@ -182,8 +182,8 @@ test.describe('the sheet', () => {
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
     expect(contrast(parseColour(await style(page, '#room-count', 'color')), paper)).toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#exit', 'color')), paper)).toBeGreaterThanOrEqual(7);
-    expect(toHex(parseColour(await style(page, '#room-report', 'color')))).toBe(DANGER[mode]);
-    expect(contrast(parseColour(await style(page, '#room-report', 'color')), paper)).toBeGreaterThanOrEqual(7);
+    expect(toHex(parseColour(await style(page, '#failure-note', 'color')))).toBe(QUIET[mode]);
+    expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });
 
   test('the grain never moves while the writer types', async ({ page }) => {
@@ -213,6 +213,7 @@ test.describe('the sheet', () => {
     const deep = parseColour(cut);
     expect(toHex(deep), 'the wash at the cut').toBe(WASH_DEEP[mode]);
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
+    expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
     // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut.
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));

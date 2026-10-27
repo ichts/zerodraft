@@ -49,13 +49,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .chrome-row{position:absolute;top:20px;left:20px;right:20px;display:flex;align-items:flex-start;justify-content:flex-end;gap:12px}
 .clock{flex:none;font-family:var(--sans);font-weight:500;font-size:16px;line-height:1;font-variant-numeric:tabular-nums;color:var(--timer)}
 
-/* The warning group and the wipe receipt share one status slot under the writing line.
-   Both are placed by ink (--danger-top / --receipt-top, set from font metrics in JS), so the
-   numeral's ink top sits 44 px under the baseline and the caption 20 px under the numeral's ink. */
+/* The warning group sits in the status slot under the writing line, placed by ink
+   (--danger-top, set from font metrics in JS), so the numeral's ink top sits 44 px under the
+   baseline and the caption 20 px under the numeral's ink. The stopped screen is not a receipt in
+   that slot: it is one group placed by its own midpoint (status-slot.js, D-070). */
 .danger{position:absolute;left:20px;right:20px;top:var(--danger-top,0);display:flex;flex-direction:column;align-items:center;pointer-events:none;text-align:center}
 .danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--paper-danger);font-variant-numeric:tabular-nums}
 .danger .caption{margin:var(--caption-gap,20px) 0 0;font:500 13px/1.5 var(--sans);letter-spacing:.04em;color:var(--ink)}
-.receipt-slot{position:absolute;left:20px;right:20px;top:var(--receipt-top,0);margin:0;text-align:center;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--paper-danger);pointer-events:none}
 
 .paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
 .count{flex:none;white-space:nowrap;font-family:var(--sans);font-weight:500;font-size:11px;line-height:1.6;letter-spacing:.16em;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
@@ -76,7 +76,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-phase="warn"] .wash,.room[data-cut="true"] .wash{transition:none}
 .room[data-cut="true"] .room-paper-wash{background:var(--paper-wash-deep)}
 .writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center;pointer-events:none}
-.room[data-phase="wipe"] #editor{color:transparent}
+.room[data-phase="wipe"] .writing-area{opacity:0}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
 /* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
    gradient: one uniform opacity per visual line (100 / 22 / 7 / gone), the Mac's D-027 treatment.
@@ -97,7 +97,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    below it, so a long draft never hides the actions. */
 .room-top{position:absolute;z-index:2;left:32px;right:32px;top:var(--room-top,72px);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
 .room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:normal;max-width:62ch}
-.room-top .room-secondary{margin-top:20px;pointer-events:auto}
+.room-top .room-secondary{margin-top:24px;pointer-events:auto}
+/* The stopped screen is one composition, not a block under the top edge (D-070): the headline,
+   the consequence line and the pill are one group whose midpoint sits at 33% of the sheet. The
+   9 px and 24 px gaps are the captain's, so the group reads as one object at any sheet height. */
+.room-top .failure-note{margin:9px 0 0;font:400 15px/1.6 var(--sans);letter-spacing:0;color:var(--paper-quiet)}
+/* Session chrome is off on the stopped screen: the clock and the 2 pt bar are not a receipt. */
+.room[data-phase="wipe"] .chrome-row,.room[data-phase="wipe"] .bar{visibility:hidden}
 #kept{position:absolute;top:var(--kept-top,72px);bottom:var(--kept-bottom,36px);left:36px;right:36px;display:flex;flex-direction:column;align-items:center}
 .kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
 #kept h1{margin:0;font:500 var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:normal}
@@ -198,6 +204,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .paper.report .anchor-wrap,.home .paper.report .prev-band{opacity:0}
 .home .chrome-row{top:18px;left:22px;right:22px;justify-content:flex-end;align-items:center}
 .home .clock{font:600 var(--t-ui)/1 var(--sans);font-variant-numeric:tabular-nums;color:var(--ink)}
+/* The demo takes the same chrome off the sheet when the session it is showing ends. */
+.home .paper.cut .chrome-row,.home .paper.cut .bar,
+.home .paper.report .chrome-row,.home .paper.report .bar{visibility:hidden}
 .home .paper > .paper-foot{left:22px;right:22px;bottom:16px;justify-content:flex-end;font:400 var(--t-small)/1.6 var(--sans);color:var(--paper-quiet)}
 .home .count{font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
 .home .prev-band{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);overflow:hidden;pointer-events:none}
@@ -244,10 +253,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mo small{position:absolute;left:20px;top:18px;font:500 12px/1.4 var(--sans);color:var(--chrome)}
 .mo.m1{background:linear-gradient(180deg,var(--stage-a),var(--stage-b))}
 .mo.m2{background:var(--red-soft)}
-.mo.m3{background:var(--red-deep)}
+.mo.m3{background:var(--red-deep);flex-direction:column;gap:var(--s2)}
 .mo .t{font:400 30px/1.3 var(--serif)}
 .mo .n{font:italic 400 150px/1 var(--serif);color:var(--red)}
-.mo .r{font:500 var(--t-small)/1.6 var(--sans);color:var(--red)}
+.mo .r{font:400 var(--t-ui)/1.6 var(--sans);color:var(--mute)}
 .mo .cur{display:inline-block;width:2px;height:.9em;background:var(--ink);vertical-align:-.1em;margin-left:2px}
 /* Mac block: card + price facts. The heading and the two actions sit as one group beside the four
    facts; the native-room paragraph that used to fill the left column is gone (D-047). */

@@ -44,7 +44,6 @@ const slot = statusSlot({
   pitches: 2,
   numeral: $('room-numeral'),
   caption: $('room-warning'),
-  receipt: $('room-report'),
   block: $('failed')
 });
 
@@ -60,9 +59,10 @@ function stepBar(fraction) {
 }
 
 // One continuous linear fill over the remaining session time. Ticks never step it
-// (the Mac's case 23/51); a new session or Reduce Motion re-anchors it.
+// (the Mac's case 23/51); a new session or Reduce Motion re-anchors it. A wipe drains it:
+// the stopped screen carries no frozen instrument as a receipt (D-070).
 function syncBar(now) {
-  if (state.phase === 'wipe' || state.phase === 'kept') { stepBar(0); return; }
+  if (state.phase === 'kept' || state.phase === 'wipe') { stepBar(0); return; }
   if (state.started === null) { stepBar(1); return; }
   const remaining = Math.max(0, state.started + SESSION_MS - now);
   if (reduced.matches) {
@@ -123,16 +123,15 @@ function render(now = performance.now()) {
   $('room-warning').textContent = warning ? WARNING : '';
   $('room-danger').hidden = !warning;
   const remaining = state.started === null || failed || kept ? 60 : Math.max(0, Math.ceil((state.started + SESSION_MS - now) / 1000));
-  // The clock holds the value the draft died at until the next session starts, so the corner and
-  // the red receipt name the same moment instead of the clock re-arming under the receipt (D-063).
-  $('room-clock').textContent = clock(kept ? 0 : failed ? state.unused : remaining);
+  // The clock and the 2 pt bar come off the sheet on the stopped screen instead of freezing
+  // as a receipt (D-070); the restart brings both back at a fresh minute.
+  $('room-clock').textContent = clock(kept ? 0 : remaining);
   const count = wordCount(state.text);
   const words = `${count} ${count === 1 ? 'word' : 'words'}`;
-  // Empty room: the count slot itself carries the instruction; after a wipe the red receipt does
-  // and the slot returns to the count. On the kept screen the receipt is the only place the
-  // session's size is printed, so the corner stays silent (D-062).
+  // Empty room: the count slot itself carries the instruction; after a wipe the block does,
+  // and the slot returns to the count (the Mac's cases 18/19/50). On the kept screen the receipt
+  // is the only place the session's size is printed, so the corner stays silent (D-062).
   $('room-count').textContent = kept ? '' : state.started === null && !failed ? 'Type to start' : words;
-  $('room-report').textContent = failed ? `DRAFT DELETED AT ${clock(state.unused)}. TYPE TO START AGAIN.` : '';
   $('failed').hidden = !failed;
   editor.hidden = kept;
   $('kept').hidden = !kept;
@@ -144,9 +143,9 @@ function render(now = performance.now()) {
     compositionBase = null;
     editor.value = '';
     fitEditor();
-    // The wiped room keeps the caret on the line, exactly as the empty room does.
+    // The editor keeps focus under the transparent writing layer, so typing restarts in place.
     editor.focus({ preventScroll: true });
-    announce($('room-report').textContent);
+    announce(`You stopped. Draft deleted. ${clock(state.unused)} unused.`);
   }
   if (kept) {
     compositionBase = null;

@@ -1215,3 +1215,96 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   10.1 and the dark `#b8b5ac` / `#ffb4a2` / .846 / .727), and the wash values `#ddd3d5` / `#ddc0be` /
   `#352c2c` / `#49302e`. D-056's grain, ink, white page identity, contrast-ladder design and the
   one-canvas renderer stand unchanged.
+
+## D-070: The stopped screen is one centred composition, and its chrome is off
+
+- Date: 2026-10-26
+- Decision: the stopped screen is one group - `You stopped.`, the single line `Draft deleted.`, and
+  the `Begin again` pill - and the group, not the headline, is what the sheet places: its midpoint
+  sits at 33% of the paper height. Under the headline the order is the line first, then the pill.
+  The gaps are 9 px (headline to line) and 24 px (line to pill), box edge to box edge. The headline
+  is Newsreader 48 px / 500 at line-height 1.1 at the desktop sheet and keeps the result role's own
+  `clamp(32px, 5vw, 48px)` on a narrow sheet; the line is 15 px system sans / 400 in the sheet's
+  quiet role, `--paper-quiet` on the web (7.21:1 light and 7.31:1 dark on the Wheat paper, D-069) and
+  `FirstLineColors.paperQuietNSColor` on the Mac (measured at 7:1 or better against its rendered
+  sheet), never `--mute`, which D-056 keeps off the paper; the pill is the room's outlined secondary at 48 px tall, 15 px / 600, 20 px side
+  padding, full radius, and the room's ink focus ring. On the Mac the composition is the same
+  mapping in the Mac's own units, not a copy of the web's pixels: the pill height is the base
+  (5% of the window width, rounded, clamped to the result role's 32-48 pt), the headline is 1.0 of
+  it on the locked 1.1 line box, the two gaps are 9/48 and 24/48 of that base, the line is 15/48 on
+  its own 24/48 box (the web's 15/1.6, a fixed line height so the box is the ratio and the ink sits
+  centred in it), the pill label is 15/48 at weight 600 from `FirstLineTypography.uiSemiboldNSFont`
+  with the size applied to the token rather than replacing it, and the pill's sides are 20/48 of the
+  base with a full radius and the room's ink focus ring. At the minimum window (980 pt content
+  width) the base is 48, so the gaps are 9 and 24, the line and label 15 on a 24 pt box, and the
+  pill 48 tall with 20 pt sides: the group is 3.2875 times the base, 157.8 pt, the same ratio sum as
+  the web's. `RoundThreeTests` asserts the anchor, both gap ratios, the line's box ratio, each type
+  size, the pill height and its side ratio, the group's ratio sum, and the invisible writing layer,
+  at 1040x720 and at a smaller 760x560 sheet (base 38), so neither a copied constant nor a font's
+  own metrics can pass. The group's midpoint sits on the room's one anchor,
+  `RoomPresentation.paperAnchorFraction`: the active writing line is placed by that same constant,
+  not by a second fraction, so the group replaces the line the writer was on and the two placements
+  cannot disagree. That single anchor is 33% of the paper height, so the Mac's writing line moves up
+  from D-025's 35% while the live web trial keeps its own 35% line, because the web's composition is
+  a separate layer over the room rather than the editor's own placement; the two surfaces' stopped
+  groups still sit at the same 33%. Session chrome is off on this screen: the clock and the 2 pt
+  session bar do not show and are not frozen as a receipt, and the restart brings both back with the
+  new session. Typing, Return and the pill all restart; the pill is the only restart control on the
+  sheet, while leaving the room still uses `ESC - EXIT` in the footer. The stopped
+  sheet's writing layer stays focused and editable but invisible (`alphaValue` 0, the same act as the
+  web's `.room[data-phase="wipe"] .writing-area{opacity:0}`), so no caret is ever drawn inside the
+  group while the next keystroke, including an IME composition, still restarts the room in place. A
+  blocked restart names only the reason that is true: the announcement and the pill's help take the
+  obstacle the app derives from its own state (the trial budget spent, or a licence needed), so an
+  exhausted trial still hears that its three free sessions are used while licence residue, a
+  trial-access error or a cleanup failure never claim they were, and the visible label stays
+  `Begin again` in every case. The web and the Mac are asserted geometrically at 1440 and
+  390 (`writeitdown/qa/phase4.spec.mjs` "the stopped screen is one group anchored at 33% of the
+  sheet") and at 1040x720 and a 760x560 sheet in both appearances
+  (`RoundThreeTests.stoppedScreenIsOneGroupAnchoredAtThirtyThreePercent`).
+- Reason: the captain rejected the alternatives and the paused checkpoint's own screen. His words:
+  搞错了 这些我都不喜欢 ... 那个 button 应该放中间 现在整个结构很怪异 you stopped 放在太上面了 其实是排版问题
+  不是 button 的问题 - the block was pinned 72 px under the sheet's top edge, which read as a caption
+  above a great emptiness rather than a screen; the pill was not the problem and the text-link
+  restart was the wrong answer to it. He then locked the composition in the live tuner at 1440 light
+  (sheet 1376x804, group 157.8 tall, top 186.1, midpoint 265) and turned the session chrome off.
+  A share of the sheet, not a pixel offset, is what keeps the composition readable from a phone
+  sheet to a desktop one.
+- Supersedes: the paused candidate-C checkpoint (`fm/wid-failure-c-screen` at `96a3647`), whose
+  stopped screen froze the clock and the 2 pt bar as its receipt and made `Begin again` a quiet
+  text link with a `RETURN` caption; its block also stayed pinned at 72 px. This entry supersedes
+  D-029's "the stopped screen is the kept screen's counterpart with a red deletion receipt" clause
+  and D-030's receipt wording; it also supersedes D-017's wipe-receipt clause (the receipt taking
+  the numeral's status slot under the writing line) and D-020's wipe-receipt ink-top clause, and it
+  retires the `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` sentence and the frozen-instrument
+  receipt on both surfaces. Its Mac-only clauses supersede D-025's "the active writing line sits at
+  35% of the paper" anchor clause (the room now places the line on the same 33% anchor as the
+  stopped group) and D-043's parity clause that makes the web room's 35% line follow the Mac's,
+  which is why that figure now differs by surface; the web keeps its own 35% line as D-043 and D-025
+  state it. Its wipe-screen clauses supersede D-043's "the wipe receipt
+  takes the same status slot" and "the wipe screen is `You stopped.` with a 48 pt outlined
+  `Begin again` and the red receipt", and D-044's "its wipe stage shows the room's failure screen
+  (`You stopped.` plus the red `DRAFT DELETED AT M:SS. TYPE TO START AGAIN.` receipt)". On the web
+  it also supersedes D-063 (the wipe clock held at the deletion value: the clock is off the stopped
+  sheet instead), D-064's failure-receipt clause (the demo's stopped stage prints no receipt; its
+  no-caret and silent-count clauses stand) and D-065 (the wiped room's caret: the stopped group sits
+  where the writing line was, so the writing layer is transparent and no caret is drawn inside the
+  group, while the editor keeps focus so typing still restarts). The spoken
+  announcement keeps the deletion and the unused seconds, because the screen no longer prints them,
+  and names the real obstacle to the next session.
+
+## D-071: The landing's m3 moment card keeps its palette until the captain decides the contrast
+
+- Date: 2026-10-26
+- Decision: the landing keeps `--red-deep` as the `m3` moment card ground and `--mute` for its
+  consequence line at 15 px / 400 until the captain makes a design decision; this change does not
+  repaint the landing or alter any colour, CSS value or behaviour. The measured pair is 3.72:1, below
+  the 4.5:1 normal-text floor, and the pair it replaced measured 4.23:1; the stopped screen's own line
+  sits on the sheet in the paper's quiet role (D-070), so the card ground and ink are the question,
+  not the room. Candidate
+  remedies, all still open: paint the card's text with `--chrome` or `--ink`, choose a different
+  ground, or keep the lines off the card.
+- Reason: the `m3` card is visible copy in the default light theme at `#core`. Repainting the landing
+  inside a Mac and stopped-screen change would widen the scope and pre-empt the captain's visual
+  ruling, so the measured gap is recorded here as a bounded follow-up for that decision.
+- Supersedes: none.

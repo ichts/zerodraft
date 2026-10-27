@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
-import { wordCount } from '../session.mjs';
+import { clock, wordCount } from '../session.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -17,6 +17,19 @@ const exitHintFor = async page => ((await touchInput(page)) ? EXIT_HINT.touch : 
 const SILENT_END = TIMELINE.typeEnd + 5000;
 const WARN_END = SILENT_END + 3000;
 const CUT_END = WARN_END + 200;
+
+const rgb = value => String(value).match(/[\d.]+/g).slice(0, 3).map(Number);
+const luminance = colour => {
+  const [r, g, b] = rgb(colour).map(v => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
 
 // Font ink metrics measured in the page itself: the tests never import room.js or
 // demo.js, so a wrong ink formula on the page cannot hide behind the same formula
@@ -238,8 +251,8 @@ test('demo and trial active-line placement: 35% of the sheet on both surfaces', 
   console.log(info.project.name, JSON.stringify({ demo, ratios: Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v.ratio])) }));
 });
 
-// The insertion point as it is actually drawn: the caret's own colour survives, and no ancestor
-// fades or hides it (an `opacity: 0` writing area used to paint the caret away, D-065).
+// The insertion point as it is actually drawn: the caret's own colour and the product of every
+// ancestor's opacity, so a test can tell a painted caret from one the stopped sheet hides (D-070).
 const insertionPoint = page => page.evaluate(() => {
   const e = document.querySelector('#editor');
   let node = e, opacity = 1;
@@ -255,7 +268,7 @@ const insertionPoint = page => page.evaluate(() => {
     focused: document.activeElement === e, collapsed: e.selectionStart === e.selectionEnd };
 });
 
-test('empty room shows only the caret and the count prompt; after a wipe the receipt carries it', async ({ page }, info) => {
+test('empty room shows only the caret and the count prompt; after a wipe the block states it', async ({ page }, info) => {
   await enter(page);
   await settle(page);
   await expect(page.locator('#room-count')).toHaveText('Type to start');
@@ -280,23 +293,21 @@ test('empty room shows only the caret and the count prompt; after a wipe the rec
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
   await expect(page.locator('#room-count')).toHaveText('0 words');
   await expect(page.locator('#failed h1')).toHaveText('You stopped.');
+  await expect(page.locator('#failure-note')).toHaveText('Draft deleted.');
   await expect(page.locator('#begin-again')).toBeVisible();
-  await expect(page.locator('#room-report')).toHaveText(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/);
-  // The wiped room keeps the caret on the line, exactly as the empty room does: only the draft
-  // text is hidden, never the insertion point the receipt tells the writer to use (D-065).
+  // The stopped sheet keeps the editor focused, so typing restarts in place, but its writing layer
+  // is transparent: no caret is drawn inside the stopped group (D-070 supersedes D-065).
   await expect(editor(page)).toBeFocused();
   const wipedPoint = await insertionPoint(page);
-  expect(wipedPoint).toEqual({ ...emptyPoint, ink: false });
-  // The clock stops on the value the draft died with and holds it until the next session starts,
-  // so the corner and the red receipt cannot name two different moments (D-063).
-  const deletedAt = (await page.locator('#room-report').textContent()).match(/DRAFT DELETED AT (\d:\d\d)\./)[1];
-  await expect(page.locator('#room-clock')).toHaveText(deletedAt);
-  await page.clock.fastForward(1500);
-  await expect(page.locator('#room-clock')).toHaveText(deletedAt);
+  expect(wipedPoint).toEqual({ ...emptyPoint, opacity: 0 });
+  // Session chrome is off on the stopped sheet: the clock is not frozen as a receipt (D-070).
+  const chrome = () => page.locator('#room .chrome-row').evaluate(el => getComputedStyle(el).visibility);
+  expect(await chrome()).toBe('hidden');
   await capture(page, info, 'wipe-report');
   await page.keyboard.insertText('A');
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');
   await expect(page.locator('#room-clock')).toHaveText('1:00');
+  expect(await chrome()).toBe('visible');
 });
 
 test('history is stepped per line and a new line shifts it exactly one pitch', async ({ page }, info) => {
@@ -340,7 +351,7 @@ test('history is stepped per line and a new line shifts it exactly one pitch', a
   await expect(page.locator('#room-count')).toHaveText(`${wordCount('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。')} words`);
 });
 
-test('warning numeral, caption and wipe receipt are placed by ink under the writing line', async ({ page }, info) => {
+test('warning numeral and caption are placed by ink under the writing line', async ({ page }, info) => {
   await enter(page);
   await page.keyboard.insertText('Keep typing until the warning lands.');
   await settle(page);
@@ -362,12 +373,6 @@ test('warning numeral, caption and wipe receipt are placed by ink under the writ
   await capture(page, info, 'warn');
   await page.clock.fastForward(2850);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
-  const receipt = await page.evaluate(() => {
-    const write = window.__writingLine();
-    return { receipt: window.__run(document.querySelector('#room-report')), baseline: write.baseline };
-  });
-  expect(receipt.receipt.inkTop - receipt.baseline, 'receipt ink top under the writing baseline').toBeGreaterThan(40);
-  expect(receipt.receipt.inkTop - receipt.baseline).toBeLessThan(48);
   await capture(page, info, 'deleted');
 });
 
@@ -443,12 +448,10 @@ test('short sheets keep the warning and result slots inside the paper', async ({
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
     const failure = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-      return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), block: box('#failed'), receipt: box('#room-report') };
+      return { paper: box('.room-paper'), footer: box('.room-paper .paper-foot'), block: box('#failed') };
     });
     expect(failure.block.top).toBeGreaterThanOrEqual(failure.paper.top);
-    expect(failure.block.bottom).toBeLessThanOrEqual(failure.receipt.top);
-    expect(failure.receipt.top).toBeGreaterThanOrEqual(failure.paper.top);
-    expect(failure.receipt.bottom).toBeLessThanOrEqual(failure.footer.top);
+    expect(failure.block.bottom).toBeLessThanOrEqual(failure.footer.top);
     await capture(page, info, `short-failure-${size.width}x${size.height}`);
     await page.keyboard.press('Enter');
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
@@ -927,43 +930,180 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   await capture(page, info, 'escape');
 });
 
-test('the failure screen restarts from the button and from Return', async ({ page }, info) => {
+// The stopped screen is one composition, not a block pinned under the top edge (D-070).
+// The captain locked it in the tuner: one group of headline, consequence line and pill,
+// its midpoint at 33% of the sheet, derived per sheet height rather than scaled.
+const FAILURE_ANCHOR = 0.33;
+const GAP_HEADLINE_LINE = 9;
+const GAP_LINE_BUTTON = 24;
+const PILL_HEIGHT = 48;
+const PILL_PAD_X = 20;
+// The headline keeps the result screens' own role size `clamp(32px, 5vw, 48px)`, so the
+// phone sheet re-derives it instead of shrinking the desktop number.
+const headlineSize = width => Math.round(Math.min(Math.max(width * 0.05, 32), 48));
+
+async function failureGeometry(page) {
+  return page.locator('#failed').evaluate(element => {
+    const paper = element.closest('.room-paper');
+    const paperRect = paper.getBoundingClientRect();
+    const css = node => getComputedStyle(node);
+    const rel = node => {
+      const r = node.getBoundingClientRect();
+      return { top: r.top - paperRect.top, bottom: r.bottom - paperRect.top,
+        left: r.left - paperRect.left, right: r.right - paperRect.left,
+        width: r.width, height: r.height };
+    };
+    const token = name => {
+      const probe = document.createElement('i');
+      probe.style.color = css(element).getPropertyValue(name);
+      element.append(probe);
+      const color = css(probe).color;
+      probe.remove();
+      return color;
+    };
+    const headline = element.querySelector('h1');
+    const line = element.querySelector('.failure-note');
+    const button = element.querySelector('#begin-again');
+    const group = rel(element);
+    const bar = paper.querySelector('.bar');
+    const chrome = paper.querySelector('.chrome-row');
+    return {
+      paper: { width: paperRect.width, height: paperRect.height },
+      group,
+      anchor: (group.top + group.height / 2) / paperRect.height,
+      centreOffset: (group.left + group.width / 2) - paperRect.width / 2,
+      headline: { ...rel(headline), size: parseFloat(css(headline).fontSize),
+        weight: css(headline).fontWeight, lineHeight: parseFloat(css(headline).lineHeight) },
+      line: { ...rel(line), size: parseFloat(css(line).fontSize),
+        weight: css(line).fontWeight, ink: css(line).color },
+      sheet: css(paper).backgroundColor,
+      button: { ...rel(button), size: parseFloat(css(button).fontSize),
+        weight: css(button).fontWeight, padX: parseFloat(css(button).paddingLeft),
+        radius: parseFloat(css(button).borderRadius), tag: button.tagName },
+      gapHeadlineLine: rel(line).top - rel(headline).bottom,
+      gapLineButton: rel(button).top - rel(line).bottom,
+      quiet: token('--paper-quiet'),
+      chrome: { clock: css(chrome).visibility, bar: css(bar).visibility },
+    };
+  });
+}
+
+test('the stopped screen is one group anchored at 33% of the sheet', async ({ page }, info) => {
   await enter(page);
   await page.keyboard.insertText('This one gets deleted.');
   await settle(page);
   await page.clock.fastForward(8350);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
-  await expect(page.locator('#failed h1')).toHaveText('You stopped.');
+  await expect(page.locator('#failed')).toBeVisible();
+  // The door's click point can land on the block that appears eight seconds later; park
+  // the pointer so the rest state is measured without a hover.
+  await page.mouse.move(1, 1);
+  const failure = await failureGeometry(page);
+  const width = info.project.use.viewport.width;
+  // Geometry first: the group's own midpoint carries the composition.
+  expect(failure.paper.height, `sheet height at ${width}`).toBeGreaterThan(200);
+  expect(failure.anchor, `group midpoint at ${(failure.anchor * 100).toFixed(2)}% of the ${failure.paper.height} px sheet`)
+    .toBeCloseTo(FAILURE_ANCHOR, 2);
+  expect(Math.abs(failure.centreOffset), 'the group is centred on the paper').toBeLessThan(1);
+  // Order under the headline: the consequence line, then the pill.
+  expect(failure.headline.bottom, 'the headline is above the line').toBeLessThanOrEqual(failure.line.top + 0.5);
+  expect(failure.line.bottom, 'the line is above the button').toBeLessThanOrEqual(failure.button.top + 0.5);
+  expect(failure.button.bottom, 'the button closes the group').toBeLessThanOrEqual(failure.group.bottom + 0.5);
+  // The two gaps the captain set, measured box edge to box edge.
+  expect(failure.gapHeadlineLine, 'headline to line').toBeCloseTo(GAP_HEADLINE_LINE, 0);
+  expect(failure.gapLineButton, 'line to button').toBeCloseTo(GAP_LINE_BUTTON, 0);
+  // Type: the headline at the result role's size for this width, Newsreader 500 at 1.1.
+  expect(failure.headline.size).toBe(headlineSize(width));
+  expect(failure.headline.weight).toBe('500');
+  expect(failure.headline.lineHeight).toBeCloseTo(failure.headline.size * 1.1, 0);
+  expect(failure.line.size).toBe(15);
+  expect(failure.line.weight).toBe('400');
+  expect(failure.line.ink, 'the line is the sheet\'s quiet ink').toBe(failure.quiet);
+  expect(contrast(failure.line.ink, failure.sheet), 'the line clears 7:1 on the sheet').toBeGreaterThanOrEqual(7);
+  // The pill: 48 tall, 15 / 600, 20 px side padding, full radius.
+  expect(failure.button.tag).toBe('BUTTON');
+  expect(failure.button.height).toBe(PILL_HEIGHT);
+  expect(failure.button.size).toBe(15);
+  expect(failure.button.weight).toBe('600');
+  expect(failure.button.padX).toBe(PILL_PAD_X);
+  expect(failure.button.radius).toBeGreaterThanOrEqual(PILL_HEIGHT / 2);
+  // No receipt: the screen states the deletion once, and the session chrome is off.
+  await expect(page.locator('#room')).not.toContainText('TYPE TO START AGAIN');
+  await expect(page.locator('#room-report, #report, #room .restart-key')).toHaveCount(0);
+  expect(failure.chrome.clock, 'the clock is not part of the stopped screen').toBe('hidden');
+  expect(failure.chrome.bar, 'the session bar is not part of the stopped screen').toBe('hidden');
   await expect(page.locator('#room-count')).toHaveText('0 words');
-  expect(await page.locator('#failed').evaluate(el => el.getBoundingClientRect().top - el.closest('.room-paper').getBoundingClientRect().top), 'the failure block keeps the Mac offset on a tall sheet').toBe(72);
-  const row = await page.evaluate(() => {
-    const button = document.querySelector('#begin-again');
-    const box = button.getBoundingClientRect();
-    return { height: box.height, text: button.textContent, border: getComputedStyle(button).borderWidth,
-      background: getComputedStyle(button).backgroundColor };
+  const red = await page.locator('#room').evaluate(room => {
+    const probe = document.createElement('i');
+    probe.style.color = 'var(--red)';
+    room.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
   });
-  expect(row.text).toBe('Begin again');
-  expect(row.height).toBe(48);
-  expect(row.border).toBe('1px');
-  await capture(page, info, 'stopped');
-  const heading = await page.locator('#failed h1').boundingBox();
-  await page.mouse.click(heading.x + heading.width / 2, heading.y + heading.height / 2);
-  await expect(editor(page)).toBeFocused();
-  const report = await page.locator('#room-report').boundingBox();
-  await page.mouse.click(report.x + report.width / 2, report.y + report.height / 2);
-  await expect(editor(page)).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
-  await expect(editor(page)).toHaveValue('');
-  await expect(editor(page)).toBeFocused();
-  await expect(page.locator('#room-count')).toHaveText('Type to start');
-  await page.keyboard.insertText('Another one.');
+  const runs = await page.locator('#failed').evaluate(el => [el, ...el.querySelectorAll('*')]
+    .map(node => ({ tag: node.tagName, text: node.textContent.trim(), color: getComputedStyle(node).color })));
+  for (const run of runs) expect(run.color, `${run.tag} "${run.text}" is red`).not.toBe(red);
+  await capture(page, info, `stopped-${width}`);
+  // The rest of the paused screen never moves the composition as time passes.
+  const settled = await failureGeometry(page);
+  await page.clock.fastForward(5000);
+  const later = await failureGeometry(page);
+  expect(later.group).toEqual(settled.group);
+});
+
+test('the stopped pill carries the keyboard and shows the room ink ring', async ({ page }, info) => {
+  await enter(page);
+  await page.keyboard.insertText('A');
   await settle(page);
   await page.clock.fastForward(8350);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
-  await page.locator('#begin-again').click();
+  await page.mouse.move(1, 1);
+  // Keyboard entry reaches the one control on the sheet and shows the room's ink ring.
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('#begin-again')).toBeFocused();
+  const focus = await page.locator('#begin-again').evaluate(button => ({
+    visible: button.matches(':focus-visible'),
+    outline: `${getComputedStyle(button).outlineWidth} ${getComputedStyle(button).outlineStyle}`,
+    offset: getComputedStyle(button).outlineOffset,
+    shortcuts: button.getAttribute('aria-keyshortcuts'),
+  }));
+  expect(focus.visible, 'focus stays visible on the stopped screen').toBe(true);
+  expect(focus.outline, "the room's 2 px ink ring").toBe('2px solid');
+  expect(parseFloat(focus.offset), 'the ring clears the pill edge').toBeGreaterThan(0);
+  expect(focus.shortcuts, 'the shortcut is exposed to assistive technology').toBe('Enter');
+  await capture(page, info, 'stopped-focus');
+});
+
+test('Return and the pill start a fresh session and bring the chrome back', async ({ page }, info) => {
+  await enter(page);
+  await page.keyboard.insertText('This one gets deleted.');
+  await settle(page);
+  await page.clock.fastForward(8350);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
+  await expect(page.locator('#room .chrome-row')).toBeHidden();
+  await page.keyboard.press('Enter');
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
   await expect(editor(page)).toBeFocused();
+  await expect(page.locator('#room-clock')).toBeVisible();
+  await expect(page.locator('#room-clock')).toHaveText('1:00');
+  expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform), 'the bar resets with the session').toBe('scaleX(1)');
+  await expect(page.locator('#room .bar')).toBeVisible();
+  await expect(page.locator('#failed')).toBeHidden();
+  await expect(page.locator('#room .chrome-row')).toBeVisible();
+  await expect(page.locator('#room-count')).toHaveText('Type to start');
+  await page.keyboard.insertText('This one gets deleted too.');
+  await settle(page);
+  await page.clock.fastForward(8350);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
+  // The pill is the only restart control, and its own box is the whole target; the footer keeps ESC - EXIT.
+  const target = await page.locator('#begin-again').boundingBox();
+  await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
+  await expect(editor(page)).toBeFocused();
+  await expect(page.locator('#room-clock')).toHaveText('1:00');
+  await expect(page.locator('#room .chrome-row')).toBeVisible();
+  expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform)).toBe('scaleX(1)');
 });
 
 test('demo is forward-only: every event appends, Backspace is tried once and blocked', async ({ page }, info) => {
@@ -1089,7 +1229,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await expect(page.locator('#demo-stopped')).toBeVisible();
   await expect(page.locator('#warn')).toBeHidden();
   await expect(page.locator('#demo-stopped .stopped')).toHaveText('You stopped.');
-  expect(await page.locator('#demo-stopped').evaluate(el => el.getBoundingClientRect().top - el.closest('.paper').getBoundingClientRect().top), 'the demo failure block keeps the Mac offset on a tall sheet').toBe(72);
+  await expect(page.locator('#demo-stopped .failure-note')).toHaveText('Draft deleted.');
   const reportLook = await page.evaluate(() => {
     const probe = name => {
       const i = document.createElement('i');
@@ -1099,24 +1239,67 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
     };
     return {
       title: getComputedStyle(document.querySelector('#demo-stopped .stopped')).color,
+      note: getComputedStyle(document.querySelector('#demo-stopped .failure-note')).color,
+      sheet: getComputedStyle(document.querySelector('#demo-stopped').closest('[data-paper]')).backgroundColor,
+      quiet: probe('--paper-quiet'),
+      red: probe('--red'),
       ink: probe('--ink'),
       tracking: getComputedStyle(document.querySelector('#clock')).letterSpacing,
     };
   });
   expect(reportLook.title).toBe(reportLook.ink);
+  expect(reportLook.note, 'the consequence line is the sheet\'s quiet ink, never red').toBe(reportLook.quiet);
+  expect(contrast(reportLook.note, reportLook.sheet), 'the demo line clears 7:1 on the sheet').toBeGreaterThanOrEqual(7);
+  expect(reportLook.note).not.toBe(reportLook.red);
   expect(reportLook.tracking).toBe('normal');
-  await expect(page.locator('#report')).toHaveText(`DRAFT DELETED AT 0:${60 - Math.round(CUT_END / 1000)}.`);
-  await expect(page.locator('#paper')).not.toContainText(/TYPE TO START AGAIN|restart/i);
-  await expect(page.locator('#count')).toHaveText('0 words');
-  const receipt = await page.evaluate(() => {
-    const script = window.__run(document.querySelector('.script'));
-    return { report: window.__run(document.querySelector('#report')), baseline: script.baseline };
+  // The demo previews the same composition: the block's midpoint at 33% of the paper and
+  // the 9 px gap under the headline, with no control (the demo is watch-only, D-044).
+  const demoBlock = await page.locator('#demo-stopped').evaluate(element => {
+    const paper = element.closest('.paper');
+    const paperRect = paper.getBoundingClientRect();
+    const rel = node => {
+      const r = node.getBoundingClientRect();
+      return { top: r.top - paperRect.top, bottom: r.bottom - paperRect.top, height: r.height };
+    };
+    const group = rel(element);
+    const note = element.querySelector('.failure-note');
+    return {
+      anchor: (group.top + group.height / 2) / paperRect.height,
+      gap: rel(note).top - rel(element.querySelector('.stopped')).bottom,
+      noteSize: parseFloat(getComputedStyle(note).fontSize),
+      clock: getComputedStyle(paper.querySelector('.chrome-row')).visibility,
+      bar: getComputedStyle(paper.querySelector('.bar')).visibility,
+    };
   });
-  expect(receipt.report.inkTop - receipt.baseline, 'the receipt takes the status slot under the line').toBeGreaterThan(40);
-  expect(receipt.report.inkTop - receipt.baseline).toBeLessThan(48);
+  expect(demoBlock.anchor, 'the demo block follows the room anchor').toBeCloseTo(FAILURE_ANCHOR, 2);
+  expect(demoBlock.gap, 'headline to line in the demo').toBeCloseTo(GAP_HEADLINE_LINE, 0);
+  expect(demoBlock.noteSize).toBe(15);
+  expect(demoBlock.clock, 'the demo takes its clock off the stopped sheet').toBe('hidden');
+  expect(demoBlock.bar, 'the demo takes its bar off the stopped sheet').toBe('hidden');
+  await expect(page.locator('#demo-stopped button')).toHaveCount(0);
+  await expect(page.locator('#report')).toHaveCount(0);
+  await expect(page.locator('#count')).toHaveText('0 words');
   await capture(page, info, 'demo-report');
   await seek(CUT_END + 2700);
   await expect(page.locator('#cur')).not.toHaveText('');
+  await expect(page.locator('#demo-stopped')).toBeHidden();
+  expect(await page.locator('#demo .chrome-row').evaluate(el => getComputedStyle(el).visibility),
+    'the rearm hands the chrome back').toBe('visible');
+});
+
+test('the demo takes its chrome off while the stopped block shows', async ({ page }, info) => {
+  test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo has no report phase');
+  await page.clock.fastForward(CUT_END + 300);
+  await expect(page.locator('#demo-stopped')).toBeVisible();
+  const clockHide = await page.locator('#demo .chrome-row').evaluate(el => getComputedStyle(el).visibility);
+  const barHide = await page.locator('#demo .bar').evaluate(el => getComputedStyle(el).visibility);
+  expect(clockHide).toBe('hidden');
+  expect(barHide).toBe('hidden');
+  // The room's own rule, not a frozen receipt: the loop hands the chrome back with the new minute.
+  await page.clock.fastForward(2400);
+  await expect(page.locator('#demo-stopped')).toBeHidden();
+  await expect(page.locator('#clock')).toHaveText('1:00');
+  expect(await page.locator('#demo .chrome-row').evaluate(el => getComputedStyle(el).visibility)).toBe('visible');
 });
 
 test('the demo danger group clears when a new loop reaches typing', async ({ page }, info) => {
@@ -1160,15 +1343,10 @@ test('short demo sheets keep the status slot inside the paper', async ({ page },
     await expect(page.locator('#demo-stopped')).toBeVisible();
     const report = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom }; };
-      return { paper: box('#paper'), footer: box('#paper .paper-foot'), block: box('#demo-stopped'), receipt: box('#report'),
-        clock: document.querySelector('#clock').textContent, receiptText: document.querySelector('#report').textContent };
+      return { paper: box('#paper'), footer: box('#paper .paper-foot'), block: box('#demo-stopped') };
     });
-    expect(report.block.top).toBeGreaterThanOrEqual(report.paper.top);
-    expect(report.block.bottom).toBeLessThanOrEqual(report.receipt.top);
-    expect(report.receipt.top).toBeGreaterThanOrEqual(report.paper.top);
-    expect(report.receipt.bottom).toBeLessThanOrEqual(report.footer.top);
-    // The corner and the receipt name one moment here too.
-    expect(report.clock, `${size.width}x${size.height}: the report clock holds the deletion value`).toBe(report.receiptText.match(/DRAFT DELETED AT (\d:\d\d)\./)[1]);
+    expect(report.block.top, `${size.width}x${size.height}: the stopped group starts inside the paper`).toBeGreaterThanOrEqual(report.paper.top);
+    expect(report.block.bottom, `${size.width}x${size.height}: the stopped group stays above the footer`).toBeLessThanOrEqual(report.footer.top);
     await capture(page, info, `short-demo-report-${size.width}x${size.height}`);
   }
 });
@@ -1445,7 +1623,7 @@ test('the landing states the warning lead-in and never labels a moment with anot
   const copy = await page.evaluate(() => ({
     moments: [...document.querySelectorAll('#core .mo small')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
     numeral: document.querySelector('#core .mo .n').textContent.trim(),
-    receipt: document.querySelector('#core .mo .r').textContent.replace(/\s+/g, ' ').trim(),
+    stopped: [...document.querySelectorAll('#core .mo.m3 .t, #core .mo.m3 .r')].map(e => e.textContent.trim()),
     marker: [...document.querySelectorAll('#how .line8 .lab span, #how .line8 .lab b')].map(e => e.textContent.trim()),
     card: document.querySelectorAll('#how .card')[1].textContent.replace(/\s+/g, ' ').trim(),
     faq: document.querySelector('#faq details p').textContent.replace(/\s+/g, ' ').trim(),
@@ -1458,13 +1636,8 @@ test('the landing states the warning lead-in and never labels a moment with anot
   expect(label, `the warning panel is labelled with its own numeral: ${copy.moments[1]}`).not.toBeNull();
   expect(Number(label[1])).toBe(Number(copy.numeral));
   expect(Number(label[1]), 'the warning leads the deletion by three seconds').toBe(3);
-  // The three panels obey the same rule: eight seconds of silence after the last keystroke.
-  const started = copy.moments[0].match(/^(\d):(\d\d)\b/);
-  const deleted = copy.receipt.match(/^DRAFT DELETED AT (\d):(\d\d)\./);
-  expect(started, `the writing panel names its clock: ${copy.moments[0]}`).not.toBeNull();
-  expect(deleted, `the receipt names the deletion moment: ${copy.receipt}`).not.toBeNull();
-  const seconds = ([, m, s]) => Number(m) * 60 + Number(s);
-  expect(seconds(started) - 8, 'the receipt is the writing clock minus the silence').toBe(seconds(deleted));
+  // The deleted panel shows the stopped screen's own words and names no second moment (D-070).
+  expect(copy.stopped).toEqual(['You stopped.', 'Draft deleted.']);
   // One form for a silence mark everywhere.
   expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
   // The lead-in is stated once, on the card and in the answer the schema repeats word for word.

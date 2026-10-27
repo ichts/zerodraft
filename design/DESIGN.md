@@ -33,7 +33,7 @@ Tokens ship as CSS custom properties in the `:root` block of `index.html`. Value
 | `--paper` | `#e9e2ce` | The one object: the Wheat sheet (D-069, which supersedes D-056's Note). Nothing else is the paper. |
 | `--ink` | `#1c1917` | Words, primary chrome, the door. 13.52:1 on the paper. |
 | `--paper-quiet` | `#464746` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.21:1, measured, never assumed. |
-| `--paper-danger` | `#63140b` | The pen **on the paper**: the warn numeral and the wipe receipt. Clears 7:1 on the sheet and on the wash the numeral sits on. |
+| `--paper-danger` | `#63140b` | The pen **on the paper**: the warn numeral and the exit confirmation hint. Clears 7:1 on the sheet and on the wash the numeral sits on. |
 | `--dim` | `#6b665b` | Secondary chrome **on the wall**. |
 | `--faint` | `#b3ada0` | Receded wall chrome, the quietest legal text on the wall. Never used on the paper. |
 | `--line` | `#dedcd5` | Hairlines only. 1px, never thicker. |
@@ -393,7 +393,7 @@ noticing that the two do not look alike.
 Rules that follow from the table:
 
 - **Tracking.** The kept heading and the failure headline are untracked on both surfaces. The machine
-  voice's own tracking stays where the Mac has it: `.02em` on the receipts and the wipe report, `.04em` on
+  voice's own tracking stays where the Mac has it: `.02em` on the kept receipt (the stopped screen's `Draft deleted.` line is untracked), `.04em` on
   the warning caption and the pill labels.
 - **Every face is served by the site.** `writeitdown/fonts/` holds the woff2 files and their OFL texts,
   `writeitdown/fonts/build-fonts.py` builds them from the app's bundled faces, and `fonts.css` /

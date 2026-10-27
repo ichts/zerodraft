@@ -364,7 +364,7 @@ struct SnapshotTests {
     }
 
     /// The paper is measured, not eyeballed: a text-free region must average the locked tone and must
-    /// carry grain (a real spread), on every room state and in both appearances (D-056).
+    /// carry grain (a real spread), on every room state the wash does not cover, in both appearances (D-056).
     private func assertPaper(_ rep: NSBitmapImageRep, around point: NSPoint,
                              in appearance: NSAppearance.Name, name: String) throws {
         let resolved = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance))

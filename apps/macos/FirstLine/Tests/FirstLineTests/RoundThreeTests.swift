@@ -634,22 +634,22 @@ struct RoundThreeTests {
     }
 
     /// Topmost ink row of each view's text, in one rendered frame.
+    /// Each run is rendered on its own, without the paper behind it, so a dark fleck of the sheet's grain inside
+    /// a run's frame is never read as the run's first ink row; the row is then placed in the root's pixel space.
     private func firstInkRows(of views: [NSView], in root: NSView) throws -> [Int] {
         root.layoutSubtreeIfNeeded()
-        let rep = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
-        root.cacheDisplay(in: root.bounds, to: rep)
-        let scale = CGFloat(rep.pixelsWide) / max(root.bounds.width, 1)
         return try views.map { view in
+            let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / max(view.bounds.width, 1)
             let frame = root.convert(view.bounds, from: view)
-            let x0 = Int(frame.minX * scale) + 1
-            let x1 = min(Int(frame.maxX * scale) - 1, rep.pixelsWide - 1)
-            let y0 = max(Int((root.bounds.height - frame.maxY) * scale) - 1, 0)
-            let y1 = min(Int((root.bounds.height - frame.minY) * scale) + 1, rep.pixelsHigh - 1)
-            for y in y0...y1 {
-                for x in x0...x1 {
-                    guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+            let top = Int(((root.bounds.height - frame.maxY) * scale).rounded())
+            for y in 0..<rep.pixelsHigh {
+                for x in 0..<rep.pixelsWide {
+                    guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                          colour.alphaComponent > 0.4 else { continue }
                     let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
-                    if luma < 0.6 { return y }
+                    if luma < 0.6 { return top + y }
                 }
             }
             throw NoRenderedText(view: String(describing: type(of: view)))

@@ -2,7 +2,7 @@
    [INPUT] every element marked data-paper, its laid-out size, devicePixelRatio, and the resolved
            theme on :root (light / dark).
    [OUTPUT] one static texture painted into a canvas child behind that element's content: the Note
-            sheet's two-scale mottle, its lamp light, and its grain (tooth, pulp, fibres, flecks).
+            sheet's two-scale mottle and its grain (tooth, pulp, fibres, flecks).
             The tone itself stays in CSS so a state wash can still tint the sheet.
    [POS] the single place on the web surface that defines what the paper looks like; the room, the
          failure sheet, the kept sheet and the landing demo sheet all mount it.

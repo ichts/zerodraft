@@ -350,11 +350,13 @@ struct RoomTests {
         #expect(fade.duration == 0.12)
         #expect((fade.fromValue as? Float) == 1)
         #expect((fade.toValue as? Float) == 0)
+        #expect(wash.fraction == 0.5, "the wash leaves on the fade still carrying its warmth, not cut to plain paper")
         var control: [Float] = [0, 0]
         fade.timingFunction?.getControlPoint(at: 1, values: &control)
         #expect(control == [0, 0])
         fixture.room.tick()
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
+        #expect(wash.fraction == 0.5, "a tick during the fade keeps the tint until the fade ends")
         fixture.clock.now = 13
         fixture.room.tick()
         #expect(wash.fraction == 0.5)
@@ -371,12 +373,14 @@ struct RoomTests {
         fixture.state.settings.reducedMotion = .never
         fixture.clock.now = 8.1
         fixture.room.tick()
-        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+        let wash = try #require(descendants(fixture.room.view, of: PaperWashView.self)
             .first { $0.alphaValue == 1 })
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
+        #expect(wash.deep)
         fixture.room.endCutAnimation()
         #expect(wash.alphaValue == 0)
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
+        #expect(wash.deep && wash.fraction == 1, "the cut leaves on the fade, still the deep step")
     }
 
     @Test func warningCaptionUsesTheLiveMachineVoice() throws {

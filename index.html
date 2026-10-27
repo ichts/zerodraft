@@ -708,15 +708,11 @@ if (document.readyState === "loading") {
     --danger: #c8392f;    /* the warn numeral and the wipe cut; nothing else */
     /* The wash exists only during warn, seconds 5-8: color-mix 88%. */
     --wash-wall: color-mix(in oklab, var(--bone) 88%, var(--danger));
-    --wash-paper: color-mix(in oklab, var(--paper) 88%, var(--danger));
     /* The eighth second goes one step deeper (double the danger share). */
     --wash-wall-deep: color-mix(in oklab, var(--bone) 76%, var(--danger));
-    --wash-paper-deep: color-mix(in oklab, var(--paper) 76%, var(--danger));
     /* Reduced-motion wash steps: once per second, a third deeper each step. */
     --wash-wall-1: color-mix(in oklab, var(--bone) 96%, var(--danger));
     --wash-wall-2: color-mix(in oklab, var(--bone) 92%, var(--danger));
-    --wash-paper-1: color-mix(in oklab, var(--paper) 96%, var(--danger));
-    --wash-paper-2: color-mix(in oklab, var(--paper) 92%, var(--danger));
     /* Type - two faces. Newsreader is the human; Plex Mono is the machine.
        The machine never speaks serif; the human never speaks mono. */
     --human: "Newsreader", Georgia, "Times New Roman", serif;
@@ -777,7 +773,15 @@ if (document.readyState === "loading") {
      wipe step still tint it); its texture is a canvas inside the element's own
      stacking context, behind every word and never in front of one. The texture
      is generated once per sheet size and never while typing (D-056). */
-  [data-paper] { position: relative; isolation: isolate; background: var(--paper); }
+  /* The paper washes resolve on the sheet itself, so they mix from the corrected --paper the renderer
+     sets inline there (D-058), not from the uncorrected token on :root. */
+  [data-paper] {
+    position: relative; isolation: isolate; background: var(--paper);
+    --wash-paper: color-mix(in oklab, var(--paper) 88%, var(--danger));
+    --wash-paper-deep: color-mix(in oklab, var(--paper) 76%, var(--danger));
+    --wash-paper-1: color-mix(in oklab, var(--paper) 96%, var(--danger));
+    --wash-paper-2: color-mix(in oklab, var(--paper) 92%, var(--danger));
+  }
   .sheet-paper {
     position: absolute;
     inset: 0;

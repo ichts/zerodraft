@@ -697,8 +697,10 @@ measured against the paper, D-027's 100/22/7 fade kept, and the alarm tinting th
   (locked tones in both appearances, every reading role on the paper >= 7:1, the recorded 100/22/7 ladder and
   its fade direction, the pen red on its warn wash, the wash mix equal to the web's `color-mix`, the rendered
   field's mean within two levels of the locked tone, determinism), `EditorFocusTests.inkSpreadIsQuantisedToTheLineStep`,
-  and `SnapshotTests` (every surface in light and dark, the paper patch on every room state at the 4-level band
-  the window bitmap allows, the warn state measured against its wash tint, `paperStaysStillWhileTyping`).
+  and `SnapshotTests` (every surface in light and dark, the paper patch on every plain-sheet room state within
+  the 0.06 band (about 15 levels) the window bitmap allows, while the two-level tone assertion runs on the field
+  render; the two light warn states measured against their wash tint, the dark warn state covered by
+  `PaperContrastTests` only, `paperStaysStillWhileTyping`).
 - PASS paper parity, measured off the window captures (25 px patch average, mid-paper, this head): rest light
   `rgb(219,231,236)` against `#dbe6ec` (219,230,236); rest dark `rgb(31,37,40)` against `#21272a` (33,39,42);
   warn light `rgb(221,213,215)` against the wash `#ddd3d5` (221,211,213); the writeitdown room measured the same

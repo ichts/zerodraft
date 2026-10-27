@@ -1198,6 +1198,12 @@ entry and names the entry it supersedes. The behaviour contract that implements 
      (`inkSpread(step:)`, alpha 0.55 x step, never interpolated), so a faded line fades its whole rendered layer
      exactly as the web fades the element that carries the displacement, the same text always renders
      identically, and a completed line cannot keep the live line's ink.
+  4. **The alarm tints the same paper, and leaves on its fade.** The Mac wash composites the sheet's whole
+     texture (both mottle scales, the grain and the mean shift) over its tint, handed over by the sheet each
+     time the field is rebuilt, so a live resize or a theme switch never builds a second field or leaves a stale
+     one. On exit the wash keeps its last tint while it fades over 120 ms and returns to the plain sheet only
+     when the fade ends. The Mac generator uses the web's seed string and pigments, and on the root landing the
+     paper washes resolve on the sheet itself, so they mix from the corrected tone.
 - Reason: The pipeline review of the Mac half found that the contrast-solved ladder (13.78 / 9.2 / 7.2:1) had
   silently replaced D-027's recorded 100/22/7 fade, that the ink shadow did not step with the ladder (so the
   faded lines rendered at roughly 11:1 and 9.6:1 while their opacity claimed 0.847 and 0.769), and that the lamp

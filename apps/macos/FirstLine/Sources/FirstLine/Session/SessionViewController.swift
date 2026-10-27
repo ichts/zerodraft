@@ -50,11 +50,12 @@ class RoomWashView: NSView {
 }
 
 /// The sheet's warn wash. It paints the paper tone mixed toward the locked wash colour and then the
-/// sheet's own grain over it, so the alarm tints textured paper on both surfaces: the web keeps its
-/// canvas above the wash background, and a flat overlay here would either hide the grain or, faded in
-/// by alpha, layer a second grain over the first (D-056).
+/// sheet's own texture (both mottle scales, the grain and the mean shift) over it, so the alarm tints the
+/// same paper on both surfaces: the web keeps its canvas above the wash background, and a flat overlay
+/// here would either hide the texture or, faded in by alpha, layer a second one over the first (D-056).
 final class PaperWashView: RoomWashView {
-    var grain: CGImage? { didSet { needsDisplay = true } }
+    var texture: PaperField.Texture? { didSet { needsDisplay = true } }
+    private var fadeToken = 0
 
     /// How far the sheet has warmed, 0...1: the ramp moves the colour, not the view's alpha.
     var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
@@ -91,17 +92,53 @@ final class PaperWashView: RoomWashView {
             }
             ctx.setFillColor(tint.cgColor)
             ctx.fill(rect)
-            if let grain {
+            if let texture {
                 ctx.saveGState()
                 ctx.translateBy(x: 0, y: rect.height)
                 ctx.scaleBy(x: 1, y: -1)
-                ctx.interpolationQuality = .none
-                ctx.setAlpha(PaperField.grain)
-                ctx.draw(grain, in: rect)
+                ctx.interpolationQuality = inLiveResize ? .high : .none
+                ctx.draw(texture.image, in: rect)
                 ctx.restoreGState()
+                PaperField.apply(shift: texture.shift, to: ctx, in: rect)
             }
             ctx.restoreGState()
         }
+    }
+
+    /// Shows the wash at `fraction` warmth, or, at zero, leaves on the 120 ms fade still carrying its last
+    /// tint and only then returns to the plain sheet, so the exit is a fade and not a cut.
+    func show(_ fraction: CGFloat, deep: Bool, reducesMotion: Bool) {
+        guard fraction > 0 else {
+            fadeOut(reducesMotion: reducesMotion)
+            return
+        }
+        fadeToken += 1
+        if self.deep != deep { self.deep = deep }
+        self.fraction = fraction
+        setOpacity(1, reducesMotion: reducesMotion)
+    }
+
+    private func fadeOut(reducesMotion: Bool) {
+        guard alphaValue > 0 else {
+            if layer?.animation(forKey: "opacity") == nil { settle() }
+            return
+        }
+        fadeToken += 1
+        let token = fadeToken
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.fadeToken == token, self.alphaValue == 0 else { return }
+                self.settle()
+            }
+        }
+        setOpacity(0, reducesMotion: reducesMotion)
+        CATransaction.commit()
+    }
+
+    private func settle() {
+        if fraction != 0 { fraction = 0 }
+        if deep { deep = false }
     }
 }
 
@@ -144,7 +181,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var lastPhase: SessionPhase = .idle
     private var renderedSessionID: UUID?
     private var cutWork: DispatchWorkItem?
-    private var washIsCut = false
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
@@ -201,7 +237,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        paperWash.grain = paper.grainForWash()
         prepareViewport()
         layoutWarning()
         syncProgressBar(phase: engine.phase)
@@ -235,7 +270,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        // The paper is the Note sheet (D-056): tone, grain and light are rendered by the view itself.
+        // The paper is the Note sheet (D-056): tone and texture are rendered by the view itself.
         paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet
@@ -274,6 +309,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperWash.translatesAutoresizingMaskIntoConstraints = false
         paperWash.cornerRadius = FirstLineRadius.sheet
         paperWash.alphaValue = 0
+        paper.textureDidChange = { [weak paperWash] texture in paperWash?.texture = texture }
         paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
         outline = RoomWashView(fillColor: .clear)
@@ -820,12 +856,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// `fraction` is how warm the sheet is, 0...1. The view is fully visible whenever there is any wash and
     /// the colour carries the ramp, so the paper keeps one grain layer instead of two (D-056).
     private func setWash(_ fraction: CGFloat, cut: Bool) {
-        if washIsCut != cut {
-            washIsCut = cut
-            paperWash.deep = cut
-        }
-        paperWash.fraction = fraction
-        paperWash.setOpacity(fraction > 0 ? 1 : 0, reducesMotion: reducesMotion)
+        paperWash.show(fraction, deep: cut, reducesMotion: reducesMotion)
     }
 
     private func showCut() {

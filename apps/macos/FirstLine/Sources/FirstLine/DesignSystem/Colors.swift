@@ -1,6 +1,6 @@
 /**
  * [INPUT]: writeitdown/tokens.css v2 (background A light palette + dark palette, same role names)
- * [OUTPUT]: Dynamic AppKit color roles for page, sheet, ink, mute, chrome, hairlines, sheet ring, red pen, wash, on-ink.
+ * [OUTPUT]: Dynamic AppKit color roles for page, sheet, ink, mute, paper quiet, chrome, hairlines, sheet ring, red pen, wash, on-ink.
  * [POS]: Shared native color tokens for every surface and the room wash; no parallel palette.
  * [PROTOCOL]: Keep values aligned with writeitdown/tokens.css and check FirstLine/AGENTS.md.
  */
@@ -33,6 +33,8 @@ enum FirstLineColors {
     static var sheetNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x26231C) }
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }
+    /// The sheet's quiet role (`--paper-quiet`): quiet words that sit on the writing sheet and must clear 7:1 on it.
+    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xB8B5AC) }
     static var chromeNSColor: NSColor { adaptive(light: 0x5C564D, dark: 0xA39D8E) }
     static var hairNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.10, darkAlpha: 0.10) }
     /// Sheet ring from the approved tokens.swift (ink 7% in light, hair 10% in dark).

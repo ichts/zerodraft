@@ -2,6 +2,54 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-26: The stopped screen's composition (D-070), the rig checks, and a recorded VM launch run; the in-guest stopped screen stays PENDING
+
+Batch record for the stopped-screen composition (one group at 33% of the paper, anchored by its midpoint,
+with the pill height as the base: gaps 9/48 and 24/48, line and pill label 15/48, sides 20/48) and for
+the exhausted-trial announcement. Entry point for the GUI evidence is the recorded VM rig on main;
+nothing ran on this machine's GUI screen.
+
+- Build: `scripts/package-app.sh --adhoc` built the universal ad-hoc bundle at
+  `apps/macos/FirstLine/dist/Write It Down.app` (codesign valid, satisfies its Designated Requirement).
+- Focused Swift checks (from `apps/macos/FirstLine/`): `swift build` exit 0;
+  `swift test --filter "RoundThreeTests/stoppedScreenIsOneGroupAnchoredAtThirtyThreePercent|RoundThreeTests/restartBringsTheChromeBackWithTheNewSession|RoomTests/stoppedScreenStatesTheDeletionAndTakesTheChromeOff|RoomTests/stoppedScreenAnnouncementCarriesTheUnusedTime|RoomTests/stoppedScreenAnnouncementAnnouncesTheTrialEndAtTheLastWipe|TrialReleaseTests/wipedSessionRestartSpendsAnotherButLastWipeDoesNotSellImmediately|TrialReleaseTests/exhaustedFailureRestartOpensActivation|ReviewRoundTests/emptyCaretAndCountPromptMatchAfterAWipe|RoomTests/keptReceiptNamesTheDurationAndCount"`
+  exited 0 with 9 tests in 4 suites passed. The geometry test runs in light and dark at 1040x720 and at
+  a 760x560 sheet, where the base is 38, and asserts the base itself (48 at 1040x720, 38 at
+  760x560), the 0.33 anchor, the 9/48 and 24/48 gaps, the
+  headline's 1.1 box, the 15/48 line and pill label from the typography tokens, the pill at the base
+  height and its 20/48 sides, so a copied constant cannot pass. `swift test` in full and the root web
+  suites were not run in this round.
+- Rig boundaries: `python3 apps/macos/FirstLine/scripts/test-vm-rig.py` printed
+  `test-vm-rig: 16 of 16 checks passed` and exit 0. It drives the analyser, clip origin, panel answer
+  validation, lens summary, launchd shim, design panel and tracked-bytecode guards with their
+  known-broken states; it does not run a GUI or the app.
+- Recorded VM run (app mode):
+  `bash apps/macos/FirstLine/scripts/vm-journey.sh apps/macos/FirstLine/dist/Write It Down.app <evidence-dir>`
+  on 2026-10-26 cloned `wid-golden`, booted it headless, installed the local bundle inside the guest the
+  way the DMG payload is installed, activated it with the disposable signed fixture and relaunched it
+  three times. Verdict `accepted`, 0 failed assertions (0 outside a declared defect), 11 timestamped
+  steps, 90 recorded frames over 48 s with the largest gap 1678 ms, an assembled `screen.mov` of 48.32 s,
+  analysis complete with 20 findings, six lenses complete and `sign_off: accepted`. The evidence is
+  `~/wid-vm/evidence/20261026-195335/` (copied to
+  `~/.no-mistakes/evidence/01M5WPAKD4X255G03M1DF3HZN1/vm-app-20261026-195335/`); `summary.json`,
+  `acceptance.txt`, `notes.md`, the launch watchers and `screen.mov` carry the run's own numbers.
+- What that run proves: a locally built, ad-hoc bundle installs and launches inside the guest under a
+  clean home, a signed fixture license activates, and three licensed relaunches open the licensed home
+  without ever showing the activation card; the input is real HID and the recording is continuous.
+  What it does not prove: the stopped screen or the three-session trial journey (app mode runs only the
+  licensed-launch proof), the shipped DMG, a genuine purchase, or a real-window capture of the stopped
+  composition. The stopped-screen geometry evidence in this round is the AppKit content-snapshot and
+  frame-geometry tests above, not a window recording.
+- PENDING, stopped-screen composition inside the guest: the three-session journey that reaches the
+  stopped screen is the DMG branch of the rig, which asserts codesign, stapler and spctl on the disk
+  image and the installed app, so an ad-hoc build cannot enter it. `scripts/release-dmg.sh` refuses
+  this branch (a staging release requires an empty checkout and license configuration, and a release
+  requires a `CFBundleVersion` above the last released build), and `scripts/dmg-journey.sh` additionally
+  needs an approved GUI machine and the clean-login evidence directory. The exact release-gate command
+  that closes this line is
+  `bash apps/macos/FirstLine/scripts/vm-journey.sh <notarized-dmg> <evidence-dir>`; until it runs on the
+  next signed DMG, no window or video acceptance of the stopped screen is claimed.
+
 ## 2026-10-26: The app bundle carries only the shared type set (D-057)
 
 The app no longer ships `IBMPlexMono-Regular.ttf` (135,580 B) or its OFL text. No token resolved to the

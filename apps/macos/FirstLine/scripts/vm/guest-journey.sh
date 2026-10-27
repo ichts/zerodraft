@@ -345,10 +345,11 @@ for used in 1 2 3; do
   if [[ "$used" -eq 2 ]]; then
     sleep 9
     snap 'session-2-wiped-after'
-    if has_re 'DRAFT DELETED AT ' && has_re 'TYPE TO START AGAIN\.'; then
-      pass 'session 2: silence deleted the draft and showed the restart receipt'
+    if has_re 'You stopped\.' && has_re 'Draft deleted\.' && has_re 'Begin again' \
+      && ! has_re 'DRAFT DELETED AT' && ! has_re '1:00'; then
+      pass 'session 2: silence deleted the draft into the stopped screen'
     else
-      bad 'session 2: silence did not delete the draft'
+      bad 'session 2: the stopped screen did not replace the draft'
     fi
     has_re '0 words' && pass 'session 2: the word count reset to zero' || bad 'session 2: the word count did not reset'
   elif [[ "$used" -eq 3 ]]; then

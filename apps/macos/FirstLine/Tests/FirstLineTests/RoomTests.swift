@@ -13,14 +13,60 @@ struct RoomTests {
         #expect(RoomPresentation.clock(0) == "0:00")
     }
 
-    @Test func wipeReportUsesUnusedTimeAndLiveSentence() {
-        #expect(RoomPresentation.wipeReport(unused: 52, canRestart: true) ==
-            "DRAFT DELETED AT 0:52. TYPE TO START AGAIN.")
-        #expect(RoomPresentation.wipeReport(unused: 52, canRestart: false) ==
-            "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.")
+    @Test func stoppedScreenAnnouncementCarriesTheUnusedTime() {
+        #expect(RoomPresentation.failureAnnouncement(unused: 52, obstacle: .none) ==
+            "You stopped. Draft deleted. 0:52 unused.")
+        #expect(RoomPresentation.failureAnnouncement(unused: 0, obstacle: .none) ==
+            "You stopped. Draft deleted. 0:00 unused.")
     }
 
-    @Test func keptReceiptMirrorsTheFailureReceipt() {
+    @Test func stoppedScreenAnnouncementNamesOnlyTheReasonThatIsTrue() {
+        #expect(RoomPresentation.failureAnnouncement(unused: 52, obstacle: .trialSpent) ==
+            "You stopped. Draft deleted. 0:52 unused. Three free sessions used. A license is needed to keep writing.")
+        // Licence residue, a trial-access error or a cleanup failure also block a restart, and none
+        // of them means the free sessions were used up (D-070).
+        #expect(RoomPresentation.failureAnnouncement(unused: 52, obstacle: .licenseNeeded) ==
+            "You stopped. Draft deleted. 0:52 unused. A license is needed to keep writing.")
+        #expect(RoomPresentation.failurePillHelp(obstacle: .none) == "Return starts a new session.")
+        #expect(RoomPresentation.failurePillHelp(obstacle: .trialSpent) ==
+            "Three free sessions used. Return opens activation to keep writing.")
+        #expect(RoomPresentation.failurePillHelp(obstacle: .licenseNeeded) ==
+            "Return opens activation to keep writing.")
+    }
+
+    @Test func stoppedScreenAnnouncementAnnouncesTheTrialEndAtTheLastWipe() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let clock = RoomClock(0)
+        let engine = SessionEngine(now: { clock.now })
+        let store = SettingsStore(configDirectory: root)
+        var saved = try store.load()
+        saved.trialSessionsUsed = 2
+        try store.save(saved)
+        let state = AppState(sessionEngine: engine, settingsStore: store,
+                             licenseClient: MockLicenseClient(),
+                             installIDStore: InstallIDStore(configDirectory: root),
+                             productID: "prod_mock")
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state, confirmationNow: { clock.now })
+        window(room)
+        let editor = try #require(descendants(room.view, of: AppendOnlyTextView.self).first)
+        editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(state.settings.trialSessionsUsed == 3)
+        #expect(!state.canStartSession)
+        clock.now = 9
+        room.tick()
+        #expect(engine.phase == .failure)
+        #expect(room.stoppedAnnouncement.hasPrefix("You stopped. Draft deleted."))
+        #expect(room.stoppedAnnouncement.hasSuffix(
+            "Three free sessions used. A license is needed to keep writing."))
+        let beginAgain = try #require(descendants(room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
+        #expect(beginAgain.accessibilityHelp() ==
+            "Three free sessions used. Return opens activation to keep writing.")
+    }
+
+    @Test func keptReceiptNamesTheDurationAndCount() {
         #expect(RoomPresentation.keptReceipt(wordCount: 63, duration: 300) == "5 MINUTES. 63 WORDS.")
         #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 60) == "1 MINUTE. 1 WORD.")
         #expect(!RoomPresentation.keptReceipt(wordCount: 63, duration: 300).contains("KEPT"))
@@ -214,29 +260,43 @@ struct RoomTests {
         #expect(!exit.isHiddenOrHasHiddenAncestor)
     }
 
-    @Test func deletedStateShowsUnusedSentenceAndCountWithoutAHint() throws {
+    @Test func stoppedScreenStatesTheDeletionAndTakesTheChromeOff() throws {
         let fixture = try roomFixture()
         fixture.editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.clock.now = 8.1
         fixture.room.tick()
+        fixture.room.endCutAnimation()
+        fixture.room.view.layoutSubtreeIfNeeded()
         #expect(fixture.engine.phase == .failure)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        let report = try #require(fields.first { $0.stringValue == "DRAFT DELETED AT 0:52. TYPE TO START AGAIN." })
-        #expect(!report.isHiddenOrHasHiddenAncestor)
-        #expect(sameColor(report.textColor, FirstLineColors.redNSColor))
-        #expect(!fields.contains { $0.stringValue == "Start typing." },
+        let visible = fields.filter { !$0.isHiddenOrHasHiddenAncestor }
+        // The block says what happened, once: no receipt sentence and no second instruction.
+        #expect(!visible.contains { $0.stringValue.hasPrefix("DRAFT DELETED AT") })
+        #expect(!visible.contains { $0.stringValue.contains("TYPE TO START AGAIN") })
+        #expect(!visible.contains { $0.stringValue == "Start typing." },
                 "the wiped room must not add an under-line hint")
-        #expect(fields.contains { $0.stringValue == "1:00" })
-        #expect(fields.contains { $0.stringValue == "0 words" })
-        // The wiped screen is the kept screen's counterpart: a headline, a real
-        // restart button and the red receipt as the detail.
-        let heading = try #require(fields.first { $0.stringValue == "You stopped." })
+        let heading = try #require(visible.first { $0.stringValue == "You stopped." })
+        let note = try #require(visible.first { $0.stringValue == "Draft deleted." })
+        #expect((note.font?.pointSize ?? 0) == 15)
+        #expect(sameColor(note.textColor, FirstLineColors.paperQuietNSColor))
         #expect(!heading.isHiddenOrHasHiddenAncestor)
-        let buttons = descendants(fixture.room.view, of: NSButton.self)
-        let beginAgain = try #require(buttons.first { $0.title == "Begin again" })
+        // No red text survives on the stopped screen; red is the pen and the deadline only.
+        for field in visible {
+            #expect(!sameColor(field.textColor, FirstLineColors.redNSColor),
+                    "\"\(field.stringValue)\" is red on the stopped screen")
+        }
+        // Session chrome off: the stopped sheet carries no clock and no bar as a receipt, and
+        // the count returns to the words it can state (D-070).
+        #expect(!visible.contains { $0.stringValue.contains(":") }, "the clock is still on the stopped sheet")
+        #expect(visible.contains { $0.stringValue == "0 words" })
+        let timer = try #require(fields.first { $0.stringValue == "1:00" })
+        #expect(timer.isHiddenOrHasHiddenAncestor, "the clock is part of the stopped screen")
+        let bar = try #require(descendants(fixture.room.view, of: FirstLineFillBar.self).first)
+        #expect(bar.isHiddenOrHasHiddenAncestor, "the session bar is part of the stopped screen")
+        let beginAgain = try #require(descendants(fixture.room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
         #expect(!beginAgain.isHiddenOrHasHiddenAncestor)
         #expect(beginAgain.keyEquivalent == "\r")
-        #expect(report.stringValue.hasPrefix("DRAFT DELETED AT"))
     }
 
     @Test func keptStateMatchesTheLiveCopyAndReceipt() throws {

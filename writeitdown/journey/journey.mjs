@@ -195,7 +195,7 @@ async function run(size, browser) {
   });
   await block('landing/core-rule', async () => {
     await step('three moments: writing, warning 3, deleted', async () => {
-      await show('#core'); ok(await page.locator('#core .mo').count() === 3, 'need 3 states'); ok(/DRAFT DELETED/.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
+      await show('#core'); ok(await page.locator('#core .mo').count() === 3, 'need 3 states'); ok(/You stopped\./.test(await page.locator('.mo.m3').innerText()) && /Draft deleted\./.test(await page.locator('.mo.m3').innerText()), 'deleted state text');
     });
   });
   await block('landing/how-it-works', async () => {
@@ -317,7 +317,6 @@ async function run(size, browser) {
       ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
       ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
       ok(/^1 MINUTE\. \d+ WORDS?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
-      ok((await page.locator('#room-report').textContent()).trim() === '', 'deletion report present after completion');
       ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
       await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
       await page.locator('#copy').click();
@@ -346,11 +345,44 @@ async function run(size, browser) {
       ok(await page.locator('#editor').inputValue() === text, 'fresh session did not accept the sentence');
       await page.waitForTimeout(8100);
       ok(await page.locator('#editor').inputValue() === '', 'silent draft was not deleted');
-      ok(/^DRAFT DELETED AT \d:\d\d\. TYPE TO START AGAIN\.$/.test(await page.locator('#room-report').innerText()), 'deletion receipt missing');
+      ok(/^Draft deleted\.$/.test((await page.locator('#failure-note').innerText()).trim()), 'deletion sentence missing');
+      ok(!/TYPE TO START AGAIN|DRAFT DELETED AT/.test(await page.locator('#room').innerText()), 'the retired receipt is still on the failure screen');
       ok(!await page.locator('#kept').isVisible(), 'silent session incorrectly kept');
       ok((await page.locator('#failed h1').innerText()).trim() === 'You stopped.', 'failure headline missing');
       ok(await page.getByRole('button', { name: 'Begin again', exact: true }).isVisible(), 'Begin again missing');
       ok((await page.locator('#room-count').innerText()).trim() === '0 words', 'wiped count is not 0 words');
+      // The stopped screen is one group anchored at 33% of the sheet, with the session chrome
+      // off. Geometry is measured, not eyeballed (D-070).
+      const stopped = await page.locator('#failed').evaluate(element => {
+        const paper = element.closest('.room-paper');
+        const p = paper.getBoundingClientRect();
+        const box = node => {
+          const r = node.getBoundingClientRect();
+          return { top: r.top - p.top, bottom: r.bottom - p.top, height: r.height };
+        };
+        const css = node => getComputedStyle(node);
+        const group = box(element);
+        const line = element.querySelector('.failure-note');
+        const button = element.querySelector('#begin-again');
+        return {
+          anchor: (group.top + group.height / 2) / p.height,
+          gapLine: box(line).top - box(element.querySelector('h1')).bottom,
+          gapButton: box(button).top - box(line).bottom,
+          pill: { height: box(button).height, font: css(button).fontSize, weight: css(button).fontWeight,
+            padX: parseFloat(css(button).paddingLeft) },
+          clock: css(paper.querySelector('.chrome-row')).visibility,
+          bar: css(paper.querySelector('.bar')).visibility,
+        };
+      });
+      ok(Math.abs(stopped.anchor - 0.33) < 0.005, `the group midpoint sits at ${(stopped.anchor * 100).toFixed(2)}% of the sheet`);
+      ok(Math.abs(stopped.gapLine - 9) < 0.5, `headline to line is ${stopped.gapLine}`);
+      ok(Math.abs(stopped.gapButton - 24) < 0.5, `line to button is ${stopped.gapButton}`);
+      ok(stopped.pill.height === 48 && stopped.pill.font === '15px' && stopped.pill.weight === '600'
+        && stopped.pill.padX === 20, `the pill is ${JSON.stringify(stopped.pill)}`);
+      ok(stopped.clock === 'hidden' && stopped.bar === 'hidden', 'the session chrome is still on the stopped sheet');
+      await page.keyboard.press('Enter');
+      await page.locator('#room').waitFor({ state: 'visible' });
+      ok(await page.locator('#room .chrome-row').isVisible(), 'the restart did not bring the clock back');
     });
   });
   await block('legal', async () => {

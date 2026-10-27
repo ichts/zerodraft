@@ -508,7 +508,119 @@ struct RoundThreeTests {
         }
     }
 
-    @Test func wipeReceiptSitsUnderTheWritingLine() throws {
+    /// The stopped screen is one composition, not a block under the top edge (D-070): `You stopped.`,
+    /// the one consequence line and the `Begin again` pill, with the group's midpoint at 33% of the
+    /// paper height. Every other value is a share of the pill height, so the same ratios hold on a
+    /// second, smaller sheet instead of a copied point list.
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua])
+    func stoppedScreenIsOneGroupAnchoredAtThirtyThreePercent(appearance: NSAppearance.Name) throws {
+        for size in [NSSize(width: 1040, height: 720), NSSize(width: 760, height: 560)] {
+            let fixture = try stoppedRoom(appearance: appearance, size: size)
+            let paper = fixture.paper
+            let fields = descendants(of: fixture.room.view, of: NSTextField.self)
+            let visible = fields.filter { !$0.isHiddenOrHasHiddenAncestor }
+            let headline = try #require(visible.first { $0.stringValue == "You stopped." })
+            let note = try #require(visible.first { $0.stringValue == "Draft deleted." })
+            let pill = try #require(descendants(of: fixture.room.view, of: NSButton.self)
+                .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
+            // Distances from the paper's top edge, so order, gaps and anchor read in one coordinate.
+            func edges(_ view: NSView) -> (top: CGFloat, bottom: CGFloat) {
+                let frame = paper.convert(view.bounds, from: view)
+                return (paper.bounds.maxY - frame.maxY, paper.bounds.maxY - frame.minY)
+            }
+            let heading = edges(headline), line = edges(note), button = edges(pill)
+            // The base is 5% of the window width, rounded and clamped to the role's 32-48 pt.
+            let base = round(min(max(size.width * 0.05, 32), 48))
+            #expect(abs((headline.font?.pointSize ?? 0) - base) <= 0.05,
+                    "the headline is \(headline.font?.pointSize ?? 0) pt, not \(base) pt at \(size)")
+            #expect(abs(pill.bounds.height - base) <= 0.5, "the pill is \(pill.bounds.height) pt tall")
+            // Order under the headline: the consequence line, then the pill.
+            #expect(heading.bottom <= line.top + 0.5, "the line is not under the headline")
+            #expect(line.bottom <= button.top + 0.5, "the pill is not under the line")
+            // The two locked gaps as shares of the base, box edge to box edge.
+            #expect(abs(line.top - heading.bottom - base * 9 / 48) <= 0.5,
+                    "headline to line is \(line.top - heading.bottom) pt at base \(base)")
+            #expect(abs(button.top - line.bottom - base * 24 / 48) <= 0.5,
+                    "line to button is \(button.top - line.bottom) pt at base \(base)")
+            // One group on the room's one anchor: its midpoint at that fraction of the sheet, and the
+            // same constant places the active writing line, so the group replaces the line the writer
+            // was on instead of disagreeing with it (D-070).
+            let anchor = ((heading.top + button.bottom) / 2) / paper.bounds.height
+            #expect(abs(anchor - RoomPresentation.paperAnchorFraction) <= 0.005,
+                    "the group midpoint sits at \(anchor * 100)% of the sheet")
+            #expect(abs(RoomPresentation.paperAnchorFraction - 0.33) <= 0.0001,
+                    "the room's anchor is no longer the locked 33% of the paper")
+            // The headline's 1.1 line box, the line's own 1.6 box (the web's 15/1.6), the line and
+            // pill label at 15/48 of the base, and the whole group the sum of those ratios.
+            #expect(abs((heading.bottom - heading.top) - base * 1.1) <= 1,
+                    "the headline line box is \(heading.bottom - heading.top) pt")
+            #expect(abs((line.bottom - line.top) - base * 16 / 10 * 15 / 48) <= 1,
+                    "the line box is \(line.bottom - line.top) pt, not the web's 15/1.6 box")
+            #expect(abs((button.bottom - heading.top) - base * 3.2875) <= 2,
+                    "the group is \(button.bottom - heading.top) pt at base \(base), not the ratio sum")
+            let noteSize = try #require(note.font?.pointSize)
+            #expect(abs(noteSize - FirstLineTypography.uiNSFont.pointSize * base / 48) <= 0.05)
+            #expect(resolved(note.textColor ?? .clear, appearance) == resolved(FirstLineColors.paperQuietNSColor, appearance))
+            let sheet = try #require((paper as? FloodCanvasView).flatMap { resolved($0.fillColor, appearance) })
+            let ink = try #require(note.attributedStringValue
+                .attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+            let noteContrast = contrast(try #require(resolved(ink, appearance)), sheet)
+            #expect(noteContrast >= 7, "the line measures \(noteContrast):1 on the sheet, under 7:1")
+            // The pill: a 15/48 semibold label, 20/48 sides, a full radius and the ring.
+            let pillFontSize = try #require(pill.font?.pointSize)
+            #expect(abs(pillFontSize - FirstLineTypography.uiSemiboldNSFont.pointSize * base / 48) <= 0.05)
+            #expect(abs(fontWeight(pill.font) - NSFont.Weight.semibold.rawValue) < 0.01,
+                    "the pill label is not semibold")
+            let label = try #require(descendants(of: pill, of: NSTextField.self)
+                .first { $0.stringValue == "Begin again" })
+            let labelFrame = pill.convert(label.bounds, from: label)
+            #expect(abs(labelFrame.midX - pill.bounds.midX) <= 0.5, "the pill label is not centred")
+            #expect(abs((pill.bounds.width - labelFrame.width) - base * 20 / 48 * 2) <= 0.5,
+                    "the pill side padding is \((pill.bounds.width - labelFrame.width) / 2) pt at base \(base)")
+            #expect(labelFrame.width < pill.bounds.width, "the label overflows the pill")
+            pill.displayIfNeeded()
+            #expect(abs((pill.layer?.cornerRadius ?? 0) - base / 2) <= 0.5,
+                    "the pill is not a full-radius pill")
+            #expect((pill.layer?.borderWidth ?? 0) == 1, "the pill has no hairline ring")
+            // Session chrome off: no clock and no bar on the stopped sheet, and a transparent
+            // writing layer, so no caret is drawn inside the locked group (the web's wipe phase does
+            // the same) while the editor keeps focus, typing and IME.
+            let timer = try #require(fields.first { $0.stringValue == "1:00" })
+            #expect(timer.isHiddenOrHasHiddenAncestor, "the clock is still on the stopped sheet")
+            let bar = try #require(descendants(of: fixture.room.view, of: FirstLineFillBar.self).first)
+            #expect(bar.isHiddenOrHasHiddenAncestor, "the session bar is still on the stopped sheet")
+            let writing = try #require(descendants(of: fixture.room.view, of: NSScrollView.self).first)
+            #expect(writing.alphaValue == 0, "the writing layer is still drawn under the group")
+            #expect(!writing.isHidden, "the editor must keep focus and typing on the stopped sheet")
+            #expect(!visible.contains { $0.stringValue.contains(":") })
+            fixture.window.orderOut(nil)
+        }
+    }
+
+    @Test func restartBringsTheChromeBackWithTheNewSession() throws {
+        let fixture = try stoppedRoom()
+        let room = fixture.room
+        let bar = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
+        let beginAgain = try #require(descendants(of: room.view, of: NSButton.self)
+            .first { $0.title == "Begin again" })
+        beginAgain.performClick(nil)
+        room.view.layoutSubtreeIfNeeded()
+        room.viewDidLayout()
+        room.view.layoutSubtreeIfNeeded()
+        let fields = descendants(of: room.view, of: NSTextField.self)
+        let visible = fields.filter { !$0.isHiddenOrHasHiddenAncestor }
+        #expect(visible.contains { $0.stringValue == "1:00" }, "the clock did not come back")
+        #expect(!bar.isHiddenOrHasHiddenAncestor, "the bar did not come back")
+        #expect(abs(bar.fraction - 1) < 0.01, "a new session refills the bar")
+        #expect(!visible.contains { $0.stringValue == "Draft deleted." })
+        #expect(!visible.contains { $0.stringValue == "You stopped." })
+        fixture.window.orderOut(nil)
+    }
+
+    /// A room wiped at nine seconds, laid out at the default 1040 x 720 window.
+    private func stoppedRoom(appearance: NSAppearance.Name = .aqua,
+                             size: NSSize = NSSize(width: 1040, height: 720))
+        throws -> (room: SessionViewController, window: NSWindow, paper: NSView) {
         let now = MutableRoundClock(0)
         let engine = SessionEngine(now: { now.now })
         let state = licensedTestState(sessionEngine: engine,
@@ -516,7 +628,7 @@ struct RoundThreeTests {
                                       installIDStore: InstallIDStore(configDirectory: tempRoot()))
         state.startSession(duration: 60)
         let room = SessionViewController(appState: state)
-        let window = makeWindow(room)
+        let window = makeWindow(room, appearance: appearance, size: size)
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -526,18 +638,14 @@ struct RoundThreeTests {
         room.view.layoutSubtreeIfNeeded()
         room.viewDidLayout()
         room.view.layoutSubtreeIfNeeded()
-        let receipt = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor })
-        #expect(!descendants(of: room.view, of: NSTextField.self).contains { $0.stringValue == "Start typing." })
-        let receiptRect = paper.convert(receipt.bounds, from: receipt)
-        let receiptFont = try #require(receipt.font)
-        let baseline = try #require(editor.currentInsertionBaseline())
-        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: editor).y
-        let receiptInkTop = receiptRect.maxY - receipt.firstBaselineOffsetFromTop + receiptFont.capHeight
-        let drop = baselineInPaper - receiptInkTop
-        #expect(drop >= 40 && drop <= 48,
-                "the receipt ink top is \(drop) pt under the writing baseline, outside the status slot")
-        window.orderOut(nil)
+        return (room, window, paper)
+    }
+
+    private func fontWeight(_ font: NSFont?) -> CGFloat {
+        guard let font,
+              let traits = font.fontDescriptor.object(forKey: .traits) as? [NSFontDescriptor.TraitKey: Any],
+              let weight = traits[.weight] as? CGFloat else { return -1 }
+        return weight
     }
 
     @Test func stateChangesDoNotMoveTheRoomChromeOrTheWritingAnchor() throws {
@@ -731,6 +839,16 @@ struct RoundThreeTests {
 
     private func tempRoot() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    }
+
+    private func contrast(_ a: NSColor, _ b: NSColor) -> CGFloat {
+        func luminance(_ color: NSColor) -> CGFloat {
+            func channel(_ c: CGFloat) -> CGFloat { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
+            return 0.2126 * channel(color.redComponent) + 0.7152 * channel(color.greenComponent)
+                + 0.0722 * channel(color.blueComponent)
+        }
+        let (la, lb) = (luminance(a), luminance(b))
+        return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 
     private func resolved(_ color: NSColor, _ appearance: NSAppearance.Name) -> NSColor? {

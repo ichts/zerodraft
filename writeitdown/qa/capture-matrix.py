@@ -28,7 +28,7 @@ for width, height in [(1440, 900), (390, 844)]:
         tag = f'{theme}-{width}'
         evaluate(f"document.querySelector('#exit').click(); if(document.documentElement.dataset.theme!=='{theme}') document.querySelector('[data-theme-toggle]').click(); return innerWidth;")
         shot('landing-' + tag)
-        evaluate("document.querySelector('.door').click(); return location.hash;")
+        evaluate("document.querySelector('.btn-primary[href=\"#trial\"]').click(); return location.hash;")
         shot('rest-' + tag)
         axi('eval', (ROOT / 'writeitdown/qa/input-regression.js').read_text())
         evaluate(INSERT + "return document.querySelector('#room-count').textContent;")
@@ -38,7 +38,7 @@ for width, height in [(1440, 900), (390, 844)]:
         shot('warn-' + tag)
         evaluate(INSERT + "return {phase:room.dataset.phase,count:document.querySelector('#room-count').textContent};")
         shot('recovery-' + tag)
-        evaluate("performance.now=qaNow; document.querySelector('#restart').click();" + INSERT + "await new Promise(r=>setTimeout(r,8300)); return {phase:room.dataset.phase,text:e.value,report:document.querySelector('#room-report').textContent};", True)
+        evaluate("performance.now=qaNow; document.querySelector('#restart').click();" + INSERT + "await new Promise(r=>setTimeout(r,8300)); const stopped=document.querySelector('#failed'), note=document.querySelector('#failure-note'); if(!stopped||!note) throw new Error('capture-matrix: stopped group #failed or #failure-note missing after wipe'); return {phase:room.dataset.phase,text:e.value,stopped:stopped.querySelector('h1').textContent,note:note.textContent,hidden:stopped.hidden};", True)
         shot('wipe-' + tag)
         evaluate("document.querySelector('#exit').click();return {focus:document.activeElement.className,empty:document.querySelector('#editor').value==='',overflow:document.documentElement.scrollWidth>innerWidth};")
         shot('exit-' + tag)

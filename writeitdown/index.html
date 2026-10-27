@@ -70,12 +70,11 @@
         <div class="anchor-wrap">
           <p class="script"><span id="cur"></span></p>
         </div>
-        <div class="room-top" id="demo-stopped" hidden><p class="stopped">You stopped.</p></div>
+        <div class="room-top" id="demo-stopped" hidden><p class="stopped">You stopped.</p><p class="failure-note">Draft deleted.</p></div>
         <div class="danger" id="warn" aria-hidden="true" hidden>
           <div class="numeral" id="numeral"></div>
           <p class="caption" id="warn-caption">KEEP TYPING OR THE DRAFT IS DELETED.</p>
         </div>
-        <p class="receipt-slot" id="report"></p>
         <div class="paper-foot">
           <div class="count" id="count"></div>
         </div>
@@ -89,7 +88,7 @@
     <div class="moments">
       <div class="mo m1"><small>0:47 &middot; writing</small><div class="t">promotion. i want time off<span class="cur" aria-hidden="true"></span></div></div>
       <div class="mo m2"><small>3 s left &middot; warning</small><div class="n" aria-label="Three seconds left">3</div></div>
-      <div class="mo m3"><small>8 s &middot; deleted</small><div class="r">DRAFT DELETED AT 0:39. TYPE TO START AGAIN.</div></div>
+      <div class="mo m3"><small>8 s &middot; deleted</small><div class="t">You stopped.</div><div class="r">Draft deleted.</div></div>
     </div>
   </section>
 
@@ -158,7 +157,8 @@
     </div>
     <div class="room-top" id="failed" hidden>
       <h1 class="ink-imperfect">You stopped.</h1>
-      <button class="room-secondary" id="begin-again" type="button">Begin again</button>
+      <p class="failure-note" id="failure-note">Draft deleted.</p>
+      <button class="room-secondary" id="begin-again" type="button" aria-keyshortcuts="Enter">Begin again</button>
     </div>
     <div class="writing-area">
       <label class="sr-only" for="editor">Write forward. Stop for eight seconds and your draft is deleted.</label>
@@ -177,7 +177,6 @@
       <div class="numeral" id="room-numeral"></div>
       <p class="caption" id="room-warning"></p>
     </div>
-    <p class="receipt-slot" id="room-report"></p>
     <div class="paper-foot">
       <button class="mini-link" id="exit" type="button">ESC - EXIT</button>
       <a class="room-mac" href="download/" target="_blank" rel="noopener">Download for Mac</a>

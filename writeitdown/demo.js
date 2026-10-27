@@ -1,5 +1,5 @@
 import { LINES, TIMELINE } from './demo-timeline.mjs';
-import { clock, wordCount } from './session.mjs';
+import { wordCount } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot } from './status-slot.js';
 
@@ -15,9 +15,6 @@ import { statusSlot } from './status-slot.js';
   var SILENCE_MS = 5000, WARN_MS = 3000, CUT_MS = 200, REPORT_HOLD_MS = 2000;
   var SILENT_END = TYPE_END + SILENCE_MS, WARN_END = SILENT_END + WARN_MS,
       CUT_END = WARN_END + CUT_MS, LOOP = CUT_END + REPORT_HOLD_MS;
-  // The minute the draft died with: the clock holds this value through the cut and the failure
-  // screen, exactly as the room's clock holds its wipe value until the next session starts.
-  var CUT_CLOCK = clock(60 - Math.round(CUT_END / 1000));
   var EVENTS = TIMELINE.events;
   var DENY = EVENTS.filter(function (e) { return e.kind === "deny"; })[0];
 
@@ -32,7 +29,6 @@ import { statusSlot } from './status-slot.js';
   var numeralEl = document.getElementById("numeral");
   var captionEl = document.getElementById("warn-caption");
   var stoppedEl = document.getElementById("demo-stopped");
-  var reportEl = document.getElementById("report");
   var countEl = document.getElementById("count");
   var barEl = document.getElementById("bar");
 
@@ -53,7 +49,6 @@ import { statusSlot } from './status-slot.js';
     pitches: 0,
     numeral: numeralEl,
     caption: captionEl,
-    receipt: reportEl,
     block: stoppedEl
   });
   function placeStatus() {
@@ -167,7 +162,6 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft(t < TYPE_END ? draftAt(t) : full());
       put(clockEl, "clock", clockAt(t));
     } else if (t < WARN_END) {
@@ -177,7 +171,6 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "KEEP TYPING OR THE DRAFT IS DELETED.";
       warnEl.hidden = false;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft(full());
       put(clockEl, "clock", clockAt(t));
       placeStatus();
@@ -188,22 +181,21 @@ import { statusSlot } from './status-slot.js';
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = true;
-      put(reportEl, "rep", "");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", CUT_CLOCK);
+      put(clockEl, "clock", "1:00");
     } else {
-      // The failure screen: the same headline and red receipt the room and the Mac show.
+      // The failure screen: the room's block, with the sheet's chrome off (D-070).
+      // The demo is watch-only, so it carries no restart control (D-044).
       setPhase("report");
       setWash(null);
       numeralEl.textContent = "";
       captionEl.textContent = "";
       warnEl.hidden = true;
       stoppedEl.hidden = false;
-      put(reportEl, "rep", "DRAFT DELETED AT " + CUT_CLOCK + ".");
       renderDraft({ done: [], cur: "" });
       put(countEl, "count", "0 words");
-      put(clockEl, "clock", CUT_CLOCK);
+      put(clockEl, "clock", "1:00");
       placeStatus();
     }
   }
@@ -220,7 +212,6 @@ import { statusSlot } from './status-slot.js';
     captionEl.textContent = "";
     warnEl.hidden = true;
     stoppedEl.hidden = true;
-    put(reportEl, "rep", "");
     renderDraft(full());
     put(clockEl, "clock", "1:00");
   }

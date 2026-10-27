@@ -1,19 +1,23 @@
 // The one status-slot definition shared by the trial room and the landing demo.
-// The warning numeral's ink top sits 44 px under the writing baseline, the caption's
-// ink top 20 px under the numeral's ink, and the wipe receipt takes the numeral's slot.
-// On a tall sheet those Mac offsets are used exactly; when the group cannot fit above
-// the footer it moves above the writing line, and the failure block and receipt clamp
-// above the footer, so nothing is clipped or laid over the active line or the controls.
+// The warning numeral's ink top sits 44 px under the writing baseline and the caption's
+// ink top 20 px under the numeral's ink. On a tall sheet those Mac offsets are used exactly;
+// when the group cannot fit above the footer it moves above the writing line, and a result
+// block (the stopped screen) is one group whose midpoint sits at 33% of the sheet, clamped
+// above the footer so nothing is clipped or laid over the controls.
 // The footer top reserves the measured height of the wrapped confirmation row, and the
 // kept screen reserves the inline row's own top, both via a hidden probe at the current
 // width, so arming the confirmation neither reflows nor overlaps a result screen.
-// Placement is cached on the three strings and re-anchored only when the caller marks
-// the geometry dirty (resize, font load, route or visibility change), so the 50 ms
-// render can ask for it without forcing style or layout reads when nothing changed.
+// Placement is cached on the two strings and re-anchored only when the caller marks the
+// geometry dirty (resize, font load, route or visibility change), so the 50 ms render can
+// ask for it without forcing style or layout reads when nothing changed.
 
 // Paper heights below this use the compact result typography. The reservation of
 // the confirmation row is handled in the placement, not in this threshold.
 const COMPACT_BELOW = 480;
+
+// The stopped screen's group midpoint, as a share of the paper height (D-070). A share, not a
+// pixel offset, so the phone sheet re-derives the composition instead of shrinking the desktop one.
+const FAILURE_ANCHOR = 0.33;
 
 const ink = (() => {
   let context;
@@ -67,13 +71,13 @@ function fontOf(el) {
     size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
 }
 
-export function statusSlot({ paper, line, pitches, numeral, caption, receipt, block }) {
+export function statusSlot({ paper, line, pitches, numeral, caption, block }) {
   let placed = null;
   let dirty = true;
   return {
     invalidate() { dirty = true; },
     place() {
-      const key = `${numeral.textContent}\u0000${caption.textContent}\u0000${receipt.textContent}`;
+      const key = `${numeral.textContent}\u0000${caption.textContent}`;
       if (!dirty && key === placed) return;
       const paperRect = paper.getBoundingClientRect();
       const paperTop = paperRect.top;
@@ -84,8 +88,6 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const baseline = lineTop + writingInk.halfLeading + writingInk.ascent;
       const numeralFont = fontOf(numeral);
       const numeralInk = ink(numeral.textContent, numeralFont.css, numeralFont.lineHeight);
-      const captionFont = fontOf(caption);
-      const receiptFont = fontOf(receipt);
       const footer = paper.querySelector('.paper-foot');
       let footerTop = paperHeight - 60;
       let confirmRow = 0;
@@ -129,6 +131,7 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
         footerTop = stableTop - paperTop - confirmRow;
       }
       const gap = 8;
+      const captionFont = fontOf(caption);
       const captionInk = ink(caption.textContent, captionFont.css, captionFont.lineHeight);
       const captionGap = numeralInk.inkTop + numeralInk.inkHeight + 20 - numeralFont.size - captionInk.inkTop;
       const numeralTop = baseline + 44 - numeralInk.inkTop;
@@ -136,15 +139,12 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const belowLine = footerTop - gap - groupHeight;
       const aboveLine = lineTop - gap - groupHeight;
       const dangerTop = numeralTop <= belowLine ? numeralTop : Math.max(0, Math.min(numeralTop, aboveLine));
-      const receiptInk = ink(receipt.textContent, receiptFont.css, receiptFont.lineHeight);
-      const receiptHeight = receipt.getBoundingClientRect().height || receiptFont.lineHeight;
-      const receiptTop = Math.min(baseline + 44 - receiptInk.inkTop, footerTop - gap - receiptHeight);
       paper.style.setProperty('--danger-top', `${dangerTop}px`);
       paper.style.setProperty('--caption-gap', `${captionGap}px`);
-      paper.style.setProperty('--receipt-top', `${Math.max(0, receiptTop)}px`);
       if (block && !block.hidden && block.offsetHeight > 0) {
         const blockHeight = block.getBoundingClientRect().height;
-        paper.style.setProperty('--room-top', `${Math.max(gap, Math.min(72, receiptTop - gap - blockHeight))}px`);
+        const anchored = paperHeight * FAILURE_ANCHOR - blockHeight / 2;
+        paper.style.setProperty('--room-top', `${Math.max(0, Math.min(anchored, footerTop - gap - blockHeight))}px`);
       }
       const compact = paperHeight < COMPACT_BELOW;
       const keptBottom = Math.max(0, compact

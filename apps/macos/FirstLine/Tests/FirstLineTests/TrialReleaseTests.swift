@@ -201,9 +201,19 @@ struct TrialReleaseTests {
             #expect(state.selectedSurface == .session)
             #expect(field.string.isEmpty)
             #expect(state.settings.trialSessionsUsed == used)
-            let expected = used == 3 ? "DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING."
-                                     : "DRAFT DELETED AT 0:52. TYPE TO START AGAIN."
-            #expect(descendants(room.view, of: NSTextField.self).contains { $0.stringValue == expected && !$0.isHidden })
+            // Every wipe keeps the same visible composition - the chrome is off and the pill is
+            // the one control - while the pill's help says what Return will do: start again, or
+            // open activation once the third free session is spent (D-070).
+            let fields = descendants(room.view, of: NSTextField.self).filter { !$0.isHidden }
+            #expect(fields.contains { $0.stringValue == "Draft deleted." })
+            #expect(fields.contains { $0.stringValue == "You stopped." && !$0.isHidden })
+            #expect(!fields.contains { $0.stringValue.contains(":") }, "the clock is still shown")
+            #expect(!fields.contains { $0.stringValue.hasPrefix("DRAFT DELETED AT") })
+            #expect(!fields.contains { $0.stringValue.contains("ACTIVATE TO KEEP WRITING") })
+            let beginAgain = try #require(descendants(room.view, of: NSButton.self)
+                .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
+            #expect(beginAgain.accessibilityHelp() ==
+                RoomPresentation.failurePillHelp(obstacle: used < 3 ? .none : .trialSpent))
         }
         field.insertText("fourth", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(field.string.isEmpty)

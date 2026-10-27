@@ -47,7 +47,7 @@ struct EditorFocusTests {
         // Empty sheet: the writing line holds only the caret at the room anchor; the
         // bottom-right count slot carries "Type to start" until the first keystroke.
         let emptyY = try currentLineTop(in: editor, paper: paper)
-        #expect(abs(emptyY / paper.bounds.height - RoomPresentation.writingAnchorFraction) < 0.01)
+        #expect(abs(emptyY / paper.bounds.height - RoomPresentation.paperAnchorFraction) < 0.01)
         let prompt = try #require(descendants(of: room.view, as: NSTextField.self)
             .first { $0.stringValue == "Type to start" })
         #expect(!prompt.isHiddenOrHasHiddenAncestor)
@@ -61,7 +61,7 @@ struct EditorFocusTests {
         room.refreshRoom()
         expectColumnWidth()
         let firstY = try currentLineTop(in: editor, paper: paper)
-        #expect(abs(firstY / paper.bounds.height - RoomPresentation.writingAnchorFraction) < 0.01)
+        #expect(abs(firstY / paper.bounds.height - RoomPresentation.paperAnchorFraction) < 0.01)
         let firstBaseline = topInPaper(try #require(editor.currentInsertionBaseline()), of: editor, paper: paper)
         #expect(abs(firstBaseline - emptyBaseline) <= 1)
         #expect(prompt.stringValue == "1 word")

@@ -69,6 +69,9 @@ test('room bar reanchors to the deadline after motion preference changes', async
     await page.clock.fastForward(3000);
     await page.keyboard.insertText(' writing');
   }
+  // Reduce Motion steps the bar on a 500 ms cadence, so the last tick's step is still pending
+  // at the 30 s mark: let it land before the preference change, not after it.
+  await page.clock.runFor(500);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.runFor(50);
   await expect.poll(() => page.locator('#room-bar').evaluate(bar => bar.getAnimations().length)).toBe(0);

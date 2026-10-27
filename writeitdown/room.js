@@ -12,9 +12,16 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 const insertions = new Set(['insertText', 'insertParagraph', 'insertLineBreak']);
 const SESSION_MS = 60000;
 const CONFIRM_MS = 2000;
-const EXIT_HINT = 'Press Esc again to leave and delete the draft.';
+// A touch screen has no Escape key, however wide it is, so the input names the control it can
+// actually press and its confirmation tells that thumb what to do next (D-067).
+const touchInput = matchMedia('(hover: none), (any-pointer: coarse)');
+const EXIT_LABEL = { keyboard: 'ESC - EXIT', touch: 'EXIT' };
+const EXIT_HINT = {
+  keyboard: 'Press Esc again to leave and delete the draft.',
+  touch: 'Tap EXIT again to leave and delete the draft.'
+};
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
-$('exit-hint').dataset.hint = EXIT_HINT;
+const hintFor = () => (touchInput.matches ? EXIT_HINT.touch : EXIT_HINT.keyboard);
 let state = fresh();
 let compositionBase = null;
 let copyGeneration = 0;
@@ -116,12 +123,15 @@ function render(now = performance.now()) {
   $('room-warning').textContent = warning ? WARNING : '';
   $('room-danger').hidden = !warning;
   const remaining = state.started === null || failed || kept ? 60 : Math.max(0, Math.ceil((state.started + SESSION_MS - now) / 1000));
-  $('room-clock').textContent = clock(kept ? 0 : remaining);
+  // The clock holds the value the draft died at until the next session starts, so the corner and
+  // the red receipt name the same moment instead of the clock re-arming under the receipt (D-063).
+  $('room-clock').textContent = clock(kept ? 0 : failed ? state.unused : remaining);
   const count = wordCount(state.text);
   const words = `${count} ${count === 1 ? 'word' : 'words'}`;
-  // Empty room: the count slot itself carries the instruction; after a wipe the red
-  // receipt does, and the slot returns to the count (the Mac's cases 18/19/50).
-  $('room-count').textContent = state.started === null && !failed ? 'Type to start' : words;
+  // Empty room: the count slot itself carries the instruction; after a wipe the red receipt does
+  // and the slot returns to the count. On the kept screen the receipt is the only place the
+  // session's size is printed, so the corner stays silent (D-062).
+  $('room-count').textContent = kept ? '' : state.started === null && !failed ? 'Type to start' : words;
   $('room-report').textContent = failed ? `DRAFT DELETED AT ${clock(state.unused)}. TYPE TO START AGAIN.` : '';
   $('failed').hidden = !failed;
   editor.hidden = kept;
@@ -173,12 +183,22 @@ function clearExitHint() {
   $('exit-hint').textContent = '';
 }
 
-// Escape and EXIT are one act, and it takes two of them: the first arms the inline
-// confirmation for 2 s, the second leaves. Typing cancels it (the Mac's case 26).
+// The control and its confirmation wear this input's wording. The confirmation's reserved footer
+// row is measured from data-hint, so it follows the copy instead of assuming the desktop one.
+function syncExitCopy() {
+  const hint = hintFor();
+  $('exit').textContent = touchInput.matches ? EXIT_LABEL.touch : EXIT_LABEL.keyboard;
+  $('exit-hint').dataset.hint = hint;
+  if ($('exit-hint').textContent) $('exit-hint').textContent = hint;
+}
+
+// Escape, EXIT and the brand are one act, and it takes two of them: the first arms the inline
+// confirmation for 2 s, the second leaves. Typing cancels it (the Mac's case 26). Nothing can
+// leave in one act, so a thumb cannot throw a live draft away (D-061).
 function requestExit() {
   if (exitArmedAt !== null && performance.now() - exitArmedAt <= CONFIRM_MS) { clearExitHint(); exit(); return; }
   exitArmedAt = performance.now();
-  $('exit-hint').textContent = EXIT_HINT;
+  $('exit-hint').textContent = hintFor();
   clearTimeout(exitTimer);
   exitTimer = setTimeout(clearExitHint, CONFIRM_MS);
 }
@@ -191,7 +211,7 @@ function reset() {
   editor.value = '';
   $('kept-text').textContent = '';
   $('receipt').textContent = '';
-  $('copy').textContent = 'COPY TEXT';
+  $('copy-label').textContent = 'COPY TEXT';
   $('status').textContent = '';
   render();
   fitEditor();
@@ -270,6 +290,9 @@ editor.addEventListener('keydown', event => {
 for (const name of ['paste', 'cut', 'drop']) editor.addEventListener(name, deny);
 editor.addEventListener('pointerup', () => { if (compositionBase === null) endCaret(); });
 $('exit').addEventListener('click', requestExit);
+// The brand stays reachable without leaving the writing: the first click arms the same
+// confirmation as EXIT, the second returns to the landing. Never a one-click navigation.
+$('room-brand').addEventListener('click', event => { event.preventDefault(); requestExit(); });
 $('begin-again').addEventListener('click', restart);
 $('restart').addEventListener('click', restart);
 paper.addEventListener('pointerdown', event => {
@@ -309,17 +332,44 @@ $('copy').addEventListener('click', async () => {
     try { fallbackCopy(text); copied = true; } catch {}
   }
   if (generation !== copyGeneration) return;
-  $('copy').textContent = copied ? 'COPIED' : 'TRY COPY AGAIN';
+  $('copy-label').textContent = copied ? 'COPIED' : 'TRY AGAIN';
   announce(copied ? 'Copied.' : 'Copy failed. Select your kept text and copy it manually.');
 });
 
-window.addEventListener('resize', () => { slot.invalidate(); fitEditor(); placeStatus(); });
-window.visualViewport?.addEventListener('resize', () => { slot.invalidate(); fitEditor(); placeStatus(); });
-document.fonts.ready.then(() => { slot.invalidate(); fitEditor(); placeStatus(); });
+// The kept pill keeps the width of its widest label on whatever face the device supplies, so the
+// floor is measured from the three labels in that face instead of a constant tuned on one machine
+// (D-059). "COPIED" and "TRY AGAIN" only exist after a press, so they cannot be measured from the
+// live label, and the probe sits on the body: the room is hidden until the writer opens it, and a
+// hidden descendant would measure 0.
+const COPY_LABELS = ['COPY TEXT', 'COPIED', 'TRY AGAIN'];
+function sizeCopyFloor() {
+  const label = $('copy-label');
+  const style = getComputedStyle(label);
+  const probe = document.createElement('span');
+  probe.setAttribute('aria-hidden', 'true');
+  probe.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;white-space:nowrap;'
+    + `font-family:${style.fontFamily};font-size:${style.fontSize};font-weight:${style.fontWeight};font-style:${style.fontStyle};`
+    + `letter-spacing:${style.letterSpacing};word-spacing:${style.wordSpacing};text-transform:${style.textTransform}`;
+  document.body.appendChild(probe);
+  let widest = 0;
+  for (const text of COPY_LABELS) {
+    probe.textContent = text;
+    widest = Math.max(widest, probe.getBoundingClientRect().width);
+  }
+  probe.remove();
+  if (widest > 0) label.style.setProperty('--copy-floor', `${Math.ceil(widest)}px`);
+}
+
+window.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+window.visualViewport?.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+document.fonts.ready.then(() => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+touchInput.addEventListener('change', () => { syncExitCopy(); slot.invalidate(); placeStatus(); });
 reduced.addEventListener('change', tick);
 window.addEventListener('hashchange', route);
 window.addEventListener('pagehide', reset);
 window.addEventListener('pageshow', event => { if (event.persisted) route(); });
 document.addEventListener('visibilitychange', tick);
 setInterval(tick, 50);
+syncExitCopy();
+sizeCopyFloor();
 route();

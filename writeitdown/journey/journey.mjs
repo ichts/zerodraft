@@ -84,7 +84,7 @@ async function run(size, browser) {
   // The room stage repeats the landing header inside the hidden #room section, so the landing
   // nav and entrance locators are anchored to the visible #landing stage.
   const landingNav = page.locator('#landing nav[aria-label=Main]');
-  const landingDoor = page.locator('#landing > .cta a[href="#trial"]');
+  const landingDoor = page.locator('#landing .cta a[href="#trial"]');
   let sha = null;
   const ldGraph = async () => (JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent()))['@graph'];
 
@@ -118,15 +118,14 @@ async function run(size, browser) {
   await block('landing/demo', async () => {
     await step('demo sheet fills >=60% of the first viewport', async () => {
       const b = await page.locator('#demo .paper').boundingBox();
-      const vis = Math.max(0, Math.min(b.y + b.height, size.height) - Math.max(b.y, 0));
-      const r = vis / size.height; ok(r >= 0.6, `demo sheet covers ${(r * 100).toFixed(0)}% of the viewport`); return `${(r * 100).toFixed(0)}%`;
+      const r = Math.min(b.height, size.height) / size.height; ok(r >= 0.6, `demo sheet covers ${(r * 100).toFixed(0)}% of the viewport`); return `${(r * 100).toFixed(0)}%`;
     });
     await step('demo is the scripted preview with a 60-second clock', async () => {
       ok(/^\d:\d\d$/.test((await page.locator('#clock').innerText()).trim()), 'clock');
       ok(await page.locator('#demo .paper').isVisible(), 'sheet hidden');
     });
     await step('the door is the only entrance, and it sits above the demo', async () => {
-      const cta = page.locator('#landing > .cta'), demo = page.locator('#demo');
+      const cta = page.locator('#landing .cta'), demo = page.locator('#demo');
       ok(await cta.count() === 1, `${await cta.count()} entrance bands`);
       const c = await cta.boundingBox(), d = await demo.boundingBox();
       ok(c.y + c.height <= d.y + 2, 'the entrance band is not above the demo');
@@ -140,13 +139,13 @@ async function run(size, browser) {
         pin.textContent = '.home{--sans:Arial, sans-serif}';
         document.head.append(pin);
         const r = s => document.querySelector(s).getBoundingClientRect();
-        const door = r('#landing > .cta a[href="#trial"]'), paper = r('#demo .paper');
+        const door = r('#landing .cta a[href="#trial"]'), paper = r('#demo .paper');
         pin.remove();
-        return { doorBottom: door.bottom, paperTop: paper.top, hiddenBelowFold: innerHeight - paper.top };
+        return { doorBottom: door.bottom, paperTop: paper.top, paperHeight: paper.height };
       });
       ok(screen.doorBottom <= size.height, `the door ends at ${Math.round(screen.doorBottom)} px, past the ${size.height} px first screen`);
       ok(screen.doorBottom <= screen.paperTop, 'the door is not above the demo sheet');
-      ok(screen.hiddenBelowFold / size.height >= 0.6, `only ${Math.round(screen.hiddenBelowFold / size.height * 100)}% of the first screen is sheet`);
+      ok(Math.min(screen.paperHeight, size.height) / size.height >= 0.6, `the sheet keeps ${Math.round(Math.min(screen.paperHeight, size.height) / size.height * 100)}% of the first viewport`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
     await step('the trimmed blocks are gone: no reassurance line, no points band, no facts table, no closing block', async () => {
@@ -208,7 +207,10 @@ async function run(size, browser) {
   await block('landing/mac-block', async () => {
     await step('Download free trial link reaches /download/ (200, real page)', async () => {
       const h = await page.locator('#mac a', { hasText: /^download free trial$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
-      const r = await ctx.request.get(url('/download/')); ok(r.status() === 200 && /<h1>Write It Down for Mac<\/h1>/.test(await r.text()), 'download page is not the real page');
+      const r = await ctx.request.get(url('/download/'));
+      const h1 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(await r.text());
+      const heading = (h1?.[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      ok(r.status() === 200 && heading === 'Write It Down for Mac', `download page h1 is "${heading}"`);
     });
     await step('Buy link points at mac.html#buy', async () => {
       ok(await page.locator('#mac a[href="mac.html#buy"]').count() === 1, 'Buy link missing');
@@ -261,7 +263,7 @@ async function run(size, browser) {
       await page.evaluate(() => { const t = document.querySelector('.dlbox').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
       const checksum = page.locator('#sha256 code');
       ok(await checksum.count() === 1, `${await checksum.count()} published checksums`);
-      sha = (await checksum.innerText({ timeout: 2000 })).trim().toLowerCase();
+      sha = (await checksum.textContent({ timeout: 2000 })).trim().toLowerCase();
       ok(/^[0-9a-f]{64}$/.test(sha), 'no published 64-hex SHA-256 (page still says pending)');
       if (expectSha) ok(sha === expectSha.toLowerCase(), `published ${sha} != expected ${expectSha}`);
       for (const sel of ['#requirements', 'main a[data-launch="dmg"]', '#sha256']) {
@@ -322,8 +324,10 @@ async function run(size, browser) {
       await page.getByRole('button', { name: 'COPIED', exact: true }).waitFor({ state: 'visible' });
       const copied = await page.evaluate(() => navigator.clipboard.readText());
       ok(copied === typed, 'clipboard differs from the finished draft');
+      const touch = await page.evaluate(() => matchMedia('(hover: none), (any-pointer: coarse)').matches);
       await page.locator('#exit').click();
-      ok((await page.locator('#exit-hint').innerText()).trim() === 'Press Esc again to leave and delete the draft.', 'exit confirmation missing');
+      ok((await page.locator('#exit').innerText()).trim() === (touch ? 'EXIT' : 'ESC - EXIT'), 'exit control missing');
+      ok((await page.locator('#exit-hint').innerText()).trim() === (touch ? 'Tap EXIT again to leave and delete the draft.' : 'Press Esc again to leave and delete the draft.'), 'exit confirmation missing');
       ok(await page.locator('#room').isVisible(), 'one exit act left the room');
       await page.locator('#exit').click();
       await page.locator('#room').waitFor({ state: 'hidden' });

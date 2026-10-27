@@ -1003,3 +1003,175 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   word is a recorded exception rather than one of three interchangeable faces. The retired mono
   identity itself was already superseded for `index.html` and `/download/` by D-053; this finishes it
   on the remaining ten pages and in the app bundle.
+
+## D-058: A small phone shares its first screen between the door and the preview
+
+- Date: 2026-10-26
+- Decision: On a small phone the landing sheet takes the space left under the door instead of
+  insisting on 61% of the viewport: at 380 px wide or narrower and 700 px tall or shorter its
+  minimum height is `max(300px, min(61vh + 2px, 100svh - 340px))`. The door, its rhythm and the whole
+  demo sheet then end inside the first screen at 375x667 and 320x700. At 320x568 the paper keeps its
+  300 px floor and the page scrolls, which the captain allowed. The 390 px targets (390x844 and the
+  toolbar-shrunk viewport the mobile gate simulates) keep the 61% sheet at every height.
+- Reason: the audit measured the door below the fold at 375x667 and 320x700 before D-047 moved it
+  above the demo, and the sheet still ended past the fold at both sizes (743.8 of 667 and 748 of
+  700), so the first screen ended on a paper cut by the screen edge. The audit's own remedy was a
+  height-aware sheet; scoping it to the widths the audit measured keeps the measured 390 px contract
+  intact, which a blanket `max-height` rule broke in the mobile dynamic-viewport test.
+- Supersedes: nothing. The 61% sheet contract stands for the sizes it was measured at.
+
+## D-059: A press and a focus change the label and the ring, nothing else
+
+- Date: 2026-10-26
+- Decision: The kept screen's primary control reserves the width of its own `COPY TEXT` label in a
+  single grid cell, so the press to `COPIED` cannot shrink the pill or re-centre the row; at 390 px
+  the kept column narrows to 24 px insets with a 16 px gap, so both controls stay on one line and
+  `RUN IT AGAIN` never lands under the pointer that pressed COPY. The shared focus rule is a ring
+  only: `.home :focus-visible` keeps the 2 px ink outline and no longer carries `border-radius`, so a
+  focused control keeps its own shape - the pill stays a pill, a text control stays square.
+- Reason: the press moved `RUN IT AGAIN` 14.8 px left at 1440 and, at 390, from a second row into the
+  first one directly under the tap point, so a second tap started a new session and threw the kept
+  draft away; and the focused COPY pill rendered as an 8 px rounded rectangle beside a 999 px
+  capsule the moment the kept screen took focus.
+- Supersedes: nothing. The 48 pt pill, its single inner ring and its 24 px label padding are
+  unchanged.
+
+## D-060: The download head breaks without an orphan, and its copyable strings never break mid-token
+
+- Date: 2026-10-26
+- Decision: `/download/`'s H1 keeps `for Mac` unbroken, so a phone head reads `Write It Down` /
+  `for Mac` instead of orphaning `Mac`. At 420 px and narrower the whole head is left-aligned, so
+  the headline's ink and the 34ch deck's ink start on the page's own left edge; the desktop head
+  keeps its centred line. The published SHA-256 sits in its own mono panel - `--tag-bg`, a hairline,
+  13 px mono in the ink role, the label in the mute role - as two atomic 32-character halves that
+  share one line when they fit and wrap into two unbroken lines when they do not (12 px and tighter
+  panel padding below 365 px so one half fits at 320 px; 13 px wherever it fits). The Install card's
+  `shasum` command breaks at its argument boundary: `shasum -a 256 ` stays on the first line and the
+  DMG filename sits on a hanging continuation line, unbroken. Neither block is a scroll container,
+  neither shows a fade, and every line is fully visible without interaction. Each block carries a
+  `COPY` control (36 px ghost pill, `COPIED` for two seconds, sr-only live status) that writes the
+  exact full value, and each control names its own value in its accessible label
+  (`Copy the SHA-256`, `Copy the install command`) so the two buttons are distinguishable. The hash
+  code's text stays the single 64-character value and the command's text the single one-line
+  command, so `release-check.mjs` reads them unchanged.
+- Reason: at 390 the head broke as `Write It Down for` / `Mac`, orphaning a 38 px word, the deck set
+  seven centred lines with seven different left edges, the 64-character hash sat at 11.96 px and
+  broke wherever the box ended, and the command a buyer must copy wrapped mid-token. A single
+  scrolling line then hid most of the hash and the install card's narrow desktop column hid the
+  filename, so the value a buyer must compare or copy could not be found.
+- Supersedes: nothing. The `data-launch="sha256"` slot, its text and the command's filename stay
+  exactly as `release-check.mjs` reads them.
+
+## D-061: The exit asks twice for a pointer too, and the phone names the control it has
+
+- Date: 2026-10-26
+- Decision: In the room, nothing leaves in one act. Escape, `EXIT` and the brand all arm the same
+  inline confirmation for two seconds and the second act leaves; the room's `Download for Mac` links
+  (header and exit row) open in a new tab with `rel="noopener"`, so the draft survives them. The
+  control is labelled `EXIT` at 767 px and below and its confirmation reads `Tap EXIT again to leave
+  and delete the draft.`; above that width it stays `ESC - EXIT` with `Press Esc again to leave and
+  delete the draft.` A tap on `EXIT` arms exactly as a click does.
+- Reason: the phone carried only the label of a key it does not have and a confirmation that named
+  that key, and the exit row itself held a one-tap link that navigated away from a live draft while
+  the two-step exit was the only thing protecting it.
+- Supersedes: D-053's phone nav arrangement only in that the Mac link in the exit row is now a new-tab
+  link; the nav keeps the mark and the theme icon alone.
+
+## D-062: The kept receipt owns the count, and one caption says the draft is not saved
+
+- Date: 2026-10-26
+- Decision: On the kept screen the red receipt prints the session's size (`1 MINUTE. 40 WORDS.`), the
+  corner count slot is silent, and one caption sits under the actions: `Nothing here is saved. Copy
+  it before you leave.` The caption's gap joins the kept screen's own space list, so a short sheet
+  gives it up before it gives up the draft's last line.
+- Reason: the count was printed twice, 598 px apart at 390, and nothing on the screen said the kept
+  text existed only in this tab, so leaving or reloading lost it silently.
+- Scope: the web surfaces (the trial room and the landing demo). The Mac kept screen still prints
+  the count twice and the Mac lane carries the same change under `docs/wid-mac-behavior.md` before
+  the two surfaces are claimed to match again.
+- Supersedes: the "count in the corner on every state" reading of D-028 for the kept screen only;
+  rest, typing, warning and wipe keep both the corner count and their instructions.
+
+## D-063: The wipe clock holds the value the draft died with
+
+- Date: 2026-10-26
+- Decision: While the failure screen is up, the corner clock shows the same `M:SS` the red receipt
+  names (`DRAFT DELETED AT 0:52.`), and holds it until `Begin again` or the next first keystroke
+  starts a session. The landing demo's failure screen does the same.
+- Reason: the clock re-armed to `1:00` under a receipt that named `0:52`, so the same corner meant
+  "already used" on the kept screen and "reset" on the wiped one, and the receipt's value had no
+  referent on screen.
+- Scope: the web surfaces. The Mac deleted screen still shows the clock after it re-arms; the Mac
+  lane takes the same change before the parity claim is restored.
+- Supersedes: nothing. The receipt string itself is unchanged.
+
+## D-064: The watch-only preview advertises no input
+
+- Date: 2026-10-26
+- Decision: The landing demo draws no caret, never writes `Type to start` in its count slot, and its
+  failure receipt reads `DRAFT DELETED AT M:SS.` with no `TYPE TO START AGAIN.` instruction. The
+  slot stays empty until the first scripted word appears, then prints the room's exact word string
+  (`1 word`, `20 words`). Its clock and its receipt keep running, and its failure screen holds the
+  clock at the deletion value like the room; the room keeps the trailing instruction because the
+  room takes input.
+- Reason: the preview painted a blinking insertion point and a typing instruction while a click, a
+  key or an IME composition changed nothing, so the first thing a visitor tried was the one thing
+  that could never work.
+- Scope: the landing demo. The room keeps its `Type to start` prompt because the room takes input,
+  and the Mac has no watch-only preview.
+- Supersedes: the demo's `Type to start` reading of D-028.
+
+## D-065: A wipe hides the draft, never the insertion point
+
+- Date: 2026-10-26
+- Decision: In the wipe phase the editor's text colour goes transparent and its caret keeps the ink
+  colour; the writing area is no longer faded to zero opacity. The wiped room shows the caret on the
+  empty line exactly as the first-entry room does.
+- Reason: the failure screen orders `TYPE TO START AGAIN.` while an `opacity: 0` writing area had
+  painted the caret away, so the one screen that tells the writer to type was the one screen with no
+  insertion point.
+- Scope: the web room. The Mac room's deleted screen is its own contract; the Mac lane applies the
+  same rule there before the parity claim is restored.
+- Supersedes: nothing.
+
+## D-066: Seconds read one way, and the clock does not breathe
+
+- Date: 2026-10-26
+- Decision: On the landing `m:ss` names only the running clock, `N s` names a silence mark, and a
+  duration is never a bare numeral: the warning panel reads `3 s left · warning` over its `3`, the
+  card's marker row reads `5 s · warning` and `8 s · deleted`, and the three-second lead-in is
+  stated once in the card and once in the answer the FAQ schema repeats word for word. The clock and
+  the count on both the room and the demo use tabular numerals.
+- Reason: the panel labelled `5 s · warning` sat over a numeral `3`, the Mac limits were listed as if
+  they were warning times although the warning always starts three seconds before the limit, and the
+  proportional clock crept sideways once a second.
+- Supersedes: nothing. The silence limits themselves (`5 s`, `8 s`, `12 s`) are unchanged.
+
+## D-067: The exit wording follows the input, not the window width
+
+- Date: 2026-10-26
+- Decision: The room chooses `EXIT` and `Tap EXIT again to leave and delete the draft.` whenever
+  `(hover: none), (any-pointer: coarse)` matches, and `ESC - EXIT` and `Press Esc again to leave and
+  delete the draft.` otherwise. Width only decides layout: the wrapped confirmation row and the
+  hidden nav pill. The wording re-syncs when that query changes and on resize. The two-act exit and
+  the new-tab Mac links are unchanged.
+- Reason: the width rule left a landscape phone (844 px) naming a key it does not have, so the
+  audit's phone-wording defect remained reachable on a wide touch screen.
+- Supersedes: D-061's width rule for the label and hint; its two-act exit and new-tab links stand.
+
+## D-068: The landing first screen is one flex column, not a breakpoint
+
+- Date: 2026-10-26
+- Decision: The landing's nav, hero, door and sheet sit in `.first-screen`, a flex column with
+  `min-height:100vh` and `100svh`; `.stagewrap` takes the remaining space with a
+  `max(300px, 61vh)` / `max(300px, 61svh)` floor (vh first, svh second), and `.home .paper` fills it
+  (`flex:1;min-height:300px`, max-width 760 px). The sheet sizing carries no width or height
+  breakpoint. When the content plus the floor exceeds the viewport, the first screen grows and the
+  page scrolls; the door and its note stay inside the viewport. The sheet stays at or above 61% of
+  the first viewport at 390x844, 375x667, 320x700 and 1440x900.
+- Reason: the 380 px / 700 px scoped rule and its width-banded constant each moved the cut to the
+  next size - 375x812 in the first, the 381-387 band in the second - so the sheet must follow the
+  content instead of hard-coded chrome; the container-only sizing then let a wider phone face drop
+  the sheet below the 60-61% contract, so the container now carries the fraction floor.
+- Supersedes: D-058's width/height scoping rule and its 340 px constant; its intent (the door and the
+  preview share the first screen) and the 300 px floor stand.

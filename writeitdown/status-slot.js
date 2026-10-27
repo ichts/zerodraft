@@ -42,7 +42,7 @@ const ink = (() => {
 // fits, so a comfortable sheet keeps its designed rhythm. A fixed block taller than the line
 // they can give crushes the draft to zero height before they are asked; the gap shrink is
 // what recovers it, so only the screen not being rendered (hidden) skips the measurement.
-const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
+const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-note', '--kept-note-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
 
 function keepDraftLine(paper) {
   const scroll = paper.querySelector('.kept-scroll');
@@ -150,12 +150,13 @@ export function statusSlot({ paper, line, pitches, numeral, caption, receipt, bl
       const keptBottom = Math.max(0, compact
         ? paperHeight - footerTop + gap
         : hintTop != null ? paperHeight - hintTop + gap : paperHeight - footerTop - 24);
-      const compactVars = ['--kept-title', '--kept-receipt-gap', '--kept-actions-gap', '--kept-scroll-gap'];
+      const compactVars = ['--kept-title', '--kept-receipt-gap', '--kept-note-gap', '--kept-actions-gap', '--kept-scroll-gap'];
       paper.style.setProperty('--kept-top', `${compact ? 8 : 72}px`);
       paper.style.setProperty('--kept-bottom', `${keptBottom}px`);
       if (compact) {
         paper.style.setProperty('--kept-title', 'var(--t-kept-compact)');
         paper.style.setProperty('--kept-receipt-gap', '6px');
+        paper.style.setProperty('--kept-note-gap', '6px');
         paper.style.setProperty('--kept-actions-gap', '8px');
         paper.style.setProperty('--kept-scroll-gap', '4px');
       } else {

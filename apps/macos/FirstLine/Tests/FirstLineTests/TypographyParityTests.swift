@@ -23,11 +23,13 @@ struct TypographyParityTests {
         let roles: [Role]
     }
 
+    private let packageRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()  // FirstLineTests
+        .deletingLastPathComponent()  // Tests
+        .deletingLastPathComponent()  // FirstLine
+
     private func baseline() throws -> Baseline {
-        let fixture = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()  // FirstLineTests
-            .deletingLastPathComponent()  // Tests
-            .deletingLastPathComponent()  // FirstLine
+        let fixture = packageRoot
             .deletingLastPathComponent()  // macos
             .deletingLastPathComponent()  // apps
             .deletingLastPathComponent()  // repo root
@@ -78,12 +80,13 @@ struct TypographyParityTests {
     }
 
     @Test func theBundleCarriesOnlyTheSharedFaces() throws {
-        let files = try #require(BundledResources.bundle.urls(forResourcesWithExtension: "ttf", subdirectory: nil))
-        #expect(Set(files.map { $0.deletingPathExtension().lastPathComponent })
-            == ["Newsreader-Variable", "Newsreader-Italic-Variable", "ZhuqueFangsong-Regular"])
-        let licences = try #require(BundledResources.bundle.urls(forResourcesWithExtension: "txt", subdirectory: nil))
-            .map { $0.lastPathComponent }.filter { $0.hasPrefix("OFL-") }
-        #expect(Set(licences) == ["OFL-Newsreader.txt", "OFL-ZhuqueFangsong.txt"])
+        // The target's declared resource directory is what ships; the incremental debug bundle can
+        // keep files a previous build copied, so it is not the source of truth.
+        let resources = packageRoot.appendingPathComponent("Sources/FirstLine/Resources")
+        let names = try FileManager.default.contentsOfDirectory(atPath: resources.path)
+        #expect(Set(names.filter { $0.hasSuffix(".ttf") })
+            == ["Newsreader-Variable.ttf", "Newsreader-Italic-Variable.ttf", "ZhuqueFangsong-Regular.ttf"])
+        #expect(Set(names.filter { $0.hasPrefix("OFL-") }) == ["OFL-Newsreader.txt", "OFL-ZhuqueFangsong.txt"])
     }
 
     @Test func chineseCascadesToTheMacRoomsFangsong() throws {

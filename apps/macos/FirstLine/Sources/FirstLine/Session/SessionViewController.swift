@@ -1,6 +1,6 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Note paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, the paper's own wash (PaperWashView: the sheet's texture over its tint, leaving on the 120 ms fade) and numeral, live deletion sentence, the stopped screen (headline, `Begin again`, red receipt), kept heading/copy receipt, two-step exit.
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, live deletion sentence, the stopped screen (headline, `Begin again`, red receipt), kept heading/copy receipt, two-step exit.
  * [POS]: Centered writing above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -49,17 +49,71 @@ class RoomWashView: NSView {
     }
 }
 
-/// The sheet's warn wash. It paints the paper tone mixed toward the locked wash colour and then the
-/// sheet's own texture (both mottle scales, the grain and the mean shift) over it, so the alarm tints the
-/// same paper on both surfaces: the web keeps its canvas above the wash background, and a flat overlay
-/// here would either hide the texture or, faded in by alpha, layer a second one over the first (D-056).
+/// The sheet's texture inside the wash: both mottle scales and the grain, drawn once into its own layer each
+/// time the sheet rebuilds its field, so a warn tick that only moves the tint never repaints it.
+final class PaperTextureView: NSView {
+    var image: CGImage? { didSet { needsDisplay = true } }
+    /// How many times the texture has been painted; a warn tick must leave it unchanged.
+    private(set) var paints = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
+        autoresizingMask = [.width, .height]
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isOpaque: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image, let ctx = NSGraphicsContext.current?.cgContext else { return }
+        paints += 1
+        ctx.saveGState()
+        ctx.translateBy(x: 0, y: bounds.height)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.interpolationQuality = .none
+        ctx.draw(image, in: CGRect(origin: .zero, size: bounds.size))
+        ctx.restoreGState()
+    }
+}
+
+/// The sheet's warn wash. Its layer carries the paper tone mixed toward the locked wash colour, and the
+/// sheet's own texture sits above it in a layer of its own, so the alarm tints the same paper on both
+/// surfaces and each tick changes one layer colour instead of repainting the sheet (D-056). The sheet's
+/// mean shift rides on that colour, so the washed sheet keeps the sheet's corrected tone.
 final class PaperWashView: RoomWashView {
-    var texture: PaperField.Texture? { didSet { needsDisplay = true } }
+    private let textureView = PaperTextureView()
+    private var shift = (r: 0.0, g: 0.0, b: 0.0)
     private var fadeToken = 0
+
+    /// The sheet's texture; set once per rebuilt field, never per tick.
+    var texture: PaperField.Texture? {
+        didSet {
+            textureView.image = texture?.image
+            shift = texture?.shift ?? (0, 0, 0)
+            needsDisplay = true
+        }
+    }
+
+    /// How many times the texture layer has been painted, so a test can prove a tick never repaints it.
+    var texturePaints: Int { textureView.paints }
 
     /// How far the sheet has warmed, 0...1: the ramp moves the colour, not the view's alpha.
     var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
     var deep = false { didSet { needsDisplay = true } }
+
+    override init(fillColor: NSColor) {
+        super.init(fillColor: fillColor)
+        textureView.frame = bounds
+        addSubview(textureView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     /// The paper's tone mixed toward the locked wash colour, resolved for this view's appearance every
     /// time it is read, so neither a theme switch nor a drawing-appearance left behind by another view
@@ -79,30 +133,12 @@ final class PaperWashView: RoomWashView {
         return resolved
     }
 
-    override var wantsUpdateLayer: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            let rect = bounds
-            ctx.saveGState()
-            if cornerRadius > 0 {
-                ctx.addPath(CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
-                ctx.clip()
-            }
-            ctx.setFillColor(tint.cgColor)
-            ctx.fill(rect)
-            if let texture {
-                ctx.saveGState()
-                ctx.translateBy(x: 0, y: rect.height)
-                ctx.scaleBy(x: 1, y: -1)
-                ctx.interpolationQuality = inLiveResize ? .high : .none
-                ctx.draw(texture.image, in: rect)
-                ctx.restoreGState()
-                PaperField.apply(shift: texture.shift, to: ctx, in: rect)
-            }
-            ctx.restoreGState()
-        }
+    override func updateLayer() {
+        super.updateLayer()
+        let colour = tint
+        layer?.backgroundColor = CGColor(srgbRed: colour.redComponent + shift.r / 255,
+                                         green: colour.greenComponent + shift.g / 255,
+                                         blue: colour.blueComponent + shift.b / 255, alpha: 1)
     }
 
     /// Shows the wash at `fraction` warmth, or, at zero, leaves on the 120 ms fade still carrying its last
@@ -270,7 +306,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        // The paper is the Note sheet (D-056): tone and texture are rendered by the view itself.
+        // The paper is the Wheat sheet (the captain's 2026-10-27 Wheat decision): tone and texture are rendered by the view itself.
         paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet
@@ -822,7 +858,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         return text
     }
 
-    /// One quiet role on the paper: the exit link keeps 7.35:1 on the Note sheet in both appearances.
+    /// One quiet role on the paper: the exit link keeps 7:1 on the Wheat sheet in both appearances.
     private func styleQuietLink(_ button: NSButton, title: String) {
         let color = FirstLineColors.paperQuietNSColor
         button.title = title

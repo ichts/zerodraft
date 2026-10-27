@@ -32,18 +32,19 @@ enum FirstLineColors {
     static var pageNSColor: NSColor { adaptive(light: 0xF7F7F5, dark: 0x15140F) }
     /// Plain surfaces: cards, fields, buttons, controls.
     static var sheetNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x26231C) }
-    /* The writing sheet is the Note paper (D-056). Its roles are measured against the paper's own
-       tone, not against white: every word on it clears 7:1, so the quiet chrome is its own role
-       and the pen red is deep enough to read on the paper and on its warn wash. */
-    static var paperNSColor: NSColor { adaptive(light: 0xDBE6EC, dark: 0x21272A) }
-    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xB8B5AC) }
-    static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFB4A2) }
+    /* The writing sheet is the Wheat paper (the captain's 2026-10-27 Wheat decision, superseding D-056's
+       Note tone). Its roles are measured against the paper's own tone, not against white: every reading
+       role clears 7:1, and the completed lines keep D-027's deliberate fade below that floor (D-069), so
+       the quiet chrome is its own role and the pen red is deep enough to read on the paper and its wash. */
+    static var paperNSColor: NSColor { adaptive(light: 0xE9E2CE, dark: 0x342E24) }
+    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xC1BEB5) }
+    static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFC5B2) }
     /// The sheet's warn wash: `color-mix(in oklab, paper 88%, #C8392F)` and its deeper 76% step of the
     /// eighth second, the exact recipe the web paints (`--wash-paper`, `--wash-paper-deep`). The values
     /// are the browser compositor's own output, so both surfaces warm through the same ramp and land on
-    /// the same colour instead of the Mac tinting a blue-grey sheet with a pale pink meant for white.
-    static var paperWashNSColor: NSColor { adaptive(light: 0xDDD3D5, dark: 0x352C2C) }
-    static var paperWashDeepNSColor: NSColor { adaptive(light: 0xDDC0BE, dark: 0x49302E) }
+    /// the same colour instead of the Mac tinting the sheet with a pale pink meant for white.
+    static var paperWashNSColor: NSColor { adaptive(light: 0xE8CFBB, dark: 0x453226) }
+    static var paperWashDeepNSColor: NSColor { adaptive(light: 0xE6BCA7, dark: 0x573428) }
     /// Per-logical-line history opacity: the current line full, one line up 22 %, two lines up 7 %, older
     /// lines gone (D-027). One fixed ladder for both appearances: a theme switch can never leave a stale
     /// step baked into a completed line (D-069).

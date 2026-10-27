@@ -374,7 +374,7 @@ struct SnapshotTests {
         var samples: [(Double, Double, Double)] = []
         for y in Int(point.y)..<Int(point.y) + side {
             for x in Int(point.x)..<Int(point.x) + side {
-                guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                guard let colour = pixel(rep, x: x, y: y) else { continue }
                 let sample = (Double(colour.redComponent), Double(colour.greenComponent), Double(colour.blueComponent))
                 samples.append(sample)
                 sum.r += sample.0
@@ -387,8 +387,7 @@ struct SnapshotTests {
         let mean = (sum.r / count, sum.g / count, sum.b / count)
         // The exact two-level tone assertion runs on the field the view draws, in
         // `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone`, where the pixels are the ones the sheet is
-        // made of. This window bitmap round-trips through the window's own colour space and the sheet's shadow,
-        // so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
+        // made of. This window bitmap is a 24 px patch of a mottled sheet, so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
         // assertion guards the value itself (D-069).
         let lift = [mean.0 - Double(expected.redComponent),
                     mean.1 - Double(expected.greenComponent),
@@ -396,11 +395,8 @@ struct SnapshotTests {
         let variance = samples.reduce(0.0) { $0 + pow($1.0 - mean.0, 2) } / count
         let spread = variance.squareRoot()
         let outOfBand = lift.contains { abs($0) > 0.06 }
-        if outOfBand || spread <= 0.002 {
-            print("PAPERFAIL \(name) mean=\(mean) expected=\(expected) lift=\(lift) spread=\(spread)")
-        }
-        #expect(!outOfBand, "\(name): the paper's tone left the locked band, lift=\(lift)")
-        #expect(spread > 0.002, "\(name): the paper carries no grain")
+        #expect(!outOfBand, "\(name): the paper's tone left the locked band, mean=\(mean) lift=\(lift)")
+        #expect(spread > 0.002, "\(name): the paper carries no grain, spread=\(spread)")
     }
 
     /// The warning sheet is measured too: the rendered patch must be the paper tone mixed toward the locked
@@ -418,7 +414,7 @@ struct SnapshotTests {
         var count = 0.0
         for y in Int(point.y)..<Int(point.y) + side {
             for x in Int(point.x)..<Int(point.x) + side {
-                guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                guard let colour = pixel(rep, x: x, y: y) else { continue }
                 sum.r += Double(colour.redComponent)
                 sum.g += Double(colour.greenComponent)
                 sum.b += Double(colour.blueComponent)
@@ -439,13 +435,25 @@ struct SnapshotTests {
     private func assertPixel(_ rep: NSBitmapImageRep, at point: NSPoint, equals token: NSColor,
                              in appearance: NSAppearance.Name, name: String) throws {
         let resolved = try #require(appearanceColor(token, appearance))
-        let color = try #require(rep.colorAt(x: Int(point.x), y: Int(point.y))?.usingColorSpace(.sRGB))
+        let color = try #require(pixel(rep, x: Int(point.x), y: Int(point.y)))
         let expected = try #require(resolved.usingColorSpace(.sRGB))
         let delta = abs(color.redComponent - expected.redComponent)
             + abs(color.greenComponent - expected.greenComponent)
             + abs(color.blueComponent - expected.blueComponent)
         if delta >= 0.16 { print("PIXFAIL \(name) point=\(Int(point.x)),\(Int(point.y)) got=\(color) expected=\(expected) size=\(rep.pixelsWide)x\(rep.pixelsHigh)") }
         #expect(delta < 0.16, "\(name): pixel \(Int(point.x)),\(Int(point.y)) differs from the token")
+    }
+
+    /// A bitmap pixel read in the bitmap's own colour space. `colorAt` tags the bytes as calibrated RGB, so
+    /// converting that to sRGB lifts dark tones by about 15 levels that are not on the screen.
+    private func pixel(_ rep: NSBitmapImageRep, x: Int, y: Int) -> NSColor? {
+        var raw = [Int](repeating: 0, count: rep.samplesPerPixel)
+        rep.getPixel(&raw, atX: x, y: y)
+        let maximum = CGFloat((1 << rep.bitsPerSample) - 1)
+        var components = raw.map { CGFloat($0) / maximum }
+        if components.count == 3 { components.append(1) }
+        return NSColor(colorSpace: rep.colorSpace, components: &components, count: components.count)
+            .usingColorSpace(.sRGB)
     }
 
     private func appearanceColor(_ color: NSColor, _ appearance: NSAppearance.Name) -> NSColor? {

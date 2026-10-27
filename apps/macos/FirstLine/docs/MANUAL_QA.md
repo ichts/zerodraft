@@ -689,6 +689,12 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 
 ## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
 
+- SUPERSEDED TONE: the captain's 2026-10-27 Wheat decision makes the Mac sheet Wheat (`#e9e2ce` / `#342e24`,
+  dark quiet `#c1beb5`, dark pen `#ffc5b2`, washes `#e8cfbb`/`#e6bca7` light and `#453226`/`#573428` dark).
+  The deterministic suite now asserts the Wheat values and `RoomTests.warnTicksNeverRepaintThePaperTexture`;
+  the Note captures and parity measurements below are the earlier head's evidence. PENDING: Wheat window
+  captures and parity measurements.
+
 Scope: D-056 as amended by D-069. The writing sheet is the Note paper on the Mac room as on the web: tone
 `#dbe6ec` light / `#21272a` dark, grain 70 of 100 at size 1.00, ink `#1c1917` / `#ece7d9`, every reading role
 measured against the paper, D-027's 100/22/7 fade kept, and the alarm tinting the sheet's own paper.

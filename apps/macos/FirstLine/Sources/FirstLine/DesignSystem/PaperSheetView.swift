@@ -1,6 +1,7 @@
 /**
  * [INPUT]: the paper's laid-out size, the window's backing scale, the effective appearance (light/dark),
- *          and the locked paper constants (D-056: tone Note #dbe6ec / #21272a, grain 70 of 100, size 1.00).
+ *          and the locked paper constants (tone Wheat #e9e2ce / #342e24 per the captain's 2026-10-27 Wheat decision superseding D-056's Note
+ *          tone; grain 70 of 100, size 1.00 per D-056).
  * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone, two-scale mottle and grain, rendered once
  *           into a cached CGImage per size and appearance, with the sheet ring and rounded clip the room needs.
  * [POS]: The Mac half of the sheet the web renders in writeitdown/paper.js; the room, its failure screen and
@@ -133,8 +134,8 @@ final class PaperSheetView: NSView {
 
 /// The generator. Every constant here is the locked paper (D-056 / writeitdown/paper.js).
 enum PaperField {
-    static let lightTone = (r: 219.0, g: 230.0, b: 236.0)
-    static let darkTone = (r: 33.0, g: 39.0, b: 42.0)
+    static let lightTone = (r: 233.0, g: 226.0, b: 206.0)
+    static let darkTone = (r: 52.0, g: 46.0, b: 36.0)
     static let grain = 0.70
     static let size = 1.00
     static let tooth = 44.0
@@ -317,9 +318,8 @@ enum PaperField {
         return abs(delta.r) + abs(delta.g) + abs(delta.b) > 0.05 ? delta : none
     }
 
-    /// Moves every pixel of `rect` by `delta` (in 0...255 sRGB levels): the sheet's mean correction, and the
-    /// same correction the wash applies over its texture.
-    static func apply(shift delta: (r: Double, g: Double, b: Double), to context: CGContext, in rect: CGRect) {
+    /// Moves every pixel of `rect` by `delta` (in 0...255 sRGB levels): the sheet's mean correction.
+    private static func apply(shift delta: (r: Double, g: Double, b: Double), to context: CGContext, in rect: CGRect) {
         let up = (r: max(delta.r, 0) / 255, g: max(delta.g, 0) / 255, b: max(delta.b, 0) / 255)
         if up.r + up.g + up.b > 0 {
             context.saveGState()

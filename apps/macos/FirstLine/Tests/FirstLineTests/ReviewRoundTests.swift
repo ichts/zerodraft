@@ -316,7 +316,7 @@ struct ReviewRoundTests {
 
         // The same patch of the sheet, before the wash and under it: the wash is the difference between
         // those two frames. An absolute redness would only be measuring the paper's own tone, which is
-        // now a cool Note blue-grey, so the assertion is the warmth the alarm adds (D-056).
+        // now the warm Wheat paper, so the assertion is the warmth the alarm adds (D-056).
         func sample() throws -> NSColor {
             room.view.layoutSubtreeIfNeeded()
             room.view.displayIfNeeded()
@@ -348,7 +348,7 @@ struct ReviewRoundTests {
         #expect(engine.phase == .danger)
         let washed = try sample()
 
-        // The tint itself is exact and deterministic: at 6.5 s the sheet is half way from the Note tone to
+        // The tint itself is exact and deterministic: at 6.5 s the sheet is half way from the Wheat tone to
         // the locked wash colour, and the view is fully covering the paper so the grain is painted once.
         let wash = try #require(descendants(of: room.view, of: PaperWashView.self).first)
         #expect(abs(wash.fraction - 0.5) < 0.001)

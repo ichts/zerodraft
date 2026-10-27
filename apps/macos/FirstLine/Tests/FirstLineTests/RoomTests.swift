@@ -368,6 +368,56 @@ struct RoomTests {
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
     }
 
+    /// A warn tick moves only the wash's colour: the texture layer is drawn once per field and never again
+    /// while the alarm ramps, and it lands on the sheet's own grain, so nothing on the paper moves or flickers.
+    @Test func warnTicksNeverRepaintThePaperTexture() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        let view = fixture.room.view
+        let paper = try #require(descendants(view, of: PaperSheetView.self).first)
+        let wash = try #require(descendants(view, of: PaperWashView.self).first)
+        func settle() {
+            view.layoutSubtreeIfNeeded()
+            view.displayIfNeeded()
+            CATransaction.flush()
+        }
+        func render() throws -> [(Double, Double, Double)] {
+            settle()
+            let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+            let origin = (x: Int(paper.frame.midX * scale), y: Int((view.bounds.height - paper.frame.maxY + 80) * scale))
+            var pixels: [(Double, Double, Double)] = []
+            for y in origin.y..<origin.y + 40 {
+                for x in origin.x..<origin.x + 40 {
+                    let colour = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    pixels.append((Double(colour.redComponent), Double(colour.greenComponent), Double(colour.blueComponent)))
+                }
+            }
+            return pixels
+        }
+        let plain = try render()
+        fixture.clock.now = 5.2
+        fixture.room.tick()
+        #expect(wash.alphaValue == 1 && wash.fraction > 0)
+        let washed = try render()
+
+        let count = Double(plain.count)
+        let offset = zip(washed, plain).reduce(0.0) { $0 + ($1.0.1 - $1.1.1) } / count
+        let residual = (zip(washed, plain).reduce(0.0) { $0 + pow($1.0.1 - $1.1.1 - offset, 2) } / count).squareRoot()
+        #expect(residual < 0.01, "the washed grain does not sit on the sheet's grain: residual \(residual)")
+
+        settle()
+        let paints = wash.texturePaints
+        #expect(paints > 0, "the texture layer was never painted")
+        for now in [5.5, 6.0, 6.5, 7.0, 7.5] {
+            fixture.clock.now = now
+            fixture.room.tick()
+            settle()
+            #expect(wash.texturePaints == paints, "a warn tick at \(now) s repainted the paper texture")
+        }
+    }
+
     @Test func cutCleanupUsesTheSameWashFade() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
@@ -398,7 +448,7 @@ struct RoomTests {
         #expect(abs((numeral.font?.pointSize ?? 0) - min(fixture.room.view.bounds.height * 0.18, 170)) < 1)
     }
 
-    /// The count and the exit link sit on the Note sheet, so they take the sheet's one quiet role in
+    /// The count and the exit link sit on the Wheat sheet, so they take the sheet's one quiet role in
     /// every phase: the wall's mute and chrome would sink below the 7:1 floor on the paper (D-056).
     @Test func countAndExitKeepThePaperQuietRoleInEveryPhase() throws {
         for phase in [SessionPhase.writing, .danger] {

@@ -55,16 +55,16 @@ struct PaperContrastTests {
         _ = NSApplication.shared
         let light = try resolved(FirstLineColors.paperNSColor, .aqua)
         let dark = try resolved(FirstLineColors.paperNSColor, .darkAqua)
-        #expect(hex(light) == "#dbe6ec", "the light sheet is the locked Note tone")
-        #expect(hex(dark) == "#21272a", "the dark sheet is the lamp version, not an inversion")
+        #expect(hex(light) == "#e9e2ce", "the light sheet is the locked Wheat tone")
+        #expect(hex(dark) == "#342e24", "the dark sheet is the Wheat lamp dark, not an inversion")
 
         #expect(hex(try resolved(FirstLineColors.inkNSColor, .aqua)) == "#1c1917")
         #expect(hex(try resolved(FirstLineColors.inkNSColor, .darkAqua)) == "#ece7d9")
 
         #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .aqua)) == "#464746")
-        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)) == "#b8b5ac")
+        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)) == "#c1beb5")
         #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .aqua)) == "#63140b")
-        #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .darkAqua)) == "#ffb4a2")
+        #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .darkAqua)) == "#ffc5b2")
     }
 
     @Test func everyTextRoleClearsSevenToOneOnTheSheet() throws {
@@ -108,10 +108,10 @@ struct PaperContrastTests {
     /// The wash is not a second palette: it is the web's `color-mix(in oklab, paper 88%, #C8392F)` (76%
     /// at the cut), so the Mac and the browser land on the same colour under the same alarm (D-056).
     @Test func theWashIsTheWebsPaperMixNotAPalePink() throws {
-        #expect(hex(try resolved(FirstLineColors.paperWashNSColor, .aqua)) == "#ddd3d5")
-        #expect(hex(try resolved(FirstLineColors.paperWashNSColor, .darkAqua)) == "#352c2c")
-        #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, .aqua)) == "#ddc0be")
-        #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, .darkAqua)) == "#49302e")
+        #expect(hex(try resolved(FirstLineColors.paperWashNSColor, .aqua)) == "#e8cfbb")
+        #expect(hex(try resolved(FirstLineColors.paperWashNSColor, .darkAqua)) == "#453226")
+        #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, .aqua)) == "#e6bca7")
+        #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, .darkAqua)) == "#573428")
         // The wash is a tint of the sheet's own hue family, warmer than the paper and warmer still at the cut.
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let paper = try resolved(FirstLineColors.paperNSColor, appearance)
@@ -127,13 +127,12 @@ struct PaperContrastTests {
     /// locked, so this measures the rendered pixels rather than the intended constant (D-069).
     @Test func theRenderedFieldStaysOnTheLockedTone() throws {
         let expectations: [(name: String, dark: Bool, tone: (Double, Double, Double))] = [
-            ("light", false, (219, 230, 236)),
-            ("dark", true, (33, 39, 42)),
+            ("light", false, (233, 226, 206)),
+            ("dark", true, (52, 46, 36)),
         ]
         for entry in expectations {
             let image = try #require(PaperField.render(width: 600, height: 400, scale: 2, dark: entry.dark))
             let mean = try meanColour(of: image)
-            print("MEAN \(entry.name): r=\(mean.r) g=\(mean.g) b=\(mean.b) tone=\(entry.tone)")
             #expect(abs(mean.r - entry.tone.0) <= 2, "\(entry.name): rendered red mean \(mean.r) against \(entry.tone.0)")
             #expect(abs(mean.g - entry.tone.1) <= 2, "\(entry.name): rendered green mean \(mean.g) against \(entry.tone.1)")
             #expect(abs(mean.b - entry.tone.2) <= 2, "\(entry.name): rendered blue mean \(mean.b) against \(entry.tone.2)")

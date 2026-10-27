@@ -193,7 +193,7 @@ test.describe('the sheet', () => {
     await enterRoom(page);
     const mode = await theme(page);
     // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
-    // background behind the canvas is the grain-corrected base, not the colour on screen (D-072).
+    // background behind the canvas is the grain-corrected base, not the colour on screen (D-073).
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     const ink = parseColour(await style(page, '#editor', 'color'));
 
@@ -254,7 +254,7 @@ test.describe('the sheet', () => {
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
     // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
     // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
-    // renderer sets on the sheet (D-072).
+    // renderer sets on the sheet (D-073).
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
     expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));

@@ -737,7 +737,7 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 
 ## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
 
-- SUPERSEDED TONE (2026-10-27): the Mac sheet is D-069's Wheat paper, with D-072 carrying it to the Mac. Tone
+- SUPERSEDED TONE (2026-10-27): the Mac sheet is D-069's Wheat paper, with D-073 carrying it to the Mac. Tone
   `#e9e2ce` / `#342e24`, dark quiet `#c2bfb7`, dark pen `#ffc2b4`, washes `#e8cfbb`/`#e6bca7` light and
   `#453226`/`#573428` dark. The history ladder is D-069's per-appearance contrast ladder (1/0.847/0.769 light,
   1/0.902/0.772 dark), re-stepped on an appearance change. The Note captures and parity measurements below are

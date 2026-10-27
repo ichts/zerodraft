@@ -778,7 +778,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return paragraph
     }
 
-    /// The ink's imperfection (D-072). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
+    /// The ink's imperfection (D-073). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
     /// a live NSTextView cannot be re-rasterised per keystroke without moving the caret with it, so the Mac
     /// keeps the transferable half - a hair of ink spread, so the strokes are thicker than a print engine's -
     /// and leaves the hand to its own writing face.

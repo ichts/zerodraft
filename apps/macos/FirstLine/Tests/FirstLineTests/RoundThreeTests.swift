@@ -563,7 +563,7 @@ struct RoundThreeTests {
             let noteSize = try #require(note.font?.pointSize)
             #expect(abs(noteSize - FirstLineTypography.uiNSFont.pointSize * base / 48) <= 0.05)
             #expect(resolved(note.textColor ?? .clear, appearance) == resolved(FirstLineColors.paperQuietNSColor, appearance))
-            // The stopped group sits on the writing sheet itself: the Wheat paper (D-069, D-072).
+            // The stopped group sits on the writing sheet itself: the Wheat paper (D-069, D-073).
             #expect(paper is PaperSheetView, "the stopped group is not on the writing sheet")
             let sheet = try #require(resolved(FirstLineColors.paperNSColor, appearance))
             let ink = try #require(note.attributedStringValue

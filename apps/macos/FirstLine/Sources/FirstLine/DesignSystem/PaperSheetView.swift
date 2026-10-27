@@ -174,7 +174,7 @@ enum PaperField {
 
     /// A deviation becomes an alpha over black or white that shifts the sheet's own channel by exactly that
     /// much, so pale and dark specks weigh the same in sRGB and the sheet's mean stays on the locked tone as
-    /// the grain is layered on (D-072).
+    /// the grain is layered on (D-073).
     private static func alpha(delta: Double, tone: (r: Double, g: Double, b: Double)) -> Double {
         let average = (tone.r + tone.g + tone.b) / 3
         let room = delta > 0 ? 255 - average : average
@@ -296,7 +296,7 @@ enum PaperField {
 
     /// The locked tone wins over the texture: the finished sheet is shifted by whatever the noise layers moved
     /// its mean, so what reaches the screen measures the token itself and not a slightly warmer or greyer paper
-    /// (D-072). The shift is one additive and one subtractive flat fill, so the grain's own contrast is untouched.
+    /// (D-073). The shift is one additive and one subtractive flat fill, so the grain's own contrast is untouched.
     private static func meanShift(of context: CGContext,
                                   to tone: (r: Double, g: Double, b: Double)) -> (r: Double, g: Double, b: Double) {
         let none = (r: 0.0, g: 0.0, b: 0.0)

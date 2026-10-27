@@ -249,7 +249,7 @@ struct EditorFocusTests {
 
     /// The ink's imperfection steps with the line: the live line, one back and two back each carry their own
     /// fixed spread, so a faded line cannot keep the live line's ink and the same text always renders
-    /// identically (D-072).
+    /// identically (D-073).
     @Test func inkSpreadIsQuantisedToTheLineStep() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()

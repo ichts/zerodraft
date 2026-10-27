@@ -4,7 +4,7 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过；精确锁定 Sparkle 2.10.0 并为二进制目标加 `@executable_path/../Frameworks` rpath，`Package.resolved` 入库。
-scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；删除 SwiftPM 增量构建残留、不在 `Sources/FirstLine/Resources` 里的资源，app bundle 只带该目录的文件；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/sign-nested.sh: package-app.sh 与 release-dmg.sh 共用的 inside-out 签名：先签每个普通 Mach-O（Sparkle 的 Autoupdate），再由深到浅签 bundle，最后签 app，并校验 `codesign --verify --deep --strict`；Developer ID 模式还要求每个可执行文件的 TeamIdentifier 与 app 一致（公证前的失败门槛）。
 packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、false/缺失的 `SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`、非 0 的 `SUSignedFeedFailureExpirationInterval`、缺失/不可读/不是单一整数的 `last-build.txt` 或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>-<build>.zip` 更新载荷并记录 `last-build.txt`（staging 既不产 ZIP 也不记 build，因此也不受递增门槛约束）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。
@@ -57,7 +57,7 @@ Sources/FirstLine/DesignSystem/Typography.swift: 系统无衬线 UI/标题字号
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: After 语言主按钮（48 ink pill）、次按钮（outline pill，默认 44，成稿重开 48）和 quiet link；ink 主按钮的焦点是贴在药丸边缘的一圈浅色环（无外侧深色边），次按钮保留外侧 ink 焦点环；房间主按钮有 160ms live hover/press 反馈与 reduced-motion；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/InkFocus.swift: 共享 ink focus ring 安装器与可测协议；按钮、分段、popup 和 checkbox 共用一圈贴控件的焦点环，主 ink pill 用贴边浅色环，禁用系统蓝环。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + IBM Plex Mono，中文 Zhuque Fangsong；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
+Sources/FirstLine/DesignSystem/WritingFontCandidate.swift: 固定写作字体定义与本地字体注册，英文 Newsreader + 中文 Zhuque Fangsong（D-057 的共享字体集，IBM Plex Mono 已从 bundle 移除）；打包应用优先从 `Contents/Resources` 中的 SwiftPM bundle 读取，裸二进制使用 `Bundle.module`。
 Sources/FirstLine/DesignSystem/Spacing.swift: 4-pt 间距与 ctl/sheet/card/stage 圆角 token。
 Sources/FirstLine/DesignSystem/SurfaceViews.swift: FirstLineShadowView（sheet-shadow 的 ring + 多层 ink/black 阴影）与 FirstLineCardView（白/暗 sheet + shadow + content insets）。
 Sources/FirstLine/DesignSystem/Controls.swift: After 语言 seg control、status 和 fill bar；原生可聚焦按钮与 appearance-aware 颜色。
@@ -74,6 +74,7 @@ Tests/FirstLineTests/BrandTests.swift: 开始屏 split-W lockup、“?”规则�
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
 Tests/FirstLineTests/CheckoutFixtures.swift: CheckoutClientTests 的测试替身（MockCheckoutClient）；仅测试目标，不建真实会话、不扣款。
 Tests/FirstLineTests/DesignTokenTests.swift: background A 与暗色 role 的颜色解析、system-sans 界面与 Newsreader 书写字体断言。
+Tests/FirstLineTests/TypographyParityTests.swift: 共享字体集（D-057）的 Mac 半边：各 role 解析出的字体、bundle 里只剩共享字体、写作字体的 CJK cascade 为 Zhuque Fangsong、clock 等宽数字、kept 标题无 tracking 与收据 0.02em、以及 `writeitdown/qa/shared-type-baseline.json` 的 advance；Web 半边是 `writeitdown/qa/typography.spec.mjs`，两侧读同一份基线。
 Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的 light/dark（含 typing fade、exit hint、reduced warning、focus、active/entry 状态、带更新开关的 Settings）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。
 Tests/FirstLineTests/EditorFocusTests.swift: 编辑器焦点与会话启动回归测试。
 Tests/FirstLineTests/PinyinInputTests.swift: NSTextInputClient 入口的 Apple Pinyin/WeType/双拼组合、候选键、unmark-then-replace 记账与拒绝边界测试。

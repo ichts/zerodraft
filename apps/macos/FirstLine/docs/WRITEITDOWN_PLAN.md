@@ -183,7 +183,7 @@ The following code inside kept files is also deleted:
 | `Sources/FirstLine/Upgrade/UpgradeViewController.swift` | It is the license screen after trial exhaustion or an invalid license record. | Order/code entry, configured checkout and the full writeitdown.app web-trial link; access rules are in `LICENSE_PAYMENT_SPEC.md`. |
 | `Sources/FirstLine/Settings/SettingsViewController.swift` | It holds appearance, motion, and the license. | Remove Storage (batch 1). Brand (batch 3). Add focus, alignment, and font-size controls (batch 5). Duration and silence choices belong only on the start screen. |
 | `Sources/FirstLine/DesignSystem/Colors.swift`, `Typography.swift`, `Spacing.swift`, `FirstLineButtons.swift`, `FloodCanvasView.swift`, `WritingFontCandidate.swift` | They are the design token layer and bundled fonts. | Site tokens (batch 3). |
-| `Sources/FirstLine/Resources/` | It holds Newsreader, IBM Plex Mono, and Zhuque Fangsong, with their OFL texts. | Keep all three. The site uses the first two, and Zhuque covers CJK. |
+| `Sources/FirstLine/Resources/` | It holds Newsreader (upright + italic variable), Zhuque Fangsong, and their OFL texts. | Keep both. They are the shared type set (D-057) the site serves too; IBM Plex Mono was removed with its OFL text because no token resolved to it. |
 | `Tests/FirstLineTests/SessionEngineTests.swift`, `EditorFocusTests.swift`, `SettingsStoreTests.swift`, `LicenseFlowTests.swift`, `SmokeFlowTests.swift` | They cover the rules that stay. | Update per batch. |
 
 ## 6. Brand and visuals

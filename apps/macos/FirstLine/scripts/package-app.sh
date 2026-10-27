@@ -34,6 +34,13 @@ rm -rf "$app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks"
 cp "$bin_dir/WriteItDown" "$app/Contents/MacOS/WriteItDown"
 cp -R "$bin_dir/WriteItDown_WriteItDown.bundle" "$app/Contents/Resources/"
+# SwiftPM copies resources additively: a bundle built by an older tree keeps files this tree no
+# longer ships, so an incremental build would package a retired face (and its licence text may
+# already be gone). The app bundle carries exactly Sources/FirstLine/Resources, nothing else.
+resources="$app/Contents/Resources/WriteItDown_WriteItDown.bundle/Contents/Resources"
+for packaged in "$resources"/*; do
+  [[ -e "Sources/FirstLine/Resources/${packaged##*/}" ]] || rm -rf "$packaged"
+done
 
 # Sparkle lives beside the executable's ../Frameworks (the rpath Package.swift adds). ditto, not
 # cp -R: the framework carries Versions/Current symlinks and breaking them breaks the signature.

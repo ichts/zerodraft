@@ -1,6 +1,6 @@
 /*
- * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
- * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, wash and numeral, live deletion sentence, the stopped screen (headline, `Begin again`, red receipt), kept heading/copy receipt, two-step exit.
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
+ * [OUTPUT]: One AppKit room: page, the Note paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, the paper's own wash (PaperWashView: the sheet's texture over its tint, leaving on the 120 ms fade) and numeral, live deletion sentence, the stopped screen (headline, `Begin again`, red receipt), kept heading/copy receipt, two-step exit.
  * [POS]: Centered writing above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor, unused-time wipe report, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */

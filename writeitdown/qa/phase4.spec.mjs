@@ -827,7 +827,9 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   expect(kept.headingBottom).toBeLessThan(kept.copyBox.top);
   // The pill hugs its one label node with 24 px each side, and a font-derived floor keeps that
   // box at the widest label's width without a second copy of the words (D-059).
-  const readCopy = () => page.evaluate(() => {
+  // Hover and press feedback ride on transitions; geometry is read once they have settled.
+  const readCopy = () => page.evaluate(async () => {
+    await Promise.all(document.getAnimations().filter(a => a instanceof CSSTransition).map(a => a.finished.catch(() => {})));
     const copy = document.querySelector('#copy');
     const label = document.querySelector('#copy-label');
     const restart = document.querySelector('#restart');
@@ -855,6 +857,10 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
     expect(state.floor, 'the label carries a measured floor').toMatch(/^\d+px$/);
     expect(state.copyBox.width - state.labelBox.width, 'the pill keeps 24 px of label padding').toBeCloseTo(48, 1);
   };
+  // The pointer rests on COPY before it presses, as a writer's does. A pointer left over RUN IT
+  // AGAIN (where the entry click lands when the row stacks) would lift it by its hover and fake a move.
+  await page.locator('#restart').hover();
+  await page.locator('#copy').hover();
   const keptCopy = await readCopy();
   await expect(page.locator('#copy')).toHaveAccessibleName(keptCopy.text);
   expectOneLabel(keptCopy);

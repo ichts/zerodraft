@@ -867,8 +867,10 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   const keptCopy = await readCopy();
   await expect(page.locator('#copy')).toHaveAccessibleName(keptCopy.text);
   expectOneLabel(keptCopy);
-  expect(kept.copyBox.height).toBe(48);
-  expect(kept.restartBox.height).toBe(48);
+  // Both actions are 48 px tall. The boxes are read in float layout space, where a fractional offset leaves a
+  // 1e-5 px rounding residue (CI read 47.99997 and 48.00003), so this asserts to a hundredth of a pixel.
+  expect(kept.copyBox.height).toBeCloseTo(48, 2);
+  expect(kept.restartBox.height).toBeCloseTo(48, 2);
   // The draft can never push the actions: it scrolls in its own area under them.
   expect(await page.locator('.kept-scroll').evaluate(e => getComputedStyle(e).overflowY)).toBe('auto');
   const stacked = Math.abs(kept.copyBox.top - kept.restartBox.top) > 1;

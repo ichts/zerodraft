@@ -11,8 +11,10 @@ sans, so there is no new window capture to take and no real-window check is pend
 still renders every surface in light and dark inside the same run.
 
 - `swift build` and `swift test` from `apps/macos/FirstLine/`: build clean, test run exit 0.
-- New guard `TypographyParityTests` (6 tests, green): every role resolves to the shared face; the bundle
-  carries only Newsreader upright and italic, Zhuque Fangsong and their two OFL texts; the writing
+- New guard `TypographyParityTests` (6 tests, green): every role resolves to the shared face; the target's
+  `Sources/FirstLine/Resources` directory (what ships; the incremental debug bundle can keep stale files,
+  which `scripts/package-app.sh` prunes from the packaged app) carries only Newsreader upright and
+  italic, Zhuque Fangsong and their two OFL texts; the writing
   font's CJK cascade is `ZhuqueFangsong-Regular`; the clock is 15 pt semibold with digits that do not
   change width; the kept heading is `NewsreaderRoman-Medium` with no kern while the receipt keeps
   0.26 pt (0.02 em); and every shared role's advance matches `writeitdown/qa/shared-type-baseline.json`

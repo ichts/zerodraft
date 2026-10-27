@@ -4,7 +4,7 @@ Parent instructions: `../AGENTS.md`
 
 成员清单
 Package.swift: `WriteItDown` Swift Package 可执行目标，支持 macOS 14+；源码路径仍为 `FirstLine`，先保证 `swift build` 与 `swift test` 通过；精确锁定 Sparkle 2.10.0 并为二进制目标加 `@executable_path/../Frameworks` rpath，`Package.resolved` 入库。
-scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
+scripts/package-app.sh: universal SwiftPM release `.app` 打包器；用 `ditto` 把 Sparkle.framework 装进 `Contents/Frameworks` 并校验 rpath、`Updater.app` 与 universal 架构；把解析出的 Sparkle MIT LICENSE 复制为 `Contents/Resources/Sparkle-LICENSE.txt`（缺失即失败）；删除 SwiftPM 增量构建残留、不在 `Sources/FirstLine/Resources` 里的资源，app bundle 只带该目录的文件；支持 ad-hoc 和 unsigned 模式，具体构建与签名契约见脚本头。
 scripts/sign-nested.sh: package-app.sh 与 release-dmg.sh 共用的 inside-out 签名：先签每个普通 Mach-O（Sparkle 的 Autoupdate），再由深到浅签 bundle，最后签 app，并校验 `codesign --verify --deep --strict`；Developer ID 模式还要求每个可执行文件的 TeamIdentifier 与 app 一致（公证前的失败门槛）。
 packaging/VolumeIcon.icns: DMG 卷图标，深色圆盘加骨白纸面和墨色 split-W；品牌与尺寸规则见 `../../../design/DESIGN.md` §11。
 scripts/release-dmg.sh: Developer ID 签名、公证及 DMG 打包器；正式发布拒绝空或不完整的许可配置，也拒绝占位更新签名公钥、非 HTTPS appcast、false/缺失的 `SURequireSignedFeed` 与 `SUVerifyUpdateBeforeExtraction`、非 0 的 `SUSignedFeedFailureExpirationInterval`、缺失/不可读/不是单一整数的 `last-build.txt` 或未递增的 CFBundleVersion；公证+staple 之后用同一个 app 生成 `dist/updates/WriteItDown-<version>-<build>.zip` 更新载荷并记录 `last-build.txt`（staging 既不产 ZIP 也不记 build，因此也不受递增门槛约束）。TEST/LIVE 共用 Info.plist 中服务地址、产品及公钥。发布检查见 `docs/RELEASE_CHECKLIST.md`，契约见脚本头。

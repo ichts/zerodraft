@@ -542,13 +542,20 @@ test('kept screens keep the controls and draft clear of the paper foot', async (
         receipt.style.paddingTop = `${lineBox}px`;
         window.dispatchEvent(new Event('resize'));
         const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
-        return { scroll: box('.kept-scroll'), lineBox,
-          lineHeight: parseFloat(getComputedStyle(document.querySelector('.kept-text')).lineHeight),
+        const scroller = document.querySelector('.kept-scroll');
+        scroller.scrollTop = 0;
+        // The draft's own first rendered line, as the face on this machine draws it.
+        const range = document.createRange();
+        range.selectNodeContents(document.querySelector('.kept-text'));
+        const first = range.getClientRects()[0];
+        return { scroll: box('.kept-scroll'), lineBox, firstLine: { top: first.top, bottom: first.bottom, height: first.height },
           receipt: box('#receipt'), actions: box('.kept-actions') };
       });
       expect(squeezed.receipt.height, 'the stress adds one receipt line above the draft').toBeGreaterThanOrEqual(20.8 + squeezed.lineBox - 1);
-      expect(squeezed.scroll.height, 'a taller fixed block still leaves one line of the kept draft')
-        .toBeGreaterThanOrEqual(squeezed.lineHeight - 0.5);
+      expect(squeezed.firstLine.height, 'the draft renders a measurable first line').toBeGreaterThan(0);
+      expect(squeezed.firstLine.top, 'the first draft line starts inside the kept box').toBeGreaterThanOrEqual(squeezed.scroll.top - 0.5);
+      expect(squeezed.firstLine.bottom, 'a taller fixed block still leaves one full line of the kept draft')
+        .toBeLessThanOrEqual(squeezed.scroll.bottom + 0.5);
       await page.locator('.kept-receipt').evaluate(e => { e.style.paddingTop = ''; });
       await page.evaluate(() => window.dispatchEvent(new Event('resize')));
       const restored = await page.evaluate(() => document.querySelector('.kept-scroll').getBoundingClientRect().height);
@@ -858,7 +865,16 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   const stacked = Math.abs(kept.copyBox.top - kept.restartBox.top) > 1;
   if (stacked) expect(kept.restartBox.top).toBeGreaterThanOrEqual(kept.copyBox.bottom); // 320 wraps the row
   else expect(Math.abs(kept.copyBox.top - kept.restartBox.top)).toBeLessThan(1);
-  if (page.viewportSize().width === 390) expect(stacked, 'the 390 row holds both controls on one line').toBe(false);
+  // The row wraps only when the two measured controls plus the gap cannot fit its width, so a
+  // wider fallback face may stack them cleanly but a row with room can never wrap.
+  // The row box shrink-wraps its controls, so the width it may use is its parent's content box.
+  const row = await page.locator('.kept-actions').evaluate(e => {
+    const p = getComputedStyle(e.parentElement);
+    const width = e.parentElement.clientWidth - parseFloat(p.paddingLeft) - parseFloat(p.paddingRight);
+    return { width, gap: parseFloat(getComputedStyle(e).columnGap) || 0 };
+  });
+  const fits = kept.copyBox.width + row.gap + kept.restartBox.width <= row.width + 0.5;
+  expect(stacked, `the row stacks only when ${kept.copyBox.width} + ${row.gap} + ${kept.restartBox.width} exceeds ${row.width}`).toBe(!fits);
   // One light ring on the pill edge: no dark margin outside an inset outline.
   expect(kept.pill.focused).toBe(true);
   expect(parseFloat(kept.pill.outlineOffset)).toBeLessThanOrEqual(-2);

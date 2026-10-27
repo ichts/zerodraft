@@ -124,7 +124,7 @@ struct PaperContrastTests {
 
     /// The locked tone wins over the renderer: what reaches the screen must be the token within +-2 levels, in
     /// both appearances. A lamp light or a one-sided grain would lift the mean away from the value the captain
-    /// locked, so this measures the rendered pixels rather than the intended constant (D-058).
+    /// locked, so this measures the rendered pixels rather than the intended constant (D-069).
     @Test func theRenderedFieldStaysOnTheLockedTone() throws {
         let expectations: [(name: String, dark: Bool, tone: (Double, Double, Double))] = [
             ("light", false, (219, 230, 236)),

@@ -1176,7 +1176,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-058's width/height scoping rule and its 340 px constant; its intent (the door and the
   preview share the first screen) and the 300 px floor stand.
 
-## D-058: The fade stays D-027's, the locked tone wins over the renderer, and the ink spread steps with the line
+## D-069: The fade stays D-027's, the locked tone wins over the renderer, and the ink spread steps with the line
 
 - Date: 2026-10-26
 - Decision: Three corrections to D-056, recorded here because D-056 authorised the paper's tone, grain and ink

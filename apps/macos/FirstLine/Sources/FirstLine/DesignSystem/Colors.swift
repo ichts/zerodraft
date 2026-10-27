@@ -46,7 +46,7 @@ enum FirstLineColors {
     static var paperWashDeepNSColor: NSColor { adaptive(light: 0xDDC0BE, dark: 0x49302E) }
     /// Per-logical-line history opacity: the current line full, one line up 22 %, two lines up 7 %, older
     /// lines gone (D-027). One fixed ladder for both appearances: a theme switch can never leave a stale
-    /// step baked into a completed line (D-058).
+    /// step baked into a completed line (D-069).
     static let paperHistoryOpacities: [CGFloat] = [1, 0.22, 0.07]
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }

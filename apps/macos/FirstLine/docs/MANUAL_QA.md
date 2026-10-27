@@ -689,7 +689,7 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 
 ## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
 
-Scope: D-056 as amended by D-058. The writing sheet is the Note paper on the Mac room as on the web: tone
+Scope: D-056 as amended by D-069. The writing sheet is the Note paper on the Mac room as on the web: tone
 `#dbe6ec` light / `#21272a` dark, grain 70 of 100 at size 1.00, ink `#1c1917` / `#ece7d9`, every reading role
 measured against the paper, D-027's 100/22/7 fade kept, and the alarm tinting the sheet's own paper.
 

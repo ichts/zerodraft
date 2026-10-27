@@ -195,7 +195,7 @@ test.describe('the sheet', () => {
     expect(alphas[1]).toBeGreaterThan(0);
     // The fade is D-027's ladder, one uniform opacity per completed logical line, not a contrast-solved
     // ladder: 22 % one line up, 7 % two lines up. It is a deliberate fade toward the sheet, so this asserts
-    // the recorded steps and that they still fade (they sit below the reading floor by design, D-058).
+    // the recorded steps and that they still fade (they sit below the reading floor by design, D-069).
     expect(alphas).toEqual([0.22, 0.07]);
     const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
     expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(ladder[1]);

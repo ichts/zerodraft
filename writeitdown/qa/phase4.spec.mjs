@@ -1198,7 +1198,7 @@ test('the room wears the landing design system', async ({ page }) => {
     const probe = name => probeOn('#room', name);
     return {
       page: css('#room').backgroundColor, pageToken: probe('--page'),
-      // The renderer owns the sheet's tone token on the sheet itself (it corrects the texture's mean, D-058),
+      // The renderer owns the sheet's tone token on the sheet itself (it corrects the texture's mean, D-069),
       // so the paper is compared with the tone the renderer set for it; the rendered value is measured in
       // qa/paper.spec.mjs.
       sheet: css('.room-paper').backgroundColor, sheetToken: probeOn('.room-paper', '--paper-tone'),
@@ -1208,7 +1208,7 @@ test('the room wears the landing design system', async ({ page }) => {
     };
   });
   expect(look.page).toBe(look.pageToken);
-  // D-056/D-058: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the plain
+  // D-056/D-069: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the plain
   // surface for cards, controls and fields, so the room's paper paints the tone the renderer set for it.
   expect(look.sheet).toBe(look.sheetToken);
   expect(look.sheetShadow).not.toBe('none');

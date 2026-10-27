@@ -17,12 +17,12 @@
   /* The writing sheet is the Note paper (D-056), the one object the writer writes on; the page, the
      cards and the controls keep the white identity. Quiet, history and danger are measured roles:
      every reading role on the paper clears 7:1 against the paper's own tone, the history ladder keeps
-     D-027's deliberate 0.22/0.07 fade below that floor (D-058), and the pen red is deepened until the
+     D-027's deliberate 0.22/0.07 fade below that floor (D-069), and the pen red is deepened until the
      numeral and the wipe receipt clear it too. */
   --paper-tone:#dbe6ec;
   --paper-quiet:#464746;
   /* One uniform opacity per completed logical line: the current line full, one line up 22 %, two up 7 %,
-     older gone (D-027). Fixed for both themes so a theme switch can never leave a stale step (D-058). */
+     older gone (D-027). Fixed for both themes so a theme switch can never leave a stale step (D-069). */
   --paper-history-1:.22;
   --paper-history-2:.07;
   --paper-danger:#63140b;

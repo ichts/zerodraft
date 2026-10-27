@@ -327,13 +327,16 @@ check_warn_recovery_wipe() {
   snap "$tier-recovered-state" >"$recovered"
   absent_text "$recovered" 'KEEP TYPING'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
-  wait_text "$tier-wiped" 'DRAFT DELETED AT ' 'DRAFT DELETED AT ' "$max"
+  wait_text "$tier-wiped" 'You stopped.' 'You stopped.' "$max"
   assert_timing "$tier" wipe "$wipe_start" "$matched_at" "$(awk -v t="$limit" 'BEGIN { print t - 0.5 }')" "$((limit + 3))"
   snap "$tier-wiped-full" >"$wiped"
-  jq -e '.window_markdown | test("DRAFT DELETED AT [0-9]+:[0-5][0-9]\\. TYPE TO START AGAIN\\.")' >/dev/null "$wiped" \
-    || fail "$tier wipe report is not the literal receipt"
+  # The stopped screen is one group with the chrome off (D-070): no receipt sentence, no clock.
+  assert_text "$wiped" 'You stopped.'
+  assert_text "$wiped" 'Draft deleted.'
+  assert_text "$wiped" 'Begin again'
   assert_text "$wiped" '0 words'
-  assert_text "$wiped" '1:00'
+  absent_text "$wiped" 'DRAFT DELETED AT'
+  absent_text "$wiped" '1:00'
   [[ "$(draft_value "$wiped")" == '' ]] || fail "$tier wipe retained editor text"
   exit_room_by_key
   snap "$tier-exit" >"$output/$tier-exit.json"
@@ -356,9 +359,11 @@ for used in 1 2 3; do
   [[ "$(draft_value "$output/trial-input.json")" == a ]] || fail 'trial input was blocked'
   # Escape may cancel an active IME composition instead of leaving the room.
   if [[ "$used" == 3 ]]; then
-    wait_text last-trial-wiped 'DRAFT DELETED AT ' 'DRAFT DELETED AT ' 32
+    wait_text last-trial-wiped 'You stopped.' 'You stopped.' 32
     snap last-trial-wiped-full >"$output/last-trial-wiped.json"
-    assert_text "$output/last-trial-wiped.json" 'DRAFT DELETED AT 0:52. ACTIVATE TO KEEP WRITING.'
+    assert_text "$output/last-trial-wiped.json" 'Draft deleted.'
+    assert_text "$output/last-trial-wiped.json" 'Begin again'
+    absent_text "$output/last-trial-wiped.json" 'ACTIVATE TO KEEP WRITING'
     press a
     snap trial-exhausted-input >"$output/trial-exhausted-input.json"
     assert_text "$output/trial-exhausted-input.json" 'Activate Write It Down'

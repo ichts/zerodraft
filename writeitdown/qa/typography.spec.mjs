@@ -226,15 +226,18 @@ test('the kept receipt and the machine-voice labels keep the Mac\'s 13 px medium
       const style = getComputedStyle(document.querySelector(selector));
       return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight, letterSpacing: style.letterSpacing };
     };
-    return { receipt: read('.kept-receipt'), report: read('#room-report'), caption: read('#room-warning'), count: read('#room-count') };
+    return { receipt: read('.kept-receipt'), note: read('#failure-note'), caption: read('#room-warning'), count: read('#room-count') };
   });
-  for (const name of ['receipt', 'report', 'caption']) {
+  for (const name of ['receipt', 'caption']) {
     expect(roles[name].size, `${name} is 13 px like the Mac`).toBe('13px');
     expect(roles[name].weight, `${name} is the Mac's medium`).toBe('500');
     expect(faceOf(roles[name]), `${name} is the tool face`).toBe('tool');
   }
   expect(roles.receipt.letterSpacing, 'the receipt keeps the Mac\'s .02em').toBe('0.26px');
-  expect(roles.report.letterSpacing, 'the wipe report keeps the Mac\'s .02em').toBe('0.26px');
+  expect(roles.note.size, 'the stopped screen\'s consequence line is 15 px').toBe('15px');
+  expect(roles.note.weight, 'the consequence line is regular').toBe('400');
+  expect(faceOf(roles.note), 'the consequence line is the tool face').toBe('tool');
+  expect(parseFloat(roles.note.letterSpacing) || 0, 'the consequence line sets no tracking').toBe(0);
   expect(roles.caption.letterSpacing, 'the warning caption keeps the Mac\'s .04em').toBe('0.52px');
   expect(roles.count.size, 'the count is 13 px like the Mac').toBe('13px');
   expect(roles.count.weight, 'the count is regular like the Mac').toBe('400');

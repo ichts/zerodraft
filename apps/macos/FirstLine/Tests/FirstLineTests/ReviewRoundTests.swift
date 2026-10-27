@@ -10,7 +10,7 @@ struct ReviewRoundTests {
         var now: TimeInterval = 0
     }
 
-    // MARK: - F-02: a wiped draft keeps a focused, visible caret
+    // MARK: - F-02: a wiped draft keeps the editor focused with an invisible writing layer
 
     @Test func wipedStateKeepsTheEditorFocusedForTheNextDraft() throws {
         let now = Clock()
@@ -378,7 +378,7 @@ struct ReviewRoundTests {
     // MARK: - Second hands-on round: empty state, kept layout, count
 
     @Test func emptyCaretAndCountPromptMatchAfterAWipe() throws {
-        func measure(wiped: Bool) -> (caret: NSRect, count: String, receipt: NSRect?) {
+        func measure(wiped: Bool) -> (caret: NSRect, count: String, block: NSRect?) {
             let now = Clock()
             let engine = SessionEngine(now: { now.now })
             let state = licensedTestState(sessionEngine: engine,
@@ -401,13 +401,13 @@ struct ReviewRoundTests {
             let caret = paper.convert(editor.caretRectForCurrentInsertionPoint(), from: editor)
             let count = descendants(of: room.view, of: NSTextField.self)
                 .first { $0.stringValue == "Type to start" || $0.stringValue == "0 words" }!
-            let receipt = descendants(of: room.view, of: NSTextField.self)
-                .first { $0.stringValue.hasPrefix("DRAFT DELETED AT") && !$0.isHiddenOrHasHiddenAncestor }
+            let block = descendants(of: room.view, of: NSTextField.self)
+                .first { $0.stringValue == "Draft deleted." && !$0.isHiddenOrHasHiddenAncestor }
                 .map { paper.convert($0.bounds, from: $0) }
             #expect(!descendants(of: room.view, of: NSTextField.self)
                 .contains { $0.stringValue == "Start typing." })
             window.orderOut(nil)
-            return (caret, count.stringValue, receipt)
+            return (caret, count.stringValue, block)
         }
         let fresh = measure(wiped: false)
         let afterWipe = measure(wiped: true)
@@ -415,8 +415,8 @@ struct ReviewRoundTests {
         #expect(abs(afterWipe.caret.midX - fresh.caret.midX) <= 1)
         #expect(fresh.count == "Type to start")
         #expect(afterWipe.count == "0 words")
-        #expect(fresh.receipt == nil)
-        #expect(afterWipe.receipt != nil)
+        #expect(fresh.block == nil)
+        #expect(afterWipe.block != nil)
     }
 
     @Test func keptActionsStayAboveALongDraftWithTheDefaultAcknowledgement() throws {

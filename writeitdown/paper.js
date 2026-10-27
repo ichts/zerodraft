@@ -179,7 +179,7 @@
     return shift.map(total => total / count);
   };
 
-  /* The locked tone wins over the texture (D-070): the sheet's own tone is shifted by exactly what the grain
+  /* The locked tone wins over the texture (D-072): the sheet's own tone is shifted by exactly what the grain
      moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {

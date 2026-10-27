@@ -1,6 +1,6 @@
 /**
  * [INPUT]: writeitdown/tokens.css v2 (background A light palette + dark palette, same role names)
- * [OUTPUT]: Dynamic AppKit color roles for page, sheet, ink, mute, chrome, hairlines, sheet ring, red pen, wash, on-ink.
+ * [OUTPUT]: Dynamic AppKit color roles for page, sheet, ink, mute, paper quiet, chrome, hairlines, sheet ring, red pen, wash, on-ink.
  * [POS]: Shared native color tokens for every surface and the room wash; no parallel palette.
  * [PROTOCOL]: Keep values aligned with writeitdown/tokens.css and check FirstLine/AGENTS.md.
  */

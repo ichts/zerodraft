@@ -24,9 +24,9 @@ final class SessionKeptView: NSView {
     private let heading = NSTextField(labelWithString: "You wrote it down.")
     private let body = NSTextField(wrappingLabelWithString: "")
     private let receipt = NSTextField(labelWithString: "")
-    /// The kept action labels sit on the row's optical centre, not on the lower
-    /// 1.6 line-box baseline; both 15 pt titles share the same lift.
-    private static let actionOpticalLift: CGFloat = 5.25
+    /// The room's pill labels sit on the control's optical centre, not on the lower
+    /// 1.6 line-box baseline; the kept row and the stopped screen's single pill share the lift.
+    static let pillLabelLift: CGFloat = 5.25
 
     private final class PassThroughLabel: NSTextField {
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -64,7 +64,7 @@ final class SessionKeptView: NSView {
             NSLayoutConstraint.activate([
                 label.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                 label.centerYAnchor.constraint(equalTo: button.centerYAnchor,
-                                               constant: -Self.actionOpticalLift),
+                                               constant: -Self.pillLabelLift),
             ])
         }
 

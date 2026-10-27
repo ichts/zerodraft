@@ -192,7 +192,9 @@ test.describe('the sheet', () => {
   test('every word on the sheet clears 7:1, including the faded history lines', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
-    const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
+    // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
+    // background behind the canvas is the grain-corrected base, not the colour on screen (D-072).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     const ink = parseColour(await style(page, '#editor', 'color'));
 
     expect(toHex(ink)).toBe(INK[mode]);
@@ -217,8 +219,8 @@ test.describe('the sheet', () => {
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
     expect(contrast(parseColour(await style(page, '#room-count', 'color')), paper)).toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#exit', 'color')), paper)).toBeGreaterThanOrEqual(7);
-    expect(toHex(parseColour(await style(page, '#room-report', 'color')))).toBe(DANGER[mode]);
-    expect(contrast(parseColour(await style(page, '#room-report', 'color')), paper)).toBeGreaterThanOrEqual(7);
+    expect(toHex(parseColour(await style(page, '#failure-note', 'color')))).toBe(QUIET[mode]);
+    expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });
 
   test('the grain never moves while the writer types', async ({ page }) => {
@@ -248,10 +250,11 @@ test.describe('the sheet', () => {
     const deep = parseColour(cut);
     expect(toHex(deep), 'the wash at the cut').toBe(WASH_DEEP[mode]);
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
+    expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
     // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
     // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
-    // renderer sets on the sheet (D-070).
+    // renderer sets on the sheet (D-072).
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
     expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));

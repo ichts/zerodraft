@@ -17,7 +17,7 @@
   /* The writing sheet is the Wheat paper (D-069), the one object the writer writes on; the page, the
      cards and the controls keep the white identity. Quiet, history and danger are measured roles:
      every word on the paper clears 7:1 against the paper's own tone, the history ladder sits at
-     9:1 then 7:1, and the pen red is deepened until the numeral and the wipe receipt clear it too. */
+     9:1 then 7:1, and the pen red is deepened until the numeral and the exit hint clear it too. */
   --paper-tone:#e9e2ce;
   --paper-quiet:#464746;
   --paper-history-1:.847;

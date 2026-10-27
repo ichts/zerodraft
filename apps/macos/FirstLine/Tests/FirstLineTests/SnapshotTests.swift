@@ -101,7 +101,7 @@ struct SnapshotTests {
     /// and nothing about the paper. The region is sampled from real window frames, before and after input.
     /// Typing never regenerates the field. The clock stays inside the reading window here on purpose: past five
     /// seconds of silence the wash is a *state* on the sheet, and that change is measured by
-    /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-070).
+    /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-072).
     @Test func paperStaysStillWhileTyping() throws {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let name = appearance == .aqua ? "light" : "dark"
@@ -244,9 +244,10 @@ struct SnapshotTests {
         settleBar(fixture)
     }
 
-    /// Static PNGs show the bar's model; the live room runs a CA animation.
+    /// Static PNGs show the bar's model; the live room runs a CA animation. The bar is off the
+    /// sheet on the stopped screen, so only the drained model is left to settle (D-070).
     private func settleBar(_ fixture: RoomFixture) {
-        let fraction: CGFloat = (fixture.engine.phase == .failure || fixture.engine.phase == .success) ? 0
+        let fraction: CGFloat = fixture.engine.phase == .failure || fixture.engine.phase == .success ? 0
             : (fixture.engine.hasStarted ? CGFloat(fixture.engine.remaining / max(fixture.engine.duration, 1)) : 1)
         for bar in allViews(in: fixture.room.view, of: FirstLineFillBar.self) {
             bar.settleForRendering(fraction)
@@ -388,7 +389,7 @@ struct SnapshotTests {
         // The exact two-level tone assertion runs on the field the view draws, in
         // `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone`, where the pixels are the ones the sheet is
         // made of. This window bitmap is a 24 px patch of a mottled sheet, so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
-        // assertion guards the value itself (D-070).
+        // assertion guards the value itself (D-072).
         let lift = [mean.0 - Double(expected.redComponent),
                     mean.1 - Double(expected.greenComponent),
                     mean.2 - Double(expected.blueComponent)]
@@ -401,7 +402,7 @@ struct SnapshotTests {
 
     /// The warning sheet is measured too: the rendered patch must be the paper tone mixed toward the locked
     /// wash colour by the state's own fraction, warmed against the plain sheet and painted with grain. The plain
-    /// tone band cannot hold here, because the alarm is a state on the sheet rather than a second paper (D-070).
+    /// tone band cannot hold here, because the alarm is a state on the sheet rather than a second paper (D-072).
     private func assertWash(_ rep: NSBitmapImageRep, around point: NSPoint, fraction: CGFloat,
                             in appearance: NSAppearance.Name, name: String) throws {
         let base = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance)?.usingColorSpace(.sRGB))

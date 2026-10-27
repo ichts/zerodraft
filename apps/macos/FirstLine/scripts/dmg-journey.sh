@@ -176,11 +176,12 @@ for used in 1 2 3; do
   if [[ "$used" -eq 2 ]]; then
     sleep 9
     snap wiped-second
-    has 'DRAFT DELETED AT ' && has 'TYPE TO START AGAIN.' && has '0 words' \
+    has 'You stopped.' && has 'Draft deleted.' && has 'Begin again' && has '0 words' \
+      && ! has 'DRAFT DELETED AT' && ! has '1:00' \
       && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
       && ! has 'COPY TEXT' \
-      && pass 'session 2 silence deleted the draft with a restart receipt' \
-      || { bad 'session 2 did not delete the draft after nine seconds of silence'; exit 1; }
+      && pass 'session 2 silence deleted the draft into the stopped screen' \
+      || { bad 'session 2 did not show the stopped screen after nine seconds of silence'; exit 1; }
   elif [[ "$used" -eq 3 ]]; then
     typed="$sentence"
     continuation=' The clouds are moving east and the birds have started singing again.'

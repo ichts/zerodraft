@@ -774,7 +774,7 @@ if (document.readyState === "loading") {
      stacking context, behind every word and never in front of one. The texture
      is generated once per sheet size and never while typing (D-056). */
   /* The paper washes resolve on the sheet itself, so they mix from the corrected --paper the renderer
-     sets inline there (D-070), not from the uncorrected token on :root. */
+     sets inline there (D-072), not from the uncorrected token on :root. */
   [data-paper] {
     position: relative; isolation: isolate; background: var(--paper);
     --wash-paper: color-mix(in oklab, var(--paper) 88%, var(--danger));
@@ -1433,7 +1433,7 @@ if (document.readyState === "loading") {
     return shift.map(total => total / count);
   };
 
-  /* The locked tone wins over the texture (D-070): the sheet's own tone is shifted by exactly what the grain
+  /* The locked tone wins over the texture (D-072): the sheet's own tone is shifted by exactly what the grain
      moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {

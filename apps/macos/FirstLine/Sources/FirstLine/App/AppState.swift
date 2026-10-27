@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
- * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
+ * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用（`trialBudgetSpent` 让停止屏说出真实的重启阻断原因）、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
  * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -73,14 +73,25 @@ final class AppState {
     private var chargedTrialSessionID: UUID?
     private(set) var trialAccessError: String?
 
+    /// The clean local trial still governs access: no licence residue, no access error.
+    private var trialBudgetApplies: Bool {
+        trialAccessError == nil && licenseActivationError != .cleanupFailure &&
+            settings.licenseStatus == .inactive && !settings.hasLicenseKey &&
+            settings.licenseToken == nil && settings.licenseInstanceID == nil &&
+            settings.licenseProductID == nil && settings.licenseActivatedAt == nil &&
+            settings.licenseLastValidatedAt == nil
+    }
+
     /// A local trial budget is not a license. Cached or revoked licenses never fall back to it.
     var trialSessionsRemaining: Int {
-        guard trialAccessError == nil, licenseActivationError != .cleanupFailure,
-              settings.licenseStatus == .inactive,
-              !settings.hasLicenseKey, settings.licenseToken == nil,
-              settings.licenseInstanceID == nil, settings.licenseProductID == nil,
-              settings.licenseActivatedAt == nil, settings.licenseLastValidatedAt == nil else { return 0 }
+        guard trialBudgetApplies else { return 0 }
         return max(0, Self.trialSessionLimit - settings.trialSessionsUsed)
+    }
+
+    /// True only when the free sessions themselves are spent, so the room can name the real reason a
+    /// restart is blocked instead of treating every blocked restart as an exhausted trial (D-070).
+    var trialBudgetSpent: Bool {
+        trialBudgetApplies && settings.trialSessionsUsed >= Self.trialSessionLimit
     }
 
     var canStartSession: Bool { hasFullAccess || trialSessionsRemaining > 0 }

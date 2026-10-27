@@ -231,9 +231,25 @@ struct EditorFocusTests {
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
     }
 
+    /// The ladder is solved per appearance (D-069), so a theme switch re-steps every completed line: no
+    /// step from the other appearance stays baked into the storage.
+    @Test func historyLadderFollowsTheAppearance() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.appearance = NSAppearance(named: .aqua)
+        textView.configureSessionTypography()
+        textView.loadRestoredText("one\ntwo\nthree")
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.847) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.769) < 0.001)
+        textView.appearance = NSAppearance(named: .darkAqua)
+        textView.viewDidChangeEffectiveAppearance()
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.902) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.772) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001)
+    }
+
     /// The ink's imperfection steps with the line: the live line, one back and two back each carry their own
     /// fixed spread, so a faded line cannot keep the live line's ink and the same text always renders
-    /// identically (D-069).
+    /// identically (D-070).
     @Test func inkSpreadIsQuantisedToTheLineStep() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
@@ -259,8 +275,9 @@ struct EditorFocusTests {
         let twoBack = try spread(0)
         // Exactly the ladder, quantised: one fixed value per step, and never the live line's spread.
         #expect(abs(live.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep) < 0.001)
-        #expect(abs(oneBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * 0.22) < 0.001)
-        #expect(abs(twoBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * 0.07) < 0.001)
+        let ladder = textView.historyLineOpacities
+        #expect(abs(oneBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[1]) < 0.001)
+        #expect(abs(twoBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[2]) < 0.001)
         #expect(oneBack.alpha < live.alpha && twoBack.alpha < oneBack.alpha)
         // The blur belongs to the sheet, not to the fade: the step moves the ink's weight only.
         #expect(abs(live.blur - oneBack.blur) < 0.001)

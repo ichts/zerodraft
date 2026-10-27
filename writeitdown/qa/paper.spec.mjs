@@ -1,16 +1,16 @@
-// The Note paper on the writeitdown site (D-056): tone, grain and ink, measured rather than eyeballed,
-// on the landing demo sheet and in the room, light and dark.
+// The Wheat paper on the writeitdown site (D-069, superseding D-056's Note tone): tone, grain and ink,
+// measured rather than eyeballed, on the landing demo sheet and in the room, light and dark.
 //
-// Fails before the change: the sheet was #ffffff with no texture at all, the quiet chrome sat at 4.5:1 and the
-// pen red at 5.2:1 against the sheet.
+// Fails on the Note sheet that shipped before the captain chose Wheat: the tone, the wash mixes, the dark
+// roles (quiet, history, pen) and the grain's rendered mean are all pinned to the Wheat values.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#dbe6ec', dark: '#21272a' };
+const TONES = { light: '#e9e2ce', dark: '#342e24' };
 const INK = { light: '#1c1917', dark: '#ece7d9' };
-const QUIET = { light: '#464746', dark: '#b8b5ac' };
-const DANGER = { light: '#63140b', dark: '#ffb4a2' };
-const WASH = { light: '#ddd3d5', dark: '#352c2c' };
-const WASH_DEEP = { light: '#ddc0be', dark: '#49302e' };
+const QUIET = { light: '#464746', dark: '#c2bfb7' };
+const DANGER = { light: '#63140b', dark: '#ffc2b4' };
+const WASH = { light: '#e8cfbb', dark: '#453226' };
+const WASH_DEEP = { light: '#e6bca7', dark: '#573428' };
 
 const parseColour = value => {
   const match = String(value).match(/rgba?\(([^)]+)\)/);
@@ -43,8 +43,17 @@ const over = (colour, backdrop) => ({
 const toHex = ({ r, g, b }) =>
   '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
-/** How warm a colour reads: red ahead of green. The Note sheet is slightly cool, so this is what "the
- *  paper turns red" means on a paper that is not white. */
+/** How far one patch's rendered mean may sit from the tone: the mottle moves a single patch more on the dark sheet. */
+const GRAIN_BAND = { light: 6, dark: 10 };
+
+/** The largest per-channel gap between a patch's rendered mean and a tone, read off the pixels. */
+const meanOffset = (mean, tone) => {
+  const target = [1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16));
+  return Math.max(...mean.map((value, i) => Math.abs(value - target[i])));
+};
+
+/** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
+ *  already warm. */
 const warmth = ({ r, g }) => (r - g) / 255;
 
 const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
@@ -74,13 +83,18 @@ async function patch(page, selector, where = 0.6) {
     const x = Math.round((canvas.width - width) / 2);
     const y = Math.round(canvas.height * position - height / 2);
     const data = ctx.getImageData(x, y, width, height).data;
+    // The pixel the reader sees: the texture composited over the sheet's own tone.
+    const base = getComputedStyle(document.querySelector(sel)).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
     let sum = 0;
     let sumSquares = 0;
     let count = 0;
     let alpha = 0;
+    const channels = [0, 0, 0];
     const values = [];
     for (let i = 0; i < data.length; i += 4) {
       alpha += data[i + 3];
+      const a = data[i + 3] / 255;
+      for (let c = 0; c < 3; c += 1) channels[c] += data[i + c] * a + base[c] * (1 - a);
       const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
       sum += lum;
       sumSquares += lum * lum;
@@ -91,6 +105,7 @@ async function patch(page, selector, where = 0.6) {
     return {
       spread: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)),
       meanAlpha: alpha / count,
+      mean: channels.map(total => total / count),
       distinct: new Set(values).size,
       hash: values.reduce((acc, value) => {
         for (let i = 0; i < value.length; i += 1) acc = (acc * 31 + value.charCodeAt(i)) | 0;
@@ -157,6 +172,7 @@ test.describe('the sheet', () => {
     const demoGrain = await patch(page, '#paper', 0.75);
     expect(demoGrain.spread, 'the demo sheet carries grain').toBeGreaterThan(2);
     expect(demoGrain.distinct).toBeGreaterThan(40);
+    expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
 
     await enterRoom(page);
     expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
@@ -173,7 +189,7 @@ test.describe('the sheet', () => {
     expect(exact.height).toBe(Math.round(exact.css[1] * exact.dpr));
   });
 
-  test('every reading role on the sheet clears 7:1, and the history keeps its recorded fade', async ({ page }) => {
+  test('every word on the sheet clears 7:1, including the faded history lines', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
@@ -193,12 +209,9 @@ test.describe('the sheet', () => {
     });
     expect(alphas[0]).toBeGreaterThan(0);
     expect(alphas[1]).toBeGreaterThan(0);
-    // The fade is D-027's ladder, one uniform opacity per completed logical line, not a contrast-solved
-    // ladder: 22 % one line up, 7 % two lines up. It is a deliberate fade toward the sheet, so this asserts
-    // the recorded steps and that they still fade (they sit below the reading floor by design, D-069).
-    expect(alphas).toEqual([0.22, 0.07]);
     const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
-    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(ladder[1]);
+    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThanOrEqual(9);
+    expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
 
     // The quiet chrome and the pen red on the sheet.
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
@@ -212,6 +225,7 @@ test.describe('the sheet', () => {
     await enterRoom(page);
     const before = await patch(page, '.room-paper', 0.75);
     expect(before.spread).toBeGreaterThan(2);
+    expect(meanOffset(before.mean, TONES[await theme(page)]), 'the room grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
     await page.locator('#editor').type('the rain is on the window and the room is quiet', { delay: 20 });
     const after = await patch(page, '.room-paper', 0.75);
     expect(after.hash, 'the grain was regenerated under the writer').toBe(before.hash);
@@ -235,8 +249,10 @@ test.describe('the sheet', () => {
     expect(toHex(deep), 'the wash at the cut').toBe(WASH_DEEP[mode]);
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
-    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut.
-    const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
+    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
+    // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
+    // renderer sets on the sheet (D-070).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
     expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));
   });
@@ -256,6 +272,7 @@ test.describe('the sheet', () => {
     expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
     const grain = await patch(page, '.room-paper', 0.5);
     expect(grain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
+    expect(meanOffset(grain.mean, TONES[await theme(page)]), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
     expect(contrast(parseColour(await style(page, '#kept-text', 'color')), paper),
       'the kept draft on the paper').toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#receipt', 'color')), paper),

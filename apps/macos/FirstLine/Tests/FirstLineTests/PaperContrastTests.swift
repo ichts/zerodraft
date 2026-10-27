@@ -62,9 +62,9 @@ struct PaperContrastTests {
         #expect(hex(try resolved(FirstLineColors.inkNSColor, .darkAqua)) == "#ece7d9")
 
         #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .aqua)) == "#464746")
-        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)) == "#c1beb5")
+        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)) == "#c2bfb7")
         #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .aqua)) == "#63140b")
-        #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .darkAqua)) == "#ffc5b2")
+        #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .darkAqua)) == "#ffc2b4")
     }
 
     @Test func everyTextRoleClearsSevenToOneOnTheSheet() throws {
@@ -77,13 +77,16 @@ struct PaperContrastTests {
 
             // The words: the active line carries the ink at full strength.
             #expect(contrast(ink, paper) >= 7, "\(name): the ink on the sheet")
-            // The two faded lines are D-027's deliberate fade: 22 % and 7 % of the ink, one uniform step per
-            // logical line. They are below the reading floor by design, so this asserts the recorded ladder
-            // and that the sheet still reads at full strength rather than pretending the fade clears 7:1.
-            #expect(FirstLineColors.paperHistoryOpacities == [1, 0.22, 0.07])
-            let faded = FirstLineColors.paperHistoryOpacities.dropFirst().map {
+            // The two faded lines: one uniform step per completed line (D-027's stepping) at D-069's contrast
+            // ladder, the same alphas as the web's `--paper-history-1/2`. The readable floor of the history is
+            // measured too: one line up reads at 9:1 or better, two lines up at 7:1 or better.
+            let ladder = FirstLineColors.paperHistoryOpacities(dark: appearance == .darkAqua)
+            #expect(ladder == (appearance == .darkAqua ? [1, 0.902, 0.772] : [1, 0.847, 0.769]))
+            let faded = ladder.dropFirst().map {
                 contrast(composited(ink, alpha: Double($0), over: paper), paper)
             }
+            #expect(faded[0] >= 9, "\(name): history step one reads \(faded[0]):1")
+            #expect(faded[1] >= 7, "\(name): history step two reads \(faded[1]):1")
             #expect(faded[0] > faded[1], "\(name): the second history step is not dimmer than the first")
             // The quiet chrome (clock, count, exit link, receipt) and the pen red (numeral, wipe report).
             #expect(contrast(quiet, paper) >= 7, "\(name): the quiet chrome on the sheet")
@@ -124,7 +127,7 @@ struct PaperContrastTests {
 
     /// The locked tone wins over the renderer: what reaches the screen must be the token within +-2 levels, in
     /// both appearances. A lamp light or a one-sided grain would lift the mean away from the value the captain
-    /// locked, so this measures the rendered pixels rather than the intended constant (D-069).
+    /// locked, so this measures the rendered pixels rather than the intended constant (D-070).
     @Test func theRenderedFieldStaysOnTheLockedTone() throws {
         let expectations: [(name: String, dark: Bool, tone: (Double, Double, Double))] = [
             ("light", false, (233, 226, 206)),

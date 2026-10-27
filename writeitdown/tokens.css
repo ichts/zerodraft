@@ -14,22 +14,19 @@
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
   --sheet:#ffffff;
-  /* The writing sheet is the Note paper (D-056), the one object the writer writes on; the page, the
+  /* The writing sheet is the Wheat paper (D-069), the one object the writer writes on; the page, the
      cards and the controls keep the white identity. Quiet, history and danger are measured roles:
-     every reading role on the paper clears 7:1 against the paper's own tone, the history ladder keeps
-     D-027's deliberate 0.22/0.07 fade below that floor (D-069), and the pen red is deepened until the
-     numeral and the wipe receipt clear it too. */
-  --paper-tone:#dbe6ec;
+     every word on the paper clears 7:1 against the paper's own tone, the history ladder sits at
+     9:1 then 7:1, and the pen red is deepened until the numeral and the wipe receipt clear it too. */
+  --paper-tone:#e9e2ce;
   --paper-quiet:#464746;
-  /* One uniform opacity per completed logical line: the current line full, one line up 22 %, two up 7 %,
-     older gone (D-027). Fixed for both themes so a theme switch can never leave a stale step (D-069). */
-  --paper-history-1:.22;
-  --paper-history-2:.07;
+  --paper-history-1:.847;
+  --paper-history-2:.769;
   --paper-danger:#63140b;
   /* The warn wash of the sheet: the root landing's `color-mix(in oklab, paper 88%, #C8392F)` and its
-     76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-056). */
-  --paper-wash:#ddd3d5;
-  --paper-wash-deep:#ddc0be;
+     76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-069). */
+  --paper-wash:#e8cfbb;
+  --paper-wash-deep:#e6bca7;
   --ink:#1c1917;
   --mute:#6b655c;
   --chrome:#5c564d;
@@ -68,13 +65,13 @@
 :root:not([data-theme="light"]){--page:#15140f;--brand-plate:#26231c}
 :root:not([data-theme="light"]) .home{
   --sheet:#26231c;
-  --paper-tone:#21272a;
-  --paper-quiet:#b8b5ac;
-  --paper-history-1:.22;
-  --paper-history-2:.07;
-  --paper-danger:#ffb4a2;
-  --paper-wash:#352c2c;
-  --paper-wash-deep:#49302e;
+  --paper-tone:#342e24;
+  --paper-quiet:#c2bfb7;
+  --paper-history-1:.902;
+  --paper-history-2:.772;
+  --paper-danger:#ffc2b4;
+  --paper-wash:#453226;
+  --paper-wash-deep:#573428;
   --ink:#ece7d9;
   --mute:#a39d8e;
   --chrome:#a39d8e;

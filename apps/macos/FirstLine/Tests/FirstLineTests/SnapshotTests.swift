@@ -101,7 +101,7 @@ struct SnapshotTests {
     /// and nothing about the paper. The region is sampled from real window frames, before and after input.
     /// Typing never regenerates the field. The clock stays inside the reading window here on purpose: past five
     /// seconds of silence the wash is a *state* on the sheet, and that change is measured by
-    /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-069).
+    /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-070).
     @Test func paperStaysStillWhileTyping() throws {
         for appearance in [NSAppearance.Name.aqua, .darkAqua] {
             let name = appearance == .aqua ? "light" : "dark"
@@ -388,7 +388,7 @@ struct SnapshotTests {
         // The exact two-level tone assertion runs on the field the view draws, in
         // `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone`, where the pixels are the ones the sheet is
         // made of. This window bitmap is a 24 px patch of a mottled sheet, so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
-        // assertion guards the value itself (D-069).
+        // assertion guards the value itself (D-070).
         let lift = [mean.0 - Double(expected.redComponent),
                     mean.1 - Double(expected.greenComponent),
                     mean.2 - Double(expected.blueComponent)]
@@ -401,7 +401,7 @@ struct SnapshotTests {
 
     /// The warning sheet is measured too: the rendered patch must be the paper tone mixed toward the locked
     /// wash colour by the state's own fraction, warmed against the plain sheet and painted with grain. The plain
-    /// tone band cannot hold here, because the alarm is a state on the sheet rather than a second paper (D-069).
+    /// tone band cannot hold here, because the alarm is a state on the sheet rather than a second paper (D-070).
     private func assertWash(_ rep: NSBitmapImageRep, around point: NSPoint, fraction: CGFloat,
                             in appearance: NSAppearance.Name, name: String) throws {
         let base = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance)?.usingColorSpace(.sRGB))

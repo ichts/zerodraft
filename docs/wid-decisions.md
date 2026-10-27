@@ -1176,49 +1176,77 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-058's width/height scoping rule and its 340 px constant; its intent (the door and the
   preview share the first screen) and the 300 px floor stand.
 
-## D-069: The fade stays D-027's, the locked tone wins over the renderer, and the ink spread steps with the line
+## D-069: The writing sheet is the Wheat paper, not the Note paper
 
-- Date: 2026-10-26
-- Decision: Four corrections to D-056, recorded here because D-056 authorised the paper's tone, grain and ink
-  and nothing more.
-  1. **The history fade is D-027's ladder, unchanged**: one uniform opacity per completed logical line - the
-     current line 1.0, one line up 0.22, two lines up 0.07, older 0 - identical in both appearances and on both
-     surfaces. All rows of one logical sentence share one opacity, and the partially visible line at the
-     aperture is clipped by the mask rather than given a different alpha. These two lines therefore
-     deliberately sit below the 7:1 reading floor: the fade is the zen step, not a text role. Every role that
-     carries reading on the sheet still clears 7:1 (ink 13.78:1, quiet chrome 7.35:1, pen red 10.1:1).
-  2. **The locked tone wins over the renderer.** The lamp light and the dark settle are gone, and the texture's
-     own mean is cancelled out of the base the sheet is drawn on, so the pixels on screen measure the locked
-     tone: `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone` renders the field and asserts its mean is
-     `#dbe6ec` in light and `#21272a` in dark within two levels per channel; the Mac sheet is Wheat
-     (`#e9e2ce` / `#342e24`, the captain's 2026-10-27 Wheat decision superseding D-056's Note tone), so on the
-     Mac it asserts those values, with the dark quiet `#c1beb5` and dark pen `#ffc5b2` re-measured to keep
-     7:1 on the Wheat sheet and its deepest wash. On the web the same correction
-     rides on the sheet's own tone token, so the wash still mixes from the corrected base
-     (`tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` measure the sheet's tone composited with the
-     texture, not the CSS constant behind it).
-  3. **The ink spread steps with the line.** The Mac's 0.35 pt ink spread is quantised to the line's ladder step
-     (`inkSpread(step:)`, alpha 0.55 x step, never interpolated), so a faded line fades its whole rendered layer
-     exactly as the web fades the element that carries the displacement, the same text always renders
-     identically, and a completed line cannot keep the live line's ink.
-  4. **The alarm tints the same paper, and leaves on its fade.** The Mac wash lays the sheet's whole texture
-     (both mottle scales and the grain) in its own layer above a tint layer that carries the mean shift, handed
-     over by the sheet each time the field is rebuilt, so a live resize or a theme switch never builds a second
-     field or leaves a stale one, and a warn tick changes one layer colour without repainting the texture. On exit the wash keeps its last tint while it fades over 120 ms and returns to the plain sheet only
-     when the fade ends. The Mac generator uses the web's seed string and pigments, and on the root landing the
-     paper washes resolve on the sheet itself, so they mix from the corrected tone.
-- Reason: The pipeline review of the Mac half found that the contrast-solved ladder (13.78 / 9.2 / 7.2:1) had
-  silently replaced D-027's recorded 100/22/7 fade, that the ink shadow did not step with the ladder (so the
-  faded lines rendered at roughly 11:1 and 9.6:1 while their opacity claimed 0.847 and 0.769), and that the lamp
-  light lifted the rendered dark sheet by 25 levels off the value the captain locked. The captain's lock is the
-  sheet, the grain and the ink; the fade was never his to change. Wheat remains the considered alternative for
-  the paper itself (D-056).
-- Tests: `PaperContrastTests` (`theRenderedFieldStaysOnTheLockedTone`,
-  `everyTextRoleClearsSevenToOneOnTheSheet` now asserting the recorded ladder and its fade direction,
-  `theWashIsTheWebsPaperMixNotAPalePink`, `theFieldIsDeterministic`), `EditorFocusTests` (the ladder is fixed and
-  appearance-independent), `tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` (tone measured as the
-  rendered composite, the ladder's two steps).
-- Supersedes: D-056's sentence that the sheet's per-line history ladder is a contrast ladder (13.78 -> 9.2 ->
-  7.2:1) and its claim that "nothing on the sheet reads below 7:1", which applied the reading floor to the zen
-  fade; D-056's paper tone, grain, wash, ink and quiet/pen roles stand unchanged on the web (the Mac tone is the
-  captain's 2026-10-27 Wheat decision), and D-027's ladder is restored exactly.
+- Date: 2026-10-27
+- Decision: On the web (the landing demo, the trial, the writeitdown.app demo, room, failure and kept
+  sheets) the writing sheet is the **Wheat** paper: light `#e9e2ce`, dark `#342e24` (the tuner's Wheat
+  lamp version of the same paper, not an inversion). Grain stays **70 of 100 at size 1.00**; the ink stays
+  `#1c1917` at weight 100 with the imperfection on in light and `#ece7d9` in dark. The page, the wall,
+  the header and the chrome stay white. The warn wash is still the sheet's own mix: `#e8cfbb` (88%) and
+  `#e6bca7` (76% at the cut) in light, `#453226` and `#573428` in dark.
+- Measured (WCAG contrast, every text role against the sheet; the numeral and the pen also against the wash):
+
+  | Role | Light on `#e9e2ce` | Dark on `#342e24` |
+  |---|---|---|
+  | Writing ink | 13.52 (`#1c1917`) | 10.88 (`#ece7d9`) |
+  | Quiet chrome (clock, count, hint, receipt, exit, kept note) | 7.21 (`#464746`, unchanged) | 7.31 (`#c2bfb7`, was `#b8b5ac` = 6.56) |
+  | Pen red (numeral, wipe report, exit hint) | 9.93 (`#63140b`, unchanged) | 8.74 (`#ffc2b4`, was `#ffb4a2` = 7.87) |
+  | Pen on the 88% wash | 8.61 | 7.88 |
+  | Pen on the 76% wash at the cut | 7.43 | 7.06 (was 6.37) |
+  | History step one | 9.03 (alpha .847, unchanged) | 9.16 (alpha .902, was .846 = 8.26) |
+  | History step two | 7.09 (alpha .769, unchanged) | 7.16 (alpha .772, was .727 = 6.54) |
+
+  Every light role clears 7:1 untouched. In dark the quiet grey, the second history step and the pen on
+  the deepest wash fell under 7:1 on the warmer, lighter lamp paper, so only those three lightness
+  values moved; the first history step moved with them so the ladder keeps its roughly 9 then 7 shape
+  (the room test pins step one at 9:1 or better).
+- Reason: the captain was asked to choose between keeping the cool Note paper, a plain white sheet and
+  the warm Wheat paper, and answered **3**. The value is the measured Wheat paper from the Platen
+  garden, the tuner's runner-up (`data/wid-paper-tuner/site/tuner.js`, `wheat`: `#e9e2ce` / `#342e24`);
+  it is warmer than the `#e0d5b8` D-056 recorded as the considered alternative.
+- Tests: `tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` now pin the Wheat values, the
+  dark roles, the washes and the grain's rendered mean (the texture composited over the tone, read off
+  the pixels: within 6 per channel in light, 10 in dark because the lamp moves it). They fail on the
+  Note values (tone, wash, dark roles and the mean at 20 to 50 off the tone).
+- Not changed here: the Mac app keeps D-056's Note paper (`PaperSheetView`, `PaperContrastTests`) until
+  its own change mirrors this one; the web and the Mac disagree on the sheet tone until then.
+- Supersedes: D-056's tone (`#dbe6ec` / `#21272a`), its measured role values for the web (13.78, 7.35,
+  10.1 and the dark `#b8b5ac` / `#ffb4a2` / .846 / .727), and the wash values `#ddd3d5` / `#ddc0be` /
+  `#352c2c` / `#49302e`. D-056's grain, ink, white page identity, contrast-ladder design and the
+  one-canvas renderer stand unchanged.
+
+## D-070: The Mac room carries D-069's Wheat paper, and the locked tone wins at the pixel on both surfaces
+
+- Date: 2026-10-27
+- Decision: The Mac room mirrors D-069, and both surfaces hold the locked tone at the pixel.
+  1. **The Mac sheet is D-069's Wheat paper** with D-069's roles, read from the same values as the web's
+     `tokens.css`: tone `#e9e2ce` / `#342e24`, quiet `#464746` / `#c2bfb7`, pen `#63140b` / `#ffc2b4`, wash
+     `#e8cfbb` / `#e6bca7` and `#453226` / `#573428`, ink `#1c1917` / `#ece7d9`, grain 70 of 100 at size 1.00.
+  2. **The history ladder is D-069's**, applied with D-027's stepping. Each completed line gets one opacity:
+     the current line 1.0, one line up 0.847 (light) / 0.902 (dark), two lines up 0.769 / 0.772, older 0. The
+     partial line at the aperture is clipped, not given its own alpha. The faded lines read at 9:1 and 7:1 or
+     better on the paper. The ladder is solved per appearance, so the Mac editor re-steps every completed line
+     when the appearance changes.
+  3. **The locked tone wins over the renderer.** The lamp light and the dark settle are gone from the
+     generator on both surfaces, and the texture's own mean is cancelled out of the base the sheet is drawn
+     on. The pixels on screen therefore measure the locked tone, within two levels per channel, rather than
+     the CSS or NSColor constant behind it. On the web the correction rides on the sheet's own tone token, so
+     the wash still mixes from the corrected base.
+  4. **The ink spread steps with the line.** The Mac's 0.35 pt ink spread is quantised to the line's ladder
+     step (`inkSpread(step:)`, alpha 0.55 x step, never interpolated), so a faded line fades its whole
+     rendered ink.
+  5. **The alarm tints the same paper.** The Mac wash lays the sheet's whole texture in its own layer above a
+     tint layer. A warn tick changes one layer colour and never repaints the texture. On exit the wash keeps
+     its last tint while it fades over 120 ms. The Mac generator uses the web's seed string and pigments.
+- Reason: The Mac had to become the same paper as the web once the captain chose Wheat (D-069). Measured on
+  the rendered Mac field, the lamp light had lifted the dark sheet about 25 levels off the locked value.
+- Tests: `PaperContrastTests` (Wheat tones and roles, the per-appearance ladder at 9:1 and 7:1 or better, the
+  rendered field's mean against the locked tone, the wash mix), `EditorFocusTests`
+  (`historyLadderFollowsTheAppearance`, `inkSpreadIsQuantisedToTheLineStep`),
+  `RoomTests.warnTicksNeverRepaintThePaperTexture`, `SnapshotTests`, `tests/paper.spec.mjs` and
+  `writeitdown/qa/paper.spec.mjs` (the sheet's tone measured as the rendered composite).
+- Supersedes: D-069's note that the Mac keeps D-056's Note paper until its own change; the lamp light in the
+  D-056 generator; the branch-only proposal to
+  restore D-027's 100/22/7 values, which never shipped (D-027's stepping stands, D-069's values replace its
+  alphas).

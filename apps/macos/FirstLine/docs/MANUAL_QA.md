@@ -689,11 +689,22 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 
 ## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
 
-- SUPERSEDED TONE: the captain's 2026-10-27 Wheat decision makes the Mac sheet Wheat (`#e9e2ce` / `#342e24`,
-  dark quiet `#c1beb5`, dark pen `#ffc5b2`, washes `#e8cfbb`/`#e6bca7` light and `#453226`/`#573428` dark).
-  The deterministic suite now asserts the Wheat values and `RoomTests.warnTicksNeverRepaintThePaperTexture`;
-  the Note captures and parity measurements below are the earlier head's evidence. PENDING: Wheat window
-  captures and parity measurements.
+- SUPERSEDED TONE (2026-10-27): the Mac sheet is D-069's Wheat paper, with D-070 carrying it to the Mac. Tone
+  `#e9e2ce` / `#342e24`, dark quiet `#c2bfb7`, dark pen `#ffc2b4`, washes `#e8cfbb`/`#e6bca7` light and
+  `#453226`/`#573428` dark. The history ladder is D-069's per-appearance contrast ladder (1/0.847/0.769 light,
+  1/0.902/0.772 dark), re-stepped on an appearance change. The Note captures and parity measurements below are
+  the earlier head's evidence.
+  - PASS deterministic: `swift test` exit 0, and the focused run
+    `swift test --filter 'PaperContrastTests|EditorFocusTests|RoomTests|SnapshotTests|ReviewRoundTests|DesignTokenTests|RoundThreeTests'`
+    passed 116 tests in 7 suites with 1 recorded known issue. That run covers `historyLadderFollowsTheAppearance`,
+    the ladder at 9:1 and 7:1 or better, the rendered field's mean on the Wheat tone and
+    `warnTicksNeverRepaintThePaperTexture`.
+  - PASS paper parity (sheet average over 10-90 % x, 55-90 % y): the live cua-driver window of the empty room
+    reads `rgb(232.4,226.2,205.4)` light against `#e9e2ce` (233,226,206) and `rgb(52.1,45.7,36.0)` dark against
+    `#342e24` (52,46,36). The AppKit content snapshots of the rest state read the same within 0.3.
+  - PENDING: real-window captures of the typing, warning and kept states on Wheat. `scripts/qa-window.sh` stops
+    at its stale exit-row geometry check. The content snapshots cover those states. A clean VM recording is
+    also still pending.
 
 Scope: D-056 as amended by D-069. The writing sheet is the Note paper on the Mac room as on the web: tone
 `#dbe6ec` light / `#21272a` dark, grain 70 of 100 at size 1.00, ink `#1c1917` / `#ece7d9`, every reading role

@@ -1,21 +1,21 @@
-/* Write It Down - the Note sheet.
+/* Write It Down - the Wheat sheet.
    [INPUT] every element marked data-paper, its laid-out size, devicePixelRatio, and the resolved
            theme on :root (light / dark).
-   [OUTPUT] one static texture painted into a canvas child behind that element's content: the Note
+   [OUTPUT] one static texture painted into a canvas child behind that element's content: the Wheat
             sheet's two-scale mottle and its grain (tooth, pulp, fibres, flecks).
             The tone itself stays in CSS so a state wash can still tint the sheet.
    [POS] the single place on the web surface that defines what the paper looks like; the room, the
          failure sheet, the kept sheet and the landing demo sheet all mount it.
    [PROTOCOL] paint once per size/theme/DPR and never again while writing; type always sits above
-              the canvas (z-index:-1 inside an isolated stacking context); values are D-056.
+              the canvas (z-index:-1 inside an isolated stacking context); values are D-069 (D-056's grain and ink).
 
    The field is deterministic: the same seed yields the same sheet, so the room, the demo and the
    Mac read as one paper. Nothing here animates, loops, or listens to typing. */
 (function () {
   'use strict';
 
-  /* The locked sheet (D-056): tone Note, grain 70 of 100 at size 1.00. */
-  const TONES = { light: '#dbe6ec', dark: '#21272a' };
+  /* The locked sheet (D-069): tone Wheat, grain 70 of 100 at size 1.00. */
+  const TONES = { light: '#e9e2ce', dark: '#342e24' };
   const GRAIN = 0.70;
   const SIZE = 1.00;
   const TOOTH = 44;
@@ -179,7 +179,7 @@
     return shift.map(total => total / count);
   };
 
-  /* The locked tone wins over the texture (D-069): the sheet's own tone is shifted by exactly what the grain
+  /* The locked tone wins over the texture (D-070): the sheet's own tone is shifted by exactly what the grain
      moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {

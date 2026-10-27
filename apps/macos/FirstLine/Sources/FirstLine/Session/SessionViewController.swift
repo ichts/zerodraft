@@ -306,7 +306,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        // The paper is the Wheat sheet (the captain's 2026-10-27 Wheat decision): tone and texture are rendered by the view itself.
+        // The paper is the Wheat sheet (D-069): tone and texture are rendered by the view itself.
         paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet

@@ -21,9 +21,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
-    /// One uniform ink step per completed line, closest line first, older lines gone (D-027). The ladder is
-    /// fixed and appearance-independent, so a theme switch cannot leave a stale step in a completed line.
-    var historyLineOpacities: [CGFloat] { FirstLineColors.paperHistoryOpacities }
+    /// One uniform ink step per completed line, closest line first, older lines gone (D-027), at D-069's
+    /// contrast ladder for the effective appearance.
+    var historyLineOpacities: [CGFloat] {
+        FirstLineColors.paperHistoryOpacities(dark: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+    }
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
     private var isPerformingInsertion = false
@@ -465,7 +467,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     }
 
     /// Base ink for the current line; completed lines are stepped by `applyLineOpacity`
-    /// to the live trial's 100/22/7 intent.
+    /// to the history ladder (D-027 stepping, D-069 values).
     func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
@@ -485,6 +487,13 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLineOpacity(in: range, textStorage: textStorage)
     }
 
+    /// The ladder differs per appearance, so a theme switch re-steps every completed line.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        guard hasMarkedText() == false, let textStorage, textStorage.length > 0 else { return }
+        applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
+    }
+
     /// A width or measure change reflows line breaks without touching the text or
     /// caret, so the per-line opacity must be recomputed against the new layout.
     func refreshLineOpacityForMeasureChange() {
@@ -498,7 +507,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     /// Each completed line gets one uniform opacity; the current line is full. The
     /// line's top and bottom always match, and older lines are gone. The opacities
-    /// follow the live trial's intent (100/22/7).
+    /// are the appearance's history ladder (D-069).
     private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
         guard textStorage.length > 0, let layoutManager, let textContainer else { return }
         layoutManager.ensureLayout(for: textContainer)
@@ -769,7 +778,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return paragraph
     }
 
-    /// The ink's imperfection (D-069). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
+    /// The ink's imperfection (D-070). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
     /// a live NSTextView cannot be re-rasterised per keystroke without moving the caret with it, so the Mac
     /// keeps the transferable half - a hair of ink spread, so the strokes are thicker than a print engine's -
     /// and leaves the hand to its own writing face.

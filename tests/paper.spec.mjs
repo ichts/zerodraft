@@ -1,6 +1,6 @@
-// The sheet on the landing and in the trial: the locked Note paper and ink (D-056), measured rather than
-// eyeballed. Every assertion here fails on the pre-change page, where the paper was #ffffff, the ink was
-// #17150f, the sheet had no grain at all, and the quiet chrome sat at 1.8:1 on the paper.
+// The sheet on the landing and in the trial: the locked Wheat paper and ink (D-069, which supersedes D-056's
+// Note tone), measured rather than eyeballed. The tone assertions fail on the Note sheet (#dbe6ec) that
+// shipped before the captain chose Wheat, and the grain's rendered mean is read off the pixels.
 //
 // What is measured:
 //   1. the two locked colours, per surface, as the browser resolves them;
@@ -11,7 +11,7 @@
 //   4. the texture exists before the demo sheet's first paint.
 import { test, expect } from '@playwright/test';
 
-const PAPER = '#dbe6ec';
+const PAPER = '#e9e2ce';
 const INK = '#1c1917';
 const QUIET = '#464746';
 const DANGER = '#63140b';
@@ -59,6 +59,12 @@ const expectTone = (measured, expected, label) => {
   });
 };
 
+/** The largest per-channel gap between a patch's rendered mean and a tone: read off the pixels. */
+const meanOffset = (mean, tone) => {
+  const target = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16)).join(',')})`);
+  return Math.max(Math.abs(mean[0] - target.r), Math.abs(mean[1] - target.g), Math.abs(mean[2] - target.b));
+};
+
 async function computed(page, selector, property = 'color') {
   return page.evaluate(([sel, prop]) => getComputedStyle(document.querySelector(sel))[prop], [selector, property]);
 }
@@ -74,13 +80,18 @@ async function patch(page, selector, offsetY = 0.6) {
     const x = Math.round((canvas.width - width) / 2);
     const y = Math.round(canvas.height * where - height / 2);
     const data = ctx.getImageData(x, y, width, height).data;
+    // The pixel the reader sees: the texture composited over the sheet's own tone.
+    const base = getComputedStyle(document.querySelector(sel)).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
     let alpha = 0;
     let sum = 0;
     let sumSquares = 0;
     let count = 0;
+    const channels = [0, 0, 0];
     const colours = [];
     for (let i = 0; i < data.length; i += 4) {
       alpha += data[i + 3];
+      const a = data[i + 3] / 255;
+      for (let c = 0; c < 3; c += 1) channels[c] += data[i + c] * a + base[c] * (1 - a);
       const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
       sum += lum;
       sumSquares += lum * lum;
@@ -91,6 +102,7 @@ async function patch(page, selector, offsetY = 0.6) {
     const spread = Math.sqrt(Math.max(0, sumSquares / count - mean * mean));
     return {
       meanAlpha: alpha / count,
+      mean: channels.map(total => total / count),
       spread,
       distinct: new Set(colours).size,
       hash: colours.reduce((acc, value) => {
@@ -125,7 +137,7 @@ async function sheetTone(page, selector) {
 }
 
 test.describe('the demo sheet at rest', () => {
-  test('carries the Note tone, the ink and the grain before its first paint', async ({ page }) => {
+  test('carries the Wheat tone, the ink and the grain before its first paint', async ({ page }) => {
     // Every animation frame from the first one records whether the sheet is on screen and whether it
     // is already textured. A frame that sees the sheet plain is the flash this test exists to forbid.
     await page.addInitScript(() => {
@@ -162,6 +174,7 @@ test.describe('the demo sheet at rest', () => {
     expect(sample.spread, 'grain spread on the demo sheet').toBeGreaterThan(2);
     expect(sample.distinct, 'distinct grain values').toBeGreaterThan(40);
     expect(sample.meanAlpha, 'the texture covers the sheet').toBeGreaterThan(20);
+    expect(meanOffset(sample.mean, PAPER), 'the grain\'s rendered mean is the sheet tone').toBeLessThanOrEqual(6);
 
     // 4. the texture is device-exact: never resampled, so it cannot shimmer at 1x
     const canvas = await page.evaluate(() => {
@@ -209,6 +222,7 @@ test.describe('the trial sheet', () => {
     expectTone(await sheetTone(page, '.trial-writing-surface'), PAPER, 'the room sheet');
     const grainBefore = await patch(page, '.trial-writing-surface', 0.7);
     expect(grainBefore.spread).toBeGreaterThan(2);
+    expect(meanOffset(grainBefore.mean, PAPER), 'the trial grain mean is the sheet tone').toBeLessThanOrEqual(6);
 
     await page.keyboard.type('one two three four five six seven', { delay: 25 });
 
@@ -252,6 +266,7 @@ test.describe('the trial sheet', () => {
     expectTone(await sheetTone(page, '.kept-paper'), PAPER, 'the kept sheet');
     const keptGrain = await patch(page, '.kept-paper', 0.6);
     expect(keptGrain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
+    expect(meanOffset(keptGrain.mean, PAPER), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(6);
 
     // The wall around the sheet is untouched: bone, not paper.
     const wall = parseColour(await computed(page, 'body', 'backgroundColor'));

@@ -32,23 +32,26 @@ enum FirstLineColors {
     static var pageNSColor: NSColor { adaptive(light: 0xF7F7F5, dark: 0x15140F) }
     /// Plain surfaces: cards, fields, buttons, controls.
     static var sheetNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x26231C) }
-    /* The writing sheet is the Wheat paper (the captain's 2026-10-27 Wheat decision, superseding D-056's
-       Note tone). Its roles are measured against the paper's own tone, not against white: every reading
-       role clears 7:1, and the completed lines keep D-027's deliberate fade below that floor (D-069), so
-       the quiet chrome is its own role and the pen red is deep enough to read on the paper and its wash. */
+    /* The writing sheet is the Wheat paper (D-069, superseding D-056's Note tone). Every word on it is
+       measured against the paper's own tone, not against white, and clears 7:1, the faded history lines
+       included, so the quiet chrome is its own role and the pen red is deep enough to read on the paper
+       and on its wash. The values are the web's `tokens.css` roles, one paper on both surfaces. */
     static var paperNSColor: NSColor { adaptive(light: 0xE9E2CE, dark: 0x342E24) }
-    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xC1BEB5) }
-    static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFC5B2) }
+    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xC2BFB7) }
+    static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFC2B4) }
     /// The sheet's warn wash: `color-mix(in oklab, paper 88%, #C8392F)` and its deeper 76% step of the
     /// eighth second, the exact recipe the web paints (`--wash-paper`, `--wash-paper-deep`). The values
     /// are the browser compositor's own output, so both surfaces warm through the same ramp and land on
     /// the same colour instead of the Mac tinting the sheet with a pale pink meant for white.
     static var paperWashNSColor: NSColor { adaptive(light: 0xE8CFBB, dark: 0x453226) }
     static var paperWashDeepNSColor: NSColor { adaptive(light: 0xE6BCA7, dark: 0x573428) }
-    /// Per-logical-line history opacity: the current line full, one line up 22 %, two lines up 7 %, older
-    /// lines gone (D-027). One fixed ladder for both appearances: a theme switch can never leave a stale
-    /// step baked into a completed line (D-069).
-    static let paperHistoryOpacities: [CGFloat] = [1, 0.22, 0.07]
+    /// History opacity per line, current line first: one uniform step per completed line, older lines gone
+    /// (D-027's stepping). The steps are D-069's contrast ladder, solved per appearance so the first faded
+    /// line reads at 9:1 and the second at 7:1 on the paper (`--paper-history-1/2` in `tokens.css`). The
+    /// editor re-applies them when the appearance changes, so no step from the other theme stays baked in.
+    static func paperHistoryOpacities(dark: Bool) -> [CGFloat] {
+        dark ? [1, 0.902, 0.772] : [1, 0.847, 0.769]
+    }
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }
     static var chromeNSColor: NSColor { adaptive(light: 0x5C564D, dark: 0xA39D8E) }

@@ -65,7 +65,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
 .room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip}
-/* The sheet is the Note paper (D-056): its tone, grain and light are painted by paper.js into a
+/* The sheet is the Wheat paper (D-069): its grain is painted by paper.js into a
    canvas that sits in the sheet's own stacking context behind every word. Nothing repaints while
    the writer types - the texture only redraws when the sheet's size or the theme changes. */
 [data-paper]{background:var(--paper-tone);isolation:isolate}

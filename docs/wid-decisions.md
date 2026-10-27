@@ -1175,3 +1175,43 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the sheet below the 60-61% contract, so the container now carries the fraction floor.
 - Supersedes: D-058's width/height scoping rule and its 340 px constant; its intent (the door and the
   preview share the first screen) and the 300 px floor stand.
+
+## D-069: The writing sheet is the Wheat paper, not the Note paper
+
+- Date: 2026-10-27
+- Decision: On the web (the landing demo, the trial, the writeitdown.app demo, room, failure and kept
+  sheets) the writing sheet is the **Wheat** paper: light `#e9e2ce`, dark `#342e24` (the tuner's Wheat
+  lamp version of the same paper, not an inversion). Grain stays **70 of 100 at size 1.00**; the ink stays
+  `#1c1917` at weight 100 with the imperfection on in light and `#ece7d9` in dark. The page, the wall,
+  the header and the chrome stay white. The warn wash is still the sheet's own mix: `#e8cfbb` (88%) and
+  `#e6bca7` (76% at the cut) in light, `#453226` and `#573428` in dark.
+- Measured (WCAG contrast, every text role against the sheet; the numeral and the pen also against the wash):
+
+  | Role | Light on `#e9e2ce` | Dark on `#342e24` |
+  |---|---|---|
+  | Writing ink | 13.52 (`#1c1917`) | 10.88 (`#ece7d9`) |
+  | Quiet chrome (clock, count, hint, receipt, exit, kept note) | 7.21 (`#464746`, unchanged) | 7.31 (`#c2bfb7`, was `#b8b5ac` = 6.56) |
+  | Pen red (numeral, wipe report, exit hint) | 9.93 (`#63140b`, unchanged) | 8.74 (`#ffc2b4`, was `#ffb4a2` = 7.87) |
+  | Pen on the 88% wash | 8.61 | 7.88 |
+  | Pen on the 76% wash at the cut | 7.43 | 7.06 (was 6.37) |
+  | History step one | 9.03 (alpha .847, unchanged) | 9.16 (alpha .902, was .846 = 8.26) |
+  | History step two | 7.09 (alpha .769, unchanged) | 7.16 (alpha .772, was .727 = 6.54) |
+
+  Every light role clears 7:1 untouched. In dark the quiet grey, the second history step and the pen on
+  the deepest wash fell under 7:1 on the warmer, lighter lamp paper, so only those three lightness
+  values moved; the first history step moved with them so the ladder keeps its roughly 9 then 7 shape
+  (the room test pins step one at 9:1 or better).
+- Reason: the captain was asked to choose between keeping the cool Note paper, a plain white sheet and
+  the warm Wheat paper, and answered **3**. The value is the measured Wheat paper from the Platen
+  garden, the tuner's runner-up (`data/wid-paper-tuner/site/tuner.js`, `wheat`: `#e9e2ce` / `#342e24`);
+  it is warmer than the `#e0d5b8` D-056 recorded as the considered alternative.
+- Tests: `tests/paper.spec.mjs` and `writeitdown/qa/paper.spec.mjs` now pin the Wheat values, the
+  dark roles, the washes and the grain's rendered mean (the texture composited over the tone, read off
+  the pixels: within 6 per channel in light, 10 in dark because the lamp moves it). They fail on the
+  Note values (tone, wash, dark roles and the mean at 20 to 50 off the tone).
+- Not changed here: the Mac app keeps D-056's Note paper (`PaperSheetView`, `PaperContrastTests`) until
+  its own change mirrors this one; the web and the Mac disagree on the sheet tone until then.
+- Supersedes: D-056's tone (`#dbe6ec` / `#21272a`), its measured role values for the web (13.78, 7.35,
+  10.1 and the dark `#b8b5ac` / `#ffb4a2` / .846 / .727), and the wash values `#ddd3d5` / `#ddc0be` /
+  `#352c2c` / `#49302e`. D-056's grain, ink, white page identity, contrast-ladder design and the
+  one-canvas renderer stand unchanged.

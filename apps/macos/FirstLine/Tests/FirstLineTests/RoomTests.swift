@@ -254,7 +254,7 @@ struct RoomTests {
         let numeral = try #require(fields.first { $0.stringValue == "3" })
         #expect(!numeral.isHiddenOrHasHiddenAncestor)
         #expect((numeral.font?.pointSize ?? 0) > 100)
-        #expect(sameColor(numeral.textColor, FirstLineColors.redNSColor))
+        #expect(sameColor(numeral.textColor, FirstLineColors.paperDangerNSColor))
         #expect(fields.contains { $0.stringValue == "0:55" })
         let exit = try #require(exitButton(in: fixture.room))
         #expect(!exit.isHiddenOrHasHiddenAncestor)
@@ -394,27 +394,33 @@ struct RoomTests {
         #expect(kept.draft.isEmpty)
     }
 
+    /// The ramp moves the sheet's colour, not the view's alpha, so the paper keeps one grain layer under
+    /// the alarm; the recovery still leaves on the 120 ms fade (D-056).
     @Test func washRecoveryFadesOnceAndWarningInterruptsImmediately() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         fixture.clock.now = 6.5
         fixture.room.tick()
-        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
-            .first { $0.alphaValue == 0.5 })
+        let wash = try #require(descendants(fixture.room.view, of: PaperWashView.self)
+            .first { $0.fraction == 0.5 })
+        #expect(wash.alphaValue == 1)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
         let fade = try #require(wash.layer?.animation(forKey: "opacity") as? CABasicAnimation)
         #expect(fade.duration == 0.12)
-        #expect((fade.fromValue as? Float) == 0.5)
+        #expect((fade.fromValue as? Float) == 1)
         #expect((fade.toValue as? Float) == 0)
+        #expect(wash.fraction == 0.5, "the wash leaves on the fade still carrying its warmth, not cut to plain paper")
         var control: [Float] = [0, 0]
         fade.timingFunction?.getControlPoint(at: 1, values: &control)
         #expect(control == [0, 0])
         fixture.room.tick()
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
+        #expect(wash.fraction == 0.5, "a tick during the fade keeps the tint until the fade ends")
         fixture.clock.now = 13
         fixture.room.tick()
-        #expect(wash.alphaValue == 0.5)
+        #expect(wash.fraction == 0.5)
+        #expect(wash.alphaValue == 1)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.state.settings.reducedMotion = .always
         fixture.editor.insertText("y", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -422,17 +428,69 @@ struct RoomTests {
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
     }
 
+    /// A warn tick moves only the wash's colour: the texture layer is drawn once per field and never again
+    /// while the alarm ramps, and it lands on the sheet's own grain, so nothing on the paper moves or flickers.
+    @Test func warnTicksNeverRepaintThePaperTexture() throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        let view = fixture.room.view
+        let paper = try #require(descendants(view, of: PaperSheetView.self).first)
+        let wash = try #require(descendants(view, of: PaperWashView.self).first)
+        func settle() {
+            view.layoutSubtreeIfNeeded()
+            view.displayIfNeeded()
+            CATransaction.flush()
+        }
+        func render() throws -> [(Double, Double, Double)] {
+            settle()
+            let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+            let origin = (x: Int(paper.frame.midX * scale), y: Int((view.bounds.height - paper.frame.maxY + 80) * scale))
+            var pixels: [(Double, Double, Double)] = []
+            for y in origin.y..<origin.y + 40 {
+                for x in origin.x..<origin.x + 40 {
+                    let colour = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    pixels.append((Double(colour.redComponent), Double(colour.greenComponent), Double(colour.blueComponent)))
+                }
+            }
+            return pixels
+        }
+        let plain = try render()
+        fixture.clock.now = 5.2
+        fixture.room.tick()
+        #expect(wash.alphaValue == 1 && wash.fraction > 0)
+        let washed = try render()
+
+        let count = Double(plain.count)
+        let offset = zip(washed, plain).reduce(0.0) { $0 + ($1.0.1 - $1.1.1) } / count
+        let residual = (zip(washed, plain).reduce(0.0) { $0 + pow($1.0.1 - $1.1.1 - offset, 2) } / count).squareRoot()
+        #expect(residual < 0.01, "the washed grain does not sit on the sheet's grain: residual \(residual)")
+
+        settle()
+        let paints = wash.texturePaints
+        #expect(paints > 0, "the texture layer was never painted")
+        for now in [5.5, 6.0, 6.5, 7.0, 7.5] {
+            fixture.clock.now = now
+            fixture.room.tick()
+            settle()
+            #expect(wash.texturePaints == paints, "a warn tick at \(now) s repainted the paper texture")
+        }
+    }
+
     @Test func cutCleanupUsesTheSameWashFade() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         fixture.clock.now = 8.1
         fixture.room.tick()
-        let wash = try #require(descendants(fixture.room.view, of: RoomWashView.self)
+        let wash = try #require(descendants(fixture.room.view, of: PaperWashView.self)
             .first { $0.alphaValue == 1 })
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
+        #expect(wash.deep)
         fixture.room.endCutAnimation()
         #expect(wash.alphaValue == 0)
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
+        #expect(wash.deep && wash.fraction == 1, "the cut leaves on the fade, still the deep step")
     }
 
     @Test func warningCaptionUsesTheLiveMachineVoice() throws {
@@ -450,7 +508,9 @@ struct RoomTests {
         #expect(abs((numeral.font?.pointSize ?? 0) - min(fixture.room.view.bounds.height * 0.18, 170)) < 1)
     }
 
-    @Test func countAndExitFollowTheLivePhaseTone() throws {
+    /// The count and the exit link sit on the Wheat sheet, so they take the sheet's one quiet role in
+    /// every phase: the wall's mute and chrome would sink below the 7:1 floor on the paper (D-056).
+    @Test func countAndExitKeepThePaperQuietRoleInEveryPhase() throws {
         for phase in [SessionPhase.writing, .danger] {
             let fixture = try roomFixture()
             advance(fixture, to: phase)
@@ -458,10 +518,9 @@ struct RoomTests {
             let count = try #require(fields.first { $0.stringValue.hasSuffix("words") })
             let exit = try #require(exitButton(in: fixture.room))
             let exitColor = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-            let expected = phase == .writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
             let countColor = count.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-            #expect(sameColor(countColor, expected))
-            #expect(sameColor(exitColor, expected))
+            #expect(sameColor(countColor, FirstLineColors.paperQuietNSColor))
+            #expect(sameColor(exitColor, FirstLineColors.paperQuietNSColor))
         }
     }
 

@@ -47,6 +47,18 @@ const over = (colour, backdrop) => ({
 const toHex = ({ r, g, b }) =>
   '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
+const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+
+/** The sheet's tone, measured within the two levels the texture's correction is allowed to leave behind. */
+const expectTone = (measured, expected, label) => {
+  const a = measured.map(Math.round);
+  const b = channels(expected);
+  a.forEach((value, index) => {
+    expect(Math.abs(value - b[index]), `${label}: channel ${index} of ${a.join(',')} against ${expected}`)
+      .toBeLessThanOrEqual(2);
+  });
+};
+
 /** The largest per-channel gap between a patch's rendered mean and a tone: read off the pixels. */
 const meanOffset = (mean, tone) => {
   const target = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16)).join(',')})`);
@@ -101,6 +113,29 @@ async function patch(page, selector, offsetY = 0.6) {
   }, [selector, offsetY]);
 }
 
+/** What the screen shows where the sheet is empty: the sheet's own tone composited with the texture's mean,
+ *  which is the pixel value the captain locked, not the CSS constant behind it. */
+async function sheetTone(page, selector) {
+  return page.evaluate(sel => {
+    const element = document.querySelector(sel);
+    const value = getComputedStyle(element).backgroundColor;
+    const parts = value.match(/rgba?\(([^)]+)\)/)[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    const base = [parts[0], parts[1], parts[2]];
+    const canvas = element.querySelector('.sheet-paper');
+    if (!canvas || canvas.width < 2) return base;
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    const count = canvas.width * canvas.height;
+    const shift = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+      shift[0] += alpha * (data[i] - base[0]);
+      shift[1] += alpha * (data[i + 1] - base[1]);
+      shift[2] += alpha * (data[i + 2] - base[2]);
+    }
+    return base.map((channel, index) => channel + shift[index] / count);
+  }, selector);
+}
+
 test.describe('the demo sheet at rest', () => {
   test('carries the Wheat tone, the ink and the grain before its first paint', async ({ page }) => {
     // Every animation frame from the first one records whether the sheet is on screen and whether it
@@ -121,7 +156,7 @@ test.describe('the demo sheet at rest', () => {
     await page.goto('/index.html');
 
     // 1. the locked colours
-    expect(toHex(parseColour(await computed(page, '.demo-paper', 'backgroundColor')))).toBe(PAPER);
+    expectTone(await sheetTone(page, '.demo-paper'), PAPER, 'the demo sheet');
     expect(toHex(parseColour(await computed(page, '.demo-text')))).toBe(INK);
 
     // 2. the contrast floor of every role that sits on the paper
@@ -184,7 +219,7 @@ test.describe('the trial sheet', () => {
     await expect(editor).toBeFocused();
 
     const paperBefore = await computed(page, '.trial-writing-surface', 'backgroundColor');
-    expect(toHex(parseColour(paperBefore))).toBe(PAPER);
+    expectTone(await sheetTone(page, '.trial-writing-surface'), PAPER, 'the room sheet');
     const grainBefore = await patch(page, '.trial-writing-surface', 0.7);
     expect(grainBefore.spread).toBeGreaterThan(2);
     expect(meanOffset(grainBefore.mean, PAPER), 'the trial grain mean is the sheet tone').toBeLessThanOrEqual(6);
@@ -192,7 +227,7 @@ test.describe('the trial sheet', () => {
     await page.keyboard.type('one two three four five six seven', { delay: 25 });
 
     const paperAfter = await computed(page, '.trial-writing-surface', 'backgroundColor');
-    expect(toHex(parseColour(paperAfter))).toBe(PAPER);
+    expectTone(await sheetTone(page, '.trial-writing-surface'), PAPER, 'the room sheet after typing');
     const grainAfter = await patch(page, '.trial-writing-surface', 0.7);
     expect(grainAfter.hash, 'the grain moved under the writer').toBe(grainBefore.hash);
     expect(grainAfter.spread).toBe(grainBefore.spread);
@@ -228,7 +263,7 @@ test.describe('the trial sheet', () => {
       const info = window.FirstLinePaper.paintInfo(document.querySelector('.kept-paper'));
       return info !== null && info.width > 2;
     });
-    expect(toHex(parseColour(await computed(page, '.kept-paper', 'backgroundColor')))).toBe(PAPER);
+    expectTone(await sheetTone(page, '.kept-paper'), PAPER, 'the kept sheet');
     const keptGrain = await patch(page, '.kept-paper', 0.6);
     expect(keptGrain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
     expect(meanOffset(keptGrain.mean, PAPER), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(6);

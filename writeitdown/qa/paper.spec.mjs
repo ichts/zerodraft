@@ -43,7 +43,7 @@ const over = (colour, backdrop) => ({
 const toHex = ({ r, g, b }) =>
   '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
-/** How far the grain's rendered mean may sit from the tone: the lamp's light moves the dark sheet more. */
+/** How far one patch's rendered mean may sit from the tone: the mottle moves a single patch more on the dark sheet. */
 const GRAIN_BAND = { light: 6, dark: 10 };
 
 /** The largest per-channel gap between a patch's rendered mean and a tone, read off the pixels. */
@@ -55,6 +55,18 @@ const meanOffset = (mean, tone) => {
 /** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
  *  already warm. */
 const warmth = ({ r, g }) => (r - g) / 255;
+
+const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+
+/** The sheet's tone, measured within the two levels the texture's correction is allowed to leave behind. */
+const expectTone = (measured, expected, label) => {
+  const a = measured.map(Math.round);
+  const b = channels(expected);
+  a.forEach((value, index) => {
+    expect(Math.abs(value - b[index]), `${label}: channel ${index} of ${a.join(',')} against ${expected}`)
+      .toBeLessThanOrEqual(2);
+  });
+};
 
 const theme = page => page.evaluate(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 const style = (page, selector, property) =>
@@ -123,12 +135,35 @@ async function waitForPaper(page, selector) {
   }, selector);
 }
 
+/** What the screen shows where the sheet is empty: the sheet's own tone composited with the texture's mean,
+ *  which is the pixel value the captain locked, not the CSS constant behind it. */
+async function sheetTone(page, selector) {
+  return page.evaluate(sel => {
+    const element = document.querySelector(sel);
+    const value = getComputedStyle(element).backgroundColor;
+    const parts = value.match(/rgba?\(([^)]+)\)/)[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    const base = [parts[0], parts[1], parts[2]];
+    const canvas = element.querySelector('.sheet-paper');
+    if (!canvas || canvas.width < 2) return base;
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    const count = canvas.width * canvas.height;
+    const shift = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+      shift[0] += alpha * (data[i] - base[0]);
+      shift[1] += alpha * (data[i + 1] - base[1]);
+      shift[2] += alpha * (data[i + 2] - base[2]);
+    }
+    return base.map((channel, index) => channel + shift[index] / count);
+  }, selector);
+}
+
 test.describe('the sheet', () => {
   test('the demo sheet and the room carry the locked tone, ink and grain', async ({ page }) => {
     await page.goto('./');
     const mode = await theme(page);
     const paper = parseColour(await style(page, '#paper', 'backgroundColor'));
-    expect(toHex(paper)).toBe(TONES[mode]);
+    expectTone(await sheetTone(page, '#paper'), TONES[mode], 'the demo sheet');
 
     // The words on the demo sheet are the locked ink.
     expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
@@ -140,7 +175,7 @@ test.describe('the sheet', () => {
     expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
 
     await enterRoom(page);
-    expect(toHex(parseColour(await style(page, '.room-paper', 'backgroundColor')))).toBe(TONES[mode]);
+    expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
     expect(toHex(parseColour(await style(page, '#editor', 'color')))).toBe(INK[mode]);
 
     // The texture is device-exact: one canvas pixel per device pixel, so it cannot shimmer.
@@ -157,7 +192,9 @@ test.describe('the sheet', () => {
   test('every word on the sheet clears 7:1, including the faded history lines', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
-    const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
+    // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
+    // background behind the canvas is the grain-corrected base, not the colour on screen (D-073).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     const ink = parseColour(await style(page, '#editor', 'color'));
 
     expect(toHex(ink)).toBe(INK[mode]);
@@ -215,8 +252,10 @@ test.describe('the sheet', () => {
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
     expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
-    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut.
-    const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
+    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
+    // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
+    // renderer sets on the sheet (D-073).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
     expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));
   });
@@ -233,7 +272,7 @@ test.describe('the sheet', () => {
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
-    expect(toHex(paper)).toBe(TONES[await theme(page)]);
+    expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
     const grain = await patch(page, '.room-paper', 0.5);
     expect(grain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
     expect(meanOffset(grain.mean, TONES[await theme(page)]), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);

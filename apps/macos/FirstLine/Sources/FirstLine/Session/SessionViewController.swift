@@ -1,13 +1,13 @@
 /*
- * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation and the After tokens.
- * [OUTPUT]: One AppKit room: page, white sheet with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, wash and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt, two-step exit.
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt, two-step exit.
  * [POS]: Writing on the paper's one anchor above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
 import CoreText
 
-final class RoomWashView: NSView {
+class RoomWashView: NSView {
     var fillColor: NSColor { didSet { needsDisplay = true } }
     var cornerRadius: CGFloat = 0 { didSet { needsDisplay = true } }
     init(fillColor: NSColor) {
@@ -46,6 +46,135 @@ final class RoomWashView: NSView {
         fade.duration = 0.12
         fade.timingFunction = CAMediaTimingFunction(name: .linear)
         layer?.add(fade, forKey: "opacity")
+    }
+}
+
+/// The sheet's texture inside the wash: both mottle scales and the grain, drawn once into its own layer each
+/// time the sheet rebuilds its field, so a warn tick that only moves the tint never repaints it.
+final class PaperTextureView: NSView {
+    var image: CGImage? { didSet { needsDisplay = true } }
+    /// How many times the texture has been painted; a warn tick must leave it unchanged.
+    private(set) var paints = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
+        autoresizingMask = [.width, .height]
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var isOpaque: Bool { false }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image, let ctx = NSGraphicsContext.current?.cgContext else { return }
+        paints += 1
+        ctx.saveGState()
+        ctx.translateBy(x: 0, y: bounds.height)
+        ctx.scaleBy(x: 1, y: -1)
+        ctx.interpolationQuality = .none
+        ctx.draw(image, in: CGRect(origin: .zero, size: bounds.size))
+        ctx.restoreGState()
+    }
+}
+
+/// The sheet's warn wash. Its layer carries the paper tone mixed toward the locked wash colour, and the
+/// sheet's own texture sits above it in a layer of its own, so the alarm tints the same paper on both
+/// surfaces and each tick changes one layer colour instead of repainting the sheet (D-056). The sheet's
+/// mean shift rides on that colour, so the washed sheet keeps the sheet's corrected tone.
+final class PaperWashView: RoomWashView {
+    private let textureView = PaperTextureView()
+    private var shift = (r: 0.0, g: 0.0, b: 0.0)
+    private var fadeToken = 0
+
+    /// The sheet's texture; set once per rebuilt field, never per tick.
+    var texture: PaperField.Texture? {
+        didSet {
+            textureView.image = texture?.image
+            shift = texture?.shift ?? (0, 0, 0)
+            needsDisplay = true
+        }
+    }
+
+    /// How many times the texture layer has been painted, so a test can prove a tick never repaints it.
+    var texturePaints: Int { textureView.paints }
+
+    /// How far the sheet has warmed, 0...1: the ramp moves the colour, not the view's alpha.
+    var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
+    var deep = false { didSet { needsDisplay = true } }
+
+    override init(fillColor: NSColor) {
+        super.init(fillColor: fillColor)
+        textureView.frame = bounds
+        addSubview(textureView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// The paper's tone mixed toward the locked wash colour, resolved for this view's appearance every
+    /// time it is read, so neither a theme switch nor a drawing-appearance left behind by another view
+    /// can bake a stale tint into the wash.
+    var tint: NSColor {
+        var resolved = NSColor.clear
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            let target = (deep ? FirstLineColors.paperWashDeepNSColor : FirstLineColors.paperWashNSColor)
+                .usingColorSpace(.sRGB)
+            guard let target, let base = FirstLineColors.paperNSColor.usingColorSpace(.sRGB) else { return }
+            let t = min(max(fraction, 0), 1)
+            resolved = NSColor(srgbRed: base.redComponent + (target.redComponent - base.redComponent) * t,
+                               green: base.greenComponent + (target.greenComponent - base.greenComponent) * t,
+                               blue: base.blueComponent + (target.blueComponent - base.blueComponent) * t,
+                               alpha: 1)
+        }
+        return resolved
+    }
+
+    override func updateLayer() {
+        super.updateLayer()
+        let colour = tint
+        layer?.backgroundColor = CGColor(srgbRed: colour.redComponent + shift.r / 255,
+                                         green: colour.greenComponent + shift.g / 255,
+                                         blue: colour.blueComponent + shift.b / 255, alpha: 1)
+    }
+
+    /// Shows the wash at `fraction` warmth, or, at zero, leaves on the 120 ms fade still carrying its last
+    /// tint and only then returns to the plain sheet, so the exit is a fade and not a cut.
+    func show(_ fraction: CGFloat, deep: Bool, reducesMotion: Bool) {
+        guard fraction > 0 else {
+            fadeOut(reducesMotion: reducesMotion)
+            return
+        }
+        fadeToken += 1
+        if self.deep != deep { self.deep = deep }
+        self.fraction = fraction
+        setOpacity(1, reducesMotion: reducesMotion)
+    }
+
+    private func fadeOut(reducesMotion: Bool) {
+        guard alphaValue > 0 else {
+            if layer?.animation(forKey: "opacity") == nil { settle() }
+            return
+        }
+        fadeToken += 1
+        let token = fadeToken
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.fadeToken == token, self.alphaValue == 0 else { return }
+                self.settle()
+            }
+        }
+        setOpacity(0, reducesMotion: reducesMotion)
+        CATransaction.commit()
+    }
+
+    private func settle() {
+        if fraction != 0 { fraction = 0 }
+        if deep { deep = false }
     }
 }
 
@@ -89,9 +218,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var copyButton: NSButton { keptView.copyButton }
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
-    private var paper: FloodCanvasView!
+    private var paper: PaperSheetView!
     private var paperShadow: FirstLineShadowView!
-    private var paperWash: RoomWashView!
+    private var paperWash: PaperWashView!
     private var outline: RoomWashView!
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
@@ -121,7 +250,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var lastPhase: SessionPhase = .idle
     private var renderedSessionID: UUID?
     private var cutWork: DispatchWorkItem?
-    private var washIsCut = false
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
@@ -137,7 +265,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var barBounds: CGSize = .zero
     var exitConfirmation = ExitConfirmation()
     private var exitHintWork: DispatchWorkItem?
-    private var quietLinkMuted: Bool?
 
     init(appState: AppState, pasteboard: NSPasteboard = .general,
          confirmationNow: @escaping () -> TimeInterval = { SessionEngine.continuousNowSeconds() }) {
@@ -208,11 +335,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func buildRoom() {
-        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.sheetNSColor)
+        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.paperNSColor)
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        paper = FloodCanvasView(fillColor: FirstLineColors.sheetNSColor)
+        // The paper is the Wheat sheet (D-069): tone and texture are rendered by the view itself.
+        paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet
         paper.clipsContent = true
@@ -246,10 +374,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         paper.addSubview(scrollView)
 
-        paperWash = RoomWashView(fillColor: FirstLineColors.redSoftNSColor)
+        paperWash = PaperWashView(fillColor: FirstLineColors.paperWashNSColor)
         paperWash.translatesAutoresizingMaskIntoConstraints = false
         paperWash.cornerRadius = FirstLineRadius.sheet
         paperWash.alphaValue = 0
+        paper.textureDidChange = { [weak paperWash] texture in paperWash?.texture = texture }
         paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
         outline = RoomWashView(fillColor: .clear)
@@ -269,7 +398,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         timerLabel.setAccessibilityRole(.staticText)
         timerLabel.setAccessibilityElement(true)
         timerLabel.setAccessibilityHidden(false)
-        countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.muteNSColor)
+        countLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.paperQuietNSColor)
         countLabel.alignment = .right
         countLabel.toolTip = RoomPresentation.countRule
         countLabel.setAccessibilityHelp(RoomPresentation.countRule)
@@ -277,17 +406,17 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
         numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
-                             color: FirstLineColors.redNSColor)
+                             color: FirstLineColors.paperDangerNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
         warningHint.maximumNumberOfLines = 0
         numeralLabel.isHidden = true
         warningHint.isHidden = true
 
         exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
-        styleQuietLink(exitButton, title: "ESC - EXIT", muted: false)
-        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.redNSColor)
+        styleQuietLink(exitButton, title: "ESC - EXIT")
+        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         exitHintLabel.attributedStringValue = Self.quietRowText(Self.exitHintText,
-            color: FirstLineColors.redNSColor, truncates: true, kernEm: 0)
+            color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
@@ -732,8 +861,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         timerLabel.stringValue = RoomPresentation.clock(seconds)
         let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
-        let writing = phase == .writing
-        let chrome = writing ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
+        let chrome = FirstLineColors.paperQuietNSColor
         // Empty room: the bottom-right count slot itself carries the instruction.
         // After the first keystroke it becomes the word count; after a wipe the stopped
         // block carries the instruction and the slot shows the count.
@@ -746,7 +874,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.attributedStringValue = Self.rowText(
             typePrompt ? "Type to start" : wordLabel, font: FirstLineTypography.smallNSFont,
             color: chrome, alignment: .right, kernEm: 0)
-        refreshQuietLinks(muted: writing)
         let warning = phase == .danger
         numeralLabel.isHidden = !warning
         warningHint.isHidden = !warning
@@ -842,18 +969,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         return text
     }
 
-    private func styleQuietLink(_ button: NSButton, title: String, muted: Bool) {
-        let color = muted ? FirstLineColors.muteNSColor : FirstLineColors.chromeNSColor
+    /// One quiet role on the paper: the exit link keeps 7:1 on the Wheat sheet in both appearances.
+    private func styleQuietLink(_ button: NSButton, title: String) {
+        let color = FirstLineColors.paperQuietNSColor
         button.title = title
         button.font = FirstLineTypography.smallMediumNSFont
         button.contentTintColor = color
         button.attributedTitle = Self.quietRowText(title, color: color)
-    }
-
-    private func refreshQuietLinks(muted: Bool) {
-        guard quietLinkMuted != muted else { return }
-        quietLinkMuted = muted
-        styleQuietLink(exitButton, title: "ESC - EXIT", muted: muted)
     }
 
     private func applyVisualSettings() {
@@ -878,12 +1000,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         applyVisualSettings()
     }
 
-    private func setWash(_ opacity: CGFloat, cut: Bool) {
-        if washIsCut != cut {
-            washIsCut = cut
-            paperWash.fillColor = cut ? FirstLineColors.redDeepNSColor : FirstLineColors.redSoftNSColor
-        }
-        paperWash.setOpacity(opacity, reducesMotion: reducesMotion)
+    /// `fraction` is how warm the sheet is, 0...1. The view is fully visible whenever there is any wash and
+    /// the colour carries the ramp, so the paper keeps one grain layer instead of two (D-056).
+    private func setWash(_ fraction: CGFloat, cut: Bool) {
+        paperWash.show(fraction, deep: cut, reducesMotion: reducesMotion)
     }
 
     private func showCut() {

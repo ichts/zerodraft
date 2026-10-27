@@ -1325,3 +1325,38 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   role into the card.
 - Supersedes: D-071's colour clause (`--mute` for the consequence line) and its open list of candidate remedies. D-071
   held the colour until the captain decided; the captain's standing rule now decides it for this line.
+
+## D-073: The Mac room carries D-069's Wheat paper, and the locked tone wins at the pixel on both surfaces
+
+- Date: 2026-10-27
+- Decision: The Mac room mirrors D-069, and both surfaces hold the locked tone at the pixel.
+  1. **The Mac sheet is D-069's Wheat paper** with D-069's roles, read from the same values as the web's
+     `tokens.css`: tone `#e9e2ce` / `#342e24`, quiet `#464746` / `#c2bfb7`, pen `#63140b` / `#ffc2b4`, wash
+     `#e8cfbb` / `#e6bca7` and `#453226` / `#573428`, ink `#1c1917` / `#ece7d9`, grain 70 of 100 at size 1.00.
+  2. **The history ladder is D-069's**, applied with D-027's stepping. Each completed line gets one opacity:
+     the current line 1.0, one line up 0.847 (light) / 0.902 (dark), two lines up 0.769 / 0.772, older 0. The
+     partial line at the aperture is clipped, not given its own alpha. The faded lines read at 9:1 and 7:1 or
+     better on the paper. The ladder is solved per appearance, so the Mac editor re-steps every completed line
+     when the appearance changes.
+  3. **The locked tone wins over the renderer.** The lamp light and the dark settle are gone from the
+     generator on both surfaces, and the texture's own mean is cancelled out of the base the sheet is drawn
+     on. The pixels on screen therefore measure the locked tone, within two levels per channel, rather than
+     the CSS or NSColor constant behind it. On the web the correction rides on the sheet's own tone token, so
+     the wash still mixes from the corrected base.
+  4. **The ink spread steps with the line.** The Mac's 0.35 pt ink spread is quantised to the line's ladder
+     step (`inkSpread(step:)`, alpha 0.55 x step, never interpolated), so a faded line fades its whole
+     rendered ink.
+  5. **The alarm tints the same paper.** The Mac wash lays the sheet's whole texture in its own layer above a
+     tint layer. A warn tick changes one layer colour and never repaints the texture. On exit the wash keeps
+     its last tint while it fades over 120 ms. The Mac generator uses the web's seed string and pigments.
+- Reason: The Mac had to become the same paper as the web once the captain chose Wheat (D-069). Measured on
+  the rendered Mac field, the lamp light had lifted the dark sheet about 25 levels off the locked value.
+- Tests: `PaperContrastTests` (Wheat tones and roles, the per-appearance ladder at 9:1 and 7:1 or better, the
+  rendered field's mean against the locked tone, the wash mix), `EditorFocusTests`
+  (`historyLadderFollowsTheAppearance`, `inkSpreadIsQuantisedToTheLineStep`),
+  `RoomTests.warnTicksNeverRepaintThePaperTexture`, `SnapshotTests`, `tests/paper.spec.mjs` and
+  `writeitdown/qa/paper.spec.mjs` (the sheet's tone measured as the rendered composite).
+- Supersedes: D-069's note that the Mac keeps D-056's Note paper until its own change; the lamp light in the
+  D-056 generator; the branch-only proposal to
+  restore D-027's 100/22/7 values, which never shipped (D-027's stepping stands, D-069's values replace its
+  alphas).

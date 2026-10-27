@@ -313,22 +313,65 @@ struct ReviewRoundTests {
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
+
+        // The same patch of the sheet, before the wash and under it: the wash is the difference between
+        // those two frames. An absolute redness would only be measuring the paper's own tone, which is
+        // now the warm Wheat paper, so the assertion is the warmth the alarm adds (D-056).
+        func sample() throws -> NSColor {
+            room.view.layoutSubtreeIfNeeded()
+            room.view.displayIfNeeded()
+            let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
+            room.view.cacheDisplay(in: room.view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
+            // Sample a patch of the empty upper middle of the paper, away from the clock and the text, and
+            // average it: the sheet is textured, so one pixel is a grain value, not the paper's tone.
+            let x = Int(paper.frame.midX * scale)
+            let y = Int((room.view.bounds.height - (paper.frame.maxY - 80)) * scale)
+            var sums = (red: CGFloat(0), green: CGFloat(0), blue: CGFloat(0))
+            var count = 0
+            for dx in -12...12 {
+                for dy in -12...12 {
+                    guard let colour = rep.colorAt(x: x + dx, y: y + dy)?.usingColorSpace(.sRGB) else { continue }
+                    sums.red += colour.redComponent
+                    sums.green += colour.greenComponent
+                    sums.blue += colour.blueComponent
+                    count += 1
+                }
+            }
+            try #require(count > 0)
+            return NSColor(srgbRed: sums.red / CGFloat(count), green: sums.green / CGFloat(count),
+                           blue: sums.blue / CGFloat(count), alpha: 1)
+        }
+        let plain = try sample()
         now.now = 6.5
         room.tick()
-        room.view.layoutSubtreeIfNeeded()
-        room.view.displayIfNeeded()
         #expect(engine.phase == .danger)
+        let washed = try sample()
 
-        let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
-        room.view.cacheDisplay(in: room.view.bounds, to: rep)
-        let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
-        // Sample the empty upper middle of the paper, away from the clock and the text.
-        let x = Int(paper.frame.midX * scale)
-        let y = Int((room.view.bounds.height - (paper.frame.maxY - 80)) * scale)
-        let colour = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
-        #expect(colour.redComponent - colour.greenComponent > 0.02,
-                "the warning paper is not tinted: \(colour)")
-        #expect(colour.greenComponent < 0.98)
+        // The tint itself is exact and deterministic: at 6.5 s the sheet is half way from the Wheat tone to
+        // the locked wash colour, and the view is fully covering the paper so the grain is painted once.
+        let wash = try #require(descendants(of: room.view, of: PaperWashView.self).first)
+        #expect(abs(wash.fraction - 0.5) < 0.001)
+        let tint = try #require(wash.tint.usingColorSpace(.sRGB))
+        var noteTone: NSColor?
+        var target: NSColor?
+        room.view.effectiveAppearance.performAsCurrentDrawingAppearance {
+            noteTone = FirstLineColors.paperNSColor.usingColorSpace(.sRGB)
+            target = FirstLineColors.paperWashNSColor.usingColorSpace(.sRGB)
+        }
+        let base = try #require(noteTone)
+        let washColour = try #require(target)
+        #expect(abs(Double(tint.redComponent) - Double((base.redComponent + washColour.redComponent) / 2)) < 0.002)
+        #expect(abs(Double(tint.greenComponent) - Double((base.greenComponent + washColour.greenComponent) / 2)) < 0.002)
+
+        // And it reaches the frame: the rendered sheet is warmer and loses green against the same patch
+        // before the alarm. The sheet's grain lifts both frames equally, so the shift is what is measured.
+        let warmth = Double(washed.redComponent - washed.greenComponent)
+            - Double(plain.redComponent - plain.greenComponent)
+        #expect(warmth > 0.015, "the warning paper is not warmed: \(washed) against \(plain)")
+        #expect(Double(plain.greenComponent - washed.greenComponent) > 0.015,
+                "the warning paper is not tinted: \(washed) against \(plain)")
+        #expect(washed.greenComponent < 0.98)
         window.orderOut(nil)
     }
 

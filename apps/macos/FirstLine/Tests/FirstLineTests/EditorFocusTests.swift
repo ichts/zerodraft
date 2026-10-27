@@ -218,15 +218,78 @@ struct EditorFocusTests {
             }
             alphas.append(lineAlphas)
         }
-        // One uniform opacity per completed line; the current line full; older lines gone.
+        // One uniform ink step per completed line; the current line full; older lines gone. The step
+        // values themselves are the measured ladder (PaperContrastTests); this asserts the wiring.
+        let ladder = textView.historyLineOpacities
         #expect(alphas[3].allSatisfy { abs($0 - 1) < 0.001 })
-        #expect(alphas[2].allSatisfy { abs($0 - 0.22) < 0.001 })
-        #expect(alphas[1].allSatisfy { abs($0 - 0.07) < 0.001 })
+        #expect(alphas[2].allSatisfy { abs($0 - ladder[1]) < 0.001 })
+        #expect(alphas[1].allSatisfy { abs($0 - ladder[2]) < 0.001 })
         #expect(alphas[0].allSatisfy { $0 == 0 })
         #expect(textView.alignment == .center)
         let paragraph = try #require(storage.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
         #expect(abs(paragraph.maximumLineHeight - 44.8) <= 0.001)
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
+    }
+
+    /// The ladder is solved per appearance (D-069), so a theme switch re-steps every completed line: no
+    /// step from the other appearance stays baked into the storage.
+    @Test func historyLadderFollowsTheAppearance() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.appearance = NSAppearance(named: .aqua)
+        textView.configureSessionTypography()
+        textView.loadRestoredText("one\ntwo\nthree")
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.847) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.769) < 0.001)
+        textView.appearance = NSAppearance(named: .darkAqua)
+        textView.viewDidChangeEffectiveAppearance()
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.902) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.772) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001)
+    }
+
+    /// The ink's imperfection steps with the line: the live line, one back and two back each carry their own
+    /// fixed spread, so a faded line cannot keep the live line's ink and the same text always renders
+    /// identically (D-073).
+    @Test func inkSpreadIsQuantisedToTheLineStep() throws {
+        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.configureSessionTypography()
+        textView.loadRestoredText("one\ntwo\nthree")
+
+        func spread(_ index: Int) throws -> (alpha: CGFloat, blur: CGFloat) {
+            let storage = try #require(textView.textStorage)
+            let layout = try #require(textView.layoutManager)
+            let container = try #require(textView.textContainer)
+            layout.ensureLayout(for: container)
+            var lines: [NSRange] = []
+            layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: storage.length)) { _, _, _, glyphRange, _ in
+                lines.append(layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil))
+            }
+            let line = try #require(lines.indices.contains(index) ? lines[index] : nil)
+            let shadow = try #require(storage.attribute(.shadow, at: line.location, effectiveRange: nil) as? NSShadow)
+            let colour = try #require(shadow.shadowColor?.usingColorSpace(.sRGB))
+            return (colour.alphaComponent, shadow.shadowBlurRadius)
+        }
+
+        let live = try spread(2)
+        let oneBack = try spread(1)
+        let twoBack = try spread(0)
+        // Exactly the ladder, quantised: one fixed value per step, and never the live line's spread.
+        #expect(abs(live.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep) < 0.001)
+        let ladder = textView.historyLineOpacities
+        #expect(abs(oneBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[1]) < 0.001)
+        #expect(abs(twoBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[2]) < 0.001)
+        #expect(oneBack.alpha < live.alpha && twoBack.alpha < oneBack.alpha)
+        // The blur belongs to the sheet, not to the fade: the step moves the ink's weight only.
+        #expect(abs(live.blur - oneBack.blur) < 0.001)
+
+        // Deterministic: the same text rendered again carries the same attributes.
+        let again = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        again.configureSessionTypography()
+        again.loadRestoredText("one\ntwo\nthree")
+        let replayed = try #require(again.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
+        let original = try #require(textView.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
+        #expect(replayed.shadowBlurRadius == original.shadowBlurRadius)
+        #expect(replayed.shadowColor?.alphaComponent == original.shadowColor?.alphaComponent)
     }
 
     @Test
@@ -254,7 +317,7 @@ struct EditorFocusTests {
         room.view.layoutSubtreeIfNeeded()
         let firstTop = try firstLineTop(in: editor, paper: paper)
         let firstAlpha = try lineAlpha(in: editor, lineIndex: 0)
-        #expect(abs(firstAlpha - 0.22) < 0.001)
+        #expect(abs(firstAlpha - editor.historyLineOpacities[1]) < 0.001)
 
         // A CJK character on the English current line used to inflate that line's
         // fragment and push the completed line up. With the fixed pitch it must not.
@@ -275,7 +338,7 @@ struct EditorFocusTests {
         let firstTopAfterNewLine = try firstLineTop(in: editor, paper: paper)
         #expect(abs((firstTop - firstTopAfterNewLine) - 44.8) <= 1,
                 "the history shifted \(firstTop - firstTopAfterNewLine) pt for a new line")
-        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - editor.historyLineOpacities[2]) < 0.001)
     }
 
     @Test
@@ -336,8 +399,8 @@ struct EditorFocusTests {
 
     private func assertTailLineOpacities(in textView: AppendOnlyTextView, lineCount: Int) throws {
         #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 1) - 1) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - 0.22) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - textView.historyLineOpacities[1]) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - textView.historyLineOpacities[2]) < 0.001)
         #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 4)) < 0.001)
     }
 
@@ -983,8 +1046,8 @@ struct EditorFocusTests {
         let end = NSRange(location: (textView.string as NSString).length, length: 0)
         #expect(textView.selectedRange() == end)
         #expect(abs(try lineAlpha(in: textView, lineIndex: 3) - 1) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 0.22) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.07) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - textView.historyLineOpacities[1]) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - textView.historyLineOpacities[2]) < 0.001)
         #expect(abs(try lineAlpha(in: textView, lineIndex: 0)) < 0.001)
     }
 

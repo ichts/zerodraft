@@ -867,8 +867,10 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   const keptCopy = await readCopy();
   await expect(page.locator('#copy')).toHaveAccessibleName(keptCopy.text);
   expectOneLabel(keptCopy);
-  expect(kept.copyBox.height).toBe(48);
-  expect(kept.restartBox.height).toBe(48);
+  // Both actions are 48 px tall. The boxes are read in float layout space, where a fractional offset leaves a
+  // 1e-5 px rounding residue (CI read 47.99997 and 48.00003), so this asserts to a hundredth of a pixel.
+  expect(kept.copyBox.height).toBeCloseTo(48, 2);
+  expect(kept.restartBox.height).toBeCloseTo(48, 2);
   // The draft can never push the actions: it scrolls in its own area under them.
   expect(await page.locator('.kept-scroll').evaluate(e => getComputedStyle(e).overflowY)).toBe('auto');
   const stacked = Math.abs(kept.copyBox.top - kept.restartBox.top) > 1;
@@ -1367,23 +1369,27 @@ test('the room wears the landing design system', async ({ page }) => {
   await enter(page);
   const look = await page.evaluate(() => {
     const css = s => getComputedStyle(document.querySelector(s));
-    const probe = name => {
+    const probeOn = (selector, name) => {
       const i = document.createElement('i');
-      i.style.color = getComputedStyle(document.querySelector('#room')).getPropertyValue(name);
+      i.style.color = getComputedStyle(document.querySelector(selector)).getPropertyValue(name);
       document.querySelector('#room').append(i);
       const c = getComputedStyle(i).color; i.remove(); return c;
     };
+    const probe = name => probeOn('#room', name);
     return {
       page: css('#room').backgroundColor, pageToken: probe('--page'),
-      sheet: css('.room-paper').backgroundColor, sheetToken: probe('--paper-tone'),
+      // The renderer owns the sheet's tone token on the sheet itself (it corrects the texture's mean, D-069),
+      // so the paper is compared with the tone the renderer set for it; the rendered value is measured in
+      // qa/paper.spec.mjs.
+      sheet: css('.room-paper').backgroundColor, sheetToken: probeOn('.room-paper', '--paper-tone'),
       sheetShadow: css('.room-paper').boxShadow, roomShadow: css('#room').boxShadow,
       writing: css('#editor').fontFamily, tool: ['#room-clock', '#room-count', '#exit'].map(s => css(s).fontFamily),
       washes: document.querySelectorAll('#room .wash').length,
     };
   });
   expect(look.page).toBe(look.pageToken);
-  // D-056: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the
-  // plain surface for cards, controls and fields, so the room's paper equals `--paper-tone`.
+  // D-056/D-069: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the plain
+  // surface for cards, controls and fields, so the room's paper paints the tone the renderer set for it.
   expect(look.sheet).toBe(look.sheetToken);
   expect(look.sheetShadow).not.toBe('none');
   expect(look.roomShadow).toBe('none');

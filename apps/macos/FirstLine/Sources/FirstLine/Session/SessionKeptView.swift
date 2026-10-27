@@ -148,7 +148,7 @@ final class SessionKeptView: NSView {
         receipt.attributedStringValue = FirstLineTypography.trackedText(
             RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration),
             font: FirstLineTypography.smallMediumNSFont,
-            color: FirstLineColors.muteNSColor, kernEm: 0.02)
+            color: FirstLineColors.paperQuietNSColor, kernEm: 0.02)
         header.setCustomSpacing(12, after: heading)
         header.setCustomSpacing(20, after: receipt)
         header.needsLayout = true

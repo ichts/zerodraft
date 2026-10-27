@@ -488,9 +488,11 @@ struct RoundThreeTests {
                 + (paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: baseline), from: editor).y)
             let x = (room.view.bounds.midX - 250)...(room.view.bounds.midX + 250)
             let y = (baselineFromTop - 60)...(paperTopFromRoomTop + paper.bounds.height - 40)
+            // Ink is the product's near-black (#1c1917, #63140b); the Wheat paper's grain is texture, and on
+            // the washed sheet its darkest flecks still sit above 0.4 luma, so the split is 0.3 (D-056).
             let runs = inkRowRuns(in: rep, scale: scale, x: x, y: y) { colour in
                 let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
-                return luma < 0.6
+                return luma < 0.3
             }
             #expect(runs.count >= 3, "expected writing line, numeral and caption ink at \(size), got \(runs)")
             guard runs.count >= 3 else { break }
@@ -561,7 +563,9 @@ struct RoundThreeTests {
             let noteSize = try #require(note.font?.pointSize)
             #expect(abs(noteSize - FirstLineTypography.uiNSFont.pointSize * base / 48) <= 0.05)
             #expect(resolved(note.textColor ?? .clear, appearance) == resolved(FirstLineColors.paperQuietNSColor, appearance))
-            let sheet = try #require((paper as? FloodCanvasView).flatMap { resolved($0.fillColor, appearance) })
+            // The stopped group sits on the writing sheet itself: the Wheat paper (D-069, D-073).
+            #expect(paper is PaperSheetView, "the stopped group is not on the writing sheet")
+            let sheet = try #require(resolved(FirstLineColors.paperNSColor, appearance))
             let ink = try #require(note.attributedStringValue
                 .attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
             let noteContrast = contrast(try #require(resolved(ink, appearance)), sheet)
@@ -740,22 +744,22 @@ struct RoundThreeTests {
     }
 
     /// Topmost ink row of each view's text, in one rendered frame.
+    /// Each run is rendered on its own, without the paper behind it, so a dark fleck of the sheet's grain inside
+    /// a run's frame is never read as the run's first ink row; the row is then placed in the root's pixel space.
     private func firstInkRows(of views: [NSView], in root: NSView) throws -> [Int] {
         root.layoutSubtreeIfNeeded()
-        let rep = try #require(root.bitmapImageRepForCachingDisplay(in: root.bounds))
-        root.cacheDisplay(in: root.bounds, to: rep)
-        let scale = CGFloat(rep.pixelsWide) / max(root.bounds.width, 1)
         return try views.map { view in
+            let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: rep)
+            let scale = CGFloat(rep.pixelsWide) / max(view.bounds.width, 1)
             let frame = root.convert(view.bounds, from: view)
-            let x0 = Int(frame.minX * scale) + 1
-            let x1 = min(Int(frame.maxX * scale) - 1, rep.pixelsWide - 1)
-            let y0 = max(Int((root.bounds.height - frame.maxY) * scale) - 1, 0)
-            let y1 = min(Int((root.bounds.height - frame.minY) * scale) + 1, rep.pixelsHigh - 1)
-            for y in y0...y1 {
-                for x in x0...x1 {
-                    guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+            let top = Int(((root.bounds.height - frame.maxY) * scale).rounded())
+            for y in 0..<rep.pixelsHigh {
+                for x in 0..<rep.pixelsWide {
+                    guard let colour = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                          colour.alphaComponent > 0.4 else { continue }
                     let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
-                    if luma < 0.6 { return y }
+                    if luma < 0.6 { return top + y }
                 }
             }
             throw NoRenderedText(view: String(describing: type(of: view)))

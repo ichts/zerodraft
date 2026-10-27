@@ -734,3 +734,58 @@ Scope: the captain reported that every launch of the shipped app showed the lice
 - PASS suite: `swift test` 287 tests. All license, trial, smoke and entitlement suites pass after their stale "blocked until validation" expectations were updated to the new contract (immediate access on a locally verified token, silent background revalidation). Two pre-existing failures are excluded from this change's claim because they reproduce identically on the unmodified source: `EditorFocusTests.movementCommandsDenyAndKeepCaretAtEnd` and `EditorFocusTests.imeMovementStaysWithinMarkedRange` both expect a deny that needs an active host app/key window, which this headless session does not provide. `RoomTests.firstPinyinKeyAfterAWipeThroughTheInputContext` passes with its recorded known issue. No IME, VoiceOver or full-screen session was run.
 - RECORDED: the first-frame half of case 58 now runs as recorded VM acceptance - see the 2026-10-25 section above. The launch with an activated license is recorded at 50 ms AX sampling before the process exists, and the pre-fix build (the shipped 1.0 DMG) reproduces the activation card on the first frame while a build of current main does not, over three relaunches. Still PENDING: the offline re-verification and revocation paths of that case, which the rig does not yet exercise.
 - Observed, pre-existing, not part of this change: on this machine the picker window measures 980x1079 pt (`CGWindowListCopyWindowInfo`) instead of the 1040x720 contract, and the pre-fix build shows the same size on both the trial path and after the card flips to the picker, so the license fix neither causes nor removes it. The launch captures therefore differ in window size between the card (1040x720) and the picker (980x1079) in the before set and are uniform in the after set. Window sizing is owned by `RootWindowController` and needs its own bounded investigation before it is treated as a shipped defect.
+
+## Note paper round (2026-10-26, branch `fm/wid-paper-locked`)
+
+- SUPERSEDED TONE (2026-10-27): the Mac sheet is D-069's Wheat paper, with D-073 carrying it to the Mac. Tone
+  `#e9e2ce` / `#342e24`, dark quiet `#c2bfb7`, dark pen `#ffc2b4`, washes `#e8cfbb`/`#e6bca7` light and
+  `#453226`/`#573428` dark. The history ladder is D-069's per-appearance contrast ladder (1/0.847/0.769 light,
+  1/0.902/0.772 dark), re-stepped on an appearance change. The Note captures and parity measurements below are
+  the earlier head's evidence.
+  - PASS deterministic: `swift test` exit 0, and the focused run
+    `swift test --filter 'PaperContrastTests|EditorFocusTests|RoomTests|SnapshotTests|ReviewRoundTests|DesignTokenTests|RoundThreeTests'`
+    passed 116 tests in 7 suites with 1 recorded known issue. That run covers `historyLadderFollowsTheAppearance`,
+    the ladder at 9:1 and 7:1 or better, the rendered field's mean on the Wheat tone and
+    `warnTicksNeverRepaintThePaperTexture`.
+  - PASS paper parity (sheet average over 10-90 % x, 55-90 % y): the live cua-driver window of the empty room
+    reads `rgb(232.4,226.2,205.4)` light against `#e9e2ce` (233,226,206) and `rgb(52.1,45.7,36.0)` dark against
+    `#342e24` (52,46,36). The AppKit content snapshots of the rest state read the same within 0.3.
+  - PENDING: real-window captures of the typing, warning and kept states on Wheat. `scripts/qa-window.sh` stops
+    at its stale exit-row geometry check. The content snapshots cover those states. A clean VM recording is
+    also still pending.
+
+Scope: D-056 as amended by D-069. The writing sheet is the Note paper on the Mac room as on the web: tone
+`#dbe6ec` light / `#21272a` dark, grain 70 of 100 at size 1.00, ink `#1c1917` / `#ece7d9`, every reading role
+measured against the paper, D-027's 100/22/7 fade kept, and the alarm tinting the sheet's own paper.
+
+- PASS deterministic: `swift test` (312 tests, 27 suites, 1 recorded known issue) with `PaperContrastTests`
+  (locked tones in both appearances, every reading role on the paper >= 7:1, the recorded 100/22/7 ladder and
+  its fade direction, the pen red on its warn wash, the wash mix equal to the web's `color-mix`, the rendered
+  field's mean within two levels of the locked tone, determinism), `EditorFocusTests.inkSpreadIsQuantisedToTheLineStep`,
+  and `SnapshotTests` (every surface in light and dark, the paper patch on every plain-sheet room state within
+  the 0.06 band (about 15 levels) the window bitmap allows, while the two-level tone assertion runs on the field
+  render; the two light warn states measured against their wash tint, the dark warn state covered by
+  `PaperContrastTests` only, `paperStaysStillWhileTyping`).
+- PASS paper parity, measured off the window captures (25 px patch average, mid-paper, this head): rest light
+  `rgb(219,231,236)` against `#dbe6ec` (219,230,236); rest dark `rgb(31,37,40)` against `#21272a` (33,39,42);
+  warn light `rgb(221,213,215)` against the wash `#ddd3d5` (221,211,213); the writeitdown room measured the same
+  day reads `rgb(218,228,234)` at rest and `rgb(221,213,216)` under the same alarm, so the two surfaces are the
+  same paper within a level.
+- PASS live window, every room state one run can hold, both appearances: `captures/mac-window-room-`
+  `{rest,typing,warning,deleted}-{light,dark}.png` through the cua-driver daemon on the packaged ad-hoc bundle
+  with an isolated `CFFIXED_USER_HOME` (theme preset), 1040x720, at the 5 minute Relaxed limit so the warn state
+  could be held, keys delivered at the AX text area with `delivery_mode: foreground`. Reduce Motion was on for
+  the capture run, so the wash lands at full strength instead of ramping.
+- PASS content snapshots of the other room states at the same size and both appearances -
+  `captures/mac-snapshot-room-*.png` (the `WID_SNAPSHOT_DIR` run): empty, typing, exit hint, warning, deleted,
+  kept, copied. AppKit content snapshots, not live window captures.
+- ASSERTIONS PASS, RECORDING REJECTED: `scripts/vm-journey.sh` against the packaged bundle (message-first:
+  install, fixture activation, three licensed relaunches) reported `FINAL failures: 0` twice, but its own frame
+  continuity check rejected both recordings (largest gap 3895 ms and 3570 ms in the guest's frame stream), so the
+  recorded acceptance does not stand yet. Evidence: `vm-evidence/` and `vm-evidence2/`.
+- Known, pre-existing: `scripts/qa-window.sh` exits at `FAIL: no element token for Begin` (it looks for an AX
+  button labelled `Begin writing` while the picker's button is labelled `Begin`); the window captures above use
+  an equivalent direct cua-driver script instead.
+- PENDING: a clean VM recording (the two attempts above failed continuity, not assertions), the independent
+  review of the capture set, and a real-window recording of the kept screen (covered by the content snapshots
+  and `SnapshotTests.keptCopyFocusRendersInLightAndDark`).

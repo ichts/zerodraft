@@ -694,16 +694,16 @@ if (document.readyState === "loading") {
   :root {
     /* Color - six colors + one alarm. */
     --bone: #f1f0eb;      /* the wall: environment, everywhere */
-    /* The sheet is the Note paper (D-056): the one object, the only thing that is not the wall. */
-    --paper: #dbe6ec;
+    /* The sheet is the Wheat paper (D-069, superseding D-056's Note): the one object, the only thing that is not the wall. */
+    --paper: #e9e2ce;
     --ink: #1c1917;       /* words, primary chrome, the door: the product's one ink */
     --dim: #6b665b;       /* secondary chrome, reports, receipts */
     --faint: #b3ada0;     /* receded chrome while typing; the quietest legal text */
     /* Sheet roles: measured against the paper's own tone, never eyeballed. Every word on the
-       paper clears 7:1 - the quiet chrome at 7.35, the danger numeral at 10.1 - because the tone
+       paper clears 7:1 - the quiet chrome at 7.21, the danger numeral at 9.93 - because the tone
        is darker than white and the wall's greys would sink into it (D-056). */
     --paper-quiet: #464746;
-    --paper-danger: #63140b;  /* 10.1:1 on the sheet, 7.6:1 on the deepest wash */
+    --paper-danger: #63140b;  /* 9.93:1 on the sheet, 7.43:1 on the deepest wash */
     --line: #dedcd5;      /* hairlines only, 1px, never thicker */
     --danger: #c8392f;    /* the warn numeral and the wipe cut; nothing else */
     /* The wash exists only during warn, seconds 5-8: color-mix 88%. */
@@ -1253,7 +1253,7 @@ if (document.readyState === "loading") {
 </style>
 
 <script>
-/* Zero Draft - the Note sheet, on the landing and in the trial.
+/* Zero Draft - the Wheat sheet, on the landing and in the trial.
    The same renderer as writeitdown/paper.js (D-056): this page must stay one deployable file, so
    the sheet's texture is generated here instead of being fetched. Both copies are proven to
    produce the same pixels by tests/paper.spec.mjs.
@@ -1264,8 +1264,8 @@ if (document.readyState === "loading") {
 (function () {
   'use strict';
 
-  /* The locked sheet (D-056): tone Note, grain 70 of 100 at size 1.00. */
-  const TONES = { light: '#dbe6ec', dark: '#21272a' };
+  /* The locked sheet (D-069): tone Wheat, grain 70 of 100 at size 1.00. */
+  const TONES = { light: '#e9e2ce', dark: '#342e24' };
   const GRAIN = 0.70;
   const SIZE = 1.00;
   const TOOTH = 44;

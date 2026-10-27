@@ -30,9 +30,9 @@ Tokens ship as CSS custom properties in the `:root` block of `index.html`. Value
 | Token | Value | Use |
 |---|---|---|
 | `--bone` | `#f1f0eb` | The wall. Environment, everywhere. |
-| `--paper` | `#dbe6ec` | The one object: the Note sheet (D-056). Nothing else is the paper. |
-| `--ink` | `#1c1917` | Words, primary chrome, the door. 13.78:1 on the paper. |
-| `--paper-quiet` | `#464746` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.35:1, measured, never assumed. |
+| `--paper` | `#e9e2ce` | The one object: the Wheat sheet (D-069, which supersedes D-056's Note). Nothing else is the paper. |
+| `--ink` | `#1c1917` | Words, primary chrome, the door. 13.52:1 on the paper. |
+| `--paper-quiet` | `#464746` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.21:1, measured, never assumed. |
 | `--paper-danger` | `#63140b` | The pen **on the paper**: the warn numeral and the wipe receipt. Clears 7:1 on the sheet and on the wash the numeral sits on. |
 | `--dim` | `#6b665b` | Secondary chrome **on the wall**. |
 | `--faint` | `#b3ada0` | Receded wall chrome, the quietest legal text on the wall. Never used on the paper. |
@@ -41,18 +41,18 @@ Tokens ship as CSS custom properties in the `:root` block of `index.html`. Value
 
 Red is a budget: it means "you are losing the draft". The logotype underscore is ink. No red on links, borders, emphasis, or decoration. No blue. Selection is an ink tint (`rgba(28,25,23,.18)`).
 
-The page around the paper keeps its white identity (D-056): the wall, the chrome and the header are never tinted with the paper, and a surface that sits on the wall (cards, buttons, fields) stays `#ffffff`.
+The page around the paper keeps its white identity (D-056, unchanged by D-069): the wall, the chrome and the header are never tinted with the paper, and a surface that sits on the wall (cards, buttons, fields) stays `#ffffff`.
 
 The paper is textured, not flat (D-056): grain 70 of 100 at size 1.00, generated once per sheet size and theme - device-pixel tooth, a coarser pulp cloud upscaled with smoothing, short fibres and sparse pigment flecks - painted under the words and never regenerated while the writer types. Its tone stays in CSS so a wash can still tint it.
 
-Every word on the paper is measured against the paper's own tone, not against white: the history ladder steps by contrast, 13.78 -> 9.2 -> 7.2:1, and nothing on the sheet reads below 7:1.
+Every word on the paper is measured against the paper's own tone, not against white: the history ladder steps by contrast, 13.52 -> 9.0 -> 7.1:1, and nothing on the sheet reads below 7:1.
 
 The wash exists only during warn, seconds 5-8:
 
 | Token | Value | Use |
 |---|---|---|
 | `--wash-wall` | `color-mix(in oklab, bone 88%, danger)` | The landing wall during warn. |
-| `--wash-paper` | `color-mix(in oklab, paper 88%, danger)` (`#ddd3d5` light / `#352c2c` dark) | The paper (and the trial room) during warn. The sheet's own mix, not a pale tint meant for white: on the Note paper a white-sheet tint lands on grey at mid-ramp (D-056). |
+| `--wash-paper` | `color-mix(in oklab, paper 88%, danger)` (`#e8cfbb` light / `#453226` dark) | The paper (and the trial room) during warn. The sheet's own mix, not a pale tint meant for white: on a toned paper a white-sheet tint lands on grey at mid-ramp (D-056, D-069). |
 | `--wash-wall-deep` / `--wash-paper-deep` | color-mix at 76% | The eighth second goes one step deeper: at 8.0s the wash deepens to double the danger share for the wipe-cut beat, then exits. |
 | `--wash-*-1` / `--wash-*-2` | color-mix at 96% / 92% | Reduced-motion wash steps (see §6). |
 
@@ -117,7 +117,7 @@ The demo's numeral scales to its paper (the theater is a scale model of the room
 
 ### 3.3 Trial, typing - two objects
 
-The wall is gone; the paper is the room (the room is the Note paper, grain and all - D-056). Objects: paper · clock. Chrome lives in the corners: rules TL · timer TR · exit BL · words BR. Idle chrome is full ink; while keys arrive it recedes to the paper's quiet role (D-056). Nothing reacts to a keystroke - no sparks, no shake, no sound. The reward for writing is silence.
+The wall is gone; the paper is the room (the room is the Wheat paper, grain and all - D-069). Objects: paper · clock. Chrome lives in the corners: rules TL · timer TR · exit BL · words BR. Idle chrome is full ink; while keys arrive it recedes to the paper's quiet role (D-056). Nothing reacts to a keystroke - no sparks, no shake, no sound. The reward for writing is silence.
 
 The empty room carries one hint in faint mono caps: `Type here. The law is live: 5s warn, 8s wipe, 60s to keep.`
 

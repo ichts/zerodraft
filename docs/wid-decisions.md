@@ -1203,9 +1203,8 @@ entry and names the entry it supersedes. The behaviour contract that implements 
      identically, and a completed line cannot keep the live line's ink.
   4. **The alarm tints the same paper, and leaves on its fade.** The Mac wash lays the sheet's whole texture
      (both mottle scales and the grain) in its own layer above a tint layer that carries the mean shift, handed
-     over by the sheet each time the field is rebuilt, so a warn tick changes one layer colour and never
-     repaints the texture, so a live resize or a theme switch never builds a second field or leaves a stale
-     one. On exit the wash keeps its last tint while it fades over 120 ms and returns to the plain sheet only
+     over by the sheet each time the field is rebuilt, so a live resize or a theme switch never builds a second
+     field or leaves a stale one, and a warn tick changes one layer colour without repainting the texture. On exit the wash keeps its last tint while it fades over 120 ms and returns to the plain sheet only
      when the fade ends. The Mac generator uses the web's seed string and pigments, and on the root landing the
      paper washes resolve on the sheet itself, so they mix from the corrected tone.
 - Reason: The pipeline review of the Mac half found that the contrast-solved ladder (13.78 / 9.2 / 7.2:1) had

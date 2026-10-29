@@ -1,9 +1,10 @@
 /*
- * [INPUT]: AppState choices, observable access status (free-trial count or license), the bundled split-W lockup
+ * [INPUT]: AppState choices, observable access status (free-trial count or license), the chip-and-wordmark lockup
  *          and AppKit focus.
- * [OUTPUT]: "How long?" white card with the split-W lockup, minute/silence segmented controls, Begin, and the live
- *           access line.
- * [POS]: Pre-writing surface in the After language with the A lockup; selections persist, Begin enters the room.
+ * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, and
+ *           the live access line.
+ * [POS]: Pre-writing surface in the After language with the chip-and-wordmark lockup; selections persist, Begin enters
+ *        the room.
  * [PROTOCOL]: Check nearest AGENTS.md when this contract changes.
  */
 import AppKit
@@ -47,18 +48,9 @@ final class HomeViewController: NSViewController {
             card.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -32),
         ])
 
-        let lockup = BrandLockupView()
-        lockup.image = Self.lockupImage()
-        lockup.image?.isTemplate = true
-        lockup.imageScaling = .scaleProportionallyUpOrDown
-        lockup.contentTintColor = FirstLineColors.inkNSColor
-        lockup.setAccessibilityLabel("Write It Down")
-        lockup.setAccessibilityRole(.image)
-        lockup.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            lockup.widthAnchor.constraint(equalToConstant: 128),
-            lockup.heightAnchor.constraint(equalToConstant: 16.25),
-        ])
+        // The same A mark chip the web header opens with: the plate around the split W,
+        // then the wordmark on the same baseline (D-075).
+        let lockup = BrandChipLockupView(typeSize: BrandChipLockupView.pickerTypeSize)
 
         let title = label("How long?", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
         let rulesButton = FirstLineButtons.link(title: "?", target: self, action: #selector(showRules))
@@ -147,13 +139,6 @@ final class HomeViewController: NSViewController {
         }
     }
 
-    private static func lockupImage() -> NSImage? {
-        guard let url = BundledResources.bundle.url(forResource: "write-it-down-lockup", withExtension: "svg") else {
-            return nil
-        }
-        return NSImage(contentsOf: url)
-    }
-
     private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
         let field = NSTextField(labelWithString: text)
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -173,9 +158,3 @@ final class HomeViewController: NSViewController {
     }
 }
 
-private final class BrandLockupView: NSImageView {
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        needsDisplay = true
-    }
-}

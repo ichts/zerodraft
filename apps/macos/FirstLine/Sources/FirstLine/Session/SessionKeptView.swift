@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Engine text, word count, real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
+ * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls, and the unsaved caption) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
  * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
  * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */
@@ -27,6 +27,10 @@ final class SessionKeptView: NSView {
     /// The room's pill labels sit on the control's optical centre, not on the lower
     /// 1.6 line-box baseline; the kept row and the stopped screen's single pill share the lift.
     static let pillLabelLift: CGFloat = 5.25
+    /// The kept screen's one caption: the count lives in the receipt, so this line says
+    /// what the writer must do with the draft instead of repeating it (D-074).
+    static let unsavedCaption = "Nothing here is saved. Copy it before you leave."
+    private let caption = NSTextField(labelWithString: SessionKeptView.unsavedCaption)
 
     private final class PassThroughLabel: NSTextField {
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -85,6 +89,13 @@ final class SessionKeptView: NSView {
         receipt.maximumNumberOfLines = 1
         receipt.toolTip = RoomPresentation.countRule
         receipt.setAccessibilityHelp(RoomPresentation.countRule)
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        caption.alignment = .center
+        caption.maximumNumberOfLines = 2
+        caption.lineBreakMode = .byWordWrapping
+        caption.attributedStringValue = FirstLineTypography.trackedText(
+            Self.unsavedCaption, font: FirstLineTypography.smallMediumNSFont,
+            color: FirstLineColors.paperQuietNSColor, kernEm: 0.02)
 
         // The action row is fixed at the top so a long draft never hides COPY TEXT.
         let actions = NSStackView(views: [copyButton, restartButton])
@@ -102,6 +113,8 @@ final class SessionKeptView: NSView {
         header.addArrangedSubview(receipt)
         header.setCustomSpacing(20, after: receipt)
         header.addArrangedSubview(actions)
+        header.setCustomSpacing(12, after: actions)
+        header.addArrangedSubview(caption)
         addSubview(header)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false

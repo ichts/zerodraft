@@ -1360,3 +1360,41 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   D-056 generator; the branch-only proposal to
   restore D-027's 100/22/7 values, which never shipped (D-027's stepping stands, D-069's values replace its
   alphas).
+
+## D-074: The Mac kept screen takes D-062: the receipt owns the count and one caption says the draft is not saved
+
+- Date: 2026-10-29
+- Decision: On the Mac kept screen the receipt is the only owner of the count (`N MINUTES. M WORDS.`,
+  singular `1 MINUTE. 1 WORD.`) and the corner count slot is hidden in that state; rest, typing, warning
+  and wipe keep it. One caption, `Nothing here is saved. Copy it before you leave.`, sits under the
+  action row in the kept block, centred on the block in the room's small caption type. The caption joins
+  the fixed block above the draft and moves nothing else in it: the heading, receipt and action row
+  keep their frames and only the flexible draft area gives way. The VoiceOver announcement on entering
+  the kept state says the same sentence. The web room and the landing demo already did this under D-062,
+  so the two surfaces match again.
+- Reason: the captain's design review decided that the receipt keeps the count, the corner goes quiet
+  and the caption ships on both surfaces with his copy. The Mac still printed the count twice and said
+  nothing about the text living only in this window.
+- Supersedes: the Mac half of case 39 in `docs/wid-mac-behavior.md`, which recorded the corner count
+  beside the receipt, and D-062's scope sentence that the Mac still printed the count twice. D-030's
+  receipt sentence, pill geometry and focus ring, and D-043's kept top block and draft scroll, stand.
+
+## D-075: The Mac picker carries the web header's A mark chip
+
+- Date: 2026-10-29
+- Decision: The Mac picker's lockup is the chip-and-wordmark lockup the web header uses: the app icon's
+  squircle plate around the split W, then the wordmark on the same baseline, in the header's 7.467 x
+  1.046 em box at 21 px type (156.8 x 22 pt). The W and wordmark come from the web's own glyph layer
+  (`writeitdown/logo/write-it-down-lockup.svg`, bundled byte for byte and asserted equal), so the
+  two chips cannot drift. The plate is drawn natively in the page token with one 1 px hair-2 edge
+  (22.33% corner radius); the W and wordmark are the ink token. The web header's sheet-token plate
+  cannot carry over unchanged: it sits on the page wall, while the picker's lockup sits on the sheet
+  card, where a sheet-token plate would vanish. The page token keeps the plate an object the writer
+  can see in both appearances. The lockup stays the first item in the "How long?" card's content block,
+  centred above the heading; the card's copy, controls and spacing do not change.
+- Reason: the captain decided the Mac front door shows the mark the site shows. D-038 gave every shipped
+  web page the mark in the corner but left the Mac picker with the wordmark alone, so the first surface
+  a buyer sees carried no logo.
+- Supersedes: D-038's clause that the Mac start screen keeps the wordmark-only lockup, and the
+  `design/DESIGN.md` section 11 sentences that described the wordmark-only Mac lockup. D-036's
+  placement inside the card, D-031's rules page and the social card's wordmark lockup stand.

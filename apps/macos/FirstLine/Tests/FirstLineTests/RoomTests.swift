@@ -323,9 +323,57 @@ struct RoomTests {
         #expect(buttons.contains { $0.title == "RUN IT AGAIN" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(buttons.contains { $0.title == "ESC - EXIT" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(fields.contains { $0.stringValue == "0:00" })
-        #expect(fields.contains { $0.stringValue == "15 words" })
 
-        #expect(!fields.contains { $0.stringValue.contains("Not saved") })
+        // The receipt owns the count; the corner slot is silent in this state (D-074).
+        let cornerCount = try #require(fields.first { $0.stringValue == "15 words" })
+        #expect(cornerCount.isHiddenOrHasHiddenAncestor, "the kept corner count is silent")
+        let visible = visibleStrings(in: fixture.room.view).joined(separator: " ").lowercased()
+        #expect(visible.components(separatedBy: "15 words").count - 1 == 1,
+                "the kept screen prints the count once, in the receipt: \(visible)")
+
+        // One caption under the actions says what the writer must do with the draft.
+        let caption = try #require(fields.first { $0.stringValue == SessionKeptView.unsavedCaption })
+        #expect(!caption.isHiddenOrHasHiddenAncestor)
+        let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "COPY TEXT" })
+        let captionFrame = fixture.room.view.convert(caption.bounds, from: caption)
+        let copyFrame = fixture.room.view.convert(copy.bounds, from: copy)
+        let receiptFrame = fixture.room.view.convert(receipt.bounds, from: receipt)
+        #expect(captionFrame.maxY <= copyFrame.minY, "the caption sits under the action row")
+        #expect(abs(captionFrame.midX - receiptFrame.midX) < 0.5, "the caption shares the kept block's centre")
+        #expect(abs((caption.font?.pointSize ?? 0) - FirstLineTypography.smallMediumNSFont.pointSize) < 0.01,
+                "the caption uses the room's small caption face")
+        let captionInk = caption.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        let receiptInk = receipt.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        func resolved(_ color: NSColor?, _ name: NSAppearance.Name) -> [CGFloat] {
+            var parts: [CGFloat] = []
+            NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+                let rgb = color?.usingColorSpace(.sRGB)
+                parts = [rgb?.redComponent ?? -1, rgb?.greenComponent ?? -1, rgb?.blueComponent ?? -1]
+            }
+            return parts
+        }
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            #expect(resolved(captionInk, name) == resolved(FirstLineColors.paperQuietNSColor, name)
+                    && resolved(captionInk, name) == resolved(receiptInk, name),
+                    "the caption is the receipt's quiet paper role, which clears 7:1 on the Wheat sheet (\(name))")
+        }
+
+        // Adding the caption moves nothing else: hiding it leaves the heading, receipt and
+        // actions exactly where they were; only the flexible draft area gives way.
+        let heading = try #require(fields.first { $0.stringValue == "You wrote it down." })
+        func frames() -> [NSRect] {
+            fixture.room.view.layoutSubtreeIfNeeded()
+            return [heading, receipt, copy].map { fixture.room.view.convert($0.bounds, from: $0) }
+        }
+        let withCaption = frames()
+        caption.isHidden = true
+        let withoutCaption = frames()
+        caption.isHidden = false
+        for (index, (with, without)) in zip(withCaption, withoutCaption).enumerated() {
+            #expect(abs(with.minY - without.minY) < 0.5, "kept block element \(index) moved when the caption was added")
+            #expect(abs(with.midX - without.midX) < 0.5, "kept block element \(index) moved horizontally")
+        }
+
         #expect(!fields.contains { $0.stringValue.contains("forward only") })
     }
 

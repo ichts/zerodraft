@@ -29,8 +29,9 @@ struct BrandTests {
         let home = HomeViewController(appState: state)
         home.loadViewIfNeeded()
         let labels = allLabels(in: home.view)
-        let images = allImages(in: home.view)
-        #expect(images.filter { $0.accessibilityLabel() == "Write It Down" && $0.image != nil }.count == 1)
+        let lockups = descendants(of: BrandChipLockupView.self, in: home.view)
+        #expect(lockups.count == 1)
+        #expect(lockups.first?.accessibilityLabel() == "Write It Down")
         #expect(labels.contains("How long?"))
         #expect(!labels.contains("Forward only. Nothing is saved."))
         #expect(labels.contains("Minutes") || labels.contains("minutes"))
@@ -149,8 +150,173 @@ struct BrandTests {
         return (value.map { [$0] } ?? []) + view.subviews.flatMap(allLabels)
     }
 
-    private func allImages(in view: NSView) -> [NSImageView] {
-        let current = (view as? NSImageView).map { [$0] } ?? []
-        return current + view.subviews.flatMap(allImages)
+    /// The picker's front door shows the same A mark chip the web header opens with: the
+    /// app icon's squircle plate around the split W, then the wordmark on the same baseline
+    /// (D-075). Geometry, layer order and theme polarity are measured, not eyeballed.
+    @Test func pickerLockupShowsTheChipTheWebHeaderUses() throws {
+        _ = NSApplication.shared
+        for (appearance, plateIsLight) in [(NSAppearance.Name.aqua, true), (.darkAqua, false)] {
+            let state = AppState()
+            let home = HomeViewController(appState: state)
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                                  styleMask: [.titled], backing: .buffered, defer: false)
+            window.appearance = NSAppearance(named: appearance)
+            window.contentViewController = home
+            window.setContentSize(NSSize(width: 1040, height: 720))
+            home.view.layoutSubtreeIfNeeded()
+            let lockup = try #require(descendants(of: BrandChipLockupView.self, in: home.view).first)
+            defer { window.orderOut(nil) }
+
+            let size = lockup.intrinsicContentSize
+            #expect(abs(size.height - BrandChipLockupView.pickerTypeSize * BrandChipLockupView.emHeight) < 0.01,
+                    "the lockup keeps the web header's 1.046 em height")
+            #expect(abs(size.width / size.height - BrandChipLockupView.emWidth / BrandChipLockupView.emHeight) < 0.001,
+                    "the lockup keeps the web header's 7.467 x 1.046 em box")
+            let chip = lockup.chipFrame
+            #expect(abs(chip.width - chip.height) < 0.01, "the chip is square")
+            #expect(abs(chip.width - lockup.bounds.height) < 0.01, "the chip spans the lockup's full height")
+            #expect(abs(chip.minX) < 0.01, "the chip opens the lockup")
+            #expect(abs(lockup.wordmarkFrame.width - lockup.bounds.width) < 0.01, "the wordmark spans the box")
+            #expect(abs(chip.width / lockup.bounds.width - 1.046 / 7.467) < 0.001,
+                    "the chip takes the 1.046 em share of the lockup")
+            #expect(abs(lockup.chipCornerRadius - chip.height * 0.2233) < 0.01,
+                    "the plate is the app icon's 22.33% squircle")
+
+            let plate = resolved(BrandChipLockupView.plateFillColor, appearance)
+            let edge = resolved(BrandChipLockupView.plateEdgeColor, appearance)
+            let ink = resolved(FirstLineColors.inkNSColor, appearance)
+            #expect(sameColor(plate, FirstLineColors.pageNSColor, appearance: appearance))
+            #expect(sameColor(edge, FirstLineColors.hairStrongNSColor, appearance: appearance))
+            #expect((luminance(plate) > luminance(ink)) == plateIsLight,
+                    "light appearance: paper plate under ink W; dark: ink plate under bone W")
+
+            // The composed lockup really draws the plate under the W, and the wordmark
+            // continues to its right. A wordmark-only lockup has no plate pixels.
+            let rep = try bitmap(of: lockup)
+            let scale = CGFloat(rep.pixelsWide) / max(lockup.bounds.width, 1)
+            let chipPixels = Int((chip.width * scale).rounded())
+            let counts = pixelCounts(rep, chipWidth: chipPixels, plate: plate, ink: ink)
+            let chipArea = Double(chipPixels * chipPixels)
+            #expect(Double(counts.plate) / chipArea > 0.5, "the plate covers the chip")
+            #expect(Double(counts.ink) / chipArea > 0.03, "the W strokes sit inside the chip")
+            #expect(Double(counts.ink) / chipArea < 0.4, "the plate stays visible around the W")
+            #expect(counts.word > 0, "the wordmark follows the chip")
+
+            // The mark sits on the plate, not beside it: the W's box lies inside the chip, is
+            // centred on it and takes the chip's 0.798 width share (DESIGN 11.6). The old
+            // wordmark-only glyph put its W off the plate's centre and failed these. Measured on
+            // the glyph layer rendered at 8x so antialiasing does not move the edges.
+            let box = try #require(glyphInkBox(of: lockup, chipWidth: chip.width))
+            #expect(abs(box.width / chip.width - 0.798) < 0.02, "the W takes 0.798 of the plate: \(box)")
+            #expect(abs(box.midX - chip.width / 2) < chip.width * 0.04, "the W is centred on the plate: \(box)")
+            #expect(abs(box.midY - chip.height / 2) < chip.height * 0.04, "the W is vertically centred: \(box)")
+        }
+    }
+
+    private struct PixelCounts {
+        let plate: Int
+        let ink: Int
+        let word: Int
+    }
+
+    private func bitmap(of view: NSView) throws -> NSBitmapImageRep {
+        view.layoutSubtreeIfNeeded()
+        let rep = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        return rep
+    }
+
+    /// Counts covered pixels on the plate side and the ink side of the chip, plus ink
+    /// pixels right of it. A wordmark-only lockup leaves the chip's surrounding pixels
+    /// transparent and fails the plate share; a missing W fails the ink share.
+    private func pixelCounts(_ rep: NSBitmapImageRep, chipWidth: Int,
+                             plate: NSColor, ink: NSColor) -> PixelCounts {
+        let plateLight = luminance(plate)
+        let inkLight = luminance(ink)
+        let midpoint = (plateLight + inkLight) / 2
+        let plateIsLighter = plateLight > inkLight
+        var plateCount = 0
+        var inkCount = 0
+        var wordCount = 0
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<rep.pixelsWide {
+                guard let color = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB),
+                      color.alphaComponent > 0.5 else { continue }
+                let light = luminance(color)
+                let onPlateSide = plateIsLighter ? light > midpoint : light < midpoint
+                if onPlateSide {
+                    if x < chipWidth { plateCount += 1 }
+                } else if x < chipWidth {
+                    inkCount += 1
+                } else {
+                    wordCount += 1
+                }
+            }
+        }
+        return PixelCounts(plate: plateCount, ink: inkCount, word: wordCount)
+    }
+
+    /// The bounding box (in lockup points) of the glyph layer's coverage inside the chip's width.
+    private func glyphInkBox(of lockup: BrandChipLockupView, chipWidth: CGFloat) -> CGRect? {
+        guard let image = lockup.wordmarkImage else { return nil }
+        let scale: CGFloat = 8
+        let size = lockup.bounds.size
+        guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(size.width * scale),
+                                         pixelsHigh: Int(size.height * scale), bitsPerSample: 8, samplesPerPixel: 4,
+                                         hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                         bytesPerRow: 0, bitsPerPixel: 0),
+              let context = { rep.size = size; return NSGraphicsContext(bitmapImageRep: rep) }() else { return nil }
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = context
+        image.draw(in: NSRect(origin: .zero, size: size))
+        NSGraphicsContext.restoreGraphicsState()
+        var minX = Int.max, minY = Int.max, maxX = -1, maxY = -1
+        for y in 0..<rep.pixelsHigh {
+            for x in 0..<Int(chipWidth * scale) {
+                guard (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 else { continue }
+                minX = min(minX, x); maxX = max(maxX, x); minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= 0 else { return nil }
+        return CGRect(x: CGFloat(minX) / scale, y: CGFloat(minY) / scale,
+                      width: CGFloat(maxX - minX + 1) / scale, height: CGFloat(maxY - minY + 1) / scale)
+    }
+
+    /// The bundled glyph layer is the web header's, byte for byte, so the two chips cannot drift.
+    @Test func pickerGlyphLayerIsTheWebHeadersFile() throws {
+        let web = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("writeitdown/logo/write-it-down-lockup.svg")
+        let bundled = try #require(BundledResources.bundle.url(forResource: "write-it-down-lockup", withExtension: "svg"))
+        #expect(try Data(contentsOf: bundled) == Data(contentsOf: web))
+    }
+
+    private func resolved(_ color: NSColor, _ appearance: NSAppearance.Name) -> NSColor {
+        var value = color
+        NSAppearance(named: appearance)?.performAsCurrentDrawingAppearance {
+            value = color.usingColorSpace(.sRGB) ?? color
+        }
+        return value
+    }
+
+    private func luminance(_ color: NSColor) -> Double {
+        let rgb = color.usingColorSpace(.sRGB) ?? color
+        return 0.2126 * Double(rgb.redComponent) + 0.7152 * Double(rgb.greenComponent) + 0.0722 * Double(rgb.blueComponent)
+    }
+
+    private func sameColor(_ lhs: NSColor, _ rhs: NSColor, appearance: NSAppearance.Name) -> Bool {
+        let left = resolved(lhs, appearance)
+        let right = resolved(rhs, appearance)
+        return abs(left.redComponent - right.redComponent) < 0.01
+            && abs(left.greenComponent - right.greenComponent) < 0.01
+            && abs(left.blueComponent - right.blueComponent) < 0.01
+            && abs(left.alphaComponent - right.alphaComponent) < 0.01
+    }
+
+    private func descendants<T: NSView>(of type: T.Type, in view: NSView) -> [T] {
+        view.subviews.flatMap { child in
+            ((child as? T).map { [$0] } ?? []) + descendants(of: type, in: child)
+        }
     }
 }

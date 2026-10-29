@@ -1,5 +1,6 @@
-# Generated and scripted files must be byte-identical on every OS (the drift gate compares them).
-*.go text eol=lf
-*.sh text eol=lf
-*.py text eol=lf
+# Byte-identical on every OS: the drift gate and `go mod tidy -diff` compare these files, and the Windows runner
+# would otherwise check them out with CRLF.
+* text=auto eol=lf
 *.ttf binary
+*.png binary
+*.ico binary

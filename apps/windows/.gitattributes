@@ -1,0 +1,5 @@
+# Generated and scripted files must be byte-identical on every OS (the drift gate compares them).
+*.go text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.ttf binary

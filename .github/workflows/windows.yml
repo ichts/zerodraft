@@ -1,0 +1,45 @@
+name: windows
+
+# Builds and unit-tests apps/windows on GitHub's Windows runner and runs the token drift gate. The real-hardware
+# IME suite, screen capture and end-to-end scripts run on the Windows test PC, never here (apps/windows/README.md).
+# The Mac sources the generator reads are in the path filter on purpose: a Mac token or sentence change must fail
+# here until apps/windows/tokens/tokens_gen.go is regenerated.
+on:
+  pull_request:
+    paths:
+      - 'apps/windows/**'
+      - 'apps/macos/FirstLine/Sources/FirstLine/**'
+      - '.github/workflows/windows.yml'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/windows
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/windows/go.mod
+          cache-dependency-path: apps/windows/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Tokens and fonts match the Mac sources
+        run: sh scripts/check_tokens.sh
+      - name: Format and module hygiene
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+          go mod tidy -diff
+          go mod verify
+      - name: Build (release flavour, QA flavour, the exe the MSIX wraps)
+        run: |
+          go build ./...
+          go build -tags widqa -o "$RUNNER_TEMP/wid-qa.exe" ./cmd/wid
+          go build -ldflags "-H=windowsgui" -o "$RUNNER_TEMP/wid.exe" ./cmd/wid
+      - name: Vet
+        run: go vet ./...
+      - name: Unit tests
+        run: go test ./...

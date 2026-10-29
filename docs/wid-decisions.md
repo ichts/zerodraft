@@ -1398,3 +1398,44 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-038's clause that the Mac start screen keeps the wordmark-only lockup, and the
   `design/DESIGN.md` section 11 sentences that described the wordmark-only Mac lockup. D-036's
   placement inside the card, D-031's rules page and the social card's wordmark lockup stand.
+
+## D-076: The history fades per logical line, and the first refused delete names the rule
+
+- Date: 2026-10-29
+- Decision: Two settled behaviours (captain, 2026-10-25), now identical on writeitdown.app and the Mac room.
+  1. **The ladder's unit is the logical line.** A logical line is a sentence, or the text up to a hard line
+     break (Unicode sentence rules: `Intl.Segmenter` on the web, `NSString` `.bySentences` on the Mac). Every
+     visual row of one logical line carries one opacity: the live line 1.0, one back 0.847 light / 0.902 dark,
+     two back 0.769 / 0.772, older 0. The values are D-069's and are unchanged; D-073 already applied them
+     with D-027's stepping, and this decision only changes what a step is applied to. A trailing hard break
+     puts the writer on a fresh empty line, so every written line sits one rung further back. The partial
+     line at the aperture is clipped at its edge, never given an alpha of its own: the web aperture is one
+     hard mask at the third pitch (no gradient), the Mac aperture is the scroll view's own clip. A sentence
+     that ends mid-row keeps one rung on each side of its boundary. The rule reads the text only, so a width
+     change never re-steps a line (the Mac's per-resize re-step is gone).
+  2. **The first refused delete of a session names the rule.** The 200 ms shake stays on every refusal. The
+     first refused delete of a session (Backspace or Delete, a word, line or paragraph delete, or the delete
+     input types a touch keyboard sends) also shows `FORWARD ONLY. DELETING IS BLOCKED.` in the footer's
+     status slot for two seconds, in the quiet role (`--paper-quiet`, 7:1 on the sheet, which clears the 4.5:1
+     floor), then the slot returns to what it held. Later refusals in the same session shake only. A session
+     that ends (wipe, kept, a new start) earns its own notice. Paste, cut, undo and caret moves only shake. An
+     armed exit confirmation keeps the slot and the notice waits unspent, because the confirmation is the
+     writer's pending decision. The slot is the exit confirmation's own footer slot, so nothing moves: the
+     frames of the exit link, the count, the clock, the paper and the writing layer are unchanged while it
+     shows and after it goes.
+- Reason: A long sentence that wraps read as a staircase of greys, which says "different lines" about one
+  thought. The refusal was silent beyond a shake, so a writer who did not know the rule had no sentence to
+  read; once per session teaches it without nagging.
+- Web mechanism: the textarea keeps the input, the caret and the IME and its glyphs are transparent; an
+  `aria-hidden` ink layer above it repeats the draft with one span per logical line at its rung and draws the
+  composition underline. Both share one box, font and wrap, and scroll together.
+- Tests: `writeitdown/qa/history-fade.spec.mjs` (rows of one line share one measured opacity in the DOM and in
+  the pixels; the ladder per theme and 7:1 per step; a mid-row sentence boundary; the hard-clip aperture;
+  first-versus-later refusal, the 2 s duration, the reset, the colour and no layout shift at 1440 and 390,
+  both themes, motion and Reduce Motion), `writeitdown/session.test.mjs`, `HistoryLinesTests`,
+  `EditorFocusTests` (`restoredDraftKeepsOneOpacityPerSentenceAcrossResize`,
+  `theAperturePartialLineIsClippedNotFaded`), `RoomTests` (first refused delete and its two seconds, the
+  reset, delete-only, the exit confirmation), `SessionEngineTests`.
+- Supersedes: D-027's per-visual-row unit (its stepping, one-pitch shift and the retired gradient stand) and
+  D-046's "visual only" refusal (the shake, the hairline, the live-region line and the absence of sound
+  stand). D-069's ladder values are cited, not changed.

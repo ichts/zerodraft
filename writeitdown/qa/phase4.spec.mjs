@@ -105,7 +105,7 @@ async function assertRoom(page) {
     const write = window.__writingLine();
     return {
       height: e.clientHeight, line, overflow: style.overflowY, scrollbar: style.scrollbarWidth,
-      mask: style.maskImage || style.webkitMaskImage,
+      mask: getComputedStyle(e.closest('.editor-stack')).maskImage || getComputedStyle(e.closest('.editor-stack')).webkitMaskImage,
       activeCentre: write.centre, ratio: (write.centre - paper.top) / paper.height,
       paperHeight: paper.height, paperTop: paper.top,
       fallback: 44 + 2.5 * line,
@@ -132,38 +132,19 @@ async function assertRoom(page) {
   expect(geometry.bars).toHaveLength(1);
   expect(geometry.bars[0].height).toBe(2);
   expect(Math.abs(geometry.bars[0].top - geometry.bars[0].paperTop)).toBeLessThan(1);
-  // Stepped per-line history, not a continuous gradient: the theme's two history stops, then
-  // 100%, then gone - each band exactly one line pitch tall (D-027's intent, D-056's values:
-  // the stops are solved so the faded lines keep 9.2:1 and 7.2:1 on the paper).
-  const bands = maskBands(geometry.mask);
-  expect(bands.length, geometry.mask).toBe(4);
-  // The browser serialises the mask stops to two decimals; the intent is the token itself.
-  const expectedAlphas = [geometry.history[1], geometry.history[0], 1, 0];
-  bands.forEach((band, index) => {
-    expect(band.alpha, `band ${index} of ${geometry.mask}`).toBeCloseTo(expectedAlphas[index], 1);
-  });
-  bands.slice(0, 3).forEach((band, index) => {
-    expect(Math.abs(band.end - band.start - geometry.line), `band ${index} of ${geometry.mask}`).toBeLessThan(1.1);
-    expect(Math.abs(band.start - index * geometry.line)).toBeLessThan(1.1);
-  });
-  expect(bands[3].start, 'nothing below the active line: the mask stops at the third band').toBeCloseTo(3 * geometry.line, 0);
+  // The aperture is one hard clip at the third pitch (the live line and the two history lines above it); the
+  // history steps live on the ink layer's spans per logical line (D-076, qa/history-fade.spec.mjs), so the
+  // clip carries no alpha band of its own and a partial line is cut, never faded.
+  expect(geometry.mask, 'the aperture clip').toMatch(/#?rgb\(0, 0, 0\) [\d.]+px, rgba\(0, 0, 0, 0\) [\d.]+px/);
+  const stops = [...geometry.mask.matchAll(/([\d.]+)px/g)].map(match => parseFloat(match[1]));
+  expect(stops, geometry.mask).toHaveLength(2);
+  stops.forEach(stop => expect(Math.abs(stop - 3 * geometry.line), geometry.mask).toBeLessThan(1.1));
 
   expect(geometry.pageHeight).toBe(geometry.viewportHeight);
   expect(geometry.pageWidth).toBe(geometry.viewportWidth);
   return geometry;
 }
 
-// Parse the computed stepped mask into {alpha,start,end} bands, in px.
-function maskBands(maskImage) {
-  const stops = [...maskImage.matchAll(/(rgba?\([^)]*\)|#\w+)\s+([\d.]+)px/g)]
-    .map(match => ({ alpha: /^rgb\(/.test(match[1]) ? 1 : parseFloat(match[1].split(',')[3]), px: parseFloat(match[2]) }));
-  const bands = [];
-  for (let index = 0; index < stops.length; index += 2) {
-    const end = stops[index + 1] ? stops[index + 1].px : null;
-    bands.push({ alpha: stops[index].alpha, start: stops[index].px, end: end ?? stops[index].px });
-  }
-  return bands;
-}
 
 test.beforeEach(async ({ page }) => {
   const evidence = { errors: [], consoleErrors: [], requests: [], failedAssets: [], failedRequests: [] };
@@ -264,7 +245,7 @@ const insertionPoint = page => page.evaluate(() => {
     const parts = match[1].split(',').map(part => parseFloat(part));
     return (parts.length < 4 ? 1 : parts[3]) > 0;
   };
-  return { opacity, caret: painted(style.caretColor), ink: painted(style.color),
+  return { opacity, caret: painted(style.caretColor), ink: painted(getComputedStyle(document.querySelector('#editor-ink')).color),
     focused: document.activeElement === e, collapsed: e.selectionStart === e.selectionEnd };
 });
 

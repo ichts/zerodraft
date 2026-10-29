@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fresh, advance, append, clock, wordCount } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, historyLines, GONE } from './session.mjs';
 import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
 test('rest has no running deadline', () => {
@@ -100,4 +100,21 @@ test('Unicode words, individual Han characters, and non-word input', () => {
     ['𠀀中文', 3], ['你好👩🏽‍💻world', 3]
   ];
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
+});
+
+test('every row of a sentence shares one history rung (D-077)', () => {
+  const text = 'First is long. Second is long. Third is long. Fourth is long.';
+  const rungs = historyLines(text).map(line => [text.slice(line.start, line.end).trim(), line.rung]);
+  assert.deepEqual(rungs, [['First is long.', GONE], ['Second is long.', 2], ['Third is long.', 1], ['Fourth is long.', 0]]);
+  assert.deepEqual(historyLines('only one').map(line => line.rung), [0]);
+  assert.deepEqual(historyLines('').map(line => line.rung), []);
+});
+
+test('a hard line break puts the writer on a fresh live line, and CJK stops split sentences', () => {
+  assert.deepEqual(historyLines('one\ntwo\n').map(line => line.rung), [2, 1]);
+  assert.deepEqual(historyLines('one\ntwo').map(line => line.rung), [1, 0]);
+  assert.deepEqual(historyLines('今天下雨。我在写字。').map(line => line.rung), [1, 0]);
+  const covered = historyLines('a. b. c');
+  assert.equal(covered[0].start, 0);
+  assert.equal(covered.at(-1).end, 7);
 });

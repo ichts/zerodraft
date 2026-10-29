@@ -33,3 +33,20 @@ export function wordCount(text) {
   const separated = text.replace(/(\p{Script=Han}\p{Mark}*)/gu, ' $1 ');
   return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
 }
+
+// The history ladder's unit is the logical line, not the visual row (D-077): a sentence, or the text
+// up to a hard line break. Every row of one logical line carries one rung, so a long sentence that
+// wraps reads as one grey, never as a staircase. The Mac room cuts the same lines with the same
+// Unicode sentence rules (`HistoryLines.swift`); the two surfaces must not drift.
+// Rung 0 is the live line, 1 and 2 are the ladder's two readable steps, GONE is everything older.
+export const GONE = 3;
+
+const sentenceSegments = new Intl.Segmenter(undefined, { granularity: 'sentence' });
+
+// The text cut into logical lines, each with its offsets and its rung. A trailing hard break means
+// the writer is already on a fresh, empty line, so every written line sits one rung further back.
+export function historyLines(text) {
+  const lines = Array.from(sentenceSegments.segment(text), part => ({ start: part.index, end: part.index + part.segment.length }));
+  const live = lines.length - 1 + (text.endsWith('\n') ? 1 : 0);
+  return lines.map((line, index) => ({ ...line, rung: Math.min(live - index, GONE) }));
+}

@@ -739,6 +739,114 @@ struct RoomTests {
         }
     }
 
+    // MARK: - The first refused delete names the rule (D-077)
+
+    private static let refusalText = "FORWARD ONLY. DELETING IS BLOCKED."
+
+    @Test func firstRefusedDeleteNamesTheRuleForTwoSecondsAndMovesNothing() async throws {
+        let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .never
+        let room = fixture.room
+        let paper = try #require(fixture.editor.enclosingScrollView?.superview)
+        let exit = try #require(exitButton(in: room))
+        let count = try #require(descendants(room.view, of: NSTextField.self).first { $0.stringValue.hasSuffix("words") || $0.stringValue.hasSuffix("word") })
+        room.view.layoutSubtreeIfNeeded()
+        let before = frames(room, [exit, count, fixture.editor])
+        #expect(refusalLabel(in: room) == nil)
+
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        let notice = try #require(refusalLabel(in: room))
+        #expect(!notice.isHidden)
+        #expect(paper.layer?.animation(forKey: "deny-shake") != nil, "the 200 ms shake still runs on the first refusal")
+        // The quiet role, which clears 7:1 on the sheet (PaperContrastTests), not the pen.
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            #expect(attributeColor(of: notice, appearance: name, matches: FirstLineColors.paperQuietNSColor))
+        }
+        room.view.layoutSubtreeIfNeeded()
+        #expect(frames(room, [exit, count, fixture.editor]) == before, "nothing else moves while the notice shows")
+
+        // A second refusal inside the window neither restarts nor repeats the notice.
+        fixture.editor.deleteForward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!notice.isHidden)
+
+        try await Task.sleep(nanoseconds: 1_700_000_000)
+        #expect(!notice.isHidden, "still showing before two seconds")
+        try await Task.sleep(nanoseconds: 500_000_000)
+        #expect(notice.isHidden, "the slot returns after two seconds")
+        room.view.layoutSubtreeIfNeeded()
+        #expect(frames(room, [exit, count, fixture.editor]) == before, "the slot returns with no layout shift")
+
+        // Later refusals in the same session shake only.
+        paper.layer?.removeAnimation(forKey: "deny-shake")
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(paper.layer?.animation(forKey: "deny-shake") != nil)
+        #expect(notice.isHidden, "a later refusal says nothing in the slot")
+    }
+
+    @Test func aNewSessionEarnsTheNoticeAgain() throws {
+        let fixture = try roomFixture()
+        let room = fixture.room
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!(try #require(refusalLabel(in: room))).isHidden)
+
+        fixture.state.abandonSession()
+        fixture.state.startSession(duration: 60)
+        room.tick()
+        #expect(refusalLabel(in: room) == nil, "a session that ends takes its notice with it")
+        fixture.editor.insertText("again", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!(try #require(refusalLabel(in: room))).isHidden, "the new session's first refused delete says it again")
+    }
+
+    @Test func onlyADeleteEarnsTheNotice() throws {
+        let fixture = try roomFixture()
+        fixture.editor.paste(nil)
+        fixture.clock.now += 0.05
+        fixture.room.tick()
+        fixture.editor.cut(nil)
+        fixture.clock.now += 0.05
+        fixture.room.tick()
+        #expect(fixture.engine.lastDenyAt != nil)
+        #expect(refusalLabel(in: fixture.room) == nil, "paste and cut only shake")
+        #expect(fixture.engine.refusalNoticeAt == nil)
+    }
+
+    @Test func anArmedExitConfirmationKeepsTheSlotAndTheNoticeWaits() throws {
+        let fixture = try roomFixture()
+        let room = fixture.room
+        room.exitConfirmation = ExitConfirmation(window: 2)
+        room.confirmationClock = { 100 }
+        room.requestExit()
+        let hint = try #require(hintLabel(in: room))
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!hint.isHidden)
+        #expect(hint.stringValue == "Press Esc again to leave and delete the draft.")
+        #expect(fixture.engine.refusalNoticeAt == nil, "the notice was not spent while the confirmation held the slot")
+
+        fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(hint.isHidden)
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!(try #require(refusalLabel(in: room))).isHidden)
+        // Arming the exit takes the slot back from a notice that is still showing.
+        room.requestExit()
+        #expect(hint.stringValue == "Press Esc again to leave and delete the draft.")
+        #expect(!hint.isHidden)
+    }
+
     // MARK: - Helpers
 
     private func roomFixture(typed: Bool = true) throws -> (room: SessionViewController, engine: SessionEngine,
@@ -906,6 +1014,19 @@ struct RoomTests {
             if let text = child as? NSTextView { return [text.string] }
             return []
         }
+    }
+
+    private func refusalLabel(in room: SessionViewController) -> NSTextField? {
+        descendants(room.view, of: NSTextField.self).first { $0.stringValue == Self.refusalText }
+    }
+
+    private func frames(_ room: SessionViewController, _ views: [NSView]) -> [NSRect] {
+        views.map { room.view.convert($0.bounds, from: $0).integral }
+    }
+
+    private func attributeColor(of label: NSTextField, appearance: NSAppearance.Name, matches expected: NSColor) -> Bool {
+        guard let colour = label.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor else { return false }
+        return sameColor(colour, expected, appearance: appearance)
     }
 
     private func hintLabel(in room: SessionViewController) -> NSTextField? {

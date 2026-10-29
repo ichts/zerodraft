@@ -14,14 +14,15 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     var onCommittedText: ((String, NSRange?) -> Void)?
     var onMarkedTextActivity: (() -> Void)?
     var onDeny: (() -> Void)?
+    /// Whether the refusal being reported is an attempt to delete, so the room can name the rule once per session.
+    private(set) var lastDenyWasDeletion = false
 
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
-    private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
-    /// One uniform ink step per completed line, closest line first, older lines gone (D-027), at D-069's
-    /// contrast ladder for the effective appearance.
+    /// One uniform ink step per logical line, closest line first, older lines gone (D-027 stepping, D-077 unit), at
+    /// D-069's contrast ladder for the effective appearance.
     var historyLineOpacities: [CGFloat] {
         FirstLineColors.paperHistoryOpacities(dark: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
     }
@@ -198,8 +199,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     /// Every denied user edit invalidates an unmarked composition range so a
     /// later input-method replacement cannot target stale text.
-    func denyEdit() {
+    func denyEdit(deleting: Bool = false) {
         if !hasMarkedText() { compositionRange = nil }
+        lastDenyWasDeletion = deleting
         onDeny?()
     }
 
@@ -215,7 +217,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteBackward(_ sender: Any?) {
         guard hasMarkedText() || isCompositionEditing else {
-            denyEdit()
+            denyEdit(deleting: true)
             return
         }
         // Hand the key to the active input method; it owns candidate editing and
@@ -231,7 +233,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func deleteForward(_ sender: Any?) {
         guard hasMarkedText() || isCompositionEditing else {
-            denyEdit()
+            denyEdit(deleting: true)
             return
         }
         // Hand the key to the active input method, same as deleteBackward.
@@ -462,8 +464,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applySessionTypography()
     }
 
-    /// Base ink for the current line; completed lines are stepped by `applyLineOpacity`
-    /// to the history ladder (D-027 stepping, D-069 values).
+    /// Base ink for the live line; completed logical lines are stepped by `applyLineOpacity`
+    /// to the history ladder (D-077 unit, D-069 values).
     func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
@@ -479,7 +481,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLightPunctuationTypography(in: range, textStorage: textStorage)
         applyScriptBoundaryKerning(in: range, textStorage: textStorage)
         textStorage.endEditing()
-        // Line opacities need a laid-out storage, so apply them after the edit block.
+        // Opacities are a function of the text alone, so they are applied once the edit block has ended.
         applyLineOpacity(in: range, textStorage: textStorage)
     }
 
@@ -490,57 +492,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
     }
 
-    /// A width or measure change reflows line breaks without touching the text or
-    /// caret, so the per-line opacity must be recomputed against the new layout.
-    func refreshLineOpacityForMeasureChange() {
-        guard hasMarkedText() == false,
-              let textStorage, textStorage.length > 0,
-              let textContainer else { return }
-        let width = textContainer.containerSize.width
-        guard width > insetEpsilon, width != lineOpacityMeasureWidth else { return }
-        applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
-    }
-
-    /// Each completed line gets one uniform opacity; the current line is full. The
-    /// line's top and bottom always match, and older lines are gone. The opacities
-    /// are the appearance's history ladder (D-069).
+    /// Each logical line (a sentence, or the text up to a hard break) gets one uniform opacity on every row it
+    /// wraps onto; the live line is full and older lines are gone (D-077). The opacities are the appearance's
+    /// history ladder (D-069). The rule reads the text only, so a width change never re-steps a line.
     private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
-        guard textStorage.length > 0, let layoutManager, let textContainer else { return }
-        layoutManager.ensureLayout(for: textContainer)
-        lineOpacityMeasureWidth = textContainer.containerSize.width
-        var lines: [(index: Int, glyphRange: NSRange)] = []
-        var index = 0
-        layoutManager.enumerateLineFragments(
-            forGlyphRange: NSRange(location: 0, length: textStorage.length)
-        ) { _, _, _, glyphRange, _ in
-            lines.append((index, glyphRange))
-            index += 1
-        }
-        guard !lines.isEmpty else { return }
-        let length = textStorage.length
-        let insertion = min(max(selectedRange().location, 0), length)
-        let currentIndex: Int
-        if insertion == length, string.hasSuffix("\n") {
-            currentIndex = lines.count
-        } else if insertion < length {
-            let glyph = layoutManager.glyphIndexForCharacter(at: insertion)
-            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
-        } else {
-            let glyph = layoutManager.glyphIndexForCharacter(at: max(length - 1, 0))
-            currentIndex = lines.first { NSLocationInRange(glyph, $0.glyphRange) }?.index ?? (lines.count - 1)
-        }
-        for line in lines {
-            let distance = currentIndex - line.index
-            let alpha: CGFloat
-            if distance <= 0 {
-                alpha = 1
-            } else if distance < historyLineOpacities.count {
-                alpha = historyLineOpacities[distance]
-            } else {
-                alpha = 0
-            }
-            let characterRange = layoutManager.characterRange(forGlyphRange: line.glyphRange, actualGlyphRange: nil)
-            let clipped = NSIntersectionRange(characterRange, range)
+        guard textStorage.length > 0 else { return }
+        for line in HistoryLines.lines(in: string) {
+            let alpha: CGFloat = line.rung < historyLineOpacities.count ? historyLineOpacities[line.rung] : 0
+            let clipped = NSIntersectionRange(line.range, range)
             guard clipped.length > 0 else { continue }
             textStorage.addAttribute(.foregroundColor,
                                       value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),

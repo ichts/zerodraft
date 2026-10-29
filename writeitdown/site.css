@@ -78,15 +78,23 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .writing-area{position:absolute;inset:72px 32px;display:flex;align-items:center;justify-content:center;pointer-events:none}
 .room[data-phase="wipe"] .writing-area{opacity:0}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
-/* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
-   gradient: one uniform opacity per visual line (100 / 22 / 7 / gone), the Mac's D-027 treatment.
-   Its stops follow the fixed pitch, so the bands can never drift from the rendered lines. */
-/* Five-line aperture, active line in the middle band at --write-anchor. The mask is stepped, not a
-   gradient: one contrast step per visual line, the Mac's D-027 ladder (D-056). The steps are alphas
-   solved from the ink and the paper tone so the second line keeps 9:1 and the oldest visible line
-   keeps 7:1 on the sheet; older lines are gone. Its stops follow the fixed pitch, so the bands can
-   never drift from the rendered lines. */
-#editor{display:block;width:100%;max-width:62ch;height:calc(5 * var(--lh));text-align:center;resize:none;border:0;border-radius:0;background:transparent;color:var(--ink);caret-color:var(--ink);font:400 var(--script)/var(--lh) var(--serif);padding:calc(2 * var(--lh)) 0;overflow:hidden;scrollbar-width:none;mask-image:linear-gradient(to bottom,rgb(0 0 0 / var(--paper-history-2)) 0 calc(var(--lh)),rgb(0 0 0 / var(--paper-history-1)) calc(var(--lh)) calc(var(--lh) * 2),#000 calc(var(--lh) * 2) calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
+/* Five-line aperture, active line in the middle band at --write-anchor. The history is stepped per
+   logical line, not per visual row (D-077): the textarea keeps the input, the caret and the IME but
+   its glyphs are transparent, and the ink layer above it repeats the same text in one span per
+   sentence, each at its ladder rung (D-069's alphas, so the second line keeps 9:1 and the oldest
+   visible line 7:1 on the sheet; older lines are gone). Rows of one sentence therefore share one
+   opacity. The aperture is a hard clip at the pitch: a partial line is cut at its edge, never given
+   an alpha of its own. Both layers share one box, one font and one wrap, so the ink sits under the
+   caret. */
+.editor-stack{position:relative;width:100%;max-width:62ch;height:calc(5 * var(--lh));mask-image:linear-gradient(to bottom,#000 calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
+#editor,.editor-ink{box-sizing:border-box;display:block;width:100%;height:100%;margin:0;border:0;border-radius:0;padding:calc(2 * var(--lh)) 0;overflow:hidden;text-align:center;font:400 var(--script)/var(--lh) var(--serif);letter-spacing:normal;word-spacing:normal;text-indent:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal}
+#editor{resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:var(--ink);scrollbar-width:none}
+.editor-ink{position:absolute;inset:0;color:var(--ink);pointer-events:none}
+.editor-ink [data-rung="1"]{opacity:var(--paper-history-1)}
+.editor-ink [data-rung="2"]{opacity:var(--paper-history-2)}
+.editor-ink [data-rung="3"]{opacity:0}
+/* The textarea's own composition underline is as transparent as its text, so the ink layer draws it. */
+.editor-ink .composing{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.12em}
 /* Only the writing surface itself takes the pointer; the rest of the aperture stays
    transparent so the result screens' controls above it stay clickable. */
 #editor{pointer-events:auto}
@@ -131,6 +139,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The two-step exit: the inline confirmation is on the footer row's own 1.6 line box, so its
    baseline meets ESC - EXIT and the count instead of sitting a few points lower (case 37). */
 .exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:500 13px/1.6 var(--sans);letter-spacing:0;color:var(--paper-danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* The first refused delete borrows the slot for two seconds in the quiet role (7:1 on the sheet), not the pen: it explains, it does not warn. */
+.exit-hint[data-kind="refusal"]{color:var(--paper-quiet);letter-spacing:.04em}
 /* The ink imperfection the captain locked (D-056): a 2 px displacement over two octaves of
    fractal noise plus a hair of text stroke, so the words sit in the paper instead of on it. */
 .ink-imperfect,.home .script,.home .prev-line{filter:url(#wid-ink-wobble);-webkit-text-stroke:.14px currentColor}

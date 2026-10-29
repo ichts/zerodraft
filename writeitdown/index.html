@@ -162,7 +162,10 @@
     </div>
     <div class="writing-area">
       <label class="sr-only" for="editor">Write forward. Stop for eight seconds and your draft is deleted.</label>
-      <textarea class="ink-imperfect" id="editor" aria-describedby="count-rule" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+      <div class="editor-stack">
+        <textarea class="ink-imperfect" id="editor" aria-describedby="count-rule" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="editor-ink ink-imperfect" id="editor-ink" aria-hidden="true"></div>
+      </div>
     </div>
     <div id="kept" hidden>
       <div class="kept-head">

@@ -105,6 +105,8 @@ struct ExitConfirmation: Equatable {
     mutating func dismiss() {
         armedAt = nil
     }
+
+    var isArmed: Bool { armedAt != nil }
 }
 
 struct DenyFeedbackState {

@@ -1,4 +1,4 @@
-import { fresh, advance, append, clock, wordCount } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, historyLines } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot } from './status-slot.js';
 
@@ -6,6 +6,8 @@ const $ = id => document.getElementById(id);
 const room = $('room');
 const paper = room.querySelector('.room-paper');
 const editor = $('editor');
+const ink = $('editor-ink');
+const hintSlot = $('exit-hint');
 const hairline = $('room-hairline');
 const bar = $('room-bar');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -21,6 +23,10 @@ const EXIT_HINT = {
   touch: 'Tap EXIT again to leave and delete the draft.'
 };
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
+// The first refused delete of a session names the rule in the footer's status slot for two seconds,
+// then the slot goes back to what it held (D-077 amends D-046); later refusals only shake.
+const REFUSAL = 'FORWARD ONLY. DELETING IS BLOCKED.';
+const REFUSAL_MS = 2000;
 const hintFor = () => (touchInput.matches ? EXIT_HINT.touch : EXIT_HINT.keyboard);
 let state = fresh();
 let compositionBase = null;
@@ -33,6 +39,9 @@ let barSteppedAt = -Infinity;
 let shiftFrame = 0;
 let shiftRunning = false;
 let shiftTarget = -1;
+let inkKey = null;
+let refusalNoticed = false;
+let refusalTimer = 0;
 
 function announce(text) {
   if ($('status').textContent !== text) $('status').textContent = text;
@@ -81,9 +90,40 @@ function syncBar(now) {
     { duration: remaining, easing: 'linear', fill: 'forwards' });
 }
 
+// The ink layer repeats the draft one span per logical line, each at its rung of the history ladder
+// (D-077). It is rebuilt only when the draft or the composing boundary changes, never per tick.
+function paintInk() {
+  const base = compositionBase === null ? -1 : compositionBase.length;
+  const key = `${base}|${editor.value}`;
+  if (key === inkKey) return;
+  inkKey = key;
+  const value = editor.value;
+  const parts = [];
+  for (const line of historyLines(value)) {
+    const cut = base > line.start && base < line.end ? base : null;
+    const pieces = cut === null ? [[line.start, line.end]] : [[line.start, cut], [cut, line.end]];
+    for (const [start, end] of pieces) parts.push({ text: value.slice(start, end), rung: line.rung, composing: base >= 0 && start >= base });
+  }
+  const spans = parts.map(part => {
+    const span = document.createElement('span');
+    span.dataset.rung = String(part.rung);
+    if (part.composing) span.className = 'composing';
+    span.textContent = part.text;
+    return span;
+  });
+  // A draft that ends on a hard break owes the textarea's empty last line to the ink layer too.
+  ink.replaceChildren(...spans, ...(value.endsWith('\n') ? ['\n'] : []));
+}
+
+function setScroll(top) {
+  editor.scrollTop = top;
+  ink.scrollTop = editor.scrollTop;
+}
+
 // A new line shifts the history exactly one pitch, 0.18 s ease-out; typing on the
 // same line moves nothing, and Reduce Motion snaps (the Mac's case 48).
 function fitEditor({ animate = false } = {}) {
+  paintInk();
   const target = Math.max(0, editor.scrollHeight - editor.clientHeight);
   // A shift already heading for the same target keeps going, so typing on the same
   // line does not snap a half-finished move; anything else re-anchors here.
@@ -95,13 +135,13 @@ function fitEditor({ animate = false } = {}) {
   const pitch = parseFloat(getComputedStyle(editor).lineHeight);
   // Only a new line (one pitch) animates; a wholesale replacement such as a restore
   // or a test's programmatic insert snaps, so the draft is never left mid-way.
-  if (!animate || reduced.matches || Math.abs(target - from) > pitch * 1.5) { editor.scrollTop = target; return; }
+  if (!animate || reduced.matches || Math.abs(target - from) > pitch * 1.5) { setScroll(target); return; }
   const started = performance.now();
   shiftTarget = target;
   shiftRunning = true;
   const shift = now => {
     const progress = Math.min(1, (now - started) / LINE_SHIFT_MS);
-    editor.scrollTop = from + (target - from) * lineShiftProgress(progress);
+    setScroll(from + (target - from) * lineShiftProgress(progress));
     if (progress < 1) shiftFrame = requestAnimationFrame(shift);
     else shiftRunning = false;
   };
@@ -112,6 +152,8 @@ function render(now = performance.now()) {
   const previous = room.dataset.phase;
   room.dataset.phase = state.phase;
   if (previous !== state.phase) slot.invalidate();
+  // A session that ends (wipe or kept) is spent; the next one earns its own notice.
+  if (previous !== state.phase && (state.phase === 'wipe' || state.phase === 'kept')) refusalNoticed = false;
   const failed = state.phase === 'wipe';
   const kept = state.phase === 'kept';
   const cut = failed && now - state.ended < 200;
@@ -165,10 +207,31 @@ function tick() {
   render(now);
 }
 
+// Only an attempt to delete earns the notice: Backspace and Delete keys, and the delete input types
+// a touch keyboard sends instead of keys. Paste, cut, undo and caret moves just shake.
+const isDeletion = event => (event.type === 'keydown' ? ['Backspace', 'Delete'].includes(event.key) : /^delete/.test(event.inputType ?? ''));
+
+function endRefusalNotice() {
+  clearTimeout(refusalTimer);
+  if (hintSlot.dataset.kind !== 'refusal') return;
+  delete hintSlot.dataset.kind;
+  hintSlot.textContent = '';
+}
+
+function showRefusalNotice() {
+  refusalNoticed = true;
+  hintSlot.dataset.kind = 'refusal';
+  hintSlot.textContent = REFUSAL;
+  clearTimeout(refusalTimer);
+  refusalTimer = setTimeout(endRefusalNotice, REFUSAL_MS);
+}
+
 function deny(event) {
   event.preventDefault();
   denyFeedback(paper, hairline);
-  announce('Blocked. Forward only.');
+  // An armed exit confirmation is the writer's pending decision and keeps the slot; the notice waits.
+  if (!refusalNoticed && exitArmedAt === null && isDeletion(event)) showRefusalNotice();
+  else announce('Blocked. Forward only.');
   render();
 }
 
@@ -176,10 +239,12 @@ function endCaret() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
 }
 
+// The slot holds one thing at a time: arming the exit confirmation takes it from a refusal notice, and
+// disarming leaves a notice alone to finish its own two seconds.
 function clearExitHint() {
   exitArmedAt = null;
   clearTimeout(exitTimer);
-  $('exit-hint').textContent = '';
+  if (hintSlot.dataset.kind !== 'refusal') hintSlot.textContent = '';
 }
 
 // The control and its confirmation wear this input's wording. The confirmation's reserved footer
@@ -187,8 +252,8 @@ function clearExitHint() {
 function syncExitCopy() {
   const hint = hintFor();
   $('exit').textContent = touchInput.matches ? EXIT_LABEL.touch : EXIT_LABEL.keyboard;
-  $('exit-hint').dataset.hint = hint;
-  if ($('exit-hint').textContent) $('exit-hint').textContent = hint;
+  hintSlot.dataset.hint = hint;
+  if (exitArmedAt !== null) hintSlot.textContent = hint;
 }
 
 // Escape, EXIT and the brand are one act, and it takes two of them: the first arms the inline
@@ -197,7 +262,9 @@ function syncExitCopy() {
 function requestExit() {
   if (exitArmedAt !== null && performance.now() - exitArmedAt <= CONFIRM_MS) { clearExitHint(); exit(); return; }
   exitArmedAt = performance.now();
-  $('exit-hint').textContent = hintFor();
+  clearTimeout(refusalTimer);
+  delete hintSlot.dataset.kind;
+  hintSlot.textContent = hintFor();
   clearTimeout(exitTimer);
   exitTimer = setTimeout(clearExitHint, CONFIRM_MS);
 }
@@ -207,6 +274,8 @@ function reset() {
   copyGeneration++;
   compositionBase = null;
   clearExitHint();
+  refusalNoticed = false;
+  endRefusalNotice();
   editor.value = '';
   $('kept-text').textContent = '';
   $('receipt').textContent = '';
@@ -280,7 +349,10 @@ editor.addEventListener('compositionstart', () => {
 editor.addEventListener('compositionend', () => {
   compositionBase = null;
   endCaret();
+  paintInk();
 });
+// A browser that scrolls the textarea on its own (caret into view) carries the ink layer with it.
+editor.addEventListener('scroll', () => { ink.scrollTop = editor.scrollTop; });
 editor.addEventListener('keydown', event => {
   if (event.isComposing) return;
   if (state.phase === 'wipe' && (event.key === 'Enter' || event.key === 'NumpadEnter')) { event.preventDefault(); restart(); return; }

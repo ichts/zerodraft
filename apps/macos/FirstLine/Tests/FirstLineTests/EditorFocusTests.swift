@@ -341,15 +341,31 @@ struct EditorFocusTests {
         #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - editor.historyLineOpacities[2]) < 0.001)
     }
 
+    /// D-077: only an attempt to delete earns the once-per-session notice; paste, cut, undo and caret moves do not.
     @Test
-    func restoredDraftReappliesLineOpacityAfterLayoutAndResize() throws {
+    func onlyDeleteCommandsAreToldApartFromOtherRefusals() {
+        for selector in AppendOnlyInputPolicy.deleteSelectors + AppendOnlyInputPolicy.blockedDeleteSelectors {
+            #expect(AppendOnlyInputPolicy.isDeleteCommand(selector), "\(selector) deletes")
+            #expect(AppendOnlyInputPolicy.shouldDenyCommand(selector, hasMarkedText: false))
+        }
+        for selector in [#selector(NSText.paste(_:)), #selector(NSText.cut(_:)), #selector(UndoManager.undo),
+                         Selector(("moveLeft:"))] {
+            #expect(!AppendOnlyInputPolicy.isDeleteCommand(selector), "\(selector) is not a delete")
+        }
+    }
+
+    /// D-077: the ladder's unit is the logical line, so every visual row of one sentence carries one opacity, at
+    /// any width, and a resize that re-wraps the sentences never re-steps them.
+    @Test
+    func restoredDraftKeepsOneOpacityPerSentenceAcrossResize() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let engine = SessionEngine()
         let state = licensedTestState(sessionEngine: engine,
                                       settingsStore: SettingsStore(configDirectory: root))
         state.startSession(duration: 60)
-        let draft = Array(repeating: "alpha beta gamma delta", count: 24).joined(separator: " ")
+        let draft = (1...6).map { "Sentence \($0) has alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu." }
+            .joined(separator: " ")
         engine.registerCommittedText(draft)
         let room = SessionViewController(appState: state)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
@@ -361,16 +377,79 @@ struct EditorFocusTests {
         let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
         #expect(editor.string == draft)
 
-        let wideLines = try lineCount(in: editor)
-        #expect(wideLines >= 4)
-        try assertTailLineOpacities(in: editor, lineCount: wideLines)
+        let ladder = editor.historyLineOpacities
+        func assertLadder(minimumRows: Int) throws {
+            let sentences = try sentenceRows(in: editor)
+            #expect(sentences.count == 6)
+            #expect(sentences.map { $0.rows }.max() ?? 0 >= minimumRows, "a sentence should wrap onto several rows here")
+            // Oldest three are gone, then two back, one back, the live sentence; each is ONE value on every row.
+            let expected: [CGFloat] = [0, 0, 0, ladder[2], ladder[1], 1]
+            for (index, sentence) in sentences.enumerated() {
+                #expect(sentence.alphas.count == 1, "sentence \(index) has \(sentence.alphas.count) opacities over \(sentence.rows) rows")
+                #expect(abs((sentence.alphas.first ?? -1) - expected[index]) < 0.001)
+            }
+        }
+        try assertLadder(minimumRows: 2)
 
         window.setContentSize(NSSize(width: 520, height: 720))
         room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
-        let narrowLines = try lineCount(in: editor)
-        #expect(narrowLines > wideLines)
-        try assertTailLineOpacities(in: editor, lineCount: narrowLines)
+        let narrow = try sentenceRows(in: editor).map { $0.rows }
+        try assertLadder(minimumRows: 3)
+        #expect(narrow.reduce(0, +) > 6)
         window.orderOut(nil)
+    }
+
+    /// The aperture is the scroll view's own clip: no gradient mask, so a line cut by its edge keeps its rung and is
+    /// clipped, never given an alpha of its own (D-077).
+    @Test
+    func theAperturePartialLineIsClippedNotFaded() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine()
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: root))
+        state.startSession(duration: 60)
+        engine.registerCommittedText("One.\nTwo.\nThree.\nFour.\nFive")
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
+        RoomWindowKeeper.windows.append(window)
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let scroll = try #require(editor.enclosingScrollView)
+        #expect(scroll.layer?.mask == nil && scroll.contentView.layer?.mask == nil, "no gradient mask over the history")
+        #expect(scroll.contentView is NSClipView)
+
+        // Slide the document half a pitch so the oldest visible line straddles the clip's top edge.
+        let before = try sentenceRows(in: editor).map { $0.alphas }
+        scroll.contentView.scroll(to: NSPoint(x: 0, y: scroll.contentView.bounds.origin.y + 22.4))
+        scroll.reflectScrolledClipView(scroll.contentView)
+        #expect(try sentenceRows(in: editor).map { $0.alphas } == before, "scrolling changes no line's opacity")
+        window.orderOut(nil)
+    }
+
+    /// Per logical line: how many visual rows it wraps onto and the set of opacities those rows carry.
+    private func sentenceRows(in textView: AppendOnlyTextView) throws -> [(rows: Int, alphas: Set<CGFloat>)] {
+        let layout = try #require(textView.layoutManager)
+        let container = try #require(textView.textContainer)
+        let storage = try #require(textView.textStorage)
+        layout.ensureLayout(for: container)
+        return HistoryLines.lines(in: textView.string).map { line in
+            var rows = 0
+            var alphas: Set<CGFloat> = []
+            let glyphs = layout.glyphRange(forCharacterRange: line.range, actualCharacterRange: nil)
+            layout.enumerateLineFragments(forGlyphRange: glyphs) { _, _, _, glyphRange, _ in
+                rows += 1
+                let characters = layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+                let start = max(characters.location, line.range.location)
+                if let colour = storage.attribute(.foregroundColor, at: start, effectiveRange: nil) as? NSColor {
+                    alphas.insert((colour.alphaComponent * 1000).rounded() / 1000)
+                }
+            }
+            return (rows, alphas)
+        }
     }
 
     private func lineAlpha(in textView: AppendOnlyTextView, lineIndex: Int) throws -> CGFloat {
@@ -384,24 +463,6 @@ struct EditorFocusTests {
         let line = try #require(lines.indices.contains(lineIndex) ? lines[lineIndex] : nil)
         let colour = try #require(textView.textStorage?.attribute(.foregroundColor, at: line.location, effectiveRange: nil) as? NSColor)
         return colour.alphaComponent
-    }
-
-    private func lineCount(in textView: AppendOnlyTextView) throws -> Int {
-        let layout = try #require(textView.layoutManager)
-        let container = try #require(textView.textContainer)
-        layout.ensureLayout(for: container)
-        var count = 0
-        layout.enumerateLineFragments(
-            forGlyphRange: NSRange(location: 0, length: (textView.string as NSString).length)
-        ) { _, _, _, _, _ in count += 1 }
-        return count
-    }
-
-    private func assertTailLineOpacities(in textView: AppendOnlyTextView, lineCount: Int) throws {
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 1) - 1) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 2) - textView.historyLineOpacities[1]) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 3) - textView.historyLineOpacities[2]) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: lineCount - 4)) < 0.001)
     }
 
     // MARK: - Geometry helpers

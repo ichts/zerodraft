@@ -1,6 +1,6 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-line opacity, the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit.
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
  * [POS]: Writing on the paper's one anchor above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -184,6 +184,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private static let roomInset: CGFloat = 22
     private static let footerHeight: CGFloat = 44
     private static let exitHintText = "Press Esc again to leave and delete the draft."
+    /// The first refused delete of a session names the rule in the footer's status slot for two seconds, then the
+    /// slot goes back to what it held (D-077 amends D-046). Later refusals only shake.
+    private static let refusalNoticeText = "FORWARD ONLY. DELETING IS BLOCKED."
+    static let refusalNoticeDuration: TimeInterval = 2
     /// The stopped screen's composition (D-070): one group whose midpoint sits on the room's one
     /// anchor, `RoomPresentation.paperAnchorFraction`. The pill height is the group's base and the
     /// headline is 1.0 of it; every other value - the two gaps, the line's 1.6 box and its size, the
@@ -253,6 +257,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// The <=200 ms sheet cut; a zero duration is a settled state for snapshots/restoration.
     var cutFlashDuration: TimeInterval = 0.2
     private var denyWork: DispatchWorkItem?
+    private var lastRefusalNoticeAt: TimeInterval?
+    private var refusalNoticeWork: DispatchWorkItem?
+    private(set) var isShowingRefusalNotice = false
     private var numeralTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
     private var chromeHover = false
@@ -322,6 +329,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         endCutAnimation()
         denyWork?.cancel()
         exitHintWork?.cancel()
+        refusalNoticeWork?.cancel()
     }
 
     private func label(_ text: String = "", font: NSFont? = FirstLineTypography.smallNSFont,
@@ -415,8 +423,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
         styleQuietLink(exitButton, title: "ESC - EXIT")
         exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
-        exitHintLabel.attributedStringValue = Self.quietRowText(Self.exitHintText,
-            color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
+        exitHintLabel.attributedStringValue = Self.exitHintString()
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
@@ -587,7 +594,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             self.engine.registerMarkedTextActivity()
             self.applyPhase()
         }
-        textView.onDeny = { [weak self] in self?.engine.registerDeny() }
+        textView.onDeny = { [weak self] in
+            guard let self else { return }
+            // An armed exit confirmation is the writer's pending decision and keeps the slot; the notice waits.
+            self.engine.registerDeny(deleting: self.textView.lastDenyWasDeletion && !self.exitConfirmation.isArmed)
+        }
     }
 
     // MARK: - Writing geometry
@@ -613,7 +624,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             // short draft sits exactly where a long one does (D-025, case 46).
             textView.scrollCaretToCompositionAnchor()
         }
-        textView.refreshLineOpacityForMeasureChange()
     }
 
     /// Keep the writing column at 62ch (70ch wide) centred in the full sheet, the
@@ -791,7 +801,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         applyPhase()
         if let deniedAt = engine.lastDenyAt, deniedAt != lastDenyAt {
             lastDenyAt = deniedAt
-            showDeny()
+            let noticeAt = engine.refusalNoticeAt
+            let earnsNotice = noticeAt != nil && noticeAt != lastRefusalNoticeAt
+            if earnsNotice { lastRefusalNoticeAt = noticeAt }
+            showDeny(announcing: !earnsNotice)
+            if earnsNotice { showRefusalNotice() }
         }
     }
 
@@ -803,6 +817,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.clearWipedText()
             keptView.reset()
             dismissExitConfirmation()
+            endRefusalNotice()
         }
         if phase == .failure, lastPhase != .failure {
             showCut()
@@ -1042,9 +1057,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     /// opacity-only red hairline. Core Animation runs both off the main thread, a
     /// repeated blocked key restarts them from the current presentation state, and
     /// Reduce Motion keeps only the opacity flash. See D-022.
-    private func showDeny() {
+    private func showDeny(announcing: Bool = true) {
         deny.begin()
-        announce("Blocked. Forward only.")
+        if announcing { announce("Blocked. Forward only.") }
         denyWork?.cancel()
 
         let currentShake = paper.layer?.presentation()?.transform.m41 ?? 0
@@ -1093,6 +1108,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func showExitHint() {
+        endRefusalNotice()
         setExitHint(visible: true)
         announce(Self.exitHintText)
         exitHintWork?.cancel()
@@ -1113,7 +1129,36 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func setExitHint(visible: Bool) {
+        // A refusal notice finishes its own two seconds; disarming the confirmation does not cut it short.
+        if isShowingRefusalNotice, !visible { return }
         if exitHintLabel.isHidden == visible { exitHintLabel.isHidden = !visible }
+    }
+
+    private static func exitHintString() -> NSAttributedString {
+        quietRowText(exitHintText, color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
+    }
+
+    /// The status slot is the exit hint's footer slot, so the notice moves nothing: the label's frame is fixed by
+    /// its constraints, hidden or not. The quiet role (7:1 on the sheet) says it, the pen is kept for warnings.
+    private func showRefusalNotice() {
+        isShowingRefusalNotice = true
+        exitHintLabel.attributedStringValue = Self.quietRowText(Self.refusalNoticeText,
+            color: FirstLineColors.paperQuietNSColor, truncates: true, kernEm: 0.04)
+        exitHintLabel.isHidden = false
+        announce(Self.refusalNoticeText)
+        refusalNoticeWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.endRefusalNotice() }
+        refusalNoticeWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.refusalNoticeDuration, execute: work)
+    }
+
+    private func endRefusalNotice() {
+        refusalNoticeWork?.cancel()
+        refusalNoticeWork = nil
+        guard isShowingRefusalNotice else { return }
+        isShowingRefusalNotice = false
+        exitHintLabel.attributedStringValue = Self.exitHintString()
+        exitHintLabel.isHidden = true
     }
 
     private func leaveRoom() { appState.abandonSession() }
@@ -1143,13 +1188,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     func textView(_ textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         let denied = AppendOnlyInputPolicy.shouldDenyCommand(selector, hasMarkedText: textView.hasMarkedText())
-        if denied { denyEdit(in: textView) }
+        if denied { denyEdit(in: textView, deleting: AppendOnlyInputPolicy.isDeleteCommand(selector)) }
         return denied
     }
 
-    private func denyEdit(in textView: NSTextView) {
+    private func denyEdit(in textView: NSTextView, deleting: Bool = false) {
         if let editor = textView as? AppendOnlyTextView {
-            editor.denyEdit()
+            editor.denyEdit(deleting: deleting)
         } else {
             engine.registerDeny()
         }

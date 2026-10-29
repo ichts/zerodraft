@@ -25,12 +25,7 @@ enum AppendOnlyInputPolicy {
         Selector(("redo:")),
         #selector(NSText.paste(_:)),
         #selector(NSText.cut(_:)),
-        #selector(NSResponder.deleteWordBackward(_:)),
-        #selector(NSResponder.deleteWordForward(_:)),
-        #selector(NSResponder.deleteToBeginningOfLine(_:)),
-        #selector(NSResponder.deleteToEndOfLine(_:)),
-        #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
-        #selector(NSResponder.deleteToEndOfParagraph(_:)),
+    ] + blockedDeleteSelectors + [
         #selector(NSResponder.yank(_:)),
         #selector(NSResponder.transpose(_:)),
     ]
@@ -70,6 +65,20 @@ enum AppendOnlyInputPolicy {
     static let deleteSelectors: [Selector] = [
         #selector(NSResponder.deleteBackward(_:)),
         #selector(NSResponder.deleteForward(_:)),
+    ]
+
+    /// 该命令是否是删除（单字符、按词、按行/段）：被拒绝时房间会按会话一次性说明规则（D-077）。
+    static func isDeleteCommand(_ selector: Selector) -> Bool {
+        deleteSelectors.contains(selector) || blockedDeleteSelectors.contains(selector)
+    }
+
+    static let blockedDeleteSelectors: [Selector] = [
+        #selector(NSResponder.deleteWordBackward(_:)),
+        #selector(NSResponder.deleteWordForward(_:)),
+        #selector(NSResponder.deleteToBeginningOfLine(_:)),
+        #selector(NSResponder.deleteToEndOfLine(_:)),
+        #selector(NSResponder.deleteToBeginningOfParagraph(_:)),
+        #selector(NSResponder.deleteToEndOfParagraph(_:)),
     ]
 
     /// 是否应吞掉该命令（返回 true 表示已处理、阻止默认行为）。

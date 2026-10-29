@@ -105,6 +105,32 @@ struct SessionEngineTests {
     }
 
     @Test
+    func theRefusalNoticeIsEarnedOncePerSessionByTheFirstDelete() {
+        var uptime = 5.0
+        let engine = SessionEngine(now: { uptime })
+        engine.start(duration: 60)
+
+        engine.registerDeny()
+        #expect(engine.refusalNoticeAt == nil, "a refusal that is not a delete earns nothing")
+
+        uptime = 6
+        engine.registerDeny(deleting: true)
+        #expect(engine.refusalNoticeAt == 6)
+
+        uptime = 7
+        engine.registerDeny(deleting: true)
+        #expect(engine.refusalNoticeAt == 6, "later refused deletes in the same session do not earn it again")
+        #expect(engine.lastDenyAt == 7)
+
+        engine.start(duration: 60)
+        #expect(engine.refusalNoticeAt == nil, "a new session resets it")
+        engine.abandon()
+        engine.registerDeny(deleting: true)
+        engine.abandon()
+        #expect(engine.refusalNoticeAt == nil)
+    }
+
+    @Test
     func committedTextResetsDanger() {
         var uptime = 50.0
         let engine = SessionEngine(now: { uptime })

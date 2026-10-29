@@ -176,7 +176,7 @@ test.describe('the sheet', () => {
 
     await enterRoom(page);
     expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
-    expect(toHex(parseColour(await style(page, '#editor', 'color')))).toBe(INK[mode]);
+    expect(toHex(parseColour(await style(page, '#editor-ink', 'color')))).toBe(INK[mode]);
 
     // The texture is device-exact: one canvas pixel per device pixel, so it cannot shimmer.
     const exact = await page.evaluate(() => {
@@ -195,12 +195,12 @@ test.describe('the sheet', () => {
     // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
     // background behind the canvas is the grain-corrected base, not the colour on screen (D-073).
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
-    const ink = parseColour(await style(page, '#editor', 'color'));
+    const ink = parseColour(await style(page, '#editor-ink', 'color'));
 
     expect(toHex(ink)).toBe(INK[mode]);
     expect(contrast(ink, paper), 'the writing ink').toBeGreaterThanOrEqual(7);
 
-    // The history ladder: the alphas the mask applies, composited over the paper.
+    // The history ladder: the alphas the ink layer's rungs apply, composited over the paper.
     const alphas = await page.evaluate(() => {
       const editor = document.querySelector('#editor');
       const value = getComputedStyle(editor);

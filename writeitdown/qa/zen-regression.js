@@ -16,25 +16,23 @@ async () => {
   check('symmetric two-line padding centers active line', Math.abs(parseFloat(css.paddingTop) - 2 * line) < 1 && css.paddingTop === css.paddingBottom);
   check('editor has no user-scrollable overflow or scrollbar', css.overflowY === 'hidden' && css.scrollbarWidth === 'none');
   check('latest line pinned to center', Math.abs(editor.scrollHeight - editor.clientHeight - editor.scrollTop) < 2);
-  const mask = css.maskImage || css.webkitMaskImage;
-  const bands = [...mask.matchAll(/(rgba?\([^)]*\))\s+([\d.]+)px/g)].map(m => ({ color: m[1], px: parseFloat(m[2]) }));
-  check('stepped per-line mask, not a continuous gradient', bands.length === 7);
-  // D-056: the ladder is the theme's two history stops (contrast steps on the Note paper), then the
-  // active line at full ink, then nothing. The contrast floor itself is owned by qa/paper.spec.mjs.
-  const historyStops = [
-    Number(css.getPropertyValue('--paper-history-2')),
-    Number(css.getPropertyValue('--paper-history-1')),
-  ];
-  const bandAlpha = colour => {
-    const match = /rgba\(0, 0, 0, ([\d.]+)\)/.exec(colour);
-    return match ? Number(match[1]) : (/^rgb\(0, 0, 0\)$/.test(colour) ? 1 : 0);
-  };
-  check('two back the second history stop, one back the first, active 100%, nothing below',
-    Math.abs(bandAlpha(bands[0].color) - historyStops[0]) < 0.011 &&
-    Math.abs(bandAlpha(bands[2].color) - historyStops[1]) < 0.011 &&
-    /^rgb\(0, 0, 0\)$/.test(bands[4].color) && /0, 0, 0, 0\)$/.test(bands[6].color));
-  const ladder = [0, 1, 1, 2, 2, 3, 3];
-  check('mask stops follow the fixed pitch', bands.every((band, i) => Math.abs(band.px - ladder[i] * line) < 1.1));
+  // D-077: the aperture is one hard clip at the third pitch, and the history steps live on the ink layer's
+  // spans, one per logical line. The contrast floor itself is owned by qa/paper.spec.mjs.
+  const stackStyle = getComputedStyle(editor.closest('.editor-stack'));
+  const mask = stackStyle.maskImage || stackStyle.webkitMaskImage;
+  const stops = [...mask.matchAll(/([\d.]+)px/g)].map(m => parseFloat(m[1]));
+  check('aperture is one hard clip at the third pitch, not a gradient', stops.length === 2 && stops.every(px => Math.abs(px - 3 * line) < 1.1));
+  const ink = document.getElementById('editor-ink');
+  const spans = [...ink.querySelectorAll('[data-rung]')];
+  check('ink layer repeats the draft, one span per logical line', spans.length > 61 && ink.textContent.replace(/\n$/, '') === text);
+  const opacityOf = rung => spans.filter(span => span.dataset.rung === String(rung)).map(span => Number(getComputedStyle(span).opacity));
+  const historyStops = [Number(css.getPropertyValue('--paper-history-1')), Number(css.getPropertyValue('--paper-history-2'))];
+  check('active line 100%, one back the first history stop, two back the second, older gone',
+    opacityOf(0).length === 1 && opacityOf(0)[0] === 1 &&
+    opacityOf(1).length === 1 && Math.abs(opacityOf(1)[0] - historyStops[0]) < 0.011 &&
+    opacityOf(2).length === 1 && Math.abs(opacityOf(2)[0] - historyStops[1]) < 0.011 &&
+    opacityOf(3).length === spans.length - 3 && opacityOf(3).every(opacity => opacity === 0));
+  check('the textarea itself paints no glyphs, so the ink layer is the only text', getComputedStyle(editor).color === 'rgba(0, 0, 0, 0)');
   check('page has no vertical or horizontal overflow', document.documentElement.scrollHeight === innerHeight && document.documentElement.scrollWidth === innerWidth);
   const top = editor.scrollTop;
   for (const key of ['Backspace', 'Delete', 'ArrowUp', 'PageUp']) {

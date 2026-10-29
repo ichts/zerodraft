@@ -165,6 +165,15 @@ struct SettingsUpdateTests {
         ((view as? NSButton).flatMap { $0.title.isEmpty ? nil : [$0] } ?? []) + view.subviews.flatMap(checkboxes)
     }
 
+    private func updateSwitch(_ view: NSView) -> NSSwitch? {
+        ((view as? NSSwitch).flatMap { $0.accessibilityLabel() == "Check for updates automatically" ? [$0] : nil } ?? [])
+            .first ?? view.subviews.lazy.compactMap(updateSwitch).first
+    }
+
+    private func textFields(_ view: NSView) -> [NSTextField] {
+        ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(textFields)
+    }
+
     private func labels(_ view: NSView) -> [String] {
         ((view as? NSTextField).map { [$0.stringValue] } ?? []) + view.subviews.flatMap(labels)
     }
@@ -172,8 +181,10 @@ struct SettingsUpdateTests {
     /// Q-05/Q-07: the new row uses the control type style, and About reports the shipped version.
     @Test func theUpdatesRowAndAboutVersionFollowTheSurfaceStyle() throws {
         let settings = SettingsViewController(appState: licensedTestState(), updateSettings: StubUpdateSettings())
-        let box = try #require(checkboxes(settings.view).first { $0.title == "Check for updates automatically" })
-        #expect(box.font?.pointSize == FirstLineTypography.smallNSFont.pointSize)
+        _ = try #require(updateSwitch(settings.view), "the updates row has no switch")
+        let label = try #require(textFields(settings.view).first { $0.stringValue == "Check for updates automatically" })
+        let theme = try #require(textFields(settings.view).first { $0.stringValue == "Theme" })
+        #expect(label.font == theme.font, "the updates row label is not the same role as the other rows")
         #expect(labels(settings.view).contains("Updates"))
         #expect(labels(settings.view).contains("Version \(AppState.displayVersion)"))
         #expect(AppState.displayVersion == (try #require(NSDictionary(contentsOf: AppState.configurationURL) as? [String: Any])["CFBundleShortVersionString"] as? String))
@@ -182,7 +193,7 @@ struct SettingsUpdateTests {
     @Test func automaticChecksStartOffAndTheSwitchWritesThrough() throws {
         let stub = StubUpdateSettings()
         let settings = SettingsViewController(appState: licensedTestState(), updateSettings: stub)
-        let box = try #require(checkboxes(settings.view).first { $0.title == "Check for updates automatically" })
+        let box = try #require(updateSwitch(settings.view))
         #expect(box.state == .off)
         box.performClick(nil)
         #expect(box.state == .on)
@@ -194,14 +205,14 @@ struct SettingsUpdateTests {
     @Test func theSwitchReflectsAPreviouslyTurnedOnSetting() throws {
         let stub = StubUpdateSettings(automaticallyChecksForUpdates: true)
         let settings = SettingsViewController(appState: licensedTestState(), updateSettings: stub)
-        let box = try #require(checkboxes(settings.view).first { $0.title == "Check for updates automatically" })
+        let box = try #require(updateSwitch(settings.view))
         #expect(box.state == .on)
     }
 
     @Test func noUpdateSwitchWhereThereIsNoUpdater() {
         // A bare executable (tests, swift run) has no Sparkle updater, so Settings must not offer the switch.
         let settings = SettingsViewController(appState: licensedTestState())
-        #expect(!checkboxes(settings.view).contains { $0.title == "Check for updates automatically" })
+        #expect(updateSwitch(settings.view) == nil)
     }
 }
 

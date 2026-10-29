@@ -53,7 +53,7 @@ struct LicenseEntitlementTests {
         #expect(fields.contains { $0.placeholderString == "WID-XXXX-XXXX" })
         let buttons = descendants(screen.view, of: NSButton.self)
         #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Start writing" })
-        let trial = try #require(buttons.first { $0.title == "Try the full web app at writeitdown.app" })
+        let trial = try #require(buttons.first { $0.title == "Try the free web room" })
         trial.performClick(nil)
         #expect(opened?.absoluteString == "https://writeitdown.app/")
         assertLocked(state)

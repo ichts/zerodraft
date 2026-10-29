@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, Update/UpdateController (UpdateSettings), DesignSystem tokens and FirstLineButtons.
- * [OUTPUT]: Settings white card: appearance, updates, motion, focus, alignment, font size, license and about.
+ * [OUTPUT]: Settings white card: appearance, updates, motion, focus, alignment, font size, license and about; every row is label leading, control trailing on one right edge, and each control is named once (booleans are FirstLineInkSwitch carrying the row label as AX name).
  * [POS]: Native settings surface in the After language; changes stay live and Done restores the prior surface.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版（光标所在行每次布局后落在锚点，短稿长稿同位）与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing, InkFocus.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring; a disabled outline pill keeps its outline.
  * [POS]: Shared native button specs; room primary opts into live hover/press motion, all controls use the design-system ink focus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */

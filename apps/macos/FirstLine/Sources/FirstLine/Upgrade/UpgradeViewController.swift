@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state, checkout state and DesignSystem tokens.
- * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy, price line and live states.
+ * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the 48 pt `Try the free web room` route and live states.
  * [POS]: writeitdown AppKit license gate; POST checkout via AppState with mac.html fallback.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */

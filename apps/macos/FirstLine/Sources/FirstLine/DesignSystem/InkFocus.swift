@@ -71,18 +71,13 @@ final class InkFocusRing {
         control.layer?.addSublayer(outline)
     }
 
-    func update(on control: NSControl, visible: Bool, inset: CGFloat, cornerRadius: CGFloat?) {
+    func update(on control: NSControl, visible: Bool, color: NSColor, inset: CGFloat, cornerRadius: CGFloat?) {
         // NSControl subclasses may reset layer masking after init; the ring lives
         // half outside the control bounds and must not be clipped by its own layer.
         control.layer?.masksToBounds = false
         outline.inset = inset
         outline.inkCornerRadius = cornerRadius
-        outline.update(for: control, color: FirstLineColors.inkNSColor, visible: visible)
-    }
-
-    func beginShowing(on control: NSControl, inset: CGFloat, cornerRadius: CGFloat?) {
-        update(on: control, visible: control.window?.firstResponder === control,
-               inset: inset, cornerRadius: cornerRadius)
+        outline.update(for: control, color: color, visible: visible)
     }
 }
 
@@ -139,7 +134,7 @@ class FirstLineInkFocusButton: NSButton, FirstLineInkFocusRinging {
 
     private func updateInkOutline(visible: Bool? = nil) {
         guard let inkRing else { return }
-        inkRing.update(on: self, visible: visible ?? visibleOutline,
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
                        inset: inkFocusRingInset, cornerRadius: inkFocusRingCornerRadius)
     }
 }
@@ -197,7 +192,7 @@ class FirstLineInkPopUpButton: NSPopUpButton, FirstLineInkFocusRinging {
 
     private func updateInkOutline(visible: Bool? = nil) {
         guard let inkRing else { return }
-        inkRing.update(on: self, visible: visible ?? visibleOutline,
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
                        inset: inkFocusRingInset, cornerRadius: inkFocusRingCornerRadius)
     }
 }
@@ -255,7 +250,7 @@ final class FirstLineInkSwitch: NSSwitch, FirstLineInkFocusRinging {
 
     private func updateInkOutline(visible: Bool? = nil) {
         guard let inkRing else { return }
-        inkRing.update(on: self, visible: visible ?? visibleOutline,
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
                        inset: inkFocusRingInset, cornerRadius: bounds.height / 2)
     }
 }

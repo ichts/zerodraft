@@ -57,12 +57,12 @@ struct TrialReleaseTests {
         #expect(state.selectedSurface == .home)
         #expect(state.canStartSession)
         #expect(!state.hasFullAccess)
-        #expect(state.accessStatusText == "Free trial: 3 of 3 sessions left.")
+        #expect(state.accessStatusText == "Free trial: 3 of 3 sessions left, counted at the first character.")
         #expect(await state.validateLicenseIfNeeded() == nil)
         #expect(await client.lastValidatedToken == nil)
         let home = HomeViewController(appState: state)
         #expect(descendants(home.view, of: NSTextField.self).contains {
-            $0.stringValue == "Free trial: 3 of 3 sessions left."
+            $0.stringValue == "Free trial: 3 of 3 sessions left, counted at the first character."
         })
         let delegate = FirstLineAppDelegate(appState: state)
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
@@ -140,7 +140,7 @@ struct TrialReleaseTests {
         field.insertText("你", replacementRange: NSRange(location: NSNotFound, length: 0))
         field.insertText(" more", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(state.settings.trialSessionsUsed == 1)
-        #expect(state.accessStatusText == "Free trial: 2 of 3 sessions left.")
+        #expect(state.accessStatusText == "Free trial: 2 of 3 sessions left, counted at the first character.")
     }
 
     @Test func exhaustionPersistsAndRoutesToExistingActivationScreen() async throws {
@@ -165,7 +165,7 @@ struct TrialReleaseTests {
         #expect(restarted.sessionEngine.text.isEmpty)
         let screen = UpgradeViewController(appState: restarted)
         let fields = descendants(screen.view, of: NSTextField.self)
-        #expect(fields.contains { $0.stringValue == "After 3 free sessions, a license is required to keep writing." })
+        #expect(fields.contains { $0.stringValue == "A license is required to keep writing on this Mac." })
         #expect(fields.contains { $0.stringValue == "Order number or activation code" })
         #expect(fields.contains { $0.placeholderString == "WID-XXXX-XXXX" })
         let buy = try #require(descendants(screen.view, of: NSButton.self).first { $0.title.hasPrefix("Buy a license") })

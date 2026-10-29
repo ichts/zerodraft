@@ -3,9 +3,10 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
-/// Regression tests for the eight Mac defects the full design review filed (problems 4, 5, 9, 10,
-/// 21, 24 and the D-030 note plus the wiped-room caret). Every case measures the real AppKit
-/// surfaces; the geometry is the contract and a capture only records it.
+/// Regression tests for the Mac defects the full design review filed (problems 4, 5, 9, 10, 21, 24 and
+/// the D-030 note, D-076); the review's wiped-room caret item is superseded by D-070 and keeps only a
+/// restart-position guard. Every case measures the real AppKit surfaces; the geometry is the contract and a
+/// capture only records it.
 @MainActor
 struct DesignReviewFixesTests {
     private static let windowSizes = [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000)]
@@ -53,7 +54,7 @@ struct DesignReviewFixesTests {
         }
     }
 
-    // MARK: - Problem 5: the writing line holds the 35% anchor for every draft length
+    // MARK: - Problem 5: the writing line holds the paper anchor for every draft length
 
     @Test(arguments: [WritingAlignment.centered, .left])
     func activeLineHoldsTheAnchorForShortAndLongDrafts(alignment: WritingAlignment) throws {
@@ -66,7 +67,7 @@ struct DesignReviewFixesTests {
                 fixture.room.refreshRoom()
                 fixture.room.view.layoutSubtreeIfNeeded()
                 let line = try currentLineCentre(in: fixture.editor, paper: paper)
-                let anchor = paper.bounds.height * RoomPresentation.writingAnchorFraction
+                let anchor = paper.bounds.height * RoomPresentation.paperAnchorFraction
                 #expect(abs(line - anchor) <= 1,
                         "\(label) at \(size): the writing line sits \(line) pt down a \(paper.bounds.height) pt sheet, expected the \(anchor) pt anchor")
             }
@@ -95,7 +96,7 @@ struct DesignReviewFixesTests {
             let window = host(fixture.room, size: size)
             let paper = try #require(editor.enclosingScrollView?.superview)
             let line = try currentLineCentre(in: editor, paper: paper)
-            let anchor = paper.bounds.height * RoomPresentation.writingAnchorFraction
+            let anchor = paper.bounds.height * RoomPresentation.paperAnchorFraction
             #expect(abs(line - anchor) <= 1,
                     "at \(size) the first layout pass leaves the writing line at \(line) of \(paper.bounds.height), expected \(anchor)")
             window.orderOut(nil)
@@ -328,9 +329,14 @@ struct DesignReviewFixesTests {
         fixture.window.orderOut(nil)
     }
 
-    // MARK: - The wiped room keeps the caret where a first entry puts it
+    // MARK: - The wiped room restarts where a first entry starts
+    //
+    // Item 8 of the review asked for a visible caret on the wiped room. D-070 supersedes that (the stopped
+    // group sits where the line was, so the writing layer is transparent and no caret is drawn inside it),
+    // and RoundThreeTests asserts the invisible layer. What stays testable is that the insertion point a
+    // restart types at is exactly the first-entry one, never left where the long draft scrolled to.
 
-    @Test func wipedRoomKeepsTheCaretOnTheWritingLine() throws {
+    @Test func wipedRoomRestartsOnTheFirstEntryInsertionPoint() throws {
         for size in Self.windowSizes {
             let fresh = try room(size: size)
             fresh.room.viewDidLayout()
@@ -359,7 +365,7 @@ struct DesignReviewFixesTests {
             #expect(wiped.window.firstResponder === wiped.editor, "the wiped room lost the editor focus")
             let scroll = try #require(wiped.editor.enclosingScrollView)
             let caret = caretInPaper(wiped.editor, paper: wiped.paper)
-            #expect(caret.height > 0, "the wiped caret has no height")
+            #expect(caret.height > 0, "the wiped insertion point has no height")
             #expect(abs(caret.minX - freshCaret.minX) <= 1,
                     "at \(size) the wiped caret is \(caret.minX), a fresh entry puts it at \(freshCaret.minX)")
             #expect(abs(caret.midY - freshCaret.midY) <= 1,
@@ -369,7 +375,6 @@ struct DesignReviewFixesTests {
                                                     from: wiped.editor)
             #expect(visible.contains(NSPoint(x: inClip.midX, y: inClip.midY)),
                     "the wiped caret at \(inClip) is outside the visible writing area \(visible)")
-            #expect(wiped.editor.alphaValue == 1 && !wiped.editor.isHiddenOrHasHiddenAncestor)
             fresh.window.orderOut(nil)
             wiped.window.orderOut(nil)
         }

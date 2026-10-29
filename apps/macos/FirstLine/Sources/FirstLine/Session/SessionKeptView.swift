@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Engine text, word count, real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls, and the unsaved caption) and a scrollable draft below; the copy pill hugs its label, the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
+ * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls, and the unsaved caption) and a scrollable draft below; the block spans the sheet's inner width so its centre is the paper's; the copy pill hugs its label down to the resting COPY TEXT width (COPIED never narrows it), the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
  * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
  * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */

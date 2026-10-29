@@ -79,7 +79,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-phase="wipe"] .writing-area{opacity:0}
 .room:not([data-phase="kept"]) .writing-area{top:max(var(--write-anchor),calc(44px + 2.5 * var(--lh)));bottom:auto;transform:translateY(-50%)}
 /* Five-line aperture, active line in the middle band at --write-anchor. The history is stepped per
-   logical line, not per visual row (D-076): the textarea keeps the input, the caret and the IME but
+   logical line, not per visual row (D-077): the textarea keeps the input, the caret and the IME but
    its glyphs are transparent, and the ink layer above it repeats the same text in one span per
    sentence, each at its ladder rung (D-069's alphas, so the second line keeps 9:1 and the oldest
    visible line 7:1 on the sheet; older lines are gone). Rows of one sentence therefore share one

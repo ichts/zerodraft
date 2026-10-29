@@ -16,7 +16,7 @@ async () => {
   check('symmetric two-line padding centers active line', Math.abs(parseFloat(css.paddingTop) - 2 * line) < 1 && css.paddingTop === css.paddingBottom);
   check('editor has no user-scrollable overflow or scrollbar', css.overflowY === 'hidden' && css.scrollbarWidth === 'none');
   check('latest line pinned to center', Math.abs(editor.scrollHeight - editor.clientHeight - editor.scrollTop) < 2);
-  // D-076: the aperture is one hard clip at the third pitch, and the history steps live on the ink layer's
+  // D-077: the aperture is one hard clip at the third pitch, and the history steps live on the ink layer's
   // spans, one per logical line. The contrast floor itself is owned by qa/paper.spec.mjs.
   const stackStyle = getComputedStyle(editor.closest('.editor-stack'));
   const mask = stackStyle.maskImage || stackStyle.webkitMaskImage;

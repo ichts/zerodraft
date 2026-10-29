@@ -34,7 +34,7 @@ export function wordCount(text) {
   return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
 }
 
-// The history ladder's unit is the logical line, not the visual row (D-076): a sentence, or the text
+// The history ladder's unit is the logical line, not the visual row (D-077): a sentence, or the text
 // up to a hard line break. Every row of one logical line carries one rung, so a long sentence that
 // wraps reads as one grey, never as a staircase. The Mac room cuts the same lines with the same
 // Unicode sentence rules (`HistoryLines.swift`); the two surfaces must not drift.

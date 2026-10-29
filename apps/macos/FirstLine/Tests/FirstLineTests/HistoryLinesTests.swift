@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
-/// The logical-line rule of D-076, with the same cases as `writeitdown/session.test.mjs` so the two surfaces cannot drift.
+/// The logical-line rule of D-077, with the same cases as `writeitdown/session.test.mjs` so the two surfaces cannot drift.
 struct HistoryLinesTests {
     private func rungs(_ text: String) -> [Int] { HistoryLines.lines(in: text).map(\.rung) }
 

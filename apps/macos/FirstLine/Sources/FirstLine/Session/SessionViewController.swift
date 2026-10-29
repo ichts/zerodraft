@@ -1,6 +1,6 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-076), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit, the first refused delete's two-second notice in the exit confirmation's footer slot (D-076).
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one top session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
  * [POS]: Writing on the paper's one anchor above the vertical middle, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to start`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -185,7 +185,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private static let footerHeight: CGFloat = 44
     private static let exitHintText = "Press Esc again to leave and delete the draft."
     /// The first refused delete of a session names the rule in the footer's status slot for two seconds, then the
-    /// slot goes back to what it held (D-076 amends D-046). Later refusals only shake.
+    /// slot goes back to what it held (D-077 amends D-046). Later refusals only shake.
     private static let refusalNoticeText = "FORWARD ONLY. DELETING IS BLOCKED."
     static let refusalNoticeDuration: TimeInterval = 2
     /// The stopped screen's composition (D-070): one group whose midpoint sits on the room's one
@@ -618,9 +618,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {
             textView.frame.size = NSSize(width: size.width, height: max(size.height, textView.frame.height))
         }
-        if !textView.hasMarkedText(), textView.pendingCompositionRefresh {
+        if !textView.hasMarkedText() {
+            // The caret's own line is the anchor, not the text block: after layout the
+            // caret line is scrolled onto the 35% line whenever it has drifted, so a
+            // short draft sits exactly where a long one does (D-025, case 46).
             textView.scrollCaretToCompositionAnchor()
-            textView.clearPendingCompositionRefresh()
         }
     }
 

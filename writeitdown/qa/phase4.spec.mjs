@@ -133,7 +133,7 @@ async function assertRoom(page) {
   expect(geometry.bars[0].height).toBe(2);
   expect(Math.abs(geometry.bars[0].top - geometry.bars[0].paperTop)).toBeLessThan(1);
   // The aperture is one hard clip at the third pitch (the live line and the two history lines above it); the
-  // history steps live on the ink layer's spans per logical line (D-076, qa/history-fade.spec.mjs), so the
+  // history steps live on the ink layer's spans per logical line (D-077, qa/history-fade.spec.mjs), so the
   // clip carries no alpha band of its own and a partial line is cut, never faded.
   expect(geometry.mask, 'the aperture clip').toMatch(/#?rgb\(0, 0, 0\) [\d.]+px, rgba\(0, 0, 0, 0\) [\d.]+px/);
   const stops = [...geometry.mask.matchAll(/([\d.]+)px/g)].map(match => parseFloat(match[1]));

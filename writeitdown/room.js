@@ -24,7 +24,7 @@ const EXIT_HINT = {
 };
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
 // The first refused delete of a session names the rule in the footer's status slot for two seconds,
-// then the slot goes back to what it held (D-076 amends D-046); later refusals only shake.
+// then the slot goes back to what it held (D-077 amends D-046); later refusals only shake.
 const REFUSAL = 'FORWARD ONLY. DELETING IS BLOCKED.';
 const REFUSAL_MS = 2000;
 const hintFor = () => (touchInput.matches ? EXIT_HINT.touch : EXIT_HINT.keyboard);
@@ -91,7 +91,7 @@ function syncBar(now) {
 }
 
 // The ink layer repeats the draft one span per logical line, each at its rung of the history ladder
-// (D-076). It is rebuilt only when the draft or the composing boundary changes, never per tick.
+// (D-077). It is rebuilt only when the draft or the composing boundary changes, never per tick.
 function paintInk() {
   const base = compositionBase === null ? -1 : compositionBase.length;
   const key = `${base}|${editor.value}`;

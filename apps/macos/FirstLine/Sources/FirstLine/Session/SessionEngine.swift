@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
- * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-076）
+ * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-077）
  * [POS]: 首次输入启动时钟与绝对截止时间裁决；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
@@ -42,7 +42,7 @@ final class SessionEngine {
     private(set) var unusedSeconds: Int?
     private(set) var deletionElapsedSeconds: Int?
     private(set) var lastDenyAt: TimeInterval?
-    /// When this session's one refusal notice was earned: the first refused delete (D-076). Nil until then, and
+    /// When this session's one refusal notice was earned: the first refused delete (D-077). Nil until then, and
     /// nil again for every new session, so the notice is once per session and never carried over.
     private(set) var refusalNoticeAt: TimeInterval?
     private(set) var copiedKeptText = false

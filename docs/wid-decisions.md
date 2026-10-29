@@ -1399,7 +1399,51 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `design/DESIGN.md` section 11 sentences that described the wordmark-only Mac lockup. D-036's
   placement inside the card, D-031's rules page and the social card's wordmark lockup stand.
 
-## D-076: The history fades per logical line, and the first refused delete names the rule
+## D-076: The Mac's review defects are fixed to measurement, and D-030's COPIED keeps the resting width
+
+- Date: 2026-10-29
+- Decision: seven Mac defects the full design review filed (`data/wid-design-review/report.md`, problems
+  4, 5, 9, 10, 21, 24 and the D-030 note) are fixed as basic defects, each with an assertion that failed
+  first (`DesignReviewFixesTests`):
+  1. **The kept block sits on the sheet's axis.** The top block (headline, receipt, action row) spans the
+     sheet's inner width, so its centre is the paper's centre at every window size; it used to size from its
+     widest child and sat 43 pt right of the axis at 1040x720 and at 1600x1000 (the action pair 43.5 pt).
+  2. **The writing line holds `RoomPresentation.paperAnchorFraction` for every draft length.** The caret's
+     own line is scrolled onto the anchor after every layout, not only when a composition refresh was
+     pending, and the top inset alone carries the first line to the anchor (the bottom inset that pinned the
+     document is gone). A room laid out before its window exists - the kept and stopped captures - had left
+     the line 89.5 pt (1040x720) and 90.1 pt (1600x1000) off the anchor. The anchor is D-070's 33%, not the
+     35% the review quoted.
+  3. **The licence card offers nothing it cannot complete.** With checkout unavailable no Buy is rendered;
+     while a launch check or a key activation runs, Buy is disabled and the card says `Checking your key...`.
+     The free route is the room's 48 pt outlined secondary, `Try the free web room`, with a hit area and the
+     ink focus ring, not a 13 pt caption link.
+  4. **Settings has one grid and names each control once.** Both boolean rows are label leading, switch
+     trailing on the popups' right edge; the switch carries its row's name as its accessibility label, so
+     `Fullscreen focus` and the updates row's duplicate title are gone.
+  5. **The rules sheet follows the type scale.** Body is the scale's 15 pt on a 1.5 line box (22.5 pt) over a
+     60-character measure; each rule title is 15 pt semibold, one step up in weight and never smaller than
+     its paragraph (it was 13 pt over 15 pt body on a 480 pt measure).
+  6. **The words follow the behaviour.** The picker line reads `Free trial: N of 3 sessions left, counted at
+     the first character.` (the counter moves on the first nonempty input, not on opening the room), and the
+     activation card reads `A license is required to keep writing on this Mac.` instead of claiming three
+     sessions were used, which a licence-less state does not always mean. The free route is named for what it
+     opens, the web room.
+  7. **COPIED keeps COPY TEXT's width.** The copy pill hugs its label down to its resting width and never
+     narrows, so RUN IT AGAIN stays where it was under the pointer (it moved 15 pt and the pill shrank 30 pt).
+     This amends D-030's "COPIED is narrower" on the Mac the way the web already holds it (Q-24, D-060).
+- Not done: the review's eighth Mac item, a caret on the wiped room, is superseded by D-070. The stopped
+  group sits where the writing line was, the writing layer is transparent and no caret is drawn inside it;
+  `RoundThreeTests` keeps asserting that. What stays asserted is that the insertion point a restart types at
+  is the first-entry one (`wipedRoomRestartsOnTheFirstEntryInsertionPoint`).
+- Reason: each was a measurable defect, not a taste call, and the review recorded the numbers.
+- Tests: `DesignReviewFixesTests` (every case above, at 1040x720 and 1600x1000 where it is geometry),
+  `SnapshotTests` (`rules-light/dark` joins the set), `RoomTests.copyButtonSwitchesToCopied`,
+  `ReviewRoundTests.keptActionsShareOneOpticalCentreAndThePillFitsItsLabel`.
+- Supersedes: D-030's COPIED-narrower clause on the Mac; the Mac's `Free trial: N of 3 sessions left.` and
+  `After 3 free sessions, a license is required to keep writing.` strings.
+
+## D-077: The history fades per logical line, and the first refused delete names the rule
 
 - Date: 2026-10-29
 - Decision: Two settled behaviours (captain, 2026-10-25), now identical on writeitdown.app and the Mac room.

@@ -67,7 +67,7 @@ enum AppendOnlyInputPolicy {
         #selector(NSResponder.deleteForward(_:)),
     ]
 
-    /// 该命令是否是删除（单字符、按词、按行/段）：被拒绝时房间会按会话一次性说明规则（D-076）。
+    /// 该命令是否是删除（单字符、按词、按行/段）：被拒绝时房间会按会话一次性说明规则（D-077）。
     static func isDeleteCommand(_ selector: Selector) -> Bool {
         deleteSelectors.contains(selector) || blockedDeleteSelectors.contains(selector)
     }

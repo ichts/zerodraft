@@ -1,4 +1,4 @@
-// D-076: the room's history fades per logical line, and the first refused delete of a session says why.
+// D-077: the room's history fades per logical line, and the first refused delete of a session says why.
 //
 // Fade: every row of one sentence shares one measured opacity (the ink layer's span, read from the computed
 // style and from the pixels), the ladder is D-069's and every step clears 7:1 on the Wheat sheet in both

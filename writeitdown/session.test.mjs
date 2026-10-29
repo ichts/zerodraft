@@ -102,7 +102,7 @@ test('Unicode words, individual Han characters, and non-word input', () => {
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
 });
 
-test('every row of a sentence shares one history rung (D-076)', () => {
+test('every row of a sentence shares one history rung (D-077)', () => {
   const text = 'First is long. Second is long. Third is long. Fourth is long.';
   const rungs = historyLines(text).map(line => [text.slice(line.start, line.end).trim(), line.rung]);
   assert.deepEqual(rungs, [['First is long.', GONE], ['Second is long.', 2], ['Third is long.', 1], ['Fourth is long.', 0]]);

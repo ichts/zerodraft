@@ -1,7 +1,7 @@
 /**
  * [INPUT]: The draft text (UTF-16 offsets, the editor's own coordinates)
  * [OUTPUT]: HistoryLines.lines(in:) - the draft cut into logical lines, each with its range and its ladder rung
- * [POS]: Pure rule for the history fade (D-076): the ladder's unit is the logical line, a sentence or the text up to a hard
+ * [POS]: Pure rule for the history fade (D-077): the ladder's unit is the logical line, a sentence or the text up to a hard
  *        line break, never the visual row, so every row of one sentence shares one opacity. The web room cuts the same lines
  *        with Intl.Segmenter (`historyLines` in writeitdown/session.mjs); the two surfaces must not drift.
  * [PROTOCOL]: Keep the rule identical to session.mjs; update this header, then check AGENTS.md

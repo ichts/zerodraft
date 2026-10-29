@@ -38,6 +38,8 @@ struct SnapshotTests {
             let exhaustedSettings = try trialState(used: 3)
             try snapshot(SettingsViewController(appState: exhaustedSettings), name: "settings-entry-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
+            try snapshot(RulesViewController(), name: "rules-\(suffix)", appearance: appearance, output: output,
+                         sheetPoint: NSPoint(x: 100, y: 360))
             try snapshot(HomeViewController(appState: try trialState(used: 2)), name: "picker-focus-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360), focus: true)
             try snapshot(UpgradeViewController(appState: try trialState(used: 3)), name: "activation-focus-\(suffix)",

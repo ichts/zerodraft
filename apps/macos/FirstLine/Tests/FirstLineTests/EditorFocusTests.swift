@@ -341,7 +341,7 @@ struct EditorFocusTests {
         #expect(abs(try lineAlpha(in: editor, lineIndex: 0) - editor.historyLineOpacities[2]) < 0.001)
     }
 
-    /// D-076: only an attempt to delete earns the once-per-session notice; paste, cut, undo and caret moves do not.
+    /// D-077: only an attempt to delete earns the once-per-session notice; paste, cut, undo and caret moves do not.
     @Test
     func onlyDeleteCommandsAreToldApartFromOtherRefusals() {
         for selector in AppendOnlyInputPolicy.deleteSelectors + AppendOnlyInputPolicy.blockedDeleteSelectors {
@@ -354,7 +354,7 @@ struct EditorFocusTests {
         }
     }
 
-    /// D-076: the ladder's unit is the logical line, so every visual row of one sentence carries one opacity, at
+    /// D-077: the ladder's unit is the logical line, so every visual row of one sentence carries one opacity, at
     /// any width, and a resize that re-wraps the sentences never re-steps them.
     @Test
     func restoredDraftKeepsOneOpacityPerSentenceAcrossResize() throws {
@@ -400,7 +400,7 @@ struct EditorFocusTests {
     }
 
     /// The aperture is the scroll view's own clip: no gradient mask, so a line cut by its edge keeps its rung and is
-    /// clipped, never given an alpha of its own (D-076).
+    /// clipped, never given an alpha of its own (D-077).
     @Test
     func theAperturePartialLineIsClippedNotFaded() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

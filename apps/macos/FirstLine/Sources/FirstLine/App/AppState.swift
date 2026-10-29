@@ -103,7 +103,10 @@ final class AppState {
         if hasFullAccess { return licenseStatusText }
         if let trialAccessError { return trialAccessError }
         if trialSessionsRemaining > 0 {
-            return "Free trial: \(trialSessionsRemaining) of \(Self.trialSessionLimit) sessions left."
+            // The counter moves on the first typed character, not on opening the room;
+            // the line states that rule instead of leaving "session" undefined.
+            return "Free trial: \(trialSessionsRemaining) of \(Self.trialSessionLimit) sessions left, "
+                + "counted at the first character."
         }
         return licenseStatusText
     }

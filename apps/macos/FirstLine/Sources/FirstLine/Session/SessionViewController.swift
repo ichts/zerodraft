@@ -607,9 +607,11 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if abs(textView.frame.width - size.width) > 0.5 || textView.frame.height < size.height {
             textView.frame.size = NSSize(width: size.width, height: max(size.height, textView.frame.height))
         }
-        if !textView.hasMarkedText(), textView.pendingCompositionRefresh {
+        if !textView.hasMarkedText() {
+            // The caret's own line is the anchor, not the text block: after layout the
+            // caret line is scrolled onto the 35% line whenever it has drifted, so a
+            // short draft sits exactly where a long one does (D-025, case 46).
             textView.scrollCaretToCompositionAnchor()
-            textView.clearPendingCompositionRefresh()
         }
         textView.refreshLineOpacityForMeasureChange()
     }

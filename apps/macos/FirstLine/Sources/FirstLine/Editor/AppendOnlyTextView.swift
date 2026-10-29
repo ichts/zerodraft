@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版（光标所在行每次布局后落在锚点，短稿长稿同位）与受控 wipe；TextKit 位置用 UTF-16
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -17,7 +17,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
-    private(set) var pendingCompositionRefresh = true
     private var lineOpacityMeasureWidth: CGFloat?
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
@@ -159,7 +158,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         if isMarkedCommit || isCompositionReplacement { compositionRange = nil }
         guard inserted.isEmpty == false && !isUpdatingMarkedText && !isRestoringProgrammatically else { return }
-        pendingCompositionRefresh = true
         applySessionTypography()
         onCommittedText?(inserted, isCompositionReplacement ? replacementRange : nil)
     }
@@ -177,9 +175,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         compositionRange = nil
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
-        // A long draft leaves the scroll view at the bottom; the empty room's line
-        // must return to the same anchor as a fresh start.
-        pendingCompositionRefresh = true
+        // A long draft leaves the scroll view at the bottom; the room's next layout
+        // scrolls the empty line back to the anchor a fresh start uses.
     }
 
     /// A selection change that AppKit makes on the IME's behalf (setMarkedText,
@@ -463,7 +460,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let end = NSRange(location: utf16Length, length: 0)
         if selectedRange() != end { setSelectedRange(end) }
         applySessionTypography()
-        pendingCompositionRefresh = true
     }
 
     /// Base ink for the current line; completed lines are stepped by `applyLineOpacity`
@@ -557,14 +553,13 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard abs(compositionAnchorY - y) > insetEpsilon else { return }
         compositionAnchorY = y
         updateViewportInsetsIfNeeded()
-        pendingCompositionRefresh = true
     }
 
     func scrollCaretToCompositionAnchor() {
         guard let scrollView = enclosingScrollView,
               let line = compositionLineRect() else { return }
 
-        // Zen: the current (last) line sits at the anchor; earlier lines move up and fade.
+        // Zen: the current line sits at the anchor; earlier lines move up and fade.
         let initialY = round(textContainerOrigin.y + line.midY - compositionAnchorY)
         let targetY = max(
             -scrollView.contentInsets.top, initialY,
@@ -574,19 +569,27 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         let delta = abs(currentY - targetY)
         guard delta > insetEpsilon else { return }
         let lineHeight = sessionFontSize * 1.6
-        // A new line moves the history by one pitch; animate that, and snap on a
-        // session/resize jump. Reduce Motion snaps.
-        if animatesHistoryScroll, delta <= lineHeight * 2.5 {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.18
-                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                scrollView.contentView.animator().setBoundsOrigin(NSPoint(x: 0, y: targetY))
-            }
-        } else {
-            scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
-            scrollView.reflectScrolledClipView(scrollView.contentView)
-        }
+        // A new line moves the history by exactly one pitch; animate that. Any other
+        // jump (a restored draft, a resize, a wipe returning to the empty line) snaps.
+        // Reduce Motion snaps too.
+        //
+        // The clip view's model position is the target from this instant and only the
+        // drawn frame eases, so the anchor is where the room says it is (case 46) while
+        // a new line still arrives over 0.18 s (D-027). Animating the model instead left
+        // every measurement, snapshot and restore a frame behind the animation.
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: targetY))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        guard animatesHistoryScroll, abs(delta - lineHeight) <= 1,
+              let clipLayer = scrollView.contentView.layer else { return }
+        let ease = CABasicAnimation(keyPath: "bounds.origin")
+        ease.fromValue = NSValue(point: NSPoint(x: 0, y: currentY))
+        ease.toValue = NSValue(point: NSPoint(x: 0, y: targetY))
+        ease.duration = 0.18
+        ease.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        clipLayer.add(ease, forKey: Self.historyScrollAnimationKey)
     }
+
+    private static let historyScrollAnimationKey = "zen-history-scroll"
 
     private func compositionLineRect() -> NSRect? {
         guard let layoutManager, let textContainer else { return nil }
@@ -598,10 +601,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return layoutManager.lineFragmentUsedRect(forGlyphAt: glyph, effectiveRange: nil)
     }
 
-    func clearPendingCompositionRefresh() {
-        pendingCompositionRefresh = false
-    }
-
     private func updateViewportInsetsIfNeeded() {
         guard let scrollView = enclosingScrollView else { return }
 
@@ -609,15 +608,17 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         guard viewportHeight > 0, compositionAnchorY > 0,
               let line = compositionLineRect() else { return }
 
+        // The top inset is how far the document may be pushed down: exactly the
+        // distance that puts the first line on the anchor. A bottom inset pins the
+        // document between the two insets, which froze the scroll position at the
+        // first line and left every later line below the anchor (case 46, D-025).
         let topInset = max(0, round(compositionAnchorY - textContainerOrigin.y - line.height / 2))
-        let bottomInset = max(0, viewportHeight - topInset)
         let currentInsets = scrollView.contentInsets
 
         guard abs(currentInsets.top - topInset) > insetEpsilon ||
-              abs(currentInsets.bottom - bottomInset) > insetEpsilon else { return }
+              abs(currentInsets.bottom) > insetEpsilon else { return }
 
-        scrollView.contentInsets = NSEdgeInsets(top: topInset, left: 0, bottom: bottomInset, right: 0)
-        pendingCompositionRefresh = true
+        scrollView.contentInsets = NSEdgeInsets(top: topInset, left: 0, bottom: 0, right: 0)
     }
 
     private func plainString(from value: Any) -> String {

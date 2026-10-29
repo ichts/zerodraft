@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors.
- * [OUTPUT]: Shared ink focus ring for every button, popup and segmented control.
+ * [OUTPUT]: Shared ink focus ring for every button, popup, switch and segmented control.
  * [POS]: One ink focus treatment for card controls; text fields keep the standard system focus ring.
  * [PROTOCOL]: Change this header and the focus-ring tests when the treatment changes.
  */
@@ -56,21 +56,34 @@ private final class FirstLineInkFocusOutline: CAShapeLayer {
     }
 }
 
+/// One ring per control: installs the outline layer and keeps its geometry and
+/// visibility current. The button, popup and switch controls share it so the ink
+/// focus treatment has one implementation.
 @MainActor
-private enum FirstLineInkFocusInstaller {
-    static func install(on control: NSControl) -> FirstLineInkFocusOutline {
+final class InkFocusRing {
+    private let outline: FirstLineInkFocusOutline
+
+    init(on control: NSControl) {
         control.focusRingType = .none
         control.wantsLayer = true
         control.layer?.masksToBounds = false
-        let outline = FirstLineInkFocusOutline()
+        outline = FirstLineInkFocusOutline()
         control.layer?.addSublayer(outline)
-        return outline
+    }
+
+    func update(on control: NSControl, visible: Bool, color: NSColor, inset: CGFloat, cornerRadius: CGFloat?) {
+        // NSControl subclasses may reset layer masking after init; the ring lives
+        // half outside the control bounds and must not be clipped by its own layer.
+        control.layer?.masksToBounds = false
+        outline.inset = inset
+        outline.inkCornerRadius = cornerRadius
+        outline.update(for: control, color: color, visible: visible)
     }
 }
 
 @MainActor
 class FirstLineInkFocusButton: NSButton, FirstLineInkFocusRinging {
-    private var inkOutline: FirstLineInkFocusOutline!
+    private var inkRing: InkFocusRing!
     var inkFocusRingInset: CGFloat = 4 { didSet { needsDisplay = true } }
     var inkFocusRingCornerRadius: CGFloat? { didSet { needsDisplay = true } }
 
@@ -83,12 +96,12 @@ class FirstLineInkFocusButton: NSButton, FirstLineInkFocusRinging {
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
-        inkOutline = FirstLineInkFocusInstaller.install(on: self)
+        inkRing = InkFocusRing(on: self)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        inkOutline = FirstLineInkFocusInstaller.install(on: self)
+        inkRing = InkFocusRing(on: self)
     }
 
     override func viewDidMoveToWindow() {
@@ -120,19 +133,15 @@ class FirstLineInkFocusButton: NSButton, FirstLineInkFocusRinging {
     }
 
     private func updateInkOutline(visible: Bool? = nil) {
-        guard let inkOutline else { return }
-        // NSButton may reset layer masking after init; the ring lives half outside
-        // the control bounds and must not be clipped by the button's own layer.
-        layer?.masksToBounds = false
-        inkOutline.inset = inkFocusRingInset
-        inkOutline.inkCornerRadius = inkFocusRingCornerRadius
-        inkOutline.update(for: self, color: inkFocusRingColor, visible: visible ?? visibleOutline)
+        guard let inkRing else { return }
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
+                       inset: inkFocusRingInset, cornerRadius: inkFocusRingCornerRadius)
     }
 }
 
 @MainActor
 class FirstLineInkPopUpButton: NSPopUpButton, FirstLineInkFocusRinging {
-    private var inkOutline: FirstLineInkFocusOutline!
+    private var inkRing: InkFocusRing!
     var inkFocusRingInset: CGFloat = 3 { didSet { needsDisplay = true } }
     var inkFocusRingCornerRadius: CGFloat? = 6 { didSet { needsDisplay = true } }
 
@@ -145,12 +154,12 @@ class FirstLineInkPopUpButton: NSPopUpButton, FirstLineInkFocusRinging {
 
     override init(frame frameRect: NSRect, pullsDown flag: Bool) {
         super.init(frame: frameRect, pullsDown: flag)
-        inkOutline = FirstLineInkFocusInstaller.install(on: self)
+        inkRing = InkFocusRing(on: self)
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        inkOutline = FirstLineInkFocusInstaller.install(on: self)
+        inkRing = InkFocusRing(on: self)
     }
 
     override func viewDidMoveToWindow() {
@@ -182,12 +191,66 @@ class FirstLineInkPopUpButton: NSPopUpButton, FirstLineInkFocusRinging {
     }
 
     private func updateInkOutline(visible: Bool? = nil) {
-        guard let inkOutline else { return }
-        // NSButton may reset layer masking after init; the ring lives half outside
-        // the control bounds and must not be clipped by the button's own layer.
-        layer?.masksToBounds = false
-        inkOutline.inset = inkFocusRingInset
-        inkOutline.inkCornerRadius = inkFocusRingCornerRadius
-        inkOutline.update(for: self, color: inkFocusRingColor, visible: visible ?? visibleOutline)
+        guard let inkRing else { return }
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
+                       inset: inkFocusRingInset, cornerRadius: inkFocusRingCornerRadius)
+    }
+}
+
+/// A settings boolean: the row's label leads, the switch trails. The switch
+/// carries no title of its own, so every control is named exactly once.
+@MainActor
+final class FirstLineInkSwitch: NSSwitch, FirstLineInkFocusRinging {
+    private var inkRing: InkFocusRing!
+    var inkFocusRingInset: CGFloat = 3 { didSet { needsDisplay = true } }
+
+    var showsInkFocusRing: Bool { visibleOutline }
+    var inkFocusRingColor: NSColor { FirstLineColors.inkNSColor }
+
+    private var visibleOutline: Bool {
+        window?.firstResponder === self
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        inkRing = InkFocusRing(on: self)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        inkRing = InkFocusRing(on: self)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        needsDisplay = true
+        updateInkOutline()
+    }
+
+    override func becomeFirstResponder() -> Bool {
+        let accepted = super.becomeFirstResponder()
+        needsDisplay = true
+        updateInkOutline()
+        return accepted
+    }
+
+    override func resignFirstResponder() -> Bool {
+        let accepted = super.resignFirstResponder()
+        needsDisplay = true
+        updateInkOutline(visible: false)
+        return accepted
+    }
+
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateLayer() {
+        super.updateLayer()
+        updateInkOutline()
+    }
+
+    private func updateInkOutline(visible: Bool? = nil) {
+        guard let inkRing else { return }
+        inkRing.update(on: self, visible: visible ?? visibleOutline, color: inkFocusRingColor,
+                       inset: inkFocusRingInset, cornerRadius: bounds.height / 2)
     }
 }

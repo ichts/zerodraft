@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, Update/UpdateController (UpdateSettings), DesignSystem tokens and FirstLineButtons.
- * [OUTPUT]: Settings white card: appearance, updates, motion, focus, alignment, font size, license and about.
+ * [OUTPUT]: Settings white card: appearance, updates, motion, focus, alignment, font size, license and about; every row is label leading, control trailing on one right edge, and each control is named once (booleans are FirstLineInkSwitch carrying the row label as AX name).
  * [POS]: Native settings surface in the After language; changes stay live and Done restores the prior surface.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -12,6 +12,7 @@ import Observation
 final class SettingsViewController: NSViewController {
     private let appState: AppState
     private let updateSettings: (any UpdateSettings)?
+    private var updateSwitch: NSSwitch?
     private var licenseField: NSTextField?
     private var activateButton: NSButton?
     private var licenseStatusLabel: NSTextField!
@@ -123,18 +124,13 @@ final class SettingsViewController: NSViewController {
 
     private func updatesSection() -> NSView? {
         guard updateSettings != nil else { return nil }
-        let button = FirstLineInkFocusButton(
-            checkboxWithTitle: "Check for updates automatically",
-            target: self,
-            action: #selector(automaticChecksChanged(_:))
-        )
-        button.font = FirstLineTypography.smallNSFont
-        button.state = updateSettings?.automaticallyChecksForUpdates == true ? .on : .off
-        // One labelled control, no duplicated row title (Q-07/D-002): the checkbox carries the words.
-        let row = horizontal(views: [button, spacer()])
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.heightAnchor.constraint(greaterThanOrEqualToConstant: 40).isActive = true
-        return section("Updates", rows: [row])
+        let toggle = FirstLineInkSwitch(frame: .zero)
+        toggle.target = self
+        toggle.action = #selector(automaticChecksChanged(_:))
+        toggle.state = updateSettings?.automaticallyChecksForUpdates == true ? .on : .off
+        toggle.setAccessibilityLabel("Check for updates automatically")
+        updateSwitch = toggle
+        return section("Updates", rows: [settingRow("Check for updates automatically", control: toggle)])
     }
 
     private func licenseSection() -> NSView {
@@ -293,11 +289,15 @@ final class SettingsViewController: NSViewController {
         return popup
     }
 
-    private func focusSwitch() -> NSButton {
-        let button = FirstLineInkFocusButton(checkboxWithTitle: "Fullscreen focus", target: self, action: #selector(focusChanged(_:)))
-        button.font = FirstLineTypography.smallNSFont
-        button.state = appState.settings.focusMode ? .on : .off
-        return button
+    private func focusSwitch() -> NSSwitch {
+        let toggle = FirstLineInkSwitch(frame: .zero)
+        toggle.target = self
+        toggle.action = #selector(focusChanged(_:))
+        toggle.state = appState.settings.focusMode ? .on : .off
+        // The row's leading label names the control; a second title on the switch
+        // gave the same row two names (problem 10).
+        toggle.setAccessibilityLabel("Focus Mode")
+        return toggle
     }
 
     private func alignmentPopup() -> NSPopUpButton {
@@ -402,11 +402,11 @@ final class SettingsViewController: NSViewController {
         appState.updateReducedMotion(ReducedMotionOverride.allCases[sender.indexOfSelectedItem])
     }
 
-    @objc private func focusChanged(_ sender: NSButton) {
+    @objc private func focusChanged(_ sender: NSSwitch) {
         appState.updateFocusMode(sender.state == .on)
     }
 
-    @objc private func automaticChecksChanged(_ sender: NSButton) {
+    @objc private func automaticChecksChanged(_ sender: NSSwitch) {
         updateSettings?.automaticallyChecksForUpdates = sender.state == .on
     }
 

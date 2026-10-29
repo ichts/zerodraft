@@ -417,13 +417,11 @@ struct RoomTests {
         copy.performClick(nil)
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
-        // The pill hugs its label, so COPIED is narrower; the row stays centred.
+        // The pill hugs its label down to the resting width: COPIED never narrows the control, so the
+        // row stays where it was under the pointer (D-030 as amended by D-076).
         #expect(copy.title == "COPIED")
-        #expect(copy.frame.width < originalWidth, "the COPIED pill kept the widest label width")
-        let copiedLabel = try #require(descendants(copy, of: NSTextField.self).first { $0.stringValue == "COPIED" })
-        let copiedPadding = copy.frame.width - copiedLabel.intrinsicContentSize.width
-        #expect(abs(copiedPadding - originalPadding) <= 2,
-                "the pill padding changed from \(originalPadding) to \(copiedPadding) on COPIED")
+        #expect(abs(copy.frame.width - originalWidth) <= 0.5,
+                "COPIED is \(copy.frame.width) pt wide, COPY TEXT was \(originalWidth) pt")
         fixture.room.tick()
         let move = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: .zero,
             modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,

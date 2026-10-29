@@ -92,7 +92,7 @@ struct ReviewRoundTests {
         fixture.room.copyKeptText()
         fixture.room.view.layoutSubtreeIfNeeded()
         #expect(copy.title == "COPIED")
-        #expect(copy.frame.width < originalWidth, "the COPIED pill kept the widest label width")
+        #expect(abs(copy.frame.width - originalWidth) <= 0.5, "COPIED changed the pill width from \(originalWidth) to \(copy.frame.width)")
         let actions = try #require(copy.superview)
         let rowCentre = fixture.room.view.convert(actions.bounds, from: actions).midX
         #expect(abs(rowCentre - fixture.room.view.bounds.midX) <= 1,

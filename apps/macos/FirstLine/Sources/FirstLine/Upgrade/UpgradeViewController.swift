@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state, checkout state and DesignSystem tokens.
- * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy, price line and live states.
+ * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the 48 pt `Try the free web room` route and live states.
  * [POS]: writeitdown AppKit license gate; POST checkout via AppState with mac.html fallback.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -59,7 +59,7 @@ final class UpgradeViewController: NSViewController {
 
         titleLabel = label("Activate Write It Down", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
         titleLabel.maximumNumberOfLines = 0
-        subtitleLabel = label("After 3 free sessions, a license is required to keep writing.",
+        subtitleLabel = label("A license is required to keep writing on this Mac.",
                               font: FirstLineTypography.subtitleNSFont(), color: FirstLineColors.muteNSColor)
         subtitleLabel.maximumNumberOfLines = 0
 
@@ -112,8 +112,12 @@ final class UpgradeViewController: NSViewController {
         pricingView = FirstLineStatusView(text: "One payment. 2 Macs. 14-day refund.")
         checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
         checkoutStatus.maximumNumberOfLines = 0
-        webTrialButton = FirstLineButtons.link(title: "Try the full web app at writeitdown.app",
-                                                target: self, action: #selector(webTrialTapped))
+        // The free route is the card's only working path when checkout is down, so it
+        // is a real 48 pt outline control with a hit area and the ink focus ring, not
+        // a caption-shaped link (problem 9).
+        webTrialButton = FirstLineButtons.secondary(title: "Try the free web room",
+                                                    target: self, action: #selector(webTrialTapped),
+                                                    height: 48)
 
         let stack = NSStackView(views: [titleLabel, subtitleLabel, fieldLabel, licenseField, actions,
                                         feedbackLabel, pricingView, checkoutStatus, webTrialButton])
@@ -129,6 +133,7 @@ final class UpgradeViewController: NSViewController {
         stack.setCustomSpacing(14, after: feedbackLabel)
         stack.setCustomSpacing(14, after: pricingView)
         stack.setCustomSpacing(6, after: checkoutStatus)
+        stack.setCustomSpacing(20, after: webTrialButton)
         card.contentView.addSubview(stack)
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor),
@@ -151,7 +156,7 @@ final class UpgradeViewController: NSViewController {
         titleLabel.stringValue = active ? "Write It Down" : "Activate Write It Down"
         subtitleLabel.stringValue = active
             ? "This Mac is licensed."
-            : "After 3 free sessions, a license is required to keep writing."
+            : "A license is required to keep writing on this Mac."
         pricingView.isHidden = active
         activateButton.title = appState.licenseActivationInFlight
             ? "Activating"
@@ -167,6 +172,9 @@ final class UpgradeViewController: NSViewController {
                 feedbackLabel.stringValue = ""
                 feedbackLabel.isHidden = true
             }
+        } else if appState.licenseActivationInFlight {
+            feedbackLabel.stringValue = "Checking your key..."
+            feedbackLabel.isHidden = false
         } else {
             feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
             feedbackLabel.isHidden = appState.licenseActivationError == nil &&
@@ -179,10 +187,14 @@ final class UpgradeViewController: NSViewController {
         let showEntry = !active
         fieldLabel.isHidden = !showEntry
         licenseField.isHidden = !showEntry
-        buyButton.isHidden = !showEntry
         webTrialButton.isHidden = !showEntry
         checkoutStatus.isHidden = !showEntry || appState.checkoutAvailable
-        buyButton.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight
+        // No disabled Buy: when checkout is not configured the card would otherwise
+        // offer a paid action that cannot complete (problem 9).
+        buyButton.isHidden = !showEntry || !appState.checkoutAvailable
+        // A check still running (launch validation or key activation) means the paid
+        // path is not settled yet; never present it as available before then.
+        buyButton.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight && !checking
         buyButton.title = appState.checkoutInFlight
             ? "Opening checkout..."
             : "Buy a license, \(AppState.displayPrice) once"

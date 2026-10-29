@@ -2,6 +2,20 @@
 
 Use the batch-specific window checks in `WRITEITDOWN_PLAN.md` for current acceptance. The checklist below records the historical Zero Draft baseline and is not a release gate; dated records follow it.
 
+## 2026-10-29: The review's Mac defects (D-076); content snapshots only, real-window recording PENDING
+
+Batch record for D-076 (kept block axis, writing-line anchor from the first layout pass, licence card,
+Settings grid, rules sheet scale, picker and activation copy, COPIED width floor). No window was driven
+on this machine's GUI; the evidence is the real-AppKit snapshot suite (`WID_SNAPSHOT_DIR=... swift test
+--filter SnapshotTests`, content snapshots, not live window captures) and the geometry assertions in
+`DesignReviewFixesTests`, which fail on the previous build with the numbers recorded in
+`docs/wid-mac-behavior.md` (Measured changes). `swift test` from `apps/macos/FirstLine/` ran 336 tests in
+29 suites and passed with its one known issue (case 53, unchanged). The test host process occasionally
+exits early with status 0 and no summary when other lanes run GUI work on the machine (it also did on
+`origin/main`); a run only counts when it prints `Test run with`. A real-window pass of the kept,
+Settings, activation and rules screens is pending independent acceptance. Item 8 of the review (a caret on
+the wiped room) is superseded by D-070 and not implemented.
+
 ## 2026-10-26: The stopped screen's composition (D-070), the rig checks, and a recorded VM launch run; the in-guest stopped screen stays PENDING
 
 Batch record for the stopped-screen composition (one group at 33% of the paper, anchored by its midpoint,

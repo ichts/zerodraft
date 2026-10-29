@@ -68,7 +68,7 @@ struct RoundThreeTests {
         let trial = HomeViewController(appState: try trialState(used: 2))
         _ = makeWindow(trial)
         let trialLine = try #require(descendants(of: trial.view, of: NSTextField.self)
-            .first { $0.stringValue == "Free trial: 1 of 3 sessions left." })
+            .first { $0.stringValue == "Free trial: 1 of 3 sessions left, counted at the first character." })
         #expect(!trialLine.isHiddenOrHasHiddenAncestor)
     }
 

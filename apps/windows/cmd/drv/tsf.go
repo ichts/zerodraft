@@ -63,8 +63,11 @@ type tfProfile struct {
 }
 
 func vcall(obj uintptr, idx int, args ...uintptr) uintptr {
-	vt := *(*uintptr)(unsafe.Pointer(obj))
-	fn := *(*uintptr)(unsafe.Pointer(vt + uintptr(idx)*unsafe.Sizeof(uintptr(0))))
+	// obj is a COM interface pointer (not Go memory): reinterpret the integer as a pointer without a uintptr->Pointer
+	// conversion, which go vet rejects. Same loads as obj->vtbl[idx].
+	vt := *(*unsafe.Pointer)(unsafe.Pointer(&obj))
+	vtbl := *(*unsafe.Pointer)(vt)
+	fn := *(*uintptr)(unsafe.Add(vtbl, idx*int(unsafe.Sizeof(uintptr(0)))))
 	r, _, _ := syscall.SyscallN(fn, append([]uintptr{obj}, args...)...)
 	return r
 }

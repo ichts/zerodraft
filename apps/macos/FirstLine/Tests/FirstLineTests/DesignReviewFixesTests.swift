@@ -380,6 +380,45 @@ struct DesignReviewFixesTests {
         }
     }
 
+    @Test func restartThroughBeginAgainPutsTheCaretWhereFirstEntryDid() throws {
+        for size in Self.windowSizes {
+            let fresh = try room(size: size)
+            fresh.window.makeKeyAndOrderFront(nil)
+            fresh.room.viewDidAppear()
+            fresh.room.view.layoutSubtreeIfNeeded()
+            let freshCaret = caretInPaper(fresh.editor, paper: fresh.paper)
+
+            let again = try room(size: size)
+            again.window.makeKeyAndOrderFront(nil)
+            again.room.viewDidAppear()
+            let long = (1...12).map { "line \($0) of a draft long enough to scroll" }.joined(separator: "\n")
+            again.editor.insertText(long, replacementRange: NSRange(location: NSNotFound, length: 0))
+            again.clock.now = 1
+            again.engine.registerMarkedTextActivity()
+            again.room.tick()
+            again.clock.now = 20
+            again.room.tick()
+            again.room.endCutAnimation()
+            again.room.viewDidLayout()
+            #expect(again.engine.phase == .failure)
+            let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: again.window.windowNumber,
+                context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false,
+                keyCode: 36))
+            #expect(again.window.performKeyEquivalent(with: ret), "Return did not reach Begin again")
+            again.room.tick()
+            again.room.viewDidLayout()
+            again.room.view.layoutSubtreeIfNeeded()
+            #expect(again.engine.phase == .writing)
+            #expect(again.editor.string.isEmpty)
+            let caret = caretInPaper(again.editor, paper: again.paper)
+            #expect(abs(caret.minX - freshCaret.minX) <= 1, "at \(size) restart caret x \(caret.minX) vs \(freshCaret.minX)")
+            #expect(abs(caret.midY - freshCaret.midY) <= 1, "at \(size) restart caret y \(caret.midY) vs \(freshCaret.midY)")
+            fresh.window.orderOut(nil)
+            again.window.orderOut(nil)
+        }
+    }
+
     // MARK: - Fixtures
 
     private final class Clock {

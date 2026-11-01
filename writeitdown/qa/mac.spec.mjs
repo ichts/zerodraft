@@ -18,8 +18,8 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} once`);
-  await expect(main).toContainText('The Mac app includes 3 free writing sessions.');
-  await expect(main).toContainText('One license covers 2 computers, any mix of Mac and Windows, for $4.99 once, with free updates and a 14-day refund.');
+  await expect(main).toContainText('Your first 3 writing sessions are free.');
+  await expect(main).toContainText('one license covers 2 computers, Mac or Windows, for $4.99 once, with free updates and a 14-day refund.');
   await expect(main).not.toContainText(/buying opens soon|not open yet|coming soon/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
   await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('method', 'post');
@@ -30,9 +30,9 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await expect(page.getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
   await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down');
   await expect(page.locator('#price-row')).toContainText('2 computers, Mac or Windows');
-  await expect(page.locator('#requirements + p')).toContainText('Mac: macOS 14 Sonoma or later');
-  await expect(page.locator('#requirements + p')).toContainText('Windows: Windows 11 on x64; the Windows app is not released yet.');
-  await expect(page.locator('#activate + p')).toContainText('One license works on two computers, any mix of Mac and Windows.');
+  await expect(page.locator('#requirements + p')).toContainText('Requires macOS 14 Sonoma or later');
+  await expect(page.locator('#requirements + p')).not.toContainText('Windows');
+  await expect(page.locator('#activate + p')).toContainText('One license works on two computers, Mac or Windows.');
   await expect(page.locator('#refund + p')).toContainText('the license stops working on every computer.');
   await expect(page.locator('#download-windows, main a[href*="windows" i]')).toHaveCount(0);
   await page.locator('.doc-buy a[href="index.html#trial"]').click();
@@ -909,7 +909,7 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await page.goto('privacy.html');
   const privacy = page.locator('#mac + p');
   await expect(privacy).toContainText('Your first 3 writing sessions are free.');
-  await expect(privacy).toContainText('license covers 2 Macs for $4.99 once, with a 14-day refund');
+  await expect(privacy).toContainText('license covers 2 computers for $4.99 once, with a 14-day refund');
   await expect(privacy).toContainText('Free updates included.');
   await expect(privacy).toContainText('local trial session counter in its settings file on the Mac');
   await expect(privacy).toContainText('That counter is not sent anywhere.');
@@ -922,7 +922,7 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');
   await expect(terms).toContainText('The Mac app includes 3 free writing sessions.');
-  await expect(terms).toContainText('$4.99 once for two Macs, with a 14-day refund');
+  await expect(terms).toContainText('$4.99 once for two computers, with a 14-day refund');
   await expect(terms).toContainText('Free updates included.');
 
   await page.goto('support.html');

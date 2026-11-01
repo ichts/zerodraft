@@ -229,7 +229,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
   await expect(mac.locator('.facts')).toContainText('$4.99 once');
-  await expect(mac.locator('.facts')).toContainText('2 Macs');
+  await expect(mac.locator('.facts')).toContainText('2 computers');
   await expect(mac.locator('.facts')).toContainText('14 days');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
   await expect(mac.locator('a[href="mac.html#buy"]')).toHaveText('Buy for $4.99 once');
@@ -684,7 +684,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   const main = page.locator('main');
   await expect(page.locator('#requirements')).toContainText('3 free sessions');
   await expect(page.locator('#requirements')).toContainText('$4.99 once');
-  await expect(page.locator('#requirements')).toContainText('2 Macs, 14-day refund');
+  await expect(page.locator('#requirements')).toContainText('2 computers, 14-day refund');
   const dmg = page.locator('[data-launch="dmg"]');
   await expect(dmg).toHaveText('Download free trial for Mac');
   await expect(dmg).toHaveAttribute('href', dmgURL);
@@ -928,7 +928,7 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await page.goto('support.html');
   const support = page.locator('#mac + p');
   await expect(support).toContainText('your first 3 writing sessions are free.');
-  await expect(support).toContainText('license covers 2 Macs for $4.99 once, with a 14-day refund');
+  await expect(support).toContainText('license covers 2 computers for $4.99 once, with a 14-day refund');
   await expect(support).toContainText('Free updates included.');
 
   await page.goto('mac.html');

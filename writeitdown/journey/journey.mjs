@@ -249,9 +249,9 @@ async function run(size, browser) {
       ok(await h1.count() === 1, `${await h1.count()} h1 elements on the download page`);
       ok((await h1.innerText()).trim() === 'Write It Down for Mac', 'download page H1 missing (host may serve the landing as fallback)');
     });
-    await step('trial terms: 3 sessions, $4.99 once, 2 Macs, 14-day refund', async () => {
+    await step('trial terms: 3 sessions, $4.99 once, 2 computers, 14-day refund', async () => {
       const t = (await page.locator('#requirements').innerText()).toUpperCase();
-      ok(/3 FREE SESSIONS/.test(t) && /\$4\.99 ONCE/.test(t) && /2 MACS/.test(t) && /14-DAY REFUND/.test(t), `terms read "${t}"`);
+      ok(/3 FREE SESSIONS/.test(t) && /\$4\.99 ONCE/.test(t) && /2 COMPUTERS/.test(t) && /14-DAY REFUND/.test(t), `terms read "${t}"`);
     });
     await step('no waived sign-in feature offered on download page', async () => { const bad = await waivedOffers(page, 'main'); ok(bad.length === 0, `found ${JSON.stringify(bad)}`); });
     await step('DMG link is the canonical URL', async () => {

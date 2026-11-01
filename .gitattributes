@@ -1,0 +1,2 @@
+# check_tokens.sh in apps/windows compares this file byte for byte with its copy; keep LF on Windows checkouts.
+apps/macos/FirstLine/Sources/FirstLine/Resources/write-it-down-lockup.svg text eol=lf

@@ -1,0 +1,11 @@
+{
+  "name": "Write It Down",
+  "slug": "write-it-down",
+  "identifier": "app.writeitdown.windows",
+  "version": "0.2.0",
+  "copyright": "© 2026 Trefoil Studio",
+  "publisher": "Trefoil Studio",
+  "icon": "packaging/icon.png",
+  "main": "./cmd/wid",
+  "out": "build"
+}

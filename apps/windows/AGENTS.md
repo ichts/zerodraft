@@ -11,10 +11,10 @@ session/: 纯会话时钟与字数（`SessionEngine.swift` 的移植），截止
 paper/: Wheat 纸面纹理（`PaperField` 的移植）。
 licence/: licence service 的 Windows 客户端（token 验证、activate/validate/deactivate、checkout、试用、离线宽限、撤销）；token、订单号、状态与试用计数只存 Windows Credential Manager，绝不落文件；`fakeservice/` 只供无头单测。
 tokens/: 由 `scripts/gen_tokens.py` 从 `../macos` 源码生成的颜色、间距、常量与文案，禁止手改。
-fonts/: Mac 应用字体文件的逐字节拷贝（`go:embed` 不能越出模块），`scripts/check_tokens.sh` 校验一致。
+fonts/: 字体。Zhuque Fangsong 是 Mac 文件的逐字节拷贝（`go:embed` 不能越出模块）；三个静态 Newsreader 由 `scripts/gen_fonts.py` 从 Mac 的可变字体按角色固定光学字号（Mac 每次绘制都把 opsz 设为字号，mygo 在 Windows 上不会）派生，`scripts/check_tokens.sh` 逐字节复算校验（需要 fonttools 4.68.0）。
 cmd/qaserver、cmd/drv、cmd/imecheck、cmd/papershot: QA 与真机验收工具，不进发布包。
 packaging/: MSIX 清单、素材与签名/安装脚本；`STORE.md` 是 Store 身份表。
-scripts/: 生成器、漂移门槛与 vivobook-1 真机脚本（IME 套件、截图度量、端到端）。
+scripts/: 生成器、漂移门槛、与 Mac 的并排度量（`compare_mac.py`、`pair.sh`、`screens.sh`）与 vivobook-1 真机脚本（IME 套件、截图度量、端到端）。
 SYNC.md: Mac 到 Windows 的对等账本，每个 Mac 行为、token、文案一行；Mac 改动后在同一 PR 里更新对应行。
 README.md: 构建、测试、漂移门槛、CrychicUI 钉版、真机脚本。
 
@@ -24,6 +24,7 @@ Windows 可执行文件（`mygo build` / MSIX）；与 Mac 同价、同许可池
 法则
 - 价格、许可、两台设备与 14 天退款与 Mac 一致；`platform: "windows"` 是服务已接受的取值。
 - Mac 源码是 token 与文案的唯一来源：`tokens/tokens_gen.go` 与 Mac 不同步时 CI 失败（`scripts/check_tokens.sh`），先重新生成、跑 `go test ./...`、再改 `SYNC.md`。
+- 对齐 Mac 用度量，不用眼看：`scripts/compare_mac.py` 在 Mac 自己的 `SnapshotTests` 快照与 Windows 真窗口截图上跑同一个检测器；系统字体（SF 对 Segoe UI Variable）造成的宽度差异记入 `SYNC.md` 第 22 行，不靠调参数掩盖。
 - 不依赖未入库的 CrychicUI 本地副本：`go.mod` 钉提交伪版本；不 vendoring。
 - 测试只连 `licence/fakeservice` 或 `cmd/qaserver` 的 loopback 假 Stripe，任何位置都不放真实或 live 密钥。
 - 草稿文本只在内存；不写统计、历史或 localStorage 类持久化。

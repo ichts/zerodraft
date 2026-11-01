@@ -2,7 +2,7 @@
 """drv script: every room state at one display scale. usage: mkcapture.py SCALE(100|125|150) OUTNAME EXE [home]
 Two launches: the 60 s room (empty, first char, typing with history fade, warn 3/2/1, stopped, restart, exit
 confirmation, deny) and a 15 s room that reaches the kept sheet (kept, COPIED, focus ring)."""
-import sys
+import os, sys
 scale, out, exe = sys.argv[1:4]
 home = sys.argv[4] if len(sys.argv) > 4 else '150'
 img = exe.split('\\')[-1]
@@ -30,6 +30,9 @@ w('typefast R'); shot('07-restarted', 200)
 w('vk esc'); shot('08-exit-armed', 150)
 w('vk backspace'); shot('09-deny', 40)
 w('sleep 2300'); shot('10-exit-expired', 0)
+if os.environ.get('WID_BREAK') == 'armedexit': w('vk esc'); w('sleep 100')   # known-broken proof, in the script: with the exit armed the slot is the confirmation's, so the notice must not show
+w('vk backspace'); shot('10b-refusal-notice', 320)   # the confirmation held the slot at 09, so this is the session's first spent notice (D-077)
+w('sleep 2300'); shot('10c-notice-gone', 0)
 w('vk esc'); w('sleep 300'); w('vk esc'); w('sleep 1200')
 w('mem', 'after-exit', img.replace('.exe', ''))
 w('killall', img)

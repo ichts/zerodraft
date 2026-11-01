@@ -79,17 +79,18 @@ func WashFraction(idleSeconds, silenceSeconds float64, reduceMotion bool) float3
 	return float32(math.Min(math.Max((idleSeconds-warnAt)/tokens.WarnLeadSeconds, 0), 1))
 }
 
-// HistoryAlpha is the D-069 ladder by distance above the writing line; lines beyond it are gone (-1).
-func HistoryAlpha(distance int, dark bool) float32 {
+// HistoryAlpha is the D-069 ladder by rung: the live logical line is 0, older lines step back (D-077); lines beyond
+// the ladder are gone (-1).
+func HistoryAlpha(rung int, dark bool) float32 {
 	l := tokens.HistoryOpacitiesLight
 	if dark {
 		l = tokens.HistoryOpacitiesDark
 	}
 	switch {
-	case distance <= 0:
+	case rung <= 0:
 		return 1
-	case distance < len(l):
-		return l[distance]
+	case rung < len(l):
+		return l[rung]
 	}
 	return -1
 }
@@ -117,4 +118,29 @@ func keyframes(vals, times []float32, t float32) float32 {
 		}
 	}
 	return vals[len(vals)-1]
+}
+
+// The Mac's 13 pt labels (receipt, caption, footer row) are NSTextFields with a 1.6 line height multiple: the box is
+// 1.6 natural lines tall and the text sits at its bottom, descent above the edge. Windows draws the same boxes, so the
+// rows land where the Mac's do whatever the system face is (Segoe UI Variable, not SF).
+const (
+	// keptBlockTop is where the kept heading's box starts under the paper's top edge. SessionKeptView pins its header 16
+	// DIP above verticalInset (72): the Mac's heading frame is y=88 on a sheet at y=32 in a 1040 x 720 window.
+	keptBlockTop = 56
+	// footerBaselineInset is the footer row's baseline above the paper's bottom edge: box bottom 25 up, descent 3.
+	footerBaselineInset = 28
+)
+
+// macLabelBox is the height of a label with the 1.6 line height multiple: 1.6 of the system face's natural line (1.2 em).
+func macLabelBox(size float32) float32 { return round(1.6 * round(size*1.2)) }
+
+// labelBoxTop is the y to draw a natural-line-height layout so its baseline sits where the Mac puts it in a label box that
+// starts at boxTop: bottom-aligned, a descent (0.2 em) above the box's lower edge.
+func labelBoxTop(boxTop, size float32, weight int) float32 {
+	return boxTop + macLabelBox(size) - round(0.2*size) - sansAscent(size, weight)
+}
+
+// sansAscent is the ascent of the system sans at a size and weight.
+func sansAscent(size float32, weight int) float32 {
+	return ui.Font{Family: sans, Size: size, Weight: weight}.Metrics().Ascent
 }

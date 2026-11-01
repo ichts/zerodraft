@@ -10,6 +10,7 @@ import (
 type probe struct {
 	*Editor
 	commits, marks, denies int
+	deletes                int // refusals that were deletes (D-077: only those earn the notice)
 	gate                   bool
 }
 
@@ -19,7 +20,12 @@ func newProbe() *probe {
 		Gate:     func(bool) bool { return p.gate },
 		OnCommit: func() { p.commits++ },
 		OnMark:   func() { p.marks++ },
-		OnDeny:   func(string) { p.denies++ },
+		OnDeny: func(_ string, deleting bool) {
+			p.denies++
+			if deleting {
+				p.deletes++
+			}
+		},
 	})
 	return p
 }
@@ -108,6 +114,15 @@ func TestKeysAreDeniedUnlessComposing(t *testing.T) {
 	p.Input(ui.InputEvent{Kind: ui.InputPointerDown})
 	if p.Text() != "abc" || p.denies != 8+5+2 {
 		t.Fatalf("text %q denies %d", p.Text(), p.denies)
+	}
+	// Backspace and Delete are the deletes here; paste, undo, caret moves and the click only shake (D-077).
+	if p.deletes != 2 {
+		t.Fatalf("deleting refusals %d, want 2", p.deletes)
+	}
+	p.Input(ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyBackspace, Mods: ui.Cmd}) // a word delete is a delete
+	p.Input(ui.InputEvent{Kind: ui.InputCommand, Text: "delete"})                     // a delete a touch keyboard sends
+	if p.deletes != 4 {
+		t.Fatalf("deleting refusals %d, want 4", p.deletes)
 	}
 	p.SetMarkedText(nil, "ni", ui.TextInputRange{})
 	if p.Input(ui.InputEvent{Kind: ui.InputKeyDown, Key: ui.KeyBackspace}) {

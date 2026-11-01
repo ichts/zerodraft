@@ -78,6 +78,7 @@ type Room struct {
 	// presentation clocks
 	exitArmedAt time.Time
 	exitHintOff time.Time
+	noticeUntil time.Time // the first refused delete's notice holds the footer's status slot until here (D-077)
 	cutUntil    time.Time
 	lastWash    float32
 	lastDeep    bool
@@ -211,10 +212,21 @@ func (r *Room) onMark() {
 	r.invalidate()
 }
 
-func (r *Room) onDeny(why string) {
-	r.denyShake0 = r.shakeOffset(r.now())
-	r.denyAt = r.now()
-	r.announce = append(r.announce, tokens.StrAnnounceBlocked)
+// onDeny is the refusal feedback: the shake and hairline on every refusal, and once per session, on the first
+// refused delete, the rule named in the footer's status slot for two seconds. An armed exit confirmation keeps the
+// slot, so a delete refused meanwhile does not spend the notice (SessionViewController D-077).
+func (r *Room) onDeny(why string, deleting bool) {
+	now := r.now()
+	r.denyShake0 = r.shakeOffset(now)
+	r.denyAt = now
+	before := r.eng.RefusalNoticeAt
+	r.eng.RegisterDeny(now, deleting && r.exitHintOff.IsZero())
+	if earned := before.IsZero() && !r.eng.RefusalNoticeAt.IsZero() && ime.Break != "nonotice"; earned {
+		r.noticeUntil = now.Add(tokens.RefusalNoticeSeconds * time.Second)
+		r.announce = append(r.announce, tokens.StrRefusalNotice)
+	} else {
+		r.announce = append(r.announce, tokens.StrAnnounceBlocked)
+	}
 	sound.Play(sound.Warning)
 	r.invalidate()
 }
@@ -233,6 +245,7 @@ func (r *Room) restart() {
 		return
 	}
 	r.dismissExit()
+	r.noticeUntil = time.Time{}
 	if r.ed.Text() != "" || r.ed.Composing() {
 		if ime.Break != "keepeditor" {
 			r.ed = r.newEditor()
@@ -260,6 +273,7 @@ func (r *Room) requestExit() {
 	}
 	r.exitArmedAt = now
 	r.exitHintOff = now.Add(tokens.ExitWindowSeconds * time.Second)
+	r.noticeUntil = time.Time{} // arming the exit takes the slot back from a notice that is still showing
 	sound.Play(sound.Open)
 	r.announce = append(r.announce, tokens.StrExitHint)
 	r.logf("EXIT armed")
@@ -272,6 +286,9 @@ func (r *Room) step(now time.Time) {
 	r.eng.Tick(now)
 	if !r.exitHintOff.IsZero() && !now.Before(r.exitHintOff) {
 		r.dismissExit()
+	}
+	if !r.noticeUntil.IsZero() && !now.Before(r.noticeUntil) {
+		r.noticeUntil = time.Time{}
 	}
 	ph := r.eng.Phase
 	if ph == session.Danger {
@@ -314,6 +331,9 @@ func (r *Room) step(now time.Time) {
 		r.keptScroll = 0
 		sound.Play(sound.Success)
 		r.announce = append(r.announce, tokens.StrAnnounceKept)
+	}
+	if ph == session.Failure || ph == session.Success {
+		r.noticeUntil = time.Time{} // a session that ends takes its notice with it
 	}
 	r.lastPhase = ph
 }
@@ -364,7 +384,7 @@ func (r *Room) schedule(c *ui.Context, now time.Time) {
 		c.After(8 * time.Millisecond)
 	case r.eng.Phase == session.Writing && r.eng.HasStarted(), r.eng.Phase == session.Danger:
 		c.After(16 * time.Millisecond)
-	case !r.exitHintOff.IsZero():
+	case !r.exitHintOff.IsZero(), !r.noticeUntil.IsZero():
 		c.After(50 * time.Millisecond)
 	default:
 		c.After(265 * time.Millisecond) // caret blink

@@ -247,3 +247,147 @@ func TestHistoryDoesNotMoveWhileTheCurrentLineGrows(t *testing.T) {
 		t.Fatalf("a new line must shift the history by exactly one pitch (%.1f), got %.2f", pitch, d)
 	}
 }
+
+// D-077: the first refused delete of a session names the rule for two seconds in the status slot; later refusals,
+// paste, cut and undo only shake; an armed exit keeps the slot and the notice waits; a new session earns it again.
+func TestFirstRefusedDeleteNamesTheRuleOncePerSession(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("private draft")
+	g.tt.Advance(50 * time.Millisecond)
+	g.tt.Command("paste")
+	g.tt.Command("cut")
+	g.tt.Key(ui.Cmd, ui.KeyZ)
+	g.tt.Advance(50 * time.Millisecond)
+	if !g.r.noticeUntil.IsZero() || !g.r.Engine().RefusalNoticeAt.IsZero() {
+		t.Fatal("paste, cut and undo only shake: they must not earn the notice")
+	}
+	g.tt.Key(0, ui.KeyBackspace)
+	g.tt.Advance(50 * time.Millisecond)
+	until := g.r.noticeUntil
+	if until.IsZero() {
+		t.Fatal("the first refused delete must show the notice")
+	}
+	if d := until.Sub(g.r.Engine().RefusalNoticeAt); d != 2*time.Second {
+		t.Fatalf("the notice lasts %v, want 2s", d)
+	}
+	g.tt.Key(0, ui.KeyDelete)
+	g.tt.Advance(1500 * time.Millisecond)
+	if !g.r.noticeUntil.Equal(until) {
+		t.Fatal("a second refusal inside the window must not restart the notice")
+	}
+	g.tt.Type(" ")
+	g.tt.Advance(700 * time.Millisecond)
+	if !g.r.noticeUntil.IsZero() {
+		t.Fatal("the slot must return after two seconds")
+	}
+	g.tt.Key(0, ui.KeyBackspace)
+	g.tt.Advance(50 * time.Millisecond)
+	if !g.r.noticeUntil.IsZero() {
+		t.Fatal("a later refusal in the same session says nothing in the slot")
+	}
+}
+
+func TestAnArmedExitKeepsTheSlotAndTheNoticeWaits(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("draft")
+	g.tt.Key(0, ui.KeyEscape)
+	g.tt.Key(0, ui.KeyBackspace)
+	if !g.r.noticeUntil.IsZero() || !g.r.Engine().RefusalNoticeAt.IsZero() {
+		t.Fatal("the notice must not be spent while the exit confirmation holds the slot")
+	}
+	g.tt.Type("x") // typing disarms the confirmation
+	g.tt.Key(0, ui.KeyBackspace)
+	if g.r.noticeUntil.IsZero() {
+		t.Fatal("the waiting notice must show on the next refused delete")
+	}
+	g.tt.Key(0, ui.KeyEscape) // arming takes the slot back from a notice still showing
+	if !g.r.noticeUntil.IsZero() || g.r.exitHintOff.IsZero() {
+		t.Fatal("arming the exit takes the slot back")
+	}
+}
+
+func TestANewSessionEarnsTheNoticeAgain(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("draft")
+	g.tt.Key(0, ui.KeyBackspace)
+	g.tt.Advance(9 * time.Second) // the wipe ends the session and takes its notice
+	if !g.r.noticeUntil.IsZero() {
+		t.Fatal("a session that ends takes its notice with it")
+	}
+	g.tt.Type("again")
+	g.tt.Key(0, ui.KeyBackspace)
+	if g.r.noticeUntil.IsZero() {
+		t.Fatal("the new session's first refused delete says it again")
+	}
+}
+
+// D-077: every visual row of one sentence carries one colour, the ladder counts logical lines from the end.
+func TestHistorySpansColourWholeSentences(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	text := "First sentence is long and wraps. Second sentence is long too. Third one. Fourth is live"
+	spans := g.r.historySpans(text, false)
+	var got []float32
+	for _, s := range spans {
+		got = append(got, float32(s.Color.A)/255)
+	}
+	want := []float32{0, 0.769, 0.847, 1} // gone, two back, one back, live (alpha of the ink, 255 for the live line)
+	if len(got) != len(want) {
+		t.Fatalf("%d spans, want %d: %v", len(got), len(want), spans)
+	}
+	for i := range want {
+		if math.Abs(float64(got[i]-want[i])) > 0.005 {
+			t.Errorf("span %d alpha %.3f want %.3f", i, got[i], want[i])
+		}
+	}
+}
+
+func TestKeptSheetHasTheCaptionAndNoCornerCount(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	for i := 0; i < 15; i++ {
+		g.tt.Type("A few more words in the draft. ")
+		g.tt.Advance(4 * time.Second)
+	}
+	g.tt.Advance(20 * time.Second)
+	if g.r.Engine().Phase != session.Success {
+		t.Fatalf("phase %v", g.r.Engine().Phase)
+	}
+	if g.r.cornerLabel(false, true) != "" || g.r.cornerLabel(false, false) == "" {
+		t.Fatal("the corner count is silent on the kept sheet only")
+	}
+	k := g.r.keptGeo(1040, 720)
+	// the Mac's kept block (SessionKeptView frames at 1040 x 720): heading box y=88, receipt box 148, actions 194..242,
+	// caption box 254, the draft area from 304; each 13 pt label box is 26 tall
+	bottom := k.copyRect.Y + k.copyRect.H
+	if bottom != 242 || k.copyRect.Y != 194 {
+		t.Fatalf("action row %.1f..%.1f, the Mac's is 194..242", k.copyRect.Y, bottom)
+	}
+	if k.area.Y != 304 {
+		t.Fatalf("the draft area starts at %.1f, the Mac's at 304 (caption box 254 + 26 + 24)", k.area.Y)
+	}
+	if k.hy != 88 {
+		t.Fatalf("heading box top %.1f, the Mac's is 88", k.hy)
+	}
+}
+
+// D-076 item 2: the writing line holds the anchor for every draft length - the live line's box sits where the Mac's does
+// (baseline half a pitch under the 33 percent anchor) for an empty draft, a short one and one that has scrolled.
+func TestWritingLineHoldsTheAnchorForEveryDraftLength(t *testing.T) {
+	var want float32
+	for i, text := range []string{"", "short", "a draft long enough to wrap around the measure of the sheet and onto a second and a third row so that the history has scrolled, and more to be sure it has"} {
+		g := newRig(t, 1040, 720)
+		g.tt.Type(text)
+		g.tt.Advance(400 * time.Millisecond) // the one-pitch shift has settled
+		font := g.r.writingFont()
+		pitch := font.Size * 1.6
+		got := g.r.oy + g.r.scrollTgt*pitch + g.r.writingBaseline(font, pitch) // the live line's baseline, element coordinates
+		if i == 0 {
+			want = got
+		}
+		if math.Abs(float64(got-want)) > 0.01 {
+			t.Fatalf("draft %d: live baseline %.2f, empty draft %.2f", i, got, want)
+		}
+	}
+	if pr := PaperRect(1040, 720); math.Abs(float64(want-(pr.Y+AnchorY(pr.H)+44.8/2))) > 0.01 {
+		t.Fatalf("baseline %.2f is not half a pitch under the anchor %.2f", want, pr.Y+AnchorY(pr.H))
+	}
+}

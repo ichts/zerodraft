@@ -2,11 +2,13 @@ package room
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/egoist/mygo/ui"
 
 	"github.com/ichts/zerodraft/apps/windows/fonts"
+	"github.com/ichts/zerodraft/apps/windows/ime"
 	"github.com/ichts/zerodraft/apps/windows/paper"
 	"github.com/ichts/zerodraft/apps/windows/session"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
@@ -261,10 +263,10 @@ func (r *Room) drawContent(p *ui.Painter, box, pr ui.Rect, now time.Time, dark, 
 		r.drawWriting(p, box, pr, now, dark)
 	}
 
-	r.drawChrome(p, pr, dark, quiet, danger, ink, failure)
+	r.drawChrome(p, pr, dark, quiet, danger, ink, failure, kept)
 }
 
-func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, ink ui.Color, failure bool) {
+func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, ink ui.Color, failure, kept bool) {
 	e := r.eng
 	// clock, top right: system sans 15 / 600, monospaced digits; off on the stopped sheet
 	if !failure {
@@ -273,26 +275,46 @@ func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, i
 		w, _ := l.Size()
 		p.TextLayout(l, pr.X+pr.W-tokens.RoomInset-w, pr.Y+18, ink)
 	}
-	rowY := pr.Y + pr.H - 16 - tokens.FooterHeight/2 // the footer row's centre
-	// ESC - EXIT, bottom left: 13 / 500, 0.04 em tracking, on a 1.6 line box
-	ex := r.shape(textSpec{s: tokens.StrExitLink, family: sans, size: 13, weight: 500, spacing: 0.04, lh: 1.6})
-	exW, exH := ex.Size()
+	// the footer row: the Mac's 13 pt labels sit bottom-aligned in their 1.6 line box, so their baseline is 3 DIP above
+	// the box's bottom edge, and the box ends 25 above the paper's (measured on the Mac room at 1040 x 720: 660 in a
+	// 688 sheet, for ESC - EXIT and the count alike)
+	base := pr.Y + pr.H - footerBaselineInset
+	// ESC - EXIT, bottom left: 13 / 500, 0.04 em tracking
+	ex := r.shape(textSpec{s: tokens.StrExitLink, family: sans, size: 13, weight: 500, spacing: 0.04})
+	exW, _ := ex.Size()
 	exX := pr.X + tokens.RoomInset
-	p.TextLayout(ex, exX, rowY-exH/2, pick(r.hover == "exit", ink, quiet))
-	r.hit["exit"] = ui.Rect{X: exX - 6, Y: rowY - tokens.FooterHeight/2, W: exW + 12, H: tokens.FooterHeight}
-	if !r.exitHintOff.IsZero() {
-		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 500, lh: 1.6})
-		_, hh := h.Size()
-		p.TextLayout(h, exX+exW+12, rowY-hh/2, danger)
+	top := base - sansAscent(13, 500)
+	p.TextLayout(ex, exX, top, pick(r.hover == "exit", ink, quiet))
+	r.hit["exit"] = ui.Rect{X: exX - 6, Y: base - 32, W: exW + 12, H: tokens.FooterHeight}
+	// the status slot beside the exit link: the armed exit confirmation in the pen, else the first refused delete's
+	// notice in the quiet role at 0.04 em (the pen is kept for warnings); the slot is one place, so nothing moves
+	switch {
+	case !r.exitHintOff.IsZero():
+		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 500})
+		p.TextLayout(h, exX+exW+12, top, danger)
+	case !r.noticeUntil.IsZero():
+		h := r.shape(textSpec{s: tokens.StrRefusalNotice, family: sans, size: 13, weight: 500, spacing: 0.04})
+		p.TextLayout(h, exX+exW+12, top, quiet)
 	}
-	// count, bottom right: 13 / 400, the instruction before the first key
-	label := tokens.StrTypeToStart
-	if e.HasStarted() || failure {
-		label = wordLabel(e.WordCount)
+	label := r.cornerLabel(failure, kept)
+	if label == "" {
+		return
 	}
-	cl := r.shape(textSpec{s: label, family: sans, size: 13, lh: 1.6})
-	cw, ch := cl.Size()
-	p.TextLayout(cl, pr.X+pr.W-tokens.RoomInset-cw, rowY-ch/2, quiet)
+	cl := r.shape(textSpec{s: label, family: sans, size: 13})
+	cw, _ := cl.Size()
+	p.TextLayout(cl, pr.X+pr.W-tokens.RoomInset-cw, base-sansAscent(13, 400), quiet)
+}
+
+// cornerLabel is the bottom-right slot: the instruction before the first key, then the live count (13 / 400). The
+// kept sheet's receipt owns the count, so the slot is silent there (D-074).
+func (r *Room) cornerLabel(failure, kept bool) string {
+	switch {
+	case kept && ime.Break != "keptcount": // keptcount is the known-broken build the capture gate must fail on
+		return ""
+	case r.eng.HasStarted() || failure:
+		return wordLabel(r.eng.WordCount)
+	}
+	return tokens.StrTypeToStart
 }
 
 func wordLabel(n int) string {
@@ -314,9 +336,9 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 
 	text := r.ed.Text()
 	ver := r.ed.Version
-	key := fmt.Sprintf("%.1f|%v", mw, r.ed.Composing())
+	key := fmt.Sprintf("%.1f|%v|%v", mw, r.ed.Composing(), dark)
 	if r.layout == nil || r.layoutVer != ver || r.layoutKey != key {
-		r.layout = r.shapeWriting(text, mw, font)
+		r.layout = r.shapeWriting(text, mw, font, dark)
 		r.layoutVer, r.layoutKey = ver, key
 	}
 	endIdx := r.ed.Len()
@@ -346,23 +368,16 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 			row = lerp(r.scrollFrom, r.scrollTgt, easeOut(t))
 		}
 	}
-	oy := anchor - (row*pitch + pitch/2)
+	// The live line's baseline sits half a pitch under the anchor: the Mac puts the glyphs at the bottom of their 1.6 line
+	// box (all the leading above) and anchors the line there. mygo splits the leading evenly, so the box moves to land
+	// the baseline on the Mac's (measured: baseline 270 on a sheet whose anchor is 248, at 1040 x 720).
+	oy := anchor + pitch/2 - r.writingBaseline(font, pitch) - row*pitch
 	r.ox, r.oy = x0, oy
 
 	area := ui.Rect{X: pr.X + 32, Y: pr.Y + 72, W: pr.W - 64, H: pr.H - 144}
 	p.Clip(area, 0, func() {
-		for d := 0; d <= 2; d++ {
-			a := HistoryAlpha(d, dark)
-			rowTop := oy + (r.scrollTgt-float32(d))*pitch
-			if a <= 0 || r.scrollTgt-float32(d) < 0 {
-				continue
-			}
-			band := ui.Rect{X: area.X, Y: rowTop, W: area.W, H: pitch}
-			if d == 0 {
-				band.H = pitch * 3 // the current row and anything a wrap just added below it
-			}
-			p.Clip(band, 0, func() { p.TextLayout(r.layout, x0, oy, withAlpha(ink, a)) })
-		}
+		// every span carries its own rung's colour (shapeWriting); the default colour is the gone rung, invisible
+		p.TextLayout(r.layout, x0, oy, ui.RGBA(0, 0, 0, 0))
 		if !r.ed.Composing() && r.eng.Phase != session.Failure && (now.UnixMilli()/530)%2 == 0 {
 			m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
 			ch := m.Ascent + m.Descent
@@ -375,6 +390,20 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 	}
 }
 
+// leadingAbove is how far the Mac's bottom-aligned glyphs sit lower in a 1.6 line box than mygo's evenly split leading
+// puts them: half of the box's leading (D-077's lines and the kept draft are Newsreader in 1.6 boxes).
+func (r *Room) leadingAbove() float32 {
+	font := r.writingFont()
+	m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
+	return (font.Size*tokens.LineHeight - (m.Ascent + m.Descent)) / 2
+}
+
+// writingBaseline is the baseline's distance below the top of a writing line's box in mygo's layout.
+func (r *Room) writingBaseline(font ui.Font, pitch float32) float32 {
+	m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
+	return (pitch-(m.Ascent+m.Descent))/2 + m.Ascent
+}
+
 func abs32(v float32) float32 {
 	if v < 0 {
 		return -v
@@ -382,21 +411,56 @@ func abs32(v float32) float32 {
 	return v
 }
 
-// shapeWriting lays the draft out centred in the measure, the preedit underlined in ink.
-func (r *Room) shapeWriting(text string, w float32, font ui.Font) *ui.TextLayout {
-	ink := rc(tokens.Ink, false)
-	spans := []ui.Span{{Text: text}}
+// shapeWriting lays the draft out centred in the measure: one span per logical line (a sentence or the text up to a
+// hard break, D-077) in its rung's colour, so every visual row of one sentence shares one opacity and a sentence that
+// ends mid-row keeps one rung on each side of its boundary. The preedit is underlined in ink.
+func (r *Room) shapeWriting(text string, w float32, font ui.Font, dark bool) *ui.TextLayout {
+	return ui.ShapeRichTextWith(r.historySpans(text, dark), font, ui.TextShape{Width: w, Align: ui.Center})
+}
+
+func (r *Room) historySpans(text string, dark bool) []ui.Span {
+	ink := rc(tokens.Ink, dark)
+	cuts := []int{0, len(text)}
+	var markA, markZ int
+	marked := false
 	if m, ok := r.ed.Marked(); ok {
-		a, z := ui.UTF16ByteOffset(text, m.Start), ui.UTF16ByteOffset(text, m.End)
-		spans = []ui.Span{{Text: text[:a]}, {Text: text[a:z], Underline: true, DecorationColor: ink, DecorationThickness: 1.5}, {Text: text[z:]}}
+		markA, markZ = ui.UTF16ByteOffset(text, m.Start), ui.UTF16ByteOffset(text, m.End)
+		marked = markZ > markA
+		cuts = append(cuts, markA, markZ)
 	}
-	return ui.ShapeRichTextWith(spans, font, ui.TextShape{Width: w, Align: ui.Center})
+	lines := session.HistoryLines(text)
+	for _, l := range lines {
+		cuts = append(cuts, l.Start, l.End)
+	}
+	slices.Sort(cuts)
+	cuts = slices.Compact(cuts)
+	var spans []ui.Span
+	li := 0
+	for i := 0; i+1 < len(cuts); i++ {
+		a, z := cuts[i], cuts[i+1]
+		for li < len(lines)-1 && lines[li].End <= a {
+			li++
+		}
+		sp := ui.Span{Text: text[a:z]}
+		if len(lines) > 0 {
+			if alpha := HistoryAlpha(lines[li].Rung, dark); alpha > 0 {
+				sp.Color = withAlpha(ink, alpha)
+			}
+		}
+		if marked && a >= markA && z <= markZ {
+			sp.Underline, sp.DecorationColor, sp.DecorationThickness = true, ink, 1.5
+		}
+		spans = append(spans, sp)
+	}
+	if len(spans) == 0 {
+		spans = []ui.Span{{Text: text}}
+	}
+	return spans
 }
 
 // drawWarning places the numeral and its line by their ink under the writing line (D-020).
 func (r *Room) drawWarning(p *ui.Painter, pr ui.Rect, ink ui.Color, dark bool, anchor, pitch float32, font ui.Font) {
-	m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
-	baseline := anchor - pitch/2 + (pitch-(m.Ascent+m.Descent))/2 + m.Ascent
+	baseline := anchor + pitch/2 // the writing line's baseline (see drawWriting)
 	n := r.eng.SecondsUntilDeletion()
 	size := round(min(r.winH()*0.18, 170))
 	above, below := DigitInk(rune('0'+n%10), size)
@@ -438,7 +502,7 @@ func (r *Room) stoppedGeo(W, H float32) stoppedGeo {
 	pr := PaperRect(W, H)
 	f := FailureFor(W)
 	g := stoppedGeo{f: f, pillLabelSize: f.PillLabel}
-	g.headline = r.shape(textSpec{s: tokens.StrStopped, family: fonts.Stack, size: f.Base, weight: 500, lh: tokens.FailureHeadlineLH, width: pr.W - 96, center: true})
+	g.headline = r.shape(textSpec{s: tokens.StrStopped, family: fonts.DisplayStack, size: f.Base, weight: 500, lh: tokens.FailureHeadlineLH, width: pr.W - 96, center: true})
 	_, hh := g.headline.Size()
 	top, _ := f.GroupTop(pr.H, hh)
 	y := pr.Y + top
@@ -467,7 +531,8 @@ func (r *Room) drawStopped(p *ui.Painter, box, pr ui.Rect, dark bool) {
 
 type keptGeo struct {
 	heading, receipt, body *ui.TextLayout
-	hx, hy, rx, ry         float32
+	caption                *ui.TextLayout
+	hx, hy, rx, ry, cx, cy float32
 	copyRect, runRect      ui.Rect
 	area                   ui.Rect
 	bw, bodyH, docH        float32
@@ -477,24 +542,31 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	pr := PaperRect(W, H)
 	e := r.eng
 	var g keptGeo
-	top := pr.Y + tokens.KeptVerticalInset
+	top := pr.Y + keptBlockTop
 	hs := KeptHeadingSize(W)
-	g.heading = r.shape(textSpec{s: tokens.StrKeptHeading, family: fonts.Stack, size: hs, weight: 500, width: pr.W - 72, center: true})
+	g.heading = r.shape(textSpec{s: tokens.StrKeptHeading, family: fonts.DisplayStack, size: hs, weight: 500, width: pr.W - 72, center: true})
 	_, hh := g.heading.Size()
 	g.hx, g.hy = pr.X+36, top
-	y := top + hh + 12
+	y := top + hh + tokens.KeptHeadingGap
+	// the receipt and the caption are 13 pt labels in the Mac's 1.6 line box, bottom-aligned: the next block starts a
+	// whole box (macLabelBox) under the box's top, whatever the glyphs inside it do
 	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration), family: sans, size: 13, weight: 500, spacing: 0.02})
-	rw, rh := g.receipt.Size()
-	g.rx, g.ry = pr.X+(pr.W-rw)/2, y
-	y += rh + 20
-	// the copy pill keeps the width of its widest label (COPY TEXT / COPIED / TRY COPY AGAIN), so the label swap
-	// never moves the row or lands the neighbour under the pointer (Q-24)
-	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 500), r.labelWidth(tokens.StrCopied, 15, 500), r.labelWidth(tokens.StrCopyRetry, 15, 500)) + 48
+	rw, _ := g.receipt.Size()
+	g.rx, g.ry = pr.X+(pr.W-rw)/2, labelBoxTop(y, 13, 500)
+	y += macLabelBox(13) + tokens.KeptReceiptGap
+	// the copy pill hugs its label but never narrows below the resting COPY TEXT width, so COPIED does not move the row
+	// or land RUN IT AGAIN under the pointer; the longer retry label does widen it (D-076 item 7)
+	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 500), r.labelWidth(r.copyLabel, 15, 500)) + 48
 	runW := r.labelWidth(tokens.StrRunAgain, 15, 500) + 40
-	x := pr.X + (pr.W-(copyW+24+runW))/2
+	x := pr.X + (pr.W-(copyW+tokens.KeptActionSpacing+runW))/2
 	g.copyRect = ui.Rect{X: x, Y: y, W: copyW, H: 48}
-	g.runRect = ui.Rect{X: x + copyW + 24, Y: y, W: runW, H: 48}
-	y += 48 + 24
+	g.runRect = ui.Rect{X: x + copyW + tokens.KeptActionSpacing, Y: y, W: runW, H: 48}
+	y += 48 + tokens.KeptActionsGap
+	// the one caption: the receipt owns the count, this line says what to do with the draft (D-074)
+	g.caption = r.shape(textSpec{s: tokens.StrKeptCaption, family: sans, size: 13, weight: 500, spacing: 0.02})
+	cw, _ := g.caption.Size()
+	g.cx, g.cy = pr.X+(pr.W-cw)/2, labelBoxTop(y, 13, 500)
+	y += macLabelBox(13) + tokens.KeptDraftGap
 	// the draft under the actions: centred when short, from the top and scrollable when long
 	g.area = ui.Rect{X: pr.X + 36, Y: y, W: pr.W - 72, H: pr.Y + pr.H - tokens.KeptVerticalInset - y}
 	g.bw = round(min(tokens.KeptMeasure, g.area.W-48))
@@ -509,10 +581,11 @@ func (r *Room) drawKept(p *ui.Painter, box, pr ui.Rect, dark bool) {
 	ink, quiet := rc(tokens.Ink, dark), rc(tokens.PaperQuiet, dark)
 	p.TextLayout(g.heading, g.hx, g.hy, ink)
 	p.TextLayout(g.receipt, g.rx, g.ry, quiet)
+	p.TextLayout(g.caption, g.cx, g.cy, quiet)
 	by := max((g.docH-g.bodyH)/2, 24)
 	r.keptScroll = clampf(r.keptScroll, 0, max(0, g.docH-g.area.H))
 	p.Clip(g.area, 0, func() {
-		p.TextLayout(g.body, g.area.X+(g.area.W-g.bw)/2, g.area.Y+by-r.keptScroll, ink)
+		p.TextLayout(g.body, g.area.X+(g.area.W-g.bw)/2, g.area.Y+by-r.keptScroll+r.leadingAbove(), ink)
 	})
 }
 

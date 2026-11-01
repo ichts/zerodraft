@@ -9,11 +9,14 @@ EV=${WID_EVIDENCE:-${TMPDIR:-/tmp}/wid-windows-evidence}; export WID_EVIDENCE=$E
 S=${1:-150}
 cd "$R"
 TAGS=""; [ -n "$WID_BREAK" ] && TAGS=" imebreak"
-GOOS=windows GOARCH=amd64 go build -tags "widqa$TAGS" -ldflags "-H=windowsgui" -o /tmp/wid-cap.exe ./cmd/wid
+CAP_EXE='C:\wid\stage\wid-cap.exe'   # WID_PREBUILT_EXE: an exe already on the PC (Smart App Control blocks a rebuilt one, see ime-suite.sh)
+if [ -n "$WID_PREBUILT_EXE" ]; then CAP_EXE=$WID_PREBUILT_EXE; else
+  GOOS=windows GOARCH=amd64 go build -tags "widqa$TAGS" -ldflags "-H=windowsgui" -o /tmp/wid-cap.exe ./cmd/wid
+  scp -q /tmp/wid-cap.exe $WIDHOST:C:/wid/stage/wid-cap.exe
+fi
 GOOS=windows GOARCH=amd64 go build -o cmd/drv/drv.exe ./cmd/drv
-scp -q /tmp/wid-cap.exe $WIDHOST:C:/wid/stage/wid-cap.exe
 NAME=cap$S${WID_BREAK:+-broken-$WID_BREAK}
-python3 scripts/mkcapture.py "$S" "$NAME" 'C:\wid\stage\wid-cap.exe' > /tmp/$NAME.txt
+python3 scripts/mkcapture.py "$S" "$NAME" "$CAP_EXE" > /tmp/$NAME.txt
 [ -n "$WID_BREAK" ] && { printf "setenv WID_BREAK=%s\n" "$WID_BREAK"; cat /tmp/$NAME.txt; } > /tmp/$NAME.brk && mv /tmp/$NAME.brk /tmp/$NAME.txt || true
 for attempt in 1 2 3; do
   scripts/run-drv.sh "$NAME" /tmp/$NAME.txt 240 >/dev/null || echo "driver run failed on attempt $attempt" >&2

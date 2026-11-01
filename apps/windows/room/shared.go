@@ -32,3 +32,9 @@ func SheetShadow(p *ui.Painter, r ui.Rect, radius float32, dark bool) {
 	p.Shadow(r, radius, 0, 12, 12, 0, withAlpha(ink, 0.12))
 	p.Shadow(r, radius, 0, 36, 36, 0, withAlpha(ink, 0.20))
 }
+
+// TextWidth is the advance of one line of text in the chrome face, for screens that size a card from a measure.
+func TextWidth(s string, size float32, weight int) float32 {
+	w, _ := ui.ShapeRichTextWith([]ui.Span{{Text: s}}, ui.Font{Family: sans, Size: size, Weight: weight}, ui.TextShape{}).Size()
+	return w
+}

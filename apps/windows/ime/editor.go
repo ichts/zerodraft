@@ -16,7 +16,8 @@ import (
 
 // Break selects a deliberately broken behaviour in `-tags imebreak` builds so the suite can prove it fails
 // on a known-broken state: "nodeny" lets Backspace, arrows and shortcuts through unreported, "keepeditor"
-// is read by the room (the editor survives a wipe). Empty in every shipped build.
+// is read by the room (the editor survives a wipe), "nonotice" and "keptcount" are read by the room too (the first
+// refused delete says nothing; the kept sheet prints the count in the corner again). Empty in every shipped build.
 var Break string
 
 // Hooks connect the editor to the room. Every field is optional.
@@ -28,8 +29,10 @@ type Hooks struct {
 	// OnCommit runs after text entered the draft (commit, Enter); OnMark after a preedit update.
 	OnCommit func()
 	OnMark   func()
-	// OnDeny runs for a refused edit: Backspace, arrows, undo, paste, a click, an out-of-range replace.
-	OnDeny func(why string)
+	// OnDeny runs for a refused edit: Backspace, arrows, undo, paste, a click, an out-of-range replace. deleting
+	// is true when the refused edit was a delete (Backspace or Delete with any modifier, or the "delete" command):
+	// the room names the rule once per session for those (D-077) and only shakes for the rest.
+	OnDeny func(why string, deleting bool)
 	// Bounds returns element-relative geometry (caret, or the preedit rect) so candidate windows follow it.
 	Bounds func(rg ui.TextInputRange) (ui.Rect, bool)
 	// Log receives one line per input-method callback (IME suite evidence); nil disables it.
@@ -76,10 +79,12 @@ func (e *Editor) logf(f string, a ...any) {
 	}
 }
 
-func (e *Editor) deny(why string) {
+func (e *Editor) deny(why string) { e.denyEdit(why, false) }
+
+func (e *Editor) denyEdit(why string, deleting bool) {
 	e.logf("DENY %s", why)
 	if e.OnDeny != nil {
-		e.OnDeny(why)
+		e.OnDeny(why, deleting)
 	}
 }
 
@@ -217,7 +222,10 @@ func (e *Editor) Input(ev ui.InputEvent) bool {
 			return false
 		}
 		switch ev.Key {
-		case ui.KeyBackspace, ui.KeyDelete, ui.KeyLeft, ui.KeyRight, ui.KeyUp, ui.KeyDown, ui.KeyHome, ui.KeyEnd,
+		case ui.KeyBackspace, ui.KeyDelete:
+			e.denyEdit(fmt.Sprintf("key %v mods %v", ev.Key, ev.Mods), true)
+			return true
+		case ui.KeyLeft, ui.KeyRight, ui.KeyUp, ui.KeyDown, ui.KeyHome, ui.KeyEnd,
 			ui.KeyPageUp, ui.KeyPageDown:
 			e.deny(fmt.Sprintf("key %v mods %v", ev.Key, ev.Mods))
 			return true
@@ -251,7 +259,7 @@ func (e *Editor) Input(ev ui.InputEvent) bool {
 		}
 		return true
 	case ui.InputCommand:
-		e.deny("command " + ev.Text)
+		e.denyEdit("command "+ev.Text, ev.Text == "delete")
 		return true
 	}
 	return false

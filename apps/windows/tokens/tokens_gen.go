@@ -70,6 +70,13 @@ const (
 	RoomInset            = 22
 	FooterHeight         = 44
 	PaperMargin          = 32 // paper inset from the window (installConstraints)
+
+	RefusalNoticeSeconds = 2  // the first refused delete's notice (D-077)
+	KeptHeadingGap       = 12 // the kept block's vertical rhythm, SessionKeptView.init
+	KeptReceiptGap       = 20
+	KeptActionsGap       = 12
+	KeptActionSpacing    = 24
+	KeptDraftGap         = 24
 )
 
 // Paper generator constants (PaperField).
@@ -90,6 +97,8 @@ const (
 	StrTypeToStart           = "Type to start"
 	StrExitLink              = "ESC - EXIT"
 	StrKeptHeading           = "You wrote it down."
+	StrKeptCaption           = "Nothing here is saved. Copy it before you leave."
+	StrRefusalNotice         = "FORWARD ONLY. DELETING IS BLOCKED."
 	StrCopyText              = "COPY TEXT"
 	StrRunAgain              = "RUN IT AGAIN"
 	StrCopied                = "COPIED"
@@ -144,9 +153,19 @@ const (
 	UpgradePricing              = "One payment. 2 PCs. 14-day refund."
 	UpgradeCheckoutUnavailable  = "Checkout is not available yet."
 	UpgradeWebTrial             = "Try the free web room"
+	UpgradeChecking             = "Checking your key..."
 	UpgradeBuyFormat            = "Buy a license, %s once"
 	UpgradeOpeningCheckout      = "Opening checkout..."
 	UpgradeCleanupActive        = "License active on this PC."
+	RulesBodyLeading            = 1.5
+	RulesCardInset              = 44
+	RulesMeasureChars           = 60
+	RulesRuleGap                = 18
+	RulesTitleGap               = 4
+	ChipEmWidth                 = 7.467
+	ChipEmHeight                = 1.046
+	ChipCornerShare             = 0.2233
+	ChipPickerTypeSize          = 21
 	StatusChecking              = "Checking license..."
 	StatusNotActivated          = "License not activated on this PC. Enter your order number or activation code."
 	StatusNeedsValidation       = "License needs online validation. Reopen the app when connected."

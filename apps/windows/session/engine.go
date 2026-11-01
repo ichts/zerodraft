@@ -36,10 +36,13 @@ type Engine struct {
 	UnusedSeconds int
 	DeletionAt    int // whole seconds into the session at which the draft was deleted
 	CopiedKept    bool
-	ID            int
-	started       bool
-	startedAt     time.Time
-	lastActivity  time.Time
+	// RefusalNoticeAt is when this session's one refusal notice was earned: the first refused delete (D-077). Zero
+	// until then and zero again for every new session, so the notice is once per session.
+	RefusalNoticeAt time.Time
+	ID              int
+	started         bool
+	startedAt       time.Time
+	lastActivity    time.Time
 }
 
 func New(duration, silence time.Duration) *Engine {
@@ -60,8 +63,16 @@ func (e *Engine) Start(d time.Duration) {
 	e.Elapsed, e.Idle = 0, 0
 	e.WipedText, e.UnusedSeconds, e.DeletionAt, e.CopiedKept = "", 0, 0, false
 	e.Text, e.WordCount = "", 0
+	e.RefusalNoticeAt = time.Time{}
 	e.started = false
 	e.Phase = Writing
+}
+
+// RegisterDeny records a refused edit; the first refused delete of the session earns the notice (SessionEngine.registerDeny).
+func (e *Engine) RegisterDeny(now time.Time, deleting bool) {
+	if deleting && e.RefusalNoticeAt.IsZero() {
+		e.RefusalNoticeAt = now
+	}
 }
 
 // SecondsUntilDeletion is the warning numeral: ceil(silence - idle), never below zero.
@@ -158,6 +169,7 @@ func (e *Engine) Abandon() {
 	e.Elapsed, e.Remaining, e.Idle = 0, e.Duration, 0
 	e.WipedText, e.UnusedSeconds, e.DeletionAt, e.CopiedKept = "", 0, 0, false
 	e.Text, e.WordCount, e.started = "", 0, false
+	e.RefusalNoticeAt = time.Time{}
 }
 
 func clamp(d, lo, hi time.Duration) time.Duration { return min(max(d, lo), hi) }

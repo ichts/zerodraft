@@ -83,9 +83,10 @@ func main() {
 		Version:    version,
 		RoomConfig: rcfg,
 	})
+	winW, winH, content := windowSize(os.Getenv("WID_WINDOW"))
 	mygo.App.WhenReady(func() {
 		win = mygo.NewWindow(mygo.WindowOptions{
-			Title: "Write It Down", Width: 1040, Height: 620, MinWidth: 760, MinHeight: 480,
+			Title: "Write It Down", Width: winW, Height: winH, UseContentSize: content, MinWidth: 760, MinHeight: 480,
 			Content: ui.View(a.View),
 		})
 		a.Start()
@@ -94,6 +95,16 @@ func main() {
 		log.Fatal(err)
 	}
 	_ = tokens.DisplayPrice
+}
+
+// windowSize is the window's size in DIPs: 1040 x 620 outer (it fits the test PC's 1280 x 720 DIP screen at 150%), or the
+// WID_WINDOW=WIDTHxHEIGHT evidence switch, which sizes the page area (the Mac content size, 1040 x 720) for side-by-side
+// measurement against the Mac's own snapshots.
+func windowSize(env string) (w, h int, content bool) {
+	if n, _ := fmt.Sscanf(env, "%dx%d", &w, &h); n == 2 && w >= 760 && h >= 480 {
+		return w, h, true
+	}
+	return 1040, 620, false
 }
 
 // secretVault is the Windows Credential Manager through mygo.Secrets (a generic credential per key, encrypted for

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"image/png"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/ichts/zerodraft/apps/windows/fonts"
 	"github.com/ichts/zerodraft/apps/windows/licence"
 	"github.com/ichts/zerodraft/apps/windows/licence/fakeservice"
+	"github.com/ichts/zerodraft/apps/windows/room"
 	"github.com/ichts/zerodraft/apps/windows/session"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
 )
@@ -39,7 +41,10 @@ type rig struct {
 
 func newRig(t *testing.T) *rig { return newRigWith(t, &licence.MemoryVault{}, nil) }
 
-func newRigWith(t *testing.T, vault *licence.MemoryVault, svc *fakeservice.Service) *rig {
+// noCheckout builds the rig with no checkout service configured (Buy has nothing to open).
+type rigOpt struct{ noCheckout bool }
+
+func newRigWith(t *testing.T, vault *licence.MemoryVault, svc *fakeservice.Service, opts ...rigOpt) *rig {
 	g := &rig{t: t, vault: vault}
 	var tt *ui.Tester
 	start := time.Now()
@@ -56,7 +61,11 @@ func newRigWith(t *testing.T, vault *licence.MemoryVault, svc *fakeservice.Servi
 	g.svc = svc
 	client := licence.NewClient(svc.URL, testProduct, svc.PublicKey, nil)
 	client.Clock = now
-	mgr := licence.NewManager(&licence.VaultStore{V: vault}, client, licence.NewCheckoutClient(svc.URL, nil), testProduct, now)
+	checkoutBase := svc.URL
+	if len(opts) > 0 && opts[0].noCheckout {
+		checkoutBase = ""
+	}
+	mgr := licence.NewManager(&licence.VaultStore{V: vault}, client, licence.NewCheckoutClient(checkoutBase, nil), testProduct, now)
 	prefs := LoadPrefs("")
 	g.a = New(mgr, prefs, Env{
 		OpenURL: func(u string) { g.opened = append(g.opened, u) },
@@ -314,3 +323,69 @@ func TestPickersPersist(t *testing.T) {
 }
 
 func nilCtx() context.Context { return context.Background() }
+
+// D-076 item 3: the card offers nothing it cannot complete. With checkout unavailable there is no Buy at all, and the
+// free route is a real 48 DIP outlined control, not a caption-shaped link.
+func TestUpgradeCardOffersNothingItCannotComplete(t *testing.T) {
+	vault := &licence.MemoryVault{}
+	vault.Set("state", licence.State{TrialSessionsUsed: 3, Status: licence.Inactive}.Marshal())
+	g := newRigWith(t, vault, nil, rigOpt{noCheckout: true})
+	if g.a.Surface() != Upgrade {
+		t.Fatal("exhausted trial opens the card")
+	}
+	if g.tt.HasText("Buy a license, $4.99 once") {
+		t.Fatalf("no Buy without checkout: %q", g.tt.Texts())
+	}
+	g.wantText(tokens.UpgradeCheckoutUnavailable)
+	g.wantText(tokens.UpgradeSubtitle)
+	g.snap("upgrade-no-checkout")
+	r, ok := g.tt.Find(tokens.UpgradeWebTrial)
+	if !ok || r.H < 47.5 || r.H > 48.5 {
+		t.Fatalf("the free web room control is %v, want 48 DIP tall", r)
+	}
+	g.click(tokens.UpgradeWebTrial)
+	if len(g.opened) != 1 || g.opened[0] != tokens.WebTrialURL {
+		t.Fatalf("opened %v", g.opened)
+	}
+}
+
+// While a key check runs the card says so and the paid path waits.
+func TestActivationInFlightSaysCheckingYourKey(t *testing.T) {
+	vault := &licence.MemoryVault{}
+	vault.Set("state", licence.State{TrialSessionsUsed: 3, Status: licence.Inactive}.Marshal())
+	g := newRigWith(t, vault, nil)
+	g.svc.Status["activate"] = 503
+	g.click(tokens.UpgradePlaceholder)
+	g.tt.Type("WID-ORDER-1234")
+	snap := g.a.Licence().Snapshot()
+	if snap.Activating {
+		t.Fatal("setup: nothing in flight yet")
+	}
+	if msg, bad := g.a.feedback(licence.Snapshot{Activating: true}); msg != tokens.UpgradeChecking || bad {
+		t.Fatalf("feedback while activating: %q bad=%v", msg, bad)
+	}
+}
+
+// D-076 item 5: the rules sheet is the scale's 15 pt on a 1.5 line box over a 60 character measure, and each rule
+// title is never smaller than its paragraph.
+func TestRulesSheetFollowsTheTypeScale(t *testing.T) {
+	g := newRig(t)
+	g.click("How it works")
+	title, ok1 := g.tt.Find(tokens.Rule1Title)
+	body, ok2 := g.tt.Find(tokens.Rule1Body)
+	if !ok1 || !ok2 {
+		t.Fatalf("rules not on screen: %q", g.tt.Texts())
+	}
+	const line = 15 * tokens.RulesBodyLeading
+	if title.H != line {
+		t.Errorf("rule title box %.2f tall, want one %.1f line", title.H, line)
+	}
+	if lines := body.H / line; lines != float32(int(lines)) || lines < 1 {
+		t.Errorf("rule body %.2f tall: not a whole number of %.1f lines", body.H, line)
+	}
+	measure := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
+	if body.W > measure+0.5 || measure < 480 {
+		t.Errorf("rule body %.1f wide on a %.1f measure", body.W, measure)
+	}
+	g.snap("rules-scale")
+}

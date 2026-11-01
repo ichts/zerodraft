@@ -23,7 +23,7 @@ var (
 // and below it (positive down), in DIPs.
 func DigitInk(d rune, size float32) (above, below float32) {
 	italicOnce.Do(func() {
-		italicFont, _ = sfnt.Parse(fonts.Data("Newsreader-Italic-Variable.ttf"))
+		italicFont, _ = sfnt.Parse(fonts.Data("Newsreader-Numeral.ttf"))
 	})
 	if italicFont == nil {
 		return size * 0.7, 0

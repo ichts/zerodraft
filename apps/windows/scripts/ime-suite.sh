@@ -11,16 +11,21 @@ EVID=$EV/ime-suite${WID_BREAK:+-broken-$WID_BREAK}
 TIPS=${*:-pinyin wetype ja}
 cd "$R"
 TAGS=""; [ -n "$WID_BREAK" ] && TAGS=" imebreak"   # known-broken proof: WID_BREAK=nodeny|keepeditor
-GOOS=windows GOARCH=amd64 go build -tags "widqa$TAGS" -ldflags "-H=windowsgui" -o /tmp/wid-suite.exe ./cmd/wid
+# WID_PREBUILT_EXE='C:\wid\stage\wid-x.exe': run an exe already on the test PC instead of building one. Smart App Control there blocks any
+# binary it has not run before (it began to on 2026-11-01), so a rebuilt exe cannot start; an exe that has run still can.
+SUITE_EXE='C:\wid\stage\wid-suite.exe'
+if [ -n "$WID_PREBUILT_EXE" ]; then SUITE_EXE=$WID_PREBUILT_EXE; else
+  GOOS=windows GOARCH=amd64 go build -tags "widqa$TAGS" -ldflags "-H=windowsgui" -o /tmp/wid-suite.exe ./cmd/wid
+fi
 GOOS=windows GOARCH=amd64 go build -o cmd/drv/drv.exe ./cmd/drv
 go build -o /tmp/imecheck ./cmd/imecheck
 ssh $WIDHOST "if not exist C:\\wid\\stage mkdir C:\\wid\\stage" </dev/null >/dev/null 2>&1 || true
-scp -q /tmp/wid-suite.exe $WIDHOST:C:/wid/stage/wid-suite.exe
+[ -n "$WID_PREBUILT_EXE" ] || scp -q /tmp/wid-suite.exe $WIDHOST:C:/wid/stage/wid-suite.exe
 rc=0
 mkdir -p "$EVID"
 for tip in $TIPS; do
   name=suite-$tip
-  python3 scripts/mksuite.py "$tip" "$name" 'C:\wid\stage\wid-suite.exe' > /tmp/$name.txt
+  python3 scripts/mksuite.py "$tip" "$name" "$SUITE_EXE" > /tmp/$name.txt
   [ -n "$WID_BREAK" ] && { printf "setenv WID_BREAK=%s\n" "$WID_BREAK"; cat /tmp/$name.txt; } > /tmp/$name.brk && mv /tmp/$name.brk /tmp/$name.txt || true
   for attempt in 1 2 3; do # the remote desktop session occasionally drops the first launch: retry once
     scripts/run-drv.sh "$name" /tmp/$name.txt 300 >/dev/null || echo "driver run failed on attempt $attempt" >&2

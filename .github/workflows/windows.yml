@@ -27,8 +27,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Tokens and fonts match the Mac sources
-        run: sh scripts/check_tokens.sh
+      - name: Tokens, fonts and lockup match the Mac sources
+        run: |
+          python -m pip install fonttools==4.68.0
+          sh scripts/check_tokens.sh
       - name: Format and module hygiene
         run: |
           test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }

@@ -3,17 +3,21 @@
 Stripe TEST mode (through the reverse tunnel): first launch, the three free sessions, the activation card, Buy (the
 hosted-checkout hand-off), a paid test session, the two-PC limit and its release, activation, a licensed session,
 relaunch, settings, refund and revocation. usage: mke2e.py SCALE OUTNAME"""
-import sys
+import os, sys
 scale, out = sys.argv[1:3]
 BROWSER = len(sys.argv) > 3 and sys.argv[3] == '1'   # the real default browser takes the hand-off (150% run); otherwise only the log
 CTL = 'http://127.0.0.1:18061'
 AUMID = r'shell:AppsFolder\TrefoilStudio.WriteItDownQA_5gka8kek26b2r!App'
+# WID_E2E_EXE=<path on the PC>: run the QA flavour as a plain exe instead of the test-signed MSIX. Smart App Control on the
+# test PC blocks the self-signed package ("could not verify its publisher"), so the MSIX path cannot launch there.
+EXE = os.environ.get('WID_E2E_EXE')
+IMG = EXE.split('\\')[-1] if EXE else 'wid.exe'   # the image name drv kills between launches
 L = []
 def w(*a): L.append(' '.join(str(x) for x in a))
 def shot(n, wait=350): w('sleep', wait); w('shotwin', f'{scale}-{n}', 'Write It Down')
 def ctl(path, method='GET'): w('http', method, CTL + path)
 def launch():
-    w('killall wid.exe'); w('sleep 600'); w('launch', r'C:\Windows\explorer.exe', AUMID); w('sleep 5000'); w('focus Write It Down'); w('sleep 700')
+    w('killall', IMG); w('sleep 600'); w('launch', EXE) if EXE else w('launch', r'C:\Windows\explorer.exe', AUMID); w('sleep 5000'); w('focus Write It Down'); w('sleep 700')
 def trial_session(n, last=False):
     w('vk enter'); w('sleep 900')                       # Begin
     if n == 1: shot('02-room-empty', 300)
@@ -25,23 +29,31 @@ def trial_session(n, last=False):
     w('vk esc'); w('sleep 300'); w('vk esc'); w('sleep 900')   # two-act exit back to Home
     shot(f'0{6+n}-home-after-session-{n}', 200)
 
+if scale == '100': w('setenv', 'WID_WINDOW=1040x720')   # the Mac's own window size, for the side-by-side measurements
 w('dpi', scale); w('tip en'); w('sleep 600')
 w('run', r'powershell -NoProfile -ExecutionPolicy Bypass -File C:\wid\qa\clearcred.ps1')
 w('run', 'cmdkey /list | findstr /i WriteItDown.qa')
 w('mark', 'PHASE first launch'); ctl('/qa/status')
 launch()
 shot('01-home-first-launch', 300)
-w('clickwin Write It Down 718 109'); shot('01b-rules', 500)              # the "?" with a real mouse click
+# the "?" with a real mouse click: the card is centred, so its place follows the page area (1040 x 620 outer by default, the
+# Mac's 1040 x 720 page area at 100%: card 482 tall, top 119, "?" 14 DIP under its content top)
+w('clickwin Write It Down', '725 177' if scale == '100' else '718 109'); shot('01b-rules', 500)
 w('vk enter'); w('sleep 500')                                                # Done
 trial_session(1); trial_session(2)
 w('mark', 'PHASE third session: the last free one, wipe does not route to checkout')
 trial_session(3, last=True)
 w('vk enter'); shot('09-upgrade-exhausted', 700)                           # restart after exhaustion opens activation
 w('vk enter'); shot('09b-upgrade-empty-submit', 400)                       # an empty field is refused locally
+w('vk comma ctrl'); shot('09c-settings-entry', 600); w('vk esc'); w('sleep 400')           # Ctrl+, from the card: Settings, unlicensed
+if os.environ.get('WID_E2E_UPTO') == 'screens':   # polish rounds: only the screens up to here (about 90 s), not the whole product
+    w('run', r'powershell -NoProfile -ExecutionPolicy Bypass -File C:\wid\qa\clearcred.ps1')
+    w('killall', IMG); w('dpi 150'); w('mark done'); print('\n'.join(L)); sys.exit(0)
 w('mark', 'PHASE buy'); w('vk tab'); w('vk tab'); shot('10-upgrade-buy-focus', 200)
 w('vk enter')
 if BROWSER:   # the real hand-off: the default browser (Edge) opens the hosted checkout URL; close what the hand-off started
     w('sleep 6000'); w('shot', f'{scale}-11a-browser-checkout'); w('killall msedge.exe'); w('sleep 1500'); w('focus Write It Down'); w('sleep 600')
+if not BROWSER: w('sleep 3500')   # no browser to wait for: give the checkout request time to reach the service before the test pays
 shot('11-upgrade-after-buy', 1000); ctl('/qa/status')
 w('mark', 'PHASE paid, both other PCs already active: the third meets the limit')
 ctl('/qa/complete'); ctl('/qa/fill?n=2')
@@ -63,5 +75,5 @@ if BROWSER:   # Stripe unavailable: Buy falls back to the public purchase page, 
     w('sleep 6000'); w('shot', f'{scale}-21-browser-fallback-page'); w('killall msedge.exe'); w('sleep 1500')
 w('run', 'cmdkey /list | findstr /i WriteItDown.qa')
 w('run', r'powershell -NoProfile -ExecutionPolicy Bypass -File C:\wid\qa\clearcred.ps1')
-w('killall wid.exe'); w('dpi 150'); w('mark done')
+w('killall', IMG); w('dpi 150'); w('mark done')
 print('\n'.join(L))

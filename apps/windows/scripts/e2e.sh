@@ -3,7 +3,9 @@
 # services/license) with a loopback fake of Stripe's API, a reverse ssh tunnel to vivobook-1, runs the whole product with
 # real input at one display scale, then stops everything it started on both machines.
 #   usage: scripts/e2e.sh 150|100 [0]    (0 = no browser hand-off)
-#   needs: the QA MSIX installed on the Windows test PC (scripts/package-msix.sh qa) and ssh access to it.
+#   The QA flavour (-tags widqa) runs as a plain exe pushed to C:\wid\stage, the way the IME suite and the captures run:
+#   Smart App Control on the test PC blocks the self-signed MSIX and the mygo-built exe, so the package path is opt-in
+#   (WID_E2E_MSIX=1 needs the QA MSIX installed by scripts/package-msix.sh qa and a PC that allows it).
 #   Builds the licence service from this repository (unmodified) and cmd/qaserver; evidence in $WID_EVIDENCE.
 set -e
 WIDHOST=${WID_HOST:-vivobook-1}   # the Windows test PC (ssh alias)
@@ -16,13 +18,21 @@ BROWSER=${2:-1}
 NAME=e2e$S
 cd "$R"
 GOOS=windows GOARCH=amd64 go build -o cmd/drv/drv.exe ./cmd/drv
+if [ -n "$WID_PREBUILT_EXE" ]; then
+  export WID_E2E_EXE=$WID_PREBUILT_EXE   # an exe already on the PC: Smart App Control there blocks a rebuilt one (see ime-suite.sh)
+elif [ -z "$WID_E2E_MSIX" ]; then
+  GOOS=windows GOARCH=amd64 go build -tags widqa -ldflags "-H=windowsgui" -o "${TMPDIR:-/tmp}/wid-e2e.exe" ./cmd/wid
+  ssh $WIDHOST "if not exist C:\\wid\\stage mkdir C:\\wid\\stage" </dev/null >/dev/null 2>&1 || true
+  scp -q "${TMPDIR:-/tmp}/wid-e2e.exe" $WIDHOST:C:/wid/stage/wid-e2e.exe
+  export WID_E2E_EXE='C:\wid\stage\wid-e2e.exe'
+fi
 rm -rf "$W"; mkdir -p "$W" "$EV"; export WID_EVIDENCE=$EV
 (cd "$R/../../services/license" && go build -o "$T/license-service" .)
 go build -o "$T/qaserver" ./cmd/qaserver
 cleanup() {
   [ -n "$TPID" ] && [ "$(ps -o command= -p $TPID 2>/dev/null | cut -c1-8)" = "ssh -N -" ] && kill "$TPID"
   [ -n "$QPID" ] && ps -o command= -p "$QPID" 2>/dev/null | grep -q qaserver && kill -INT "$QPID" && sleep 2
-  ssh $WIDHOST 'taskkill /f /im wid.exe & del C:\wid\qa\config.json' </dev/null >/dev/null 2>&1
+  ssh $WIDHOST 'taskkill /f /im wid.exe & taskkill /f /im wid-e2e.exe & del C:\wid\qa\config.json' </dev/null >/dev/null 2>&1
 }
 trap cleanup EXIT
 "$T/qaserver" -service "$T/license-service" -dir "$W" $([ "$BROWSER" = 1 ] || echo -no-browser) > "$W/qaserver.log" 2>&1 & QPID=$!
@@ -31,7 +41,7 @@ for i in 1 2 3 4 5 6 7 8 9 10; do grep -q READY "$W/qaserver.log" && break; slee
 grep -q READY "$W/qaserver.log" || { cat "$W/qaserver.log"; exit 1; }
 grep SERVICE_PID "$W/qaserver.log"
 scp -q scripts/clearcred.ps1 $WIDHOST:C:/wid/qa/clearcred.ps1
-ssh $WIDHOST 'del C:\wid\out\qa\app.log' </dev/null >/dev/null 2>&1 || true
+ssh $WIDHOST 'mkdir C:\wid\out\qa & del C:\wid\out\qa\app.log' </dev/null >/dev/null 2>&1 || true
 scp -q "$W/config.json" $WIDHOST:C:/wid/qa/config.json
 ssh -N -R 127.0.0.1:18060:127.0.0.1:18060 -R 127.0.0.1:18061:127.0.0.1:18061 $WIDHOST </dev/null & TPID=$!
 echo "tunnel pid $TPID: $(ps -o command= -p $TPID | cut -c1-40)"

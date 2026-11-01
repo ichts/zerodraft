@@ -71,8 +71,10 @@ check('three writing lines visible (current + two history steps)', len(lines) >=
 cur = lines[-1]
 anchor = pr[1] + round(0.33 * (ph / s)) * s
 curmid = oy + (cur[0] + cur[1]) / 2
-check('current line sits on the 33% anchor', abs(curmid - anchor) <= 0.15 * 44.8 * s,
-      f'ink centre {curmid:.1f}px vs anchor {anchor:.1f}px (line pitch {44.8*s:.1f}px)')
+# The Mac sets the glyphs at the bottom of their 1.6 line box and puts the line's box on the anchor, so the live line's ink
+# centre is 14.5 DIP under the anchor (measured on the Mac room at 1040 x 720: x-height 257..269 on an anchor of 249, SYNC row 20)
+check('current line sits on the 33% anchor the way the Mac sets it (ink centre 14.5 DIP under it)', abs(curmid - (anchor + 14.5 * s)) <= 2.5 * s,
+      f'ink centre {curmid:.1f}px vs anchor {anchor:.1f}px + {14.5*s:.1f}px (line pitch {44.8*s:.1f}px)')
 if len(lines) >= 2:
     pitch = ((lines[-1][0] + lines[-1][1]) - (lines[-2][0] + lines[-2][1])) / 2
     check('line pitch is 1.6 x 28 pt', abs(pitch - 44.8 * s) <= 2.5 * s, f'{pitch:.1f}px vs {44.8*s:.1f}px')
@@ -80,8 +82,10 @@ if len(lines) >= 2:
     def depth(bd):
         seg = ref[oy + bd[0]: oy + bd[1], ox: ox + (area[2] - area[0])].mean(axis=2)
         return 255 - np.percentile(seg, 2)
-    d0, d1 = depth(lines[-1]), (depth(lines[-2]) if len(lines) > 1 else 0)
-    check('history line is fainter than the writing line', d1 < d0 - 5, f'ink depth {d0:.0f} -> {d1:.0f}')
+    # the ladder's unit is the sentence (D-077): a row can hold the end of one and the start of the next, so the oldest
+    # visible row is the one that must be fainter than the live row
+    d0, d1 = depth(lines[-1]), (depth(lines[-3] if len(lines) > 2 else lines[-2]) if len(lines) > 1 else 0)
+    check('the oldest visible line is fainter than the writing line', d1 < d0 - 5, f'ink depth {d0:.0f} -> {d1:.0f}')
 
 if len(lines) >= 2:   # Q-04: a full history line is centred on the sheet (ink edges of a centred line are within a few px)
     full = lines[-2]
@@ -300,6 +304,43 @@ if 3 in saved and 1 in saved:
         check('numeral is centred on the paper (its advance box; the italic ink leans)', abs(((xs.min() + xs.max()) / 2 + pr[0]) - (pr[0] + pr[2]) / 2) <= 14 * s, f'{(xs.min()+xs.max())/2+pr[0]:.0f} vs {(pr[0]+pr[2])/2:.0f}')
     else:
         check('numeral appears under the writing line', False, 'no pen-red ink found')
+
+# --- D-074: the kept receipt owns the count, so the corner is silent; one caption sits under the action row
+if len(full):
+    kfoot = pr3[3] - int(16 * s) - int(22 * s)
+    kd, ky, kx = ink_rows(kp, (pr3[0], kfoot - int(16 * s), pr3[2], kfoot + int(16 * s)), 150)
+    check('D-074 kept: the corner count is silent', not bands(kd[:, kd.shape[1] // 2:]), f'{len(bands(kd[:, kd.shape[1] // 2:]))} ink band(s) in the right half of the footer row')
+    pill_bottom = pr3[1] + int(150 * s) + bot_i
+    cd, cy, cx = ink_rows(kp, (pr3[0] + int(40 * s), pill_bottom + int(4 * s), pr3[2] - int(40 * s), pill_bottom + int(48 * s)), 150)
+    cb_ = [b for b in bands(cd) if b[1] - b[0] >= 6 * s]
+    if cb_:
+        xs_ = np.where(cd[cb_[0][0]:cb_[0][1]].sum(axis=0) >= 2)[0]   # two dark pixels in a column: the paper's flecks are single
+        gap_ = (cy + cb_[0][0] - pill_bottom) / s
+        mid_ = cx + (np.percentile(xs_, 2) + np.percentile(xs_, 98)) / 2   # the paper's flecks must not stretch the extent
+        check('D-074 kept: one caption under the action row (the Mac sets it 25 DIP of ink under the pills), centred', 20 <= gap_ <= 30 and abs(mid_ - (pr3[0] + pr3[2]) / 2) <= 6 * s,
+              f'caption ink {gap_:.1f} DIP under the pills, centre {mid_:.0f}px vs paper {(pr3[0]+pr3[2])/2:.0f}px')
+    else:
+        check('D-074 kept: one caption under the action row', False, 'no ink under the pills')
+
+# --- D-077: the first refused delete names the rule in the footer slot, in the quiet role, and the slot returns
+def slot_extent(name):
+    im = load(name); p = paper_rect(im, (0, 0, im.shape[1], im.shape[0]))
+    ft = p[3] - int(16 * s) - int(22 * s)
+    fd_, fy_, fx_ = ink_rows(im, (p[0], ft - int(16 * s), p[0] + (p[2] - p[0]) // 2, ft + int(16 * s)), 150)
+    cols_ = np.where(fd_.sum(axis=0) >= 2)[0]   # two dark pixels in a column: the paper's flecks are single
+    red_ = (np.abs(im - np.array([99, 20, 11])).sum(axis=2) <= 90)[p[3] - int(70 * s): p[3] - int(20 * s), p[0]: p[2]]
+    end = 0
+    for c in cols_:                      # the link and the notice are one run of ink; a stray fleck 24 DIP past it is not text
+        if end and c - end > 24 * s: break
+        end = c
+    return (end + 1) / s if len(cols_) else 0, int(red_.sum())
+if os.path.exists(os.path.join(D, f'{S}-10b-refusal-notice.png')):
+    w1, r1 = slot_extent('10b-refusal-notice'); w2, r2 = slot_extent('10c-notice-gone')
+    check('D-077: the first refused delete names the rule in the footer slot, in the quiet role (not the pen)', w1 > 200 and r1 < 40, f'footer ink reaches {w1:.0f} DIP, {r1} pen-red pixels')
+    check('D-077: the slot returns after two seconds with nothing moved', w2 < 100, f'footer ink reaches {w2:.0f} DIP')
+    mb = chrome_marks('10b-refusal-notice'); mc = chrome_marks('10c-notice-gone')
+    check('D-077: exit link, count and clock stay put while the notice shows', all(abs(mb[k] - base[k]) <= 1.5 * s for k in base if k in mb) and all(abs(mc[k] - base[k]) <= 1.5 * s for k in base if k in mc),
+          json.dumps({'notice': {k: int(v) for k, v in mb.items()}, 'gone': {k: int(v) for k, v in mc.items()}}))
 
 fails = [r for r in rows if not r[0]]
 json.dump([{'ok': r[0], 'check': r[1], 'detail': r[2]} for r in rows], open(os.path.join(D, f'measure-{S}.json'), 'w'), indent=1)

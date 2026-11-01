@@ -3,10 +3,12 @@ package app
 import (
 	_ "embed"
 	"fmt"
+	"math"
 
 	"github.com/ELY-Open-Source/CrychicUI/button"
 	"github.com/egoist/mygo/ui"
 
+	"github.com/ichts/zerodraft/apps/windows/fonts"
 	"github.com/ichts/zerodraft/apps/windows/licence"
 	"github.com/ichts/zerodraft/apps/windows/room"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
@@ -83,7 +85,7 @@ func gap(c *ui.Context, h float32) { ui.Box(c).Height(h) }
 
 // text is one role of text; centre is the card default.
 func text(c *ui.Context, s string, size float32, weight int, col ui.Color) ui.Element {
-	return ui.Text(c, s).FontSize(size).FontWeight(weight).TextColor(col).LineHeight(1.25)
+	return ui.Text(c, s).FontSize(size).FontWeight(weight).TextColor(col).LineHeight(1.2)
 }
 
 func display(c *ui.Context, p pal, s string, size float32) ui.Element {
@@ -91,7 +93,7 @@ func display(c *ui.Context, p pal, s string, size float32) ui.Element {
 }
 
 func sub(c *ui.Context, p pal, s string) ui.Element {
-	return text(c, s, 15, 400, p.mute()).TextAlign(ui.Center).LineHeight(1.4)
+	return text(c, s, 15, 400, p.mute()).TextAlign(ui.Center)
 }
 
 func smallLabel(c *ui.Context, p pal, s string) ui.Element {
@@ -148,6 +150,17 @@ func (a *App) field(c *ui.Context, p pal, value *string, placeholder string) ui.
 		Background(p.of(tokens.Sheet)).Radius(tokens.RadiusControl).Border(1, p.of(tokens.HairStrong))
 }
 
+// chipLockup is BrandChipLockupView: the A mark chip (the page-coloured plate with its hair edge, 22.33 percent
+// corners, a square of the lockup's height) under the split W, then the wordmark, both from the Mac's one SVG that
+// spans the whole box. The plate takes the page token because the lockup sits on the sheet card (D-075).
+func chipLockup(pp *ui.Painter, r ui.Rect, p pal) {
+	plate := ui.Rect{X: r.X, Y: r.Y, W: r.H, H: r.H}
+	radius := r.H * tokens.ChipCornerShare
+	pp.Fill(plate, p.of(tokens.Page), radius)
+	pp.Stroke(ui.Rect{X: plate.X + 0.5, Y: plate.Y + 0.5, W: plate.W - 1, H: plate.H - 1}, p.of(tokens.HairStrong), radius-0.5, 1)
+	pp.Icon(lockup, r, p.ink())
+}
+
 // ---- Home
 
 func (a *App) homeView(c *ui.Context, dark bool) {
@@ -163,12 +176,16 @@ func (a *App) homeView(c *ui.Context, dark bool) {
 			if rules.Clicked() {
 				a.openRules()
 			}
-			ui.Box(c).Size(128, 16.25).Label(tokens.HomeLockupLabel).Role(ui.RoleImage).Draw(func(pp *ui.Painter, r ui.Rect) { pp.Icon(lockup, r, p.ink()) })
-			gap(c, 20)
+			var chipW, chipH float32 = tokens.ChipPickerTypeSize * tokens.ChipEmWidth, tokens.ChipPickerTypeSize * tokens.ChipEmHeight
+			ui.Box(c).Size(chipW, chipH).Label(tokens.HomeLockupLabel).Role(ui.RoleImage).
+				Draw(func(pp *ui.Painter, r ui.Rect) { chipLockup(pp, r, p) })
+			// the vertical gaps below are the Mac's (20, 24, 8, 20, 8, 26, 18) less what Segoe UI Variable's taller line box
+			// adds, measured ink to ink against the Mac picker at 1040 x 720 (scripts/screens.sh, SYNC.md row 34)
+			gap(c, 17)
 			display(c, p, tokens.HomeTitle, 34)
-			gap(c, 24)
+			gap(c, 20)
 			smallLabel(c, p, tokens.HomeMinutes)
-			gap(c, 8)
+			gap(c, 7)
 			mins := make([]string, len(tokens.DurationChoices))
 			for i, d := range tokens.DurationChoices {
 				mins[i] = fmt.Sprint(d / 60)
@@ -177,7 +194,7 @@ func (a *App) homeView(c *ui.Context, dark bool) {
 			a.setDuration(tokens.DurationChoices[a.ui.durIdx])
 			gap(c, 20)
 			smallLabel(c, p, tokens.HomeSilence)
-			gap(c, 8)
+			gap(c, 7)
 			segmented(c, p, &a.ui.silIdx, tokens.HomeSilence, tokens.SilenceLabels)
 			a.setSilence(tokens.SilenceChoices[a.ui.silIdx])
 			gap(c, 26)
@@ -206,22 +223,28 @@ func (a *App) rulesView(c *ui.Context, dark bool) {
 	if c.Shortcut(0, ui.KeyEscape) || c.Shortcut(0, ui.KeyEnter) {
 		a.closeRules()
 	}
+	// The scale's 15 pt body on a 1.5 line box over a 60-character measure; the card carries the measure plus the same
+	// inset each side. Each rule title is one step up in weight at the paragraph's own size, never smaller (D-076).
+	measure := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
+	body := func(s string, col ui.Color) ui.Element {
+		return text(c, s, 15, 400, col).LineHeight(tokens.RulesBodyLeading).Width(measure)
+	}
 	page(c, p, tokens.RulesEyebrow, func() {
-		card(c, p, 620, 40, 44, func() {
-			ui.Column(c).Width(480).AlignItems(ui.Start).Children(func() {
+		card(c, p, measure+2*tokens.RulesCardInset, 40, tokens.RulesCardInset, func() {
+			ui.Column(c).Width(measure).AlignItems(ui.Start).Children(func() {
 				smallLabel(c, p, tokens.RulesEyebrow)
 				gap(c, 10)
 				text(c, tokens.RulesHeading, 34, 500, p.ink()).Font(roomSerif).LineHeight(1.1)
 				gap(c, 12)
-				text(c, tokens.RulesSub, 15, 400, p.mute()).LineHeight(1.4)
+				body(tokens.RulesSub, p.mute())
 				gap(c, 24)
 				for i, r := range [][2]string{{tokens.Rule1Title, tokens.Rule1Body}, {tokens.Rule2Title, tokens.Rule2Body}, {tokens.Rule3Title, tokens.Rule3Body}} {
 					if i > 0 {
-						gap(c, 18)
+						gap(c, tokens.RulesRuleGap)
 					}
-					text(c, r[0], 13, 600, p.ink())
-					gap(c, 4)
-					text(c, r[1], 15, 400, p.mute()).LineHeight(1.4)
+					text(c, r[0], 15, 600, p.ink()).LineHeight(tokens.RulesBodyLeading)
+					gap(c, tokens.RulesTitleGap)
+					body(r[1], p.mute())
 				}
 				gap(c, 28)
 			})
@@ -233,7 +256,7 @@ func (a *App) rulesView(c *ui.Context, dark bool) {
 	})
 }
 
-const roomSerif = "Newsreader, Zhuque Fangsong"
+const roomSerif = fonts.DisplayStack // the rules heading is Newsreader 500 at its own size (the Mac sets the optical axis to the size)
 
 // ---- Upgrade (the activation card)
 
@@ -245,16 +268,17 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 		licensed = false
 	}
 	page(c, p, tokens.UpgradeTitle, func() {
-		card(c, p, 560, 44, 48, func() {
+		// 39 where the Mac's inset is 44: the title's ink starts 5 DIP lower in Segoe UI Variable's line box than in SF's
+		card(c, p, 560, 39, 48, func() {
 			title, subtitle := tokens.UpgradeTitle, tokens.UpgradeSubtitle
 			if licensed {
 				title, subtitle = tokens.UpgradeTitleLicensed, tokens.UpgradeSubtitleLicensed
 			}
 			ui.Column(c).Width(464).AlignItems(ui.Center).Children(func() {
 				display(c, p, title, 34)
-				gap(c, 8)
+				gap(c, 6)
 				sub(c, p, subtitle).MaxWidth(440)
-				gap(c, 26)
+				gap(c, 25)
 				if licensed {
 					a.licensedBlock(c, p, snap)
 					return
@@ -279,27 +303,32 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 					if (act.Clicked() || submit) && !snap.Activating {
 						a.activate()
 					}
-					buyLabel := fmt.Sprintf(tokens.UpgradeBuyFormat, tokens.DisplayPrice)
-					if snap.CheckingOut {
-						buyLabel = tokens.UpgradeOpeningCheckout
-					}
-					buy := secondary(c, p, buyLabel).Disabled(!snap.CheckoutOK || snap.CheckingOut)
-					if buy.Clicked() {
-						a.buy()
+					// No disabled Buy: with checkout unavailable the card would offer a paid action that cannot complete. While a
+					// launch check or a key activation runs the paid path is not settled, so Buy waits (D-076 item 3).
+					if snap.CheckoutOK {
+						buyLabel := fmt.Sprintf(tokens.UpgradeBuyFormat, tokens.DisplayPrice)
+						if snap.CheckingOut {
+							buyLabel = tokens.UpgradeOpeningCheckout
+						}
+						buy := secondary(c, p, buyLabel).Disabled(snap.CheckingOut || snap.Activating || snap.Validating)
+						if buy.Clicked() {
+							a.buy()
+						}
 					}
 				})
 				if msg, bad := a.feedback(snap); msg != "" {
 					gap(c, 14)
 					text(c, msg, 13, 400, pick(bad, p.of(tokens.Red), p.mute())).TextAlign(ui.Center).MaxWidth(440).LineHeight(1.35)
 				}
-				gap(c, 14)
+				gap(c, 12)
 				status(c, p, tokens.UpgradePricing, false, 440)
+				gap(c, 13)
 				if !snap.CheckoutOK {
-					gap(c, 14)
 					text(c, tokens.UpgradeCheckoutUnavailable, 13, 400, p.chrome()).MaxWidth(440)
+					gap(c, 6)
 				}
-				gap(c, 6)
-				if link(c, p, tokens.UpgradeWebTrial).Clicked() {
+				// the free route is a real 48 pt outlined control with a hit area and a focus ring, not a caption-shaped link
+				if secondary(c, p, tokens.UpgradeWebTrial).Clicked() {
 					a.openWebTrial()
 				}
 			})
@@ -310,6 +339,9 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 // feedback is the one line under the buttons: this attempt's error, the empty-field prompt, or the standing
 // licence state (Mac UpgradeViewController.refreshLicense). bad is the red tone.
 func (a *App) feedback(s licence.Snapshot) (string, bool) {
+	if s.Activating { // while a key check runs the card says so instead of the standing status
+		return tokens.UpgradeChecking, false
+	}
 	if s.Err != nil {
 		return s.Err.Error(), true
 	}
@@ -399,6 +431,10 @@ func (a *App) settingsView(c *ui.Context, dark bool) {
 							a.buy()
 						}
 					})
+					if !snap.CheckoutOK {
+						gap(c, 8)
+						text(c, tokens.UpgradeCheckoutUnavailable, 13, 400, p.mute())
+					}
 				}
 				gap(c, 24)
 				text(c, tokens.SettingsAbout, 15, 600, p.ink())

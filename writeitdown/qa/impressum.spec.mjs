@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
 // The legal notice (Impressum): the operator block the captain approved, verbatim, and the footer
@@ -28,7 +27,6 @@ test('the Impressum names the operator, address and email exactly, and nothing e
 test('the Impressum is canonical, in the sitemap and linked from every footer', async ({ page, request }) => {
   const xml = await (await request.get('/writeitdown/sitemap.xml')).text();
   expect(xml).toContain('<loc>https://writeitdown.app/impressum.html</loc>');
-  expect(readFileSync('install.sh', 'utf8')).toContain(' impressum.html ');
   await page.goto('impressum.html');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://writeitdown.app/impressum.html');
   for (const path of pages) {

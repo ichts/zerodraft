@@ -1,11 +1,58 @@
 name: writeitdown
 
+# The writeitdown acceptance suite is 1048 Playwright tests (8 projects x 2 workers), about 15 minutes serial.
+# It runs as parallel shards (the matrix below sets how many); the job named `test` at the bottom is the single required check.
+# It always reports: success when every shard passed or when the web suite was legitimately skipped
+# (a changes-detection job, not `on.paths`, so a required check never stays pending).
 on:
   pull_request:
 
+# A newer push to the same PR ref supersedes the older run. Runs on main are never cancelled.
+concurrency:
+  group: writeitdown-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test:
+  changes:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      # The web suite is skipped only when EVERY changed file is provably outside what it reads or serves.
+      # Anything unknown runs it, and so does any error here. The suite reads the Mac Info.plist and execs
+      # the Mac release scripts (qa/mac.spec.mjs), so those two stay in the run set.
+      - id: filter
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          web=true
+          if files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)') && [ -n "$files" ]; then
+            web=false
+            while IFS= read -r f; do
+              case "$f" in
+                writeitdown/*|.github/workflows/writeitdown.yml) web=true ;;
+                apps/macos/FirstLine/Sources/FirstLine/Info.plist|apps/macos/FirstLine/scripts/*) web=true ;;
+                docs/*|apps/macos/*|apps/windows/*|.github/workflows/windows.yml|*.md) ;;
+                *) web=true ;;
+              esac
+            done <<< "$files"
+          fi
+          echo "web=$web" >> "$GITHUB_OUTPUT"
+          echo "web suite required: $web"
+
+  shard:
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    name: shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     defaults:
       run:
         working-directory: writeitdown
@@ -14,6 +61,71 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: writeitdown/package-lock.json
       - run: npm ci
       - run: npx playwright install --with-deps chrome
-      - run: npm test
+      - name: Playwright shard ${{ matrix.shard }}/${{ strategy.job-total }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/shard-${{ matrix.shard }}.json
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=list,json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shard-report-${{ matrix.shard }}
+          path: ${{ runner.temp }}/shard-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: shard-traces-${{ matrix.shard }}
+          path: writeitdown/test-results
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # Single required check. Keeps the pre-sharding job name `test`, so branch protection needs no change.
+  test:
+    needs: [changes, shard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every upstream job succeeded, or the web suite was legitimately skipped
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          WEB: ${{ needs.changes.outputs.web }}
+          SHARD: ${{ needs.shard.result }}
+        run: |
+          echo "changes=$CHANGES web=$WEB shard=$SHARD"
+          [ "$CHANGES" = success ] || { echo "::error::changes detection did not succeed ($CHANGES)"; exit 1; }
+          if [ "$WEB" = false ]; then
+            [ "$SHARD" = skipped ] || { echo "::error::suite was meant to be skipped but shard=$SHARD"; exit 1; }
+            echo "Web suite skipped: no changed file is read or served by it."
+          else
+            [ "$SHARD" = success ] || { echo "::error::shards did not all succeed ($SHARD)"; exit 1; }
+          fi
+      # Sharding must not lose a test: the shards' reports together hold exactly the tests the suite lists.
+      - uses: actions/checkout@v5
+        if: needs.changes.outputs.web == 'true'
+      - uses: actions/setup-node@v4
+        if: needs.changes.outputs.web == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: writeitdown/package-lock.json
+      - uses: actions/download-artifact@v4
+        if: needs.changes.outputs.web == 'true'
+        with:
+          pattern: shard-report-*
+          path: ${{ runner.temp }}/reports
+          merge-multiple: true
+      - name: Sharded test count equals the listed test count
+        if: needs.changes.outputs.web == 'true'
+        working-directory: writeitdown
+        run: |
+          npm ci
+          count='[.. | objects | select(has("tests")) | .tests[]] | length'
+          listed=$(npx playwright test --list --reporter=json | jq "$count")
+          ran=$(cat "$RUNNER_TEMP"/reports/shard-*.json | jq -s "map($count) | add")
+          echo "listed=$listed ran-across-shards=$ran"
+          [ "$listed" = "$ran" ] || { echo "::error::shards ran $ran tests, suite lists $listed"; exit 1; }

@@ -139,3 +139,4 @@ Artifact: the capture set, the review, and the log entry.
 - Skip the folded cut list, or drop a case without a written reason.
 - Ship without a card, or widen the scope beyond the card and call it a detail.
 - Ask more than five questions in a round, or ask a question it could answer by reading the code.
+

@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 
-// The twelve shipped pages. Every one of them carries the landing page's design system: the A mark
+// The thirteen shipped pages. Every one of them carries the landing page's design system: the A mark
 // lockup on its paper plate, the theme button, the shared footer, and the v2 type and colour roles.
 // The support and answer pages are not a reading mode; the purchase page is not a third system.
-const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html',
+const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
-const documentPages = ['mac.html', 'support.html', 'privacy.html', 'terms.html',
+const documentPages = ['mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
 const service = 'https://licenses.writeitdown.app/api/v1';
@@ -51,7 +51,7 @@ const readShell = page => page.evaluate(async () => {
   };
 });
 
-test('twelve shipped pages share one header, plate, canvas and body family', async ({ page }) => {
+test('thirteen shipped pages share one header, plate, canvas and body family', async ({ page }) => {
   const shells = [];
   for (const path of pages) {
     await page.goto(path);
@@ -86,7 +86,7 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
     const read = await page.evaluate(() => {
       const css = (selector, pseudo = null) => getComputedStyle(document.querySelector(selector), pseudo);
       const main = document.querySelector('main.doc');
-      const paragraph = [...main.querySelectorAll('p')].find(p => p.textContent.trim().length > 80);
+      const paragraph = [...main.querySelectorAll('p')].sort((x, y) => y.textContent.length - x.textContent.length)[0];
       const box = paragraph.getBoundingClientRect();
       return {
         font: css('main.doc p').fontFamily,

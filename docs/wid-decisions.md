@@ -1483,3 +1483,18 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: D-027's per-visual-row unit (its stepping, one-pitch shift and the retired gradient stand) and
   D-046's "visual only" refusal (the shake, the hairline, the live-region line and the absence of sound
   stand). D-069's ladder values are cited, not changed.
+
+## D-078: writeitdown.app carries an Impressum, linked from every footer
+
+- Date: 2026-11-03. Captain approved the operator details ("ok 那 就用吧").
+- Decision: the site ships `impressum.html` on the shared document shell with four labelled fields only:
+  Operator `Ian Zhou (Trefoil Studio)`, Address `Balsahout 4, 2719 MJ Zoetermeer, Netherlands`, Email
+  `contact@trefoilstudio.com`, and `Responsible for content (§ 18 MStV)` `Ian Zhou` at the same address. The
+  Legal footer column on every page gains an `Impressum` link after Terms; the page is in the sitemap,
+  `llms.txt` and `install.sh`.
+- Reason: the licence checkout sells to Germany, where a provider must name itself and an address. No KvK
+  number, VAT id or phone number exists, so none is written.
+- Tests: `writeitdown/qa/impressum.spec.mjs` (exact fields, footer link on every page, measured footer
+  geometry at 1440 and 390).
+- Supersedes: nothing. The site is English only; a German or Italian page would use `Niederlande` or
+  `Paesi Bassi` for the country word.

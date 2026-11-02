@@ -1,3 +1,4 @@
 build/
 build-qa/
 cmd/drv/drv.exe
+build-store/

@@ -110,9 +110,10 @@ real input and the Microsoft IMEs, so they are not CI. Host and desktop user com
   Buy hand-off, a paid test session, the two-PC limit, activation, relaunch, refund and revocation. It runs the QA flavour as a
   plain exe pushed to the PC (`WID_E2E_MSIX=1` runs the installed QA MSIX instead). `scripts/measure_screens.py` measures its
   captures.
-- `scripts/package-msix.sh release|qa` - builds, test-signs and installs the MSIX on the test PC with the Windows SDK
+- `scripts/package-msix.sh release|qa|store` - builds, test-signs and installs the MSIX on the test PC with the Windows SDK
   build tools (`packaging/make-msix.ps1`, `packaging/STORE.md` for the Store identity). Test signing uses a
-  throw-away `CN=WID Test Signing` certificate; no production certificate or Store submission lives here.
+  throw-away `CN=WID Test Signing` certificate; no production certificate or Store submission lives here. `store` instead packs
+  the release binary unsigned under the reserved Store identity (never installed); `scripts/check_manifest.sh` asserts the identities.
 
 **Smart App Control on vivobook-1** (state `On`, `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState`)
 blocks the test-signed MSIX and the `mygo build` exe ("could not verify its publisher") and, since 2026-11-01 about 19:40, every

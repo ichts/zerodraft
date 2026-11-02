@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     defaults:
       run:
         working-directory: writeitdown
@@ -89,9 +89,6 @@ jobs:
     needs: [changes, shard]
     if: always()
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: writeitdown
     steps:
       - name: Every upstream job succeeded, or the web suite was legitimately skipped
         env:
@@ -124,6 +121,7 @@ jobs:
           merge-multiple: true
       - name: Sharded test count equals the listed test count
         if: needs.changes.outputs.web == 'true'
+        working-directory: writeitdown
         run: |
           npm ci
           count='[.. | objects | select(has("tests")) | .tests[]] | length'

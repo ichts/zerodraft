@@ -20,8 +20,8 @@ package the Store ingests (release binary, identity above, packed on vivobook-1 
 never installed or signed). `scripts/check_manifest.sh` (run in CI) asserts the store manifest carries exactly this identity, a
 four-section version whose first section is not 0, the Windows 11 floor and no sideload value, that the sideload manifests keep the
 test-signing identity and the Windows 10 floor, that all three agree on the version, and (with doctored manifests) that the gate
-still refuses a zero first section and a below-Windows-11 floor. Certification of an unsigned MSIX is the Store's; this lane did not
-submit.
+still refuses a zero first section, a Store floor below Windows 11 and a sideload that leaves the Windows 10 floor. Certification of
+an unsigned MSIX is the Store's; this lane did not submit.
 
 The version has one source, `version/version.txt` (`1.0.0` now): Settings > About shows it, `package-msix.sh` renders the identity's
 `1.0.0.0` from it, and `version/version_test.go` fails when `mygo.json`'s copy (the exe's version resource) drifts from it or when a

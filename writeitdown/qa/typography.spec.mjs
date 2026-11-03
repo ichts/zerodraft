@@ -19,7 +19,7 @@ const SHARED = {
   accent: /^"Reenie Beanie"$/,
 };
 const baseline = JSON.parse(readFileSync(new URL('./shared-type-baseline.json', import.meta.url)));
-const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html',
+const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
 const fontHosts = /fonts\.(googleapis|gstatic)\.com/;

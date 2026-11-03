@@ -236,7 +236,7 @@ async function run(size, browser) {
     await step('Trefoil Studio, Product/Help/Legal links all resolve', async () => {
       await show('footer'); const t = await page.locator('footer').innerText(); ok(/Trefoil Studio/.test(t), 'Trefoil Studio missing');
       const hrefs = await page.locator('footer a').evaluateAll(els => els.map(e => e.getAttribute('href')));
-      for (const n of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#buy']) ok(hrefs.includes(n), `footer link ${n} missing`);
+      for (const n of ['support.html', 'privacy.html', 'terms.html', 'impressum.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#buy']) ok(hrefs.includes(n), `footer link ${n} missing`);
       for (const h of hrefs.filter(h => !/^(mailto:|#)/.test(h))) { const r = await ctx.request.get(url('/' + h.split('#')[0])); ok(r.status() === 200, `${h} -> ${r.status()}`); }
     });
   });

@@ -10,7 +10,7 @@ const answers = [
   '/delete-a-draft.html',
   '/is-my-writing-saved.html',
 ];
-const pages = ['/', '/download/', '/support.html', ...answers, '/privacy.html', '/terms.html'];
+const pages = ['/', '/download/', '/support.html', ...answers, '/privacy.html', '/terms.html', '/impressum.html'];
 const shipped = [...pages, '/mac.html'];
 const origin = 'https://writeitdown.app';
 const crawlers = ['OAI-SearchBot', 'ChatGPT-User', 'GPTBot', 'PerplexityBot', 'ClaudeBot'];

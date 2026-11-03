@@ -2,21 +2,24 @@ package version
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"os"
 	"os/exec"
 	"regexp"
-	"strings"
 	"testing"
 )
 
-// TestVersionShape keeps the version one the Store accepts: Microsoft refuses a first section of 0, and the identity
-// has exactly four numeric sections whose last one the Store reserves for itself.
+var (
+	// appVersion is version.txt's shape: three sections, the first not 0 because Microsoft refuses a first section of 0.
+	appVersion = regexp.MustCompile(`^[1-9][0-9]*\.[0-9]+\.[0-9]+$`)
+	// packVersion is the identity's shape: four sections, the first not 0, the fourth 0 because the Store reserves it.
+	packVersion = regexp.MustCompile(`^[1-9][0-9]*\.[0-9]+\.[0-9]+\.0$`)
+)
+
+// TestVersionShape keeps the version one the Store accepts: Microsoft refuses a first section of 0.
 func TestVersionShape(t *testing.T) {
-	if !regexp.MustCompile(`^[1-9][0-9]*\.[0-9]+\.[0-9]+$`).MatchString(Version) {
+	if !appVersion.MatchString(Version) {
 		t.Fatalf("version.txt is %q: the Store refuses a first section of 0, so it must be a.b.c with a > 0", Version)
-	}
-	if PackVersion != Version+".0" {
-		t.Fatalf("PackVersion is %q, want %q: the Store reserves the fourth section", PackVersion, Version+".0")
 	}
 }
 
@@ -39,8 +42,16 @@ func TestMygoJSONAgrees(t *testing.T) {
 	}
 }
 
-// TestManifestsCarryPackVersion proves every package flavour renders the version the app reports. It renders the
-// manifests through the same script the CI gate uses, so a hardcoded VERSION in the packaging path fails here.
+// manifestIdentity is the identity the packaging script rendered into an AppxManifest.xml.
+type manifestIdentity struct {
+	Identity struct {
+		Version string `xml:"Version,attr"`
+	} `xml:"Identity"`
+}
+
+// TestManifestsCarryPackVersion proves every package flavour renders the app's version with the Store's reserved fourth
+// section, in the four-section shape the Store accepts. It renders the manifests through the same script the CI gate
+// uses, so a hardcoded or wrongly derived version in the packaging path fails here.
 func TestManifestsCarryPackVersion(t *testing.T) {
 	sh, err := exec.LookPath("sh")
 	if err != nil {
@@ -51,8 +62,16 @@ func TestManifestsCarryPackVersion(t *testing.T) {
 		if err != nil {
 			t.Fatalf("render the %s manifest: %v", flavour, err)
 		}
-		if !strings.Contains(string(out), `Version="`+PackVersion+`"`) {
-			t.Fatalf("the %s manifest does not carry Version=%q", flavour, PackVersion)
+		var m manifestIdentity
+		if err := xml.Unmarshal(out, &m); err != nil {
+			t.Fatalf("parse the %s manifest: %v", flavour, err)
+		}
+		if !packVersion.MatchString(m.Identity.Version) {
+			t.Fatalf("the %s manifest carries Version=%q: the Store needs a.b.c.0 with a > 0 and the fourth section 0",
+				flavour, m.Identity.Version)
+		}
+		if m.Identity.Version != PackVersion {
+			t.Fatalf("the %s manifest carries Version=%q and the app reports %q", flavour, m.Identity.Version, PackVersion)
 		}
 	}
 }

@@ -1,7 +1,7 @@
 // Package version is the one place the Windows app's version is written. version.txt holds the marketing version;
 // Settings > About shows it, scripts/package-msix.sh turns it into the MSIX identity (which the Store reserves a fourth
 // section of), and mygo.json carries the copy `mygo build` puts in the exe's version resource. version_test.go keeps
-// those three in step, so the Settings screen, the installed package and the Store listing can never disagree.
+// version.txt, mygo.json and the rendered manifests in step.
 package version
 
 import (

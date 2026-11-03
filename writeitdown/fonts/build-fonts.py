@@ -2,7 +2,8 @@
 """Build the webfonts writeitdown.app serves from its own files.
 
 [INPUT] The Mac app's bundled faces (apps/macos/FirstLine/Sources/FirstLine/Resources): Newsreader
-        upright and italic variable, Zhuque Fangsong, and writeitdown/reenie-beanie.woff2.
+        upright and italic variable, Zhuque Fangsong, and the committed
+        writeitdown/fonts/reenie-beanie.woff2 hand accent.
 [OUTPUT] writeitdown/fonts/*.woff2 plus the generated writeitdown/fonts.css (the faces every page
         links) and writeitdown/fonts-cjk.css (the Chinese slices, linked by index.html alone).
 [POS]   The one font build step for the static site; the committed woff2 files are its product.

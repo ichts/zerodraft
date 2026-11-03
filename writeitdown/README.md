@@ -154,7 +154,7 @@ absent. The page branch resolves `/download/` and `/` to their directory index a
 
 #### Host cache policy
 
-Until 2026-11-03 the host sent no `Cache-Control` at all on `/`, `site.css`, `tokens.css` and the
+On 2026-11-03 the host sent no `Cache-Control` at all on `/`, `site.css`, `tokens.css` and the
 scripts, so browsers applied heuristic freshness (roughly 10% of the time since `Last-Modified`) and
 a returning visitor could keep an old `site.css` beside new HTML for an hour or more. The block
 above fixes that. It keeps the two rules the host already had (the feed's `no-cache` and the
@@ -165,19 +165,18 @@ it exactly the `no-cache` it already had.
 - `no-cache` means "store it, but ask before reuse". The browser keeps its copy and the ETag
 decides: an unchanged file answers `304 Not Modified`, a changed file answers `200` with a new ETag.
 That is a deploy showing up on an ordinary reload, with no hard refresh and no `?v=` argument.
-- Everything except the Sparkle payloads is served under a name that survives a new deploy:
-`site.css`, `tokens.css`, `paper.js`, `room.js`, `demo.js`, the pages and the fonts
+- The pages, stylesheets, scripts, text, images and fonts are served under a name that survives a
+new deploy: `site.css`, `tokens.css`, `paper.js`, `room.js`, `demo.js`, the pages and the fonts
 (`newsreader-latin.woff2`, `newsreader-latin-italic.woff2`, the thirteen `zhuque-fangsong-NN.woff2`
 subsets, `fonts/reenie-beanie.woff2`) all keep their file name when their bytes change, so none of
 them is cached as `immutable`. Only the Sparkle payloads qualify, and only because their name
-carries both version and build number; the feed is never reused at all.
+carries both version and build number; the feed revalidates like the pages.
 - The DMG keeps `no-cache` too. `Write-It-Down-<version>.dmg` carries the marketing version only, and
 a rebuild inside one version keeps that name, so an immutable year would pin the old installer.
 - `/api/*` stays out of the policy on purpose. The waitlist handler
-(`services/waitlist/deploy/Caddyfile.snippet`) sets only `Allow` and `Content-Type` today and sends
-no `Cache-Control` at all; the license routes are served from `licenses.writeitdown.app` and never
-reach this block. The policy therefore adds no directive to an `/api/` response and replaces none
-that the service sets.
+(`services/waitlist/deploy/Caddyfile.snippet`) sends no `Cache-Control` at all today; the license
+routes are served from `licenses.writeitdown.app` and never reach this block. The policy therefore
+adds no directive to an `/api/` response and replaces none that the service sets.
 
 The policy has one owner on purpose. `header` at site level runs before any `handle`, and a
 `Cache-Control` set inside a `handle` would silently win over the policy above, so keep
@@ -212,12 +211,11 @@ curl -sSI https://writeitdown.app/download/updates/<payload>.zip | grep -i '^cac
 
 Fonts keep `no-cache` because their names are stable: `newsreader-latin.woff2`,
 `newsreader-latin-italic.woff2`, the thirteen `zhuque-fangsong-NN.woff2` subsets and
-`fonts/reenie-beanie.woff2` are replaced in place by `fonts/build-fonts.py`, so a face rebuild changes
-their bytes without changing their names, and a year under `immutable` would pin an old face. Hashing
-their names instead would mean renaming every face in `fonts/build-fonts.py` and in both generated
-CSS files, while `fonts.css` itself still revalidated, so the fonts revalidate like every other
-stable name. The Sparkle payloads stay the only immutable set, because a new build publishes a new
-file name.
+`fonts/reenie-beanie.woff2` keep their name when a rebuild replaces their bytes, so a face rebuild
+cannot change the URL, and a year under `immutable` would pin an old face. Hashing their names
+instead would mean renaming every face in `fonts/build-fonts.py` and in both generated CSS files,
+while `fonts.css` itself still revalidated, so the fonts revalidate like every other stable name.
+The Sparkle payloads stay the only immutable set, because a new build publishes a new file name.
 
 Two files from an older deploy still sit in the site root and are served today:
 `/reenie-beanie.woff2` and `/OFL-ReenieBeanie.txt`. Both shipped into `fonts/` from 1.0 on, nothing in

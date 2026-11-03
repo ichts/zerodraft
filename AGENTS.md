@@ -2,6 +2,11 @@
 
 These repository-specific rules extend the global `~/.pi/agent/AGENTS.md`. Do not duplicate global rules here. The sections below add the discipline and product contracts that are specific to Zero Draft; the global file still owns the universal rules (no em dash, no unrequested co-authored trailer, no editing generated files, no exposed secrets, and no commit/push/deploy without authorization). `VISION.md` is the acceptance policy that governs whether a change may land; it does not override `design/DESIGN.md` (the visual constitution) or this file (process).
 
+## Principles
+
+- Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
+- Make the best decision that will elevate all three: the user experience (UX), developer experience (DX), and agent experience (AX) always, without breaking anything.
+
 ## How to work here
 
 - Address the developer as 哥 and communicate with the developer in Chinese. Keep product copy and the public pages in the product's own English voice.

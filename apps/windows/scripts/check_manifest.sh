@@ -57,6 +57,7 @@ want qa TrefoilStudio.WriteItDownQA 'CN=WID Test Signing'
 # known-broken controls: each doctored manifest must be refused, and for its own reason
 STORE_MANIFEST=$(scripts/package-msix.sh store --manifest)
 RELEASE_MANIFEST=$(scripts/package-msix.sh release --manifest)
+BELOW_FLOOR=$(printf '%s\n' "$WINDOWS11" | awk -F. '{ print $1 "." $2 "." ($3 - 1) "." $4 }')
 refuse() { # what, the reason the refusal must give, then the audit arguments for the doctored manifest
   what=$1; reason=$2; shift 2
   out=$(audit "$@" 2>&1) && fail "the gate accepted a manifest with $what"
@@ -67,13 +68,13 @@ refuse 'a version whose first section is 0' 'first section of 0' \
   store "$(printf '%s\n' "$STORE_MANIFEST" | sed '/<Identity /s|Version="[0-9.]*"|Version="0.2.0.0"|')" \
   TrefoilStudio.WriteItDown "$STORE_PUBLISHER"
 refuse 'a Store manifest below the Windows 11 floor' "want $WINDOWS11" \
-  store "$(printf '%s\n' "$STORE_MANIFEST" | sed '/<TargetDeviceFamily /s|MinVersion="[0-9.]*"|MinVersion="10.0.19041.0"|')" \
+  store "$(printf '%s\n' "$STORE_MANIFEST" | sed "/<TargetDeviceFamily /s|MinVersion=\"[0-9.]*\"|MinVersion=\"$BELOW_FLOOR\"|")" \
   TrefoilStudio.WriteItDown "$STORE_PUBLISHER"
 refuse 'the test-signing publisher' 'Identity Publisher' \
   store "$(printf '%s\n' "$STORE_MANIFEST" | sed '/<Identity /s|Publisher="[^"]*"|Publisher="CN=WID Test Signing"|')" \
   TrefoilStudio.WriteItDown "$STORE_PUBLISHER"
 refuse 'a sideload manifest below the Windows 11 floor' "want $WINDOWS11" \
-  release "$(printf '%s\n' "$RELEASE_MANIFEST" | sed '/<TargetDeviceFamily /s|MinVersion="[0-9.]*"|MinVersion="10.0.19041.0"|')" \
+  release "$(printf '%s\n' "$RELEASE_MANIFEST" | sed "/<TargetDeviceFamily /s|MinVersion=\"[0-9.]*\"|MinVersion=\"$BELOW_FLOOR\"|")" \
   TrefoilStudio.WriteItDown 'CN=WID Test Signing'
 
 # the Store flavour is unsigned and never installed: it must not call the signing or install scripts

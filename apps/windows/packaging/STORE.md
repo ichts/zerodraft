@@ -23,9 +23,9 @@ test-signing identity and the same Windows 11 floor, that all three agree on the
 still refuses a zero first section and a floor below Windows 11. Certification of an unsigned MSIX is the Store's; this lane did not
 submit.
 
-Every packaged flavour floors at Windows 11 (`10.0.22000.0`, one constant in `scripts/package-msix.sh`): nothing below Windows 11
-has been run. Windows 10 is reconsidered only after the vivobook-1 Windows 10 run (`wid-win10-vm`) passes, at which point the floor
-is a one-line change.
+Every packaged flavour floors at Windows 11 (`10.0.22000.0`): nothing below Windows 11 has been run. The shipping constant in
+`scripts/package-msix.sh` and the gate's independent oracle in `scripts/check_manifest.sh` must move together, and the gate's
+below-floor controls follow that oracle. Windows 10 is reconsidered only after the vivobook-1 Windows 10 run (`wid-win10-vm`) passes.
 
 The version has one source, `version/version.txt` (`1.0.0` now): Settings > About shows it, `package-msix.sh` renders the identity's
 `1.0.0.0` from it, and `version/version_test.go` fails when `mygo.json`'s copy (the exe's version resource) drifts from it or when a

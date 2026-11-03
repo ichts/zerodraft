@@ -1498,3 +1498,33 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   geometry at 1440 and 390).
 - Supersedes: nothing. The site is English only; a German or Italian page would use `Niederlande` or
   `Paesi Bassi` for the country word.
+
+## D-079: The site's radii sit on a 4 px grid and nest as R - p, and headings, text and corners get shared CSS switches
+
+- Date: 2026-11-02
+- Decision: Web only (`writeitdown/site.css`, `tokens.css`; the Mac app is untouched). Every radius on a shipped
+  page is on the 4 px grid and at least 4 px, or a pill or circle. `--r-card` is 24 px (was 22), the key caps use
+  `--r-ctl` 8 px (were 10), and the phone demo sheet keeps `--r-sheet` 16 px like the room sheet (was 14 below
+  768 px). A panel padded `p` inside a card of radius `R` takes `max(4, R - p)`: each card that owns panels
+  declares its padding as `--pad` and derives `--r-panel` from it, so the SHA-256 panel, the install command and
+  the license key are 4 px at their current paddings (were 8) and 12 px in the 12 px-padded download card on a
+  phone below 365 px. Headings (`h1` to `h3`) use `text-wrap: balance`, paragraphs and list items
+  `text-wrap: pretty`, button labels are `nowrap`, and the price and the price facts declare tabular figures.
+  Continuous corners are progressive enhancement: under `@supports (corner-shape: superellipse(1.25))` every box
+  takes `superellipse(1.25)` and every pill and circle `round`; browsers without it show the plain radius.
+- Kept as they were: the two writing sheets keep their own text wrapping (`wrap`), so the anchor, the stopped
+  group and the kept screen do not move (D-070, D-077); the download head keeps its `Write It Down` / `for Mac`
+  break, so balance is off on it (D-060); the header chip keeps its drawn 22.33% squircle and `round` corners
+  (D-038, D-075); the EXIT control stays square (D-059); the room sheet's 16 px radius value is D-004's, only its
+  curve changes; the 2 px strike bar on the key caps is a stroke, not a box. Paddings off the 4 px grid
+  (`.dlbox` at 22 px between 365 and 820 px, the 14 px and 12 px panel paddings) are left alone: moving them
+  changes the width the hash halves and the command wrap against (D-060).
+- Reason: the radii had drifted (22, 10 and 14 beside a 4 px scale), a small panel in a large card kept the same
+  radius whatever its padding, and headings could end on one lonely word. The rule is one relation that a test
+  can measure. Newsreader's default figures are already tabular, so the serif numbers only declare it; the
+  system sans is proportional by default and carries it on the clock, count and numeral.
+- Tests: `writeitdown/qa/shape-text.spec.mjs` (computed `text-wrap-style` on all twelve pages, the sheets and the
+  download head excluded, radii on the grid and at least 4, pills `round`, nested `r = R - p` at 1440, 700 and
+  360 px and on the license card, digit widths with a proportional negative control, `nowrap` and one-line labels
+  at 320 px, no `line-break: anywhere` or `word-break: break-all`).
+- Supersedes: no recorded decision. D-004's "corner radius" is cited, not changed.

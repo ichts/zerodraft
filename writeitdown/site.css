@@ -170,9 +170,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   mask:url(logo/write-it-down-lockup.svg) no-repeat center/100% auto}
 /* header end: the page action plus the theme icon button */
 .nav-end{display:flex;align-items:center;gap:var(--s2,8px)}
-.theme-btn{flex:none;position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:999px;border:1px solid var(--hair-2,color-mix(in oklab,var(--ink) 18%,transparent));background:var(--sheet,transparent);color:var(--ink)}
+.theme-btn{flex:none;position:relative;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0;border-radius:var(--r-pill);border:1px solid var(--hair-2,color-mix(in oklab,var(--ink) 18%,transparent));background:var(--sheet,transparent);color:var(--ink)}
 .theme-btn::after{content:"";position:absolute;inset:-4px}
-.theme-btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:999px}
+.theme-btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:var(--r-pill)}
 .theme-btn .i-sun,:root[data-theme="dark"] .theme-btn .i-moon{display:none}
 :root[data-theme="dark"] .theme-btn .i-sun{display:block}
 /* buttons: primary 48 ink pill, ghost 44, quiet 36 */
@@ -188,7 +188,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* tag, key cap */
 .home .tag{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px;border-radius:var(--r-pill);background:var(--tag-bg);border:1px solid var(--hair);font:400 12px/1 var(--sans);color:var(--chrome)}
 .home .tag b{width:6px;height:6px;border-radius:50%;background:var(--red);display:block}
-.home .key{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:58px;height:50px;padding:0 12px;border-radius:10px;background:var(--sheet);border:1px solid var(--hair-2);font:600 17px/1 var(--sans)}
+.home .key{position:relative;display:inline-flex;align-items:center;justify-content:center;min-width:58px;height:50px;padding:0 12px;border-radius:var(--r-ctl);background:var(--sheet);border:1px solid var(--hair-2);font:600 17px/1 var(--sans)}
 .home .key.no::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:var(--red);transform:rotate(-14deg);border-radius:2px}
 /* headline */
 .home .hero{text-align:center;padding:var(--s4) var(--gut) 0}
@@ -245,7 +245,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .sub{margin:18px auto 0;max-width:46ch;text-align:center;font:400 var(--t-body)/1.55 var(--sans);color:var(--mute)}
 .hero-sub{max-width:var(--measure);margin-top:var(--s3)}
 .cards,.moments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:var(--s7)}
-.home .card{background:var(--sheet);border-radius:var(--r-card);border:1px solid var(--hair);overflow:hidden;display:flex;flex-direction:column}
+.home .card{--r-panel:max(var(--r-min),calc(var(--r-card) - var(--pad,0px)));background:var(--sheet);border-radius:var(--r-card);border:1px solid var(--hair);overflow:hidden;display:flex;flex-direction:column}
 .card .vis{height:190px;background:linear-gradient(180deg,var(--stage-a),var(--stage-b));display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--hair)}
 .card .txt{padding:22px var(--s5) 26px}
 .card h3{margin:0 0 var(--s2);font:500 var(--t-h3)/1.15 var(--serif);letter-spacing:-.01em}
@@ -276,7 +276,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .facts{list-style:none;margin:0;padding:0;display:grid}
 .facts li{display:flex;align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .facts li:last-child{border-bottom:0}
-.facts b{font:500 28px/1.1 var(--serif);min-width:120px;letter-spacing:-.01em;color:var(--ink)}
+.facts b{font:500 28px/1.1 var(--serif);min-width:120px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 /* footer */
 .home-foot{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut);font:400 14px/1.5 var(--sans);color:var(--mute)}
 .foot-grid{padding:var(--s8) 0 var(--s6);border-top:1px solid var(--hair);display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:var(--s6)}
@@ -315,7 +315,6 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .hero-sub{margin-top:var(--s1)}
   .cta{padding-top:var(--s4)}
   .stagewrap{margin-top:var(--s5)}
-  .home .paper{border-radius:14px}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
   .faqwrap{grid-template-columns:1fr;gap:20px}
@@ -335,13 +334,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
 .dl-page .dlhead h1 .nw{white-space:nowrap}
 .dl-page .dlhead .sub{max-width:60ch}
-.dlbox{max-width:760px;margin:36px auto 0;padding:32px;gap:20px}
+.dlbox{--pad:32px;max-width:760px;margin:36px auto 0;padding:var(--pad);gap:20px}
 .dlbox .actions{display:flex;flex-wrap:wrap;gap:var(--s3)}
 /* The one string a buyer has to copy: the label in the tool face, the hash in the ink mono, on its
    own panel. Its two atomic 32-character halves share a line when they fit and wrap when they do
    not, so the value is visible whole without scrolling (D-060). */
 .dlrow{display:block}
-.dlbox .sha{margin:0;padding:12px 14px;border:1px solid var(--hair);border-radius:var(--r-ctl);background:var(--tag-bg);
+.dlbox .sha{margin:0;padding:12px 14px;border:1px solid var(--hair);border-radius:var(--r-panel);background:var(--tag-bg);
   font:400 var(--t-small)/1.7 var(--sans);color:var(--mute)}
 .sha-label{display:block}
 .dlbox .sha code{display:block;font:500 13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
@@ -349,7 +348,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .dlcopy{display:inline-flex;margin-top:8px}
 /* The install command breaks at its argument boundary; the filename stays whole on the hanging line. */
 .dlcmd{display:block;margin:10px 0 0}
-.dl-page #install code{display:block;margin:0;padding:10px 12px;border-radius:var(--r-ctl);background:var(--tag-bg);
+.dl-page #install code{display:block;margin:0;padding:10px 12px;border-radius:var(--r-panel);background:var(--tag-bg);
   white-space:normal;overflow-wrap:normal;font:500 13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
 .dl-page #install code .cmd-call{white-space:pre}
 .dl-page #install code .cmd-file{display:block;padding-left:0.5ch;white-space:nowrap}
@@ -359,13 +358,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .reqs li{padding:12px 0;border-bottom:1px solid var(--hair);font-size:15px;color:var(--mute)}
 .reqs b{display:block;color:var(--ink);font-weight:600}
 .steps3{max-width:760px;margin:20px auto 0;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.steps3 .card{padding:20px}
+.steps3 .card{--pad:20px;padding:var(--pad)}
 .steps3 h2{margin:0 0 6px;text-align:left;font:500 20px/1.2 var(--serif)}
 .steps3 p{margin:0 0 10px;color:var(--mute);font-size:15px;line-height:1.55}
 .steps3 a,.dl-alt a{text-decoration:underline;text-underline-offset:3px}
 .dl-alt{margin:28px auto 0;padding-bottom:var(--s8)}
-@media (max-width:820px){.reqs,.steps3{grid-template-columns:1fr}.dlbox{padding:22px}}
-@media (max-width:364px){.dlbox{padding:12px}.dlbox .sha{padding:12px 8px}.dlbox .sha code{font-size:12px}}
+@media (max-width:820px){.reqs,.steps3{grid-template-columns:1fr}.dlbox{--pad:22px}}
+@media (max-width:364px){.dlbox{--pad:12px}.dlbox .sha{padding:12px 8px}.dlbox .sha code{font-size:12px}}
 /* A phone head: the whole head is left-aligned on the page edge, so the headline and the 34ch deck
    start on one edge instead of stacking centred lines with different left edges (D-060). */
 @media (max-width:420px){.dl-page .dlhead{text-align:left}.dl-page .dlhead .sub{max-width:34ch;margin-left:0;text-align:left}}
@@ -425,13 +424,13 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .doc-buy{padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
 .home .doc-buy h2{margin:0}
 .home .price-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s2) var(--s3);margin:var(--s4) 0 0}
-.home .price-row .doc-price{margin:0;font:500 32px/1.1 var(--serif);letter-spacing:-.01em;color:var(--ink)}
+.home .price-row .doc-price{margin:0;font:500 32px/1.1 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .home .doc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .home .doc-actions form{margin:0;display:flex}
 /* The licence card is the buyer's return surface: pending, ready, copied and unpaid all live here. */
-.home .license-card{margin-top:var(--s5);padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
+.home .license-card{--pad:clamp(24px,4vw,40px);margin-top:var(--s5);padding:var(--pad);scroll-margin-top:var(--s4)}
 .home .license-card h2{margin:0}
-.home .license-key{margin:var(--s4) 0;padding:var(--s4);border:1px solid var(--hair);border-radius:var(--r-ctl);background:var(--tag-bg);font:500 var(--t-ui)/1.6 var(--sans);overflow-wrap:anywhere}
+.home .license-key{margin:var(--s4) 0;padding:var(--s4);border:1px solid var(--hair);border-radius:var(--r-panel);background:var(--tag-bg);font:500 var(--t-ui)/1.6 var(--sans);overflow-wrap:anywhere}
 .home .license-key code{font:inherit;color:var(--ink)}
 @media(max-width:767px){
   .home main.doc{padding-top:var(--s6)}
@@ -442,4 +441,27 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media(max-width:767px){
   .room-nav .btn-quiet{display:none}
   .room .paper-foot .room-mac{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet)}
+}
+
+/* ---------- Text wrapping and corner shape: global switches ----------
+   Both are progressive enhancement, so a browser that does not know a property ignores it. Headings
+   break into even lines; a paragraph or list item never ends on one lonely word. The two writing
+   sheets (the demo and the room) keep the wrapping their measured geometry was set with, so the
+   anchor, the stopped group and the kept screen cannot move. Newsreader's default figures are already
+   tabular, so the price and the price facts only declare it (set on their own rules, because the font
+   shorthand resets it); the system sans needs it, and the clock, count and numeral rules already carry it. A button label never breaks onto a second line.
+   The line-breaking rules stay on: no stylesheet here turns them off. */
+h1,h2,h3{text-wrap:balance}
+p,li{text-wrap:pretty}
+:is(.paper,.room-paper) :is(h1,h2,h3,p,li){text-wrap:wrap}
+/* D-060 owns the download head's break: a phone reads `Write It Down` / `for Mac`, and balance would split the name. */
+.dl-page .dlhead h1{text-wrap:wrap}
+.mo .t{text-wrap:balance}
+button,.btn,.room-primary,.room-secondary,.tag{white-space:nowrap}
+.faq summary h3{min-width:0}
+/* Continuous corners (Chrome and Edge 139+). The radius stays the fallback everywhere else. Pills
+   and circles stay fully round, and the header chip keeps its drawn squircle (D-038). */
+@supports (corner-shape: superellipse(1.25)){
+  :where(*){corner-shape:superellipse(1.25)}
+  .btn,.room-primary,.room-secondary,.theme-btn,.tag,.tag b,.line8 .track,.line8 .track i{corner-shape:round}
 }

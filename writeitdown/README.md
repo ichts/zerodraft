@@ -110,17 +110,30 @@ the host's existing API routes separately.
 writeitdown.app {
 	root * /var/www/writeitdown.app
 
+	# Cache policy: Cache-Control has exactly one owner. Three mutually exclusive matchers,
+	# so no two directives can write the same field whatever order they run in.
+	# 1. Sparkle payloads: the name carries version and build, so this URL never changes bytes.
+	@cacheImmutable path /download/updates/*
+	# 2. Sparkle feed: the only way an installed app learns a release exists.
+	@cacheFeed path /download/appcast.xml
+	# 3. Everything else the file server answers - HTML, CSS, JS, XML, text, images, fonts,
+	#    the DMG and directory indexes - keeps a stable name across deploys, so the browser
+	#    must revalidate and let the ETag decide. /api/ is excluded: those responses belong
+	#    to the service behind them and keep their own headers.
+	@cacheStable not path /download/updates/* /download/appcast.xml /api/*
+
+	header @cacheImmutable Cache-Control "public, max-age=31536000, immutable"
+	header @cacheFeed Cache-Control "no-cache"
+	header @cacheStable Cache-Control "no-cache"
+
 	@appcast path /download/appcast.xml
 	handle @appcast {
 		header Content-Type "application/xml; charset=utf-8"
-		header Cache-Control "no-cache"
 		file_server
 	}
 
 	@updatefiles path /download/updates/*
 	handle @updatefiles {
-		# Archive names carry the version and build number, so a given payload never changes.
-		header Cache-Control "public, max-age=31536000, immutable"
 		file_server
 	}
 
@@ -141,6 +154,70 @@ writeitdown.app {
 The DMG, appcast and update branches have no fallback: `file_server` returns 404 when the file is
 absent. The page branch resolves `/download/` and `/` to their directory index and otherwise returns
 404, so a broken link or a mistyped URL never answers with the landing page and a 200.
+
+#### Host cache policy
+
+Until 2026-11-03 the host sent no `Cache-Control` at all on `/`, `site.css`, `tokens.css` and the
+scripts, so browsers applied heuristic freshness (roughly 10% of the time since `Last-Modified`) and
+a returning visitor could keep an old `site.css` beside new HTML for an hour or more. The block
+above fixes that. It keeps the two rules the host already had (the feed's `no-cache` and the
+payloads' immutable year, same values) and moves them to site level so one owner can add the rest:
+
+- `no-cache` means "store it, but ask before reuse". The browser keeps its copy and the ETag
+decides: an unchanged file answers `304 Not Modified`, a changed file answers `200` with a new ETag.
+That is a deploy showing up on an ordinary reload, with no hard refresh and no `?v=` argument.
+- Nothing the site serves carries a version or content hash in its file name. `site.css`, `tokens.css`,
+`paper.js`, `room.js`, `demo.js` and the fonts (`newsreader-latin.woff2`, the thirteen
+`zhuque-fangsong-NN.woff2` subsets, `reenie-beanie.woff2`) are all stable names, so none of them is
+cached as `immutable`. Only the Sparkle payloads qualify, and only because their name carries both
+version and build number; the feed is never reused at all.
+- The DMG keeps `no-cache` too. `Write-It-Down-<version>.dmg` carries the marketing version only, and
+a rebuild inside one version keeps that name, so an immutable year would pin the old installer.
+- `/api/*` stays out of the policy: the waitlist handler (`services/waitlist/deploy/Caddyfile.snippet`)
+and the license routes own their own response headers.
+
+The policy has one owner on purpose. `header` at site level runs before any `handle`, and a
+`Cache-Control` set inside a `handle` would silently win over the policy above, so keep
+`Cache-Control` out of the handler blocks: the `@appcast` and `@updatefiles` handlers below set only
+`Content-Type` and routing. The DMG and appcast content types, the `.txt` mapping and the
+`file_server` ETag/`Last-Modified` behaviour are untouched by this policy.
+
+Prove the policy locally before touching the host, and after any change to it:
+
+```sh
+sh qa/cache-headers.sh
+```
+
+It serves the exact production file set (`install.sh` owns that list) from a disposable root with
+this Caddyfile block, on loopback, using the real Caddy binary, then asserts the `Cache-Control` and
+`ETag` of every path above, proves a cached file revalidates to `304`, proves changed bytes come back
+as `200` with a new ETag instead of a pinned old file, and proves an `/api/` response keeps its own
+header. It exits non-zero on any drift. A pass means the documented policy is the policy that was
+run; the deployed host block still has to be reloaded and checked by hand:
+
+```sh
+curl -sSI https://writeitdown.app/ | grep -i '^cache-control'          # no-cache
+curl -sSI https://writeitdown.app/site.css | grep -i '^cache-control'  # no-cache
+curl -sSI https://writeitdown.app/download/updates/<payload>.zip | grep -i '^cache-control'
+# public, max-age=31536000, immutable
+```
+
+Optional, not implemented: the fonts could be cached for a year if their names carried their content.
+Rename each file to `fonts/<face>.<shorthash>.woff2`, update `fonts.css` and `fonts-cjk.css`, then add
+`/fonts/*` to `@cacheImmutable` and to the `not path` list of `@cacheStable`. One hop only: `fonts.css`
+revalidates, so the new font names arrive with the reload that already fetches the new CSS. CSS and JS
+the same way would need a build step that rewrites every page's `<link>` and `<script>` URL; the pages
+are hand-written static files, so no such step exists and this change does not add one.
+
+Two files from an older deploy still sit in the site root and are served today:
+`/reenie-beanie.woff2` and `/OFL-ReenieBeanie.txt` (last modified 2026-10-26, while the current bundle
+is 2026-11-03). Both shipped into `fonts/` from 1.0 on, nothing references the root copies, and
+`install.sh` neither installs nor prunes them. Remove them by hand in the same host change:
+
+```sh
+rm /var/www/writeitdown.app/reenie-beanie.woff2 /var/www/writeitdown.app/OFL-ReenieBeanie.txt
+```
+
 After `caddy reload`, prove the routing instead of assuming it:
 
 ```sh

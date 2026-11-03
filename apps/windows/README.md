@@ -24,6 +24,8 @@ cmd/qaserver     QA only: runs the real services/license behind a loopback fake 
 cmd/drv          Windows desktop driver (SendInput, TSF IME switching, DPI switching, window captures)
 cmd/imecheck     judges one IME suite run
 packaging/       MSIX manifest, assets, make-msix.ps1, install-msix.ps1, STORE.md
+version/         the app version: version.txt (one source) embedded for Settings > About, and the test that keeps
+                 mygo.json and every package flavour on it
 scripts/         generators, drift gate, the Mac comparison, and the vivobook-1 scripts below
 ```
 
@@ -41,7 +43,9 @@ and `go mod verify`, and builds the QA flavour and the `-H=windowsgui` exe. It a
 `apps/macos/FirstLine/Sources/FirstLine` change.
 
 The release exe is `mygo build -platform windows/amd64` (icon, DPI manifest and version resources come from
-`mygo.json`): `go run github.com/egoist/mygo/cmd/mygo build -platform windows/amd64 -o build`.
+`mygo.json`): `go run github.com/egoist/mygo/cmd/mygo build -platform windows/amd64 -o build`. The version itself has one
+source, `version/version.txt`: Settings > About and every MSIX flavour's identity come from it, `mygo.json` carries the copy
+`mygo build` needs, and `go test ./version` fails when the three disagree.
 
 ### Licence tests never touch a live service
 
@@ -113,7 +117,8 @@ real input and the Microsoft IMEs, so they are not CI. Host and desktop user com
 - `scripts/package-msix.sh release|qa|store` - builds, test-signs and installs the MSIX on the test PC with the Windows SDK
   build tools (`packaging/make-msix.ps1`, `packaging/STORE.md` for the Store identity). Test signing uses a
   throw-away `CN=WID Test Signing` certificate; no production certificate or Store submission lives here. `store` instead packs
-  the release binary unsigned under the reserved Store identity (never installed); `scripts/check_manifest.sh` asserts the identities.
+  the release binary unsigned under the reserved Store identity (never installed) and floors at Windows 11;
+  `scripts/check_manifest.sh` asserts the identities, the version and the floor.
 
 **Smart App Control on vivobook-1** (state `On`, `HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy\VerifiedAndReputablePolicyState`)
 blocks the test-signed MSIX and the `mygo build` exe ("could not verify its publisher") and, since 2026-11-01 about 19:40, every

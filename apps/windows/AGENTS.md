@@ -13,7 +13,8 @@ licence/: licence service 的 Windows 客户端（token 验证、activate/valida
 tokens/: 由 `scripts/gen_tokens.py` 从 `../macos` 源码生成的颜色、间距、常量与文案，禁止手改。
 fonts/: 字体。Zhuque Fangsong 是 Mac 文件的逐字节拷贝（`go:embed` 不能越出模块）；三个静态 Newsreader 由 `scripts/gen_fonts.py` 从 Mac 的可变字体按角色固定光学字号（Mac 每次绘制都把 opsz 设为字号，mygo 在 Windows 上不会）派生，`scripts/check_tokens.sh` 逐字节复算校验（需要 fonttools 4.68.0）。
 cmd/qaserver、cmd/drv、cmd/imecheck、cmd/papershot: QA 与真机验收工具，不进发布包。
-packaging/: MSIX 清单、素材与签名/安装脚本；`STORE.md` 是 Store 身份表（已保留的 Name/Publisher/PFN/Store ID）；`scripts/package-msix.sh store` 用该身份打未签名 MSIX，`scripts/check_manifest.sh` 断言 store 清单恰为该身份、sideload 清单不是。
+packaging/: MSIX 清单、素材与签名/安装脚本；`STORE.md` 是 Store 身份表（已保留的 Name/Publisher/PFN/Store ID、提交版本与 Windows 11 下限）；`scripts/package-msix.sh store` 用该身份打未签名 MSIX，`scripts/check_manifest.sh` 断言 store 清单为该身份、版本首段不为 0、下限不低于 Windows 11，sideload 清单不是。
+version/: 应用版本的唯一来源 `version.txt`（Settings 的 About 与每个 MSIX 清单的版本都由它来；`mygo.json` 里的副本由 `go test ./version` 守同，三处不一致即失败）。
 scripts/: 生成器、漂移门槛、与 Mac 的并排度量（`compare_mac.py`、`pair.sh`、`screens.sh`）与 vivobook-1 真机脚本（IME 套件、截图度量、端到端）。
 SYNC.md: Mac 到 Windows 的对等账本，每个 Mac 行为、token、文案一行；Mac 改动后在同一 PR 里更新对应行。
 README.md: 构建、测试、漂移门槛、CrychicUI 钉版、真机脚本。

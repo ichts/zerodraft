@@ -110,20 +110,17 @@ the host's existing API routes separately.
 writeitdown.app {
 	root * /var/www/writeitdown.app
 
-	# Cache policy: Cache-Control has exactly one owner. Three mutually exclusive matchers,
+	# Cache policy: Cache-Control has exactly one owner. Two mutually exclusive matchers,
 	# so no two directives can write the same field whatever order they run in.
 	# 1. Sparkle payloads: the name carries version and build, so this URL never changes bytes.
 	@cacheImmutable path /download/updates/*
-	# 2. Sparkle feed: the only way an installed app learns a release exists.
-	@cacheFeed path /download/appcast.xml
-	# 3. Everything else the file server answers - HTML, CSS, JS, XML, text, images, fonts,
-	#    the DMG and directory indexes - keeps a stable name across deploys, so the browser
-	#    must revalidate and let the ETag decide. /api/ is excluded: those responses belong
-	#    to the service behind them and keep their own headers.
-	@cacheStable not path /download/updates/* /download/appcast.xml /api/*
+	# 2. Everything else the file server answers - HTML, CSS, JS, XML, text, images, fonts,
+	#    the Sparkle feed, the DMG and directory indexes - keeps a stable name across deploys,
+	#    so the browser must revalidate and let the ETag decide. /api/ is excluded: those
+	#    responses belong to the service behind them and keep their own headers.
+	@cacheStable not path /download/updates/* /api/*
 
 	header @cacheImmutable Cache-Control "public, max-age=31536000, immutable"
-	header @cacheFeed Cache-Control "no-cache"
 	header @cacheStable Cache-Control "no-cache"
 
 	@appcast path /download/appcast.xml
@@ -161,7 +158,9 @@ Until 2026-11-03 the host sent no `Cache-Control` at all on `/`, `site.css`, `to
 scripts, so browsers applied heuristic freshness (roughly 10% of the time since `Last-Modified`) and
 a returning visitor could keep an old `site.css` beside new HTML for an hour or more. The block
 above fixes that. It keeps the two rules the host already had (the feed's `no-cache` and the
-payloads' immutable year, same values) and moves them to site level so one owner can add the rest:
+payloads' immutable year, same values) and moves them to site level so one owner can add the rest.
+The feed needs no matcher of its own: it is a stable name like the pages, so the stable rule gives
+it exactly the `no-cache` it already had.
 
 - `no-cache` means "store it, but ask before reuse". The browser keeps its copy and the ETag
 decides: an unchanged file answers `304 Not Modified`, a changed file answers `200` with a new ETag.
@@ -185,8 +184,11 @@ The policy has one owner on purpose. `header` at site level runs before any `han
 Prove the policy locally before touching the host, and after any change to it:
 
 ```sh
-sh qa/cache-headers.sh
+npm run cache-headers
 ```
+
+This is a manual pre-host-change check, not a CI gate: it needs a real Caddy binary and
+`python3`, which CI does not install, and `npm test` stays the browser suite alone.
 
 It serves the exact production file set (`install.sh` owns that list) from a disposable root with
 this Caddyfile block, on loopback, using the real Caddy binary, then asserts the `Cache-Control` and
@@ -202,21 +204,18 @@ curl -sSI https://writeitdown.app/download/updates/<payload>.zip | grep -i '^cac
 # public, max-age=31536000, immutable
 ```
 
-Optional, not implemented: the fonts could be cached for a year if their names carried their content.
-Rename each file to `fonts/<face>.<shorthash>.woff2`, update `fonts.css` and `fonts-cjk.css`, then add
-`/fonts/*` to `@cacheImmutable` and to the `not path` list of `@cacheStable`. One hop only: `fonts.css`
-revalidates, so the new font names arrive with the reload that already fetches the new CSS. CSS and JS
-the same way would need a build step that rewrites every page's `<link>` and `<script>` URL; the pages
-are hand-written static files, so no such step exists and this change does not add one.
+Only the Sparkle payloads are cached for a year, and that is deliberate rather than a deferred step.
+The fonts are the asset class the ask expected to cache immutably, and the ask was wrong about them:
+`newsreader-latin.woff2`, `newsreader-latin-italic.woff2`, the thirteen `zhuque-fangsong-NN.woff2`
+subsets and `fonts/reenie-beanie.woff2` are stable names that a face rebuild replaces in place, so
+they revalidate under the same `no-cache` rule as every other stable name. Giving them a content hash
+would mean `fonts/build-fonts.py` and the two generated CSS files renaming every face, and `fonts.css`
+would still revalidate, for a saving this site does not need.
 
 Two files from an older deploy still sit in the site root and are served today:
 `/reenie-beanie.woff2` and `/OFL-ReenieBeanie.txt` (last modified 2026-10-26, while the current bundle
-is 2026-11-03). Both shipped into `fonts/` from 1.0 on, nothing references the root copies, and
-`install.sh` neither installs nor prunes them. Remove them by hand in the same host change:
-
-```sh
-rm /var/www/writeitdown.app/reenie-beanie.woff2 /var/www/writeitdown.app/OFL-ReenieBeanie.txt
-```
+is 2026-11-03). They stay in this change: an older cached page can still reference the root font path,
+so removing them belongs to a separate cleanup once the policy has been live.
 
 After `caddy reload`, prove the routing instead of assuming it:
 

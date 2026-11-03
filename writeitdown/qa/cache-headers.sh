@@ -10,7 +10,8 @@
 #   - an /api/ response keeps the header its service sets.
 # It never writes the site: the served root is a copy under $TMPDIR, removed on exit.
 #
-# Usage: sh qa/cache-headers.sh     (CADDY_BIN overrides where caddy is found)
+# Usage: npm run cache-headers, or sh qa/cache-headers.sh     (CADDY_BIN overrides where caddy is
+# found). A manual pre-host-change check, not a CI gate: CI does not install caddy.
 # Exit: 0 every assertion held; 1 on drift, on a missing caddy/python3, or when the documented
 # block could not be read. A pass proves the documented policy, not the deployed host.
 set -eu

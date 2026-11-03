@@ -134,14 +134,14 @@ test('numbers that update or sit in a column keep their width', async ({ page })
       clock: digits.map(text => probe(clock, text)),
       fact: digits.map(text => probe(fact, text)),
       factVariant: getComputedStyle(fact).fontVariantNumeric,
-      // Negative control: the system sans really is proportional until tabular-nums is asked for.
-      proportional: digits.map(text => probe(clock, text, 'normal')),
+      // Negative control: the bundled Newsreader face is proportional until tabular-nums is asked for.
+      proportional: digits.map(text => probe(fact, text, 'proportional-nums')),
     };
   });
   expect(new Set(widths.clock).size, 'the clock digits share one width').toBe(1);
   expect(new Set(widths.fact).size, 'the price facts share one digit width').toBe(1);
   expect(widths.factVariant).toBe('tabular-nums');
-  expect(new Set(widths.proportional).size, 'negative control: proportional sans digits differ').toBeGreaterThan(1);
+  expect(new Set(widths.proportional).size, 'negative control: proportional Newsreader digits differ').toBeGreaterThan(1);
 });
 
 test('the mac page price keeps tabular figures', async ({ page }) => {

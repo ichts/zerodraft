@@ -2,7 +2,7 @@
 <!-- Write It Down for Windows. The @...@ fields are filled by make-msix.ps1: the test-signed sideload build uses
      Publisher "CN=WID Test Signing"; a Store build replaces Name, Publisher, PublisherDisplayName, Version and
      MinVersion with the submission values (see STORE.md). Version has four sections whose fourth the Store reserves
-     for itself, and the Store build's MinVersion is the Windows 11 floor. Nothing in this file needs the Microsoft
+     for itself, and every flavour's MinVersion is the Windows 11 floor. Nothing in this file needs the Microsoft
      developer account to build. -->
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"

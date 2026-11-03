@@ -5,10 +5,10 @@
 #   usage: scripts/package-msix.sh release|qa|store [--manifest]
 #     qa    = the -tags widqa flavour that talks to the local TEST service
 #     store = the release binary as an UNSIGNED MSIX with the identity Partner Center reserved (packaging/STORE.md):
-#             packed on the PC, copied back to build-store/, never installed, never signed (the Store signs it); the
-#             Store build also floors at Windows 11 (MinVersion 10.0.22000.0), the sideload builds at Windows 10 2004
+#             packed on the PC, copied back to build-store/, never installed, never signed (the Store signs it)
 #     --manifest prints the AppxManifest.xml the flavour gets and exits (no build, no PC); scripts/check_manifest.sh
 #             asserts it.
+# Every flavour floors at Windows 11 (MinVersion 10.0.22000.0): nothing below it has been run (STORE.md).
 # The version has one source, version/version.txt: the identity carries its four sections (the Store reserves the 4th).
 set -e
 WIDHOST=${WID_HOST:-vivobook-1}   # the Windows test PC (ssh alias)
@@ -16,11 +16,11 @@ R=$(cd "$(dirname "$0")/.." && pwd)
 FLAVOUR=${1:-release}
 cd "$R"
 VERSION="$(tr -d '[:space:]' < version/version.txt).0"
-PUBLISHER='CN=WID Test Signing'; PUBDISPLAY='Trefoil Studio'; MINVERSION=10.0.19041.0; SIGN=1
+PUBLISHER='CN=WID Test Signing'; PUBDISPLAY='Trefoil Studio'; MINVERSION=10.0.22000.0; SIGN=1
 case "$FLAVOUR" in
   release) NAME=TrefoilStudio.WriteItDown; DISPLAY='Write It Down'; SHORT='Write It Down'; OUT=build ;;
   qa)      NAME=TrefoilStudio.WriteItDownQA; DISPLAY='Write It Down (QA)'; SHORT='WID QA'; OUT=build-qa; export GOFLAGS=-tags=widqa ;;
-  store)   NAME=TrefoilStudio.WriteItDown; PUBLISHER=CN=E0C4C311-1698-4A16-BCE3-58C3DB5B825E; DISPLAY='Write It Down'; SHORT='Write It Down'; OUT=build-store; SIGN=0; MINVERSION=10.0.22000.0 ;;
+  store)   NAME=TrefoilStudio.WriteItDown; PUBLISHER=CN=E0C4C311-1698-4A16-BCE3-58C3DB5B825E; DISPLAY='Write It Down'; SHORT='Write It Down'; OUT=build-store; SIGN=0 ;;
   *) echo "release|qa|store [--manifest]"; exit 2 ;;
 esac
 if [ "$2" = --manifest ]; then

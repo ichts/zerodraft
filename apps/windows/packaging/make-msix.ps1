@@ -1,8 +1,8 @@
 # Packages the app exe as a test-signed MSIX on Windows (needs C:\wid\tools\x64 = Microsoft.Windows.SDK.BuildTools).
-# -Version and -MinVersion are required: scripts/package-msix.sh passes them from version/version.txt and the flavour's
+# -Version and -MinVersion are required: scripts/package-msix.sh passes them from version/version.txt and the Windows 11
 # floor, and nothing here keeps a second copy of either.
-#   release: make-msix.ps1 -Exe C:\wid\stage\wid.exe -Out C:\wid\out\WriteItDown.msix -Version 1.0.0.0 -MinVersion 10.0.19041.0
-#   QA:      make-msix.ps1 -Exe ... -Out ... -Name TrefoilStudio.WriteItDownQA -Display 'Write It Down (QA)' -Short 'WID QA' -Version 1.0.0.0 -MinVersion 10.0.19041.0
+#   release: make-msix.ps1 -Exe C:\wid\stage\wid.exe -Out C:\wid\out\WriteItDown.msix -Version 1.0.0.0 -MinVersion 10.0.22000.0
+#   QA:      make-msix.ps1 -Exe ... -Out ... -Name TrefoilStudio.WriteItDownQA -Display 'Write It Down (QA)' -Short 'WID QA' -Version 1.0.0.0 -MinVersion 10.0.22000.0
 param(
   [string]$Exe, [string]$Out, [string]$Work = 'C:\wid\msixwork',
   [string]$Name = 'TrefoilStudio.WriteItDown', [string]$Display = 'Write It Down', [string]$Short = 'Write It Down',

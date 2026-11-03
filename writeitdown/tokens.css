@@ -52,8 +52,9 @@
   /* space: 4-pt scale */
   --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;--s9:96px;--s10:128px;
   --gut:32px;--measure:720px;--maxw:1120px;--nav-h:64px;--section:clamp(72px,10vw,128px);
-  /* shape */
-  --r-ctl:8px;--r-sheet:16px;--r-card:22px;--r-stage:28px;--r-pill:999px;
+  /* shape: every radius sits on the 4 px grid. A box padded p inside a container of radius R takes R - p and
+     never less than --r-min, so both corners share one centre (site.css derives --r-panel from --pad). */
+  --r-ctl:8px;--r-sheet:16px;--r-card:24px;--r-stage:28px;--r-pill:999px;--r-min:4px;
   /* depth: hairline ring + 3 soft layers tinted with ink */
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(28,25,23,.04),0 2px 4px rgba(28,25,23,.04),0 8px 16px -4px rgba(28,25,23,.06),0 24px 48px -16px rgba(28,25,23,.10);
   --sheet-shadow:0 0 0 1px rgba(28,25,23,.07),0 2px 4px rgba(28,25,23,.05),0 12px 24px -8px rgba(28,25,23,.12),0 36px 72px -24px rgba(28,25,23,.20);

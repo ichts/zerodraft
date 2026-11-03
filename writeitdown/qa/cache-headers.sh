@@ -7,7 +7,8 @@
 #   - every revalidating path also carries an ETag and Last-Modified, so a browser can revalidate;
 #   - a cached file revalidates to 304 instead of downloading again;
 #   - changed bytes come back as 200 with a new ETag, so a deploy shows on an ordinary reload;
-#   - an /api/ response keeps the header its service sets.
+#   - the policy neither adds nor replaces an /api/ response header (a fixture directive, because
+#     the waitlist handler sets none today).
 # It never writes the site: the served root is a copy under $TMPDIR, removed on exit.
 #
 # Usage: npm run cache-headers, or sh qa/cache-headers.sh     (CADDY_BIN overrides where caddy is
@@ -118,7 +119,8 @@ awk -v api="$WORK/api-handle.caddyfile" '
 "$CADDY" validate --config "$WORK/Caddyfile" --adapter caddyfile > "$WORK/validate.log" 2>&1 ||
 	{ cat "$WORK/validate.log"; die 'caddy rejected the assembled site block'; }
 
-# --- Serve: the stub owns the /api/ response header the policy must not touch ---------------
+# --- Serve: the /api/ stub sends a fixture Cache-Control the real waitlist handler does not set
+# today, so the gate can prove the policy neither adds nor replaces a service-level header.
 
 cat > "$WORK/api-stub.py" <<'PY'
 import http.server, sys
@@ -128,6 +130,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         body = b'{"ok":true}\n'
         self.send_response(200)
         self.send_header('Content-Type', 'application/json')
+        # Fixture: the live handler sets no Cache-Control, so any site-level header that added to
+        # or replaced this value would change it here.
         self.send_header('Cache-Control', 'private, max-age=30')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
@@ -248,8 +252,9 @@ check '/download/updates/WriteItDown-1.1-2.zip' "$IMMUTABLE" 200
 check '/download/updates/does-not-exist.zip' "$IMMUTABLE" 404
 check '/download/absent.dmg' "$STABLE" 404
 
-# Dynamic responses keep their own headers; the policy must not add or replace one. They also
-# carry no ETag of their own, so revalidators are not expected here.
+# /api/ responses stay out of the policy. The stub's directive is a fixture the live waitlist
+# handler does not send, so this asserts non-interference only; the stub carries no ETag, so
+# revalidators are not expected here.
 check '/api/waitlist' 'private, max-age=30' 200 'application/json' no
 
 # Revalidation: a held copy costs one conditional request, not another download.

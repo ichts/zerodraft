@@ -169,6 +169,7 @@ const('UpgradeActivate', lit(upgrade, 'Activate', 'UpgradeActivate')); const('Up
 const('UpgradeStartWriting', lit(upgrade, 'Start writing', 'UpgradeStartWriting'))
 const('UpgradeEnterFirst', lit(upgrade, 'Enter your order number or activation code first.', 'UpgradeEnterFirst'))
 const('UpgradePricing', lit(upgrade, 'One payment. 2 Macs. 14-day refund.', 'UpgradePricing'))
+const('UpgradeCheckoutNote', lit(upgrade, 'Checkout opens in your browser. Payment is handled by Stripe.', 'UpgradeCheckoutNote'))
 const('UpgradeCheckoutUnavailable', lit(upgrade, 'Checkout is not available yet.', 'UpgradeCheckoutUnavailable'))
 const('UpgradeWebTrial', lit(upgrade, 'Try the free web room', 'UpgradeWebTrial'))
 const('UpgradeChecking', lit(upgrade, 'Checking your key...', 'UpgradeChecking'))

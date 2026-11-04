@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
-const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
+const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.1.dmg';
 const dmgFile = new URL(dmgURL).pathname.split('/').pop();
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
@@ -107,7 +107,11 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
   const publishedHash = download.match(/<code data-launch="sha256">([\s\S]*?)<\/code>/)?.[1].replace(/<[^>]+>/g, '') ?? '';
-  const withNote = attrs => download.replace('<ul class="reqs" id="requirements">', `<p class="sha" id="release-notes" ${attrs}>1.1 is available.</p>\n<ul class="reqs" id="requirements">`);
+  // The page ships its own release note, so the note controls rewrite that element in place and the
+  // linked version comes from the DMG file name the page itself publishes.
+  const linkedVersion = dmgFile.replace(/^Write-It-Down-|\.dmg$/g, '');
+  const aheadVersion = linkedVersion.split('.').map((part, index, parts) => index === parts.length - 1 ? String(Number(part) + 1) : part).join('.');
+  const withNote = attrs => download.replace(/(<p[^>]*\sid="release-notes")[^>]*>/, `$1 ${attrs}>`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
@@ -115,7 +119,6 @@ test('release gate rejects missing or invalid purchase and download configuratio
   expect(output).toContain('Not verified live');
   expect(output).toContain('real test order');
   expect(releaseCheck(inputs, '--download')[0]).toBe(0);
-  expect(releaseCheck({ ...inputs, download: withNote('data-release-note="1.0"') })[0]).toBe(0);
   const [live, liveOutput] = releaseCheck(inputs, '--live-sales');
   expect(live).toBe(1);
   expect(liveOutput).toContain('LIVE sales blocked: maintainer installed-DMG TEST acceptance is pending');
@@ -138,13 +141,13 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace(`<span class="cmd-file">${dmgFile}</span>`, '<span class="cmd-file">Write-It-Down-0.9.dmg</span>') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
     [{ download: download.replace(/(<code>)[\s\S]*?(<\/code>)/, `$1shasum -a 256 ${dmgFile}$2`) }, 'Install command: the code element must hold the call span and the filename span'],
     [{ download: download.replace(/<code>[\s\S]*?<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
-    [{ download: withNote('data-release-note="1.1"') }, 'Release notes: the note declares 1.1 but the download is 1.0'],
-    [{ download: withNote('data-release-note="1.0"').replaceAll(dmgFile, 'Write-It-Down-1.1.dmg') }, 'Release notes: the note declares 1.0 but the download is 1.1'],
-    [{ download: withNote('data-release-note="1.0" data-launch-pending="release-notes"') }, 'Release notes: data-launch-pending is retired'],
+    [{ download: withNote(`data-release-note="${aheadVersion}"`) }, `Release notes: the note declares ${aheadVersion} but the download is ${linkedVersion}`],
+    [{ download: download.replaceAll(dmgFile, `Write-It-Down-${aheadVersion}.dmg`) }, `Release notes: the note declares ${linkedVersion} but the download is ${aheadVersion}`],
+    [{ download: withNote(`data-release-note="${linkedVersion}" data-launch-pending="release-notes"`) }, 'Release notes: data-launch-pending is retired'],
     [{ download: withNote('') }, 'Release notes: the note does not declare its version in data-release-note'],
   ];
   // The release note is optional. When present it declares the linked artifact version and no
-  // pending mark; production ships without one.
+  // pending mark; the page ships one that names the version it links.
   for (const [changes, message] of cases) {
     const [code, out] = releaseCheck({ ...inputs, ...changes });
     expect(code, message).toBe(1);

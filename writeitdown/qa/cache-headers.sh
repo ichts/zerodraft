@@ -62,7 +62,7 @@ for file in $files; do
 	cp "$SITE/$file" "$WEBROOT/$file"
 done
 # The DMG, the Sparkle feed and its payloads are placed on the host separately, never committed.
-printf 'dmg fixture\n' > "$WEBROOT/download/Write-It-Down-1.0.dmg"
+printf 'dmg fixture\n' > "$WEBROOT/download/Write-It-Down-1.1.dmg"
 printf '<?xml version="1.0" encoding="utf-8"?>\n<rss version="2.0"><channel><title>fixture</title></channel></rss>\n' \
 	> "$WEBROOT/download/appcast.xml"
 printf 'payload fixture\n' > "$WEBROOT/download/updates/WriteItDown-1.1-2.zip"
@@ -241,7 +241,7 @@ check '/fonts/newsreader-latin.woff2' "$STABLE" 200 'font/woff2'
 check '/fonts/zhuque-fangsong-01.woff2' "$STABLE" 200 'font/woff2'
 check '/fonts/OFL-Newsreader.txt' "$STABLE" 200 'text/plain'
 # The DMG name carries the marketing version only, so a rebuild inside one version reuses the URL.
-check '/download/Write-It-Down-1.0.dmg' "$STABLE" 200 'application/x-apple-diskimage'
+check '/download/Write-It-Down-1.1.dmg' "$STABLE" 200 'application/x-apple-diskimage'
 
 # The Sparkle feed is never reused, and it is read as XML, not as the landing page.
 check '/download/appcast.xml' "$STABLE" 200 'application/xml'

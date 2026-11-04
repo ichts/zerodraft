@@ -6,6 +6,60 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-11-04: The download and Mac pages name 1.1
+
+`/download/` offered `Write-It-Down-1.0.dmg` while the Sparkle feed already offered 1.1 (build 2), so
+the site contradicted itself: a visitor downloaded an older app than the updater would give them.
+The page now links `Write-It-Down-1.1.dmg` (9,229,162 bytes, SHA-256
+`b5796ac123419f69ec758c3d671e3d90fcd119ae8e932136adee0484616818a6`), and the two 32-character hash
+spans, the Install command's filename and the note all name that artifact. `#release-notes` returns
+with `data-release-note="1.1"` and reads `Version 1.1. A free update for the app you already own.`;
+`mac.html` carries the same line in its `doc-note` shape under Requirements. No style, layout,
+analytics, copy about features or other page changed.
+
+## Commands and results
+
+- `node writeitdown/release-check.mjs --download`: `STATIC CHECK PASSED` and `Download page ready: the
+  DMG link, the Install command and its published SHA-256 agree.`
+- `node writeitdown/release-check.mjs --download --live`: `LIVE CHECK PASSED`, so the served DMG
+  hashes to the published value. `curl -sSI https://writeitdown.app/download/Write-It-Down-1.1.dmg`
+  reports `content-length: 9229162`, and an independent `shasum -a 256` of the download returns
+  `b5796ac123419f69ec758c3d671e3d90fcd119ae8e932136adee0484616818a6`. The feed at
+  `https://writeitdown.app/download/appcast.xml` carries `sparkle:shortVersionString` 1.1 and
+  `sparkle:version` 2, so page and feed now name one version.
+- `cd writeitdown && npx playwright test qa/mac.spec.mjs -g "download page states the trial, the DMG"`:
+  8 passed. `-g "Mac page offers the free trial and real Buy"`: 8 passed. `-g "the download head
+  breaks without an orphan"`: 6 passed and 2 timed out at the 30 s per-test budget under parallel
+  load; both projects pass alone (16.0 s and 17.4 s), so the gate is unchanged, not regressed.
+  `-g "release gate rejects missing or invalid"`: 8 passed after the note fixtures began deriving
+  the linked version and version ahead of it from the page instead of a hardcoded pair.
+- Placement, measured rather than eyeballed: on `/download/` the note's left edge is 373 px against
+  the card's 373 px content edge at 1440 and 43 px against 43 px at 390, with no overflow; on
+  `mac.html` its left edge equals the Requirements paragraph's (388.05 px at 1440, 20 px at 390).
+  The note's contrast is 5.15:1 light and 5.28:1 dark on the download panel, 5.38:1 and 6.82:1 on the
+  Mac page, all above the 4.5:1 floor for its 13 px and 15 px sizes.
+- Captures at `/Users/ichts/firstmate-homes/wid/data/wid-download-11/captures/`:
+  `{download,mac}-{1440,390}-{light,dark}.png`, full page.
+
+Limits: this round only makes the pages describe the artifact the release pipeline already hosts.
+Installing the site is a separate deploy step, and the page served from writeitdown.app until then
+still shows 1.0.
+
+## Quality checklist rows this change touches
+
+- Q-07 (no extra labels or helper lines) - PASS: the download note is one line with the version and
+the free-update fact; `mac.html` carries the same line and no new section, kicker or subtitle.
+- Q-14 (deliberate alignment) - PASS: measured left edges above (373/373 and 388.05/388.05, 43/43 and
+20/20 px) at 1440 and 390.
+- Q-20 (copy states a fact, never sells) - PASS: `Version 1.1.` plus `A free update for the app you
+already own.`; no feature, changelog or benefit claim, and the price string `$4.99 once` is untouched
+(`qa/shell.spec.mjs` `the purchase path states one price string` still reads one string).
+- Q-28 (nothing a reader must copy is broken or clipped) - PASS: the two 32-character spans, the
+`shasum -a 256 ` call span and the `Write-It-Down-1.1.dmg` filename span keep their shape; the head
+and command test passes on both phone widths and both desktop widths.
+- Text floors - PASS: 5.15:1 and 5.28:1 on the download panel, 5.38:1 and 6.82:1 on `mac.html`, all
+above 4.5:1 for 13 px and 15 px text.
+
 # 2026-10-26: The room, the fold and the download head hold their numbers (web audit round)
 
 The captain's site audit (sections 9.3 to 9.5) and the design review named eleven basic defects on

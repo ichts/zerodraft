@@ -32,15 +32,16 @@
 </header>
 <section class="card dlbox" aria-label="Download">
 <div class="actions">
-<a class="btn btn-primary" data-launch="dmg" href="https://writeitdown.app/download/Write-It-Down-1.0.dmg">Download free trial for Mac</a>
+<a class="btn btn-primary" data-launch="dmg" href="https://writeitdown.app/download/Write-It-Down-1.1.dmg">Download free trial for Mac</a>
 <a class="btn btn-ghost" href="../mac.html#buy">Buy for $4.99 once</a>
 </div>
-<!-- Release gate: the next line is the published checksum of the DMG (one line). Run `npm run release-check -- --download --live` before installing the site. -->
+<!-- Release gate: the next line is the published checksum of the DMG (one line). Publishing a version flips this line, the DMG link, the Install card's shasum filename and the release note's data-release-note together. Run `npm run release-check -- --download --live` before installing the site. -->
 <div class="dlrow">
-<p class="sha" id="sha256"><span class="sha-label">SHA-256: </span><code data-launch="sha256"><span>5b8483bd210e5f4c697265fad0c447b4</span><span>bc88b9265a1999bd9a7566be74bf4bc4</span></code></p>
+<p class="sha" id="sha256"><span class="sha-label">SHA-256: </span><code data-launch="sha256"><span>b5796ac123419f69ec758c3d671e3d90</span><span>fcd119ae8e932136adee0484616818a6</span></code></p>
 <button class="btn btn-quiet dlcopy" type="button" data-copy="sha256" aria-label="Copy the SHA-256">COPY</button>
 </div>
 <p class="sr-only" id="copy-sha256-status" role="status" aria-live="polite"></p>
+<p class="sha" id="release-notes" data-release-note="1.1"><b>Version 1.1.</b> A free update for the app you already own.</p>
 <ul class="reqs" id="requirements">
 <li><b>macOS 14 Sonoma or later</b>One universal app for Apple silicon and Intel Macs.</li>
 <li><b>3 free sessions</b>A session counts once you type its first character.</li>
@@ -49,7 +50,7 @@
 </ul>
 </section>
 <section class="steps3" aria-label="Install, activate, refunds">
-<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image. To check the download, run this in Terminal and compare the result with the SHA-256 above:</p><div class="dlcmd"><code><span class="cmd-call">shasum -a 256 </span><span class="cmd-file">Write-It-Down-1.0.dmg</span></code><button class="btn btn-quiet dlcopy" type="button" data-copy="install" aria-label="Copy the install command">COPY</button></div><p class="sr-only" id="copy-install-status" role="status" aria-live="polite"></p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
+<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image. To check the download, run this in Terminal and compare the result with the SHA-256 above:</p><div class="dlcmd"><code><span class="cmd-call">shasum -a 256 </span><span class="cmd-file">Write-It-Down-1.1.dmg</span></code><button class="btn btn-quiet dlcopy" type="button" data-copy="install" aria-label="Copy the install command">COPY</button></div><p class="sr-only" id="copy-install-status" role="status" aria-live="polite"></p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
 <div class="card" id="trial"><h2>Activate</h2><p>Your first 3 writing sessions are free. After the third, writing needs a license: $4.99 once for 2 computers. <a href="../mac.html#buy">Buy a license</a>, then paste the key from the purchase page into the app.</p></div>
 <div class="card" id="refunds"><h2>Refunds</h2><p>You have 14 days from purchase to ask for a refund, no reason needed. The license then stops working on every Mac.</p></div>
 </section>

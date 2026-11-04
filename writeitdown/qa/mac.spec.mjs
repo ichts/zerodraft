@@ -31,7 +31,10 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down');
   await expect(page.locator('#price-row')).toContainText('2 computers, Mac or Windows');
   await expect(page.locator('#requirements + p')).toContainText('Requires macOS 14 Sonoma or later');
-  await expect(page.locator('#requirements + p')).not.toContainText('Windows');
+  // The captain-approved Windows sentence is the only Windows text on this page while the Store listing is not live.
+  await expect(page.locator('#requirements + p')).toContainText('Write It Down for Windows requires Windows 11. It activates with the same license key.');
+  await expect(page.locator('#install + p')).not.toContainText('Windows');
+  await expect(page.locator('main')).not.toContainText(/Microsoft Store|Windows installer|Download for Windows/i);
   await expect(page.locator('#activate + p')).toContainText('One license works on two computers, Mac or Windows.');
   await expect(page.locator('#refund + p')).toContainText('the license stops working on every computer.');
   await expect(page.locator('#download-windows, main a[href*="windows" i]')).toHaveCount(0);
@@ -918,6 +921,24 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await expect(updateNotice).toContainText('No check runs unless you turn on');
   await expect(updateNotice).toContainText('Check for updates automatically');
   await expect(updateNotice).toContainText('Check for Updates…');
+
+  // The Windows app block follows the Mac app block, in the same voice and structure.
+  const privacyHeadings = await page.locator('main h2').allTextContents();
+  expect(privacyHeadings.indexOf('Windows app')).toBe(privacyHeadings.indexOf('Mac app') + 1);
+  const windows = page.locator('#windows + p');
+  await expect(windows).toContainText('The Windows app keeps writing in memory on your PC and never uploads it.');
+  await expect(windows).toContainText('It stores a local trial session counter, a random installation identifier and, once you activate, your license token and order number in Windows Credential Manager, encrypted for your Windows account.');
+  await expect(windows).toContainText('Those entries stay when you uninstall the app, so the trial does not start over; to remove them, delete the entries named TrefoilStudio.WriteItDown in Credential Manager.');
+  await expect(page.locator('#windows ~ p').filter({ hasText: 'has no update check of its own' })).toHaveCount(1);
+  // Checkout names Stripe, word for word, in both app blocks.
+  const stripeSentence = "Checkout uses Stripe's page under its privacy policy. Stripe shares your email address and order details with us for support and refunds; we do not receive your card details.";
+  const macCheckout = page.locator('#mac ~ p').filter({ hasText: 'Downloading the app makes an ordinary request' });
+  await expect(macCheckout).toHaveCount(1);
+  await expect(macCheckout).toContainText(stripeSentence);
+  await expect(page.locator('#windows ~ p').filter({ hasText: stripeSentence })).toHaveCount(1);
+  await expect(page.locator('main')).not.toContainText('payment provider');
+  // The outside-request list names the apps, not only the Mac page.
+  await expect(page.locator('main')).toContainText('The only outside requests are the cookieless analytics beacon and, on the Mac page and in the Mac and Windows apps, the license service.');
 
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');

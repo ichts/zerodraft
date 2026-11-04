@@ -10,6 +10,9 @@ import Testing
 @MainActor
 struct DesignReviewFixesTests {
     private static let windowSizes = [NSSize(width: 1040, height: 720), NSSize(width: 1600, height: 1000)]
+    /// The approved checkout sentence, identical in the Mac card and the Windows card (apps/windows tokens
+    /// UpgradeCheckoutNote is generated from this literal).
+    private static let checkoutNote = "Checkout opens in your browser. Payment is handled by Stripe."
 
     // MARK: - Problem 4: the kept block sits on the sheet's axis
 
@@ -147,6 +150,8 @@ struct DesignReviewFixesTests {
             .contains { $0.title.hasPrefix("Buy a license") && !$0.isHiddenOrHasHiddenAncestor },
             "the card still offers Buy while checkout is unavailable")
         #expect(visibleStrings(in: unavailable.view).contains { $0.contains("Checkout is not available") })
+        #expect(!visibleStrings(in: unavailable.view).contains(Self.checkoutNote),
+                "the checkout note describes a Buy that is not on the card")
         unavailableWindow.orderOut(nil)
 
         // Checkout configured: Buy is available, until a licence check is running.
@@ -157,6 +162,10 @@ struct DesignReviewFixesTests {
             .first { $0.title.hasPrefix("Buy a license") })
         #expect(!buy.isHiddenOrHasHiddenAncestor)
         #expect(buy.isEnabled, "Buy is disabled while checkout is available and idle")
+        // The sentence the Windows card shows too, word for word, next to Buy.
+        #expect(visibleStrings(in: available.view).contains(Self.checkoutNote),
+                "the checkout note is missing while Buy is offered")
+        #expect(visibleStrings(in: available.view).filter { $0 == Self.checkoutNote }.count == 1)
         state.licenseActivationInFlight = true
         // The card re-reads the observable state on the next main-actor turn.
         try await Task.sleep(for: .milliseconds(200))
@@ -168,6 +177,13 @@ struct DesignReviewFixesTests {
         #expect(free.isEnabled && !free.isHiddenOrHasHiddenAncestor,
                 "the free route went away while the key was being checked")
         availableWindow.orderOut(nil)
+
+        // A licensed card offers no Buy, so it carries no checkout note either.
+        let licensed = UpgradeViewController(appState: licensedTestState())
+        let licensedWindow = host(licensed, size: NSSize(width: 1040, height: 720))
+        #expect(!visibleStrings(in: licensed.view).contains(Self.checkoutNote),
+                "a licensed card explains a checkout it does not offer")
+        licensedWindow.orderOut(nil)
     }
 
     // MARK: - Problem 10: one Settings grid, one name per control

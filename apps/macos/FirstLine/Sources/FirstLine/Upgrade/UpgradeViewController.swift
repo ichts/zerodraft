@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state, checkout state and DesignSystem tokens.
- * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the 48 pt `Try the free web room` route and live states.
+ * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the checkout/Stripe note next to Buy, the 48 pt `Try the free web room` route and live states.
  * [POS]: writeitdown AppKit license gate; POST checkout via AppState with mac.html fallback.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -20,6 +20,7 @@ final class UpgradeViewController: NSViewController {
     private var subtitleLabel: NSTextField!
     private var pricingView: FirstLineStatusView!
     private var checkoutStatus: NSTextField!
+    private var checkoutNote: NSTextField!
     private var webTrialButton: NSButton!
 
     init(appState: AppState) {
@@ -112,6 +113,10 @@ final class UpgradeViewController: NSViewController {
         pricingView = FirstLineStatusView(text: "One payment. 2 Macs. 14-day refund.")
         checkoutStatus = label("Checkout is not available yet.", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
         checkoutStatus.maximumNumberOfLines = 0
+        // Next to Buy, in both apps: what the click does and who takes the payment. The Windows card carries the same
+        // sentence verbatim (apps/windows tokens UpgradeCheckoutNote, generated from this literal).
+        checkoutNote = label("Checkout opens in your browser. Payment is handled by Stripe.",
+                             font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
         // The free route is the card's only working path when checkout is down, so it
         // is a real 48 pt outline control with a hit area and the ink focus ring, not
         // a caption-shaped link (problem 9).
@@ -120,7 +125,7 @@ final class UpgradeViewController: NSViewController {
                                                     height: 48)
 
         let stack = NSStackView(views: [titleLabel, subtitleLabel, fieldLabel, licenseField, actions,
-                                        feedbackLabel, pricingView, checkoutStatus, webTrialButton])
+                                        feedbackLabel, pricingView, checkoutStatus, checkoutNote, webTrialButton])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX
@@ -133,6 +138,7 @@ final class UpgradeViewController: NSViewController {
         stack.setCustomSpacing(14, after: feedbackLabel)
         stack.setCustomSpacing(14, after: pricingView)
         stack.setCustomSpacing(6, after: checkoutStatus)
+        stack.setCustomSpacing(20, after: checkoutNote)
         stack.setCustomSpacing(20, after: webTrialButton)
         card.contentView.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -148,6 +154,7 @@ final class UpgradeViewController: NSViewController {
             feedbackLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 440),
             pricingView.widthAnchor.constraint(lessThanOrEqualToConstant: 440),
             checkoutStatus.widthAnchor.constraint(lessThanOrEqualToConstant: 440),
+            checkoutNote.widthAnchor.constraint(lessThanOrEqualToConstant: 440),
         ])
     }
 
@@ -189,6 +196,9 @@ final class UpgradeViewController: NSViewController {
         licenseField.isHidden = !showEntry
         webTrialButton.isHidden = !showEntry
         checkoutStatus.isHidden = !showEntry || appState.checkoutAvailable
+        // The note explains the click that Buy performs, so it appears exactly when Buy does: never beside no paid
+        // action, and never on a licensed card.
+        checkoutNote.isHidden = !showEntry || !appState.checkoutAvailable
         // No disabled Buy: when checkout is not configured the card would otherwise
         // offer a paid action that cannot complete (problem 9).
         buyButton.isHidden = !showEntry || !appState.checkoutAvailable

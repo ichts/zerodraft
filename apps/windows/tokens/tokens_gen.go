@@ -151,6 +151,7 @@ const (
 	UpgradeStartWriting         = "Start writing"
 	UpgradeEnterFirst           = "Enter your order number or activation code first."
 	UpgradePricing              = "One payment. 2 PCs. 14-day refund."
+	UpgradeCheckoutNote         = "Checkout opens in your browser. Payment is handled by Stripe."
 	UpgradeCheckoutUnavailable  = "Checkout is not available yet."
 	UpgradeWebTrial             = "Try the free web room"
 	UpgradeChecking             = "Checking your key..."

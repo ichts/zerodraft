@@ -158,6 +158,8 @@ func TestHomeAndTheThreeFreeSessions(t *testing.T) {
 	g.snap("upgrade-exhausted")
 	g.wantText("Activate Write It Down")
 	g.wantText("One payment. 2 PCs. 14-day refund.")
+	// Next to Buy, the sentence the Mac card shows word for word.
+	g.wantText(tokens.UpgradeCheckoutNote)
 	// the counter survives a relaunch
 	g2 := newRigWith(t, g.vault, g.svc)
 	if g2.a.Surface() != Upgrade || g2.a.Licence().TrialRemaining() != 0 {
@@ -335,6 +337,9 @@ func TestUpgradeCardOffersNothingItCannotComplete(t *testing.T) {
 	}
 	if g.tt.HasText("Buy a license, $4.99 once") {
 		t.Fatalf("no Buy without checkout: %q", g.tt.Texts())
+	}
+	if g.tt.HasText(tokens.UpgradeCheckoutNote) {
+		t.Fatalf("the checkout note describes a Buy that is not on the card: %q", g.tt.Texts())
 	}
 	g.wantText(tokens.UpgradeCheckoutUnavailable)
 	g.wantText(tokens.UpgradeSubtitle)

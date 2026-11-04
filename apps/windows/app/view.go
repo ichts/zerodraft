@@ -326,6 +326,10 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 				if !snap.CheckoutOK {
 					text(c, tokens.UpgradeCheckoutUnavailable, 13, 400, p.chrome()).MaxWidth(440)
 					gap(c, 6)
+				} else {
+					// Next to Buy, the same sentence the Mac card shows: what the click does and who takes the payment.
+					text(c, tokens.UpgradeCheckoutNote, 13, 400, p.chrome()).MaxWidth(440)
+					gap(c, 20)
 				}
 				// the free route is a real 48 pt outlined control with a hit area and a focus ring, not a caption-shaped link
 				if secondary(c, p, tokens.UpgradeWebTrial).Clicked() {

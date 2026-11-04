@@ -133,6 +133,18 @@ Attribute-name gotcha: HTML lowercases attribute names, so any signal key declar
 - Take inspiration from the uninterrupted-output idea behind 750 Words, but do not imply an affiliation or claim features such as streaks, history, accounts, or analytics.
 - Avoid therapeutic, ceremonial, or self-help language such as "honest sentence", "long practice", or "begin when you are ready". Prefer direct labels such as "Start typing", "Keep writing", and "Draft deleted".
 
+Write every public page so an AI reader can understand each section and has evidence to cite it.
+
+1. Give the answer first, then the reason. Never lead with background and leave the conclusion until the end.
+2. Make every section stand alone. A reader must not need an earlier section to understand the answer.
+3. Name the concrete entity. Do not use vague references such as "it" or "this product" in place of the product, feature, or service name.
+4. Write one fact per sentence in plain subject-verb-object form. Split sentences that bundle several claims.
+5. Organise sections around real user questions. Use question-style headings, with the direct answer as the first sentence under each heading.
+6. State each conclusion's conditions, scope, and when the conclusion applies. Do not present a conditional or time-bound answer as a universal claim.
+7. Attach verifiable evidence or a source to every important claim about data, performance, price, or capability. Do not publish unsupported claims.
+
+These rules do not override the existing rules against AI-smell, filler, or process disclosure.
+
 ## Visual system: constitution v2 (all public pages)
 
 The landing page implements visual constitution v2, defined in `design/DESIGN.md` - that document is the visual constitution for all landing work (tokens as CSS custom properties, the four-objects landing, corner chrome, the wash, the step numeral, machine-voice captions, motion law, anti-patterns). Read it before changing landing markup or CSS. Its short form:

@@ -33,7 +33,7 @@ The legal pages disclose that the site serves its own fonts, possible hosting ac
 
 ### Discovery files and answer pages
 
-`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, a pointer to current Mac purchase details, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the appcast and update-file handlers sit ahead of the DMG and page handlers, and the page handler (`try_files {path} {path}/index.html`) has no `/index.html` fallback, so a missing path is a 404, not the landing page with a 200. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
+`llms.txt` ships at `/llms.txt` as a hand-written plain-text file in llmstxt form: what the product is, who it is for, the 3 free Mac sessions, a pointer to current Mac purchase details, and the canonical URLs. It never names an AI provider or model. It must be a real installed file: the appcast and update-file handlers sit ahead of the DMG and page handlers, and the page handler (`try_files {path} {path}/index.html {path}.html`) has no `/index.html` fallback, so a missing path is a 404, not the landing page with a 200. Caddy already maps `.txt` to `text/plain; charset=utf-8`. Check after every deploy:
 
 ```sh
 curl -sI https://writeitdown.app/llms.txt | grep -i '^content-type:'
@@ -142,15 +142,25 @@ writeitdown.app {
 
 	handle {
 		# No `/index.html` fallback: a missing page is a 404, not the landing page with a 200.
-		try_files {path} {path}/index.html
+		# `{path}.html` keeps extensionless page links (/privacy, /mac) working.
+		try_files {path} {path}/index.html {path}.html
+		file_server
+	}
+
+	# A 404 answers with the site's own page and keeps its 404 status. Any other error keeps
+	# Caddy's own response. A missing 404.html answers the same 404 with an empty body.
+	handle_errors {
+		@html404 expression {http.error.status_code} == 404
+		header @html404 Content-Type "text/html; charset=utf-8"
+		rewrite @html404 /404.html
 		file_server
 	}
 }
 ```
 
 The DMG, appcast and update branches have no fallback: `file_server` returns 404 when the file is
-absent. The page branch resolves `/download/` and `/` to their directory index and otherwise returns
-404, so a broken link or a mistyped URL never answers with the landing page and a 200.
+absent. The page branch resolves `/download/` and `/` to their directory index and `/privacy` to `privacy.html`, and otherwise returns
+404 with the body of `404.html` (`noindex`, one sentence, one link home), so a broken link or a mistyped URL never answers with the landing page and a 200.
 
 #### Host cache policy
 

@@ -1,7 +1,10 @@
 name: windows
 
-# Builds and unit-tests apps/windows on GitHub's Windows runner and runs the token drift gate. The real-hardware
-# IME suite, screen capture and end-to-end scripts run on the Windows test PC, never here (apps/windows/README.md).
+# Builds and unit-tests apps/windows on GitHub's Windows runner and runs the token drift gate and the MSIX manifest gate
+# (Store identity, the submission version's non-zero first section, the Windows 11 floor on every flavour, plus its
+# known-broken controls).
+# The real-hardware IME suite, screen capture and end-to-end scripts run on the Windows test PC, never here
+# (apps/windows/README.md).
 # The Mac sources the generator reads are in the path filter on purpose: a Mac token or sentence change must fail
 # here until apps/windows/tokens/tokens_gen.go is regenerated.
 on:
@@ -31,7 +34,7 @@ jobs:
         run: |
           python -m pip install fonttools==4.68.0
           sh scripts/check_tokens.sh
-      - name: MSIX identity (store flavour carries the reserved identity, sideload does not)
+      - name: MSIX manifests (Store identity, version and Windows 11 floor; sideload keeps the test identity)
         run: sh scripts/check_manifest.sh
       - name: Format and module hygiene
         run: |

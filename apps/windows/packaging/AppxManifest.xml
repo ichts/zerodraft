@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Write It Down for Windows. The @...@ fields are filled by make-msix.ps1: the test-signed sideload build uses
-     Publisher "CN=WID Test Signing"; a Store build replaces Name, Publisher and PublisherDisplayName with the values
-     Partner Center reserves (see STORE.md). Nothing in this file needs the Microsoft developer account to build. -->
+     Publisher "CN=WID Test Signing"; a Store build replaces Name, Publisher, PublisherDisplayName, Version and
+     MinVersion with the submission values (see STORE.md). Version has four sections whose fourth the Store reserves
+     for itself, and every flavour's MinVersion is the Windows 11 floor. Nothing in this file needs the Microsoft
+     developer account to build. -->
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
@@ -14,7 +16,7 @@
     <Description>A writing room with no way back: write forward, stop for eight seconds and the draft is deleted.</Description>
   </Properties>
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="@MINVERSION@" MaxVersionTested="10.0.26100.0" />
   </Dependencies>
   <Resources>
     <Resource Language="en-us" />

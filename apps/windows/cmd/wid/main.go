@@ -20,10 +20,8 @@ import (
 	"github.com/ichts/zerodraft/apps/windows/licence"
 	"github.com/ichts/zerodraft/apps/windows/room"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
+	"github.com/ichts/zerodraft/apps/windows/version"
 )
-
-// version is the Windows app's own version (the MSIX identity carries 0.2.0.0).
-const version = "0.2.0"
 
 var logMu sync.Mutex
 
@@ -80,7 +78,7 @@ func main() {
 		},
 		Log:        logf,
 		Bare:       bareMode(),
-		Version:    version,
+		Version:    version.Version,
 		RoomConfig: rcfg,
 	})
 	winW, winH, content := windowSize(os.Getenv("WID_WINDOW"))

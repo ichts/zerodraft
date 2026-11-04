@@ -1,13 +1,16 @@
 # Packages the app exe as a test-signed MSIX on Windows (needs C:\wid\tools\x64 = Microsoft.Windows.SDK.BuildTools).
-#   release: make-msix.ps1 -Exe C:\wid\stage\wid.exe -Out C:\wid\out\WriteItDown.msix
-#   QA:      make-msix.ps1 -Exe ... -Out ... -Name TrefoilStudio.WriteItDownQA -Display 'Write It Down (QA)' -Short 'WID QA'
+# -Version and -MinVersion are required: scripts/package-msix.sh passes them from version/version.txt and the Windows 11
+# floor, and nothing here keeps a second copy of either.
+#   release: make-msix.ps1 -Exe C:\wid\stage\wid.exe -Out C:\wid\out\WriteItDown.msix -Version 1.0.0.0 -MinVersion 10.0.22000.0
+#   QA:      make-msix.ps1 -Exe ... -Out ... -Name TrefoilStudio.WriteItDownQA -Display 'Write It Down (QA)' -Short 'WID QA' -Version 1.0.0.0 -MinVersion 10.0.22000.0
 param(
   [string]$Exe, [string]$Out, [string]$Work = 'C:\wid\msixwork',
   [string]$Name = 'TrefoilStudio.WriteItDown', [string]$Display = 'Write It Down', [string]$Short = 'Write It Down',
-  [string]$Publisher = 'CN=WID Test Signing', [string]$PublisherDisplay = 'Trefoil Studio', [string]$Version = '0.2.0.0',
+  [string]$Publisher = 'CN=WID Test Signing', [string]$PublisherDisplay = 'Trefoil Studio', [string]$Version, [string]$MinVersion,
   [switch]$NoSign
 )
 $ErrorActionPreference = 'Stop'
+if (-not $Version -or -not $MinVersion) { throw 'make-msix.ps1 needs -Version a.b.c.0 and -MinVersion (scripts/package-msix.sh passes both)' }
 $sdk = 'C:\wid\tools\x64'
 Remove-Item $Work -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force "$Work\layout\Assets" | Out-Null
@@ -15,7 +18,7 @@ Copy-Item (Join-Path $PSScriptRoot 'assets\*') "$Work\layout\Assets" -Force
 # the manifest names Assets\StoreLogo.png etc.; the shell picks the scale-qualified files
 Copy-Item $Exe "$Work\layout\wid.exe"
 $m = Get-Content (Join-Path $PSScriptRoot 'AppxManifest.xml') -Raw -Encoding UTF8
-$m = $m.Replace('@EXE@', 'wid.exe').Replace('@NAME@', $Name).Replace('@DISPLAY@', $Display).Replace('@SHORT@', $Short).Replace('@PUBLISHER@', $Publisher).Replace('@PUBDISPLAY@', $PublisherDisplay).Replace('@VERSION@', $Version)
+$m = $m.Replace('@EXE@', 'wid.exe').Replace('@NAME@', $Name).Replace('@DISPLAY@', $Display).Replace('@SHORT@', $Short).Replace('@PUBLISHER@', $Publisher).Replace('@PUBDISPLAY@', $PublisherDisplay).Replace('@VERSION@', $Version).Replace('@MINVERSION@', $MinVersion)
 Set-Content "$Work\layout\AppxManifest.xml" $m -Encoding UTF8
 New-Item -ItemType Directory -Force (Split-Path $Out) | Out-Null
 Remove-Item $Out -Force -ErrorAction SilentlyContinue

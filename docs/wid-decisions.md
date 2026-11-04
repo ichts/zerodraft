@@ -1528,3 +1528,41 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   360 px and on the license card, digit widths with a proportional negative control, `nowrap` and one-line labels
   at 320 px, no `line-break: anywhere` or `word-break: break-all`).
 - Supersedes: no recorded decision. D-004's "corner radius" is cited, not changed.
+
+## D-080: A Mac running Write It Down 1.0 has no updater, so 1.0 to 1.1 is a manual reinstall
+
+- Date: 2026-11-04
+- Decision: Write It Down 1.0 shipped with no updater of any kind, so 1.1 cannot and does not reach
+  an installed 1.0. Read from the installed 1.0 bundle (8,117,026 bytes, SHA-256 `5b8483bd…`, the
+  build the public page served, compiled from `de522b0`): `Contents/Frameworks` does not exist, so
+  there is no Sparkle framework; the executable carries no `Sparkle`, `SUFeedURL`, `SUUpdater` or
+  `appcast` string (`otool -L` and `strings -a`, zero matches); `Info.plist` holds 15 entries with
+  no `SUFeedURL`, no `SUPublicEDKey` and no `SUEnableAutomaticChecks`; the app menu has no
+  `Check for Updates…`; Settings has no Updates section. `Package.swift` at `de522b0` has no
+  Sparkle dependency, which enters in `13f214e` for 1.1. With 1.0 running from `/Applications` for
+  six minutes, the wire recorded 294 packets and every one was Apple system traffic;
+  `writeitdown.app` (95.216.150.141) was never resolved and never contacted. So 1.0 -> 1.1 is a
+  manual reinstall: a 1.0 user downloads `Write-It-Down-1.1.dmg` from
+  `https://writeitdown.app/download/` and replaces the app, and nothing reaches a 1.0 installation
+  automatically. The feed is healthy and 1.1 reads it correctly, so this is a fact about the 1.0
+  client, not a feed fault: `https://writeitdown.app/download/appcast.xml` answers 200 signed with
+  build 2 / 1.1, and 1.1's `Check for Updates…` fetched it over TLS and reported `You're up to
+  date!`. D-041's sentence "the first automatic delivery lands with 1.2" is accurate as a
+  statement about 1.2 and about nothing else: 1.2 is the first release that can install itself, and
+  it can only install onto an installation already running 1.1. 1.1 is a build every existing user
+  gets by hand. The half of D-041 that did ship is the release note: PR 101 merged as `9cb2827`
+  repoints `/download/` to `Write-It-Down-1.1.dmg` and publishes `Version 1.1. A free update for
+  the app you already own.` on `/download/` and `mac.html`, which is the mechanism D-041 promised.
+  At the time of this entry the live URL still answered with the 1.0 page (`last-modified`
+  2026-11-03), so the note reaches users with that site deploy bundle, not with the merge.
+- Reason: the log described a delivery path the shipped app cannot take, so read in sequence it
+  promised 1.0 users an automatic 1.1 that no code on their Mac could receive, while the download
+  page was the only real path all along. Naming the two apart keeps the record usable: 1.0 is a
+  manual reinstall, 1.2 is the first automatic delivery, and D-041's opt-in default, its
+  signed-feed and key rules and its room rules were never the problem and do not change. Evidence:
+  the 2026-11-04 upgrade run in `data/wid-upgrade-vm/report.md`, with captures 01 to 11 and
+  `logs/net-1.0-six-minute-window.pcap`.
+- Supersedes: D-041's delivery-path sentence ("1.0 users learn about 1.1 from a release-notes line
+  on the download page; the first automatic delivery lands with 1.2") as a description of how 1.1
+  reaches a 1.0 user. Its opt-in default, its signed-feed and key rules and every room string,
+  geometry and motion rule stand.

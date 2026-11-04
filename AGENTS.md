@@ -129,7 +129,7 @@ Attribute-name gotcha: HTML lowercases attribute names, so any signal key declar
 ## Product voice
 
 - Explain the mechanism and consequence in short, plain sentences.
-- Position Zero Draft as an opinionated forced-output writing tool: the user writes forward, cannot edit the first draft, and loses it after eight seconds of silence.
+- Position Write It Down as an opinionated forced-output writing tool: the user writes forward, cannot edit the first draft, and loses it after eight seconds of silence.
 - Take inspiration from the uninterrupted-output idea behind 750 Words, but do not imply an affiliation or claim features such as streaks, history, accounts, or analytics.
 - Avoid therapeutic, ceremonial, or self-help language such as "honest sentence", "long practice", or "begin when you are ready". Prefer direct labels such as "Start typing", "Keep writing", and "Draft deleted".
 

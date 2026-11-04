@@ -6,7 +6,7 @@
     "release-check": "node release-check.mjs",
     "cache-headers": "sh qa/cache-headers.sh",
     "journey": "node journey/journey.mjs",
-    "journey:live": "node journey/journey.mjs --base https://writeitdown.app --expect-sha 5b8483bd210e5f4c697265fad0c447b4bc88b9265a1999bd9a7566be74bf4bc4"
+    "journey:live": "node journey/journey.mjs --base https://writeitdown.app --expect-sha b5796ac123419f69ec758c3d671e3d90fcd119ae8e932136adee0484616818a6"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

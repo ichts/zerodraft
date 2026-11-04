@@ -12,7 +12,7 @@ const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 
 
 http.createServer((req, res) => {
   const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
-  if (dmg && p === '/download/Write-It-Down-1.0.dmg') {
+  if (dmg && p === '/download/Write-It-Down-1.1.dmg') {
     res.writeHead(200, { 'content-type': types['.dmg'], 'content-length': dmg.length });
     return res.end(req.method === 'HEAD' ? undefined : dmg);
   }

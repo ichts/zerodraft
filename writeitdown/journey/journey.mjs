@@ -22,7 +22,7 @@ const scenarios = arg('scenarios', null)?.split(',');
 if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe', 'mac-purchase'].includes(name))) {
   console.error('--scenarios accepts full-session,silence-wipe,mac-purchase'); process.exit(2);
 }
-const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.0.dmg';
+const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.1.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
 const results = [];
 let waivers;

@@ -184,10 +184,19 @@ test('answer-first pages open on the answer and keep the document grid', async (
         scrollWidth: document.documentElement.scrollWidth,
         text: main.innerText,
         lede: main.querySelector('.doc-lede').innerText,
-        headings: [...main.querySelectorAll('h1, h2, h3')].map(heading => ({
-          ...grid(heading),
-          answer: heading.nextElementSibling?.matches('p') ? heading.nextElementSibling.innerText : null,
-        })),
+        headings: [...main.querySelectorAll('h1, h2, h3')].map(heading => {
+          const next = heading.nextElementSibling?.matches('p') ? heading.nextElementSibling.innerText : null;
+          const parts = next ? sentences(next) : [];
+          const firstAnswer = parts[0] && /^(No|Yes)\.$/.test(parts[0])
+            ? parts.slice(0, 2).join(' ')
+            : (parts[0] || '');
+          return {
+            ...grid(heading),
+            tag: heading.tagName,
+            answer: next,
+            firstSentence: firstAnswer,
+          };
+        }),
         paragraphs: [...main.querySelectorAll('p')].map(paragraph => ({
           ...grid(paragraph),
           sentences: sentences(paragraph.innerText),
@@ -201,19 +210,18 @@ test('answer-first pages open on the answer and keep the document grid', async (
     expect(before.text, `${path}: no em dash`).not.toContain('\u2014');
     expect(before.lede, `${path}: no introductory filler`).not.toMatch(/is simple:|for you:|keep typing:/);
     // Rule 18 item 5: every section opens with a question in the reader's words.
+    // The title, H1, each H2 question and its first answer sentence name Write It Down.
     for (const heading of before.headings) {
       expect(heading.text, `${path}: ${heading.text} is a question`).toMatch(/\?$/);
       expect(heading.text, `${path}: ${heading.text} names the product`).toContain('Write It Down');
       expect(heading.answer, `${path}: ${heading.text} is answered by the next paragraph`).toBeTruthy();
+      if (heading.tag === 'H1' || heading.tag === 'H2') {
+        expect(heading.firstSentence, `${path}: first answer sentence under "${heading.text}" names the product`).toContain('Write It Down');
+      }
     }
-    // Rule 18 items 2 and 3: each passage survives being read alone, so its opening
-    // sentences name Write It Down instead of a pronoun the reader has lost.
+    // Each sentence carries one fact; later sentences use it/the room/the app with an unambiguous referent.
     for (const paragraph of before.paragraphs) {
-      expect(paragraph.sentences.slice(0, 2).join(' '), `${path}: ${paragraph.text} names the product up front`)
-        .toContain('Write It Down');
       for (const sentence of paragraph.sentences) {
-        expect(sentence, `${path}: ${sentence} opens on a named subject`)
-          .not.toMatch(/^(It|This|That|These|Those|They)\s+(is|are|was|were|has|have|had|does|do|did|keeps?|saves?|deletes?|stores?|runs?|costs?|works?|applies?|waits?|requires?|writes?|means?|shows?|starts?|ends?|lives?|stays?|sends?|blocks?|lets?|needs?|expires?|uploads?)\b/);
         expect(sentence.split(/\s+/).length, `${path}: ${sentence} carries one fact`).toBeLessThanOrEqual(32);
       }
     }

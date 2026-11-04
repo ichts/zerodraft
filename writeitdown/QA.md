@@ -572,7 +572,7 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
 - No deployment was attempted: the supplied brief states SSH credentials are unavailable. The install bundle is the handoff, not proof of a live release.
 - Real iOS Safari, its virtual keyboard, and physical IME candidate selection were not exercised. Mobile evidence is isolated Chrome emulation.
 - Clipboard read permission was denied by headless Chrome. Validation checked the actual write call's complete payload and success, and the fallback's selected full text and successful copy result.
-- The public contact address remains explicitly unconfigured, as requested. Hosting log retention has not been independently audited; Privacy does not claim otherwise.
+- The public contact address remains explicitly unconfigured, as requested. Privacy states the 2026-11-04 access-log policy (IPv4 truncated to /24, IPv6 to /48, referrer cut to its origin, raw logs kept at most 14 days); the hosting configuration has not been independently audited.
 
 # 2026-10-26: The stopped screen is one composition (web + Mac, D-070)
 

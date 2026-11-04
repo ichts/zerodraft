@@ -3,7 +3,7 @@
 # and no PC, and asserts what each package must carry: the identity Partner Center reserved for the Store (STORE.md), the
 # test-signing identity for the sideloads, one four-section version across every flavour whose first section is not 0
 # (Microsoft refuses a first version section of 0) and whose fourth stays 0 (the Store reserves it), and the Windows 11
-# TargetDeviceFamily floor on every flavour, because nothing below Windows 11 has been run. It ends with known-broken
+# TargetDeviceFamily floor on every flavour, because nothing below Windows 11 has been run. It also runs known-broken
 # controls: a doctored manifest must be refused, so a gate that stopped biting cannot pass silently.
 # The actual makeappx pack is not run here: the GitHub windows job builds, this gate only reads the rendered XML.
 #   usage: scripts/check_manifest.sh

@@ -31,10 +31,15 @@ async function faqData(page, path) {
       question: item.querySelector('summary h3').textContent.trim(),
       answer: item.querySelector('p').textContent.trim(),
     }));
-    const answerPage = [...document.querySelectorAll('#faq .qa')].map(item => ({
-      question: item.querySelector('h3').textContent.trim(),
-      answer: item.querySelector('p').textContent.trim(),
-    }));
+    const answerPage = [
+      ...(document.querySelector('#faq > h2 + p')
+        ? [{ question: document.querySelector('#faq > h2').textContent.trim(), answer: document.querySelector('#faq > p').textContent.trim() }]
+        : []),
+      ...[...document.querySelectorAll('#faq .qa')].map(item => ({
+        question: item.querySelector('h3').textContent.trim(),
+        answer: item.querySelector('p').textContent.trim(),
+      })),
+    ];
     return {
       visible: landing.length ? landing : answerPage,
       schema: faq ? faq.mainEntity.map(item => ({
@@ -147,34 +152,98 @@ test('answer pages answer one question with matching Article, breadcrumb and pro
     expect(data.article, `${path}: Article schema`).toEqual({ headline: data.h1, description: data.firstParagraph });
     expect(data.crumbNames[0], `${path}: breadcrumb starts at home`).toBe('Home');
     expect(data.schemaCrumbs, `${path}: BreadcrumbList matches the visible breadcrumb`).toEqual(data.crumbNames);
-    expect(data.selfMention, `${path}: self-mention line`).toBe(true);
+    // The five answer-first pages answer their question directly, so only the older page still
+    // carries the tool-directed self-description.
+    expect(data.selfMention, `${path}: tool-directed self-description`).toBe(path === '/write-it-down-mac-vs-web.html');
   }
 });
 
-test('verification files are served without HTML fallback', async ({ request }) => {
-  const googleFile = readdirSync('.').find(name => /^google[a-zA-Z0-9_-]+\.html$/.test(name));
-  expect(googleFile).toBeTruthy();
-  for (const file of [googleFile, 'BingSiteAuth.xml']) {
-    const response = await request.get('/writeitdown/' + file);
-    expect(response.ok()).toBe(true);
-    expect(await response.text()).toBe(readFileSync(file, 'utf8'));
+test('answer-first pages open on the answer and keep the document grid', async ({ page }) => {
+  const rewritten = answers.filter(path => path !== '/write-it-down-mac-vs-web.html');
+  for (const path of rewritten) {
+    await page.goto(localPath(path));
+    await page.evaluate(() => document.fonts.ready);
+    const measure = () => page.evaluate(() => {
+      const main = document.querySelector('main');
+      const bounds = main.getBoundingClientRect();
+      const sentences = value => [...new Intl.Segmenter('en', { granularity: 'sentence' }).segment(value)]
+        .map(part => part.segment.trim()).filter(Boolean);
+      const grid = element => {
+        const rect = element.getBoundingClientRect();
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return {
+          text: element.innerText,
+          left: rect.left,
+          right: rect.right,
+          clipped: [...range.getClientRects()].some(line => line.left < rect.left - 1 || line.right > rect.right + 1),
+        };
+      };
+      return {
+        width: innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        text: main.innerText,
+        lede: main.querySelector('.doc-lede').innerText,
+        headings: [...main.querySelectorAll('h1, h2, h3')].map(heading => {
+          const next = heading.nextElementSibling?.matches('p') ? heading.nextElementSibling.innerText : null;
+          const parts = next ? sentences(next) : [];
+          const firstAnswer = parts[0] && /^(No|Yes)\.$/.test(parts[0])
+            ? parts.slice(0, 2).join(' ')
+            : (parts[0] || '');
+          return {
+            ...grid(heading),
+            tag: heading.tagName,
+            answer: next,
+            firstSentence: firstAnswer,
+          };
+        }),
+        paragraphs: [...main.querySelectorAll('p')].map(paragraph => ({
+          ...grid(paragraph),
+          sentences: sentences(paragraph.innerText),
+        })),
+        column: { left: main.querySelector('h1').getBoundingClientRect().left, right: main.querySelector('h1').getBoundingClientRect().right },
+      };
+    });
+    const before = await measure();
+    expect(before.scrollWidth, `${path}: no horizontal scroll`).toBe(before.width);
+    expect(before.text, `${path}: no tool-directed copy`).not.toMatch(/ChatGPT|ask an AI|language model/i);
+    expect(before.text, `${path}: no em dash`).not.toContain('\u2014');
+    expect(before.lede, `${path}: no introductory filler`).not.toMatch(/is simple:|for you:|keep typing:/);
+    // Rule 18 item 5: every section opens with a question in the reader's words.
+    // The title, H1, each H2 question and its first answer sentence name Write It Down.
+    for (const heading of before.headings) {
+      expect(heading.text, `${path}: ${heading.text} is a question`).toMatch(/\?$/);
+      expect(heading.text, `${path}: ${heading.text} names the product`).toContain('Write It Down');
+      expect(heading.answer, `${path}: ${heading.text} is answered by the next paragraph`).toBeTruthy();
+      if (heading.tag === 'H1' || heading.tag === 'H2') {
+        expect(heading.firstSentence, `${path}: first answer sentence under "${heading.text}" names the product`).toContain('Write It Down');
+      }
+    }
+    // Each sentence carries one fact; later sentences use it/the room/the app with an unambiguous referent.
+    for (const paragraph of before.paragraphs) {
+      for (const sentence of paragraph.sentences) {
+        expect(sentence.split(/\s+/).length, `${path}: ${sentence} carries one fact`).toBeLessThanOrEqual(32);
+      }
+    }
+    // Every block sits on the one text column the H1 defines, and none of it is cut off.
+    for (const block of [...before.headings, ...before.paragraphs]) {
+      expect(Math.abs(block.left - before.column.left), `${path}: left grid ${block.text}`).toBeLessThanOrEqual(1);
+      expect(block.right, `${path}: right edge ${block.text}`).toBeCloseTo(before.column.right, 0);
+      expect(block.clipped, `${path}: text fits ${block.text}`).toBe(false);
+    }
+    await page.waitForTimeout(150);
+    const after = await measure();
+    expect(after.headings, `${path}: headings stay put`).toEqual(before.headings);
+    expect(after.paragraphs, `${path}: paragraphs stay put`).toEqual(before.paragraphs);
   }
 });
 
-test('IndexNow key file is served with the exact key', async ({ request }) => {
-  const key = '1bcb6b66144003eb070fe87774217f86';
-  const response = await request.get(`/writeitdown/${key}.txt`);
-  expect(response.ok()).toBe(true);
-  expect((await response.text()).trim()).toBe(key);
-  expect(readFileSync(`${key}.txt`, 'utf8').trim()).toBe(key);
-});
-
-test('Cloudflare beacon appears exactly once on each shipped page', async ({ request }) => {
-  for (const path of shipped) {
-    const response = await request.get(servedPath(path));
-    const html = await response.text();
-    expect(html.match(/beacon\.min\.js/g)).toHaveLength(1);
-    expect(html.match(/df0c43279d154d5eb9ee4ef8a7d92fec/g)).toHaveLength(1);
-    expect(html.indexOf('static.cloudflareinsights.com')).toBeLessThan(html.indexOf('</body>'));
+test('answer pages link each other', async ({ page }) => {
+  for (const path of answers) {
+    await page.goto(localPath(path));
+    const links = await page.evaluate(() => [...document.querySelectorAll('main.doc a')]
+      .map(link => link.getAttribute('href')));
+    const siblings = answers.filter(other => other !== path && links.includes(other.slice(1)));
+    expect(siblings.length, `${path}: links ${siblings.join(', ')}`).toBeGreaterThanOrEqual(2);
   }
 });

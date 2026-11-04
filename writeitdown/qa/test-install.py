@@ -16,7 +16,7 @@ files = {
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
     'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html',
     'write-it-down-free-trial.html', 'write-it-down-price.html',
-    'delete-a-draft.html', 'is-my-writing-saved.html',
+    'delete-a-draft.html', 'is-my-writing-saved.html', '404.html',
     'og.png', 'robots.txt', 'sitemap.xml', 'llms.txt', 'BingSiteAuth.xml',
     'google7787e5a0693832e8.html', '1bcb6b66144003eb070fe87774217f86.txt',
     'logo/write-it-down-lockup.svg', 'logo/write-it-down-lockup-plate.svg', 'favicon.svg', 'favicon-16.png', 'favicon-32.png',

@@ -267,6 +267,19 @@ test('the release route server answers a missing page with 404', async ({ reques
   }
 });
 
+test('404.html is the document shell with one sentence, one link home and noindex', async ({ page }) => {
+  await page.goto('404.html');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
+  await expect(page.locator('main.doc h1')).toHaveText('Page not found');
+  await expect(page.locator('main.doc p')).toHaveCount(2);
+  await expect(page.locator('main.doc a')).toHaveCount(1);
+  await expect(page.locator('main.doc a')).toHaveAttribute('href', '/');
+  const shell = await readShell(page);
+  expect(shell.brandTop, '404 header lockup sits where the other pages put it').toBeGreaterThan(0);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow, '404 does not overflow horizontally').toBeLessThanOrEqual(0);
+});
+
 test('the phone room nav keeps only the theme icon, and the Mac link moves into the exit row', async ({ page }, info) => {
   test.skip(info.project.use.viewport.width !== 390, 'phone layout');
   await page.goto('index.html#trial');

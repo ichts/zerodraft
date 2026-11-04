@@ -147,19 +147,26 @@ writeitdown.app {
 		file_server
 	}
 
-	# A 404 answers with the site's own page and keeps its 404 status. Any other error keeps
-	# Caddy's own response. A missing 404.html answers the same 404 with an empty body.
+	# A 404 on a page address answers with the site's own page and keeps its 404 status. The
+	# release routes are excluded so a missing feed, payload or disk image keeps its own
+	# Content-Type, cache policy and empty body. Any other error keeps Caddy's own response.
+	# A missing 404.html answers the same 404 with an empty body.
 	handle_errors {
-		@html404 expression {http.error.status_code} == 404
-		header @html404 Content-Type "text/html; charset=utf-8"
-		rewrite @html404 /404.html
+		@page404 {
+			expression {http.error.status_code} == 404
+			not path /download/appcast.xml /download/updates/* /download/*.dmg /download/*.dmg.sha256
+		}
+		rewrite @page404 /404.html
 		file_server
 	}
 }
 ```
 
 The DMG, appcast and update branches have no fallback: `file_server` returns 404 when the file is
-absent. The page branch resolves `/download/` and `/` to their directory index and `/privacy` to `privacy.html`, and otherwise returns
+absent, and `handle_errors` excludes those paths, so the absent file keeps its own status, Content-Type,
+cache policy and empty body instead of being replaced by the HTML page. Sparkle parses whatever the
+feed URL returns, so a missing feed must never arrive as an HTML document. The page branch resolves
+`/download/` and `/` to their directory index and `/privacy` to `privacy.html`, and otherwise returns
 404 with the body of `404.html` (`noindex`, one sentence, one link home), so a broken link or a mistyped URL never answers with the landing page and a 200.
 
 #### Host cache policy

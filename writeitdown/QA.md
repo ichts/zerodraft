@@ -747,3 +747,58 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
   (`scripts/dmg-journey.sh`) and the VM guest journey (`scripts/vm/guest-journey.sh`) now wait for
   and assert the stopped group - `You stopped.`, `Draft deleted.`, `Begin again`, `0 words`, no
   receipt sentence and no clock - instead of the retired `DRAFT DELETED AT …` receipt.
+
+# 2026-11-05: The kept screen offers one quiet route to the app (web, D-083)
+
+- Scope: the browser trial's kept screen only. Nothing on the landing, the download page, the demo or the
+  Mac app changed. The new control is `#kept a.kept-app`, `Mac app`, `download/?from=kept`, `_blank` plus
+  `noopener`, styled by one rule in `site.css` in the room's quiet role.
+- Geometry, measured on the real kept path (real Chrome, the sixty-second deadline played through, the
+  suite's own clock acceleration only in the assertions): the action row is the same box before and after
+  the change at both widths - 1440x900 top 241.59 / left 564.28 / 311.44x48, 390x844 top 215.98 / left
+  43.28 / 303.44x48 - and the same box again with the link taken out of flow in the same page. The row
+  adds 50 px (6 px gap, 44 px tap row, 13 px ink) under the pair and keeps the returned draft's line: the
+  kept scroll measures 413.2 px at 1440 and 370.4 px at 390 against a 33.6-44.8 px line.
+- The row yields to the draft. `status-slot.js` decides it from the layout it already measures: a sheet
+  whose kept scroll would be shorter than one draft line drops the row (`data-kept-app="false"`) and keeps
+  the block's rhythm and the line. Measured: 320x568 (line 33.6, scroll 33.6), 667x375 (33.6), 844x390
+  (67 against a 44.8 line) and 1440x350 (44.8) all keep their line; without the rule 320x568 fell to
+  23.6 px and 844x390 to 41 px, and the suite's "kept screens keep the controls and draft clear of the
+  paper foot" failed. The header pill (above 767 px) or the phone exit-row `Download for Mac` still offers
+  the app on those sheets.
+- Web assertions: `qa/phase4.spec.mjs` "the kept screen offers one route to the app, and the writing
+  screen none" (one visible link on the kept screen, none on the writing, wipe and 844x390 sheets; text,
+  target and rel; the quiet role's colour equal to the caption's, 13 px, underlined, a 44 px row below the
+  pair and above the caption; the pair's four edges unchanged with the link out of flow; the Tab-reached
+  link wearing the shared 2 px ink ring on its square shape). The kept and phase specs that already
+  govern this screen stay green: "kept screens keep the controls and draft clear of the paper foot" (seven
+  sheets, the compact and the 320 px squeeze stress), "the kept screen draws the draft once", "kept
+  screen: headline, quiet receipt, action row above a scrollable draft" (COPY TEXT / COPIED / TRY AGAIN
+  keep one pill and RUN IT AGAIN does not move), `qa/paper.spec.mjs` "the kept screen stays on the same
+  paper", `qa/typography.spec.mjs` "the kept receipt and the machine-voice labels keep the Mac's 13 px
+  medium and its tracking", and `qa/mac.spec.mjs` "every shipped link resolves and every fragment exists".
+- Evidence: `data/wid-kept-app-link/after/` - `kept-1440x900.png`, `kept-390x844.png`,
+  `kept-link-focused-{1440x900,390x844}.png`, `kept-no-app-row-844x390.png` and the two link close-ups.
+  Inspected: the row reads as a quiet editorial link under the pill pair in both widths, its underline is
+  the only one on the block, the focus ring clears the pill row above it, and the caption below is
+  unchanged.
+- Limits: the 390 px capture is Chrome desktop with a fine pointer, not a real phone; touch was not
+  exercised on hardware. On the kept screen a second route to the same page exists in the room's own
+  chrome (the header pill above 767 px, the exit-row link below it); that is D-061/D-067 wayfinding, not
+  this row, and it was left alone. The href is relative like every other Mac link on the page, so the
+  suite's site-wide link gate can resolve it under `/writeitdown/`; an absolute `/download/` would 404
+  there and only resolve on the deployed root.
+- UI quality checklist (`../docs/ui-quality.md`), the rows this change touches: Q-05 pass (the link is its
+  own role with its own line box, so the pair keeps one optical centre; the kept actions still sit above a
+  long draft at 1440, 390 and 320x568). Q-06 pass (nothing outside the kept block moves: the exit row reads
+  top 830 at 1440 and 772 at 390 before and after the session). Q-07 pass (a route, not a label: the spec's
+  two words, no caption, arrow or helper). Q-08 pass (the Mac kept screen keeps its own composition; D-083
+  records the difference). Q-09 pass (light and dark kept captures at both default sizes). Q-13 pass (the
+  link is Tab-reachable from RUN IT AGAIN and wears the 2 px ink ring on its own shape). Q-14 pass (centred
+  on the sheet axis, 6 px optical gap under the pair, no ±1 px nudge). Q-21 pass (the site's underlined-link
+  treatment, tokens only, no page-local colour). Q-22 pass (the link uses the caption's `--paper-quiet`,
+  which `qa/paper.spec.mjs` holds at 7:1 or better on the kept sheet in both themes). Q-24 pass (focus
+  changes the ring and nothing else; the control keeps its square shape). Q-25 pass (the receipt, the silent
+  corner count and the caption are untouched; the row adds no number). Q-29 pass (a new tab with
+  `noopener`, so the link cannot throw the live draft away). Q-33 pass (the block still centres on the sheet
+  axis). Q-36 pass (the new row, asserted by the new phase4 test).

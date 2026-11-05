@@ -48,12 +48,35 @@ const ink = (() => {
 // what recovers it, so only the screen not being rendered (hidden) skips the measurement.
 const KEPT_GAPS = [['.kept-scroll', '--kept-scroll-gap'], ['.kept-note', '--kept-note-gap'], ['.kept-actions', '--kept-actions-gap'], ['.kept-receipt', '--kept-receipt-gap']];
 
-function keepDraftLine(paper) {
+// The kept screen's measurements all start from the draft it returned: the scroll box the draft
+// lives in and the line the rendered face gives it. A screen that is not rendered has no box to
+// measure, so it is skipped instead of being read as zero.
+function keptDraft(paper) {
   const scroll = paper.querySelector('.kept-scroll');
   const text = paper.querySelector('.kept-text');
-  if (!scroll || !text || scroll.getClientRects().length === 0) return;
+  if (!scroll || !text || scroll.getClientRects().length === 0) return null;
   const line = parseFloat(getComputedStyle(text).lineHeight);
-  if (!(line > 0)) return;
+  return line > 0 ? { scroll, line } : null;
+}
+
+// The app row under the action row is the one member of the kept block the writer did not earn
+// with their minute, so it is the first thing to go: a sheet that cannot hold both it and one
+// draft line keeps the line and the block's own rhythm, and the row steps out. The decision is
+// taken from the layout with the row shown, so it reads the same whichever state the sheet is in
+// and cannot flip between placements.
+function placeAppRow(paper) {
+  if (!paper.querySelector('.kept-app')) return;
+  const draft = keptDraft(paper);
+  if (!draft) return;
+  // Put the row back before measuring: the decision is read from the layout that includes it.
+  paper.dataset.keptApp = 'true';
+  paper.dataset.keptApp = String(draft.scroll.getBoundingClientRect().height >= draft.line - 0.5);
+}
+
+function keepDraftLine(paper) {
+  const draft = keptDraft(paper);
+  if (!draft) return;
+  const { scroll, line } = draft;
   for (const [selector, name] of KEPT_GAPS) {
     const short = line - scroll.getBoundingClientRect().height;
     if (short <= 0.5) return;
@@ -162,6 +185,7 @@ export function statusSlot({ paper, line, pitches, numeral, caption, block }) {
       } else {
         compactVars.forEach(name => paper.style.removeProperty(name));
       }
+      placeAppRow(paper);
       keepDraftLine(paper);
       placed = key;
       dirty = false;

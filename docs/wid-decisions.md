@@ -1566,3 +1566,35 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   on the download page; the first automatic delivery lands with 1.2") as a description of how 1.1
   reaches a 1.0 user. Its opt-in default, its signed-feed and key rules and every room string,
   geometry and motion rule stand.
+
+## D-081: The 1.0 download stops being a current download without breaking the links that point at it
+
+- Date: 2026-11-05
+- Decision: `/download/` keeps 1.1 as its only current download (D-080's repoint, unchanged) and
+  gains one quiet line under the requirements, `#previous-version`, that reads `Previous version:
+  1.0.` `A 1.0 installation cannot update itself.` and links the archived copy at
+  `/download/releases/Write-It-Down-1.0.dmg`, whose filename is the link text. The line is not a
+  second download: it is 13 px muted text on the card's content edge, its link is an inline
+  underlined filename that never breaks across lines, and it names no other version. The two
+  retired host addresses `/download/Write-It-Down-1.0.dmg` and
+  `/download/Write-It-Down-1.0.dmg.sha256` answer `301` to `/download/`, so an old link lands on
+  the page that offers 1.1. `/download/releases/*` is served from the site directory as the archive;
+  that directory is a host file, never committed and never in the deploy bundle, and `install.sh`
+  neither creates nor prunes it. The archive note is not one of the page's version facts: a publish
+  moves the DMG link, the Install command, the two SHA-256 halves and `#release-notes`, and leaves
+  the archive note alone. `release-check.mjs --download` refuses an archive link that is not
+  `releases/Write-It-Down-<version>.dmg` or not older than the linked download.
+- Reason: measured on 2026-11-05, three weeks after 1.1 shipped, `https://writeitdown.app/download/
+  Write-It-Down-1.0.dmg` still answered `200 application/x-apple-diskimage` with
+  `content-length: 8117026`, while the page beside it had offered `Write-It-Down-1.1.dmg` since
+  `9cb2827`. A 1.0 bundle has no updater at all (D-080), so every install that followed the old
+  link is stranded on a build nothing can update. Deleting the file or letting the address 404
+  breaks the pages, mail and forum posts that still link to it; a rewrite that keeps serving 1.0 as
+  a download keeps producing stranded installs. The 301 sends the visitor to the page that offers
+  1.1, and the archive keeps the exact build reachable for someone who needs to reproduce or match
+  it, without the page presenting it as current. Evidence: the live probes, the Caddy v2.6.2 delta
+  validation and the before/after route matrix in `data/wid-dmg-10-retire/report.md` and `lab/`, and
+  the browser pass in `writeitdown/QA.md` ("2026-11-05: The download page keeps 1.1 current and
+  archives 1.0"). The host rules are handed over as a delta and are not applied by this change.
+- Supersedes: no recorded decision. It carries out the consequence D-080 records for the download
+  address; D-080's reading of the 1.0 build, D-041's opt-in update rules and every room rule stand.

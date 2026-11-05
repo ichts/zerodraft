@@ -49,6 +49,11 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
   // Derived from the configured baseURL so the suite still holds its own origin when it runs on
   // another port; the default remains http://127.0.0.1:8015/writeitdown/.
   const base = new URL('/writeitdown/', info.project.use.baseURL);
+  // Host artifacts the repository does not hold, so this static server cannot answer them: the
+  // archived 1.0 disk image is placed on the host under download/releases/ and never enters the
+  // deploy bundle (README, "The 1.0 archive"). Its address and its place on the page are
+  // asserted by "the download page offers 1.1 as current and 1.0 as the archived previous version".
+  const hostArtifacts = new Set([new URL('download/releases/Write-It-Down-1.0.dmg', base).pathname]);
   for (const file of shipped) {
     await page.goto(file);
     const hrefs = await page.locator('a[href]').evaluateAll(links => links.map(a => a.getAttribute('href')));
@@ -63,6 +68,7 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
         expect(url.protocol, `${file}: ${href}`).toBe('https:');
         continue;
       }
+      if (hostArtifacts.has(url.pathname)) continue;
       const response = await request.get(url.pathname);
       expect(response.ok(), `${file}: ${href}`).toBe(true);
       if (url.hash && url.hash !== '#trial') {
@@ -112,6 +118,9 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const linkedVersion = dmgFile.replace(/^Write-It-Down-|\.dmg$/g, '');
   const aheadVersion = linkedVersion.split('.').map((part, index, parts) => index === parts.length - 1 ? String(Number(part) + 1) : part).join('.');
   const withNote = attrs => download.replace(/(<p[^>]*\sid="release-notes")[^>]*>/, `$1 ${attrs}>`);
+  // The archive note is rewritten in place too, so a case can hand the check a wrong or unpublished
+  // archived version without touching the rest of the page.
+  const withArchive = href => download.replace(/(id="previous-version"[\s\S]*?<a\s[^>]*href=")[^"]*/, `$1${href}`);
   const checkout = 'https://writeitdown.app/mac.html';
   const inputs = { mac, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
@@ -145,6 +154,10 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replaceAll(dmgFile, `Write-It-Down-${aheadVersion}.dmg`) }, `Release notes: the note declares ${linkedVersion} but the download is ${aheadVersion}`],
     [{ download: withNote(`data-release-note="${linkedVersion}" data-launch-pending="release-notes"`) }, 'Release notes: data-launch-pending is retired'],
     [{ download: withNote('') }, 'Release notes: the note does not declare its version in data-release-note'],
+    [{ download: withArchive(`releases/Write-It-Down-${linkedVersion}.dmg`) }, `Previous version: the note archives ${linkedVersion} but the download is ${linkedVersion}`],
+    [{ download: withArchive(`releases/Write-It-Down-${aheadVersion}.dmg`) }, `Previous version: the note archives ${aheadVersion} but the download is ${linkedVersion}`],
+    [{ download: withArchive('/download/releases/Write-It-Down-1.0.dmg') }, 'Previous version: the note does not link releases/Write-It-Down-<version>.dmg'],
+    [{ download: withArchive('releases/Write-It-Down.dmg') }, 'Previous version: the note does not link releases/Write-It-Down-<version>.dmg'],
   ];
   // The release note is optional. When present it declares the linked artifact version and no
   // pending mark; the page ships one that names the version it links.
@@ -314,6 +327,9 @@ for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'tr
 // content still clears the overflow, overlap and 6 px gutter checks above while the whole lockup moves
 // inward, so this test pins the box to the container the sections below it use.
 test('the landing header spans the page container at every width', async ({ page }) => {
+  // Six widths, each with a fresh load and the fonts resolved: the 30 s default budget is a
+  // navigation budget, and on a loaded machine this sweep spends it inside the loop.
+  test.slow();
   for (const width of [320, 375, 390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto('index.html');
@@ -500,6 +516,9 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
 // responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
 // below owns the every-width fit.
 for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
+  // Thirteen pages at three widths, each with a load, the fonts and a measurement: under parallel load
+  // this sweep timed out at the 30 s default budget while every assertion inside it held.
+  test.slow();
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const lockups = [];
@@ -709,6 +728,98 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
+});
+
+// One version is current and the older one stays reachable: the download link, the Install command
+// and the release note name the same current version, the archive note links the previous one under
+// releases/, and the archive note is a quiet line under the requirements, never a second download.
+test('the download page offers 1.1 as current and 1.0 as the archived previous version', async ({ page }, info) => {
+  test.slow();
+  await page.goto('download/');
+  await page.evaluate(() => document.fonts.ready);
+  const projectWidth = page.viewportSize().width;
+  expect(dmgFile, 'the current download is 1.1').toBe('Write-It-Down-1.1.dmg');
+  const current = page.locator('[data-launch="dmg"]');
+  await expect(current).toHaveCount(1);
+  await expect(current).toHaveAttribute('href', dmgURL);
+  await expect(page.locator('#install .cmd-file')).toHaveText(dmgFile);
+  await expect(page.locator('#release-notes')).toHaveAttribute('data-release-note', '1.1');
+  // The page's whole DMG link set: the current download and one archived version, nothing else.
+  const dmgLinks = page.locator('main a[href$=".dmg"]');
+  await expect(dmgLinks).toHaveCount(2);
+  const hrefs = await dmgLinks.evaluateAll(links => links.map(a => a.getAttribute('href')));
+  expect(hrefs.sort()).toEqual([dmgURL, 'releases/Write-It-Down-1.0.dmg'].sort());
+  const at = 'the archive note:';
+  const note = page.locator('#previous-version');
+  await expect(note).toBeVisible();
+  await expect(note).toContainText('Previous version: 1.0.');
+  await expect(note).toContainText('A 1.0 installation cannot update itself.');
+  await expect(note).toContainText('is a fresh install of 1.0 only.');
+  const archive = note.locator('a');
+  await expect(archive).toHaveText('Write-It-Down-1.0.dmg');
+  await expect(archive).toHaveAttribute('href', 'releases/Write-It-Down-1.0.dmg');
+  expect(await archive.evaluate(link => link.hasAttribute('data-launch')), `${at} no launch slot`).toBe(false);
+  // Not a second current download: no button role, no primary styling, and it sits below the
+  // requirements rather than beside the download action.
+  await expect(archive).not.toHaveClass(/btn/);
+  const noteRow = await page.evaluate(() => {
+    const note = document.querySelector('#previous-version');
+    const box = note.getBoundingClientRect();
+    const card = document.querySelector('.dlbox');
+    const cardBox = card.getBoundingClientRect();
+    const pad = parseFloat(getComputedStyle(card).paddingLeft);
+    const border = parseFloat(getComputedStyle(card).borderLeftWidth);
+    const style = getComputedStyle(note);
+    const link = note.querySelector('a');
+    return {
+      top: box.top,
+      left: box.left,
+      right: box.right,
+      requirementsBottom: document.querySelector('#requirements').getBoundingClientRect().bottom,
+      currentBottom: document.querySelector('[data-launch="dmg"]').getBoundingClientRect().bottom,
+      requirementsLeft: document.querySelector('#requirements').getBoundingClientRect().left,
+      contentLeft: cardBox.left + border + pad,
+      contentRight: cardBox.right - border - parseFloat(getComputedStyle(card).paddingRight),
+      colour: style.color,
+      background: getComputedStyle(card).backgroundColor,
+      linkUnderline: getComputedStyle(link).textDecorationLine,
+      linkDisplay: getComputedStyle(link).display,
+    };
+  });
+  expect(noteRow.top, `${at} sits below the download action, not beside it`).toBeGreaterThan(noteRow.currentBottom);
+  expect(noteRow.top, `${at} sits below the requirements it follows`).toBeGreaterThan(noteRow.requirementsBottom);
+  expect(Math.abs(noteRow.left - noteRow.requirementsLeft), `${at} starts on the requirements' edge`).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(noteRow.left - noteRow.contentLeft), `${at} starts on the card's content edge`).toBeLessThanOrEqual(0.5);
+  expect(noteRow.right, `${at} never overflows the card`).toBeLessThanOrEqual(noteRow.contentRight + 0.5);
+  expect(contrast(noteRow.colour, noteRow.background), `${at} text contrast`).toBeGreaterThanOrEqual(4.5);
+  expect(noteRow.linkUnderline, `${at} the archive link is underlined`).toBe('underline');
+  expect(noteRow.linkDisplay, `${at} the link is not a block control`).toBe('inline');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
+  // The archived filename is a string a reader may need to match against a file on disk, so it never
+  // breaks across lines, at the narrowest shipped width as well (Q-28).
+  for (const width of [projectWidth, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const narrow = await page.evaluate(() => {
+      const link = document.querySelector('#previous-version a');
+      const note = document.querySelector('#previous-version').getBoundingClientRect();
+      const card = document.querySelector('.dlbox');
+      const cardBox = card.getBoundingClientRect();
+      const style = getComputedStyle(card);
+      return {
+        rects: link.getClientRects().length,
+        text: link.textContent,
+        noteRight: note.right,
+        contentRight: cardBox.right - parseFloat(style.borderLeftWidth) - parseFloat(style.paddingRight),
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(narrow.rects, `the archived filename stays whole at ${width}px`).toBe(1);
+    expect(narrow.text, `the archived filename at ${width}px`).toBe('Write-It-Down-1.0.dmg');
+    expect(narrow.noteRight, `the note fits the card at ${width}px`).toBeLessThanOrEqual(narrow.contentRight + 0.5);
+    expect(narrow.overflow, `the page never scrolls sideways at ${width}px`).toBeLessThanOrEqual(0);
+    await page.locator('#previous-version').scrollIntoViewIfNeeded();
+    await page.locator('.dlbox').screenshot({ path: info.outputPath(`download-archive-note-${width}.png`) });
+  }
 });
 
 // Contrast of two computed colours, measured the WCAG way (the site's own tokens, not a guess).

@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
- * [OUTPUT]: 主窗口、surface 路由、theme/focus 响应及成稿复制与新篇同步刷新菜单桥接
+ * [OUTPUT]: 主窗口、surface 路由、theme/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
  * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -55,6 +55,17 @@ final class RootWindowController: NSWindowController {
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// Edit 菜单的 Undo/Redo 是 nil-target 条目：AppKit 需要一个实现 undo:/redo: 的响应者，否则条目永远
+    /// 灰着、⌘Z 在许可输入框里什么都不做。文本框的字段编辑器把自己的编辑记在自己的 undo manager 上，
+    /// 这里只把命令转给它；房间不参与（append-only 关掉了 undo，canUndo 为假，条目保持灰着）（D-082）。
+    @objc func undo(_ sender: Any?) { firstResponderUndoManager?.undo() }
+    @objc func redo(_ sender: Any?) { firstResponderUndoManager?.redo() }
+
+    private var firstResponderUndoManager: UndoManager? {
+        guard let editor = window?.firstResponder as? NSTextView, editor.allowsUndo else { return nil }
+        return editor.undoManager
+    }
 
     override func showWindow(_ sender: Any?) {
         super.showWindow(sender)
@@ -146,6 +157,17 @@ enum SurfaceFactory {
         case .session:  return SessionViewController(appState: appState)
         case .settings: return SettingsViewController(appState: appState, updateSettings: updateSettings)
         case .upgrade:  return UpgradeViewController(appState: appState)
+        }
+    }
+}
+
+// Edit 菜单的 Undo/Redo 由本控制器实现，可用性跟随当前第一响应者的 undo manager。
+extension RootWindowController: NSMenuItemValidation {
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(undo(_:)): return firstResponderUndoManager?.canUndo ?? false
+        case #selector(redo(_:)): return firstResponderUndoManager?.canRedo ?? false
+        default: return true
         }
     }
 }

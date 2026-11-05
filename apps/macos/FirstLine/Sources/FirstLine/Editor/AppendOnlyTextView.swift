@@ -253,6 +253,19 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         denyEdit()
     }
 
+    /// 成稿后编辑器不可编辑，此时 Copy 就是产品自己的 Copy Kept Text：沿 responder chain 交给
+    /// 房间去复制整篇草稿（D-082）。房间的编辑器是这条命令在成稿态唯一的第一响应者，因此菜单的
+    /// copy: 必须在这里转发，否则 ⌘C 会落在一个没有选区、什么也不做的文本视图上。
+    override func copy(_ sender: Any?) {
+        guard !isEditable else {
+            super.copy(sender)
+            return
+        }
+        if nextResponder?.tryToPerform(#selector(NSText.copy(_:)), with: sender) != true {
+            NSSound.beep()
+        }
+    }
+
     override func readSelection(from pboard: NSPasteboard) -> Bool {
         denyEdit()
         return false
@@ -269,10 +282,14 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         let blocked = [
-            #selector(UndoManager.undo),
+            Selector(("undo:")),
             Selector(("redo:")),
             #selector(NSText.cut(_:)),
             #selector(NSText.paste(_:)),
+            // Select All 也在拒绝之列：房间没有选区语义（选区一律被拉回末尾），菜单的 Select All
+            // 如果可用，只会在一次按键后进入 deny 动画。禁用后房间对 ⌘A 的表现与没有 Edit 菜单时
+            // 一致：什么也不发生（D-082）。
+            #selector(NSText.selectAll(_:)),
             #selector(NSResponder.deleteBackward(_:)),
             #selector(NSResponder.deleteForward(_:)),
             #selector(NSResponder.deleteWordBackward(_:)),
@@ -287,6 +304,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         if blocked.contains(item.action ?? Selector(("_noop:"))) {
             return false
+        }
+
+        // 成稿态的房间把 Copy 当作 Copy Kept Text；写作中保持原有判断（没有选区就没有可复制的内容）。
+        if !isEditable, item.action == #selector(NSText.copy(_:)) {
+            return true
         }
 
         return super.validateUserInterfaceItem(item)

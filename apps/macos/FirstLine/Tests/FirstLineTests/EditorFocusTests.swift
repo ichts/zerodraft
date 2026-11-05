@@ -845,7 +845,7 @@ struct EditorFocusTests {
             #selector(NSResponder.transpose(_:)),
             #selector(NSResponder.deleteBackward(_:)),
             #selector(NSResponder.deleteForward(_:)),
-            #selector(UndoManager.undo),
+            Selector(("undo:")),
             Selector(("redo:")),
             #selector(NSText.cut(_:)),
             #selector(NSText.paste(_:)),

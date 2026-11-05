@@ -803,3 +803,54 @@ measured against the paper, D-027's 100/22/7 fade kept, and the alarm tinting th
 - PENDING: a clean VM recording (the two attempts above failed continuity, not assertions), the independent
   review of the capture set, and a real-window recording of the kept screen (covered by the content snapshots
   and `SnapshotTests.keptCopyFocusRendersInLightAndDark`).
+
+## 1.1.1 - ⌘V dead in the licence field (2026-11-05, D-082)
+
+Report: `data/wid-cmdv-bug/report.md`. Branch `fm/wid-cmdv-bug`; every capture named below sits in
+`data/wid-cmdv-bug/captures/` and was taken inside a Tart VM on the headless Mac mini (`wid-cmdv-repro`,
+guest macOS 26.6.2), never on the host GUI. Keys came from the `widrig` HID/AX rig as real key codes.
+
+- FAIL deterministic first, on the published build: `Write-It-Down-1.1.dmg` (9,229,162 bytes, sha256
+  `b5796ac1...18a6`) installed in the VM had only the app menu and Navigate, no Edit menu. In the licence
+  field (`Order number or activation code`) ⌘V, ⌘A, ⌘C, ⌘X and ⌘Z were all no-ops (`02` to `08`), while
+  right-click - Paste inserted the pasteboard through the text system's own menu (`09` to `12`). A
+  TextEdit control in the same guest took the same keys (`13` to `15`), so the rig was sound and the app
+  was the fault. Cause: AppKit delivers every standard editing command through a menu item carrying that
+  key equivalent, and 1.1 had no such menu. The kept room's ⌘C already worked on 1.1 (`16`, `17`).
+- PASS after the fix, same VM, ad-hoc build of this branch (universal, `CFBundleShortVersionString` 1.1),
+  driven against the loopback licence fixture (`license-fixture`, product `window-qa-product`): the
+  licence field takes ⌘V (`window-qa-order` pasted), ⌘A selects it (`proof-02-selected.png`), ⌘C copies
+  it over a marker, ⌘X cuts it and leaves it on the pasteboard, ⌘V restores it, ⌘A plus typing replaces
+  it, ⌘Z restores the replaced text (`final-02-cmdz.png`), ⇧⌘Z redoes it (`final-03-redo.png`), and the
+  Edit menu names the last action (`Undo Paste`), with Paste and Select All lit and Cut/Copy greyed until
+  text is selected (`final-01-edit-menu.png`).
+- PASS the activation card a buyer sees on a spent trial takes the same keys and the pasted key activates
+  the Mac: `proof-02-selected.png` then `proof-03-activated.png` (`This Mac is licensed.`).
+- PASS the live room refuses all six: with the room writing, ⌘V left the draft and the pasteboard
+  untouched, ⌘A/⌘X/⌘Z changed neither, ⌘C did not copy the live draft, typing still appended, and the
+  Edit menu's six items were greyed (`final-06-room-refused.png`, `final-07-room-edit-menu.png`).
+- PASS the kept room's ⌘C still copies the whole draft: with the pasteboard pre-loaded with
+  `KEPT-NO-COPY-YET`, ⌘C in the kept room wrote the draft and the action read `COPIED`
+  (`final-08-kept-copied.png`); clicking the sheet first and pressing ⌘C again repeated it.
+- PASS deterministic: `swift test --filter "EditingCommandTests|EditorFocusTests"` reports
+  `Test run with 44 tests in 2 suites passed` (exit 0), including the six new `EditingCommandTests`
+  (menu shape, licence field acceptance, undo/redo through the controller, room refusal, kept-room copy,
+  room undo stays disabled). `swift test --filter "RoomTests|SnapshotTests|PaperContrastTests|RoundThreeTests|ReviewRoundTests|PinyinInputTests|KeyboardFlowTests|SmokeFlowTests"` reports
+  `Test run with 123 tests in 8 suites passed after 81.586 seconds with 1 known issue`, the recorded
+  known issue being the pre-existing one already noted above. The remaining suites were run in three
+  filtered batches (90, 60 and 9 tests) with 0 failures.
+- FINDING, pre-existing: a single `swift test` over the whole package exits before it prints its summary
+  in this environment (exit 0, partial log). Reproduced identically on the base commit `da262e7` in a
+  clean worktree, which stops at the same `CheckoutClientTests.appStateOpensHostedCheckoutAndUsesFallbackOnlyOnError`
+  after 322 passes. The filtered batches above are the deterministic evidence; the harness exit is not a
+  regression from this change.
+- NOT EXERCISED: IME composition through a live input method in this VM run. The rig posts Unicode
+  characters directly, so enabling Apple Pinyin in the guest (`fix-09-ime-enabled.png`) did not switch
+  the input source and typed text arrived as Latin. IME behaviour stays covered by `PinyinInputTests`
+  (composition path, marked text, no reset of the clock) and by case 3; a real IME-in-the-room recording
+  remains pending.
+- NOT EXERCISED: signing, notarization and the release DMG. They stay with the 1.1.1 release run; this
+  branch ships an ad-hoc build only.
+- Windows: see the finding recorded for row 73 of `apps/windows/SYNC.md`. The installed build on the test
+  PC is the 0.1.0.0 prototype, and its licence card is only reachable after the three free sessions, so
+  Ctrl+V in that field was not exercised; Windows has no `NSMenu` and therefore no such bug class.

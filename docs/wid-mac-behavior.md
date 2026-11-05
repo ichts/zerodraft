@@ -145,6 +145,18 @@ wiped room, is superseded by D-070 (case 38); case 69 keeps only the restart pos
 | 69 | After a wipe the insertion point a restart types at is the first-entry one (same x, same y within 1 pt, inside the visible writing area). The wiped sheet itself draws no caret (case 38, D-070). | `DesignReviewFixesTests.wipedRoomRestartsOnTheFirstEntryInsertionPoint` | `room-deleted-light.png` |
 | 70 | The first refused delete of a session shows `FORWARD ONLY. DELETING IS BLOCKED.` in the footer's status slot (the exit confirmation's slot) for two seconds in the quiet role, then the slot returns to what it held, with no layout shift: the exit link, the count, the clock and the writing layer keep their frames. The 200 ms shake still runs. Later refusals in the same session shake only; a new session earns the notice again; paste, cut, undo and caret moves only shake; an armed exit confirmation keeps the slot and the notice waits unspent (D-077). | `RoomTests.firstRefusedDeleteNamesTheRuleForTwoSecondsAndMovesNothing`; `RoomTests.aNewSessionEarnsTheNoticeAgain`; `RoomTests.onlyADeleteEarnsTheNotice`; `RoomTests.anArmedExitConfirmationKeepsTheSlotAndTheNoticeWaits`; `SessionEngineTests.theRefusalNoticeIsEarnedOncePerSessionByTheFirstDelete` | real-window capture, `mac-light-refusal.png` / `mac-dark-refusal.png` |
 
+## 11. Editing keys (D-082)
+
+The Edit menu carries the six standard editing commands with nil targets, so AppKit lights each one only
+where the first responder accepts it. Every text field in the product therefore takes the keyboard, and
+the writing room still refuses every command but its own copy.
+
+| # | Case | Bound test | Recording |
+| 71 | The licence field takes a pasted key with ⌘V, selects with ⌘A, copies with ⌘C, cuts with ⌘X, undoes typing with ⌘Z and redoes it with ⇧⌘Z, and the Edit menu reflects each state: Undo named for the last action, Paste and Select All lit, Cut and Copy greyed until text is selected. | `EditingCommandTests.aTextFieldAcceptsTheEditingCommandsTheEditMenuOffers`, `typingInTheLicenceFieldUndoesFromTheEditMenu`; real keys in the 1.1.1 VM run | `data/wid-cmdv-bug/captures/final-01-edit-menu.png`, `final-02-cmdz.png`, `final-03-redo.png`, `proof-02-selected.png` |
+| 72 | The activation card a buyer sees on a spent trial takes the same six commands and the pasted key activates the Mac. | same two tests (the card carries the same field) | `data/wid-cmdv-bug/captures/proof-02-selected.png`, `proof-03-activated.png` |
+| 73 | While the room is live the Edit menu's six items stay greyed and the keys change nothing: ⌘V leaves the draft and the pasteboard untouched, ⌘A/⌘X/⌘Z change neither the draft nor the clipboard, ⌘C does not copy a live draft, and typing still appends. | `EditingCommandTests.theWritingRoomRefusesEveryEditingCommand`, `theWritingRoomLeavesUndoDisabled`; `EditorFocusTests.blockedEditingCommandsAreNotValidated` | `data/wid-cmdv-bug/captures/final-07-room-edit-menu.png`, `final-06-room-refused.png` |
+| 74 | In the kept phase ⌘C writes the whole draft to the pasteboard and the action reads COPIED, with the text view or the sheet as first responder, while the Navigate item `Copy Kept Text` stays available and enabled. | `EditingCommandTests.theKeptRoomCopiesItsWholeDraft` | `data/wid-cmdv-bug/captures/final-08-kept-copied.png` |
+
 ## Measured changes
 
 Numbers below are frames/baselines from the layout or from the rendered frame, in points. "Paper top"

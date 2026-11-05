@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState
- * [OUTPUT]: AppKit 菜单，包含 Cmd+N 新篇、Cmd+C 成稿复制、Cmd+W 关窗、Cmd+, Settings 与 Check for Updates…。
- * [POS]: 菜单 target-action 桥接 AppDelegate，动态命令由 validateMenuItem 验证。
+ * [OUTPUT]: AppKit 菜单，包含标准 Edit 菜单（Undo/Redo/Cut/Copy/Paste/Select All，nil target 走 responder chain）、Cmd+N 新篇、Cmd+C 成稿复制、Cmd+W 关窗、Cmd+, Settings 与 Check for Updates…。
+ * [POS]: 菜单 target-action 桥接 AppDelegate，动态命令由 validateMenuItem 验证；标准编辑命令不带 target，由 AppKit 按 first responder 校验后交给正在编辑的文本框。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -73,6 +73,27 @@ enum MainMenuBuilder {
         )
         quitItem.target = validationOwner
         appMenu.addItem(quitItem)
+
+        // Edit 菜单：AppKit 只在菜单项的快捷键里派发标准编辑命令（paste:、copy:、selectAll:、
+        // undo:、cut:），条目保持 nil target，命令由 responder chain 交给第一响应者，因此许可
+        // 输入框（字段编辑器）和任何文本框都能用 ⌘V/⌘A/⌘C/⌘X/⌘Z。这些条目必须保留自动启用：
+        // 主菜单关掉了 autoenablesItems，只有子菜单的自动校验才会让“没有响应者能处理”的条目禁用。
+        // ⌘C 与 Navigate 的 Copy Kept Text 同键，按阶段各有唯一结果：写作中房间的编辑器禁用 copy:，
+        // ⌘C 什么也不做；成稿后同一个编辑器把 copy: 沿 responder chain 转给房间，复制整篇草稿，而
+        // Navigate 的产品条目仍是同一动作的菜单入口（D-082）。
+        let editMenuItem = NSMenuItem()
+        mainMenu.addItem(editMenuItem)
+        let editMenu = NSMenu(title: "Edit")
+        editMenu.autoenablesItems = true
+        editMenuItem.submenu = editMenu
+
+        editMenu.addItem(withTitle: "Undo", action: Selector(("undo:")), keyEquivalent: "z")
+        editMenu.addItem(withTitle: "Redo", action: Selector(("redo:")), keyEquivalent: "Z")
+        editMenu.addItem(.separator())
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 
         // Navigate 菜单。
         let navigateMenuItem = NSMenuItem()

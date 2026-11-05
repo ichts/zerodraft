@@ -1598,3 +1598,39 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   archives 1.0"). The host rules are handed over as a delta and are not applied by this change.
 - Supersedes: no recorded decision. It carries out the consequence D-080 records for the download
   address; D-080's reading of the 1.0 build, D-041's opt-in update rules and every room rule stand.
+
+## D-082: The Mac carries the standard Edit menu, and ⌘C keeps both of its meanings
+
+- Date: 2026-11-05
+- Decision: The Mac app's main menu gains a standard Edit menu between the app menu and Navigate: Undo
+  ⌘Z, Redo ⇧⌘Z, Cut ⌘X, Copy ⌘C, Paste ⌘V, Select All ⌘A. All six are nil-target items, so AppKit
+  validates each one against the responder chain and only the responder that can perform the command
+  lights it up. The window controller implements `undo:`/`redo:` by forwarding to the first responder's
+  own undo manager, which is what makes the standard Undo item live in a text field. The Navigate item
+  `Copy Kept Text` keeps ⌘C and its explicit target.
+- Reason: 1.1 built only the app menu and Navigate. AppKit delivers every standard editing command
+  through a menu item carrying that key equivalent, so on 1.1 the licence field accepted typing and the
+  mouse but not the keyboard: ⌘V, ⌘A, ⌘C, ⌘X and ⌘Z were dead in the field the buyer types a key into,
+  while right-click - Paste worked because that menu comes from the text system itself. The captain hit
+  exactly that on the published 1.1 DMG. Reproducing it in a Tart VM with real HID keys (captures 02 to
+  12 in `data/wid-cmdv-bug/captures`, report at `data/wid-cmdv-bug/report.md`) showed the same field
+  taking a right-click paste and ignoring ⌘V, and a TextEdit control taking the same keys in the same
+  guest, so the rig was sound and the app was the fault.
+- Two meanings of ⌘C, resolved by the responder chain, not by a special case: in the writing room the
+  append-only editor refuses cut, copy, paste, select-all, undo and redo, so the Edit menu's items are
+  greyed and ⌘C does nothing while a draft is live; in the kept phase the same editor is not editable,
+  so it forwards `copy:` up to the room, which runs Copy Kept Text. The Navigate item still serves the
+  writers who reach for the menu bar. One key, two phases, no shadowing and no second code path.
+- Rejected: fixed-target Edit items (a fixed target is never in the field editor's responder chain and
+  so never receives `paste:`); a validation-only menu delegate (it cannot know which responder will have
+  focus when the key is pressed, which is what nil targets exist for); fixing the licence field alone
+  (the activation card carries the same field, and the next text field would inherit the bug).
+- Supersedes: none. The room's keyboard contract (cases 1 to 70) is unchanged: typing appends, every
+  editing command is refused, and the denial choreography still answers a blocked delete.
+- Evidence: `apps/macos/FirstLine/docs/MANUAL_QA.md` (2026-11-05 entry) with the VM run against an
+  ad-hoc build of this branch: `final-01-edit-menu.png` (Undo Paste enabled, Paste and Select All
+  enabled, Cut and Copy greyed with no selection), `proof-02-selected.png` (⌘V pasted and ⌘A selected a
+  key), `proof-03-activated.png` (the pasted key activated the Mac), `final-02-cmdz.png` and
+  `final-03-redo.png` (⌘Z and ⇧⌘Z over a replaced key), `final-07-room-edit-menu.png` (all six items
+  greyed in the live room) and `final-08-kept-copied.png` (⌘C in the kept room wrote the draft and the
+  action read COPIED). Bound tests: `EditingCommandTests`.

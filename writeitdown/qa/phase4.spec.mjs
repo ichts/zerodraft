@@ -966,6 +966,94 @@ test('the kept screen draws the draft once', async ({ page }, info) => {
   }
 });
 
+// The payoff screen is the one moment a stranger has felt the product work, so it carries one
+// quiet route to the app and never before the draft is kept. Inserting it must not move the action
+// row the writer's hand is already on.
+test('the kept screen offers one route to the app, and the writing screen none', async ({ page }, info) => {
+  const link = '#kept a[href="download/?from=kept"]';
+  await enter(page);
+  await page.keyboard.insertText('A draft that earns the payoff screen.');
+  await settle(page);
+  expect(await page.locator(`${link}:visible`).count(), 'the writing screen carries no app link').toBe(0);
+  for (let second = 0; second < 57; second += 3) {
+    await page.clock.fastForward(3000);
+    await page.keyboard.insertText(' Keep going.');
+  }
+  await page.clock.fastForward(3000);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+  await expect(page.locator(`${link}:visible`), 'the kept screen carries exactly one route').toHaveCount(1);
+  const app = page.locator(link);
+  await expect(app).toHaveText('Mac app');
+  expect(await app.getAttribute('target'), 'the app opens beside the draft').toBe('_blank');
+  expect(await app.getAttribute('rel'), 'the new tab never reaches back').toContain('noopener');
+  const kept = await page.evaluate(selector => {
+    const box = element => {
+      const r = element.getBoundingClientRect();
+      return { top: r.top, left: r.left, right: r.right, bottom: r.bottom, width: r.width, height: r.height };
+    };
+    const style = getComputedStyle(document.querySelector(selector));
+    return {
+      link: box(document.querySelector(selector)), actions: box(document.querySelector('.kept-actions')),
+      note: box(document.querySelector('.kept-note')), scroll: box(document.querySelector('.kept-scroll')),
+      colour: style.color, noteColour: getComputedStyle(document.querySelector('.kept-note')).color,
+      size: parseFloat(style.fontSize), decoration: style.textDecorationLine,
+    };
+  }, link);
+  expect(kept.link.top, 'the link sits under the action row').toBeGreaterThanOrEqual(kept.actions.bottom);
+  expect(kept.note.top, 'the link sits above the not-saved caption').toBeGreaterThanOrEqual(kept.link.bottom);
+  expect(kept.actions.bottom, 'the caption stays above the draft').toBeLessThanOrEqual(kept.scroll.top);
+  expect(kept.link.height, 'the link keeps a 44 px tap row').toBeGreaterThanOrEqual(44);
+  expect(kept.size, 'the link carries the quiet role, not a second pill').toBe(13);
+  expect(kept.colour, 'the link takes the quiet ink, in the caption\'s own colour').toBe(kept.noteColour);
+  expect(kept.decoration, 'the link reads as a link').toContain('underline');
+  // The pair must not depend on the link: taken out of flow, the action row sits exactly where it sits
+  // with the link present, so the new control cost the writer no pixel of the row they are on.
+  const without = await page.evaluate(selector => {
+    const element = document.querySelector(selector);
+    element.style.display = 'none';
+    window.dispatchEvent(new Event('resize'));
+    const r = document.querySelector('.kept-actions').getBoundingClientRect();
+    element.style.display = '';
+    window.dispatchEvent(new Event('resize'));
+    return { top: r.top, left: r.left, right: r.right, bottom: r.bottom };
+  }, link);
+  for (const edge of ['top', 'left', 'right', 'bottom']) {
+    expect(without[edge], `the action row ${edge} does not depend on the link`).toBeCloseTo(kept.actions[edge], 1);
+  }
+  // Keyboard reach, and the ring is the shared one on the control's own shape.
+  await page.locator('#restart').focus();
+  await page.keyboard.press('Tab');
+  const focused = await page.evaluate(() => {
+    const element = document.activeElement;
+    const style = getComputedStyle(element);
+    return { text: element.textContent.trim(), ring: element.matches(':focus-visible'),
+      outline: `${style.outlineWidth} ${style.outlineStyle}`, radius: style.borderRadius, top: element.getBoundingClientRect().top };
+  });
+  expect(focused.text, 'one Tab from RUN IT AGAIN reaches the app').toBe('Mac app');
+  expect(focused.ring, 'the ring is visible').toBe(true);
+  expect(focused.outline).toBe('2px solid');
+  expect(focused.radius, 'a text control keeps its shape under focus').toBe('0px');
+  expect(focused.top, 'the ring is not laid over the pill row above it').toBeGreaterThan(kept.actions.bottom);
+  await capture(page, info, 'kept-app-link');
+  // A sheet too short for the payoff block and one line of the returned draft leaves the app row out
+  // and keeps the draft line; the room's own Mac link still offers the app there.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.clock.fastForward(100);
+  expect(await page.locator(`${link}:visible`).count(), 'a 390 px sheet keeps its draft line instead').toBe(0);
+  expect(await page.locator('#room a[href="download/"]:visible').count(), 'the room still offers the app').toBeGreaterThan(0);
+  await page.setViewportSize(info.project.use.viewport);
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  await page.clock.fastForward(100);
+  expect(await page.locator(`${link}:visible`).count(), 'a sheet with room carries the route again').toBe(1);
+  // The stopped screen is not a payoff, so it carries no route either.
+  await page.locator('#restart').click();
+  await page.keyboard.insertText('A draft that stops.');
+  await page.clock.fastForward(9000);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
+  expect(await page.locator(`${link}:visible`).count(), 'the wipe screen carries no app link').toBe(0);
+});
+
 // The stopped screen is one composition, not a block pinned under the top edge (D-070).
 // The captain locked it in the tuner: one group of headline, consequence line and pill,
 // its midpoint at 33% of the sheet, derived per sheet height rather than scaled.

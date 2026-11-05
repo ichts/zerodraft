@@ -117,6 +117,14 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 #kept h1{margin:0;font:500 var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:normal}
 .kept-receipt{margin:var(--kept-receipt-gap,12px) 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--paper-quiet)}
 .kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:var(--kept-actions-gap,20px)}
+/* The kept screen's one route to the app: the quiet role under the action row, on the footer
+   link's 44 px tap row, and never in the room before the draft is kept. The 6 px top keeps the
+   3 px focus ring clear of the pill row above it. */
+.room .kept-app{display:inline-flex;align-items:center;min-height:44px;margin-top:6px;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+/* A sheet with no room for both the app row and one line of the returned draft keeps the line and
+   the block's rhythm; the row steps out (status-slot decides that from the layout it already
+   measures). The header pill or the phone exit row still offers the app there. */
+.room-paper[data-kept-app="false"] .kept-app{display:none}
 .kept-scroll{flex:1;min-height:0;width:100%;margin-top:var(--kept-scroll-gap,24px);overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
 .kept-scroll::-webkit-scrollbar{display:none}
 .kept-text{width:100%;max-width:62ch;margin:auto 0;text-align:center;font:400 var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}

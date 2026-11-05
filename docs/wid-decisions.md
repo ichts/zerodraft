@@ -1634,3 +1634,32 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `final-03-redo.png` (⌘Z and ⇧⌘Z over a replaced key), `final-07-room-edit-menu.png` (all six items
   greyed in the live room) and `final-08-kept-copied.png` (⌘C in the kept room wrote the draft and the
   action read COPIED). Bound tests: `EditingCommandTests`.
+## D-083: The payoff screen carries one quiet route to the app
+
+- Date: 2026-11-05
+- Decision: the web room's kept screen carries one link directly under the COPY TEXT / RUN IT AGAIN pair,
+  its text exactly `Mac app`, its target `download/?from=kept` in a new tab with `rel="noopener"`. It sits
+  in the quiet role (`--paper-quiet`, 13 px/500 sans, 1 px underline, a 44 px tap row), so it is clearly
+  lighter than the ink pill above it and adds no component, colour, caption or arrow. It appears on the
+  kept screen only, never on the writing, warning or wipe screens, and it costs the pair nothing: the
+  action row's measured box is the same with the link in flow and taken out of it (`qa/phase4.spec.mjs`,
+  "the kept screen offers one route to the app, and the writing screen none"). A sheet that cannot hold
+  both the row and one line of the returned draft keeps the draft's line and drops the row
+  (`data-kept-app="false"`, decided in `status-slot.js` from the layout it already measures), where the
+  header pill or the phone exit-row Mac link still offers the app. The Mac kept screen does not gain the
+  row; D-062's one-step-behind rule stands. The link text becomes `Mac and Windows app` when the Store
+  listing is live; nothing else about the row changes.
+- Reason: the kept screen is the one moment a stranger has felt the product work, and it offered no route
+  to the app at all: COPY TEXT and RUN IT AGAIN were its only controls, so the moment of value ended in a
+  dead patch of paper. The link is lighter than the pair because it is an offer, not the session's next
+  act, and it is the first thing to yield when space is short because the writer earned the draft and
+  nothing else on that screen. Measured (real Chrome, `data/wid-kept-app-link/`, kept through the real
+  deadline): the pair's box is unchanged at both widths before and after the change (1440: top 241.59,
+  left 564.28, 311.44x48; 390: top 215.98, left 43.28, 303.44x48); the row adds 50 px under it and keeps
+  the draft's line at 1440 (413 px scroll), 390 (370 px) and every sheet down to 320x568 and 844x390,
+  where the row itself steps out and the 44 px tap target would have crushed the draft to 23.6 px of a
+  33.6 px line. The href is relative (`download/?from=kept`) like every other Mac link on the page: it
+  resolves to `https://writeitdown.app/download/?from=kept` from the room's route and stays checkable by
+  the suite's site-wide link gate, which cannot serve an absolute root path under `/writeitdown/`.
+- Supersedes: no recorded decision. It adds to D-062's kept screen; D-062's receipt, silent corner count,
+  not-saved caption and one-step-behind Mac rule stand.

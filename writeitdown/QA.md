@@ -6,6 +6,74 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-11-05: The download page keeps 1.1 current and archives 1.0
+
+`/download/` links `Write-It-Down-1.1.dmg` and publishes that artifact's SHA-256, as it has since
+2026-11-04. What changed is what the page says about the version before it: one quiet line under the
+requirements, `#previous-version`, reads `Previous version: 1.0.` / `A 1.0 installation cannot update
+itself.` / `The archived Write-It-Down-1.0.dmg is a fresh install of 1.0 only.` and links
+`releases/Write-It-Down-1.0.dmg` (D-081). The archive is a host file: until firstmate places it on
+the host and applies the Caddy delta, that address answers 404, so the link is correct and dead.
+
+## Commands and results
+
+- `node writeitdown/release-check.mjs --download`: `STATIC CHECK PASSED` and `Download page ready: the
+DMG link, the Install command and its published SHA-256 agree.` The gate now also refuses an archive
+note that is not `releases/Write-It-Down-<version>.dmg` or not older than the linked download; the
+fixture table in `qa/mac.spec.mjs` carries 25 refusal cases, four of them new.
+- `cd writeitdown && npx playwright test qa/mac.spec.mjs -g "the download page offers 1.1 as current
+and 1.0 as the archived previous version"`: 8 passed (1440/390, light/dark, both motion settings).
+- `cd writeitdown && npx playwright test qa/mac.spec.mjs`: 211 passed, 1 failed. The failure was
+`the header keeps its right gutter and a legible chip at 360 px with wider system-font metrics`
+timing out at 35.7 s against Playwright's 30 s default budget, the known parallel-load timeout this
+file already records for 2026-11-04, not an assertion. That sweep and `the landing header spans the
+page container at every width` now declare `test.slow()` (a 90 s budget for 6 to 39 navigations);
+both pass alone in 4.2 s, 11.2 s and 7.6 s.
+- `python3 qa/test-install.py`: `PASS: 62 exact production files, preserved backup, repeat
+installation, rejected symlinks.` It now exempts the archive path, which no deploy bundle contains,
+instead of failing on a link its reference crawl cannot install.
+- `cd writeitdown && npx playwright test` (8 projects): 1152 passed, 27 failed, 1.4 h on a machine
+running four other agent lanes. All 27 were timeouts or disposed browser contexts in specs this
+change does not touch (`history-fade`, `checkout`, `impressum`, `motion-regression`, `phase4`,
+`shape-text`, `shell`) plus the two header sweeps above; twelve of the failing titles re-run alone
+passed, and so did the remaining two. This is a load result, not a clean run: the changed specs are
+`qa/mac.spec.mjs` (211/212, the one failure fixed by the budget above) and `qa/test-install.py`
+(green). No other suite run was clean on this machine today.
+
+## Measured (what the new assertion holds)
+
+| Item | Surface | Measured | Assertion |
+| Q-14 alignment | `/download/` at 1440, 390, 320 | the note's left edge 373.00 / 43.00 / 33.00 px equals the requirements' 373.00 / 43.00 / 33.00 px and the card's content edge, at both themes; 24 px below the requirements' last rule; page never scrolls sideways (overflow 0) | `the download page offers 1.1 as current and 1.0 as the archived previous version` |
+| Q-28 copyable filename | the archive link at 1440, 390, 320 | one client rect at every width, 139.3 px, text `Write-It-Down-1.0.dmg`; `white-space: nowrap` keeps it whole, so a reader can match it against a file on disk | same test |
+| Link set | `/download/` | exactly two `.dmg` links: `https://writeitdown.app/download/Write-It-Down-1.1.dmg` from `data-launch="dmg"`, and `releases/Write-It-Down-1.0.dmg` inside `#previous-version`; the Install command and `#release-notes` still name 1.1 | same test |
+| Not a second download | `#previous-version` | no `data-launch` mark, not a `.btn`, `display: inline` link, 13 px muted line below the requirements and below the download action's bottom edge (872.16 vs 848.16 and 447.38 px at 1440) | same test |
+| Text floor | the note at both themes | 5.77:1 light and 5.80:1 dark against the card, above the 4.5:1 floor for 13 px text; the link keeps the same colour and adds an underline | same test |
+
+Captures: `test-results/mac-the-download-page-*/download-archive-note-{1440,390,320}.png`, the
+download card only, and the existing full-page `download.png` per project.
+
+## Quality checklist rows this change touches
+
+- Q-07 (no extra labels or helper lines) - PASS: the note is one line that states a version, a
+limitation and what the archive is; no heading, kicker, badge or second card.
+- Q-14 (deliberate alignment) - PASS: measured left edges above.
+- Q-20 (copy states a fact, never sells) - PASS: three subject-verb-object sentences, no benefit,
+no changelog; `$4.99 once` and the requirements list are untouched.
+- Q-28 (nothing a reader must copy is broken or clipped) - PASS: the archived filename stays one
+139.3 px run at 320 px and the two hash halves, the `shasum` call and the 1.1 filename keep their
+shapes in the existing head test.
+- Text floors - PASS: 5.77:1 and 5.80:1, both above 4.5:1.
+
+## Not exercised
+
+- The 301s and the archive directory are written as a Caddy delta and measured against a real
+  Caddy v2.6.2 binary in a loopback lab (see `data/wid-dmg-10-retire/report.md`); nothing was
+  applied to the host, so the live `/download/Write-It-Down-1.0.dmg` still answers 200 today.
+- The archive link is unvisited in a browser against the real host: the file is not there yet, and
+  the suite's link crawl deliberately skips it as a host artifact.
+- No independent cross-vendor review of the note's copy and placement yet; the wording is proposed
+  for approval in the task report before it goes live.
+
 # 2026-11-04: The download and Mac pages name 1.1
 
 `/download/` offered `Write-It-Down-1.0.dmg` while the Sparkle feed already offered 1.1 (build 2), so

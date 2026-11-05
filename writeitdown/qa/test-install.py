@@ -27,6 +27,9 @@ fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/reenie-beanie.woff2',
          'fonts/OFL-Newsreader.txt', 'fonts/OFL-ZhuqueFangsong.txt', 'fonts/OFL-ReenieBeanie.txt'}
 fonts |= {f'fonts/zhuque-fangsong-{index:02d}.woff2' for index in range(1, 14)}
 files |= fonts
+# Host files a page may link that no deploy bundle contains: the archived 1.0 disk image lives in
+# download/releases/ on the host, outside the installed set (README, "The 1.0 archive").
+host_artifacts = {'download/releases/Write-It-Down-1.0.dmg'}
 
 
 class LocalReferences(HTMLParser):
@@ -79,7 +82,10 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source) as temp:
                 if asset.is_dir():
                     asset /= 'index.html'
                 assert asset.is_relative_to(target), (name, reference)
-                assert asset.relative_to(target).as_posix() in files, (name, reference)
+                relative = asset.relative_to(target).as_posix()
+                if relative in host_artifacts:
+                    continue
+                assert relative in files, (name, reference)
     victim = base / 'untouched'
     victim.write_text('protected')
     (target / 'room.js').unlink()

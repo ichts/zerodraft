@@ -58,7 +58,7 @@ Attribution stays on the existing Cloudflare Web Analytics beacon's referrer rep
 
 `download/index.html` (served at `/download/`) offers the free-trial DMG at `https://writeitdown.app/download/Write-It-Down-1.1.dmg`. That disk image must contain the configured license service origin, product ID and deployed Ed25519 public key from the app's `Info.plist` (3 free sessions, then the license gate). Do not install this site against a paid-only binary. Upload the signed, notarized DMG into `/var/www/writeitdown.app/download/` first. The page publishes its SHA-256 in the `data-launch="sha256"` slot as two 32-character spans inside the code element; the two halves join to the published 64-character value and are replaced together. The Install card's `shasum` command is the `shasum -a 256 ` call span plus the filename span on its hanging line; replace both there too. The release note is optional: when present it declares the artifact version it links in `data-release-note`, which must equal the linked DMG version and may not carry `data-launch-pending`; publishing a version adds the visible note naming that version. Update the DMG link name, the Install command's call and filename spans, the two SHA-256 halves and the note's declared version together in the deploy that publishes a new version. `npm run release-check -- --download` strips the tags, validates the 64-hex value, and refuses a page whose hash code element is not exactly two 32-character spans, whose command code element is not the call span plus the filename span, or whose Install command names a different DMG than the link; it also refuses a DMG file name that does not carry its version as `Write-It-Down-<version>.dmg`, a note without a valid `data-release-note`, a note whose version differs from the linked DMG in either direction, and any `data-launch-pending` mark. The shape itself is covered by the `the download head breaks without an orphan and its checksum block reads` QA test. Pass `npm run release-check -- --download --live` against the uploaded artifact before installing the site. Payment acceptance and the TEST-to-LIVE gate are below.
 
-The DMG link name, the Install command's call and filename spans, the two SHA-256 halves and, when present, the release note are the page's version facts. From 1.1 on they must match the version the appcast advertises, so the same deploy that uploads a new DMG also updates them.
+The DMG link name, the Install command's call and filename spans, the two SHA-256 halves and, when present, the release note are the page's version facts. From 1.1 on they must match the version the appcast advertises, so the same deploy that uploads a new DMG also updates them. The archive note in `#previous-version` is not one of them: it names 1.0 as the previous version and stays as it is when the current version moves (see "The 1.0 archive").
 
 #### Update feed (Sparkle, from 1.1)
 
@@ -142,6 +142,23 @@ writeitdown.app {
 		file_server
 	}
 
+	# The retired 1.0 download: a Mac running 1.0 has no updater (D-080), so the old link stops
+	# being a download and points at the page that offers 1.1. The archived copy below stays
+	# reachable. Applied by the host delta recorded in "The 1.0 archive" until this block is next
+	# applied whole; Caddy 2.6.2 runs `redir` before every handle block.
+	@retired10 path /download/Write-It-Down-1.0.dmg /download/Write-It-Down-1.0.dmg.sha256
+	redir @retired10 /download/ 301
+
+	# Archived releases, a flat host directory no deploy bundle contains. The host also sends
+	# Content-Disposition on a DMG, so the archive answers like the current installer.
+	@releases path /download/releases/*
+	@archiveDmg path /download/releases/*.dmg
+	handle @releases {
+		header @archiveDmg Content-Type application/x-apple-diskimage
+		header @archiveDmg Content-Disposition attachment
+		file_server
+	}
+
 	handle {
 		# No `/index.html` fallback: a missing page is a 404, not the landing page with a 200.
 		# `{path}.html` keeps extensionless page links (/privacy, /mac) working.
@@ -156,7 +173,7 @@ writeitdown.app {
 	handle_errors {
 		@page404 {
 			expression {http.error.status_code} == 404
-			not path /download/appcast.xml /download/updates/* /download/*.dmg /download/*.dmg.sha256
+			not path /download/appcast.xml /download/updates/* /download/releases/* /download/*.dmg /download/*.dmg.sha256
 		}
 		rewrite @page404 /404.html
 		file_server
@@ -170,6 +187,30 @@ cache policy and empty body instead of being replaced by the HTML page. Sparkle 
 feed URL returns, so a missing feed must never arrive as an HTML document. The page branch resolves
 `/download/` and `/` to their directory index and `/privacy` to `privacy.html`, and otherwise returns
 404 with the body of `404.html` (`noindex`, one sentence, one link home), so a broken link or a mistyped URL never answers with the landing page and a 200.
+
+#### The 1.0 archive
+
+`/download/releases/Write-It-Down-1.0.dmg` is the only address that still serves 1.0. It is a host
+file: never committed, never in the deploy bundle, and `install.sh` neither creates nor prunes its
+directory, so an install cannot delete it. Create the directory once with
+`install -d -m 0755 /var/www/writeitdown.app/download/releases` and place the signed 1.0 disk image
+there, beside its `.sha256` sidecar. The archive is flat on purpose: `@releases` matches everything
+below `/download/releases/`, and `@archiveDmg` gives a file directly inside it the DMG headers.
+
+The old addresses `/download/Write-It-Down-1.0.dmg` and `/download/Write-It-Down-1.0.dmg.sha256`
+answer `301` to `/download/`. A Mac running 1.0 has no updater of any kind (D-080), so an old link
+must land on the page that offers 1.1 instead of installing a build that can never reach it, while
+a reader who needs that exact build still finds it through `#previous-version` on `/download/`. That
+note is the page's only claim about an older version: `release-check.mjs --download` refuses an
+archive link that is not `releases/Write-It-Down-<version>.dmg` or not older than the linked
+download. Leave the 1.0 file in `download/` only if nothing serves it; the redirect makes that copy
+unreachable. Never restore those two addresses as downloads.
+
+Both rules were measured against Caddy v2.6.2, the host's binary, before handover: `301` on both
+addresses, the archive served as `application/x-apple-diskimage` with `Content-Disposition:
+attachment`, and unchanged answers for the 1.1 DMG, its sidecar, `/download/updates/*`, the appcast,
+the pages and `/api/waitlist*`. The host delta and its evidence are recorded in
+`docs/wid-decisions.md` D-081.
 
 #### Host cache policy
 

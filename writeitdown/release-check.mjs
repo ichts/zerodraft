@@ -6,7 +6,9 @@
 //   node release-check.mjs --download  only the free-trial download page: the DMG link,
 //                                      the Install card's DMG filename and its published
 //                                      SHA-256, and, when present, the release note,
-//                                      which declares the version of the linked DMG.
+//                                      which declares the version of the linked DMG, and
+//                                      the archive note, which links an older version
+//                                      under releases/.
 //   --live                             after a static pass, fetch the public buy page (never
 //                                      create a checkout or payment) and verify the hosted
 //                                      DMG against its published SHA-256.
@@ -139,6 +141,19 @@ export function downloadBlockers({ download }) {
     } else if (linkedVersion && versionOrder(noteVersion, linkedVersion) !== 0) {
       found.push(`Release notes: the note declares ${noteVersion} but the download is ${linkedVersion}`);
     }
+  }
+
+  // The archive note is optional as well, and it is the page's only claim about an older build. When
+  // present it links a file under releases/ whose version is behind the linked download, so exactly
+  // one version is current and the older one stays reachable without being advertised as current.
+  const oldTag = download.match(/<p[^>]*\sid="previous-version"[^>]*>/i)?.[0] ?? '';
+  if (oldTag) {
+    const href = contentOf(download, oldTag).match(/<a\b[^>]*href="([^"]+)"/i)?.[1] ?? '';
+    const archivedVersion = /^releases\/Write-It-Down-(\d+(?:\.\d+)*)\.dmg$/.exec(href)?.[1] ?? '';
+    if (!archivedVersion)
+      found.push('Previous version: the note does not link releases/Write-It-Down-<version>.dmg');
+    else if (linkedVersion && versionOrder(archivedVersion, linkedVersion) >= 0)
+      found.push(`Previous version: the note archives ${archivedVersion} but the download is ${linkedVersion}`);
   }
   return found;
 }

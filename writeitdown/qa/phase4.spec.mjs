@@ -913,6 +913,59 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   await capture(page, info, 'escape');
 });
 
+// The kept screen is one draft in one place: the wide kept block. The writing column's ink layer
+// repeats the same text, so a kept screen that leaves it painted draws the draft twice, and at
+// phone width the two copies land line over line.
+test('the kept screen draws the draft once', async ({ page }, info) => {
+  // One logical line long enough to wrap: the room's newest rung, the one the aperture shows.
+  const draft = 'The train was late so I wrote the letter anyway.';
+  for (const size of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(size);
+    await enter(page);
+    await page.keyboard.insertText(draft);
+    for (let second = 0; second < 57; second += 3) {
+      await page.clock.fastForward(3000);
+      await page.keyboard.insertText(' and kept going');
+    }
+    await page.clock.fastForward(3000);
+    await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+    const drawn = await page.evaluate(first => {
+      // A copy is painted when it has a box, no ancestor hides it with display or visibility, and the
+      // opacities above it do not multiply it away.
+      const painted = element => {
+        if (!element) return false;
+        let opacity = 1;
+        for (let node = element; node; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          if (style.display === 'none' || style.visibility === 'hidden') return false;
+          opacity *= Number(style.opacity);
+        }
+        return opacity > 0 && [...element.getClientRects()].some(rect => rect.width > 0 && rect.height > 0);
+      };
+      const name = element => `${element.tagName}${element.id ? `#${element.id}` : ''}`;
+      return [...document.querySelectorAll('#room *')]
+        .filter(element => [...element.childNodes]
+          .some(node => node.nodeType === Node.TEXT_NODE && node.nodeValue.includes(first)) && painted(element))
+        .map(name);
+    }, draft);
+    // The writing column's textarea and the ink layer that paints it both leave the sheet, so the only
+    // draft on screen is the kept block's own; one holder proves it whichever element a copy uses.
+    await expect(page.locator('#editor'), `the ${size.width} kept screen hides the writing line`).toBeHidden();
+    await expect(page.locator('#editor-ink'), `the ${size.width} kept screen hides the writing ink`).toBeHidden();
+    expect(drawn, `the ${size.width} kept screen holds one copy of the draft`).toEqual(['DIV#kept-text']);
+    if (info.project.name === '1440-light-no-preference' || info.project.name === '390-light-no-preference') {
+      await capture(page, info, `kept-once-${size.width}x${size.height}`);
+    }
+    // The next session paints its ink again: hiding the layer must not outlive the kept screen.
+    await page.locator('#restart').click();
+    await page.keyboard.insertText('A new draft');
+    await expect(page.locator('#editor-ink'), 'the restarted room still paints its draft').toHaveText('A new draft');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#landing')).toBeVisible();
+  }
+});
+
 // The stopped screen is one composition, not a block pinned under the top edge (D-070).
 // The captain locked it in the tuner: one group of headline, consequence line and pill,
 // its midpoint at 33% of the sheet, derived per sheet height rather than scaled.

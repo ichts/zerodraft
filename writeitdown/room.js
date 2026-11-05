@@ -176,6 +176,9 @@ function render(now = performance.now()) {
   $('room-count').textContent = kept ? '' : state.started === null && !failed ? 'Type to start' : words;
   $('failed').hidden = !failed;
   editor.hidden = kept;
+  // The ink layer is the draft's visible paint, so the kept screen hides it with the textarea;
+  // left showing, it repeats the draft under the kept block and draws it twice.
+  ink.hidden = kept;
   $('kept').hidden = !kept;
   syncBar(now);
   if (warning || failed) placeStatus();

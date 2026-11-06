@@ -48,7 +48,7 @@ header @llmstxt Content-Type "text/plain; charset=utf-8"
 
 The six answer pages (`what-is-write-it-down.html`, `write-it-down-mac-vs-web.html`, `write-it-down-free-trial.html`, `write-it-down-price.html`, `delete-a-draft.html`, `is-my-writing-saved.html`) answer one question each, are self-canonical, listed in `sitemap.xml`, and linked from `support.html` and each other. Each names Write It Down in the title, H1 and first body sentence and has at least 120 visible words and a visible FAQ.
 
-Five of the six are answer-first: every heading is a question, the first answer sentence under it names Write It Down, and later sentences use it/the room/the app with an unambiguous referent. Each links at least two sibling answers where the topics connect. Their copy does not direct readers to an AI tool; the older self-description remains only on `write-it-down-mac-vs-web.html` and `support.html`. Change an open question and its answer together: the schema is generated from the visible copy.
+Five of the six are answer-first: every heading is a question, the first answer sentence under it names Write It Down, and later sentences use it/the room/the app with an unambiguous referent. Each links at least two sibling answers where the topics connect. Their copy does not direct readers to an AI tool; the older self-description remains only on `write-it-down-mac-vs-web.html`. Change an open question and its answer together: the schema is generated from the visible copy.
 
 Each answer page's `Article.headline` matches its H1 and `Article.description` matches its entire first paragraph, not just the first sentence. Its `BreadcrumbList` names match the visible breadcrumb, and its `FAQPage` questions and answers match the visible FAQ word for word. `qa/seo.spec.mjs` enforces these contracts, the question-heading and answer-first rules, the sibling-link rule, the landing FAQ equality, the `llms.txt` content type and URL coverage, and sitemap order and canonicals. `robots.txt` allows OAI-SearchBot, ChatGPT-User, GPTBot, PerplexityBot and ClaudeBot and lists the sitemap. Add a new answer page to the sitemap, `install.sh`, the `llms.txt` link list and the spec together.
 
@@ -186,7 +186,7 @@ absent, and `handle_errors` excludes those paths, so the absent file keeps its o
 cache policy and empty body instead of being replaced by the HTML page. Sparkle parses whatever the
 feed URL returns, so a missing feed must never arrive as an HTML document. The page branch resolves
 `/download/` and `/` to their directory index and `/privacy` to `privacy.html`, and otherwise returns
-404 with the body of `404.html` (`noindex`, one sentence, one link home), so a broken link or a mistyped URL never answers with the landing page and a 200.
+404 with the body of `404.html` (`noindex`, the `Page not found` heading and one link home), so a broken link or a mistyped URL never answers with the landing page and a 200.
 
 #### The 1.0 archive
 

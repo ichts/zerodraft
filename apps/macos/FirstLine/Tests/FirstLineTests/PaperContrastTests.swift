@@ -61,10 +61,18 @@ struct PaperContrastTests {
         #expect(hex(try resolved(FirstLineColors.inkNSColor, .aqua)) == "#1c1917")
         #expect(hex(try resolved(FirstLineColors.inkNSColor, .darkAqua)) == "#ece7d9")
 
-        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .aqua)) == "#464746")
+        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .aqua)) == "#48443e")
         #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)) == "#c2bfb7")
         #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .aqua)) == "#63140b")
         #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, .darkAqua)) == "#ffc2b4")
+    }
+
+    /// D-084: no grey on the sheet is cool. The light quiet role keeps the paper's own warm order of
+    /// channels (red ahead of green ahead of blue), where `#464746` leaned green-blue.
+    @Test func theLightQuietGreyIsWarm() throws {
+        let quiet = try resolved(FirstLineColors.paperQuietNSColor, .aqua)
+        #expect(quiet.redComponent > quiet.greenComponent, "the quiet grey is not warmer than neutral toward red")
+        #expect(quiet.greenComponent > quiet.blueComponent, "the quiet grey leans blue")
     }
 
     @Test func everyTextRoleClearsSevenToOneOnTheSheet() throws {

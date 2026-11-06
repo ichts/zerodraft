@@ -239,6 +239,38 @@ struct DesignReviewFixesTests {
         window.orderOut(nil)
     }
 
+    // MARK: - Settings opens at its top (mac design audit A1)
+
+    /// The real route: the app's own window, ordered front, switched to Settings through `AppState`, exactly
+    /// as the picker's Settings command does. Hosting the controller alone laid it out at full size at once
+    /// and hid the defect: the scroll view was first sized empty inside the container and then grown.
+    @Test(arguments: [NSSize(width: 1040, height: 720), NSSize(width: 980, height: 680)])
+    func settingsOpensWithTheHeadingAndDoneInView(size: NSSize) async throws {
+        let state = try exhaustedState(checkoutConfigured: true, used: 0)
+        let controller = RootWindowController(appState: state, updateSettings: StubUpdateSettings())
+        let window = try #require(controller.window)
+        window.setContentSize(size)
+        window.makeKeyAndOrderFront(nil)
+        state.openSettings()
+        try await Task.sleep(for: .milliseconds(300))
+        window.contentView?.layoutSubtreeIfNeeded()
+        let container = try #require(window.contentViewController as? RootContainerViewController)
+        let settings = try #require(container.children.first as? SettingsViewController)
+        settings.view.layoutSubtreeIfNeeded()
+        let scroll = try #require(descendants(of: settings.view, as: NSScrollView.self).first)
+        let clip = scroll.contentView
+        let document = try #require(scroll.documentView)
+        #expect(document.frame.height > clip.bounds.height, "the card must be taller than the window or this proves nothing")
+        let heading = try #require(descendants(of: settings.view, as: NSTextField.self)
+            .first { $0.stringValue == "Settings" })
+        let done = try #require(descendants(of: settings.view, as: NSButton.self).first { $0.title == "Done" })
+        for (name, view) in [("the Settings heading", heading as NSView), ("Done", done)] {
+            let frame = clip.convert(view.bounds, from: view)
+            #expect(clip.bounds.contains(frame), "\(name) opens at \(frame) outside the visible \(clip.bounds) at \(size)")
+        }
+        window.orderOut(nil)
+    }
+
     // MARK: - Problem 21: the rules sheet follows the type scale
 
     @Test func rulesSheetUsesTheScaleForLeadingAndSubheads() throws {

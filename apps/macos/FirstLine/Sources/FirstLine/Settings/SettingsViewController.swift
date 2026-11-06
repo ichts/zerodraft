@@ -8,6 +8,12 @@
 import AppKit
 import Observation
 
+/// A scroll document that starts at its top edge: AppKit pins an unflipped document's bottom, so a card
+/// taller than the window opened scrolled to its last rows with the heading and Done clipped away.
+private final class TopAnchoredDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
 @MainActor
 final class SettingsViewController: NSViewController {
     private let appState: AppState
@@ -75,7 +81,7 @@ final class SettingsViewController: NSViewController {
         about.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         card.contentView.addSubview(content)
 
-        let document = NSView()
+        let document = TopAnchoredDocumentView()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(card)
         let scroll = NSScrollView()

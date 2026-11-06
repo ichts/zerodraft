@@ -366,7 +366,7 @@ struct LicenseFlowTests {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         let settings = SettingsViewController(appState: state)
-        let input = try #require(fields(settings.view).first { $0.placeholderString == "Order number or activation code" })
+        let input = try #require(fields(settings.view).first { $0.placeholderString == "License key" })
         #expect(!input.isHidden && input.superview?.isHidden == false)
 
         await state.activateLicense(key: "KEY")
@@ -409,7 +409,7 @@ struct LicenseFlowTests {
         func fields(_ view: NSView) -> [NSTextField] {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
-        #expect(fields(SettingsViewController(appState: wrong).view).contains { $0.placeholderString == "Order number or activation code" })
+        #expect(fields(SettingsViewController(appState: wrong).view).contains { $0.placeholderString == "License key" })
     }
 
     @Test
@@ -644,8 +644,8 @@ struct LicenseFlowTests {
         let settingsView = settings.view
         let upgradeView = upgrade.view
         let homeView = home.view
-        let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Order number or activation code" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Order number or activation code" })
+        let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "License key" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "License key" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         // The cached license is already trusted, so the licensed card is shown before the
@@ -654,7 +654,7 @@ struct LicenseFlowTests {
         #expect(fields(settingsView).contains { $0.stringValue == "Checking license…" })
 
         await state.validateLicenseIfNeeded()
-        let status = valid ? "License active." : "License revoked. Enter a valid order number or activation code."
+        let status = valid ? "License active." : "License revoked. Enter a valid license key."
         let upgradeStatus = valid ? "This Mac is licensed." : status
         for _ in 0..<50 {
             if fields(settingsView).contains(where: { $0.stringValue == status }) &&
@@ -667,7 +667,7 @@ struct LicenseFlowTests {
         #expect(fields(homeView).contains { $0.stringValue == status })
         #expect(settingsKey.stringValue == "unfinished key")
         #expect(upgradeKey.stringValue == "unfinished key")
-        #expect(buttons(upgradeView).contains { $0.title == (valid ? "Start writing" : "Activate") })
+        #expect(buttons(upgradeView).contains { $0.title == (valid ? "Begin" : "Activate") })
         #expect(settingsKey.isHidden == valid || settingsKey.superview?.isHidden == valid)
     }
 
@@ -687,7 +687,7 @@ struct LicenseFlowTests {
         }
         let view = settings.view
         let status = try #require(fields(view).first { $0.stringValue == "Checking license…" })
-        let input = try #require(fields(view).first { $0.placeholderString == "Order number or activation code" })
+        let input = try #require(fields(view).first { $0.placeholderString == "License key" })
         input.stringValue = "unfinished key"
         // A failed activation cannot hijack the line of an already licensed Mac.
         await state.activateLicense(key: "BAD")

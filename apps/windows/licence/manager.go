@@ -299,7 +299,7 @@ func (m *Manager) DismissSuccess() {
 	m.mu.Unlock()
 }
 
-// SetEmptyKeyError is the "Enter your order number..." state for an empty submission.
+// SetEmptyKeyError is the "Enter your license key first." state for an empty submission.
 func (m *Manager) SetEmptyKeyError() {
 	m.mu.Lock()
 	m.activationErr = actErr(KindEmptyKey)

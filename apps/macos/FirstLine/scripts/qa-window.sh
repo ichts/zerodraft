@@ -114,13 +114,13 @@ record_geometry() { # record_geometry <stage> <json-object>
 }
 
 # The empty room has no hint near the line; its instruction is the bottom-right
-# count prompt ("Type to start"), which must share the footer row with ESC - EXIT.
+# count prompt ("Type to begin"), which must share the footer row with ESC - EXIT.
 # AX has no caret frame, so the caret/line origin equality is bound to the
 # deterministic RoundThreeTests.
 assert_room_geometry() { # assert_room_geometry <room-snapshot>
   local ta prompt exit
   ta="$(frame_of "$1" AXTextArea '')"
-  prompt="$(frame_of "$1" AXStaticText '^Type to start$')"
+  prompt="$(frame_of "$1" AXStaticText '^Type to begin$')"
   exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
   [[ -n "$ta" && -n "$prompt" && -n "$exit" ]] || fail 'room geometry: missing text area, count prompt or exit frame'
   record_geometry room "$(jq -cn --argjson ta "$ta" --argjson prompt "$prompt" --argjson exit "$exit" \
@@ -128,7 +128,7 @@ assert_room_geometry() { # assert_room_geometry <room-snapshot>
   jq -en --argjson prompt "$prompt" --argjson exit "$exit" '
     def d(a; b): (a - b) | if . < 0 then -. else . end;
     d(($prompt.y + $prompt.h / 2); ($exit.y + $exit.h / 2)) <= 1
-  ' >/dev/null || fail 'the Type to start prompt is not on the footer row'
+  ' >/dev/null || fail 'the Type to begin prompt is not on the footer row'
 }
 
 # The numeral is directly under the writing line: its top is above the text
@@ -156,7 +156,7 @@ assert_exit_row_geometry() { # assert_exit_row_geometry <snapshot>
   local exit hint count
   exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
   hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave and delete the draft\.$')"
-  count="$(frame_of "$1" AXStaticText '^([0-9]+ words?|Type to start)$')"
+  count="$(frame_of "$1" AXStaticText '^([0-9]+ words?|Type to begin)$')"
   [[ -n "$exit" && -n "$hint" && -n "$count" ]] || fail 'exit row geometry: missing a row element'
   record_geometry exit-row "$(jq -cn --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count"     '{exit: $exit, confirmation: $hint, count: $count}')"
   jq -en --argjson exit "$exit" --argjson hint "$hint" --argjson count "$count" '
@@ -380,7 +380,7 @@ assert_text "$output/upgrade.json" 'Activate Write It Down'
 assert_text "$output/upgrade.json" 'After 3 free sessions, a license is required to keep writing.'
 assert_text "$output/upgrade.json" 'Try the full web app at writeitdown.app'
 absent_text "$output/upgrade.json" 'Back to Home'
-absent_text "$output/upgrade.json" 'Type to start'
+absent_text "$output/upgrade.json" 'Type to begin'
 absent_text "$output/upgrade.json" 'Mac trial:'
 
 ### 2. Activate the real client against a disposable signed fixture.
@@ -392,7 +392,7 @@ activate="$(token_of "$output/order-entered.json" button 'Activate')"
 cua click "{\"pid\":$pid,\"element_token\":\"$activate\"}" >/dev/null
 wait_text activated 'This Mac is licensed.' 'This Mac is licensed.' 30
 snap activated >"$output/activated.json"
-start="$(token_of "$output/activated.json" button 'Start writing')"
+start="$(token_of "$output/activated.json" button 'Begin')"
 cua click "{\"pid\":$pid,\"element_token\":\"$start\"}" >/dev/null
 snap activated-home >"$output/activated-home.json"
 
@@ -410,7 +410,7 @@ done
 select_tier "$output/home.json" 'Standard 8 s' standard
 enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
-assert_text "$output/room.json" 'Type to start'
+assert_text "$output/room.json" 'Type to begin'
 assert_text "$output/room.json" '1:00'
 assert_text "$output/room.json" 'ESC - EXIT'
 jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$output/room.json" \
@@ -448,7 +448,7 @@ for tier in strict relaxed; do
   select_tier "$home" "$label" "$tier"
   enter_room "$output/selected-$tier.json"
   snap "$tier-room" >"$output/$tier-room.json"
-  assert_text "$output/$tier-room.json" 'Type to start'
+  assert_text "$output/$tier-room.json" 'Type to begin'
   # The daemon confirms a key only after delivery; that round trip can exceed a
   # second. Bracket the input: Strict's 2s warn needs the early clock, while
   # Relaxed's 9s warn needs the late clock to avoid counting delivery latency.
@@ -482,10 +482,10 @@ for mode in offline refunded; do
   if [[ "$mode" == offline ]]; then
     enter_room "$output/$mode-result.json"
     snap offline-room >"$output/offline-room.json"
-    assert_text "$output/offline-room.json" 'Type to start'
+    assert_text "$output/offline-room.json" 'Type to begin'
   else
     assert_text "$output/$mode-result.json" 'Activate Write It Down'
-    absent_text "$output/$mode-result.json" 'Type to start'
+    absent_text "$output/$mode-result.json" 'Type to begin'
     absent_text "$output/$mode-result.json" 'Back to Home'
   fi
 done

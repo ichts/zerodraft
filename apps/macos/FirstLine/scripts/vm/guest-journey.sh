@@ -328,7 +328,7 @@ for used in 1 2 3; do
   snap "session-$used-minute-after"
   [[ "$(screen_text)" == *"1 minute"* ]] || bad "session $used: the 1-minute choice is not on screen"
   click_el AXButton 'Begin writing' || { bad "session $used: no Begin writing button"; exit 1; }
-  wait_re 'Type to start' 20 || { bad "session $used: the writing room did not open"; exit 1; }
+  wait_re 'Type to begin' 20 || { bad "session $used: the writing room did not open"; exit 1; }
   snap "session-$used-room"
   sentence='I watched the rain cross the garden.'
   # Wall clock, not time.monotonic(): a virtualized guest can freeze the monotonic
@@ -380,7 +380,7 @@ for used in 1 2 3; do
     snap 'session-3-copied-after'
     if has_re 'COPIED'; then pass 'session 3: COPY TEXT flipped to COPIED'; else bad 'session 3: COPY TEXT did not confirm'; fi
     if [[ "$(pbpaste)" == "$typed" ]]; then pass 'session 3: the clipboard holds exactly the kept draft'; else bad 'session 3: clipboard differs from the kept draft'; fi
-    click_el AXButton 'RUN IT AGAIN' || { bad 'session 3: RUN IT AGAIN is missing'; exit 1; }
+    click_el AXButton 'BEGIN AGAIN' || { bad 'session 3: BEGIN AGAIN is missing'; exit 1; }
   fi
   if [[ "$used" -lt 3 ]]; then
     "$rig" key --name escape >/dev/null
@@ -401,7 +401,7 @@ done
 
 wait_re 'Activate Write It Down' 30 && pass 'after three free sessions the activation page appears' \
   || bad 'the activation page did not appear after the third session'
-has_re 'Type to start' && bad 'the editor is still writable after the free sessions' \
+has_re 'Type to begin' && bad 'the editor is still writable after the free sessions' \
   || pass 'no writable editor remains after the free sessions'
 snap 'activation-page'
 }
@@ -435,7 +435,7 @@ if [[ -n "$fixture_bin" && -x "$fixture_bin" ]]; then
       # app's own Settings surface, which runs the same activation code path.
       click_el AXMenuBarItem '^Write It Down' || bad 'proof build: could not open the app menu'
       click_el AXMenuItem '^Settings' || bad 'proof build: could not open Settings'
-      wait_re '[Oo]rder number or activation code' 20 >/dev/null \
+      wait_re 'License key' 20 >/dev/null \
         && pass 'proof build: Settings shows the activation field' \
         || bad 'proof build: Settings did not show the activation field'
     else
@@ -464,7 +464,7 @@ if [[ -n "$fixture_bin" && -x "$fixture_bin" ]]; then
         || pass "licensed relaunch $round: the licensed home does not advertise the trial"
       snap "licensed-relaunch-$round-after"
       watch_never "$evidence/launch-licensed-$round.jsonl" 'Activate Write It Down' "licensed launch $round" 'licensed-launch-no-activation-page'
-      watch_never "$evidence/launch-licensed-$round.jsonl" 'Enter your order number' "licensed launch $round"
+      watch_never "$evidence/launch-licensed-$round.jsonl" 'Enter your license key' "licensed launch $round"
       watch_seen "$evidence/launch-licensed-$round.jsonl" 'Begin writing' "licensed launch $round"
       stop_app
     done

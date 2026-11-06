@@ -63,7 +63,7 @@ DECLARED_LAUNCH_ASSERTION = "licensed-launch-no-activation-page"
 # Surfaces that must never appear during the launch of a trial or a licensed relaunch.
 FORBIDDEN_LAUNCH_TEXT = [
     re.compile(r"Activate Write It Down", re.I),
-    re.compile(r"Enter your order number", re.I),
+    re.compile(r"Enter your license key", re.I),
     re.compile(r"License not activated on this Mac", re.I),
 ]
 # The launch stream whose own contract requires the activation page: the fixture build is

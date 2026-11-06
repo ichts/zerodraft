@@ -61,7 +61,7 @@ w('vk tab shift'); w('vk tab shift'); w('typehttp', CTL + '/qa/key'); shot('12-u
 w('vk enter'); shot('13-upgrade-limit', 2500)
 w('mark', 'PHASE one PC released: same entry succeeds'); ctl('/qa/free')
 w('vk enter'); shot('14-upgrade-licensed', 2800)
-w('vk enter'); shot('15-home-licensed', 700)                               # Start writing -> Home, no access line
+w('vk enter'); shot('15-home-licensed', 700)                               # Begin -> Home, no access line
 w('vk enter'); w('sleep 900'); w('typefast Licensed session, nothing is spent.'); w('sleep 9600'); shot('16-room-stopped-licensed', 0)
 w('vk enter'); shot('17-room-restarted-in-place', 700)                     # licensed: restarts in place, no card
 w('vk esc'); w('sleep 300'); w('vk esc'); w('sleep 900')

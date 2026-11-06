@@ -13,7 +13,7 @@ async () => {
     editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: text, inputType, isComposing }));
   };
   reset();
-  check('empty room carries the prompt in the count slot', count.textContent === 'Type to start');
+  check('empty room carries the prompt in the count slot', count.textContent === 'Type to begin');
   input('hello world');
   check('Latin', count.textContent === '2 words');
   input(' 中文测试');

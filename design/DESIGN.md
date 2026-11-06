@@ -129,11 +129,11 @@ Warn does not move the object. The paper never translates, scales, shakes, or ch
 
 ### 3.5 Wipe (8.0s lands) - two objects
 
-A cut, not a ceremony: the text is gone in <=200ms, one pass. At the eighth second the wash steps one step deeper (`--wash-*-deep`) for the cut beat, then exits on the snap; bone returns. The machine report states the cost: `DRAFT WIPED - 0:37 UNUSED.` then rearms: `TYPE TO RESTART.` - and it is literal: the editor stays armed, and the next keystroke starts a fresh 60s session. The timer rearms to 1:00. No ash, no fade, no italic, no condolences.
+A cut, not a ceremony: the text is gone in <=200ms, one pass. At the eighth second the wash steps one step deeper (`--wash-*-deep`) for the cut beat, then exits on the snap; bone returns. The machine report states the cost: `DRAFT WIPED - 0:37 UNUSED.` then rearms: `TYPE TO BEGIN AGAIN.` - and it is literal: the editor stays armed, and the next keystroke starts a fresh 60s session. The timer rearms to 1:00. No ash, no fade, no italic, no condolences.
 
 ### 3.6 Kept (0:00 reached) - three objects
 
-The only quiet surface. The clock stops at 0:00; the paper returns to the wall (the room goes bone, the paper sits on it with the lift). Receipt, not praise: `0:00 - 148 WORDS KEPT.` No confetti, no "well done." One action: COPY TEXT (its completed state is COPIED - same door, feedback in ink). One mono link: RUN IT AGAIN (fresh 60s, same room). One caption: NOTHING HERE IS SAVED. The words are the biggest thing on the surface; they won, let them.
+The only quiet surface. The clock stops at 0:00; the paper returns to the wall (the room goes bone, the paper sits on it with the lift). Receipt, not praise: `0:00 - 148 WORDS KEPT.` No confetti, no "well done." One action: COPY TEXT (its completed state is COPIED - same door, feedback in ink). One mono link: BEGIN AGAIN (fresh 60s, same room). One caption: NOTHING HERE IS SAVED. The words are the biggest thing on the surface; they won, let them.
 
 ## 4. State matrix
 
@@ -143,7 +143,7 @@ The only quiet surface. The clock stops at 0:00; the paper returns to the wall (
 | TYPING - keys arriving | unchanged; the room never reacts to a keystroke, and the paper's grain is never regenerated | recedes to faint; timer runs at dim | the user's serif - the only mess allowed | identical |
 | PAUSE <5S - 0-5.0s still | nothing changes; restraint is deliberate | caret blinks; timer keeps running | - | identical |
 | WARN 5-8S - second 5.0 lands | wash ramps linearly, peaking at 8s; the only environmental motion | snaps to ink; numeral 3→2→1 in danger, min(40vh,360px); caption KEEP TYPING OR THE DRAFT IS DELETED | machine caps; states the consequence | wash steps once per second (96%, 92%, 88% mixes); numeral identical; nothing withheld |
-| WIPE @8S - second 8.0 lands | wash steps one step deeper for the <=200ms cut, then exits on the snap | text cut in one pass; timer rearms to 1:00 | DRAFT WIPED - 0:37 UNUSED. TYPE TO RESTART. | the cut is already a step |
+| WIPE @8S - second 8.0 lands | wash steps one step deeper for the <=200ms cut, then exits on the snap | text cut in one pass; timer rearms to 1:00 | DRAFT WIPED - 0:37 UNUSED. TYPE TO BEGIN AGAIN. | the cut is already a step |
 | KEPT @0:00 - the clock reaches zero | bone; still; the room lets go | timer stops at 0:00, ink; receipt row + COPY TEXT | receipt: 0:00 - 148 WORDS KEPT. | identical |
 
 Reduced motion removes ramps, never information. Warn still lands at 5.0s - red, huge, on time.
@@ -175,12 +175,12 @@ One consistent form: Plex Mono caps, label or system style, machine voice. Every
 
 - Hint (empty trial): TYPE HERE. THE LAW IS LIVE: 5S WARN, 8S WIPE, 60S TO KEEP.
 - Warn: KEEP TYPING OR THE DRAFT IS DELETED
-- Wipe: DRAFT WIPED - 0:37 UNUSED. / TYPE TO RESTART.
+- Wipe: DRAFT WIPED - 0:37 UNUSED. / TYPE TO BEGIN AGAIN.
 - Kept: 0:00 - 148 WORDS KEPT. / NOTHING HERE IS SAVED.
 - Copy completed: COPIED.
 - Deny (screen reader only): BLOCKED. FORWARD ONLY.
 
-CTA capitalization is consistent within each voice: the door speaks human sentence case (`Give it sixty seconds.`); machine actions and links go caps (COPY TEXT, RUN IT AGAIN, ESC - EXIT, MAC APP ->). Labels do not take trailing periods; system sentences do.
+CTA capitalization is consistent within each voice: the door speaks human sentence case (`Give it sixty seconds.`); machine actions and links go caps (COPY TEXT, BEGIN AGAIN, ESC - EXIT, MAC APP ->). Labels do not take trailing periods; system sentences do.
 
 ## 8. Interaction contract
 

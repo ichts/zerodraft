@@ -140,7 +140,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The primary's label swaps COPY TEXT -> COPIED -> TRY AGAIN after the press. The label holds the
    width of the widest of the three, measured from the face the device actually renders (room.js),
    so the pill keeps one width without a second copy of the words and the press can neither shrink
-   it nor re-centre the row under RUN IT AGAIN (D-059). The em value is the no-script fallback. */
+   it nor re-centre the row under BEGIN AGAIN (D-059). The em value is the no-script fallback. */
 .home .room-primary#copy{display:inline-grid;place-items:center}
 #copy-label{min-inline-size:var(--copy-floor,6.25em);text-align:center}
 .kept-note{margin:var(--kept-note-gap,14px) 0 0;font:400 var(--t-small)/1.6 var(--sans);color:var(--paper-quiet)}
@@ -393,7 +393,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media(max-width:767px){
   .room .paper-foot{left:16px;right:16px}
   /* The kept screen's action row keeps both controls on one line at 390 px, so the press that
-     swaps COPY TEXT for COPIED cannot change where RUN IT AGAIN sits (D-059). */
+     swaps COPY TEXT for COPIED cannot change where BEGIN AGAIN sits (D-059). */
   #kept{left:24px;right:24px}
   .kept-actions{gap:16px}
   /* A truncated destructive confirmation is not acceptable on a phone: the inline hint takes its

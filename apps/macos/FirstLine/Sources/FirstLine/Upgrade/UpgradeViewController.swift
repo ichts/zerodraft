@@ -67,7 +67,7 @@ final class UpgradeViewController: NSViewController {
                               font: FirstLineTypography.subtitleNSFont(), color: FirstLineColors.muteNSColor)
         subtitleLabel.maximumNumberOfLines = 0
 
-        fieldLabel = label("Order number or activation code",
+        fieldLabel = label("License key",
                            font: FirstLineTypography.smallSemiboldNSFont, color: FirstLineColors.chromeNSColor)
         fieldLabel.alignment = .left
 
@@ -170,7 +170,7 @@ final class UpgradeViewController: NSViewController {
         pricingView.isHidden = active
         activateButton.title = appState.licenseActivationInFlight
             ? "Activating"
-            : (active ? "Start writing" : "Activate")
+            : (active ? "Begin" : "Activate")
         activateButton.action = active ? #selector(startWritingTapped) : #selector(activateTapped)
         activateButton.isEnabled = !appState.licenseActivationInFlight
         let checking = appState.licenseValidationInFlight || appState.licenseActivationInFlight
@@ -183,7 +183,7 @@ final class UpgradeViewController: NSViewController {
                 feedbackLabel.isHidden = true
             }
         } else if appState.licenseActivationInFlight {
-            feedbackLabel.stringValue = "Checking your key…"
+            feedbackLabel.stringValue = "Checking your license key…"
             feedbackLabel.isHidden = false
         } else {
             feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
@@ -244,7 +244,7 @@ final class UpgradeViewController: NSViewController {
     @objc private func activateTapped() {
         let key = licenseField.stringValue
         guard !AppSettings.trimmedLicenseKey(key).isEmpty, !appState.licenseActivationInFlight else {
-            feedbackLabel.stringValue = "Enter your order number or activation code first."
+            feedbackLabel.stringValue = "Enter your license key first."
             feedbackLabel.textColor = FirstLineColors.redNSColor
             feedbackLabel.isHidden = false
             return

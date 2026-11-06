@@ -36,13 +36,13 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidKey:
-            return "Order not available. Check the order number or contact support if you just paid."
+            return "Order not available. Check the license key or contact support if you just paid."
         case .activationLimitReached:
             return "This license has reached its 2-Mac activation limit."
         case .networkFailure:
             return "Could not reach the license service. Check your connection and try again."
         case .emptyKey:
-            return "Enter your Waffo order number or activation code."
+            return "Enter your Waffo license key."
         case .unexpected(let statusCode):
             return "Activation failed (HTTP \(statusCode))."
         case .storageFailure:

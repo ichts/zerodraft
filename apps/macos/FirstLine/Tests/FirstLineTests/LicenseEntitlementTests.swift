@@ -49,10 +49,10 @@ struct LicenseEntitlementTests {
         let screen = UpgradeViewController(appState: state)
         let fields = descendants(screen.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "Activate Write It Down" })
-        #expect(fields.contains { $0.stringValue == "Order number or activation code" })
-        #expect(fields.contains { $0.placeholderString == "Order number or activation code" })
+        #expect(fields.contains { $0.stringValue == "License key" })
+        #expect(fields.contains { $0.placeholderString == "License key" })
         let buttons = descendants(screen.view, of: NSButton.self)
-        #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Start writing" })
+        #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Begin" })
         let trial = try #require(buttons.first { $0.title == "Try the free web room" })
         trial.performClick(nil)
         #expect(opened?.absoluteString == "https://writeitdown.app/")
@@ -79,14 +79,14 @@ struct LicenseEntitlementTests {
         let window = try #require(controller.window)
         let view = try #require(window.contentView)
         let field = try #require(descendants(view, of: NSTextField.self).first {
-            $0.placeholderString == "Order number or activation code"
+            $0.placeholderString == "License key"
         })
         window.makeFirstResponder(field)
         window.makeFirstResponder(nil)
         window.makeFirstResponder(field)
         await Task.yield()
         #expect(!descendants(view, of: NSTextField.self).contains {
-            !$0.isHidden && $0.stringValue == "Enter your order number or activation code first."
+            !$0.isHidden && $0.stringValue == "Enter your license key first."
         })
     }
 

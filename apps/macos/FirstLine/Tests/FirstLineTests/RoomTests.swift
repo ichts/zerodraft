@@ -27,7 +27,7 @@ struct RoomTests {
         // of them means the free sessions were used up (D-070).
         #expect(RoomPresentation.failureAnnouncement(unused: 52, obstacle: .licenseNeeded) ==
             "You stopped. Draft deleted. 0:52 unused. A license is needed to keep writing.")
-        #expect(RoomPresentation.failurePillHelp(obstacle: .none) == "Return starts a new session.")
+        #expect(RoomPresentation.failurePillHelp(obstacle: .none) == "Return begins a new session.")
         #expect(RoomPresentation.failurePillHelp(obstacle: .trialSpent) ==
             "Three free sessions used. Return opens activation to keep writing.")
         #expect(RoomPresentation.failurePillHelp(obstacle: .licenseNeeded) ==
@@ -320,7 +320,7 @@ struct RoomTests {
         #expect(body.isHiddenOrHasHiddenAncestor == false)
         let buttons = descendants(fixture.room.view, of: NSButton.self)
         #expect(buttons.contains { $0.title == "COPY TEXT" && !$0.isHiddenOrHasHiddenAncestor })
-        #expect(buttons.contains { $0.title == "RUN IT AGAIN" && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(buttons.contains { $0.title == "BEGIN AGAIN" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(buttons.contains { $0.title == "ESC - EXIT" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(fields.contains { $0.stringValue == "0:00" })
 

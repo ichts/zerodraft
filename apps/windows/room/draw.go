@@ -314,7 +314,7 @@ func (r *Room) cornerLabel(failure, kept bool) string {
 	case r.eng.HasStarted() || failure:
 		return wordLabel(r.eng.WordCount)
 	}
-	return tokens.StrTypeToStart
+	return tokens.StrTypeToBegin
 }
 
 func wordLabel(n int) string {
@@ -555,9 +555,9 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	g.rx, g.ry = pr.X+(pr.W-rw)/2, labelBoxTop(y, 13, 500)
 	y += macLabelBox(13) + tokens.KeptReceiptGap
 	// the copy pill hugs its label but never narrows below the resting COPY TEXT width, so COPIED does not move the row
-	// or land RUN IT AGAIN under the pointer; the longer retry label does widen it (D-076 item 7)
+	// or land BEGIN AGAIN under the pointer; the longer retry label does widen it (D-076 item 7)
 	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 500), r.labelWidth(r.copyLabel, 15, 500)) + 48
-	runW := r.labelWidth(tokens.StrRunAgain, 15, 500) + 40
+	runW := r.labelWidth(tokens.StrKeptBeginAgain, 15, 500) + 40
 	x := pr.X + (pr.W-(copyW+tokens.KeptActionSpacing+runW))/2
 	g.copyRect = ui.Rect{X: x, Y: y, W: copyW, H: 48}
 	g.runRect = ui.Rect{X: x + copyW + tokens.KeptActionSpacing, Y: y, W: runW, H: 48}

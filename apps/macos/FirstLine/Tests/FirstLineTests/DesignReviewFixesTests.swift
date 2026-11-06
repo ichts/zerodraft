@@ -27,7 +27,7 @@ struct DesignReviewFixesTests {
             let copy = try #require(descendants(of: fixture.room.view, as: NSButton.self)
                 .first { $0.title == "COPY TEXT" })
             let restart = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-                .first { $0.title == "RUN IT AGAIN" })
+                .first { $0.title == "BEGIN AGAIN" })
             for (name, view) in [("heading", heading as NSView), ("receipt", receipt)] {
                 let centre = fixture.room.view.convert(view.bounds, from: view).midX
                 #expect(abs(centre - paperCentre) <= 1,
@@ -171,7 +171,7 @@ struct DesignReviewFixesTests {
         try await Task.sleep(for: .milliseconds(200))
         available.view.layoutSubtreeIfNeeded()
         #expect(!buy.isEnabled, "Buy is still offered while a key is being checked")
-        #expect(visibleStrings(in: available.view).contains("Checking your key…"))
+        #expect(visibleStrings(in: available.view).contains("Checking your license key…"))
         let free = try #require(descendants(of: available.view, as: NSButton.self)
             .first { $0.title == "Try the free web room" })
         #expect(free.isEnabled && !free.isHiddenOrHasHiddenAncestor,
@@ -316,8 +316,8 @@ struct DesignReviewFixesTests {
         let settingsField = try #require(descendants(of: settings.view, as: NSTextField.self)
             .first { $0.placeholderString != nil })
         #expect(upgradeField.placeholderString == settingsField.placeholderString)
-        #expect(settingsField.placeholderString == "Order number or activation code")
-        #expect(!visibleStrings(in: settings.view).contains { $0.hasPrefix("Enter your order number") })
+        #expect(settingsField.placeholderString == "License key")
+        #expect(!visibleStrings(in: settings.view).contains { $0.hasPrefix("Enter your license key") })
         window.orderOut(nil)
     }
 
@@ -424,7 +424,7 @@ struct DesignReviewFixesTests {
         let copy = try #require(descendants(of: fixture.room.view, as: NSButton.self)
             .first { $0.title == "COPY TEXT" })
         let restart = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-            .first { $0.title == "RUN IT AGAIN" })
+            .first { $0.title == "BEGIN AGAIN" })
         fixture.room.view.layoutSubtreeIfNeeded()
         let restingWidth = copy.frame.width
         let restingRestart = fixture.room.view.convert(restart.bounds, from: restart)
@@ -437,7 +437,7 @@ struct DesignReviewFixesTests {
                 "COPIED is \(copy.frame.width) pt wide against COPY TEXT's \(restingWidth) pt")
         let copiedRestart = fixture.room.view.convert(restart.bounds, from: restart)
         #expect(abs(copiedRestart.minX - restingRestart.minX) <= 0.5,
-                "RUN IT AGAIN moved \(copiedRestart.minX - restingRestart.minX) pt under the pointer")
+                "BEGIN AGAIN moved \(copiedRestart.minX - restingRestart.minX) pt under the pointer")
         let copiedRow = fixture.room.view.convert(copy.superview?.bounds ?? .zero, from: copy.superview ?? copy)
         #expect(abs(copiedRow.midX - restingRow.midX) <= 0.5)
         fixture.window.orderOut(nil)

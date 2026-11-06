@@ -43,7 +43,7 @@ enum RoomPresentation {
     /// The pill's visible label stays `Begin again`; its help names what Return will actually do.
     static func failurePillHelp(obstacle: RestartObstacle) -> String {
         switch obstacle {
-        case .none: return "Return starts a new session."
+        case .none: return "Return begins a new session."
         case .trialSpent: return "Three free sessions used. Return opens activation to keep writing."
         case .licenseNeeded: return "Return opens activation to keep writing."
         }

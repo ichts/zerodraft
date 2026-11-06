@@ -173,7 +173,7 @@ function render(now = performance.now()) {
   // Empty room: the count slot itself carries the instruction; after a wipe the block does,
   // and the slot returns to the count (the Mac's cases 18/19/50). On the kept screen the receipt
   // is the only place the session's size is printed, so the corner stays silent (D-062).
-  $('room-count').textContent = kept ? '' : state.started === null && !failed ? 'Type to start' : words;
+  $('room-count').textContent = kept ? '' : state.started === null && !failed ? 'Type to begin' : words;
   $('failed').hidden = !failed;
   editor.hidden = kept;
   // The ink layer is the draft's visible paint, so the kept screen hides it with the textarea;

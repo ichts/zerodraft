@@ -68,7 +68,7 @@ Real selectors on the root surface (stable handles, do not substitute coordinate
 - door (the only way in): `a.door` with text `Give it sixty seconds.` — href `#trial`
 - trial editor: `.trial-editor[role="textbox"][aria-label="Zero Draft trial editor"]` (contenteditable)
 - timer: `.chrome-tr .trial-timer`; word count: `.chrome-br .label` (`N words`); rules: `.chrome-tl`; exit: `.chrome-bl .trial-exit`
-- wipe report: `.report-line` with DOM text `Draft wiped - M:SS unused.` plus `.report-rearm` `Type to restart.`
+- wipe report: `.report-line` with DOM text `Draft wiped - M:SS unused.` plus `.report-rearm` `Type to begin again.`
 - kept state: `section.trial-kept` with `.kept-text`, receipt `.receipt-line` (DOM text `0:00 - N words kept.`), `.copy-door` (`Copy text` -> `Copied`), caption `Nothing here is saved`
 - machine-voice lines render in uppercase via CSS `text-transform: uppercase` on the `.system`/label classes; match DOM text (sentence case), not the styled display
 - landing demo theater: `.demo-paper`, `.demo-text`, `.demo-clock`, `.demo-report` (watch-only; pointer and keystrokes do nothing on the landing)

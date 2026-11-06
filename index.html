@@ -432,7 +432,7 @@ window.FirstLineLandingDemo = (() => {
   }
   function onFail(report) {
     const el = trialEditor();
-    // The room rearms for input immediately: TYPE TO RESTART is literal.
+    // The room rearms for input immediately: TYPE TO BEGIN AGAIN is literal.
     if (el) {
       el.innerHTML = "";
       el.setAttribute("contenteditable", "true");
@@ -443,7 +443,7 @@ window.FirstLineLandingDemo = (() => {
     setSrStatus(report);
   }
 
-  // RUN IT AGAIN: one mono link on the kept surface. Fresh 60s, same room.
+  // BEGIN AGAIN: one mono link on the kept surface. Fresh 60s, same room.
   function restart() {
     const el = trialEditor();
     if (el) { el.innerHTML = ""; el.setAttribute("contenteditable", "true"); }
@@ -1653,7 +1653,7 @@ if (document.readyState === "loading") {
       <section class="trial-report" data-show="$_session.failed &amp;&amp; $_session.context === 'trial'" aria-label="Draft wiped">
         <div>
           <p class="report-line system" data-text="$_session.wipeReport">Draft wiped - 0:45 unused.</p>
-          <p class="report-rearm system">Type to restart.</p>
+          <p class="report-rearm system">Type to begin again.</p>
         </div>
       </section>
       <section class="trial-kept" data-show="$_session.complete &amp;&amp; $_session.context === 'trial'" aria-label="Draft kept">
@@ -1671,7 +1671,7 @@ if (document.readyState === "loading") {
           </div>
         </div>
         <div class="kept-below">
-          <button type="button" class="run-again" data-on:click="FirstLineLandingDemo.restart()">Run it again</button>
+          <button type="button" class="run-again" data-on:click="FirstLineLandingDemo.restart()">Begin again</button>
           <p class="kept-caption label">Nothing here is saved</p>
         </div>
         </div>

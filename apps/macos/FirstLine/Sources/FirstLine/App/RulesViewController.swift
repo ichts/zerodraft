@@ -1,8 +1,8 @@
 /**
  * [INPUT]: The shipped copy tokens, the type scale and the landing page's "How it works" wording.
- * [OUTPUT]: A dedicated sheet: how it works, the landing's three rules in order, and a Done action; body text is the
+ * [OUTPUT]: The system sheet's own content, with no card inside it: how it works, the landing's three rules in order, and a Done action; body text is the
  *           scale's 15 pt at 1.5 leading on a 60ch measure, and each rule title is one step up in weight, not down in size.
- * [POS]: Opened from the picker's small "?" control; Esc or Return dismisses it; light and dark use the After card.
+ * [POS]: Opened from the picker's small "?" control; Esc or Return dismisses it; light and dark follow the sheet surface.
  * [PROTOCOL]: Keep the wording and order identical to writeitdown/index.html's How it works cards.
  */
 import AppKit
@@ -20,9 +20,10 @@ final class RulesViewController: NSViewController {
         let character = ("0" as NSString).size(withAttributes: [.font: bodyFont]).width
         return (60 * character).rounded()
     }
-    /// The card carries the measure plus the same 44 pt inset on both sides.
+    /// The sheet is the measure plus the same 44 pt inset on both sides.
     static let cardInset: CGFloat = 44
     static var cardWidth: CGFloat { bodyMeasure + cardInset * 2 }
+    static let contentInsets = NSEdgeInsets(top: 40, left: cardInset, bottom: 36, right: cardInset)
 
     private let doneButton: NSButton
 
@@ -39,17 +40,9 @@ final class RulesViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
-        let card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 40, left: Self.cardInset, bottom: 36,
-                                                                right: Self.cardInset))
-        view.addSubview(card)
-        NSLayoutConstraint.activate([
-            card.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
-            card.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            card.widthAnchor.constraint(equalToConstant: Self.cardWidth),
-            card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
-            card.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-        ])
+        // The system sheet is the one rounded panel: the content sits directly on it, on the plain
+        // surface fill, with no card of its own inside.
+        view = FloodCanvasView(fillColor: FirstLineColors.sheetNSColor)
 
         let eyebrow = label("How it works", font: FirstLineTypography.smallSemiboldNSFont,
                             color: FirstLineColors.chromeNSColor)
@@ -65,7 +58,7 @@ final class RulesViewController: NSViewController {
             rule("No way back",
                  "Deleting, pasting, cutting and undo are blocked. You can only add the next word."),
             rule("Eight seconds of silence",
-                 "Stop typing for eight seconds and the draft is deleted. A warning appears at five. On the Mac: Strict 5 s, Standard 8 s or Relaxed 12 s."),
+                 "Stop typing for eight seconds and the draft is deleted. A warning appears at five."),
             rule("Reach zero, keep it",
                  "Make it to the end of the clock and the text is yours to copy. Nothing is uploaded."),
         ])
@@ -93,17 +86,19 @@ final class RulesViewController: NSViewController {
         stack.setCustomSpacing(12, after: heading)
         stack.setCustomSpacing(24, after: sub)
         stack.setCustomSpacing(28, after: rules)
-        card.contentView.addSubview(stack)
+        view.addSubview(stack)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: card.contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: card.contentView.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.cardInset),
+            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.cardInset),
+            stack.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.contentInsets.top),
+            stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.contentInsets.bottom),
             sub.widthAnchor.constraint(equalToConstant: measure),
             rules.widthAnchor.constraint(equalToConstant: measure),
             doneRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])
-        preferredContentSize = NSSize(width: Self.cardWidth, height: 640)
+        // The sheet is exactly as tall as its content, so no empty band shows under Done.
+        preferredContentSize = NSSize(width: Self.cardWidth,
+                                      height: stack.fittingSize.height + Self.contentInsets.top + Self.contentInsets.bottom)
     }
 
     override func viewDidAppear() {
@@ -137,7 +132,7 @@ final class RulesViewController: NSViewController {
     }
 
     /// Readable body text: the scale's body face, its 1.5 leading and the 60ch measure,
-    /// left-aligned on the card's content edge.
+    /// left-aligned on the content edge.
     private func body(_ text: String, color: NSColor) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.translatesAutoresizingMaskIntoConstraints = false

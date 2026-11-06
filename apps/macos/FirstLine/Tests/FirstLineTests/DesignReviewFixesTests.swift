@@ -294,10 +294,10 @@ struct DesignReviewFixesTests {
         }
         // Rendered pitch: a two-line body run is exactly two line boxes tall.
         let twoLine = try #require(bodyLabels.first {
-            $0.stringValue.hasPrefix("Stop typing for eight seconds")
+            $0.stringValue.hasPrefix("Open it, start typing")
         })
         let lines = max(1, Int((twoLine.frame.height / expectedLeading).rounded()))
-        #expect(lines >= 2, "the longest rule body did not wrap, so the pitch cannot be read")
+        #expect(lines >= 2, "the intro body did not wrap, so the pitch cannot be read")
         #expect(abs(twoLine.frame.height - CGFloat(lines) * expectedLeading) <= 1,
                 "a \(lines)-line body is \(twoLine.frame.height) pt tall, expected \(CGFloat(lines) * expectedLeading)")
 

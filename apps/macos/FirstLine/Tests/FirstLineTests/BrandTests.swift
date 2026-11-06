@@ -135,6 +135,45 @@ struct BrandTests {
         window.orderOut(nil)
     }
 
+    /// Mac design audit A3: the system sheet is the one rounded panel. The content sits straight on it,
+    /// so the sheet is exactly its content's size and no second card, shadow or rounded fill sits inside.
+    @Test func rulesSheetHasOneRoundedEdgeAndNoEmptyBand() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        rules.view.layoutSubtreeIfNeeded()
+        func surfaces(_ view: NSView) -> [NSView] {
+            let own: [NSView] = (view is FirstLineCardView || view is FirstLineShadowView || view is FloodCanvasView) ? [view] : []
+            return own + view.subviews.flatMap(surfaces)
+        }
+        let found = surfaces(rules.view)
+        #expect(found.count == 1 && found.first === rules.view,
+                "the sheet holds a second panel: \(found.map { String(describing: type(of: $0)) })")
+        #expect((rules.view as? FloodCanvasView)?.cornerRadius == 0, "the content fill rounds its own corners")
+        let size = rules.preferredContentSize
+        let done = try #require(allButtons(in: rules.view).first { $0.title == "Done" })
+        let doneFrame = rules.view.convert(done.bounds, from: done)
+        #expect(abs(rules.view.bounds.height - size.height) <= 1, "the view is \(rules.view.bounds.height) tall, the sheet asks \(size.height)")
+        // Done is the last row: the bottom inset is the declared one, so nothing empty trails it.
+        #expect(abs(doneFrame.minY - RulesViewController.contentInsets.bottom) <= 1,
+                "Done sits \(doneFrame.minY) pt above the sheet's bottom, expected \(RulesViewController.contentInsets.bottom)")
+        rules.dismiss(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+        window.orderOut(nil)
+    }
+
     private func allTextFields(in view: NSView) -> [NSTextField] {
         let current = (view as? NSTextField).map { [$0] } ?? []
         return current + view.subviews.flatMap(allTextFields)

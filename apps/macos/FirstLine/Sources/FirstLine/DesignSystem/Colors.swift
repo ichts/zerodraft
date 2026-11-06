@@ -35,9 +35,10 @@ enum FirstLineColors {
     /* The writing sheet is the Wheat paper (D-069, superseding D-056's Note tone). Every word on it is
        measured against the paper's own tone, not against white, and clears 7:1, the faded history lines
        included, so the quiet chrome is its own role and the pen red is deep enough to read on the paper
-       and on its wash. The values are the web's `tokens.css` roles, one paper on both surfaces. */
+       and on its wash. The values are the web's `tokens.css` roles, one paper on both surfaces, except the light
+       quiet grey, which the Mac warms to a brown-grey (D-084). */
     static var paperNSColor: NSColor { adaptive(light: 0xE9E2CE, dark: 0x342E24) }
-    static var paperQuietNSColor: NSColor { adaptive(light: 0x464746, dark: 0xC2BFB7) }
+    static var paperQuietNSColor: NSColor { adaptive(light: 0x48443E, dark: 0xC2BFB7) }
     static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFC2B4) }
     /// The sheet's warn wash: `color-mix(in oklab, paper 88%, #C8392F)` and its deeper 76% step of the
     /// eighth second, the exact recipe the web paints (`--wash-paper`, `--wash-paper-deep`). The values

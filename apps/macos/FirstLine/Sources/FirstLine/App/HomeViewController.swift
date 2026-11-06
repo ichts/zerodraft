@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState choices, observable access status (free-trial count or license), the chip-and-wordmark lockup
  *          and AppKit focus.
- * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, and
+ * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, the card's 560 pt resting (not fixed) width, and
  *           the live access line.
  * [POS]: Pre-writing surface in the After language with the chip-and-wordmark lockup; selections persist, Begin enters
  *        the room.

@@ -12,7 +12,7 @@ var (
 	Page          = Role{0xF7F7F5, 0x15140F, 1, 1}
 	Sheet         = Role{0xFFFFFF, 0x26231C, 1, 1}
 	Paper         = Role{0xE9E2CE, 0x342E24, 1, 1}
-	PaperQuiet    = Role{0x464746, 0xC2BFB7, 1, 1}
+	PaperQuiet    = Role{0x48443E, 0xC2BFB7, 1, 1}
 	PaperDanger   = Role{0x63140B, 0xFFC2B4, 1, 1}
 	PaperWash     = Role{0xE8CFBB, 0x453226, 1, 1}
 	PaperWashDeep = Role{0xE6BCA7, 0x573428, 1, 1}

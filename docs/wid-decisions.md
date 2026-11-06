@@ -1669,9 +1669,10 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Date: 2026-11-06
 - Decision: on the Mac the light `paperQuiet` role (clock, count, exit link, receipt, kept note, notices)
   changes from `#464746` to `#48443E`. Nothing else changes: the dark role `#C2BFB7`, the ink, the pen
-  red, the history ladder and the wash keep their values. The web (`tokens.css`, the landing demo, the
-  trial) and the Windows tokens keep `#464746` until the same change is decided there; the cross-surface
-  parity of this one role is a follow-up, not part of this change.
+  red, the history ladder and the wash keep their values. The Windows tokens are generated from the Mac
+  sources (`apps/windows/scripts/gen_tokens.py`), so Windows follows in the same change. The web
+  (`tokens.css`, the landing demo, the trial) keeps `#464746` until the same change is decided there; the
+  web parity of this one role is a follow-up.
 - Reason: the Mac design audit (rule 6, warm greys only) found `#464746` the one cool grey on the Wheat
   paper. `#48443E` keeps the red-green-blue order of the paper's own tone, and it reads 7.47:1 on
   `#E9E2CE` (was 7.21:1), so the 7:1 floor of D-069 holds with more margin. Bound tests:

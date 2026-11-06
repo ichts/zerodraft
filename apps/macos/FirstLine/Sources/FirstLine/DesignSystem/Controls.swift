@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing, DesignSystem/SurfaceViews.
- * [OUTPUT]: After-language segmented control, fill bar and status line used by the picker, room, activation, settings and kept sheet.
+ * [OUTPUT]: After-language segmented control (a segment never compresses below its label), fill bar and status line used by the picker, room, activation, settings and kept sheet.
  * [POS]: Shared After-language controls; keyboard reachability stays AppKit's, focus rings come from InkFocus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -134,6 +134,7 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
         font = FirstLineTypography.smallMediumNSFont
         inkFocusRingInset = 2
         inkFocusRingCornerRadius = 19
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         wantsLayer = true
         setAccessibilityRole(.radioButton)
     }

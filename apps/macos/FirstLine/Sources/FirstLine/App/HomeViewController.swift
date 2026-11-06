@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState choices, observable access status (free-trial count or license), the chip-and-wordmark lockup
  *          and AppKit focus.
- * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, and
+ * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, the card's 560 pt resting (not fixed) width, and
  *           the live access line.
  * [POS]: Pre-writing surface in the After language with the chip-and-wordmark lockup; selections persist, Begin enters
  *        the room.
@@ -40,10 +40,13 @@ final class HomeViewController: NSViewController {
     private func buildInterface() {
         let card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 44, left: 48, bottom: 44, right: 48))
         view.addSubview(card)
+        // 560 is the resting width; a longer label widens the card instead of squeezing a segment.
+        let restingWidth = card.widthAnchor.constraint(equalToConstant: 560)
+        restingWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
+            restingWidth,
             card.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            card.widthAnchor.constraint(equalToConstant: 560),
             card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 32),
             card.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -32),
         ])

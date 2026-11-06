@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state, checkout state and DesignSystem tokens.
- * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the checkout/Stripe note next to Buy, the 48 pt `Try the free web room` route and live states.
+ * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the checkout/Stripe note next to Buy, the 48 pt `Try the free web room` route, the 560 pt resting (not fixed) card width and live states.
  * [POS]: writeitdown AppKit license gate; POST checkout via AppState with mac.html fallback.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
@@ -50,10 +50,13 @@ final class UpgradeViewController: NSViewController {
     private func buildInterface() {
         let card = FirstLineCardView()
         view.addSubview(card)
+        // 560 is the resting width; a longer label widens the card instead of squeezing a pill.
+        let restingWidth = card.widthAnchor.constraint(equalToConstant: 560)
+        restingWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
+            restingWidth,
             card.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            card.widthAnchor.constraint(equalToConstant: 560),
             card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 24),
             card.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
         ])

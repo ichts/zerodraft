@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing, InkFocus.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring; a disabled outline pill keeps its outline.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring; a disabled outline pill keeps its outline; a pill never compresses below its label.
  * [POS]: Shared native button specs; room primary opts into live hover/press motion, all controls use the design-system ink focus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -45,6 +45,9 @@ enum FirstLineButtons {
         button.bezelStyle = .inline
         button.font = FirstLineTypography.uiSemiboldNSFont
         button.roomMotion = roomMotion
+        // A pill is as wide as its label plus its padding and never narrower: when a row runs out of room
+        // the card around it grows, the label is not squeezed (mac design audit A5).
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.wantsLayer = true
         let resolvedHeight = height ?? role.height
         button.layer?.cornerRadius = resolvedHeight / 2

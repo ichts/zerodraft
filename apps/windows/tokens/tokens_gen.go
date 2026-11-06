@@ -136,7 +136,7 @@ const (
 	Rule1Title                  = "No way back"
 	Rule1Body                   = "Deleting, pasting, cutting and undo are blocked. You can only add the next word."
 	Rule2Title                  = "Eight seconds of silence"
-	Rule2Body                   = "Stop typing for eight seconds and the draft is deleted. A warning appears at five. Strict 5 s, Standard 8 s or Relaxed 12 s."
+	Rule2Body                   = "Stop typing for eight seconds and the draft is deleted. A warning appears at five."
 	Rule3Title                  = "Reach zero, keep it"
 	Rule3Body                   = "Make it to the end of the clock and the text is yours to copy. Nothing is uploaded."
 	RulesDone                   = "Done"

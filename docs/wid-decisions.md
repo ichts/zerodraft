@@ -1696,3 +1696,24 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the wording (not the behaviour) of D-059, D-062, D-070 and D-076 where they name
   `RUN IT AGAIN`, `Type to start` or `Checking your key…`; their geometry and behaviour stand. Error
   prose, the trial line and the rules copy are not part of this decision.
+
+## D-086: Errors, status lines, the trial line and the rules sheet say one plain thing each
+
+- Date: 2026-11-06
+- Decision: every license error and every license or trial status line is one plain sentence that says what
+  happened and then what to do, with no HTTP code and no vendor name (for example `We could not connect, so
+  check your internet connection and try again.`). The picker's trial line is `N free sessions left.`
+  (`1 free session left.`), with no clause about when a session is counted. The rules sheet loses its lead
+  line, and its three rules read `No way back` / `You can only add the next word.`, `Silence deletes it` /
+  `Stop for N seconds and the draft is deleted.` (N is the picker's silence limit on the Mac and Windows,
+  8 on the web) and `Reach zero, keep it` / `The text is yours to copy.` The activation card names its field
+  with the label `License key` and drops the placeholder; Settings keeps its one placeholder. The revoked
+  line is `This license is no longer valid, so enter a different license key.` The web's three How it works
+  cards carry the same titles and bodies. The three helper lines on the activation card stay for now.
+- Reason: product-design rules 2 and 3. The picker, the room and the kept screen already show what the
+  removed sentences explained (the first typed character spends a session, blocked keys refuse themselves,
+  the kept screen says nothing is saved), and the old rule titles hard-coded eight seconds while the picker
+  offers 5, 8 and 12. The captain approved the sentences on 2026-11-06.
+- Supersedes: the wording of D-085's exclusions and of D-076 items 5 and 6 (the trial line and the rules
+  sheet) and the one-placeholder-on-both-surfaces rule of the Mac audit's activation fixes (#111: the card
+  now has a label and no placeholder). Behaviour and geometry stand.

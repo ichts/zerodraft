@@ -86,13 +86,13 @@ struct BrandTests {
         rules.view.layoutSubtreeIfNeeded()
         let labels = allLabels(in: rules.view)
         let ordered = ["How it works", "Forward only. Nothing kept.", "No way back",
-                       "Eight seconds of silence", "Reach zero, keep it"]
+                       "Silence deletes it", "Reach zero, keep it"]
         for text in ordered {
             #expect(labels.contains(text), "missing rule text: \(text)")
         }
         let positions = ordered.compactMap { labels.firstIndex(of: $0) }
         #expect(positions == positions.sorted(), "the rules are not in the landing page's order")
-        #expect(labels.contains("Open it, start typing, say the thing you have been avoiding. The only way out is through."))
+        #expect(labels.contains("Stop for 8 seconds and the draft is deleted."))
         #expect(!labels.contains { $0.contains("!") })
         let done = try #require(allButtons(in: rules.view).first { $0.title == "Done" })
         #expect(done.keyEquivalent == "\r")

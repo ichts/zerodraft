@@ -73,7 +73,6 @@ final class UpgradeViewController: NSViewController {
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = AppState.licenseFieldPlaceholder
         licenseField.font = FirstLineTypography.fieldNSFont
         licenseField.textColor = FirstLineColors.inkNSColor
         licenseField.backgroundColor = FirstLineColors.sheetNSColor

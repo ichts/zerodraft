@@ -188,7 +188,7 @@ async function run(size, browser) {
     await step('heading tree: one h1, h2 order per SEO.md, 3 h3 under how, 8 h3 under FAQ', async () => {
       const tree = (await page.locator('#landing h1, #landing h2, #landing h3').evaluateAll(els => els.map(e => e.tagName.toLowerCase() + ' ' + e.textContent.replace(/\s+/g, ' ').trim()))).join('\n');
       const h = tree.split('\n'); ok(h.filter(x => x.startsWith('h1 ')).length === 1, 'need exactly one h1 in the landing');
-      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h3 No way back/, /^h3 Eight seconds of silence/, /^h3 Reach zero, keep it/, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
+      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h3 No way back/, /^h3 Silence deletes it/, /^h3 Reach zero, keep it/, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
       order.forEach((re, i) => ok(re.test(h[i] || ''), `heading ${i}: "${h[i]}" does not match ${re}`));
       ok(h.slice(8, 16).every(x => x.startsWith('h3 ')) && h.length === 16, `FAQ headings: ${JSON.stringify(h.slice(8))}`);
     });
@@ -199,9 +199,9 @@ async function run(size, browser) {
     });
   });
   await block('landing/how-it-works', async () => {
-    await step('3 cards: no way back, eight seconds, reach zero', async () => {
+    await step('3 cards: no way back, silence, reach zero', async () => {
       await show('#how'); const t = await page.locator('#how .cards .card h3').allInnerTexts();
-      ok(t.length === 3 && /no way back/i.test(t[0]) && /eight seconds/i.test(t[1]) && /reach zero/i.test(t[2]), `cards ${JSON.stringify(t)}`);
+      ok(t.length === 3 && /no way back/i.test(t[0]) && /silence deletes it/i.test(t[1]) && /reach zero/i.test(t[2]), `cards ${JSON.stringify(t)}`);
     });
   });
   await block('landing/mac-block', async () => {

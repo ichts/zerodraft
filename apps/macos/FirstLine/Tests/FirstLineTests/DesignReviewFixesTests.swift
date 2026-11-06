@@ -306,16 +306,16 @@ struct DesignReviewFixesTests {
 
     // MARK: - Activation and Settings mechanics (mac design audit A4)
 
-    /// One field, one placeholder, on both surfaces; and no second sentence naming it above the field.
-    @Test func activationAndSettingsShareOnePlaceholder() throws {
+    /// The card names its field with a label and no placeholder; Settings keeps the one placeholder and no sentence above it.
+    @Test func activationCardLabelsItsFieldAndSettingsKeepsThePlaceholder() throws {
         let upgrade = UpgradeViewController(appState: try exhaustedState(checkoutConfigured: true))
         let settings = SettingsViewController(appState: try exhaustedState(checkoutConfigured: true))
         let window = host(settings, size: NSSize(width: 1040, height: 720))
-        let upgradeField = try #require(descendants(of: upgrade.view, as: NSTextField.self)
-            .first { $0.placeholderString != nil })
+        let upgradeFields = descendants(of: upgrade.view, as: NSTextField.self)
+        #expect(upgradeFields.contains { $0.stringValue == "License key" })
+        #expect(!upgradeFields.contains { $0.placeholderString != nil })
         let settingsField = try #require(descendants(of: settings.view, as: NSTextField.self)
             .first { $0.placeholderString != nil })
-        #expect(upgradeField.placeholderString == settingsField.placeholderString)
         #expect(settingsField.placeholderString == "License key")
         #expect(!visibleStrings(in: settings.view).contains { $0.hasPrefix("Enter your license key") })
         window.orderOut(nil)
@@ -344,7 +344,7 @@ struct DesignReviewFixesTests {
         let window = host(rules, size: NSSize(width: RulesViewController.cardWidth + 40, height: 760))
         let bodySize = RulesViewController.bodyFont.pointSize
         let expectedLeading = bodySize * RulesViewController.bodyLeading
-        let bodies = ["Open it, start typing", "Deleting, pasting", "Stop typing for eight seconds", "Make it to the end"]
+        let bodies = ["You can only add", "Stop for 8 seconds", "The text is yours"]
         var bodyLabels: [NSTextField] = []
         for prefix in bodies {
             let field = try #require(descendants(of: rules.view, as: NSTextField.self)
@@ -359,16 +359,13 @@ struct DesignReviewFixesTests {
             #expect(paragraph.lineBreakMode == .byWordWrapping)
         }
         // Rendered pitch: a two-line body run is exactly two line boxes tall.
-        let twoLine = try #require(bodyLabels.first {
-            $0.stringValue.hasPrefix("Open it, start typing")
-        })
-        let lines = max(1, Int((twoLine.frame.height / expectedLeading).rounded()))
-        #expect(lines >= 2, "the intro body did not wrap, so the pitch cannot be read")
-        #expect(abs(twoLine.frame.height - CGFloat(lines) * expectedLeading) <= 1,
-                "a \(lines)-line body is \(twoLine.frame.height) pt tall, expected \(CGFloat(lines) * expectedLeading)")
+        let oneLine = try #require(bodyLabels.first)
+        let lines = max(1, Int((oneLine.frame.height / expectedLeading).rounded()))
+        #expect(abs(oneLine.frame.height - CGFloat(lines) * expectedLeading) <= 1,
+                "a \(lines)-line body is \(oneLine.frame.height) pt tall, expected \(CGFloat(lines) * expectedLeading)")
 
         // Subheads are one step up in weight at the body size, never smaller than their text.
-        for title in ["No way back", "Eight seconds of silence", "Reach zero, keep it"] {
+        for title in ["No way back", "Silence deletes it", "Reach zero, keep it"] {
             let field = try #require(descendants(of: rules.view, as: NSTextField.self)
                 .first { $0.stringValue == title })
             let size = try #require(field.font?.pointSize)
@@ -387,13 +384,13 @@ struct DesignReviewFixesTests {
 
     // MARK: - Problem 24: the picker line and the activation copy state the behaviour
 
-    @Test func pickerTrialLineStatesHowASessionIsCounted() throws {
+    @Test func pickerTrialLineStatesTheCountOnly() throws {
         let state = try exhaustedState(checkoutConfigured: true, used: 1)
         let picker = HomeViewController(appState: state)
         let window = host(picker, size: NSSize(width: 1040, height: 720))
-        let line = try #require(visibleStrings(in: picker.view).first { $0.hasPrefix("Free trial:") },
+        let line = try #require(visibleStrings(in: picker.view).first { $0.hasSuffix("free sessions left.") },
                                 "the picker lost its trial line")
-        #expect(line == "Free trial: 2 of 3 sessions left, counted at the first character.",
+        #expect(line == "2 free sessions left.",
                 "the trial line does not match the counter: \(line)")
         let field = try #require(descendants(of: picker.view, as: NSTextField.self)
             .first { $0.stringValue == line })

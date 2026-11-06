@@ -50,7 +50,7 @@ struct LicenseEntitlementTests {
         let fields = descendants(screen.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "Activate Write It Down" })
         #expect(fields.contains { $0.stringValue == "License key" })
-        #expect(fields.contains { $0.placeholderString == "License key" })
+        #expect(!fields.contains { $0.placeholderString != nil }, "the card names its field with the label, not a placeholder")
         let buttons = descendants(screen.view, of: NSButton.self)
         #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Begin" })
         let trial = try #require(buttons.first { $0.title == "Try the free web room" })
@@ -79,7 +79,7 @@ struct LicenseEntitlementTests {
         let window = try #require(controller.window)
         let view = try #require(window.contentView)
         let field = try #require(descendants(view, of: NSTextField.self).first {
-            $0.placeholderString == "License key"
+            $0.isEditable
         })
         window.makeFirstResponder(field)
         window.makeFirstResponder(nil)

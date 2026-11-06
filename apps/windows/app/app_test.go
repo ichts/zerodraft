@@ -136,7 +136,7 @@ func TestHomeAndTheThreeFreeSessions(t *testing.T) {
 	g := newRig(t)
 	g.snap("home-fresh")
 	g.wantText("How long?")
-	g.wantText(fmt.Sprintf(tokens.TrialLeftFormat, 3, 3))
+	g.wantText(fmt.Sprintf(tokens.TrialLeftFormat, 3))
 	// entering an empty room and leaving it spends nothing
 	g.click("Begin writing")
 	g.tt.Key(0, ui.KeyEscape)
@@ -144,7 +144,7 @@ func TestHomeAndTheThreeFreeSessions(t *testing.T) {
 	if g.a.Surface() != Home || g.a.Licence().TrialRemaining() != 3 {
 		t.Fatalf("an empty room costs nothing: surface %d left %d", g.a.Surface(), g.a.Licence().TrialRemaining())
 	}
-	g.wantText(fmt.Sprintf(tokens.TrialLeftFormat, 3, 3))
+	g.wantText(fmt.Sprintf(tokens.TrialLeftFormat, 3))
 	for i := 1; i <= 3; i++ {
 		g.spend()
 		if got, want := g.a.Licence().TrialRemaining(), 3-i; got != want {
@@ -213,7 +213,7 @@ func TestActivationFlow(t *testing.T) {
 	}
 	g.snap("upgrade-empty")
 	for status, want := range map[int]string{
-		403: tokens.ErrInvalidKey, 404: tokens.ErrInvalidKey, 503: tokens.ErrNetworkFailure, 400: "Activation failed (HTTP 400).",
+		403: tokens.ErrInvalidKey, 404: tokens.ErrInvalidKey, 503: tokens.ErrNetworkFailure, 400: tokens.ErrUnexpected,
 	} {
 		g.svc.Status["activate"] = status
 		g.clickKeyField()
@@ -227,7 +227,7 @@ func TestActivationFlow(t *testing.T) {
 	g.clickKeyField()
 	g.tt.Type("WID-ORDER-1234")
 	g.click("Activate")
-	g.wantText("This license has reached its 2-PC activation limit.")
+	g.wantText(tokens.ErrActivationLimitReached)
 	g.snap("upgrade-limit")
 	g.svc.Status["activate"] = 0
 	g.click("Activate")
@@ -238,7 +238,7 @@ func TestActivationFlow(t *testing.T) {
 		t.Fatal("licensed and the field cleared")
 	}
 	g.click("Begin")
-	if g.a.Surface() != Home || g.tt.HasText("Free trial") || g.tt.HasText("Activate this PC") {
+	if g.a.Surface() != Home || g.tt.HasText("free sessions left") || g.tt.HasText("Activate this PC") {
 		t.Fatalf("a licensed Home shows no access line: %q", g.tt.Texts())
 	}
 	g.snap("home-licensed")

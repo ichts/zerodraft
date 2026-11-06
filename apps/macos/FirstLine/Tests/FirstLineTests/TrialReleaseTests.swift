@@ -57,12 +57,12 @@ struct TrialReleaseTests {
         #expect(state.selectedSurface == .home)
         #expect(state.canStartSession)
         #expect(!state.hasFullAccess)
-        #expect(state.accessStatusText == "Free trial: 3 of 3 sessions left, counted at the first character.")
+        #expect(state.accessStatusText == "3 free sessions left.")
         #expect(await state.validateLicenseIfNeeded() == nil)
         #expect(await client.lastValidatedToken == nil)
         let home = HomeViewController(appState: state)
         #expect(descendants(home.view, of: NSTextField.self).contains {
-            $0.stringValue == "Free trial: 3 of 3 sessions left, counted at the first character."
+            $0.stringValue == "3 free sessions left."
         })
         let delegate = FirstLineAppDelegate(appState: state)
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
@@ -140,7 +140,7 @@ struct TrialReleaseTests {
         field.insertText("你", replacementRange: NSRange(location: NSNotFound, length: 0))
         field.insertText(" more", replacementRange: NSRange(location: NSNotFound, length: 0))
         #expect(state.settings.trialSessionsUsed == 1)
-        #expect(state.accessStatusText == "Free trial: 2 of 3 sessions left, counted at the first character.")
+        #expect(state.accessStatusText == "2 free sessions left.")
     }
 
     @Test func exhaustionPersistsAndRoutesToExistingActivationScreen() async throws {
@@ -167,7 +167,7 @@ struct TrialReleaseTests {
         let fields = descendants(screen.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "A license is required to keep writing on this Mac." })
         #expect(fields.contains { $0.stringValue == "License key" })
-        #expect(fields.contains { $0.placeholderString == "License key" })
+        #expect(!fields.contains { $0.placeholderString != nil }, "the card names its field with the label, not a placeholder")
         let buy = try #require(descendants(screen.view, of: NSButton.self).first { $0.title.hasPrefix("Buy a license") })
         #expect(buy.isEnabled)
         buy.performClick(nil)
@@ -313,10 +313,10 @@ struct TrialReleaseTests {
         #expect(!state.sessionEngine.hasStarted)
         #expect(state.settings.trialSessionsUsed == 0)
         #expect(state.selectedSurface == .upgrade)
-        #expect(state.accessStatusText.contains("Could not save trial usage"))
+        #expect(state.accessStatusText.contains("We could not save your free sessions"))
         let screen = UpgradeViewController(appState: state)
         #expect(descendants(screen.view, of: NSTextField.self).contains {
-            !$0.isHidden && $0.stringValue.contains("Could not save trial usage")
+            !$0.isHidden && $0.stringValue.contains("We could not save your free sessions")
         })
         #expect(!state.canStartSession)
     }
@@ -329,7 +329,7 @@ struct TrialReleaseTests {
         let state = makeState(at: root)
         #expect(state.selectedSurface == .upgrade)
         #expect(state.trialSessionsRemaining == 0)
-        #expect(state.accessStatusText.contains("Could not read trial usage"))
+        #expect(state.accessStatusText.contains("We could not read your free sessions"))
     }
 
     @Test(arguments: [false, true])

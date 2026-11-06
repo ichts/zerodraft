@@ -344,12 +344,12 @@ check_warn_recovery_wipe() {
 
 ### 1. Empty rooms cost nothing; each first input spends one of three sessions.
 snap fresh-trial >"$output/fresh-trial.json"
-assert_text "$output/fresh-trial.json" 'Free trial: 3 of 3 sessions left.'
+assert_text "$output/fresh-trial.json" '3 free sessions left.'
 enter_room "$output/fresh-trial.json"
 snap empty-trial >"$output/empty-trial.json"
 exit_room_by_key
 snap unspent-trial >"$output/unspent-trial.json"
-assert_text "$output/unspent-trial.json" 'Free trial: 3 of 3 sessions left.'
+assert_text "$output/unspent-trial.json" '3 free sessions left.'
 for used in 1 2 3; do
   snap "trial-$used-home" >"$output/trial-home.json"
   enter_room "$output/trial-home.json"
@@ -370,7 +370,7 @@ for used in 1 2 3; do
   else
     exit_room_by_click
     snap "trial-$used-exit" >"$output/trial-exit.json"
-    assert_text "$output/trial-exit.json" "Free trial: $((3 - used)) of 3 sessions left."
+    assert_text "$output/trial-exit.json" "$((3 - used)) free session$([[ $used == 1 ]] && echo s) left."
   fi
 done
 kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
@@ -476,7 +476,7 @@ for mode in offline refunded; do
   kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
   printf '%s\n' "$mode" >"$output/fixture-mode"
   launch_app
-  if [[ "$mode" == offline ]]; then expected='License active.'; else expected='License revoked.'; fi
+  if [[ "$mode" == offline ]]; then expected='License active.'; else expected='This license is no longer valid'; fi
   wait_text "$mode-license" 'License' "$expected" 30
   snap "$mode-result" >"$output/$mode-result.json"
   if [[ "$mode" == offline ]]; then

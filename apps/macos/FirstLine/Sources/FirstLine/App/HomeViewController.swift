@@ -58,7 +58,7 @@ final class HomeViewController: NSViewController {
         let title = label("How long?", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
         let rulesButton = FirstLineButtons.link(title: "?", target: self, action: #selector(showRules))
         rulesButton.setAccessibilityLabel("How it works")
-        rulesButton.setAccessibilityHelp("How it works: no way back, eight seconds of silence, reach zero and keep it.")
+        rulesButton.setAccessibilityHelp("How it works: no way back, silence deletes it, reach zero and keep it.")
         durationControl = FirstLineSegmentedControl(
             items: SessionEngine.durationChoices.map { duration in
                 let minutes = Int(duration / 60)
@@ -157,7 +157,7 @@ final class HomeViewController: NSViewController {
     }
 
     @objc private func showRules() {
-        presentAsSheet(RulesViewController())
+        presentAsSheet(RulesViewController(silenceSeconds: appState.settings.silenceLimit.rawValue))
     }
 }
 

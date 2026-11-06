@@ -144,8 +144,9 @@ func segmented(c *ui.Context, p pal, sel *int, label string, items []string) {
 }
 
 // field is the 44 pt text field of the activation card.
-func (a *App) field(c *ui.Context, p pal, value *string, placeholder string) ui.Element {
-	return ui.TextInput(c.Key("order"), value).Placeholder(placeholder).Label(placeholder).Width(464).Height(44).FontSize(17).AlignSelf(ui.Center).
+// field is the one licence-key input; the activation card passes no placeholder (its label names the field), Settings passes the one placeholder.
+func (a *App) field(c *ui.Context, p pal, value *string, placeholder, label string) ui.Element {
+	return ui.TextInput(c.Key("order"), value).Placeholder(placeholder).Label(label).Width(464).Height(44).FontSize(17).AlignSelf(ui.Center).
 		Background(p.of(tokens.Sheet)).Radius(tokens.RadiusControl).Border(1, p.of(tokens.HairStrong))
 }
 
@@ -234,10 +235,8 @@ func (a *App) rulesView(c *ui.Context, dark bool) {
 				smallLabel(c, p, tokens.RulesEyebrow)
 				gap(c, 10)
 				text(c, tokens.RulesHeading, 34, 500, p.ink()).Font(roomSerif).LineHeight(1.1)
-				gap(c, 12)
-				body(tokens.RulesSub, p.mute())
 				gap(c, 24)
-				for i, r := range [][2]string{{tokens.Rule1Title, tokens.Rule1Body}, {tokens.Rule2Title, tokens.Rule2Body}, {tokens.Rule3Title, tokens.Rule3Body}} {
+				for i, r := range [][2]string{{tokens.Rule1Title, tokens.Rule1Body}, {tokens.Rule2Title, fmt.Sprintf(tokens.Rule2BodyFormat, a.prefs.SilenceSeconds)}, {tokens.Rule3Title, tokens.Rule3Body}} {
 					if i > 0 {
 						gap(c, tokens.RulesRuleGap)
 					}
@@ -286,7 +285,7 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 					smallLabel(c, p, tokens.UpgradeFieldLabel)
 					gap(c, 8)
 				})
-				field := a.field(c, p, &a.key, tokens.UpgradePlaceholder).AutoFocus()
+				field := a.field(c, p, &a.key, "", tokens.UpgradeFieldLabel).AutoFocus()
 				if field.Changed() {
 					a.emptyShown = false
 					a.lic.ClearActivationError()
@@ -415,7 +414,7 @@ func (a *App) settingsView(c *ui.Context, dark bool) {
 					gap(c, 14)
 					ui.Divider(c).Width(464).Background(p.of(tokens.Hair))
 					gap(c, 14)
-					field := a.field(c, p, &a.key, tokens.SettingsFieldPlaceholder)
+					field := a.field(c, p, &a.key, tokens.SettingsFieldPlaceholder, tokens.SettingsFieldPlaceholder)
 					if field.Changed() {
 						a.lic.ClearActivationError()
 					}

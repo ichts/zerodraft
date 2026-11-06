@@ -211,11 +211,11 @@ func TestActivationErrorStates(t *testing.T) {
 		{"unknown or revoked order", 403, "", KindInvalidKey, tokens.ErrInvalidKey},
 		{"refunded", 404, "", KindInvalidKey, tokens.ErrInvalidKey},
 		{"third install", 409, "device limit reached\n", KindActivationLimitReached, tokens.ErrActivationLimitReached},
-		{"other 409 is not the limit", 409, "installation platform mismatch", KindUnexpected, "Activation failed (HTTP 409)."},
+		{"other 409 is not the limit", 409, "installation platform mismatch", KindUnexpected, tokens.ErrUnexpected},
 		{"rate limited", 429, "", KindNetworkFailure, tokens.ErrNetworkFailure},
 		{"server error", 503, "", KindNetworkFailure, tokens.ErrNetworkFailure},
-		{"bad request", 400, "", KindUnexpected, "Activation failed (HTTP 400)."},
-		{"redirect is refused", 302, "", KindUnexpected, "Activation failed (HTTP 302)."},
+		{"bad request", 400, "", KindUnexpected, tokens.ErrUnexpected},
+		{"redirect is refused", 302, "", KindUnexpected, tokens.ErrUnexpected},
 	}
 	for _, c := range cases {
 		e := newEnv(t)
@@ -364,7 +364,7 @@ func TestRenewalReplacesTheToken(t *testing.T) {
 
 func TestTrialLikeTheMac(t *testing.T) {
 	e := newEnv(t)
-	if e.m.TrialRemaining() != 3 || !e.m.CanStartSession() || e.m.AccessStatusText() != fmt.Sprintf(tokens.TrialLeftFormat, 3, 3) {
+	if e.m.TrialRemaining() != 3 || !e.m.CanStartSession() || e.m.AccessStatusText() != fmt.Sprintf(tokens.TrialLeftFormat, 3) {
 		t.Fatalf("fresh: %d %q", e.m.TrialRemaining(), e.m.AccessStatusText())
 	}
 	for id := uint64(1); id <= 3; id++ {
@@ -422,7 +422,7 @@ func TestSecondInstallAndThirdAreTheServicesBusiness(t *testing.T) {
 	e := newEnv(t)
 	e.f.status["activate"], e.f.detail["activate"] = 409, "device limit reached"
 	e.activate("WID-ORDER-12345")
-	if e.m.Snapshot().Err.Error() != "This license has reached its 2-PC activation limit." {
+	if e.m.Snapshot().Err.Error() != tokens.ErrActivationLimitReached {
 		t.Errorf("limit text: %q", e.m.Snapshot().Err.Error())
 	}
 	for _, s := range []string{tokens.ErrInvalidKey, tokens.ErrNetworkFailure, tokens.ErrEmptyKey, tokens.ErrStorageFailure, tokens.ErrCleanupFailure} {

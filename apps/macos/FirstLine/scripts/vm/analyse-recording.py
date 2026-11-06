@@ -64,7 +64,7 @@ DECLARED_LAUNCH_ASSERTION = "licensed-launch-no-activation-page"
 FORBIDDEN_LAUNCH_TEXT = [
     re.compile(r"Activate Write It Down", re.I),
     re.compile(r"Enter your license key", re.I),
-    re.compile(r"License not activated on this Mac", re.I),
+    re.compile(r"This Mac is not activated", re.I),
 ]
 # The launch stream whose own contract requires the activation page: the fixture build is
 # started to show it before activation, so only its transience is judged, never the surface.

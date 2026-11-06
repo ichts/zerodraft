@@ -405,7 +405,7 @@ struct LicenseFlowTests {
         await wrong.validateLicenseIfNeeded()
         wrong.startSession()
         #expect(wrong.selectedSurface == .upgrade)
-        #expect(wrong.licenseStatusText.contains("does not match"))
+        #expect(wrong.licenseStatusText.contains("different app"))
         func fields(_ view: NSView) -> [NSTextField] {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
@@ -559,7 +559,7 @@ struct LicenseFlowTests {
         #expect(!state.hasFullAccess)
         state.startSession()
         #expect(state.selectedSurface == .upgrade)
-        #expect(state.licenseStatusText.contains("online validation"))
+        #expect(state.licenseStatusText.contains("check your license online"))
 
         let online = AppState(settingsStore: store, licenseClient: MockLicenseClient(),
                               installIDStore: InstallIDStore(configDirectory: root), clock: { now }, productID: "prod_mock")
@@ -645,16 +645,16 @@ struct LicenseFlowTests {
         let upgradeView = upgrade.view
         let homeView = home.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "License key" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "License key" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.isEditable })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         // The cached license is already trusted, so the licensed card is shown before the
         // background check returns; only the Settings line reports that a check is running.
         #expect(fields(upgradeView).contains { $0.stringValue == "This Mac is licensed." })
-        #expect(fields(settingsView).contains { $0.stringValue == "Checking license…" })
+        #expect(fields(settingsView).contains { $0.stringValue == "Checking your license…" })
 
         await state.validateLicenseIfNeeded()
-        let status = valid ? "License active." : "License revoked. Enter a valid license key."
+        let status = valid ? "License active." : "This license is no longer valid, so enter a different license key."
         let upgradeStatus = valid ? "This Mac is licensed." : status
         for _ in 0..<50 {
             if fields(settingsView).contains(where: { $0.stringValue == status }) &&
@@ -686,13 +686,13 @@ struct LicenseFlowTests {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         let view = settings.view
-        let status = try #require(fields(view).first { $0.stringValue == "Checking license…" })
+        let status = try #require(fields(view).first { $0.stringValue == "Checking your license…" })
         let input = try #require(fields(view).first { $0.placeholderString == "License key" })
         input.stringValue = "unfinished key"
         // A failed activation cannot hijack the line of an already licensed Mac.
         await state.activateLicense(key: "BAD")
         #expect(state.licenseActivationError == .invalidKey)
-        #expect(status.stringValue == "Checking license…")
+        #expect(status.stringValue == "Checking your license…")
         await state.validateLicenseIfNeeded()
         for _ in 0..<50 {
             if status.stringValue == "License active." { break }

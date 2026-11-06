@@ -155,7 +155,7 @@ type_text() {
 }
 clock_now() { python3 -c 'import time; print(time.monotonic())'; }
 
-wait_has home 'Free trial: 3 of 3 sessions left' && pass 'fresh Mac shows "Free trial: 3 of 3 sessions left."' \
+wait_has home '3 free sessions left' && pass 'fresh Mac shows "3 free sessions left."' \
   || { bad 'fresh launch does not show 3 of 3 free sessions'; exit 1; }
 for used in 1 2 3; do
   tok="$(token radio '1 minute')"; [[ -n "$tok" ]] || { bad "no 1-minute radio (session $used)"; exit 1; }
@@ -216,7 +216,7 @@ for used in 1 2 3; do
   fi
   left=$((3 - used))
   if [[ "$left" -gt 0 ]]; then
-    wait_has "home-$used" "Free trial: $left of 3 sessions left" && pass "session $used counted; $left left" \
+    wait_has "home-$used" "$left free session" && pass "session $used counted; $left left" \
       || { bad "after session $used the home does not say $left of 3 left"; exit 1; }
   fi
 done

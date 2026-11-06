@@ -38,8 +38,9 @@ struct SnapshotTests {
             let exhaustedSettings = try trialState(used: 3)
             try snapshot(SettingsViewController(appState: exhaustedSettings), name: "settings-entry-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
+            // The rules sheet has no card: its whole surface is the sheet fill, so the corners are that fill.
             try snapshot(RulesViewController(), name: "rules-\(suffix)", appearance: appearance, output: output,
-                         sheetPoint: NSPoint(x: 100, y: 360))
+                         cornerFill: FirstLineColors.sheetNSColor)
             try snapshot(HomeViewController(appState: try trialState(used: 2)), name: "picker-focus-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360), focus: true)
             try snapshot(UpgradeViewController(appState: try trialState(used: 3)), name: "activation-focus-\(suffix)",
@@ -313,7 +314,7 @@ struct SnapshotTests {
     private func snapshot(_ controller: NSViewController, name: String, appearance: NSAppearance.Name,
                           output: URL?, sheetPoint: NSPoint? = nil, paperPoint: NSPoint? = nil,
                           washPoint: (point: NSPoint, fraction: CGFloat)? = nil,
-                          focus: Bool = false) throws {
+                          focus: Bool = false, cornerFill: NSColor = FirstLineColors.pageNSColor) throws {
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: appearance)
@@ -342,11 +343,11 @@ struct SnapshotTests {
             let data = try #require(rep.representation(using: .png, properties: [:]))
             try data.write(to: output.appendingPathComponent("\(name).png"))
         }
-        try assertPixel(rep, at: NSPoint(x: 4, y: 4), equals: FirstLineColors.pageNSColor, in: appearance, name: name)
+        try assertPixel(rep, at: NSPoint(x: 4, y: 4), equals: cornerFill, in: appearance, name: name)
         // The right edge can carry a vertical scroller in a tall settings card;
         // sample the other left-page corner instead of the scroller track.
         try assertPixel(rep, at: NSPoint(x: 4, y: rep.pixelsHigh - 5),
-                        equals: FirstLineColors.pageNSColor, in: appearance, name: name)
+                        equals: cornerFill, in: appearance, name: name)
         if let sheetPoint {
             let scale = CGFloat(rep.pixelsWide) / size.width
             try assertPixel(rep, at: NSPoint(x: sheetPoint.x * scale, y: sheetPoint.y * scale),

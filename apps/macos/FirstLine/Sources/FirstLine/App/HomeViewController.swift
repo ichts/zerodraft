@@ -40,10 +40,13 @@ final class HomeViewController: NSViewController {
     private func buildInterface() {
         let card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 44, left: 48, bottom: 44, right: 48))
         view.addSubview(card)
+        // 560 is the resting width; a longer label widens the card instead of squeezing a segment.
+        let restingWidth = card.widthAnchor.constraint(equalToConstant: 560)
+        restingWidth.priority = .defaultHigh
         NSLayoutConstraint.activate([
+            restingWidth,
             card.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
             card.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
-            card.widthAnchor.constraint(equalToConstant: 560),
             card.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 32),
             card.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -32),
         ])

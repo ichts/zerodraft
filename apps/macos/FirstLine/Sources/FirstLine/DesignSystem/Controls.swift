@@ -134,6 +134,7 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
         font = .systemFont(ofSize: 14, weight: .medium)
         inkFocusRingInset = 2
         inkFocusRingCornerRadius = 19
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         wantsLayer = true
         setAccessibilityRole(.radioButton)
     }

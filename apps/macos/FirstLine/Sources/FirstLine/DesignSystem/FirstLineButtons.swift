@@ -45,6 +45,9 @@ enum FirstLineButtons {
         button.bezelStyle = .inline
         button.font = FirstLineTypography.uiSemiboldNSFont
         button.roomMotion = roomMotion
+        // A pill is as wide as its label plus its padding and never narrower: when a row runs out of room
+        // the card around it grows, the label is not squeezed (mac design audit A5).
+        button.setContentCompressionResistancePriority(.required, for: .horizontal)
         button.wantsLayer = true
         let resolvedHeight = height ?? role.height
         button.layer?.cornerRadius = resolvedHeight / 2

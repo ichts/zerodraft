@@ -51,6 +51,8 @@ struct LicenseEntitlementTests {
         #expect(fields.contains { $0.stringValue == "Activate Write It Down" })
         #expect(fields.contains { $0.stringValue == "License key" })
         #expect(!fields.contains { $0.placeholderString != nil }, "the card names its field with the label, not a placeholder")
+        let entry = try #require(fields.first { $0.isEditable })
+        #expect(entry.accessibilityLabel() == "License key")
         let buttons = descendants(screen.view, of: NSButton.self)
         #expect(!buttons.contains { $0.title == "Back to Home" || $0.title == "Begin" })
         let trial = try #require(buttons.first { $0.title == "Try the free web room" })

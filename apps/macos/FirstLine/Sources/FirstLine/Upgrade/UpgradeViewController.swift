@@ -80,6 +80,7 @@ final class UpgradeViewController: NSViewController {
         licenseField.isBezeled = true
         licenseField.bezelStyle = .roundedBezel
         licenseField.focusRingType = .default
+        licenseField.setAccessibilityLabel("License key")
         licenseField.target = self
         licenseField.action = #selector(activateTapped)
         licenseField.cell?.sendsActionOnEndEditing = false

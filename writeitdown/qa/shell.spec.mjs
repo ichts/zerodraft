@@ -267,17 +267,53 @@ test('the release route server answers a missing page with 404', async ({ reques
   }
 });
 
-test('404.html is the document shell with one sentence, one link home and noindex', async ({ page }) => {
+test('404.html is the document shell with one link home and noindex', async ({ page }) => {
   await page.goto('404.html');
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
   await expect(page.locator('main.doc h1')).toHaveText('Page not found');
-  await expect(page.locator('main.doc p')).toHaveCount(2);
+  await expect(page.locator('main.doc p')).toHaveCount(1);
+  await expect(page.locator('main.doc')).not.toContainText('There is no page at this address.');
   await expect(page.locator('main.doc a')).toHaveCount(1);
   await expect(page.locator('main.doc a')).toHaveAttribute('href', '/');
   const shell = await readShell(page);
   expect(shell.brandTop, '404 header lockup sits where the other pages put it').toBeGreaterThan(0);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow, '404 does not overflow horizontally').toBeLessThanOrEqual(0);
+});
+
+test('footers keep Contact without repeating its address in the copy row', async ({ page }) => {
+  for (const path of [...pages, '404.html']) {
+    await page.goto(path);
+    await expect(page.locator('.home-foot .copy span')).toHaveText(['© 2026 Trefoil Studio']);
+    await expect(page.locator('.home-foot a[href="mailto:contact@trefoilstudio.com"]')).toHaveText('Contact');
+  }
+});
+
+test('support keeps each answer once and lists the six answer links without separator dots', async ({ page }) => {
+  await page.goto('support.html');
+  const main = page.locator('main.doc');
+  await expect(main).not.toContainText('You can ask ChatGPT for Write It Down:');
+  expect((await main.innerText()).match(/A wiped or closed draft cannot be recovered\./g)).toHaveLength(1);
+  const list = page.locator('#answers + ul');
+  await expect(list.locator(':scope > li')).toHaveCount(6);
+  await expect(list).not.toContainText('·');
+  expect(await list.locator('a').evaluateAll(links => links.map(link => [link.textContent, link.getAttribute('href')]))).toEqual([
+    ['What is Write It Down?', 'what-is-write-it-down.html'],
+    ['Mac app or web room', 'write-it-down-mac-vs-web.html'],
+    ['How the free trial works', 'write-it-down-free-trial.html'],
+    ['Price and license', 'write-it-down-price.html'],
+    ['Deleting a draft', 'delete-a-draft.html'],
+    ['Whether writing is saved', 'is-my-writing-saved.html'],
+  ]);
+  const boxes = await list.locator('a').evaluateAll(links => links.map(link => {
+    const box = link.getBoundingClientRect();
+    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
+  }));
+  for (const [index, box] of boxes.entries()) {
+    expect(box.left).toBeCloseTo(boxes[0].left, 0);
+    expect(box.right).toBeLessThanOrEqual(page.viewportSize().width);
+    if (index > 0) expect(box.top).toBeGreaterThanOrEqual(boxes[index - 1].bottom);
+  }
 });
 
 test('the phone room nav keeps only the theme icon, and the Mac link moves into the exit row', async ({ page }, info) => {
@@ -336,7 +372,7 @@ test('every page puts its content on the header grid at 1440, 1024 and 390', asy
     const blocks = [...document.querySelector('main').children]
       .filter(child => child.getClientRects().length)
       .map(child => {
-        const box = edges(child);
+        const box = child.getBoundingClientRect();
         return {
           tag: child.tagName.toLowerCase() + (child.className ? `.${String(child.className).split(' ')[0]}` : ''),
           left: +(box.left - header.left).toFixed(1),

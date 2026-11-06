@@ -673,6 +673,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   await expect(page.locator('#landing h2')).toHaveText([
     /What it feels like when you stop/, /Sixty seconds\. Forward only\. Nothing kept\./,
     'Write It Down for Mac', 'Questions, answered']);
+  await expect(page.locator('#core > p.sub, #how > p.sub')).toHaveCount(0);
   const questions = page.locator('#faq details');
   await expect(questions).toHaveCount(8);
   await expect(questions.first()).toHaveAttribute('open', '');

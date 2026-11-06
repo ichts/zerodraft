@@ -73,7 +73,7 @@ final class UpgradeViewController: NSViewController {
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = "WID-XXXX-XXXX"
+        licenseField.placeholderString = AppState.licenseFieldPlaceholder
         licenseField.font = FirstLineTypography.fieldNSFont
         licenseField.textColor = FirstLineColors.inkNSColor
         licenseField.backgroundColor = FirstLineColors.sheetNSColor
@@ -183,7 +183,7 @@ final class UpgradeViewController: NSViewController {
                 feedbackLabel.isHidden = true
             }
         } else if appState.licenseActivationInFlight {
-            feedbackLabel.stringValue = "Checking your key..."
+            feedbackLabel.stringValue = "Checking your key…"
             feedbackLabel.isHidden = false
         } else {
             feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
@@ -209,7 +209,7 @@ final class UpgradeViewController: NSViewController {
         // path is not settled yet; never present it as available before then.
         buyButton.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight && !checking
         buyButton.title = appState.checkoutInFlight
-            ? "Opening checkout..."
+            ? "Opening checkout…"
             : "Buy a license, \(AppState.displayPrice) once"
     }
 

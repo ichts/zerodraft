@@ -29,6 +29,8 @@ final class AppState {
         if Bundle.main.bundleURL.pathExtension == "app" { return Bundle.main.infoDictionary ?? [:] }
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
+    /// The one placeholder of the licence field, on the activation card and in Settings.
+    static let licenseFieldPlaceholder = "Order number or activation code"
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
     /// Marketing version shown in Settings > About; the same configuration source as the price,
     /// so a bare executable (swift run, tests) reports the tracked Info.plist instead of a placeholder.
@@ -548,7 +550,7 @@ final class AppState {
     }
 
     var licenseStatusText: String {
-        if licenseValidationInFlight { return "Checking license..." }
+        if licenseValidationInFlight { return "Checking license…" }
         if settings.licenseKey != nil && settings.licenseInstanceID == nil {
             return "License not activated on this Mac. Enter your order number or activation code."
         }

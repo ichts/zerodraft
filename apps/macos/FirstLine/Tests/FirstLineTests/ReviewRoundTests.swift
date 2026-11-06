@@ -146,7 +146,6 @@ struct ReviewRoundTests {
         settings.view.displayIfNeeded()
         let labels = visibleLabels(in: settings.view)
         let status = try #require(labels.first { $0.stringValue == "Activate this Mac to start writing." })
-        let explanation = try #require(labels.first { $0.stringValue.hasPrefix("Enter your order number") })
         let field = try #require(descendants(of: settings.view, of: NSTextField.self)
             .first { $0.placeholderString == "Order number or activation code" })
         let activate = try #require(descendants(of: settings.view, of: NSButton.self).first { $0.title == "Activate" })
@@ -156,9 +155,12 @@ struct ReviewRoundTests {
         let theme = try #require(descendants(of: settings.view, of: NSPopUpButton.self).first)
 
         let statusFrame = settings.view.convert(status.bounds, from: status)
-        let explanationFrame = settings.view.convert(explanation.bounds, from: explanation)
-        #expect(abs(statusFrame.minX - explanationFrame.minX) <= 1, "license text is not left-aligned")
+        let heading = try #require(labels.first { $0.stringValue == "License" })
+        let headingFrame = settings.view.convert(heading.bounds, from: heading)
+        #expect(abs(statusFrame.minX - headingFrame.minX) <= 1, "license text is not left-aligned")
         #expect(!field.isHidden)
+        #expect(!labels.contains { $0.stringValue.hasPrefix("Enter your order number") },
+                "the field is named twice: a sentence above a placeholder that says the same")
 
         let activateFrame = settings.view.convert(activate.bounds, from: activate)
         let buyFrame = settings.view.convert(buy.bounds, from: buy)

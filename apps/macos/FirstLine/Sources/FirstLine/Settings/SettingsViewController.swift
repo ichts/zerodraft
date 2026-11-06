@@ -24,7 +24,6 @@ final class SettingsViewController: NSViewController {
     private var licenseStatusLabel: NSTextField!
     private var licenseCleanupWarningLabel: NSTextField!
     private var licenseEntryView: NSView?
-    private var licenseExplanationLabel: NSTextField?
     private var buyPageButton: NSButton?
     private var checkoutStatusLabel: NSTextField?
     private var licenseDetails: [NSTextField] = []
@@ -197,13 +196,8 @@ final class SettingsViewController: NSViewController {
         entry.addArrangedSubview(divider)
         entry.setCustomSpacing(14, after: divider)
 
-        let explanation = muted("Enter your order number or activation code to activate this Mac.")
-        licenseExplanationLabel = explanation
-        entry.addArrangedSubview(explanation)
-        entry.setCustomSpacing(10, after: explanation)
-
         let field = NSTextField(string: "")
-        field.placeholderString = "Order number or activation code"
+        field.placeholderString = AppState.licenseFieldPlaceholder
         field.font = FirstLineTypography.uiNSFont
         field.focusRingType = .default
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -260,11 +254,10 @@ final class SettingsViewController: NSViewController {
             label.isHidden = !active || value == nil
         }
         licenseEntryView?.isHidden = active
-        licenseExplanationLabel?.isHidden = !active ? false : true
         buyPageButton?.isHidden = active
         buyPageButton?.isEnabled = appState.checkoutAvailable && !appState.checkoutInFlight
         buyPageButton?.title = appState.checkoutInFlight
-            ? "Opening checkout..."
+            ? "Opening checkout…"
             : "Buy a license, \(AppState.displayPrice) once"
         checkoutStatusLabel?.isHidden = !active && appState.checkoutAvailable
         activateButton?.isEnabled = !checking
@@ -441,7 +434,7 @@ final class SettingsViewController: NSViewController {
     @objc private func activateTapped() {
         guard let licenseField, let activateButton else { return }
         activateButton.isEnabled = false
-        licenseStatusLabel.stringValue = "Activating..."
+        licenseStatusLabel.stringValue = "Activating…"
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: licenseField.stringValue)

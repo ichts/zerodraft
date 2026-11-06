@@ -167,7 +167,7 @@ struct TrialReleaseTests {
         let fields = descendants(screen.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "A license is required to keep writing on this Mac." })
         #expect(fields.contains { $0.stringValue == "Order number or activation code" })
-        #expect(fields.contains { $0.placeholderString == "WID-XXXX-XXXX" })
+        #expect(fields.contains { $0.placeholderString == "Order number or activation code" })
         let buy = try #require(descendants(screen.view, of: NSButton.self).first { $0.title.hasPrefix("Buy a license") })
         #expect(buy.isEnabled)
         buy.performClick(nil)

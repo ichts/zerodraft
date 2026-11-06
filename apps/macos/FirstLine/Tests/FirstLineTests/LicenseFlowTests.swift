@@ -645,13 +645,13 @@ struct LicenseFlowTests {
         let upgradeView = upgrade.view
         let homeView = home.view
         let settingsKey = try #require(fields(settingsView).first { $0.placeholderString == "Order number or activation code" })
-        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "WID-XXXX-XXXX" })
+        let upgradeKey = try #require(fields(upgradeView).first { $0.placeholderString == "Order number or activation code" })
         settingsKey.stringValue = "unfinished key"
         upgradeKey.stringValue = "unfinished key"
         // The cached license is already trusted, so the licensed card is shown before the
         // background check returns; only the Settings line reports that a check is running.
         #expect(fields(upgradeView).contains { $0.stringValue == "This Mac is licensed." })
-        #expect(fields(settingsView).contains { $0.stringValue == "Checking license..." })
+        #expect(fields(settingsView).contains { $0.stringValue == "Checking license…" })
 
         await state.validateLicenseIfNeeded()
         let status = valid ? "License active." : "License revoked. Enter a valid order number or activation code."
@@ -686,13 +686,13 @@ struct LicenseFlowTests {
             ((view as? NSTextField).map { [$0] } ?? []) + view.subviews.flatMap(fields)
         }
         let view = settings.view
-        let status = try #require(fields(view).first { $0.stringValue == "Checking license..." })
+        let status = try #require(fields(view).first { $0.stringValue == "Checking license…" })
         let input = try #require(fields(view).first { $0.placeholderString == "Order number or activation code" })
         input.stringValue = "unfinished key"
         // A failed activation cannot hijack the line of an already licensed Mac.
         await state.activateLicense(key: "BAD")
         #expect(state.licenseActivationError == .invalidKey)
-        #expect(status.stringValue == "Checking license...")
+        #expect(status.stringValue == "Checking license…")
         await state.validateLicenseIfNeeded()
         for _ in 0..<50 {
             if status.stringValue == "License active." { break }

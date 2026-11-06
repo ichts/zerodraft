@@ -372,7 +372,7 @@ test('every page puts its content on the header grid at 1440, 1024 and 390', asy
     const blocks = [...document.querySelector('main').children]
       .filter(child => child.getClientRects().length)
       .map(child => {
-        const box = edges(child);
+        const box = child.getBoundingClientRect();
         return {
           tag: child.tagName.toLowerCase() + (child.className ? `.${String(child.className).split(' ')[0]}` : ''),
           left: +(box.left - header.left).toFixed(1),

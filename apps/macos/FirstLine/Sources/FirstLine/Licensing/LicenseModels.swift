@@ -43,7 +43,7 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
             return "We could not connect, so check your internet connection and try again."
         case .emptyKey:
             return "Enter your license key."
-        case .unexpected(let statusCode):
+        case .unexpected:
             return "Activation did not work, so try again in a moment or contact support if it keeps happening."
         case .storageFailure:
             return "We could not save your license on this Mac, so check your disk and try again."

@@ -131,7 +131,7 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
         translatesAutoresizingMaskIntoConstraints = false
         isBordered = false
         bezelStyle = .inline
-        font = .systemFont(ofSize: 14, weight: .medium)
+        font = FirstLineTypography.smallMediumNSFont
         inkFocusRingInset = 2
         inkFocusRingCornerRadius = 19
         wantsLayer = true

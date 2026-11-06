@@ -177,7 +177,9 @@ struct ReviewRoundTests {
         // its cell inset (4 pt), which is normal macOS chrome, not a column drift.
         let themeRight = settings.view.convert(theme.alignmentRect(forFrame: theme.frame),
                                                from: theme.superview).maxX
-        #expect(abs(doneRight - contentRight) <= 1)
+        // Done's 44 pt target leans out past the content edge by its padding so the word itself stays on it
+        // (A6); its word's edge is asserted in `pickerSegmentsShareTheSmallSizeAndDoneIsATarget`.
+        #expect(abs(doneRight - contentRight - 4) <= 1)
         #expect(abs(themeRight - contentRight) <= 1, "appearance controls do not reach the card content edge")
         #expect(abs(buyFrame.maxX - contentRight) <= 1, "the license controls do not align with Done")
 

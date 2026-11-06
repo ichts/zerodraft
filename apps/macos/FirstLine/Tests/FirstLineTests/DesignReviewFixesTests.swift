@@ -171,7 +171,7 @@ struct DesignReviewFixesTests {
         try await Task.sleep(for: .milliseconds(200))
         available.view.layoutSubtreeIfNeeded()
         #expect(!buy.isEnabled, "Buy is still offered while a key is being checked")
-        #expect(visibleStrings(in: available.view).contains("Checking your key..."))
+        #expect(visibleStrings(in: available.view).contains("Checking your key…"))
         let free = try #require(descendants(of: available.view, as: NSButton.self)
             .first { $0.title == "Try the free web room" })
         #expect(free.isEnabled && !free.isHiddenOrHasHiddenAncestor,
@@ -301,6 +301,39 @@ struct DesignReviewFixesTests {
         let switchRight = try #require(descendants(of: settings.view, as: FirstLineInkSwitch.self).first)
         let switchEdge = settings.view.convert(NSPoint(x: switchRight.bounds.maxX, y: 0), from: switchRight).x
         #expect(abs(wordRight - switchEdge) <= 2.5, "Done's word ends at \(wordRight), the switches at \(switchEdge)")
+        window.orderOut(nil)
+    }
+
+    // MARK: - Activation and Settings mechanics (mac design audit A4)
+
+    /// One field, one placeholder, on both surfaces; and no second sentence naming it above the field.
+    @Test func activationAndSettingsShareOnePlaceholder() throws {
+        let upgrade = UpgradeViewController(appState: try exhaustedState(checkoutConfigured: true))
+        let settings = SettingsViewController(appState: try exhaustedState(checkoutConfigured: true))
+        let window = host(settings, size: NSSize(width: 1040, height: 720))
+        let upgradeField = try #require(descendants(of: upgrade.view, as: NSTextField.self)
+            .first { $0.placeholderString != nil })
+        let settingsField = try #require(descendants(of: settings.view, as: NSTextField.self)
+            .first { $0.placeholderString != nil })
+        #expect(upgradeField.placeholderString == settingsField.placeholderString)
+        #expect(settingsField.placeholderString == "Order number or activation code")
+        #expect(!visibleStrings(in: settings.view).contains { $0.hasPrefix("Enter your order number") })
+        window.orderOut(nil)
+    }
+
+    /// The status line is its text: no 8 pt grey square in front of it.
+    @Test func statusLineHasNoDot() throws {
+        let status = FirstLineStatusView(text: "One payment. 2 Macs. 14-day refund.")
+        let window = host(NSViewController(), size: NSSize(width: 400, height: 100))
+        status.translatesAutoresizingMaskIntoConstraints = false
+        window.contentView?.addSubview(status)
+        NSLayoutConstraint.activate([status.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor),
+                                     status.topAnchor.constraint(equalTo: window.contentView!.topAnchor)])
+        window.contentView?.layoutSubtreeIfNeeded()
+        let label = try #require(descendants(of: status, as: NSTextField.self).first)
+        #expect(status.subviews.count == 1, "the status line carries more than its text: \(status.subviews)")
+        let edge = label.alignmentRect(forFrame: label.frame).minX
+        #expect(abs(edge) <= 0.5, "the text starts \(edge) pt in, a mark still reserves room")
         window.orderOut(nil)
     }
 

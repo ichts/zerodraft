@@ -275,7 +275,6 @@ final class FirstLineStatusView: NSView {
     enum Tone { case neutral, bad }
 
     private let label = NSTextField(labelWithString: "")
-    private let dot = NSView()
     private var tone: Tone = .neutral
 
     init(text: String = "", tone: Tone = .neutral) {
@@ -283,23 +282,14 @@ final class FirstLineStatusView: NSView {
         translatesAutoresizingMaskIntoConstraints = false
         self.tone = tone
 
-        dot.translatesAutoresizingMaskIntoConstraints = false
-        dot.wantsLayer = true
-        dot.layer?.cornerRadius = 2
-
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = .systemFont(ofSize: 13)
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         label.stringValue = text
-        addSubview(dot)
         addSubview(label)
         NSLayoutConstraint.activate([
-            dot.leadingAnchor.constraint(equalTo: leadingAnchor),
-            dot.topAnchor.constraint(equalTo: topAnchor, constant: 6),
-            dot.widthAnchor.constraint(equalToConstant: 8),
-            dot.heightAnchor.constraint(equalToConstant: 8),
-            label.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 8),
+            label.leadingAnchor.constraint(equalTo: leadingAnchor),
             label.trailingAnchor.constraint(equalTo: trailingAnchor),
             label.topAnchor.constraint(equalTo: topAnchor),
             label.bottomAnchor.constraint(equalTo: bottomAnchor),
@@ -320,7 +310,7 @@ final class FirstLineStatusView: NSView {
 
     override var intrinsicContentSize: NSSize {
         let labelSize = label.intrinsicContentSize
-        return NSSize(width: labelSize.width + 16, height: max(18, labelSize.height))
+        return NSSize(width: labelSize.width, height: max(18, labelSize.height))
     }
 
     override func viewDidMoveToWindow() {
@@ -334,10 +324,6 @@ final class FirstLineStatusView: NSView {
     }
 
     private func applyTone() {
-        let color = tone == .bad ? FirstLineColors.redNSColor : FirstLineColors.inkNSColor
         label.textColor = tone == .bad ? FirstLineColors.redNSColor : FirstLineColors.chromeNSColor
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            dot.layer?.backgroundColor = color.withAlphaComponent(tone == .bad ? 1 : 0.35).cgColor
-        }
     }
 }

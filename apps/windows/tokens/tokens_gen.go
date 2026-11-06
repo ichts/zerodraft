@@ -145,7 +145,7 @@ const (
 	UpgradeSubtitle             = "A license is required to keep writing on this PC."
 	UpgradeSubtitleLicensed     = "This PC is licensed."
 	UpgradeFieldLabel           = "Order number or activation code"
-	UpgradePlaceholder          = "WID-XXXX-XXXX"
+	UpgradePlaceholder          = "Order number or activation code"
 	UpgradeActivate             = "Activate"
 	UpgradeActivating           = "Activating"
 	UpgradeStartWriting         = "Start writing"
@@ -154,9 +154,9 @@ const (
 	UpgradeCheckoutNote         = "Checkout opens in your browser. Payment is handled by Stripe."
 	UpgradeCheckoutUnavailable  = "Checkout is not available yet."
 	UpgradeWebTrial             = "Try the free web room"
-	UpgradeChecking             = "Checking your key..."
+	UpgradeChecking             = "Checking your key…"
 	UpgradeBuyFormat            = "Buy a license, %s once"
-	UpgradeOpeningCheckout      = "Opening checkout..."
+	UpgradeOpeningCheckout      = "Opening checkout…"
 	UpgradeCleanupActive        = "License active on this PC."
 	RulesBodyLeading            = 1.5
 	RulesCardInset              = 44
@@ -167,7 +167,7 @@ const (
 	ChipEmHeight                = 1.046
 	ChipCornerShare             = 0.2233
 	ChipPickerTypeSize          = 21
-	StatusChecking              = "Checking license..."
+	StatusChecking              = "Checking license…"
 	StatusNotActivated          = "License not activated on this PC. Enter your order number or activation code."
 	StatusNeedsValidation       = "License needs online validation. Reopen the app when connected."
 	StatusWrongProduct          = "License does not match the configured writeitdown product."
@@ -193,7 +193,6 @@ const (
 	SettingsDone                = "Done"
 	SettingsLicense             = "License"
 	SettingsAbout               = "About"
-	SettingsExplanation         = "Enter your order number or activation code to activate this PC."
 	SettingsFieldPlaceholder    = "Order number or activation code"
 	SettingsActivated           = "Activated %s"
 	SettingsLastValidated       = "Last validated %s"

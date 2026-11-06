@@ -115,14 +115,13 @@ func link(c *ui.Context, p pal, label string) ui.Element {
 	return button.Ghost(c, label).Padding(4, 8).FontSize(13).FontWeight(500).TextColor(p.chrome()).AlignSelf(ui.Center)
 }
 
-// status is the dot-and-sentence line (FirstLineStatusView).
+// status is the sentence line (FirstLineStatusView): its text alone, no leading mark.
 func status(c *ui.Context, p pal, s string, bad bool, maxW float32) {
-	dot, tc := room.Alpha(p.ink(), 0.35), p.chrome()
+	tc := p.chrome()
 	if bad {
-		dot, tc = p.of(tokens.Red), p.of(tokens.Red)
+		tc = p.of(tokens.Red)
 	}
-	ui.Row(c).AlignItems(ui.Start).Gap(8).MaxWidth(maxW).Children(func() {
-		ui.Box(c).Size(8, 8).Radius(2).Background(dot).Margin(6, 0, 0, 0)
+	ui.Row(c).AlignItems(ui.Start).MaxWidth(maxW).Children(func() {
 		text(c, s, 13, 400, tc).LineHeight(1.35)
 	})
 }
@@ -416,8 +415,6 @@ func (a *App) settingsView(c *ui.Context, dark bool) {
 					gap(c, 14)
 					ui.Divider(c).Width(464).Background(p.of(tokens.Hair))
 					gap(c, 14)
-					text(c, tokens.SettingsExplanation, 13, 400, p.mute())
-					gap(c, 10)
 					field := a.field(c, p, &a.key, tokens.SettingsFieldPlaceholder)
 					if field.Changed() {
 						a.lic.ClearActivationError()

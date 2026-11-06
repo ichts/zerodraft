@@ -99,6 +99,18 @@ func (g *rig) click(label string) {
 	}
 }
 
+// clickKeyField focuses the licence field. Its label above it and its placeholder say the same words (one
+// string on both surfaces), so a click by text would land on the label; the field is the 44 DIP box 8 DIPs
+// under the label, centred on the card.
+func (g *rig) clickKeyField() {
+	g.t.Helper()
+	label, ok := g.tt.Find(tokens.UpgradeFieldLabel)
+	if !ok {
+		g.t.Fatalf("no field label on screen: %q", g.tt.Texts())
+	}
+	g.tt.ClickAt(520, label.Y+label.H+8+22)
+}
+
 func (g *rig) wantText(s string) {
 	g.t.Helper()
 	if !g.tt.HasText(s) {
@@ -204,7 +216,7 @@ func TestActivationFlow(t *testing.T) {
 		403: tokens.ErrInvalidKey, 404: tokens.ErrInvalidKey, 503: tokens.ErrNetworkFailure, 400: "Activation failed (HTTP 400).",
 	} {
 		g.svc.Status["activate"] = status
-		g.click(tokens.UpgradePlaceholder)
+		g.clickKeyField()
 		g.tt.Type("WID-ORDER-1234")
 		g.click("Activate")
 		g.wantText(want)
@@ -212,7 +224,7 @@ func TestActivationFlow(t *testing.T) {
 		g.tt.Key(0, ui.KeyBackspace)
 	}
 	g.svc.Status["activate"], g.svc.Detail["activate"] = 409, "device limit reached"
-	g.click(tokens.UpgradePlaceholder)
+	g.clickKeyField()
 	g.tt.Type("WID-ORDER-1234")
 	g.click("Activate")
 	g.wantText("This license has reached its 2-PC activation limit.")
@@ -287,7 +299,7 @@ func TestSettingsRulesAndTheOtherScreensRender(t *testing.T) {
 	g.click("Close how it works")
 	g.click("Settings")
 	g.wantText("License")
-	g.wantText(tokens.SettingsExplanation)
+	g.wantText(tokens.SettingsFieldPlaceholder)
 	g.snap("settings-unlicensed")
 	g.click("Done")
 	if g.a.Surface() != Home {
@@ -360,7 +372,7 @@ func TestActivationInFlightSaysCheckingYourKey(t *testing.T) {
 	vault.Set("state", licence.State{TrialSessionsUsed: 3, Status: licence.Inactive}.Marshal())
 	g := newRigWith(t, vault, nil)
 	g.svc.Status["activate"] = 503
-	g.click(tokens.UpgradePlaceholder)
+	g.clickKeyField()
 	g.tt.Type("WID-ORDER-1234")
 	snap := g.a.Licence().Snapshot()
 	if snap.Activating {

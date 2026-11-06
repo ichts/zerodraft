@@ -20,7 +20,7 @@ final class RulesViewController: NSViewController {
         let character = ("0" as NSString).size(withAttributes: [.font: bodyFont]).width
         return (60 * character).rounded()
     }
-    /// The card carries the measure plus the same 44 pt inset on both sides.
+    /// The sheet is the measure plus the same 44 pt inset on both sides.
     static let cardInset: CGFloat = 44
     static var cardWidth: CGFloat { bodyMeasure + cardInset * 2 }
     static let contentInsets = NSEdgeInsets(top: 40, left: cardInset, bottom: 36, right: cardInset)
@@ -132,7 +132,7 @@ final class RulesViewController: NSViewController {
     }
 
     /// Readable body text: the scale's body face, its 1.5 leading and the 60ch measure,
-    /// left-aligned on the card's content edge.
+    /// left-aligned on the content edge.
     private func body(_ text: String, color: NSColor) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: text)
         field.translatesAutoresizingMaskIntoConstraints = false

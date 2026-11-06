@@ -119,13 +119,25 @@ final class SettingsViewController: NSViewController {
         fill.isActive = true
     }
 
+    /// Half the Done target's growth past its 13 pt word (46 pt frame around a 38 pt word).
+    private static let doneTargetOverhang: CGFloat = 4
+
     private func header() -> NSView {
         let heading = NSTextField(labelWithString: "Settings")
         heading.translatesAutoresizingMaskIntoConstraints = false
         heading.font = FirstLineTypography.displayNSFont(size: 28)
         heading.textColor = FirstLineColors.inkNSColor
         let done = FirstLineButtons.link(title: "Done", target: self, action: #selector(doneTapped))
-        return horizontal(views: [heading, spacer(), done])
+        // The glyph stays 13 pt; the control's own frame is the hit area, so it is a comfortable target.
+        NSLayoutConstraint.activate([
+            done.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            done.heightAnchor.constraint(greaterThanOrEqualToConstant: 28),
+        ])
+        let row = horizontal(views: [heading, spacer(), done])
+        // The target grows around the glyph, so the row leans out by the padding and the word keeps
+        // its right edge on the rows' (the switches') edge.
+        row.edgeInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: -Self.doneTargetOverhang)
+        return row
     }
 
     private func updatesSection() -> NSView? {

@@ -271,6 +271,39 @@ struct DesignReviewFixesTests {
         window.orderOut(nil)
     }
 
+    // MARK: - Segment font and Done target (mac design audit A6)
+
+    /// The picker uses three text sizes (13, 15 and the 34 pt title), not 13, 14 and 15; and Settings' Done
+    /// is a 44 x 28 target around the same 13 pt glyph.
+    @Test func pickerSegmentsShareTheSmallSizeAndDoneIsATarget() throws {
+        let home = HomeViewController(appState: try exhaustedState(checkoutConfigured: true, used: 1))
+        let homeWindow = host(home, size: NSSize(width: 1040, height: 720))
+        let segments = descendants(of: home.view, as: NSButton.self).filter { $0.title == "5" || $0.title.hasPrefix("Strict") }
+        #expect(segments.count == 2)
+        for segment in segments {
+            #expect(segment.font?.pointSize == FirstLineTypography.smallNSFont.pointSize,
+                    "segment '\(segment.title)' is \(String(describing: segment.font?.pointSize)) pt")
+        }
+        let sizes = Set(descendants(of: home.view, as: NSTextField.self).compactMap { $0.font?.pointSize }
+            + descendants(of: home.view, as: NSButton.self).filter { !$0.isHiddenOrHasHiddenAncestor }.compactMap { $0.font?.pointSize })
+        #expect(!sizes.contains(14), "the picker still draws a 14 pt label: \(sizes.sorted())")
+        homeWindow.orderOut(nil)
+
+        let settings = SettingsViewController(appState: try exhaustedState(checkoutConfigured: true),
+                                              updateSettings: StubUpdateSettings())
+        let window = host(settings, size: NSSize(width: 1040, height: 720))
+        let done = try #require(descendants(of: settings.view, as: NSButton.self).first { $0.title == "Done" })
+        #expect(done.frame.width >= 44 && done.frame.height >= 28, "Done is \(done.frame.size)")
+        #expect(done.font?.pointSize == 13)
+        // The word keeps its right edge on the switches' edge (within the button's own 1.6 pt text padding): the target grew around it, not to its left.
+        let word = NSAttributedString(string: "Done", attributes: [.font: try #require(done.font)]).size().width
+        let wordRight = settings.view.convert(NSPoint(x: done.bounds.midX + word / 2, y: 0), from: done).x
+        let switchRight = try #require(descendants(of: settings.view, as: FirstLineInkSwitch.self).first)
+        let switchEdge = settings.view.convert(NSPoint(x: switchRight.bounds.maxX, y: 0), from: switchRight).x
+        #expect(abs(wordRight - switchEdge) <= 2.5, "Done's word ends at \(wordRight), the switches at \(switchEdge)")
+        window.orderOut(nil)
+    }
+
     // MARK: - Problem 21: the rules sheet follows the type scale
 
     @Test func rulesSheetUsesTheScaleForLeadingAndSubheads() throws {

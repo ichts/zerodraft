@@ -101,7 +101,7 @@ enum MainMenuBuilder {
         let navigateMenu = NSMenu(title: "Navigate")
         navigateMenuItem.submenu = navigateMenu
 
-        let newItem = NSMenuItem(title: "New Piece", action: #selector(FirstLineAppDelegate.newPiece(_:)), keyEquivalent: "n")
+        let newItem = NSMenuItem(title: "Begin", action: #selector(FirstLineAppDelegate.newPiece(_:)), keyEquivalent: "n")
         newItem.target = validationOwner
         navigateMenu.addItem(newItem)
         let copyItem = NSMenuItem(title: "Copy Kept Text", action: #selector(FirstLineAppDelegate.copyKept(_:)), keyEquivalent: "c")

@@ -64,7 +64,7 @@ type App struct {
 
 	// the activation and settings fields
 	key        string
-	emptyShown bool // the "Enter your order number ... first." line of the upgrade card
+	emptyShown bool // the "Enter your license key first." line of the upgrade card
 	ui         uiState
 }
 

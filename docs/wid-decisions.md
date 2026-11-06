@@ -1678,3 +1678,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `#E9E2CE` (was 7.21:1), so the 7:1 floor of D-069 holds with more margin. Bound tests:
   `PaperContrastTests.theLightQuietGreyIsWarm`, `everyTextRoleClearsSevenToOneOnTheSheet`.
 - Supersedes: D-069's light quiet value `#464746` on the Mac only; D-069's contrast floor stands.
+
+## D-085: One verb for beginning a session, one noun for what the buyer types
+
+- Date: 2026-11-06
+- Decision: starting a writing session is `Begin`, and starting another one is `Begin again`, on the
+  Mac, the web and Windows. `RUN IT AGAIN` becomes `BEGIN AGAIN` (the kept screen keeps its capitals),
+  the Navigate menu's `New Piece` becomes `Begin`, the licensed card's `Start writing` becomes `Begin`,
+  the web trial's `Run it again` link becomes `Begin again`, and the empty-room prompt `Type to start`
+  becomes `Type to begin` (the wipe line's `Type to restart.` becomes `Type to begin again.`). What the
+  buyer types into the activation field and Settings is a license key: the field label, the one placeholder,
+  the empty-field and checking feedback and the access status lines all say `license key`. `Order number`
+  stays on receipts and in support and is never the label of the input.
+- Reason: the Mac design audit (rules 3 and 8, rows 2, 6, 24) counted six to eight verbs for one action
+  and five nouns for one object. The ruling is a substitution of those words; no sentence is new. The
+  accessible name `Begin writing` on the picker button already uses the one verb and stays.
+- Supersedes: the wording (not the behaviour) of D-059, D-062, D-070 and D-076 where they name
+  `RUN IT AGAIN`, `Type to start` or `Checking your key…`; their geometry and behaviour stand. Error
+  prose, the trial line and the rules copy are not part of this decision.

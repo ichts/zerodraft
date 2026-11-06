@@ -232,12 +232,12 @@ func TestActivationFlow(t *testing.T) {
 	g.svc.Status["activate"] = 0
 	g.click("Activate")
 	g.wantText("This PC is licensed.")
-	g.wantText("Start writing")
+	g.wantText("Begin")
 	g.snap("upgrade-licensed")
 	if !g.a.Licence().HasFullAccess() || g.a.key != "" {
 		t.Fatal("licensed and the field cleared")
 	}
-	g.click("Start writing")
+	g.click("Begin")
 	if g.a.Surface() != Home || g.tt.HasText("Free trial") || g.tt.HasText("Activate this PC") {
 		t.Fatalf("a licensed Home shows no access line: %q", g.tt.Texts())
 	}

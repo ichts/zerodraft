@@ -30,7 +30,7 @@ final class AppState {
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
     /// The one placeholder of the licence field, on the activation card and in Settings.
-    static let licenseFieldPlaceholder = "Order number or activation code"
+    static let licenseFieldPlaceholder = "License key"
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
     /// Marketing version shown in Settings > About; the same configuration source as the price,
     /// so a bare executable (swift run, tests) reports the tracked Info.plist instead of a placeholder.
@@ -552,7 +552,7 @@ final class AppState {
     var licenseStatusText: String {
         if licenseValidationInFlight { return "Checking license…" }
         if settings.licenseKey != nil && settings.licenseInstanceID == nil {
-            return "License not activated on this Mac. Enter your order number or activation code."
+            return "License not activated on this Mac. Enter your license key."
         }
         if settings.licenseStatus == .active && !hasFullAccess {
             if settings.licenseKey != nil && !productID.isEmpty &&
@@ -565,13 +565,13 @@ final class AppState {
         case .active:
             return "License active."
         case .revoked:
-            return "License revoked. Enter a valid order number or activation code."
+            return "License revoked. Enter a valid license key."
         case .invalid:
             return "License invalid. Activate this Mac again."
         case .unknown:
             return "License status unknown. Reconnect to validate."
         case .inactive:
-            return "Activate this Mac to start writing."
+            return "Activate this Mac to begin writing."
         }
     }
 

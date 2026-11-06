@@ -84,13 +84,13 @@ strings = {
  'DraftDeleted': s1(r'"(Draft deleted\.)"', svc),
  'BeginAgain': s1(r'title: "(Begin again)"', svc),
  'Warning': s1(r'"(KEEP TYPING OR THE DRAFT IS DELETED\.)"', svc),
- 'TypeToStart': s1(r'"(Type to start)"', svc),
+ 'TypeToBegin': s1(r'"(Type to begin)"', svc),
  'ExitLink': s1(r'title: "(ESC - EXIT)"', svc),
  'KeptHeading': s1(r'labelWithString: "(You wrote it down\.)"', kept),
  'KeptCaption': s1(r'static let unsavedCaption = "([^"]+)"', kept),
  'RefusalNotice': s1(r'private static let refusalNoticeText = "([^"]+)"', svc),
  'CopyText': s1(r'title: "(COPY TEXT)"', kept),
- 'RunAgain': s1(r'title: "(RUN IT AGAIN)"', kept),
+ 'KeptBeginAgain': s1(r'title: "(BEGIN AGAIN)"', kept),
  'Copied': s1(r'"(COPIED)"', svc),
  'CopyRetry': s1(r'"(TRY COPY AGAIN)"', svc),
  'CountRule': s1(r'countRule = "([^"]+)"', room),
@@ -114,7 +114,7 @@ plist = plistlib.loads(open(os.path.join(mac, 'Info.plist'), 'rb').read())
 state, home, upgrade, settingsvc = rd('App/AppState.swift'), rd('App/HomeViewController.swift'), rd('Upgrade/UpgradeViewController.swift'), rd('Settings/SettingsViewController.swift')
 rules, models, engine = rd('App/RulesViewController.swift'), rd('Licensing/LicenseModels.swift'), rd('Session/SessionEngine.swift')
 checkout = rd('Licensing/CheckoutClient.swift')
-WIN_SUBS = [('On the Mac: ', ''), ('2-Mac', '2-PC'), ('2 Macs', '2 PCs'), ('this Mac', 'this PC'), ('Waffo order number', 'order number'), ('This Mac', 'This PC')]
+WIN_SUBS = [('On the Mac: ', ''), ('2-Mac', '2-PC'), ('2 Macs', '2 PCs'), ('this Mac', 'this PC'), ('Waffo license key', 'license key'), ('This Mac', 'This PC')]
 WIN_OVERRIDES = {
     # the licence lives in the Windows Credential Manager, not a file on disk (no "disk permissions" to check)
     'storageFailure': ('Could not save the license on this Mac. Check disk permissions and try again.',
@@ -163,16 +163,16 @@ const('RulesDone', lit(rules, 'Done', 'RulesDone'))
 const('UpgradeTitle', lit(upgrade, 'Activate Write It Down', 'UpgradeTitle')); const('UpgradeTitleLicensed', 'Write It Down')
 const('UpgradeSubtitle', lit(upgrade, 'A license is required to keep writing on this Mac.', 'UpgradeSubtitle'))
 const('UpgradeSubtitleLicensed', lit(upgrade, 'This Mac is licensed.', 'UpgradeSubtitleLicensed'))
-const('UpgradeFieldLabel', lit(upgrade, 'Order number or activation code', 'UpgradeFieldLabel'))
-const('UpgradePlaceholder', lit(state, 'Order number or activation code', 'UpgradePlaceholder'))  # one placeholder for both surfaces: AppState.licenseFieldPlaceholder, shown by the activation card and Settings
+const('UpgradeFieldLabel', lit(upgrade, 'License key', 'UpgradeFieldLabel'))
+const('UpgradePlaceholder', lit(state, 'License key', 'UpgradePlaceholder'))  # one placeholder for both surfaces: AppState.licenseFieldPlaceholder, shown by the activation card and Settings
 const('UpgradeActivate', lit(upgrade, 'Activate', 'UpgradeActivate')); const('UpgradeActivating', lit(upgrade, 'Activating', 'UpgradeActivating'))
-const('UpgradeStartWriting', lit(upgrade, 'Start writing', 'UpgradeStartWriting'))
-const('UpgradeEnterFirst', lit(upgrade, 'Enter your order number or activation code first.', 'UpgradeEnterFirst'))
+const('UpgradeBegin', lit(upgrade, 'Begin', 'UpgradeBegin'))
+const('UpgradeEnterFirst', lit(upgrade, 'Enter your license key first.', 'UpgradeEnterFirst'))
 const('UpgradePricing', lit(upgrade, 'One payment. 2 Macs. 14-day refund.', 'UpgradePricing'))
 const('UpgradeCheckoutNote', lit(upgrade, 'Checkout opens in your browser. Payment is handled by Stripe.', 'UpgradeCheckoutNote'))
 const('UpgradeCheckoutUnavailable', lit(upgrade, 'Checkout is not available yet.', 'UpgradeCheckoutUnavailable'))
 const('UpgradeWebTrial', lit(upgrade, 'Try the free web room', 'UpgradeWebTrial'))
-const('UpgradeChecking', lit(upgrade, 'Checking your key…', 'UpgradeChecking'))
+const('UpgradeChecking', lit(upgrade, 'Checking your license key…', 'UpgradeChecking'))
 const('UpgradeBuyFormat', lit(upgrade, 'Buy a license, \\(AppState.displayPrice) once', 'UpgradeBuyFormat').replace('\\(AppState.displayPrice)', '%s'))
 const('UpgradeOpeningCheckout', lit(upgrade, 'Opening checkout…', 'UpgradeOpeningCheckout'))
 const('UpgradeCleanupActive', 'License active on this PC.') if 'License active on this Mac.' in upgrade else sys.exit('cleanup copy changed')
@@ -184,11 +184,11 @@ num('RulesTitleGap', s1(r'stack\.setCustomSpacing\((\d+), after: titleLabel\)', 
 num('ChipEmWidth', s1(r'static let emWidth: CGFloat = ([0-9.]+)', chip)); num('ChipEmHeight', s1(r'static let emHeight: CGFloat = ([0-9.]+)', chip))
 num('ChipCornerShare', s1(r'static let plateCornerShare: CGFloat = ([0-9.]+)', chip)); num('ChipPickerTypeSize', s1(r'static let pickerTypeSize: CGFloat = (\d+)', chip))
 # licence and access status (AppState), activation errors (LicenseModels)
-for k, t in [('StatusChecking', 'Checking license…'), ('StatusNotActivated', 'License not activated on this Mac. Enter your order number or activation code.'),
+for k, t in [('StatusChecking', 'Checking license…'), ('StatusNotActivated', 'License not activated on this Mac. Enter your license key.'),
              ('StatusNeedsValidation', 'License needs online validation. Reopen the app when connected.'), ('StatusWrongProduct', 'License does not match the configured writeitdown product.'),
-             ('StatusActive', 'License active.'), ('StatusRevoked', 'License revoked. Enter a valid order number or activation code.'),
+             ('StatusActive', 'License active.'), ('StatusRevoked', 'License revoked. Enter a valid license key.'),
              ('StatusInvalid', 'License invalid. Activate this Mac again.'), ('StatusUnknown', 'License status unknown. Reconnect to validate.'),
-             ('StatusInactive', 'Activate this Mac to start writing.'),
+             ('StatusInactive', 'Activate this Mac to begin writing.'),
              ('TrialReadError', "Could not read trial usage. Check access to the app's settings and reopen the app."),
              ('TrialSaveError', "Could not save trial usage. Check access to the app's settings and reopen the app.")]:
     const(k, lit(state, t, k))
@@ -206,7 +206,7 @@ assert len(re.findall(r'case \.(\w+)(?:\(let statusCode\))?:\s*return "', models
 # settings
 const('SettingsTitle', lit(settingsvc, 'Settings', 'SettingsTitle')); const('SettingsDone', lit(settingsvc, 'Done', 'SettingsDone'))
 const('SettingsLicense', lit(settingsvc, 'License', 'SettingsLicense')); const('SettingsAbout', lit(settingsvc, 'About', 'SettingsAbout'))
-const('SettingsFieldPlaceholder', lit(state, 'Order number or activation code', 'SettingsFieldPlaceholder'))
+const('SettingsFieldPlaceholder', lit(state, 'License key', 'SettingsFieldPlaceholder'))
 const('SettingsActivated', 'Activated %s') if '"Activated \\(formatted($0))"' in settingsvc else sys.exit('settings copy changed')
 const('SettingsLastValidated', 'Last validated %s') if '"Last validated \\(formatted($0))"' in settingsvc else sys.exit('settings copy changed')
 const('SettingsVersionFormat', 'Version %s') if '"Version \\(version)"' in settingsvc else sys.exit('settings copy changed')

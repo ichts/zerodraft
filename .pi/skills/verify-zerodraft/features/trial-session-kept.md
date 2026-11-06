@@ -1,6 +1,6 @@
 # Trial session kept (60s deadline)
 
-**What it is:** the browser trial's success path. The user clicks the door, types forward for the full 60 seconds without an 8-second silence, and the session completes: the paper returns to the bone wall with the draft, the receipt `0:00 - N words kept.` (rendered uppercase by CSS), one action `Copy text` (-> `Copied`), one link `RUN IT AGAIN`, and the caption `Nothing here is saved`.
+**What it is:** the browser trial's success path. The user clicks the door, types forward for the full 60 seconds without an 8-second silence, and the session completes: the paper returns to the bone wall with the draft, the receipt `0:00 - N words kept.` (rendered uppercase by CSS), one action `Copy text` (-> `Copied`), one link `BEGIN AGAIN`, and the caption `Nothing here is saved`.
 
 **How to reach it:** `/index.html` -> click `a.door` (`Give it sixty seconds.`), or open `/#trial` directly.
 

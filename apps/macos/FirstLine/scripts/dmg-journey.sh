@@ -165,7 +165,7 @@ for used in 1 2 3; do
     || { bad "session $used did not select 1 minute"; exit 1; }
   tok="$(token button 'Begin writing')"; [[ -n "$tok" ]] || { bad "no Begin button (session $used)"; exit 1; }
   cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null
-  wait_has "room-$used" 'Type to start' || { bad "session $used room did not open"; exit 1; }
+  wait_has "room-$used" 'Type to begin' || { bad "session $used room did not open"; exit 1; }
   sentence='I watched the rain cross the garden.'
   started="$(clock_now)" || { bad 'monotonic clock unavailable'; exit 1; }
   type_text "$sentence" || { bad "session $used key delivery failed"; exit 1; }
@@ -207,7 +207,7 @@ for used in 1 2 3; do
       && python3 -c 'import subprocess,sys; sys.exit(subprocess.check_output(["pbpaste"]).decode() != sys.argv[1])' "$typed" \
       && pass 'session 3 copied exactly the kept draft' \
       || { bad 'session 3 copy failed or clipboard differs from kept text'; exit 1; }
-    tok="$(token button 'RUN IT AGAIN')"
+    tok="$(token button 'BEGIN AGAIN')"
     [[ -n "$tok" ]] && cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
       || { bad 'session 3 restart affordance missing or failed'; exit 1; }
   fi
@@ -223,7 +223,7 @@ done
 # 5. After the third session, writing needs a license: the activation page.
 wait_has activation 'Activate Write It Down' && pass 'after 3 free sessions the activation page appears' \
   || bad 'activation page not shown after the third session'
-has 'Type to start' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
+has 'Type to begin' && bad 'editor is still writable after the free sessions' || pass 'no writable editor after the free sessions'
 
 # 6. Manual remainder.
 log "SUMMARY automated failures: $failures (artifacts: $out)"

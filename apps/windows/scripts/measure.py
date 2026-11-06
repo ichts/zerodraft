@@ -204,7 +204,7 @@ def chrome_marks(name):
     fb = (p[0], foot - int(16 * s), p[2], foot + int(16 * s))
     fd, fy, fx = ink_rows(im, fb, 150)
     half = fd.shape[1] // 2
-    def baseline(m):   # the row where the ink density falls away: descenders (Type to start) do not count
+    def baseline(m):   # the row where the ink density falls away: descenders (Type to begin) do not count
         prof = m.sum(axis=1)
         return int(np.where(prof >= 0.5 * prof.max())[0].max()) + 1 if prof.max() > 0 else None
     be, bc = baseline(fd[:, :half]), baseline(fd[:, half:])

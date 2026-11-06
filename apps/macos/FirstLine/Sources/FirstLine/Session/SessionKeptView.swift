@@ -49,7 +49,7 @@ final class SessionKeptView: NSView {
         copyButton = FirstLineButtons.roomPrimary(title: "COPY TEXT", target: copyTarget, action: copyAction,
                                                   reducesMotion: reducesMotion)
         copyButton.font = .systemFont(ofSize: 15, weight: .medium)
-        restartButton = FirstLineButtons.secondary(title: "RUN IT AGAIN", target: restartTarget,
+        restartButton = FirstLineButtons.secondary(title: "BEGIN AGAIN", target: restartTarget,
                                                    action: restartAction, height: 48)
         self.reducesMotion = reducesMotion
         super.init(frame: .zero)
@@ -244,11 +244,11 @@ final class SessionKeptView: NSView {
 
     private func styleRestart() {
         let font = NSFont.systemFont(ofSize: 15, weight: .medium)
-        restartButton.title = "RUN IT AGAIN"
+        restartButton.title = "BEGIN AGAIN"
         restartButton.font = font
-        restartButton.attributedTitle = transparentTitle("RUN IT AGAIN", font: font, kernEm: 0.04)
+        restartButton.attributedTitle = transparentTitle("BEGIN AGAIN", font: font, kernEm: 0.04)
         restartTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
-            "RUN IT AGAIN", font: font, color: FirstLineColors.inkNSColor, kernEm: 0.04,
+            "BEGIN AGAIN", font: font, color: FirstLineColors.inkNSColor, kernEm: 0.04,
             lineHeightMultiple: 1.6)
         restartButton.invalidateIntrinsicContentSize()
     }

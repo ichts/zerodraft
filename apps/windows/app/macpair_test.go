@@ -39,7 +39,7 @@ func TestMacPairSnapshots(t *testing.T) {
 	g.a.Licence().Activate(nilCtx(), "WID-ORDER-1234")
 	g.tt.Frame()
 	g.snap("activation-active-light")
-	g.click("Start writing")
+	g.click("Begin")
 	g.click("Settings")
 	g.snap("settings-light")
 }

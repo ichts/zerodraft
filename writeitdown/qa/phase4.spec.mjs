@@ -252,7 +252,7 @@ const insertionPoint = page => page.evaluate(() => {
 test('empty room shows only the caret and the count prompt; after a wipe the block states it', async ({ page }, info) => {
   await enter(page);
   await settle(page);
-  await expect(page.locator('#room-count')).toHaveText('Type to start');
+  await expect(page.locator('#room-count')).toHaveText('Type to begin');
   // No hint on the line: the empty writing line holds only the caret (D-021/D-028).
   expect(await editor(page).evaluate(e => e.hasAttribute('placeholder'))).toBe(false);
   const caret = await editor(page).evaluate(e => {
@@ -882,11 +882,11 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await page.locator('#kept-text').textContent());
   const copied = await readCopy();
   // The press swaps the label and moves nothing: the pill keeps its floor, the row keeps its
-  // anchor, and RUN IT AGAIN stays under no pointer at all (D-059).
+  // anchor, and BEGIN AGAIN stays under no pointer at all (D-059).
   expect(copied.copyBox.width, 'the pill keeps one width across labels').toBeCloseTo(keptCopy.copyBox.width, 1);
   expectOneLabel(copied);
   expect(copied.copyBox.left).toBeCloseTo(keptCopy.copyBox.left, 1);
-  expect(copied.restartBox.left, 'RUN IT AGAIN does not move').toBeCloseTo(keptCopy.restartBox.left, 1);
+  expect(copied.restartBox.left, 'BEGIN AGAIN does not move').toBeCloseTo(keptCopy.restartBox.left, 1);
   expect(copied.restartBox.top).toBeCloseTo(keptCopy.restartBox.top, 1);
   expect(copied.restartBox.width).toBeCloseTo(keptCopy.restartBox.width, 1);
   if (!stacked) {
@@ -1029,7 +1029,7 @@ test('the kept screen offers one route to the app, and the writing screen none',
     return { text: element.textContent.trim(), ring: element.matches(':focus-visible'),
       outline: `${style.outlineWidth} ${style.outlineStyle}`, radius: style.borderRadius, top: element.getBoundingClientRect().top };
   });
-  expect(focused.text, 'one Tab from RUN IT AGAIN reaches the app').toBe('Mac app');
+  expect(focused.text, 'one Tab from BEGIN AGAIN reaches the app').toBe('Mac app');
   expect(focused.ring, 'the ring is visible').toBe(true);
   expect(focused.outline).toBe('2px solid');
   expect(focused.radius, 'a text control keeps its shape under focus').toBe('0px');
@@ -1215,7 +1215,7 @@ test('Return and the pill start a fresh session and bring the chrome back', asyn
   await expect(page.locator('#room .bar')).toBeVisible();
   await expect(page.locator('#failed')).toBeHidden();
   await expect(page.locator('#room .chrome-row')).toBeVisible();
-  await expect(page.locator('#room-count')).toHaveText('Type to start');
+  await expect(page.locator('#room-count')).toHaveText('Type to begin');
   await page.keyboard.insertText('This one gets deleted too.');
   await settle(page);
   await page.clock.fastForward(8350);

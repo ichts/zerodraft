@@ -54,6 +54,10 @@ struct EditingCommandTests {
         #expect(menu.items.compactMap { $0.submenu?.title } == ["", "Edit", "Navigate"],
                 "the Edit menu sits between the app menu and Navigate")
 
+        // D-085: one verb for beginning a session, so Cmd+N reads Begin, never New Piece.
+        let navigate = try #require(submenu("Navigate", in: menu))
+        #expect(navigate.items.first?.title == "Begin" && navigate.items.first?.keyEquivalent == "n")
+
         let edit = try #require(submenu("Edit", in: menu))
         #expect(edit.autoenablesItems,
                 "nil-target items need AppKit's responder-chain validation, which disables them when nothing handles the action")
@@ -97,7 +101,7 @@ struct EditingCommandTests {
         window.contentViewController = settings
         defer { window.orderOut(nil) }
         let field = try #require(fields(in: settings.view)
-            .first { $0.placeholderString == "Order number or activation code" })
+            .first { $0.placeholderString == "License key" })
 
         // The licence field's editor is what answers the Edit menu while a buyer types a key.
         window.makeFirstResponder(field)
@@ -141,7 +145,7 @@ struct EditingCommandTests {
         let window = try #require(controller.window)
         defer { window.orderOut(nil) }
         let view = try #require(window.contentViewController?.view)
-        let field = try #require(fields(in: view).first { $0.placeholderString == "Order number or activation code" },
+        let field = try #require(fields(in: view).first { $0.placeholderString == "License key" },
                                  "an unlicensed Mac offers the licence field in Settings")
         window.makeFirstResponder(field)
         let editor = try #require(window.fieldEditor(false, for: field) as? NSTextView)

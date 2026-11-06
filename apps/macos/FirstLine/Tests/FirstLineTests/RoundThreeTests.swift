@@ -6,13 +6,13 @@ import Testing
 struct RoundThreeTests {
     // MARK: - Card alignment
 
-    @Test func licensedCardCentresStartWritingAndPreLicenceGroup() throws {
+    @Test func licensedCardCentresBeginAndPreLicenceGroup() throws {
         let licensed = UpgradeViewController(appState: licensedTestState())
         let window = makeWindow(licensed)
         let card = try #require(descendants(of: licensed.view, of: FirstLineCardView.self).first)
         let content = card.contentView
-        let start = try #require(descendants(of: content, of: NSButton.self).first { $0.title == "Start writing" })
-        assertCentred(start, in: content, "licensed Start writing")
+        let start = try #require(descendants(of: content, of: NSButton.self).first { $0.title == "Begin" })
+        assertCentred(start, in: content, "licensed Begin")
 
         let inactive = UpgradeViewController(appState: try trialState(used: 3))
         let inactiveWindow = makeWindow(inactive)
@@ -44,7 +44,7 @@ struct RoundThreeTests {
         let roomPrimary = try #require(FirstLineButtons.roomPrimary(title: "COPY TEXT", target: nil,
                                                                    action: action, reducesMotion: { true })
             as? FirstLineInkFocusButton)
-        let secondary = try #require(FirstLineButtons.secondary(title: "RUN IT AGAIN", target: nil, action: action)
+        let secondary = try #require(FirstLineButtons.secondary(title: "BEGIN AGAIN", target: nil, action: action)
             as? FirstLineInkFocusButton)
         let quiet = try #require(FirstLineButtons.link(title: "ESC - EXIT", target: nil, action: action)
             as? FirstLineInkFocusButton)
@@ -146,7 +146,7 @@ struct RoundThreeTests {
         #expect(!descendants(of: room.view, of: NSTextField.self).contains { $0.stringValue == "Start typing." },
                 "the empty room still shows an under-line hint")
         let prompt = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Type to start" })
+            .first { $0.stringValue == "Type to begin" })
         #expect(!prompt.isHiddenOrHasHiddenAncestor)
         #expect(prompt.font?.pointSize == 13, "the prompt does not use the count style")
 
@@ -184,7 +184,7 @@ struct RoundThreeTests {
         let container = try #require(editor.textContainer)
         let emptyBaseline = try #require(editor.currentInsertionBaseline())
         let prompt = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { $0.stringValue == "Type to start" })
+            .first { $0.stringValue == "Type to begin" })
 
         editor.setMarkedText("nihao", selectedRange: NSRange(location: 5, length: 0),
                              replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -664,7 +664,7 @@ struct RoundThreeTests {
         let editor = try #require(descendants(of: room.view, of: AppendOnlyTextView.self).first)
         let paper = try #require(editor.enclosingScrollView?.superview)
         let timer = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "1:00" })
-        let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "Type to start" })
+        let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "Type to begin" })
         let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
 
         // Fixed edges only: the clock's text width changes, its right edge must not.
@@ -733,7 +733,7 @@ struct RoundThreeTests {
         // Same baseline: read the first ink row of each run from one rendered frame.
         // The count shares the row too, with its own type role.
         let count = try #require(descendants(of: room.view, of: NSTextField.self)
-            .first { ($0.stringValue == "Type to start" || $0.stringValue.hasSuffix("words"))
+            .first { ($0.stringValue == "Type to begin" || $0.stringValue.hasSuffix("words"))
                 && !$0.isHiddenOrHasHiddenAncestor })
         let rows = try firstInkRows(of: [exit, hint, count], in: room.view)
         #expect(abs(rows[0] - rows[1]) <= 1,

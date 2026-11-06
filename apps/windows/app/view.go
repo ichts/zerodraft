@@ -364,7 +364,7 @@ func (a *App) licensedBlock(c *ui.Context, p pal, s licence.Snapshot) {
 		text(c, tokens.UpgradeCleanupActive+"\n"+s.Err.Error(), 13, 400, p.of(tokens.Red)).TextAlign(ui.Center).MaxWidth(440)
 		gap(c, 14)
 	}
-	start := primary(c, tokens.UpgradeStartWriting).AutoFocus()
+	start := primary(c, tokens.UpgradeBegin).AutoFocus()
 	if start.Clicked() || c.Shortcut(0, ui.KeyEnter) {
 		a.startWriting()
 	}

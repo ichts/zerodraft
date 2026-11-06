@@ -127,7 +127,7 @@ try {
   check('draft is gone', (await editor.textContent()) === '');
   await page.screenshot({ path: join(evidence, '04-wiped.png') });
 
-  // 6. Type to restart: the editor is still armed, a fresh session begins.
+  // 6. Type to begin again: the editor is still armed, a fresh session begins.
   await editor.click();
   await page.keyboard.type('Again.', { delay: 60 });
   await page.waitForTimeout(300);

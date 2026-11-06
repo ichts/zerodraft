@@ -48,7 +48,7 @@ struct ReviewRoundTests {
         let copy = try #require(descendants(of: fixture.room.view, of: NSButton.self)
             .first { $0.title == "COPY TEXT" })
         let restart = try #require(descendants(of: fixture.room.view, of: NSButton.self)
-            .first { $0.title == "RUN IT AGAIN" })
+            .first { $0.title == "BEGIN AGAIN" })
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.view.displayIfNeeded()
 
@@ -69,10 +69,10 @@ struct ReviewRoundTests {
         let copyInkCentre = (CGFloat(copyInk.lowerBound) + CGFloat(copyInk.upperBound)) / 2
         let restartInkCentre = (CGFloat(restartInk.lowerBound) + CGFloat(restartInk.upperBound)) / 2
         let centreDelta = abs(copyInkCentre - restartInkCentre) / scale
-        #expect(centreDelta <= 1, "COPY TEXT and RUN IT AGAIN ink centres are \(centreDelta) pt apart")
+        #expect(centreDelta <= 1, "COPY TEXT and BEGIN AGAIN ink centres are \(centreDelta) pt apart")
         #expect(abs(copy.frame.height - 48) <= 0.5)
-        #expect(abs(restart.frame.height - 48) <= 0.5, "RUN IT AGAIN is not the primary height")
-        #expect(restart.layer?.borderWidth == 1, "RUN IT AGAIN is not a quiet outlined control")
+        #expect(abs(restart.frame.height - 48) <= 0.5, "BEGIN AGAIN is not the primary height")
+        #expect(restart.layer?.borderWidth == 1, "BEGIN AGAIN is not a quiet outlined control")
         // The pill label must be optically centred: the ink gaps above and below
         // are equal within 1 pt (the fourth hands-on report: it sat low).
         let height = CGFloat(rep.pixelsHigh) / scale
@@ -103,7 +103,7 @@ struct ReviewRoundTests {
     @Test func keptRestartEntersTheWritingRoomWithoutATick() throws {
         let fixture = keptRoom()
         let restart = try #require(descendants(of: fixture.room.view, of: NSButton.self)
-            .first { $0.title == "RUN IT AGAIN" })
+            .first { $0.title == "BEGIN AGAIN" })
         let editor = try #require(descendants(of: fixture.room.view, of: AppendOnlyTextView.self).first)
         let scroll = try #require(editor.enclosingScrollView)
         #expect(fixture.engine.phase == .success)
@@ -145,9 +145,9 @@ struct ReviewRoundTests {
         settings.view.layoutSubtreeIfNeeded()
         settings.view.displayIfNeeded()
         let labels = visibleLabels(in: settings.view)
-        let status = try #require(labels.first { $0.stringValue == "Activate this Mac to start writing." })
+        let status = try #require(labels.first { $0.stringValue == "Activate this Mac to begin writing." })
         let field = try #require(descendants(of: settings.view, of: NSTextField.self)
-            .first { $0.placeholderString == "Order number or activation code" })
+            .first { $0.placeholderString == "License key" })
         let activate = try #require(descendants(of: settings.view, of: NSButton.self).first { $0.title == "Activate" })
         let buy = try #require(descendants(of: settings.view, of: NSButton.self)
             .first { $0.title.hasPrefix("Buy a license") })
@@ -159,7 +159,7 @@ struct ReviewRoundTests {
         let headingFrame = settings.view.convert(heading.bounds, from: heading)
         #expect(abs(statusFrame.minX - headingFrame.minX) <= 1, "license text is not left-aligned")
         #expect(!field.isHidden)
-        #expect(!labels.contains { $0.stringValue.hasPrefix("Enter your order number") },
+        #expect(!labels.contains { $0.stringValue.hasPrefix("Enter your license key") },
                 "the field is named twice: a sentence above a placeholder that says the same")
 
         let activateFrame = settings.view.convert(activate.bounds, from: activate)
@@ -201,7 +201,7 @@ struct ReviewRoundTests {
         #expect(labels.contains { $0.stringValue.hasPrefix("Activated ") })
         #expect(labels.contains { $0.stringValue.hasPrefix("Last validated ") })
         #expect(!labels.contains { $0.stringValue.contains("Instance:") })
-        #expect(!labels.contains { $0.stringValue.hasPrefix("Enter your order number") })
+        #expect(!labels.contains { $0.stringValue.hasPrefix("Enter your license key") })
         #expect(descendants(of: settings.view, of: NSButton.self)
             .filter { !$0.isHiddenOrHasHiddenAncestor }
             .contains { $0.title == "Activate" } == false,
@@ -404,7 +404,7 @@ struct ReviewRoundTests {
             }
             let caret = paper.convert(editor.caretRectForCurrentInsertionPoint(), from: editor)
             let count = descendants(of: room.view, of: NSTextField.self)
-                .first { $0.stringValue == "Type to start" || $0.stringValue == "0 words" }!
+                .first { $0.stringValue == "Type to begin" || $0.stringValue == "0 words" }!
             let block = descendants(of: room.view, of: NSTextField.self)
                 .first { $0.stringValue == "Draft deleted." && !$0.isHiddenOrHasHiddenAncestor }
                 .map { paper.convert($0.bounds, from: $0) }
@@ -417,7 +417,7 @@ struct ReviewRoundTests {
         let afterWipe = measure(wiped: true)
         #expect(abs(afterWipe.caret.minY - fresh.caret.minY) <= 1, "the caret moved after a wipe")
         #expect(abs(afterWipe.caret.midX - fresh.caret.midX) <= 1)
-        #expect(fresh.count == "Type to start")
+        #expect(fresh.count == "Type to begin")
         #expect(afterWipe.count == "0 words")
         #expect(fresh.block == nil)
         #expect(afterWipe.block != nil)
@@ -435,7 +435,7 @@ struct ReviewRoundTests {
         let restartFrame = fixture.room.view.convert(restart.bounds, from: restart)
         let scrollFrame = fixture.room.view.convert(search.bounds, from: search)
         #expect(copyFrame.minY > scrollFrame.maxY, "COPY TEXT is not above the draft area")
-        #expect(restartFrame.minY > scrollFrame.maxY, "RUN IT AGAIN is not above the draft area")
+        #expect(restartFrame.minY > scrollFrame.maxY, "BEGIN AGAIN is not above the draft area")
         #expect(!copy.isHiddenOrHasHiddenAncestor)
         #expect(search.documentView!.frame.height > search.contentSize.height,
                 "the long draft does not scroll under the fixed actions")

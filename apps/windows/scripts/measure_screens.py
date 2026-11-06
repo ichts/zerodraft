@@ -110,7 +110,7 @@ def upgrade(name, licensed=False):
     check(f'{name}: card centred vertically', within((cd[1] + cd[3]) / 2, ccy, 4), f'{((cd[1]+cd[3])/2):.1f}px vs {ccy:.1f}px')
     if licensed:
         ps = pills(im, cd, 30)
-        check(f'{name}: Start writing is one 48 DIP pill, centred', len(ps) == 1 and within(ps[0][3] - ps[0][1], 48 * s, 3) and within(near_cx(ps[0]), near_cx(cd), 2), f'{[(p[3]-p[1])/s for p in ps]} DIP')
+        check(f'{name}: Begin is one 48 DIP pill, centred', len(ps) == 1 and within(ps[0][3] - ps[0][1], 48 * s, 3) and within(near_cx(ps[0]), near_cx(cd), 2), f'{[(p[3]-p[1])/s for p in ps]} DIP')
         return
     ps = pills(im, cd, 30)
     act = [p for p in ps if p[3] - p[1] >= 40 * s]

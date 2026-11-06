@@ -49,8 +49,8 @@ func (r *Room) pills(c *ui.Context, W, H float32, dark bool) {
 		if cp.Clicked() {
 			r.activate("copy")
 		}
-		rn := button.Outline(c, tokens.StrRunAgain)
-		r.pillStyle(rn, g.runRect, 15, 500, dark, true).Label(tokens.StrRunAgain)
+		rn := button.Outline(c, tokens.StrKeptBeginAgain)
+		r.pillStyle(rn, g.runRect, 15, 500, dark, true).Label(tokens.StrKeptBeginAgain)
 		if rn.Clicked() {
 			r.activate("run")
 		}

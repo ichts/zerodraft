@@ -1809,13 +1809,13 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Decision: the dark writing sheet is the flat `#342e24` with a single very fine per-pixel grain, peak +-3
   levels (luminance sigma about 1.1), and nothing else: no mottle, no pulp cloud, no fibres, no flecks. The
   light Wheat sheet is unchanged. The web, the Mac and the Windows renderers paint the same dark sheet.
-  Every text role on the sheet clears 7:1 against the brightest pixel the grain paints (ink `#ece7d9` 10.4:1,
+  The ink and quiet roles clear 7:1 against the brightest pixel the grain paints (ink `#ece7d9` 10.4:1,
   quiet `#c2bfb7` 7.0:1), not only against the mean.
 - Reason: the captain, 2026-11-07: the dark paper's texture looked strange. Measured on the shipped dark
   sheet, the mottle (9 and 4.5 levels at 34 px and 9 px cells) and the brown flecks read as blotchy brown
   stains (32 px blocks vary by 1.7 levels, grain sigma 4.8) and lifted single pixels to 5.2:1 for the ink and
   3.5:1 for the quiet role. He picked option A from three candidates (A fine grain, B flat, C the light recipe
-  at a fifth of the contrast) in the evidence round, PR 121.
+  at a fifth of the contrast) in the evidence round, https://github.com/ichts/zerodraft/pull/121.
 - Supersedes: D-056's and D-069's two-scale mottle, fibres and flecks on the dark sheet only (the dark "lift"
   that scaled them to 0.4, 0.32 and 0.22). The tone `#342e24`, D-073's locked mean and the light sheet stand.
 - Evidence: `PaperContrastTests.theDarkSheetIsFineGrainWithNoBlotchesAndEveryPixelClearsSevenToOne`,

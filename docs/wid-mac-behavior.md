@@ -198,7 +198,7 @@ recorded frames only.
 | Kept restart control | 13 pt plain text link | 48 x 150 pt quiet outlined secondary, 1 pt hairline | case 39 |
 | Deleted-state caret | none in the still set | editor first responder; the writing layer is transparent, so no caret is drawn | case 38 |
 | Stopped-screen block top, 1040x720 | pinned 72 pt under the paper top, midpoint at 21% of the sheet | group midpoint at 33% of the sheet (216 pt on a 656 pt paper) | case 50 |
-| Top session bar | fraction updated from the 100 ms tick (10 steps/s) | one continuous linear CA over the remaining time; no per-tick writes | case 23 |
+| Top session bar | fraction updated from the 100 ms tick (10 steps/s) | one continuous linear CA over the remaining time; no per-tick writes; the bar is the paper's own rounded top edge (D-087), so a full bar reaches both card edges | case 23 |
 | Deny feedback | two timer steps (0/0.14/0.28 s) with a static outline | 200 ms transform keyframe + 220 ms opacity flash; interruptible | case 44 |
 | Kept actions / receipt | actions below a scrolling draft; `0:00 - N WORDS KEPT.` | actions in a fixed top block; `5 MINUTES. 63 WORDS.` in the small-caps receipt style | case 39 |
 | Kept count owner | receipt and the corner count both print the count | the receipt is the only count; the corner slot is hidden while kept; the caption `Nothing here is saved. Copy it before you leave.` sits under the actions | case 39 |

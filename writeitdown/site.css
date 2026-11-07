@@ -243,7 +243,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .prev-line:first-child{opacity:var(--paper-history-1)}
 .home .prev-line:nth-child(2){opacity:var(--paper-history-2)}
 .home .prev-line:nth-child(n+3){opacity:0}
-.bar{position:absolute;left:0;top:0;height:2px;width:100%;background:var(--ink);transform-origin:left;z-index:2}
+/* Reveal the rounded top border, never scale its corners with the remaining time. */
+.bar{position:absolute;left:0;top:0;box-sizing:border-box;height:calc(2 * var(--r-sheet));width:100%;border-top:2px solid var(--ink);border-radius:var(--r-sheet) var(--r-sheet) 0 0;clip-path:inset(0 0 0 0);pointer-events:none;z-index:2}
 /* the one button between the headline and the demo, and nothing else */
 .cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s5) var(--gut) 0;text-align:center}
 /* sections */

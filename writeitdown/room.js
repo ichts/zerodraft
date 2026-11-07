@@ -64,7 +64,7 @@ function placeStatus() {
 function stepBar(fraction) {
   barAnimation?.cancel();
   barAnimation = null;
-  bar.style.transform = `scaleX(${Math.max(0, Math.min(1, fraction))})`;
+  bar.style.clipPath = `inset(0 ${(1 - Math.max(0, Math.min(1, fraction))) * 100}% 0 0)`;
 }
 
 // One continuous linear fill over the remaining session time. Ticks never step it
@@ -85,8 +85,8 @@ function syncBar(now) {
   if (barAnimation && barStarted === state.started) return;
   barAnimation?.cancel();
   barStarted = state.started;
-  bar.style.transform = `scaleX(${remaining / SESSION_MS})`;
-  barAnimation = bar.animate([{ transform: bar.style.transform }, { transform: 'scaleX(0)' }],
+  bar.style.clipPath = `inset(0 ${(1 - remaining / SESSION_MS) * 100}% 0 0)`;
+  barAnimation = bar.animate([{ clipPath: bar.style.clipPath }, { clipPath: 'inset(0 100% 0 0)' }],
     { duration: remaining, easing: 'linear', fill: 'forwards' });
 }
 

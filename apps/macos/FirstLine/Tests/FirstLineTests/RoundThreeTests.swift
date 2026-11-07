@@ -255,11 +255,20 @@ struct RoundThreeTests {
         // away from the writing line.
         #expect(bars.count == 1, "the room must not carry a second (bottom) bar")
         let top = try #require(bars.first)
-        #expect(abs(top.frame.height - 2) <= 0.5)
+        #expect(abs(top.frame.height - FirstLineRadius.sheet) <= 0.5, "the bar box spans the corner radius so the stroke can follow the curve")
         #expect(abs(top.frame.maxY - paper.bounds.maxY) <= 1, "the session bar is pinned to the paper top")
         #expect(abs(top.frame.width - paper.bounds.width) <= 1)
         #expect(paper.layer?.masksToBounds == true, "the bar is clipped by the sheet's rounded rect")
         #expect(paper.layer?.cornerRadius == FirstLineRadius.sheet)
+        // The stroke is the paper's own top border: it starts and ends on the side edges and
+        // follows both corner arcs, so a full bar reaches the card's curve instead of floating inside it.
+        let outline = try #require(top.borderPath, "the bar draws a rounded top border")
+        let box = outline.boundingBox
+        #expect(abs(box.minX) <= 0.01 && abs(box.maxX - top.bounds.width) <= 0.01, "the stroke touches both card edges")
+        #expect(abs(box.maxY - top.bounds.maxY) <= 0.01, "the stroke touches the card's top edge")
+        #expect(outline.contains(CGPoint(x: top.bounds.width / 2, y: top.bounds.maxY - 1)), "2 pt thick on the straight run")
+        #expect(!outline.contains(CGPoint(x: 4, y: top.bounds.maxY - 1)), "outside the corner curve stays unpainted")
+        #expect(outline.contains(CGPoint(x: 4, y: top.bounds.maxY - FirstLineRadius.sheet + 10)), "the stroke runs down the corner arc to the side edge")
         #expect(top.toolTip == nil)
         #expect(top.accessibilityLabel() == nil, "the bar is the only indicator: no label")
         #expect(abs(top.fraction - 1) <= 0.01, "the bar starts full")

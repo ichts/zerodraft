@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
 import { clock, wordCount } from '../session.mjs';
+import { barFraction, EMPTY_BAR } from './bar-clip.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -115,7 +116,8 @@ async function assertRoom(page) {
       pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
       bars: [...document.querySelectorAll('#room .bar, #room .meter, #room .session-bar')].map(bar => {
         const box = bar.getBoundingClientRect();
-        return { cls: bar.className, top: box.top, height: box.height, width: box.width, paperTop: paper.top };
+        return { cls: bar.className, top: box.top, height: box.height, width: box.width, paperTop: paper.top,
+          border: getComputedStyle(bar).borderTopWidth };
       }),
     };
   });
@@ -128,9 +130,9 @@ async function assertRoom(page) {
   expect(geometry.apertureTop).toBeGreaterThan(geometry.chromeBottom);
   expect(geometry.overflow).toBe('hidden');
   expect(geometry.scrollbar).toBe('none');
-  // One 2 pt bar pinned to the paper top; the 3 pt silence meter is gone (D-014).
+  // One 2 pt border-top bar (its box spans the corner radius) pinned to the paper top; the 3 pt silence meter is gone (D-014).
   expect(geometry.bars).toHaveLength(1);
-  expect(geometry.bars[0].height).toBe(2);
+  expect(geometry.bars[0].border).toBe('2px');
   expect(Math.abs(geometry.bars[0].top - geometry.bars[0].paperTop)).toBeLessThan(1);
   // The aperture is one hard clip at the third pitch (the live line and the two history lines above it); the
   // history steps live on the ink layer's spans per logical line (D-077, qa/history-fade.spec.mjs), so the
@@ -589,31 +591,69 @@ test('the session bar is one continuous linear animation, never a stepped tick',
   const bar = await page.evaluate(() => {
     const bar = document.querySelector('#room-bar');
     return bar.getAnimations().map(animation => ({ timing: animation.effect.getTiming(),
-      frames: animation.effect.getKeyframes().map(frame => frame.transform) }));
+      frames: animation.effect.getKeyframes().map(frame => frame.clipPath) }));
   });
   if (info.project.use.reducedMotion === 'reduce') {
     // Reduce Motion steps the remaining bar at a 0.5 s cadence instead of animating it.
     expect(bar).toHaveLength(0);
-    const first = await page.locator('#room-bar').evaluate(bar => bar.style.transform);
+    const first = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
     await page.clock.fastForward(600);
-    const stepped = await page.locator('#room-bar').evaluate(bar => bar.style.transform);
+    const stepped = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
     expect(stepped).not.toBe(first);
     await page.clock.fastForward(500);
-    expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform)).not.toBe(stepped);
+    expect(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath)).not.toBe(stepped);
     return;
   }
   expect(bar).toHaveLength(1);
   expect(bar[0].timing.easing).toBe('linear');
   expect(bar[0].frames).toHaveLength(2);
-  const startScale = Number(/scaleX\(([^)]+)\)/.exec(bar[0].frames[0])?.[1]);
+  const startScale = barFraction(bar[0].frames[0]);
   expect(startScale).toBeGreaterThan(0.99);
   expect(startScale).toBeLessThanOrEqual(1);
-  expect(bar[0].frames[1]).toBe('scaleX(0)');
+  expect(bar[0].frames[1]).toMatch(EMPTY_BAR);
   expect(bar[0].timing.duration).toBeGreaterThan(59000);
   expect(bar[0].timing.duration).toBeLessThanOrEqual(60000);
-  const before = await page.locator('#room-bar').evaluate(bar => bar.style.transform);
+  const before = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
   await page.clock.fastForward(1000);
-  expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform), 'a tick never writes the bar').toBe(before);
+  expect(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath), 'a tick never writes the bar').toBe(before);
+});
+
+test('the session bar is the paper\'s own rounded top edge at every fill', async ({ page }) => {
+  await enter(page);
+  await page.keyboard.insertText('A');
+  await settle(page);
+  const geometry = () => page.evaluate(() => {
+    const paper = document.querySelector('#room .room-paper');
+    const bar = document.querySelector('#room-bar');
+    const p = paper.getBoundingClientRect();
+    const b = bar.getBoundingClientRect();
+    const s = getComputedStyle(bar);
+    const radius = parseFloat(getComputedStyle(paper).borderTopLeftRadius);
+    return { left: b.left - p.left, right: p.right - b.right, top: b.top - p.top, radius,
+      border: s.borderTopWidth, barRadius: [s.borderTopLeftRadius, s.borderTopRightRadius],
+      side: [s.borderLeftWidth, s.borderRightWidth], clip: s.clipPath, overflow: getComputedStyle(paper).overflow };
+  });
+  const full = await geometry();
+  expect(full.left, 'the bar starts at the card edge').toBe(0);
+  expect(full.right, 'the bar ends at the card edge').toBe(0);
+  expect(full.top).toBe(0);
+  expect(full.border).toBe('2px');
+  expect(full.side, 'the border tapers to the card edge, never a side stroke').toEqual(['0px', '0px']);
+  expect(full.radius).toBeGreaterThan(0);
+  expect(full.barRadius, 'the bar follows the card corner curve').toEqual([`${full.radius}px`, `${full.radius}px`]);
+  expect(barFraction(full.clip)).toBeGreaterThan(0.99);
+  for (let i = 0; i < 10; i++) {
+    await page.clock.fastForward(3000);
+    await page.keyboard.insertText(' writing');
+  }
+  await page.clock.runFor(600);
+  // WAAPI runs on the real timeline, not the faked page clock: seat the fill at its midpoint.
+  await page.locator('#room-bar').evaluate(bar => bar.getAnimations().forEach(a => { a.pause(); a.currentTime = 30000; }));
+  const half = await geometry();
+  expect(half.left, 'the bar still starts at the card edge').toBe(0);
+  expect(half.right, 'the revealed edge never shrinks the box').toBe(0);
+  expect(barFraction(half.clip)).toBeGreaterThan(0.4);
+  expect(barFraction(half.clip)).toBeLessThan(0.6);
 });
 
 test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ page }, info) => {
@@ -1211,7 +1251,7 @@ test('Return and the pill start a fresh session and bring the chrome back', asyn
   await expect(editor(page)).toBeFocused();
   await expect(page.locator('#room-clock')).toBeVisible();
   await expect(page.locator('#room-clock')).toHaveText('1:00');
-  expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform), 'the bar resets with the session').toBe('scaleX(1)');
+  expect(barFraction(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath)), 'the bar resets with the session').toBe(1);
   await expect(page.locator('#room .bar')).toBeVisible();
   await expect(page.locator('#failed')).toBeHidden();
   await expect(page.locator('#room .chrome-row')).toBeVisible();
@@ -1227,7 +1267,7 @@ test('Return and the pill start a fresh session and bring the chrome back', asyn
   await expect(editor(page)).toBeFocused();
   await expect(page.locator('#room-clock')).toHaveText('1:00');
   await expect(page.locator('#room .chrome-row')).toBeVisible();
-  expect(await page.locator('#room-bar').evaluate(bar => bar.style.transform)).toBe('scaleX(1)');
+  expect(barFraction(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath))).toBe(1);
 });
 
 test('demo is forward-only: every event appends, Backspace is tried once and blocked', async ({ page }, info) => {
@@ -1316,8 +1356,9 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   expect(Number(ladder.rendered[1])).toBeCloseTo(Number(ladder.stops[1]), 2);
   // No second bar: the 3 pt silence meter is gone.
   await expect(page.locator('#meter')).toHaveCount(0);
-  const bars = await page.evaluate(() => [...document.querySelectorAll('#demo .bar, #demo .meter')].map(e => e.getBoundingClientRect().height));
-  expect(bars).toEqual([2]);
+  // One bar, painted as a 2 px border-top on a box one corner radius tall (the paper's own top edge).
+  const bars = await page.evaluate(() => [...document.querySelectorAll('#demo .bar, #demo .meter')].map(e => getComputedStyle(e).borderTopWidth));
+  expect(bars).toEqual(['2px']);
   await capture(page, info, 'demo-typing');
   await expect(page.locator('#warn')).toBeHidden();
   await expect(page.locator('#demo-stopped')).toBeHidden();

@@ -1854,3 +1854,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `writeitdown/qa/paper.spec.mjs` (the dark-sheet test fails on the old code: a 22-level lift),
   `TestDarkSheetIsFineGrain` on Windows, and Chrome 1x/2x plus macOS 26.6.2 and 15.7.7 before/after
   captures in `data/wid-dark-paper/final-before-after.pdf`.
+## D-094: `Esc to exit` in the room footer is a real quiet text button
+
+- Date: 2026-11-07
+- Decision: the label stays quiet text in the footer's one type style, but on the web, the Mac and the Windows
+  room it is a real button named `Exit`. A click or press does what Esc does (the same two-act confirmation), the
+  hover moves only its ink from the quiet role to the full ink, the keyboard focus draws the ink ring, and its hit
+  area is at least 44 pt tall. Hover and focus never move the label.
+- Windows detail: while a draft is being written, Tab stays swallowed (a stray Tab must never take the keyboard
+  off the draft), so the button is reached by pointer or assistive technology there. On the kept screen, where no
+  editor is live, Tab walks Copy, Begin again and Exit. The room's pointer handler now lets presses on any button
+  through to it, which the stopped and kept pills also needed.
+- Reason: the captain, 2026-11-07: the label should be a button, not a decoration. D-090 and D-092 fixed its
+  words and style; this gives it the behaviour its look promised.
+- Supersedes: nothing; D-090's footer style and D-092's footer parity stand.
+- Evidence: `writeitdown/qa/ink-footer.spec.mjs` (hover ink, 2 px ink outline, 44 px target, click and Esc share the
+  confirmation), `RoomTests.exitHasAQuietHoverInkFocusAndAFullHeightHitTarget`,
+  `RoomTests.clickAndEscapeShareOneConfirmation`, `apps/windows/room` `TestExit*` and `TestTabNeverTakesTheDraftsKeyboardWhileWriting`.

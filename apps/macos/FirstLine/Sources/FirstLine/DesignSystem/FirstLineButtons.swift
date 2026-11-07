@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing, InkFocus.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link and 32 pt hairline icon-circle factories; every control uses the ink focus ring; a disabled outline pill keeps its outline; a pill never compresses below its label.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link, room exit and 32 pt hairline icon-circle factories; every control uses the ink focus ring; a disabled outline pill keeps its outline; a pill never compresses below its label.
  * [POS]: Shared native button specs; room primary opts into live hover/press motion, all controls use the design-system ink focus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -27,6 +27,12 @@ enum FirstLineButtons {
 
     static func link(title: String, target: AnyObject?, action: Selector) -> NSButton {
         FirstLineLinkButton(title: title, target: target, action: action)
+    }
+
+    static func roomExit(title: String, target: AnyObject?, action: Selector) -> NSButton {
+        let button = FirstLineRoomExitButton(title: title, target: target, action: action)
+        button.refreshTitle()
+        return button
     }
 
     /// A 32 pt circle with the secondary pill's hairline outline: the picker's help button (D-091).
@@ -81,6 +87,52 @@ private final class FirstLineLinkButton: FirstLineInkFocusButton {
         inkFocusRingInset = 3
         inkFocusRingCornerRadius = 4
         setAccessibilityRole(.button)
+    }
+}
+
+/// The room's quiet text control, with the same baseline as the footer count. Only its ink changes on hover.
+private final class FirstLineRoomExitButton: FirstLineInkFocusButton {
+    private var hover = false
+    private var tracking: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        translatesAutoresizingMaskIntoConstraints = false
+        isBordered = false
+        bezelStyle = .inline
+        font = FirstLineTypography.smallNSFont
+        inkFocusRingInset = 3
+        inkFocusRingCornerRadius = 0
+        setAccessibilityLabel("Exit")
+        setAccessibilityRole(.button)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hover = true
+        refreshTitle()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hover = false
+        refreshTitle()
+    }
+
+    func refreshTitle() {
+        let color = hover ? FirstLineColors.inkNSColor : FirstLineColors.paperQuietNSColor
+        contentTintColor = color
+        attributedTitle = FirstLineTypography.trackedText(title, font: FirstLineTypography.smallNSFont,
+                                                          color: color, kernEm: 0)
     }
 }
 

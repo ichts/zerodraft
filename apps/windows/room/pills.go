@@ -32,11 +32,31 @@ func roomTheme(dark bool) *ui.Theme {
 	return t
 }
 
+// exitButton keeps the footer's label and baseline but makes its whole 44 DIP target a real keyboard and
+// accessibility button. The same ButtonBase as the pills owns pointer, Enter/Space and the ink focus ring.
+func (r *Room) exitButton(c *ui.Context, W, H float32, dark bool) {
+	pr := PaperRect(W, H)
+	label := r.shape(textSpec{s: tokens.StrExitLink, family: sans, size: 13, weight: 400})
+	w, _ := label.Size()
+	hit := ui.Rect{X: pr.X + tokens.RoomInset - 6, Y: pr.Y + pr.H - footerBaselineInset - 32, W: w + 12, H: tokens.FooterHeight}
+	r.buttons = append(r.buttons, hit)
+	b := ui.ButtonBase(c).Absolute().Left(hit.X).Top(hit.Y).Width(hit.W).Height(hit.H).
+		Radius(0).Label("Exit").Cursor(ui.CursorPointer)
+	b.Draw(func(p *ui.Painter, rect ui.Rect) {
+		color := pick(b.Hovered(), rc(tokens.Ink, dark), rc(tokens.PaperQuiet, dark))
+		p.TextLayout(label, rect.X+6, rect.Y+32-sansAscent(13, 400), color)
+	})
+	if b.Clicked() {
+		r.activate("exit")
+	}
+}
+
 // pills places the buttons of the stopped and kept screens as absolutely positioned children of the room.
 func (r *Room) pills(c *ui.Context, W, H float32, dark bool) {
 	switch r.eng.Phase {
 	case session.Failure:
 		g := r.stoppedGeo(W, H)
+		r.buttons = append(r.buttons, g.pill)
 		b := button.Outline(c, tokens.StrBeginAgain)
 		r.pillStyle(b, g.pill, g.pillLabelSize, 600, dark, true).KeepFocus().Label(tokens.StrBeginAgain)
 		if b.Clicked() {
@@ -44,6 +64,7 @@ func (r *Room) pills(c *ui.Context, W, H float32, dark bool) {
 		}
 	case session.Success:
 		g := r.keptGeo(W, H)
+		r.buttons = append(r.buttons, g.copyRect, g.runRect)
 		cp := button.Pill(c, r.copyLabel)
 		r.pillStyle(cp, g.copyRect, 15, 500, dark, false).AutoFocus().Label(r.copyLabel)
 		if cp.Clicked() {

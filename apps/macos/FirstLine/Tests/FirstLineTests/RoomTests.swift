@@ -219,6 +219,50 @@ struct RoomTests {
         #expect(fixture.state.selectedSurface == .home)
     }
 
+    @Test func exitHasAQuietHoverInkFocusAndAFullHeightHitTarget() throws {
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            let fixture = try roomFixture()
+            let window = try #require(fixture.room.view.window)
+            window.appearance = NSAppearance(named: name)
+            fixture.room.view.layoutSubtreeIfNeeded()
+            let exit = try #require(exitButton(in: fixture.room))
+            let frame = exit.frame
+            #expect(exit.accessibilityLabel() == "Exit")
+            #expect(frame.height >= 44)
+            for y in [CGFloat(1), exit.bounds.midY, exit.bounds.height - 1] {
+                let point = fixture.room.view.convert(NSPoint(x: exit.bounds.midX, y: y), from: exit)
+                #expect(fixture.room.view.hitTest(point) === exit)
+            }
+            exit.effectiveAppearance.performAsCurrentDrawingAppearance {
+                let event = NSEvent.mouseEvent(with: .mouseMoved, location: .zero, modifierFlags: [],
+                                              timestamp: 0, windowNumber: window.windowNumber,
+                                              context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+                exit.mouseEntered(with: event)
+                let color = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+                #expect(sameColor(color, FirstLineColors.inkNSColor, appearance: name))
+                exit.mouseExited(with: event)
+                let quiet = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+                #expect(sameColor(quiet, FirstLineColors.paperQuietNSColor, appearance: name))
+                window.makeFirstResponder(exit)
+                let ring = exit as? FirstLineInkFocusRinging
+                #expect(ring?.showsInkFocusRing == true)
+                #expect(sameColor(ring?.inkFocusRingColor, FirstLineColors.inkNSColor, appearance: name))
+            }
+            #expect(exit.frame == frame)
+        }
+    }
+
+    @Test func clickAndEscapeShareOneConfirmation() throws {
+        let fixture = try roomFixture()
+        let exit = try #require(exitButton(in: fixture.room))
+        fixture.room.confirmationClock = { 100 }
+        exit.performClick(nil)
+        #expect(fixture.room.exitConfirmation.isArmed)
+        fixture.room.requestExit()
+        #expect(fixture.state.selectedSurface == .home)
+        #expect(fixture.engine.text.isEmpty)
+    }
+
     @Test func exitRemainsVisibleInEveryRoomPhase() throws {
         for phase in [SessionPhase.writing, .danger, .failure, .success] {
             let fixture = try roomFixture()

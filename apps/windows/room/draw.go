@@ -142,7 +142,6 @@ func (r *Room) draw(p *ui.Painter, box ui.Rect, now time.Time, dark bool) {
 	failure := phase == session.Failure
 	kept := phase == session.Success
 
-	r.hit = map[string]ui.Rect{}
 	SheetShadow(p, pr, tokens.RadiusSheet, dark)
 
 	dx := r.shakeOffset(now)
@@ -284,8 +283,6 @@ func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, i
 	exW, _ := ex.Size()
 	exX := pr.X + tokens.RoomInset
 	top := base - sansAscent(13, 400)
-	p.TextLayout(ex, exX, top, pick(r.hover == "exit", ink, quiet))
-	r.hit["exit"] = ui.Rect{X: exX - 6, Y: base - 32, W: exW + 12, H: tokens.FooterHeight}
 	// the status slot beside the exit link: the armed exit confirmation in the pen, else the first refused delete's
 	// notice in the quiet role (the pen is kept for warnings); the slot is one place, so nothing moves
 	switch {

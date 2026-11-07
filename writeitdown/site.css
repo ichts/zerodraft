@@ -389,6 +389,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0}
 /* One footer style (D-090): the exit label, the count and the phone's Mac link share size, weight, tracking and colour, sentence case, one baseline. */
 .room .paper-foot :is(.mini-link,.count,.room-mac){font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
+@media(hover:hover){.room .paper-foot #exit:hover{color:var(--ink)}}
 .room .paper-foot{gap:12px;left:22px;right:22px;bottom:16px;align-items:center}
 @media(max-width:767px){
   .room .paper-foot{left:16px;right:16px}

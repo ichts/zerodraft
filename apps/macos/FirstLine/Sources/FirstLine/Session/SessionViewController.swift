@@ -1,6 +1,6 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
  * [POS]: Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -420,8 +420,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         numeralLabel.isHidden = true
         warningHint.isHidden = true
 
-        exitButton = FirstLineButtons.link(title: Self.exitLabel, target: self, action: #selector(exitTapped))
-        styleQuietLink(exitButton, title: Self.exitLabel)
+        exitButton = FirstLineButtons.roomExit(title: Self.exitLabel, target: self, action: #selector(exitTapped))
         exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         exitHintLabel.attributedStringValue = Self.exitHintString()
         exitHintLabel.maximumNumberOfLines = 1
@@ -993,15 +992,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                               range: NSRange(location: 0, length: text.length))
         }
         return text
-    }
-
-    /// One quiet role on the paper: the exit link keeps 7:1 on the Wheat sheet in both appearances.
-    private func styleQuietLink(_ button: NSButton, title: String) {
-        let color = FirstLineColors.paperQuietNSColor
-        button.title = title
-        button.font = FirstLineTypography.smallNSFont
-        button.contentTintColor = color
-        button.attributedTitle = Self.quietRowText(title, color: color)
     }
 
     private func applyVisualSettings() {

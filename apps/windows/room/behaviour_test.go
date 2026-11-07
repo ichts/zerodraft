@@ -53,6 +53,114 @@ func TestExitNeedsTwoActsInsideTwoSeconds(t *testing.T) {
 	}
 }
 
+// keptRig reaches the kept screen, where no editor holds the keyboard, so Tab walks the buttons.
+func keptRig(t *testing.T) *rig {
+	g := newRig(t, 1040, 720)
+	for i := 0; i < 15; i++ {
+		g.tt.Type("A few more words in the draft. ")
+		g.tt.Advance(4 * time.Second)
+	}
+	g.tt.Advance(20 * time.Second)
+	if g.r.Engine().Phase != session.Success {
+		t.Fatalf("want success, got %v", g.r.Engine().Phase)
+	}
+	return g
+}
+
+// tabToExit walks the focus ring until Exit itself, not only its container, holds it.
+func tabToExit(t *testing.T, g *rig) {
+	for i := 0; i < 6; i++ {
+		g.tt.Key(0, ui.KeyTab)
+		g.tt.Frame()
+		if g.tt.Focused("Exit") && !g.tt.Focused("COPY TEXT") && !g.tt.Focused("BEGIN AGAIN") {
+			return
+		}
+	}
+	t.Fatal("Tab never reached Exit")
+}
+
+func TestExitIsAnAccessibleButtonThatSharesEscConfirmation(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	g.tt.Type("private draft")
+	rect, ok := g.tt.Find("Exit")
+	if !ok || rect.H < 44 {
+		t.Fatalf("Exit must be an accessible button at least 44 DIP tall: %v %v", rect, ok)
+	}
+	if err := g.tt.Click("Exit"); err != nil {
+		t.Fatal(err)
+	}
+	g.tt.Frame()
+	if g.quit || g.r.exitHintOff.IsZero() {
+		t.Fatal("one click only arms the exit")
+	}
+	g.tt.Key(0, ui.KeyEscape)
+	if !g.quit {
+		t.Fatal("click then Esc must leave")
+	}
+}
+
+func TestTabNeverTakesTheDraftsKeyboardWhileWriting(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	g.tt.Type("a")
+	g.tt.Key(0, ui.KeyTab)
+	g.tt.Type("b")
+	if g.r.Editor().Text() != "ab" {
+		t.Fatalf("a stray Tab must not move the keyboard off the draft: %q", g.r.Editor().Text())
+	}
+}
+
+func TestExitKeyboardActivationOnTheKeptScreen(t *testing.T) {
+	g := keptRig(t)
+	tabToExit(t, g)
+	g.tt.Key(0, ui.KeySpace)
+	g.tt.Frame()
+	if g.quit || g.r.exitHintOff.IsZero() {
+		t.Fatal("Space on Exit must arm the same confirmation as Esc")
+	}
+	g.tt.Key(0, ui.KeyEscape)
+	if !g.quit {
+		t.Fatal("Esc must confirm a button-armed exit")
+	}
+}
+
+func TestExitHoverAndFocusChangePixelsWithoutMovingTheTarget(t *testing.T) {
+	g := keptRig(t)
+	rect, ok := g.tt.Find("Exit")
+	if !ok {
+		t.Fatal("Exit button missing")
+	}
+	before := g.tt.Image()
+	g.tt.Move(rect.X+rect.W/2, rect.Y+rect.H/2)
+	g.tt.Frame()
+	hover := g.tt.Image()
+	changed := false
+	for y := int(rect.Y); y < int(rect.Y+rect.H); y++ {
+		for x := int(rect.X); x < int(rect.X+rect.W); x++ {
+			changed = changed || before.At(x, y) != hover.At(x, y)
+		}
+	}
+	if !changed {
+		t.Fatal("hover must tint the label from quiet to ink")
+	}
+	g.tt.Move(0, 0)
+	g.tt.Frame()
+	before = g.tt.Image()
+	tabToExit(t, g)
+	focused := g.tt.Image()
+	changed = false
+	for y := int(rect.Y) - 5; y < int(rect.Y+rect.H)+5; y++ {
+		for x := int(rect.X) - 5; x < int(rect.X+rect.W)+5; x++ {
+			changed = changed || before.At(x, y) != focused.At(x, y)
+		}
+	}
+	if !changed {
+		t.Fatal("keyboard focus must draw an ink ring on Exit")
+	}
+	if after, _ := g.tt.Find("Exit"); after != rect {
+		t.Fatal("hover and focus must not move the target")
+	}
+}
+
 func TestTypingDismissesTheExitConfirmation(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	g.tt.Type("hi")

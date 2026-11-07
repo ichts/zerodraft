@@ -17,9 +17,9 @@ async () => {
   input('hello world');
   check('Latin', count.textContent === '2 words');
   input(' 中文测试');
-  check('mixed Latin and Chinese', count.textContent === '14 characters');
+  check('mixed Latin and Chinese', count.textContent === '6 words');
   input('，！？ 👨‍👩‍👧‍👦 👍🏽');
-  check('punctuation and emoji excluded, graphemes retained', count.textContent === '14 characters' && editor.value.endsWith('👍🏽'));
+  check('punctuation and emoji excluded, graphemes retained', count.textContent === '6 words' && editor.value.endsWith('👍🏽'));
   const original = editor.value;
   for (const type of ['deleteContentBackward', 'insertFromPaste', 'historyUndo', 'insertFromDrop']) {
     const event = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: type });

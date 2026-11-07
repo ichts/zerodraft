@@ -27,13 +27,18 @@ func UsesCharacterCount(s string) bool {
 // digits (an apostrophe or a connecting mark inside a run stays in the word), punctuation and emoji do not
 // count.
 func WordCount(s string) int {
-	n, in := 0, false
+	n, in, afterCJK := 0, false, false
 	rs := []rune(s)
 	for i, r := range rs {
+		if afterCJK && unicode.IsMark(r) {
+			continue
+		}
+		afterCJK = false
 		switch {
 		case isCJK(r):
 			n++
 			in = false
+			afterCJK = true
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r):
 			if !in {
 				n++

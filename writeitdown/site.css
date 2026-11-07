@@ -146,12 +146,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .kept-note{margin:var(--kept-note-gap,14px) 0 0;font:400 var(--t-small)/1.6 var(--sans);color:var(--paper-quiet)}
 /* The two-step exit: the inline confirmation is on the footer row's own 1.6 line box, so its
    baseline meets ESC - EXIT and the count instead of sitting a few points lower (case 37). */
-.exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:500 13px/1.6 var(--sans);letter-spacing:0;color:var(--paper-danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--paper-danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* The first refused delete borrows the slot for two seconds in the quiet role (7:1 on the sheet), not the pen: it explains, it does not warn. */
 .exit-hint[data-kind="refusal"]{color:var(--paper-quiet);letter-spacing:.04em}
-/* The ink imperfection the captain locked (D-056): a 2 px displacement over two octaves of
-   fractal noise plus a hair of text stroke, so the words sit in the paper instead of on it. */
-.ink-imperfect,.home .script,.home .prev-line{filter:url(#wid-ink-wobble);-webkit-text-stroke:.14px currentColor}
+/* Glyphs are never filtered, displaced or stroked (D-090): the ink is the colour and nothing else. */
 .paper > .paper-foot{justify-content:flex-end}
 @media(max-width:767px){
   .room{--room-gut:12px}.writing-area{inset:64px 20px}
@@ -388,9 +386,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    lives on the sheet only (no desk behind it). Zen geometry and the 35% anchor are defined with the room above. */
 .room.home{min-height:0;--script:var(--t-write);--lh:var(--lh-write);font:400 var(--t-ui)/1.5 var(--sans)}
 .room-nav{flex:none;padding:0 calc(var(--gut) - var(--room-gut))}
-.room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet)}
+.room .mini-link{display:inline-flex;align-items:center;min-height:44px;padding:0}
+/* One footer style (D-090): the exit label, the count and the phone's Mac link share size, weight, tracking and colour, sentence case, one baseline. */
+.room .paper-foot :is(.mini-link,.count,.room-mac){font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
 .room .paper-foot{gap:12px;left:22px;right:22px;bottom:16px;align-items:center}
-.room .count{letter-spacing:0}
 @media(max-width:767px){
   .room .paper-foot{left:16px;right:16px}
   /* The kept screen's action row keeps both controls on one line at 390 px, so the press that
@@ -454,7 +453,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room .room-mac{display:none}
 @media(max-width:767px){
   .room-nav .btn-quiet{display:none}
-  .room .paper-foot .room-mac{display:inline-flex;align-items:center;min-height:44px;padding:0;font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--paper-quiet)}
+  .room .paper-foot .room-mac{display:inline-flex;align-items:center;min-height:44px;padding:0}
 }
 
 /* ---------- Text wrapping and corner shape: global switches ----------

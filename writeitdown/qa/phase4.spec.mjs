@@ -784,7 +784,7 @@ test('exit needs two acts, inks the inline confirmation on the footer row, and t
     expect(Math.abs(row.hint.baseline - row.count.baseline), 'one baseline on the exit row').toBeLessThan(1);
   }
   expect(row.tracking).toBe('normal');
-  expect(parseFloat(row.exitTracking)).toBeGreaterThan(0);
+  expect(row.exitTracking, 'the exit label tracks like the count (D-090)').toBe(row.tracking);
   await capture(page, info, 'exit-hint');
   // Typing cancels the armed exit.
   await page.keyboard.insertText('!');
@@ -1260,7 +1260,7 @@ test('Return and the pill start a fresh session and bring the chrome back', asyn
   await settle(page);
   await page.clock.fastForward(8350);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
-  // The pill is the only restart control, and its own box is the whole target; the footer keeps ESC - EXIT.
+  // The pill is the only restart control, and its own box is the whole target; the footer keeps Esc to exit.
   const target = await page.locator('#begin-again').boundingBox();
   await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'rest');
@@ -1608,7 +1608,7 @@ test('nothing in the room can throw a live draft away in one act', async ({ page
   await settle(page);
   const text = await editor(page).inputValue();
   // The warning names the act this width can perform.
-  await expect(page.locator('#exit')).toHaveText((await touchInput(page)) ? 'EXIT' : 'ESC - EXIT');
+  await expect(page.locator('#exit')).toHaveText((await touchInput(page)) ? 'Exit' : 'Esc to exit');
   // Both Mac links leave this document alone, so a click on them cannot take the draft down.
   const macLinks = await page.evaluate(() => [...document.querySelectorAll('#room a[href="download/"]')]
     .map(link => ({ target: link.target, rel: link.rel })));
@@ -1644,7 +1644,7 @@ test.describe('a thumb on the phone', () => {
     await page.clock.runFor(50);
     await page.keyboard.insertText('Typed with a thumb.');
     await page.clock.runFor(50);
-    await expect(page.locator('#exit')).toHaveText('EXIT');
+    await expect(page.locator('#exit')).toHaveText('Exit');
     const tap = async selector => {
       const box = await page.locator(selector).boundingBox();
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
@@ -1675,7 +1675,7 @@ test.describe('a landscape phone', () => {
     expect(await touchInput(page), 'the touch profile reports coarse input').toBe(true);
     await page.locator('#landing .cta a[href="#trial"]').tap();
     await expect(editor(page)).toBeFocused();
-    await expect(page.locator('#exit')).toHaveText('EXIT');
+    await expect(page.locator('#exit')).toHaveText('Exit');
     const tap = async selector => {
       const box = await page.locator(selector).boundingBox();
       await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
@@ -1696,7 +1696,7 @@ test.describe('a wide fine pointer', () => {
     expect(await touchInput(page), 'the desktop profile reports a fine pointer').toBe(false);
     await page.locator('#landing .cta a[href="#trial"]').click();
     await expect(editor(page)).toBeFocused();
-    await expect(page.locator('#exit')).toHaveText('ESC - EXIT');
+    await expect(page.locator('#exit')).toHaveText('Esc to exit');
     await page.locator('#exit').click();
     await expect(page.locator('#exit-hint')).toHaveText(EXIT_HINT.keyboard);
     await expect(page.locator('#room')).toBeVisible();

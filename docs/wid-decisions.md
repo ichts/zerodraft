@@ -1764,3 +1764,24 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: nothing; D-025's placement under the caret line is unchanged and now holds on both systems.
 - Evidence: `RoomTests.silenceCountdownSitsOnThePaperUnderTheWritingLine` (fails on the old code), and a Tart
   macOS 15.7.7 run: numeral at y 812 before, 377 after, visible under the writing line.
+
+## D-090: Glyphs are never filtered, and the web room's footer is one type style
+
+- Date: 2026-11-07
+- Decision: no element that carries words (the home demo, the trial room's input and ink layer, its headings,
+  the kept text) takes a CSS filter, an SVG displacement or a text stroke on writeitdown.app or the Zero Draft
+  landing. The ink is the colour and nothing else. The web room's footer is one style: the left label, the
+  count and the phone's Mac link are 13 px / 400, no tracking, sentence case, one baseline. The left label
+  reads `Esc to exit` (`Exit` on touch input).
+- Reason: the captain, 2026-11-07, twice: the typed words warp on the paper, and the footer's two sides look like
+  two sizes. Cause of the warp, measured by switching one property at a time in Chrome and Safari at 1x and 2x:
+  the SVG `feTurbulence` + `feDisplacementMap` (2 px) that D-056 put on the writing layer bends every glyph
+  outline; the 0.14 px stroke, the `translateY(-50%)` on the writing area and the aperture mask change nothing visible.
+  The footer was 13 px / 500 / +4 % tracking in caps on the left and 11 px / 500 on the right.
+- Supersedes: D-056's "ink imperfection on" (the 2 px displacement and the hair of stroke); the caps `ESC - EXIT`
+  and `EXIT` labels and the 13/500 +4 % footer link on the web. The Mac and Windows rooms keep `ESC - EXIT` until
+  their own change.
+- Evidence: `writeitdown/qa/ink-footer.spec.mjs` (fails on the old code: a displacement filter on the writing
+  layer, and two footer labels with different computed metrics); before/after 200 % crops in
+  `data/wid-ink-warp/before-after.pdf`.
+

@@ -791,9 +791,7 @@ if (document.readyState === "loading") {
     border-radius: inherit;
     pointer-events: none;
   }
-  /* The ink imperfection (D-056): a 2 px displacement over two octaves of fractal
-     noise plus a hair of text stroke, so the words sit in the paper. */
-  .ink-imperfect { filter: url(#fl-ink-wobble); -webkit-text-stroke: .14px currentColor; }
+  /* Glyphs are never filtered, displaced or stroked (D-090): the ink is the colour and nothing else. */
 
   /* ---------- caption form (one consistent machine voice) ----------
      Every caption is Plex Mono caps and carries its reading: it states what
@@ -1587,14 +1585,6 @@ if (document.readyState === "loading") {
   data-on:popstate__window="FirstLineLandingDemo.emitFlroutecheck()"
   data-on:flroutecheck="(location.hash === '#trial' &amp;&amp; $_session.context !== 'trial') ? FirstLineLandingDemo.startTrial(null) : ((location.hash !== '#trial' &amp;&amp; $_session.context === 'trial') ? FirstLineLandingDemo.exitTrial() : '')"
 >
-  <!-- The ink's imperfection (D-056): a 2 px displacement over two octaves of fractal noise.
-       One filter, referenced by .ink-imperfect on every surface that carries writing. -->
-  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
-    <filter id="fl-ink-wobble" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
-      <feTurbulence type="fractalNoise" baseFrequency="0.06 0.075" numOctaves="2" seed="11" result="noise"/>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </svg>
   <p class="sr-only" role="status" aria-live="polite" data-text="$_session.srStatus"></p>
   <div class="room">
     <header class="nav">
@@ -1615,7 +1605,7 @@ if (document.readyState === "loading") {
             <span class="demo-clock">1:00</span>
           </div>
           <div class="demo-stage">
-            <p class="demo-text ink-imperfect" aria-hidden="true"></p>
+            <p class="demo-text" aria-hidden="true"></p>
             <p class="demo-report system" hidden aria-hidden="true"></p>
             <div class="danger-overlay" data-show="$_session.dangerActive &amp;&amp; $_session.context === 'demo'" aria-live="polite" aria-atomic="true">
               <span class="numeral" data-text="$_session.dangerSeconds">3</span>
@@ -1643,7 +1633,7 @@ if (document.readyState === "loading") {
       <p class="chrome chrome-bl"><button type="button" class="trial-exit" data-on:click="FirstLineLandingDemo.exitTrial()">Esc - Exit</button></p>
       <p class="chrome chrome-br"><span class="label" data-text="$_session.livewords + ' words'">0 words</span></p>
       <div class="trial-column">
-        <div class="trial-editor ink-imperfect" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
+        <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
         <p class="trial-hint label" data-show="$_session.context === 'trial' &amp;&amp; !$_session.failed &amp;&amp; !$_session.complete &amp;&amp; $_session.text.trim().length === 0">Type here. The law is live: 5s warn, 8s wipe, 60s to keep.</p>
       </div>
       <div class="danger-overlay trial-danger" data-show="$_session.dangerActive &amp;&amp; $_session.context === 'trial'" aria-live="assertive" aria-atomic="true">
@@ -1664,7 +1654,7 @@ if (document.readyState === "loading") {
             <span class="rules label rules-compact">Fwd only / 5s / 8s / 60s</span>
             <span class="kept-clock">0:00</span>
           </div>
-          <article class="kept-text ink-imperfect" data-text="$_session.resultText"></article>
+          <article class="kept-text" data-text="$_session.resultText"></article>
           <div class="kept-receipt">
             <span class="receipt-line system" data-text="'0:00 - ' + $_session.resultWordCount + ' words kept.'">0:00 - 0 words kept.</span>
             <button type="button" class="copy-door" data-text="$_session.copied ? 'Copied' : 'Copy text'" data-class:is-copied="$_session.copied" data-on:click="FirstLineLandingDemo.copyText($_session.resultText)">Copy text</button>

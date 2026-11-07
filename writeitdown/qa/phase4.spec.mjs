@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
-import { clock, wordCount } from '../session.mjs';
+import { clock, wordCount, countLabel } from '../session.mjs';
 import { barFraction, EMPTY_BAR } from './bar-clip.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
@@ -351,7 +351,7 @@ test('history is stepped per line and a new line shifts it exactly one pitch', a
   }
   await settle(page);
   expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line keeps the same pitch').toBeCloseTo(topology.scroll + 4 * topology.line, 0);
-  await expect(page.locator('#room-count')).toHaveText(`${wordCount('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。')} words`);
+  await expect(page.locator('#room-count')).toHaveText(countLabel('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。'));
 });
 
 test('warning numeral and caption are placed by ink under the writing line', async ({ page }, info) => {
@@ -836,9 +836,11 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   }
   await page.clock.fastForward(3000);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+  // The one-pixel hover lift is deliberate; measure the row at rest, with the pointer off both controls.
+  await page.mouse.move(0, 0);
   await expect(page.locator('#kept h1')).toHaveText('You wrote it down.');
-  const words = wordCount(await page.locator('#kept-text').textContent());
-  await expect(page.locator('#receipt')).toHaveText(`1 minute. ${words} words.`);
+  const keptDraft = await page.locator('#kept-text').textContent();
+  await expect(page.locator('#receipt')).toHaveText(`1 minute. ${countLabel(keptDraft)}.`);
   const kept = await page.evaluate(() => {
     const copy = document.querySelector('#copy');
     const restart = document.querySelector('#restart');

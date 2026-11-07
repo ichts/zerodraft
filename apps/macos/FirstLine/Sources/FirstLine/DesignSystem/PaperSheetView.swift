@@ -2,7 +2,8 @@
  * [INPUT]: the paper's laid-out size, the window's backing scale, the effective appearance (light/dark),
  *          and the locked paper constants (tone Wheat #e9e2ce / #342e24 per D-069, superseding D-056's Note
  *          tone; grain 70 of 100, size 1.00 per D-056).
- * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone, two-scale mottle and grain, rendered once
+ * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone with, in light, two-scale mottle and grain and, in
+ *           dark, one fine grain (D-093), rendered once
  *           into a cached CGImage per size and appearance, with the sheet ring and rounded clip the room needs.
  * [POS]: The Mac half of the sheet the web renders in writeitdown/paper.js; the room, its failure screen and
  *        the kept sheet all sit on this one paper. Cards, fields and controls keep FirstLineColors.sheetNSColor.
@@ -140,6 +141,9 @@ enum PaperField {
     static let size = 1.00
     static let tooth = 44.0
     static let pulp = 24.0
+    /// The dark sheet's whole texture (D-093): one very fine grain, peak +-3 levels, nothing else. No mottle,
+    /// pulp, fibres or flecks, so no pixel lifts far enough to cost a text role its 7:1.
+    static let darkGrain = 3.0
 
     /// mulberry32, the web renderer's generator; the same seed yields the same field.
     struct Random {
@@ -234,6 +238,8 @@ enum PaperField {
         paper.setFillColor(CGColor(srgbRed: colour.r / 255, green: colour.g / 255, blue: colour.b / 255, alpha: 1))
         paper.fill(full)
 
+        if dark { return darkSheet(width: width, height: height, colour: colour, paper: paper, texture: texture) }
+
         // Two scales of mottle, each generated small and upscaled with smoothing.
         var coarse = Random(seed: seed("coarse" + hex(colour)))
         var fine = Random(seed: seed("fine" + hex(colour)))
@@ -258,9 +264,8 @@ enum PaperField {
         // The seed's size is serialised the way the web's `'tooth' + hex + SIZE` prints 1.00: "1".
         guard let grainContext = makeContext(width: width, height: height) else { return nil }
         var random = Random(seed: seed("tooth" + hex(colour) + "1"))
-        let lift = dark ? 0.4 : 1.0
 
-        if let toothImage = noiseImage(width: width, height: height, amount: tooth * lift,
+        if let toothImage = noiseImage(width: width, height: height, amount: tooth,
                                        tone: colour, random: &random) {
             grainContext.interpolationQuality = .none
             grainContext.draw(toothImage, in: full)
@@ -268,15 +273,15 @@ enum PaperField {
         let pulpCell = max(2, Int((Double(scale) * 0.8).rounded()))
         let pulpWidth = max(2, (width + pulpCell - 1) / pulpCell)
         let pulpHeight = max(2, (height + pulpCell - 1) / pulpCell)
-        if let pulpImage = noiseImage(width: pulpWidth, height: pulpHeight, amount: pulp * lift,
+        if let pulpImage = noiseImage(width: pulpWidth, height: pulpHeight, amount: pulp,
                                       tone: colour, random: &random) {
             grainContext.interpolationQuality = .high
             grainContext.draw(pulpImage, in: full)
         }
         drawFibres(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random, dark: dark)
+                   tone: colour, random: &random)
         drawFlecks(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random, dark: dark)
+                   tone: colour, random: &random)
 
         if let grainLayer = grainContext.makeImage() {
             for context in [paper, texture] {
@@ -285,6 +290,24 @@ enum PaperField {
                 context.interpolationQuality = .none
                 context.draw(grainLayer, in: full)
                 context.restoreGState()
+            }
+        }
+        guard let textureImage = texture.makeImage() else { return nil }
+        let shift = meanShift(of: paper, to: colour)
+        apply(shift: shift, to: paper, in: full)
+        guard let image = paper.makeImage() else { return nil }
+        return Sheet(image: image, texture: Texture(image: textureImage, shift: shift))
+    }
+
+    /// The dark sheet: the flat token and one fine grain at device-pixel size, drawn at full strength.
+    private static func darkSheet(width: Int, height: Int, colour: (r: Double, g: Double, b: Double),
+                                  paper: CGContext, texture: CGContext) -> Sheet? {
+        let full = CGRect(x: 0, y: 0, width: width, height: height)
+        var random = Random(seed: seed("tooth" + hex(colour) + "1"))
+        if let image = noiseImage(width: width, height: height, amount: darkGrain, tone: colour, random: &random) {
+            for context in [paper, texture] {
+                context.interpolationQuality = .none
+                context.draw(image, in: full)
             }
         }
         guard let textureImage = texture.makeImage() else { return nil }
@@ -340,13 +363,13 @@ enum PaperField {
 
     /// Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches.
     private static func drawFibres(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random, dark: Bool) {
+                                   tone: (r: Double, g: Double, b: Double), random: inout Random) {
         let dpr = Double(scale)
         let count = Int((Double(width * height) / (dpr * dpr) * 0.0026).rounded())
         ctx.setLineCap(.round)
         for _ in 0..<count {
-            let pale = random.next() < (dark ? 0.2 : 0.44)
-            let spread = (12 + random.next() * 34) * (dark ? 0.32 : 1) * (pale ? 0.7 : 1)
+            let pale = random.next() < 0.44
+            let spread = (12 + random.next() * 34) * (pale ? 0.7 : 1)
             ctx.setAlpha(alpha(delta: (pale ? 1.0 : -1.0) * spread, tone: tone) * (0.55 + random.next() * 0.45))
             ctx.setStrokeColor(CGColor(srgbRed: pale ? 1 : 0, green: pale ? 1 : 0, blue: pale ? 1 : 0, alpha: 1))
             ctx.setLineWidth((0.5 + random.next() * 0.7) * dpr)
@@ -366,9 +389,9 @@ enum PaperField {
 
     /// Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones.
     private static func drawFlecks(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random, dark: Bool) {
+                                   tone: (r: Double, g: Double, b: Double), random: inout Random) {
         let dpr = Double(scale)
-        let count = Int((Double(width * height) / (dpr * dpr) * 0.0030 * (dark ? 0.22 : 1)).rounded())
+        let count = Int((Double(width * height) / (dpr * dpr) * 0.0030).rounded())
         for _ in 0..<count {
             let x = random.next() * Double(width)
             let y = random.next() * Double(height)
@@ -377,7 +400,7 @@ enum PaperField {
                 ? (255, 250, 240)
                 : (random.next() < 0.7 ? (36, 29, 21) : (91, 67, 39))
             ctx.setFillColor(CGColor(srgbRed: pigment.r / 255, green: pigment.g / 255, blue: pigment.b / 255, alpha: 1))
-            ctx.setAlpha((pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46) * (dark ? 0.5 : 1))
+            ctx.setAlpha(pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46)
             let radius = (0.4 + random.next() * 1.0) * dpr * max(0.7, size * 0.85)
             let lobes = random.next() < 0.7 ? 1 : 2
             for _ in 0..<lobes {

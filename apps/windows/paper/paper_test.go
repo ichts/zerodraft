@@ -68,3 +68,20 @@ func BenchmarkRender150(b *testing.B) {
 		Render(2850, 1500, 1.5, false)
 	}
 }
+
+// D-093: the dark sheet is one fine grain, peak +-3 levels about the tone, so no pixel lifts far enough to cost
+// a text role its 7:1 (ink #ece7d9 and quiet #c2bfb7 against the brightest pixel).
+func TestDarkSheetIsFineGrain(t *testing.T) {
+	s := Render(640, 384, 2, true)
+	var peak, mean float64
+	for i := 0; i < len(s.Texture.Pix); i += 4 {
+		k := 1 - float64(s.Texture.Pix[i+3])/255
+		l := 0.2126*(float64(s.Texture.Pix[i])+clamp(s.Base.R)*k) + 0.7152*(float64(s.Texture.Pix[i+1])+clamp(s.Base.G)*k) + 0.0722*(float64(s.Texture.Pix[i+2])+clamp(s.Base.B)*k)
+		mean += l
+		peak = math.Max(peak, l)
+	}
+	mean /= float64(len(s.Texture.Pix) / 4)
+	if peak-mean > 3.5 {
+		t.Fatalf("brightest pixel lifts %.1f levels, past the +-3 grain", peak-mean)
+	}
+}

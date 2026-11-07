@@ -1,8 +1,8 @@
 /* Write It Down - the Wheat sheet.
    [INPUT] every element marked data-paper, its laid-out size, devicePixelRatio, and the resolved
            theme on :root (light / dark).
-   [OUTPUT] one static texture painted into a canvas child behind that element's content: the Wheat
-            sheet's two-scale mottle and its grain (tooth, pulp, fibres, flecks).
+   [OUTPUT] one static texture painted into a canvas child behind that element's content: the light Wheat
+            sheet's two-scale mottle and its grain (tooth, pulp, fibres, flecks); the dark sheet's one fine grain.
             The tone itself stays in CSS so a state wash can still tint the sheet.
    [POS] the single place on the web surface that defines what the paper looks like; the room, the
          failure sheet, the kept sheet and the landing demo sheet all mount it.
@@ -20,6 +20,9 @@
   const SIZE = 1.00;
   const TOOTH = 44;
   const PULP = 24;
+  /* The dark sheet is flat warm charcoal with one very fine grain and nothing else (D-093): peak +-3 levels,
+     no mottle, pulp, fibres or flecks, so no pixel lifts far enough to cost a text role its 7:1. */
+  const DARK_GRAIN = 3;
 
   const hexToRgb = hex => {
     const h = hex.replace('#', '');
@@ -83,12 +86,12 @@
   };
 
   /* Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches. */
-  const drawFibres = (ctx, width, height, dpr, tone, rnd, dark) => {
+  const drawFibres = (ctx, width, height, dpr, tone, rnd) => {
     const count = Math.round((width * height) / (dpr * dpr) * 0.0026);
     ctx.lineCap = 'round';
     for (let i = 0; i < count; i += 1) {
-      const pale = rnd() < (dark ? 0.2 : 0.44);
-      const delta = (pale ? 1 : -1) * (12 + rnd() * 34) * (dark ? 0.32 : 1) * (pale ? 0.7 : 1);
+      const pale = rnd() < 0.44;
+      const delta = (pale ? 1 : -1) * (12 + rnd() * 34) * (pale ? 0.7 : 1);
       ctx.globalAlpha = alphaFor(delta, tone) * (0.55 + rnd() * 0.45);
       ctx.strokeStyle = pale ? '#ffffff' : '#000000';
       ctx.lineWidth = (0.5 + rnd() * 0.7) * dpr;
@@ -111,14 +114,14 @@
   };
 
   /* Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones. */
-  const drawFlecks = (ctx, width, height, dpr, tone, rnd, dark) => {
-    const count = Math.round((width * height) / (dpr * dpr) * 0.0030 * (dark ? 0.22 : 1));
+  const drawFlecks = (ctx, width, height, dpr, tone, rnd) => {
+    const count = Math.round((width * height) / (dpr * dpr) * 0.0030);
     for (let i = 0; i < count; i += 1) {
       const x = rnd() * width;
       const y = rnd() * height;
       const pale = rnd() < 0.14;
       ctx.fillStyle = pale ? '#fffaf0' : (rnd() < 0.7 ? '#241d15' : '#5b4327');
-      ctx.globalAlpha = (pale ? 0.16 + rnd() * 0.24 : 0.26 + rnd() * 0.46) * (dark ? 0.5 : 1);
+      ctx.globalAlpha = pale ? 0.16 + rnd() * 0.24 : 0.26 + rnd() * 0.46;
       const radius = (0.4 + rnd() * 1.0) * dpr * Math.max(0.7, SIZE * 0.85);
       const lobes = rnd() < 0.7 ? 1 : 2;
       for (let lobe = 0; lobe < lobes; lobe += 1) {
@@ -135,26 +138,33 @@
 
   /* Grain sits on its own layer and is composited once at the locked strength, so the sheet's
      tone is decided by the base layer alone. */
-  const drawGrain = (ctx, width, height, dpr, tone, dark) => {
+  const drawGrain = (ctx, width, height, dpr, tone) => {
     const layer = canvasWith(width, height);
     const grain = contextWith(layer);
     const rnd = prng(seedFrom('tooth' + rgbToHex(tone) + SIZE));
-    const lift = dark ? 0.4 : 1;
     /* Two scales of surface: tooth at device-pixel size, then a coarser pulp cloud upscaled with
        smoothing. One scale alone reads as dither or as sponge. */
-    grain.putImageData(noiseLayer(width, height, TOOTH * lift, tone, rnd), 0, 0);
+    grain.putImageData(noiseLayer(width, height, TOOTH, tone, rnd), 0, 0);
     const cell = Math.max(2, Math.round(dpr * 0.8));
     const pulp = canvasWith(Math.max(2, Math.ceil(width / cell)), Math.max(2, Math.ceil(height / cell)));
-    contextWith(pulp).putImageData(noiseLayer(pulp.width, pulp.height, PULP * lift, tone, rnd), 0, 0);
+    contextWith(pulp).putImageData(noiseLayer(pulp.width, pulp.height, PULP, tone, rnd), 0, 0);
     grain.imageSmoothingEnabled = true;
     grain.drawImage(pulp, 0, 0, width, height);
-    drawFibres(grain, width, height, dpr, tone, rnd, dark);
-    drawFlecks(grain, width, height, dpr, tone, rnd, dark);
+    drawFibres(grain, width, height, dpr, tone, rnd);
+    drawFlecks(grain, width, height, dpr, tone, rnd);
 
     ctx.save();
     ctx.globalAlpha = GRAIN;
     ctx.drawImage(layer, 0, 0);
     ctx.restore();
+  };
+
+  /* The dark sheet's whole texture: tooth at device-pixel size, at the full layer strength. */
+  const drawDarkGrain = (ctx, width, height, tone) => {
+    const rnd = prng(seedFrom('tooth' + rgbToHex(tone) + SIZE));
+    const layer = canvasWith(width, height);
+    contextWith(layer).putImageData(noiseLayer(width, height, DARK_GRAIN, tone, rnd), 0, 0);
+    ctx.drawImage(layer, 0, 0);
   };
 
   const currentTheme = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -183,7 +193,6 @@
      moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {
-    const dark = theme === 'dark';
     const tone = hexToRgb(TONES[theme]);
     const canvasWidth = Math.max(1, Math.round(width * dpr));
     const canvasHeight = Math.max(1, Math.round(height * dpr));
@@ -191,9 +200,13 @@
     canvas.height = canvasHeight;
     const ctx = contextWith(canvas);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 34, 9.0, 'coarse');
-    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 9, 4.5, 'fine');
-    drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, dark);
+    if (theme === 'dark') {
+      drawDarkGrain(ctx, canvasWidth, canvasHeight, tone);
+    } else {
+      mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 34, 9.0, 'coarse');
+      mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 9, 4.5, 'fine');
+      drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone);
+    }
     const shift = textureDelta(ctx, canvasWidth, canvasHeight, tone);
     const corrected = tone.map((channel, index) => Math.max(0, Math.min(255, channel - shift[index])));
     return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now(), base: rgbToHex(corrected) };

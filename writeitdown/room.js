@@ -17,7 +17,7 @@ const CONFIRM_MS = 2000;
 // A touch screen has no Escape key, however wide it is, so the input names the control it can
 // actually press and its confirmation tells that thumb what to do next (D-067).
 const touchInput = matchMedia('(hover: none), (any-pointer: coarse)');
-const EXIT_LABEL = { keyboard: 'ESC - EXIT', touch: 'EXIT' };
+const EXIT_LABEL = { keyboard: 'Esc to exit', touch: 'Exit' };
 const EXIT_HINT = {
   keyboard: 'Press Esc again to leave and delete the draft.',
   touch: 'Tap EXIT again to leave and delete the draft.'

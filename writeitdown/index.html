@@ -31,14 +31,6 @@
 <link rel="stylesheet" href="fonts-cjk.css">
 </head>
 <body class="page-a">
-<!-- The ink's imperfection (D-056): a 2 px displacement over two octaves of fractal noise. One
-     filter, referenced by .ink-imperfect on every surface that carries writing. -->
-<svg width="0" height="0" aria-hidden="true" style="position:absolute">
-  <filter id="wid-ink-wobble" x="-3%" y="-3%" width="106%" height="106%" color-interpolation-filters="sRGB">
-    <feTurbulence type="fractalNoise" baseFrequency="0.06 0.075" numOctaves="2" seed="11" result="noise"/>
-    <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" xChannelSelector="R" yChannelSelector="G"/>
-  </filter>
-</svg>
 <main class="home" id="landing">
   <div class="first-screen">
   <nav class="wrap home-nav" aria-label="Main">
@@ -154,33 +146,33 @@
       <div class="clock" id="room-clock">1:00</div>
     </div>
     <div class="room-top" id="failed" hidden>
-      <h1 class="ink-imperfect">You stopped.</h1>
+      <h1>You stopped.</h1>
       <p class="failure-note" id="failure-note">Draft deleted.</p>
       <button class="room-secondary" id="begin-again" type="button" aria-keyshortcuts="Enter">Begin again</button>
     </div>
     <div class="writing-area">
       <label class="sr-only" for="editor">Write forward. Stop for eight seconds and your draft is deleted.</label>
       <div class="editor-stack">
-        <textarea class="ink-imperfect" id="editor" aria-describedby="count-rule" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
-        <div class="editor-ink ink-imperfect" id="editor-ink" aria-hidden="true"></div>
+        <textarea id="editor" aria-describedby="count-rule" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off"></textarea>
+        <div class="editor-ink" id="editor-ink" aria-hidden="true"></div>
       </div>
     </div>
     <div id="kept" hidden>
       <div class="kept-head">
-        <h1 class="ink-imperfect">You wrote it down.</h1>
+        <h1>You wrote it down.</h1>
         <p class="kept-receipt" id="receipt"></p>
         <div class="kept-actions"><button class="room-primary" id="copy" type="button"><span id="copy-label">COPY TEXT</span></button><button class="room-secondary" id="restart" type="button">BEGIN AGAIN</button></div>
         <a class="kept-app" href="download/?from=kept" target="_blank" rel="noopener">Mac app</a>
         <p class="kept-note" id="kept-note">Nothing here is saved. Copy it before you leave.</p>
       </div>
-      <div class="kept-scroll"><div class="kept-text ink-imperfect" id="kept-text"></div></div>
+      <div class="kept-scroll"><div class="kept-text" id="kept-text"></div></div>
     </div>
     <div class="danger" id="room-danger" aria-hidden="true" hidden>
       <div class="numeral" id="room-numeral"></div>
       <p class="caption" id="room-warning"></p>
     </div>
     <div class="paper-foot">
-      <button class="mini-link" id="exit" type="button">ESC - EXIT</button>
+      <button class="mini-link" id="exit" type="button">Esc to exit</button>
       <a class="room-mac" href="download/" target="_blank" rel="noopener">Download for Mac</a>
       <p class="exit-hint" id="exit-hint" role="status" aria-live="polite"></p>
       <div class="count" id="room-count" title="Counts words. Each Chinese character counts as one. Punctuation and emoji do not count.">Type to begin</div>

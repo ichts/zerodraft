@@ -325,7 +325,7 @@ async function run(size, browser) {
       ok(copied === typed, 'clipboard differs from the finished draft');
       const touch = await page.evaluate(() => matchMedia('(hover: none), (any-pointer: coarse)').matches);
       await page.locator('#exit').click();
-      ok((await page.locator('#exit').innerText()).trim() === (touch ? 'EXIT' : 'ESC - EXIT'), 'exit control missing');
+      ok((await page.locator('#exit').innerText()).trim() === (touch ? 'Exit' : 'Esc to exit'), 'exit control missing');
       ok((await page.locator('#exit-hint').innerText()).trim() === (touch ? 'Tap EXIT again to leave and delete the draft.' : 'Press Esc again to leave and delete the draft.'), 'exit confirmation missing');
       ok(await page.locator('#room').isVisible(), 'one exit act left the room');
       await page.locator('#exit').click();

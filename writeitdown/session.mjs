@@ -29,7 +29,7 @@ export function clock(seconds) {
 const wordSegments = new Intl.Segmenter(undefined, { granularity: 'word' });
 
 // Han, Hiragana and Katakana (and the prolonged sound mark) are written without spaces, so each one is a
-// unit; every other script uses Unicode word boundaries (D-094). The Mac and Windows rooms use the same rule.
+// unit; every other script uses Unicode word boundaries (D-095). The Mac and Windows rooms use the same rule.
 const CJK = String.raw`[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC]`;
 const cjkUnits = new RegExp(`(${CJK}\\p{Mark}*)`, 'gu');
 const cjkLetter = new RegExp(CJK, 'gu');

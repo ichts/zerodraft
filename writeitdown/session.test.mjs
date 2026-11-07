@@ -102,7 +102,7 @@ test('Unicode words, individual Han characters, and non-word input', () => {
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
 });
 
-test('the label says characters only when CJK letters are at least half of the draft (D-094)', () => {
+test('the label says characters only when CJK letters are at least half of the draft (D-095)', () => {
   const english = `${'word '.repeat(500)}你好`;
   const cases = [
     ['我们是', '3 characters'], ['我', '1 character'], ['こんにちは世界', '7 characters'], ['コーヒー', '4 characters'],

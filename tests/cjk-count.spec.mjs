@@ -1,4 +1,4 @@
-// The root trial counts like the rooms (D-094): a Chinese draft reads characters, never words, and an
+// The root trial counts like the rooms (D-095): a Chinese draft reads characters, never words, and an
 // English draft with one quoted 你好 stays words.
 import { test, expect } from '@playwright/test';
 

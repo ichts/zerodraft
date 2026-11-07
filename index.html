@@ -89,7 +89,7 @@ window.FirstLineLandingDemo = (() => {
   function fmtClock(seconds) {
     return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
   }
-  // The count rule of the rooms (D-094): Han, Hiragana and Katakana count one per character, other words by
+  // The count rule of the rooms (D-095): Han, Hiragana and Katakana count one per character, other words by
   // Unicode word boundary; the label says characters when CJK letters are at least half of the draft.
   const wordSegments = new Intl.Segmenter(undefined, { granularity: "word" });
   const CJK = String.raw`[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC]`;

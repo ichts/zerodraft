@@ -1871,7 +1871,7 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Evidence: `writeitdown/qa/ink-footer.spec.mjs` (hover ink, 2 px ink outline, 44 px target, click and Esc share the
   confirmation), `RoomTests.exitHasAQuietHoverInkFocusAndAFullHeightHitTarget`,
   `RoomTests.clickAndEscapeShareOneConfirmation`, `apps/windows/room` `TestExit*` and `TestTabNeverTakesTheDraftsKeyboardWhileWriting`.
-## D-094: The result screen is sentence case, and a Chinese or Japanese draft counts in characters
+## D-095: The result screen is sentence case, and a Chinese or Japanese draft counts in characters
 
 - Date: 2026-11-07
 - Decision: the kept screen's receipt, its two actions and the copy states read as sentences on the Mac,

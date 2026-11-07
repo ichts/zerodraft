@@ -3,7 +3,7 @@ package session
 import "unicode"
 
 // isCJK is a script written without spaces, so each character is one unit: Han, Hiragana, Katakana and the
-// prolonged sound mark (D-094). The Mac and the web rooms use the same rule.
+// prolonged sound mark (D-095). The Mac and the web rooms use the same rule.
 func isCJK(r rune) bool {
 	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) || r == '\u30FC'
 }

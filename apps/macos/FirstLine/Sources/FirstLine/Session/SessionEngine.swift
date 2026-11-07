@@ -27,7 +27,7 @@ final class SessionEngine {
         durationChoices.contains(value) ? value : defaultDurationSeconds
     }
 
-    /// Han, Hiragana, Katakana and the prolonged sound mark are written without spaces: each is one unit (D-094).
+    /// Han, Hiragana, Katakana and the prolonged sound mark are written without spaces: each is one unit (D-095).
     nonisolated private static let cjkClass = "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\u30FC]"
     private static let cjkUnitPattern = try! NSRegularExpression(pattern: "(\(cjkClass)\\p{Mark}*)")
     nonisolated private static let cjkPattern = try! NSRegularExpression(pattern: cjkClass)

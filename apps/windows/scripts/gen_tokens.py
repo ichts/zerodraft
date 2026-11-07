@@ -23,7 +23,7 @@ for m in re.finditer(r'static var (\w+)NSColor: NSColor \{ adaptive\(light: (0x[
 out.append(')\n')
 # history ladder
 h = re.search(r'dark \? \[([0-9., ]+)\] : \[([0-9., ]+)\]', colors)
-out.append(f'// HistoryOpacities is the D-069 ladder, current line first; lines beyond it are gone.')
+out.append(f'// HistoryOpacities are the history steps (D-092), current line first; lines beyond them are gone.')
 out.append(f'var HistoryOpacitiesDark = []float32{{{h.group(1)}}}')
 out.append(f'var HistoryOpacitiesLight = []float32{{{h.group(2)}}}\n')
 # spacing
@@ -85,7 +85,7 @@ strings = {
  'BeginAgain': s1(r'title: "(Begin again)"', svc),
  'Warning': s1(r'"(KEEP TYPING OR THE DRAFT IS DELETED\.)"', svc),
  'TypeToBegin': s1(r'"(Type to begin)"', svc),
- 'ExitLink': s1(r'title: "(ESC - EXIT)"', svc),
+ 'ExitLink': s1(r'static let exitLabel = "([^"]+)"', svc),
  'KeptHeading': s1(r'labelWithString: "(You wrote it down\.)"', kept),
  'KeptCaption': s1(r'static let unsavedCaption = "([^"]+)"', kept),
  'RefusalNotice': s1(r'private static let refusalNoticeText = "([^"]+)"', svc),

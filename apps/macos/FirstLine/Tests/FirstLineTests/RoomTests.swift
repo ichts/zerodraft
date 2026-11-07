@@ -210,7 +210,7 @@ struct RoomTests {
         room.exitConfirmation = ExitConfirmation(window: 2)
         room.confirmationClock = { now }
         let exit = try #require(exitButton(in: room))
-        #expect(exit.title == "ESC - EXIT")
+        #expect(exit.title == "Esc to exit")
         exit.performClick(nil)
         #expect(fixture.state.selectedSurface == .session)
         #expect(!(try #require(hintLabel(in: room))).isHidden)
@@ -226,7 +226,7 @@ struct RoomTests {
             fixture.room.view.layoutSubtreeIfNeeded()
             let exit = try #require(exitButton(in: fixture.room))
             #expect(!exit.isHiddenOrHasHiddenAncestor)
-            #expect(exit.title == "ESC - EXIT")
+            #expect(exit.title == "Esc to exit")
         }
     }
 
@@ -363,7 +363,7 @@ struct RoomTests {
         let buttons = descendants(fixture.room.view, of: NSButton.self)
         #expect(buttons.contains { $0.title == "COPY TEXT" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(buttons.contains { $0.title == "BEGIN AGAIN" && !$0.isHiddenOrHasHiddenAncestor })
-        #expect(buttons.contains { $0.title == "ESC - EXIT" && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(buttons.contains { $0.title == "Esc to exit" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(fields.contains { $0.stringValue == "0:00" })
 
         // The receipt owns the count; the corner slot is silent in this state (D-074).
@@ -1077,7 +1077,7 @@ struct RoomTests {
     }
 
     private func exitButton(in room: SessionViewController) -> NSButton? {
-        descendants(room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" }
+        descendants(room.view, of: NSButton.self).first { $0.title == "Esc to exit" }
     }
 
     private func sameColor(_ lhs: NSColor?, _ rhs: NSColor, appearance: NSAppearance.Name = .aqua) -> Bool {

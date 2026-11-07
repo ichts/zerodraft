@@ -1,8 +1,10 @@
-// D-077 and D-088: the room's history fades per line, and the first refused delete of a session says why.
+// D-077, D-088 and D-092: the room's history fades per line ended by Return, and the first refused delete of a session says why.
 //
-// Fade: the unit is the line ended by Return, never a sentence (D-088). Every row of one line shares one measured opacity (the ink layer's span, read from the computed
-// style and from the pixels), the ladder is D-069's and every step clears 7:1 on the Wheat sheet in both
-// themes, and the aperture is a hard clip, so a partial line is cut at its edge and never given an alpha.
+// Fade: the unit is the line ended by Return, never a sentence (D-088). Every row of one line shares one measured opacity
+// (the ink layer's span, read from the computed style and from the pixels). The steps are D-092's: live 1, one back .22,
+// two back .07, older gone, per theme; the lines above dissolve to their next step over 320 ms when Return lands. The
+// dimmed lines are exempt from the 7:1 floor (the captain's exception); the live line keeps the full ink. The aperture is
+// a hard clip, so a partial line is cut at its edge and never given an alpha.
 // Refusal: the 200 ms shake stays on every refusal; the first refused delete of a session also names the
 // rule in the footer's status slot for two seconds, and nothing else moves.
 import { test, expect } from '@playwright/test';
@@ -23,6 +25,12 @@ async function enter(page) {
   await page.locator('#landing .cta a[href="#trial"]').click();
   await expect(page.locator('#editor')).toBeFocused();
 }
+
+/** Every running dissolve has landed: the document timeline only moves with frames, so wait on the animations themselves. */
+const dissolved = page => page.evaluate(async () => {
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {})));
+});
 
 const theme = page => page.evaluate(() => document.documentElement.dataset.theme || 'light');
 
@@ -72,7 +80,7 @@ test('every row of one logical line carries one opacity, measured in the DOM and
   const tone = hex(TONES[mode]);
   const words = Array.from({ length: 40 }, () => 'mmmm').join(' ');
   await page.keyboard.insertText(`${words}.\nmmmm mmmm`);
-  await page.waitForTimeout(450);
+  await dissolved(page);
 
   const lines = await inkLines(page);
   const long = lines[0];
@@ -93,60 +101,66 @@ test('every row of one logical line carries one opacity, measured in the DOM and
   expect(liveDepth - depths[0], `live ${liveDepth.toFixed(1)} against history ${depths[0].toFixed(1)}`).toBeGreaterThan(10);
 });
 
-test('the ladder is D-069 per theme, each step clears 7:1, and older lines are gone', async ({ page }) => {
+test('each Return line gets exactly its step, 1 / .22 / .07 per theme, and older lines are gone (D-092)', async ({ page }) => {
   await enter(page);
   const mode = await theme(page);
   await page.keyboard.insertText('Oldest line.\nThree back.\nTwo back.\nOne back.\nLive');
-  await page.waitForTimeout(450);
+  await dissolved(page);
   const lines = await inkLines(page);
   expect(lines.map(line => line.rung)).toEqual(['3', '3', '2', '1', '0']);
   const tokens = await page.evaluate(() => {
     const style = getComputedStyle(document.querySelector('#editor-ink'));
     return [1, 2].map(n => Number(style.getPropertyValue(`--paper-history-${n}`)));
   });
-  expect(tokens).toEqual(mode === 'dark' ? [0.902, 0.772] : [0.847, 0.769]);
+  expect(tokens).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
   const byRung = Object.fromEntries(lines.map(line => [line.rung, line.opacity]));
+  expect(byRung).toEqual({ 0: 1, 1: tokens[0], 2: tokens[1], 3: 0 });
   expect(byRung['0']).toBe(1);
-  expect(byRung['1']).toBeCloseTo(tokens[0], 3);
-  expect(byRung['2']).toBeCloseTo(tokens[1], 3);
-  expect(byRung['3']).toBe(0);
   const ink = rgb(await page.evaluate(() => getComputedStyle(document.querySelector('#editor-ink')).color));
   const paper = hex(TONES[mode]);
-  for (const alpha of [1, ...tokens]) {
-    const ratio = contrast(over(ink, alpha, paper), paper);
-    expect(ratio, `alpha ${alpha}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
-  }
+  expect(contrast(ink, paper), 'the live line keeps the full ink').toBeGreaterThanOrEqual(7);
+  // The captain's contrast exception: the same 1.57:1 and 1.15:1 in both themes, not 7:1 roles.
+  const ratios = tokens.map(alpha => contrast(over(ink, alpha, paper), paper));
+  expect(ratios[0], `one back ${ratios[0].toFixed(2)}:1`).toBeGreaterThan(1.5);
+  expect(ratios[0]).toBeLessThan(1.65);
+  expect(ratios[1], `two back ${ratios[1].toFixed(2)}:1`).toBeGreaterThan(1.1);
+  expect(ratios[1]).toBeLessThan(1.2);
 });
 
 test('a full stop never ends a line: one line holds every sentence typed before Return (D-088)', async ({ page }) => {
   await enter(page);
   await page.keyboard.insertText('One short sentence. And another one follows it. Third');
-  await page.waitForTimeout(450);
+  await dissolved(page);
   const lines = await inkLines(page);
   expect(lines.map(line => line.text.trim())).toEqual(['One short sentence. And another one follows it. Third']);
   expect(lines.map(line => line.rung)).toEqual(['0']);
   expect(lines[0].opacity, 'typing sentences on the live line fades nothing').toBe(1);
 });
 
-test('pressing Return fades the line just written, one rung, and not before', async ({ page }) => {
+test('pressing Return starts the dissolve of the line just written, and not before', async ({ page }, info) => {
+  const reduced = info.project.use.reducedMotion === 'reduce';
   await enter(page);
   const token = await page.evaluate(() => Number(getComputedStyle(document.querySelector('#editor-ink')).getPropertyValue('--paper-history-1')));
   await page.keyboard.insertText('First thought. Still the first line');
-  await page.waitForTimeout(450);
+  await dissolved(page);
   expect((await inkLines(page)).map(line => [line.rung, line.opacity])).toEqual([['0', 1]]);
 
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(450);
-  let lines = await inkLines(page);
-  expect(lines.map(line => line.rung), 'the written line steps back the moment Return lands').toEqual(['1']);
-  expect(lines[0].opacity).toBeCloseTo(token, 3);
+  expect((await inkLines(page)).map(line => line.rung), 'the written line steps back in the task Return lands').toEqual(['1']);
+  const dissolve = await page.evaluate(() => document.querySelector('#editor-ink [data-rung]').getAnimations()
+    .filter(a => a.transitionProperty === 'opacity').map(a => a.effect.getTiming().duration));
+  expect(dissolve, reduced ? 'Reduce Motion steps at once' : 'a 320 ms opacity dissolve starts with Return').toEqual(reduced ? [] : [320]);
+  await dissolved(page);
+  expect((await inkLines(page))[0].opacity, 'the dissolve lands on the first step').toBeCloseTo(token, 3);
 
   await page.keyboard.insertText('Second line. Third sentence');
+  expect((await inkLines(page)).map(line => line.rung)).toEqual(['1', '0']);
   await page.keyboard.press('Enter');
-  await page.waitForTimeout(450);
-  lines = await inkLines(page);
-  expect(lines.map(line => line.rung)).toEqual(['2', '1']);
-  expect(lines.map(line => line.text.trim())).toEqual(['First thought. Still the first line', 'Second line. Third sentence']);
+  expect((await inkLines(page)).map(line => line.rung)).toEqual(['2', '1']);
+  const hist2 = await page.evaluate(() => Number(getComputedStyle(document.querySelector('#editor-ink')).getPropertyValue('--paper-history-2')));
+  await dissolved(page);
+  expect((await inkLines(page)).map(line => line.opacity)).toEqual([hist2, token]);
+  expect((await inkLines(page)).map(line => line.text.trim())).toEqual(['First thought. Still the first line', 'Second line. Third sentence']);
 });
 
 test('the aperture clips a partial line at its edge and never fades it', async ({ page }) => {
@@ -154,7 +168,7 @@ test('the aperture clips a partial line at its edge and never fades it', async (
   const mode = await theme(page);
   const tone = hex(TONES[mode]);
   await page.keyboard.insertText('Above.\nLive line here');
-  await page.waitForTimeout(450);
+  await dissolved(page);
   const geometry = await page.evaluate(() => {
     const stack = document.querySelector('.editor-stack');
     const ink = document.querySelector('#editor-ink');

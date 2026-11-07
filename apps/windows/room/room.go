@@ -101,6 +101,11 @@ type Room struct {
 	ox, oy float32
 	boxH   float32
 
+	// history dissolve (D-092): the alpha each line is drawn at, by line index, and the dissolve in flight
+	hShown, hFrom, hTo []float32
+	hAt                time.Time
+	hDark              bool
+
 	// layout cache
 	layout    *ui.TextLayout
 	layoutVer int
@@ -380,6 +385,7 @@ func (r *Room) schedule(c *ui.Context, now time.Time) {
 	case r.eng.Phase == session.Failure && now.Before(r.cutUntil.Add(200*time.Millisecond)),
 		!r.denyAt.IsZero() && now.Sub(r.denyAt) < 300*time.Millisecond,
 		!r.scrollAt.IsZero() && now.Sub(r.scrollAt) < 250*time.Millisecond,
+		!r.hAt.IsZero() && now.Sub(r.hAt) < HistoryDissolve+20*time.Millisecond,
 		!r.fadeStart.IsZero() && r.lastWash > 0:
 		c.After(8 * time.Millisecond)
 	case r.eng.Phase == session.Writing && r.eng.HasStarted(), r.eng.Phase == session.Danger:

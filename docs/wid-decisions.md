@@ -1785,3 +1785,21 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   layer, and two footer labels with different computed metrics); before/after 200 % crops in
   `data/wid-ink-warp/before-after.pdf`.
 
+## D-091: The picker's help control is a quiet 32 pt circle on the logo row
+
+- Date: 2026-11-07
+- Decision: the `?` that opens the rules sheet is a 32 pt circle button with a 1 pt hairline outline (the
+  secondary pill's), drawn in ink. Its centre sits on the logo lockup's centre line and its right edge sits
+  flush with the card's inner padding. Hover fills it with 6% ink, press with 12%; keyboard focus draws the
+  ink ring around the circle. The label stays `How it works` and no new copy exists. The Mac picker and the
+  Windows picker carry the same control; the web trial has no picker.
+- Reason: the captain, 2026-11-07: the `?` was not aligned and had no button mark, it just floated. Measured
+  on a real window it sat 3 pt under the logo row's centre line and 11 pt inside the padding, with no outline,
+  and its quiet chrome colour read 5.8:1 in dark. He chose this over an underlined "How it works" link in the
+  card's last row (which would add 36 pt of card height) after the options round in PR 122.
+- Supersedes: the placement and look of the control in D-031 (a small quiet `?` at the card's top-right);
+  D-031's rules sheet, wording and order stand.
+- Evidence: `PickerHelpButtonTests` (32 pt, 0 pt off the logo centre line and the padding, hit test, ink 7:1 in
+  light and dark, focus ring), `TestHelpButtonSitsOnTheLogoRowAndTheCardPadding` on Windows, and Tart
+  macOS 26.6.2 and 15.7.7 before/after captures in the PR.
+

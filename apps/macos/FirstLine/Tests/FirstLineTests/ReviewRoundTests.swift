@@ -263,8 +263,10 @@ struct ReviewRoundTests {
         let card = try #require(descendants(of: home.view, of: FirstLineCardView.self).first)
         let content = card.contentView
         let rules = try #require(descendants(of: content, of: NSButton.self).first { $0.title == "?" })
+        // The circle is 32 pt on the logo row's centre line (D-091), so it rises into the card's top padding.
         let frame = rules.convert(rules.bounds, to: content)
-        #expect(content.bounds.contains(frame))
+        #expect(card.bounds.contains(rules.convert(rules.bounds, to: card)))
+        #expect(frame.maxX <= content.bounds.maxX + 0.5)
         let centre = rules.convert(NSPoint(x: rules.bounds.midX, y: rules.bounds.midY), to: content.superview)
         #expect(content.hitTest(centre) === rules)
         window.orderOut(nil)

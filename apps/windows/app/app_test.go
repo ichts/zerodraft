@@ -406,3 +406,26 @@ func TestRulesSheetFollowsTheTypeScale(t *testing.T) {
 	}
 	g.snap("rules-scale")
 }
+
+// D-091: the help button is a 32 DIP circle on the lockup's centre line, flush with the card's inner padding.
+func TestHelpButtonSitsOnTheLogoRowAndTheCardPadding(t *testing.T) {
+	g := newRig(t)
+	help, ok1 := g.tt.Find(tokens.HomeRulesHelp)
+	title, ok2 := g.tt.Find(tokens.HomeTitle)
+	if !ok1 || !ok2 {
+		t.Fatalf("help or title not on screen: %q", g.tt.Texts())
+	}
+	// the lockup sits 17 DIP above the title (homeView's first gap); its box is the chip's measured size
+	const chipH = tokens.ChipPickerTypeSize * tokens.ChipEmHeight
+	lockupMid := title.Y - 17 - chipH/2
+	if help.W != 32 || help.H != 32 {
+		t.Errorf("help button %.2f x %.2f, want 32 x 32", help.W, help.H)
+	}
+	if d := (help.Y + help.H/2) - lockupMid; d < -0.5 || d > 0.5 {
+		t.Errorf("help centre is %.2f off the lockup centre line", d)
+	}
+	const cardW, pad, windowW = 560, 48 + 1, 1040 // padding plus the card ring
+	if d := (help.X + help.W) - (float32(windowW-cardW)/2 + cardW - pad); d < -0.5 || d > 0.5 {
+		t.Errorf("help right edge is %.2f off the card's inner padding", d)
+	}
+}

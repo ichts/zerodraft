@@ -17,14 +17,14 @@ async () => {
   check('editor has no user-scrollable overflow or scrollbar', css.overflowY === 'hidden' && css.scrollbarWidth === 'none');
   check('latest line pinned to center', Math.abs(editor.scrollHeight - editor.clientHeight - editor.scrollTop) < 2);
   // D-077: the aperture is one hard clip at the third pitch, and the history steps live on the ink layer's
-  // spans, one per logical line. The contrast floor itself is owned by qa/paper.spec.mjs.
+  // spans, one per line ended by Return (D-088). The contrast floor itself is owned by qa/paper.spec.mjs.
   const stackStyle = getComputedStyle(editor.closest('.editor-stack'));
   const mask = stackStyle.maskImage || stackStyle.webkitMaskImage;
   const stops = [...mask.matchAll(/([\d.]+)px/g)].map(m => parseFloat(m[1]));
   check('aperture is one hard clip at the third pitch, not a gradient', stops.length === 2 && stops.every(px => Math.abs(px - 3 * line) < 1.1));
   const ink = document.getElementById('editor-ink');
   const spans = [...ink.querySelectorAll('[data-rung]')];
-  check('ink layer repeats the draft, one span per logical line', spans.length > 61 && ink.textContent.replace(/\n$/, '') === text);
+  check('ink layer repeats the draft, one span per line ended by Return: 60 written lines plus the active one, never one per sentence', spans.length === 61 && ink.textContent.replace(/\n$/, '') === text);
   const opacityOf = rung => spans.filter(span => span.dataset.rung === String(rung)).map(span => Number(getComputedStyle(span).opacity));
   const historyStops = [Number(css.getPropertyValue('--paper-history-1')), Number(css.getPropertyValue('--paper-history-2'))];
   check('active line 100%, one back the first history stop, two back the second, older gone',

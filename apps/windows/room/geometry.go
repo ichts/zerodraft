@@ -79,7 +79,7 @@ func WashFraction(idleSeconds, silenceSeconds float64, reduceMotion bool) float3
 	return float32(math.Min(math.Max((idleSeconds-warnAt)/tokens.WarnLeadSeconds, 0), 1))
 }
 
-// HistoryAlpha is the D-069 ladder by rung: the live logical line is 0, older lines step back (D-077); lines beyond
+// HistoryAlpha is the D-069 ladder by rung: the live line is 0, older lines step back (D-088); lines beyond
 // the ladder are gone (-1).
 func HistoryAlpha(rung int, dark bool) float32 {
 	l := tokens.HistoryOpacitiesLight

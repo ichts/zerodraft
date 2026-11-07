@@ -354,18 +354,18 @@ struct EditorFocusTests {
         }
     }
 
-    /// D-077: the ladder's unit is the logical line, so every visual row of one sentence carries one opacity, at
-    /// any width, and a resize that re-wraps the sentences never re-steps them.
+    /// D-088: the ladder's unit is the line the writer ended with Return, so every visual row of one line carries
+    /// one opacity, at any width, and a resize that re-wraps the lines never re-steps them.
     @Test
-    func restoredDraftKeepsOneOpacityPerSentenceAcrossResize() throws {
+    func restoredDraftKeepsOneOpacityPerLineAcrossResize() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let engine = SessionEngine()
         let state = licensedTestState(sessionEngine: engine,
                                       settingsStore: SettingsStore(configDirectory: root))
         state.startSession(duration: 60)
-        let draft = (1...6).map { "Sentence \($0) has alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu." }
-            .joined(separator: " ")
+        let draft = (1...6).map { "Line \($0) has alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu. A second sentence." }
+            .joined(separator: "\n")
         engine.registerCommittedText(draft)
         let room = SessionViewController(appState: state)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
@@ -381,11 +381,11 @@ struct EditorFocusTests {
         func assertLadder(minimumRows: Int) throws {
             let sentences = try sentenceRows(in: editor)
             #expect(sentences.count == 6)
-            #expect(sentences.map { $0.rows }.max() ?? 0 >= minimumRows, "a sentence should wrap onto several rows here")
-            // Oldest three are gone, then two back, one back, the live sentence; each is ONE value on every row.
+            #expect(sentences.map { $0.rows }.max() ?? 0 >= minimumRows, "a line should wrap onto several rows here")
+            // Oldest three are gone, then two back, one back, the live line; each is ONE value on every row.
             let expected: [CGFloat] = [0, 0, 0, ladder[2], ladder[1], 1]
             for (index, sentence) in sentences.enumerated() {
-                #expect(sentence.alphas.count == 1, "sentence \(index) has \(sentence.alphas.count) opacities over \(sentence.rows) rows")
+                #expect(sentence.alphas.count == 1, "line \(index) has \(sentence.alphas.count) opacities over \(sentence.rows) rows")
                 #expect(abs((sentence.alphas.first ?? -1) - expected[index]) < 0.001)
             }
         }
@@ -399,8 +399,41 @@ struct EditorFocusTests {
         window.orderOut(nil)
     }
 
+    /// D-088: a full stop fades nothing and Return fades the line just written, one rung, on the live editor path.
+    @Test
+    func returnFadesTheLineJustWrittenAndAFullStopDoesNot() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = SessionEngine()
+        let state = licensedTestState(sessionEngine: engine,
+                                      settingsStore: SettingsStore(configDirectory: root))
+        state.startSession(duration: 60)
+        let room = SessionViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = room
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        room.view.layoutSubtreeIfNeeded(); room.viewDidLayout()
+        RoomWindowKeeper.windows.append(window)
+        let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
+        let ladder = editor.historyLineOpacities
+        func type(_ text: String) {
+            editor.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
+        }
+
+        type("First thought. Still the first line.")
+        #expect(try sentenceRows(in: editor).map { $0.alphas } == [[1]], "sentences on the live line fade nothing")
+
+        type("\n")
+        #expect(try sentenceRows(in: editor).map { $0.alphas } == [[ladder[1]]], "Return steps the written line back one rung")
+
+        type("Second line. Third sentence.\n")
+        #expect(try sentenceRows(in: editor).map { $0.alphas } == [[ladder[2]], [ladder[1]]])
+        window.orderOut(nil)
+    }
+
     /// The aperture is the scroll view's own clip: no gradient mask, so a line cut by its edge keeps its rung and is
-    /// clipped, never given an alpha of its own (D-077).
+    /// clipped, never given an alpha of its own (D-077, unit changed by D-088).
     @Test
     func theAperturePartialLineIsClippedNotFaded() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

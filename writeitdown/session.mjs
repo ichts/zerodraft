@@ -34,19 +34,26 @@ export function wordCount(text) {
   return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
 }
 
-// The history ladder's unit is the logical line, not the visual row (D-077): a sentence, or the text
-// up to a hard line break. Every row of one logical line carries one rung, so a long sentence that
-// wraps reads as one grey, never as a staircase. The Mac room cuts the same lines with the same
-// Unicode sentence rules (`HistoryLines.swift`); the two surfaces must not drift.
+// The history ladder's unit is the line the writer ended with Return (D-088, superseding D-077's
+// sentence rule): the text up to a hard break, never a sentence and never a visual row. A line that
+// wraps is still one line, so its rows carry one rung and read as one grey, never as a staircase.
+// A full stop does not end a line. The Mac and Windows rooms cut the same lines (`HistoryLines.swift`,
+// `session/lines.go`); the three surfaces must not drift.
 // Rung 0 is the live line, 1 and 2 are the ladder's two readable steps, GONE is everything older.
 export const GONE = 3;
 
-const sentenceSegments = new Intl.Segmenter(undefined, { granularity: 'sentence' });
-
-// The text cut into logical lines, each with its offsets and its rung. A trailing hard break means
-// the writer is already on a fresh, empty line, so every written line sits one rung further back.
+// The text cut into lines, each with its offsets and its rung. A hard break is LF, CRLF or a lone CR
+// and belongs to the line it ends. A trailing hard break means the writer is already on a fresh, empty
+// line, so every written line sits one rung further back.
 export function historyLines(text) {
-  const lines = Array.from(sentenceSegments.segment(text), part => ({ start: part.index, end: part.index + part.segment.length }));
+  const lines = [];
+  let start = 0;
+  for (const hardBreak of text.matchAll(/\r\n|[\n\r]/g)) {
+    const end = hardBreak.index + hardBreak[0].length;
+    lines.push({ start, end });
+    start = end;
+  }
+  if (start < text.length) lines.push({ start, end: text.length });
   const live = lines.length - 1 + (text.endsWith('\n') ? 1 : 0);
   return lines.map((line, index) => ({ ...line, rung: Math.min(live - index, GONE) }));
 }

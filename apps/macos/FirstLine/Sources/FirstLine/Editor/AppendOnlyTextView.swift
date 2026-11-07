@@ -21,7 +21,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private let insetEpsilon: CGFloat = 0.5
     /// The room sets this from Reduce Motion; history scrolls then snap.
     var animatesHistoryScroll = true
-    /// One uniform ink step per logical line, closest line first, older lines gone (D-027 stepping, D-077 unit), at
+    /// One uniform ink step per line ended by Return, closest line first, older lines gone (D-027 stepping, D-088 unit), at
     /// D-069's contrast ladder for the effective appearance.
     var historyLineOpacities: [CGFloat] {
         FirstLineColors.paperHistoryOpacities(dark: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
@@ -486,8 +486,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applySessionTypography()
     }
 
-    /// Base ink for the live line; completed logical lines are stepped by `applyLineOpacity`
-    /// to the history ladder (D-077 unit, D-069 values).
+    /// Base ink for the live line; completed lines are stepped by `applyLineOpacity`
+    /// to the history ladder (D-088 unit, D-069 values).
     func applySessionTypography() {
         guard hasMarkedText() == false else { return }
         guard let textStorage else { return }
@@ -514,8 +514,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
     }
 
-    /// Each logical line (a sentence, or the text up to a hard break) gets one uniform opacity on every row it
-    /// wraps onto; the live line is full and older lines are gone (D-077). The opacities are the appearance's
+    /// Each line (the text up to a hard break, D-088) gets one uniform opacity on every row it wraps onto; the live
+    /// line is full and older lines are gone. The opacities are the appearance's
     /// history ladder (D-069). The rule reads the text only, so a width change never re-steps a line.
     private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
         guard textStorage.length > 0 else { return }

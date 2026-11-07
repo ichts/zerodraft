@@ -1730,3 +1730,25 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   the bar looks like it never reaches the end (captain, 2026-11-07).
 - Supersedes: the "straight 2 pt bar" shape in D-014; the bar's box is now the corner radius tall, only the
   top 2 px paint.
+
+## D-088: The history fades per line ended by Return, never per sentence
+
+- Date: 2026-11-07
+- Decision: the history ladder's unit is the line the writer ended with Return, on writeitdown.app, the Mac
+  room and the Windows room. A line is the text up to a hard break (LF, CRLF or a lone CR; the break belongs
+  to the line it ends). A wrapped line is still one line, so every visual row of it carries one opacity. A
+  full stop, a question mark or a CJK stop ends nothing: no sentence segmentation exists on any surface
+  (the sentence cuts, `Intl.Segmenter` sentences and `NSString` `.bySentences`, are gone; the word count keeps its word segmenter). The ladder values are unchanged (live 1.0, one
+  back 0.847 light / 0.902 dark, two back 0.769 / 0.772, older 0), as are the clip at the aperture, the one
+  pitch shift, and a width change never re-stepping a line. A trailing hard break puts the writer on a fresh
+  empty line, so pressing Return fades the line just written one rung and nothing fades before it. A blank
+  line is a line. D-077's second item (the first refused delete names the rule) stands unchanged.
+- Reason: the captain, 2026-11-07: the fade is per line and Return triggers it; nobody told the room to count
+  sentences. Three sentences typed on one line read as one thought in the writer's hand, and a row that
+  dimmed before the writer pressed Return said the room had decided where the line ended.
+- Supersedes: D-077 item 1 (the logical line as "a sentence, or the text up to a hard break") and its
+  mechanism note that the web cuts with `Intl.Segmenter`; D-073's per-sentence application. Case 48 of
+  `docs/wid-mac-behavior.md`, Q-34 of `docs/ui-quality.md`, and row 19 of `apps/windows/SYNC.md` carry the new unit.
+- Evidence: `writeitdown/session.test.mjs`, `writeitdown/qa/history-fade.spec.mjs`,
+  `HistoryLinesTests`, `EditorFocusTests.returnFadesTheLineJustWrittenAndAFullStopDoesNot`,
+  `apps/windows/session/lines_test.go`: the same cases on the three surfaces.

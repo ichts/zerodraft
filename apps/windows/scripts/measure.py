@@ -82,8 +82,8 @@ if len(lines) >= 2:
     def depth(bd):
         seg = ref[oy + bd[0]: oy + bd[1], ox: ox + (area[2] - area[0])].mean(axis=2)
         return 255 - np.percentile(seg, 2)
-    # the ladder's unit is the sentence (D-077): a row can hold the end of one and the start of the next, so the oldest
-    # visible row is the one that must be fainter than the live row
+    # the ladder's unit is the line ended by Return (D-088): the oldest visible row is the one that must be fainter
+    # than the live row
     d0, d1 = depth(lines[-1]), (depth(lines[-3] if len(lines) > 2 else lines[-2]) if len(lines) > 1 else 0)
     check('the oldest visible line is fainter than the writing line', d1 < d0 - 5, f'ink depth {d0:.0f} -> {d1:.0f}')
 

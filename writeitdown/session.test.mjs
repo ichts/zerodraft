@@ -102,19 +102,23 @@ test('Unicode words, individual Han characters, and non-word input', () => {
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
 });
 
-test('every row of a sentence shares one history rung (D-077)', () => {
-  const text = 'First is long. Second is long. Third is long. Fourth is long.';
+test('the history ladder counts lines ended by Return, never sentences (D-088)', () => {
+  const text = 'First is long. Second is long.\nThird is long. Fourth is long.\nLive. Still live';
   const rungs = historyLines(text).map(line => [text.slice(line.start, line.end).trim(), line.rung]);
-  assert.deepEqual(rungs, [['First is long.', GONE], ['Second is long.', 2], ['Third is long.', 1], ['Fourth is long.', 0]]);
+  assert.deepEqual(rungs, [['First is long. Second is long.', 2], ['Third is long. Fourth is long.', 1], ['Live. Still live', 0]]);
+  assert.deepEqual(historyLines('One. Two. Three.').map(line => line.rung), [0], 'full stops never end a line');
   assert.deepEqual(historyLines('only one').map(line => line.rung), [0]);
   assert.deepEqual(historyLines('').map(line => line.rung), []);
 });
 
-test('a hard line break puts the writer on a fresh live line, and CJK stops split sentences', () => {
+test('a hard line break puts the writer on a fresh live line, and CJK stops do not split a line', () => {
   assert.deepEqual(historyLines('one\ntwo\n').map(line => line.rung), [2, 1]);
   assert.deepEqual(historyLines('one\ntwo').map(line => line.rung), [1, 0]);
-  assert.deepEqual(historyLines('今天下雨。我在写字。').map(line => line.rung), [1, 0]);
-  const covered = historyLines('a. b. c');
+  assert.deepEqual(historyLines('今天下雨。我在写字。').map(line => line.rung), [0]);
+  assert.deepEqual(historyLines('今天下雨。\n我在写字。').map(line => line.rung), [1, 0]);
+  assert.deepEqual(historyLines('a\n\nb').map(line => line.rung), [2, 1, 0], 'a blank line is a line');
+  assert.deepEqual(historyLines('a\r\nb\rc').map(line => line.rung), [2, 1, 0], 'CRLF is one break');
+  const covered = historyLines('a. b.\nc');
   assert.equal(covered[0].start, 0);
   assert.equal(covered.at(-1).end, 7);
 });

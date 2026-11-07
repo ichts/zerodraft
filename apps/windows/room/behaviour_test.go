@@ -321,10 +321,11 @@ func TestANewSessionEarnsTheNoticeAgain(t *testing.T) {
 	}
 }
 
-// D-077: every visual row of one sentence carries one colour, the ladder counts logical lines from the end.
-func TestHistorySpansColourWholeSentences(t *testing.T) {
+// D-088: every visual row of one line carries one colour, the ladder counts lines ended by Return from the end, and
+// a full stop never steps it.
+func TestHistorySpansColourWholeLines(t *testing.T) {
 	g := newRig(t, 1040, 620)
-	text := "First sentence is long and wraps. Second sentence is long too. Third one. Fourth is live"
+	text := "First line is long and wraps. Still the first line.\nSecond line is long too.\nThird one. Same line.\nFourth is live"
 	spans := g.r.historySpans(text, false)
 	var got []float32
 	for _, s := range spans {

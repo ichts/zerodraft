@@ -1752,3 +1752,15 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Evidence: `writeitdown/session.test.mjs`, `writeitdown/qa/history-fade.spec.mjs`,
   `HistoryLinesTests`, `EditorFocusTests.returnFadesTheLineJustWrittenAndAFullStopDoesNot`,
   `apps/windows/session/lines_test.go`: the same cases on the three surfaces.
+
+## D-089: The silence digits are placed from the live caret line each time they show
+
+- Date: 2026-11-07
+- Decision: on the Mac the 3-2-1 numeral and its caption are positioned from the caret's current line every
+  time the warning phase draws them, not only from the last layout pass.
+- Reason: on macOS 15.6.1 (the captain's Air, two recordings) no layout pass ran after the first warning
+  second, so the digits kept the placement of an empty room at width 0, about 700 pt down and off the paper. The
+  paper tinted and the draft was deleted with no digits on screen. macOS 26 happened to relayout and hid it.
+- Supersedes: nothing; D-025's placement under the caret line is unchanged and now holds on both systems.
+- Evidence: `RoomTests.silenceCountdownSitsOnThePaperUnderTheWritingLine` (fails on the old code), and a Tart
+  macOS 15.7.7 run: numeral at y 812 before, 377 after, visible under the writing line.

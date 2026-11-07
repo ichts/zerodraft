@@ -171,12 +171,14 @@ func (a *App) homeView(c *ui.Context, dark bool) {
 	}
 	page(c, p, "Write It Down", func() {
 		card(c, p, 560, 44, 48, func() {
-			// the quiet "?" sits at the content's top right, 12 in from its edge (Mac rulesButton constraints)
-			rules := link(c, p, "?").Label(tokens.HomeRulesHelp).Absolute().Top(44).Right(60).Size(28, 28).Padding(0)
+			var chipW, chipH float32 = tokens.ChipPickerTypeSize * tokens.ChipEmWidth, tokens.ChipPickerTypeSize * tokens.ChipEmHeight
+			// the help button (D-091, Mac iconCircle): a 32 DIP hairline circle on the lockup's centre line, flush with
+			// the card's inner padding
+			rules := button.Outline(c, "?").Label(tokens.HomeRulesHelp).Absolute().Top(44+chipH/2-16).Right(48).Size(32, 32).Padding(0).
+				Radius(16).Border(1, p.of(tokens.HairStrong)).FontSize(14).FontWeight(600).TextColor(p.ink()).Justify(ui.Center).AlignItems(ui.Center)
 			if rules.Clicked() {
 				a.openRules()
 			}
-			var chipW, chipH float32 = tokens.ChipPickerTypeSize * tokens.ChipEmWidth, tokens.ChipPickerTypeSize * tokens.ChipEmHeight
 			ui.Box(c).Size(chipW, chipH).Label(tokens.HomeLockupLabel).Role(ui.RoleImage).
 				Draw(func(pp *ui.Painter, r ui.Rect) { chipLockup(pp, r, p) })
 			// the vertical gaps below are the Mac's (20, 24, 8, 20, 8, 26, 18) less what Segoe UI Variable's taller line box

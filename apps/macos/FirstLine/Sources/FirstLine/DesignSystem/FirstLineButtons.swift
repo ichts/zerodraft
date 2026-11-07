@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Typography, DesignSystem/Spacing, InkFocus.
- * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link factories; every control uses the ink focus ring; a disabled outline pill keeps its outline; a pill never compresses below its label.
+ * [OUTPUT]: FirstLineButtons primary (48 ink pill), room primary, secondary (44 outline pill) and quiet link and 32 pt hairline icon-circle factories; every control uses the ink focus ring; a disabled outline pill keeps its outline; a pill never compresses below its label.
  * [POS]: Shared native button specs; room primary opts into live hover/press motion, all controls use the design-system ink focus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -27,6 +27,11 @@ enum FirstLineButtons {
 
     static func link(title: String, target: AnyObject?, action: Selector) -> NSButton {
         FirstLineLinkButton(title: title, target: target, action: action)
+    }
+
+    /// A 32 pt circle with the secondary pill's hairline outline: the picker's help button (D-091).
+    static func iconCircle(title: String, target: AnyObject?, action: Selector) -> NSButton {
+        FirstLineIconCircleButton(title: title, target: target, action: action)
     }
 
     private static func styled(
@@ -246,6 +251,72 @@ private final class FirstLineButton: FirstLineInkFocusButton {
                 layer?.borderColor = FirstLineColors.hairStrongNSColor.cgColor
                 layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
             }
+        }
+    }
+}
+
+final class FirstLineIconCircleButton: FirstLineInkFocusButton {
+    static let diameter: CGFloat = 32
+    private var hover = false { didSet { needsDisplay = true } }
+    private var tracking: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        style()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        style()
+    }
+
+    private func style() {
+        translatesAutoresizingMaskIntoConstraints = false
+        isBordered = false
+        bezelStyle = .inline
+        font = .systemFont(ofSize: 14, weight: .semibold)
+        contentTintColor = FirstLineColors.inkNSColor
+        inkFocusRingInset = 3
+        wantsLayer = true
+        setAccessibilityRole(.button)
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: Self.diameter),
+            heightAnchor.constraint(equalToConstant: Self.diameter),
+        ])
+    }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: Self.diameter, height: Self.diameter) }
+    override var wantsUpdateLayer: Bool { true }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                  owner: self, userInfo: nil)
+        addTrackingArea(area)
+        tracking = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { hover = true }
+    override func mouseExited(with event: NSEvent) { hover = false }
+    override func highlight(_ flag: Bool) {
+        super.highlight(flag)
+        needsDisplay = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
+    }
+
+    override func updateLayer() {
+        super.updateLayer()
+        layer?.cornerRadius = Self.diameter / 2
+        layer?.borderWidth = 1
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.borderColor = FirstLineColors.hairStrongNSColor.cgColor
+            let fill = isHighlighted ? 0.12 : (hover ? 0.06 : 0)
+            layer?.backgroundColor = FirstLineColors.inkNSColor.withAlphaComponent(fill).cgColor
         }
     }
 }

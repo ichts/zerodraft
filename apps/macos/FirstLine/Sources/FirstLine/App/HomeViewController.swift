@@ -56,7 +56,7 @@ final class HomeViewController: NSViewController {
         let lockup = BrandChipLockupView(typeSize: BrandChipLockupView.pickerTypeSize)
 
         let title = label("How long?", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
-        let rulesButton = FirstLineButtons.link(title: "?", target: self, action: #selector(showRules))
+        let rulesButton = FirstLineButtons.iconCircle(title: "?", target: self, action: #selector(showRules))
         rulesButton.setAccessibilityLabel("How it works")
         rulesButton.setAccessibilityHelp("How it works: no way back, silence deletes it, reach zero and keep it.")
         durationControl = FirstLineSegmentedControl(
@@ -117,12 +117,11 @@ final class HomeViewController: NSViewController {
             stack.bottomAnchor.constraint(equalTo: card.contentView.bottomAnchor),
             statusView.widthAnchor.constraint(lessThanOrEqualToConstant: 400),
         ])
+        // The help button sits on the logo row's centre line, flush with the card's inner padding (D-091).
         card.contentView.addSubview(rulesButton)
         NSLayoutConstraint.activate([
-            rulesButton.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor, constant: -12),
-            rulesButton.topAnchor.constraint(equalTo: card.contentView.topAnchor),
-            rulesButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 28),
-            rulesButton.heightAnchor.constraint(equalToConstant: 28),
+            rulesButton.trailingAnchor.constraint(equalTo: card.contentView.trailingAnchor),
+            rulesButton.centerYAnchor.constraint(equalTo: lockup.centerYAnchor),
         ])
     }
 

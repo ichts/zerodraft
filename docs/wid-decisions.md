@@ -4,7 +4,8 @@ Status: durable, append-only record of product decisions for Write It Down / Zer
 text are not the source of truth; this file is. An entry is never edited. A later decision adds a new
 entry and names the entry it supersedes. The behaviour contract that implements these decisions is
 `docs/wid-mac-behavior.md`; visual tokens remain owned by `design/DESIGN.md` (web) and
-`apps/macos/FirstLine/AGENTS.md` (Mac).
+`apps/macos/FirstLine/AGENTS.md` (Mac). The per-surface world table
+is `docs/wid-world-table.md`.
 
 ## D-001: One design language across web and Mac
 

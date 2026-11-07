@@ -44,6 +44,45 @@ test('no element that carries words is filtered, displaced or stroked', async ({
   expect(await offenders()).toEqual([]);
 });
 
+test('the exit control has a quiet hover, ink focus and a 44 px target without moving its label', async ({ page }) => {
+  await enter(page);
+  const exit = page.getByRole('button', { name: 'Exit', exact: true });
+  await expect(exit).toBeVisible();
+  const before = await exit.boundingBox();
+  expect(before.height).toBeGreaterThanOrEqual(44);
+  const quiet = await exit.evaluate(el => getComputedStyle(el).color);
+  await exit.hover();
+  const ink = await page.locator('#editor').evaluate(el => getComputedStyle(el).caretColor);
+  await expect(exit).toHaveCSS('color', ink);
+  expect(await exit.evaluate(el => getComputedStyle(el).color)).not.toBe(quiet);
+  expect(await exit.boundingBox()).toEqual(before);
+  await page.mouse.move(0, 0);
+  await page.locator('#editor').focus();
+  await page.keyboard.press('Tab');
+  await expect(exit).toBeFocused();
+  await expect(exit).toHaveCSS('outline-style', 'solid');
+  await expect(exit).toHaveCSS('outline-width', '2px');
+  await expect(exit).toHaveCSS('outline-color', ink);
+  expect(await exit.boundingBox()).toEqual(before);
+});
+
+test('click and Escape share the same two-act exit and typing cancels either', async ({ page }) => {
+  await enter(page);
+  await page.keyboard.type('Words to delete');
+  const exit = page.getByRole('button', { name: 'Exit', exact: true });
+  await exit.click();
+  await expect(page.locator('#exit-hint')).toContainText('again');
+  await expect(page.locator('#room')).toBeVisible();
+  await page.keyboard.type('x');
+  await expect(page.locator('#exit-hint')).toBeEmpty();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#exit-hint')).toContainText('again');
+  await exit.click();
+  await expect(page.locator('#room')).toBeHidden();
+  await expect(page.locator('#editor')).toHaveValue('');
+  await expect(page).not.toHaveURL(/#trial/);
+});
+
 test('the exit label and the count compute identical font metrics on one baseline', async ({ page }) => {
   await enter(page);
   const empty = await footer(page);

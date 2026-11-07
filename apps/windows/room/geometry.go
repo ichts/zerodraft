@@ -2,6 +2,7 @@ package room
 
 import (
 	"math"
+	"time"
 
 	"github.com/egoist/mygo/ui"
 
@@ -79,8 +80,8 @@ func WashFraction(idleSeconds, silenceSeconds float64, reduceMotion bool) float3
 	return float32(math.Min(math.Max((idleSeconds-warnAt)/tokens.WarnLeadSeconds, 0), 1))
 }
 
-// HistoryAlpha is the D-069 ladder by rung: the live line is 0, older lines step back (D-088); lines beyond
-// the ladder are gone (-1).
+// HistoryAlpha is the history's opacity by rung (D-092): the live line is 0, older lines step back to .22 and .07
+// (light; .16 and .05 dark); lines beyond the steps are gone (-1).
 func HistoryAlpha(rung int, dark bool) float32 {
 	l := tokens.HistoryOpacitiesLight
 	if dark {
@@ -93,6 +94,31 @@ func HistoryAlpha(rung int, dark bool) float32 {
 		return l[rung]
 	}
 	return -1
+}
+
+// HistoryDissolve is how long the lines above take to reach their next step when Return lands (D-092); the web's
+// transition and the Mac's timer are the same 320 ms.
+const HistoryDissolve = 320 * time.Millisecond
+
+// DissolveEase is CSS ease-out, cubic-bezier(0, 0, .58, 1), the curve the web's dissolve uses.
+func DissolveEase(t float32) float32 {
+	if t <= 0 {
+		return 0
+	}
+	if t >= 1 {
+		return 1
+	}
+	bez := func(u, a, b float32) float32 { return 3*a*u*(1-u)*(1-u) + 3*b*u*u*(1-u) + u*u*u }
+	lo, hi := float32(0), float32(1)
+	for i := 0; i < 24; i++ {
+		mid := (lo + hi) / 2
+		if bez(mid, 0, 0.58) < t {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return bez((lo+hi)/2, 0, 1)
 }
 
 // KeptHeadingSize is clamp(5% of the window, 32, 48), the live heading's own rule.

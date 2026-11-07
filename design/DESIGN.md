@@ -45,7 +45,7 @@ The page around the paper keeps its white identity (D-056, unchanged by D-069): 
 
 The paper is textured, not flat (D-056): grain 70 of 100 at size 1.00, generated once per sheet size and theme - device-pixel tooth, a coarser pulp cloud upscaled with smoothing, short fibres and sparse pigment flecks - painted under the words and never regenerated while the writer types. The dark sheet is the exception (D-093): flat warm charcoal with one fine grain, peak +-3 levels, and no mottle, pulp, fibres or flecks. Its tone stays in CSS so a wash can still tint it.
 
-Every word on the paper is measured against the paper's own tone, not against white: the history ladder steps by contrast, 13.52 -> 9.0 -> 7.1:1, and nothing on the sheet reads below 7:1.
+Every word on the paper is measured against the paper's own tone, not against white: the history lines above the live one are dimmed to .22 and .07 of the ink and dissolve over 320 ms when Return lands (D-092; the one exemption from 7:1), and nothing else on the sheet reads below 7:1.
 
 The wash exists only during warn, seconds 5-8:
 

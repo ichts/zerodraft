@@ -85,16 +85,16 @@ struct PaperContrastTests {
 
             // The words: the active line carries the ink at full strength.
             #expect(contrast(ink, paper) >= 7, "\(name): the ink on the sheet")
-            // The two faded lines: one uniform step per completed line (D-027's stepping) at D-069's contrast
-            // ladder, the same alphas as the web's `--paper-history-1/2`. The readable floor of the history is
-            // measured too: one line up reads at 9:1 or better, two lines up at 7:1 or better.
+            // The dimmed history (D-092, the captain's option B): live 1, one back .22, two back .07 in light and the same
+            // contrast on the dark paper (.16, .05), the same alphas as the web's `--paper-history-1/2`. These lines are
+            // exempt from the 7:1 rule; the test pins their ratios so the two themes cannot drift apart.
             let ladder = FirstLineColors.paperHistoryOpacities(dark: appearance == .darkAqua)
-            #expect(ladder == (appearance == .darkAqua ? [1, 0.902, 0.772] : [1, 0.847, 0.769]))
+            #expect(ladder == (appearance == .darkAqua ? [1, 0.16, 0.05] : [1, 0.22, 0.07]))
             let faded = ladder.dropFirst().map {
                 contrast(composited(ink, alpha: Double($0), over: paper), paper)
             }
-            #expect(faded[0] >= 9, "\(name): history step one reads \(faded[0]):1")
-            #expect(faded[1] >= 7, "\(name): history step two reads \(faded[1]):1")
+            #expect(abs(faded[0] - 1.57) < 0.03, "\(name): history step one reads \(faded[0]):1")
+            #expect(abs(faded[1] - 1.15) < 0.03, "\(name): history step two reads \(faded[1]):1")
             #expect(faded[0] > faded[1], "\(name): the second history step is not dimmer than the first")
             // The quiet chrome (clock, count, exit link, receipt) and the pen red (numeral, wipe report).
             #expect(contrast(quiet, paper) >= 7, "\(name): the quiet chrome on the sheet")

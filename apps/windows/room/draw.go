@@ -142,7 +142,6 @@ func (r *Room) draw(p *ui.Painter, box ui.Rect, now time.Time, dark bool) {
 	failure := phase == session.Failure
 	kept := phase == session.Success
 
-	r.hit = map[string]ui.Rect{}
 	SheetShadow(p, pr, tokens.RadiusSheet, dark)
 
 	dx := r.shakeOffset(now)
@@ -277,23 +276,21 @@ func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, i
 	}
 	// the footer row: the Mac's 13 pt labels sit bottom-aligned in their 1.6 line box, so their baseline is 3 DIP above
 	// the box's bottom edge, and the box ends 25 above the paper's (measured on the Mac room at 1040 x 720: 660 in a
-	// 688 sheet, for ESC - EXIT and the count alike)
+	// 688 sheet, for the exit label and the count alike)
 	base := pr.Y + pr.H - footerBaselineInset
-	// ESC - EXIT, bottom left: 13 / 500, 0.04 em tracking
-	ex := r.shape(textSpec{s: tokens.StrExitLink, family: sans, size: 13, weight: 500, spacing: 0.04})
+	// the exit label, bottom left (D-090: one footer style, 13 / 400, no tracking, sentence case, like the count)
+	ex := r.shape(textSpec{s: tokens.StrExitLink, family: sans, size: 13, weight: 400})
 	exW, _ := ex.Size()
 	exX := pr.X + tokens.RoomInset
-	top := base - sansAscent(13, 500)
-	p.TextLayout(ex, exX, top, pick(r.hover == "exit", ink, quiet))
-	r.hit["exit"] = ui.Rect{X: exX - 6, Y: base - 32, W: exW + 12, H: tokens.FooterHeight}
+	top := base - sansAscent(13, 400)
 	// the status slot beside the exit link: the armed exit confirmation in the pen, else the first refused delete's
-	// notice in the quiet role at 0.04 em (the pen is kept for warnings); the slot is one place, so nothing moves
+	// notice in the quiet role (the pen is kept for warnings); the slot is one place, so nothing moves
 	switch {
 	case !r.exitHintOff.IsZero():
-		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 500})
+		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 400})
 		p.TextLayout(h, exX+exW+12, top, danger)
 	case !r.noticeUntil.IsZero():
-		h := r.shape(textSpec{s: tokens.StrRefusalNotice, family: sans, size: 13, weight: 500, spacing: 0.04})
+		h := r.shape(textSpec{s: tokens.StrRefusalNotice, family: sans, size: 13, weight: 400})
 		p.TextLayout(h, exX+exW+12, top, quiet)
 	}
 	label := r.cornerLabel(failure, kept)
@@ -336,9 +333,10 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 
 	text := r.ed.Text()
 	ver := r.ed.Version
-	key := fmt.Sprintf("%.1f|%v|%v", mw, r.ed.Composing(), dark)
-	if r.layout == nil || r.layoutVer != ver || r.layoutKey != key {
-		r.layout = r.shapeWriting(text, mw, font, dark)
+	alphas, dissolving := r.historyAlphas(text, dark, now)
+	key := fmt.Sprintf("%.1f|%v|%v|%v", mw, r.ed.Composing(), dark, alphas)
+	if r.layout == nil || r.layoutVer != ver || r.layoutKey != key || dissolving {
+		r.layout = r.shapeWriting(text, mw, font, dark, alphas)
 		r.layoutVer, r.layoutKey = ver, key
 	}
 	endIdx := r.ed.Len()
@@ -411,14 +409,76 @@ func abs32(v float32) float32 {
 	return v
 }
 
-// shapeWriting lays the draft out centred in the measure: one span per line (the text up to a hard break, D-088)
-// in its rung's colour, so every visual row of one wrapped line shares one opacity and a full stop never steps the
-// ladder. The preedit is underlined in ink.
-func (r *Room) shapeWriting(text string, w float32, font ui.Font, dark bool) *ui.TextLayout {
-	return ui.ShapeRichTextWith(r.historySpans(text, dark), font, ui.TextShape{Width: w, Align: ui.Center})
+// historyAlphas is the opacity each line is drawn at now. A line that Return moves to its next step dissolves there
+// over HistoryDissolve instead of jumping (D-092); a new line, a changed theme, Reduce Motion or a wiped draft is
+// drawn at its step at once. dissolving is true while a frame still differs from the last one.
+func (r *Room) historyAlphas(text string, dark bool, now time.Time) (alphas []float32, dissolving bool) {
+	lines := session.HistoryLines(text)
+	targets := make([]float32, len(lines))
+	for i, l := range lines {
+		targets[i] = max(HistoryAlpha(l.Rung, dark), 0)
+	}
+	known := len(r.hShown)
+	reduce := r.ctx != nil && r.ctx.Preferences().ReduceMotion
+	if r.hDark != dark || reduce || known == 0 || known > len(targets) {
+		r.hShown, r.hFrom, r.hTo, r.hAt, r.hDark = targets, nil, targets, time.Time{}, dark
+		return targets, false
+	}
+	// extend the running dissolve over lines that appeared since the last frame: they start at their step
+	pad := func(v []float32) []float32 {
+		for len(v) < len(targets) {
+			v = append(v, targets[len(v)])
+		}
+		return v
+	}
+	moved := false
+	for i := 0; i < known; i++ {
+		if abs32(targets[i]-r.hTo[i]) > 0.0005 {
+			moved = true
+		}
+	}
+	if moved {
+		r.hFrom, r.hAt = pad(append([]float32(nil), r.hShown...)), now
+	} else if !r.hAt.IsZero() {
+		r.hFrom = pad(r.hFrom)
+	}
+	r.hTo = targets
+	if r.hAt.IsZero() {
+		r.hShown = targets
+		return targets, false
+	}
+	t := float32(now.Sub(r.hAt)) / float32(HistoryDissolve)
+	if t >= 1 {
+		r.hAt, r.hFrom, r.hShown = time.Time{}, nil, targets
+		return targets, false
+	}
+	e := DissolveEase(t)
+	shown := make([]float32, len(targets))
+	for i := range shown {
+		shown[i] = lerp(r.hFrom[i], targets[i], e)
+	}
+	r.hShown = shown
+	return shown, true
 }
 
+// shapeWriting lays the draft out centred in the measure: one span per line (the text up to a hard break, D-088)
+// in its alpha, so every visual row of one wrapped line shares one opacity and a full stop never steps the
+// history. The preedit is underlined in ink.
+func (r *Room) shapeWriting(text string, w float32, font ui.Font, dark bool, alphas []float32) *ui.TextLayout {
+	return ui.ShapeRichTextWith(r.historySpansAt(text, dark, alphas), font, ui.TextShape{Width: w, Align: ui.Center})
+}
+
+// historySpans is the draft's spans at the history's resting steps.
 func (r *Room) historySpans(text string, dark bool) []ui.Span {
+	lines := session.HistoryLines(text)
+	alphas := make([]float32, len(lines))
+	for i, l := range lines {
+		alphas[i] = max(HistoryAlpha(l.Rung, dark), 0)
+	}
+	return r.historySpansAt(text, dark, alphas)
+}
+
+func (r *Room) historySpansAt(text string, dark bool, alphas []float32) []ui.Span {
 	ink := rc(tokens.Ink, dark)
 	cuts := []int{0, len(text)}
 	var markA, markZ int
@@ -442,10 +502,8 @@ func (r *Room) historySpans(text string, dark bool) []ui.Span {
 			li++
 		}
 		sp := ui.Span{Text: text[a:z]}
-		if len(lines) > 0 {
-			if alpha := HistoryAlpha(lines[li].Rung, dark); alpha > 0 {
-				sp.Color = withAlpha(ink, alpha)
-			}
+		if len(lines) > 0 && li < len(alphas) && alphas[li] > 0 {
+			sp.Color = withAlpha(ink, alphas[li])
 		}
 		if marked && a >= markA && z <= markZ {
 			sp.Underline, sp.DecorationColor, sp.DecorationThickness = true, ink, 1.5

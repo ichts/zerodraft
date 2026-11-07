@@ -1,6 +1,6 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
+ * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
  * [POS]: Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -420,8 +420,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         numeralLabel.isHidden = true
         warningHint.isHidden = true
 
-        exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
-        styleQuietLink(exitButton, title: "ESC - EXIT")
+        exitButton = FirstLineButtons.roomExit(title: Self.exitLabel, target: self, action: #selector(exitTapped))
         exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         exitHintLabel.attributedStringValue = Self.exitHintString()
         exitHintLabel.maximumNumberOfLines = 1
@@ -889,7 +888,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.toolTip = typePrompt ? nil : RoomPresentation.countRule
         countLabel.setAccessibilityHelp(typePrompt ? "Type to begin." : RoomPresentation.countRule)
         // The count shares the footer row's 1.6 line box, so its baseline meets the
-        // ESC - EXIT title baseline instead of sitting about 5 pt lower.
+        // exit label's title baseline instead of sitting about 5 pt lower.
         countLabel.attributedStringValue = Self.rowText(
             typePrompt ? "Type to begin" : wordLabel, font: FirstLineTypography.smallNSFont,
             color: chrome, alignment: .right, kernEm: 0)
@@ -959,7 +958,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     /// A footer-row run with the row's shared 1.6 line box. The count and the inline
     /// confirmation use it so centring their frames lands their baselines on the
-    /// ESC - EXIT title baseline instead of a few points below it.
+    /// exit label's title baseline instead of a few points below it.
     private static func rowText(_ text: String, font: NSFont, color: NSColor,
                                 alignment: NSTextAlignment, kernEm: CGFloat) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
@@ -973,11 +972,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         ])
     }
 
-    /// One type style for the footer row and its inline confirmation: same face,
-    /// size, weight and tracking, so the two runs share a baseline and rhythm.
+    /// The footer's left label (D-090): sentence case, as the web room says it. The Mac has no touch input, so the
+    /// web's `Exit` variant has no counterpart here.
+    static let exitLabel = "Esc to exit"
+
+    /// One type style for the whole footer row (D-090): the exit label, its status slot and the count are 13 pt
+    /// regular, no tracking, so the runs share a face, a baseline and a rhythm, as on the web.
     private static func quietRowText(_ text: String, color: NSColor, truncates: Bool = false,
-                                     kernEm: CGFloat = 0.04) -> NSAttributedString {
-        let font = FirstLineTypography.smallMediumNSFont
+                                     kernEm: CGFloat = 0) -> NSAttributedString {
+        let font = FirstLineTypography.smallNSFont
         let text = NSMutableAttributedString(attributedString: FirstLineTypography.trackedText(
             text, font: font, color: color, kernEm: kernEm))
         if truncates {
@@ -989,15 +992,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                               range: NSRange(location: 0, length: text.length))
         }
         return text
-    }
-
-    /// One quiet role on the paper: the exit link keeps 7:1 on the Wheat sheet in both appearances.
-    private func styleQuietLink(_ button: NSButton, title: String) {
-        let color = FirstLineColors.paperQuietNSColor
-        button.title = title
-        button.font = FirstLineTypography.smallMediumNSFont
-        button.contentTintColor = color
-        button.attributedTitle = Self.quietRowText(title, color: color)
     }
 
     private func applyVisualSettings() {
@@ -1146,7 +1140,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private func showRefusalNotice() {
         isShowingRefusalNotice = true
         exitHintLabel.attributedStringValue = Self.quietRowText(Self.refusalNoticeText,
-            color: FirstLineColors.paperQuietNSColor, truncates: true, kernEm: 0.04)
+            color: FirstLineColors.paperQuietNSColor, truncates: true)
         exitHintLabel.isHidden = false
         announce(Self.refusalNoticeText)
         refusalNoticeWork?.cancel()

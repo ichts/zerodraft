@@ -190,7 +190,7 @@ test.describe('the sheet', () => {
     expect(exact.height).toBe(Math.round(exact.css[1] * exact.dpr));
   });
 
-  test('every word on the sheet clears 7:1, including the faded history lines', async ({ page }) => {
+  test('every word on the sheet clears 7:1, except the dimmed history lines (D-092)', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
     // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
@@ -201,7 +201,8 @@ test.describe('the sheet', () => {
     expect(toHex(ink)).toBe(INK[mode]);
     expect(contrast(ink, paper), 'the writing ink').toBeGreaterThanOrEqual(7);
 
-    // The history ladder: the alphas the ink layer's rungs apply, composited over the paper.
+    // The history (D-092): the alphas the ink layer's rungs apply, composited over the paper. The captain's contrast
+    // exception: one back 1.57:1 and two back 1.15:1 in both themes, so no 7:1 floor applies to them.
     const alphas = await page.evaluate(() => {
       const editor = document.querySelector('#editor');
       const value = getComputedStyle(editor);
@@ -213,8 +214,11 @@ test.describe('the sheet', () => {
     expect(alphas[0]).toBeGreaterThan(0);
     expect(alphas[1]).toBeGreaterThan(0);
     const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
-    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThanOrEqual(9);
-    expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
+    expect(alphas).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
+    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(1.5);
+    expect(ladder[0]).toBeLessThan(1.65);
+    expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThan(1.1);
+    expect(ladder[1]).toBeLessThan(1.2);
 
     // The quiet chrome and the pen red on the sheet.
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);

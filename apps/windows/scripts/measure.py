@@ -94,7 +94,7 @@ if len(lines) >= 2:   # Q-04: a full history line is centred on the sheet (ink e
     check('Q-04: a centred writing line is centred on the sheet', abs(cmid - (pr[0] + pr[2]) / 2) <= 7 * s,
           f'line ink centre {cmid:.1f}px vs sheet centre {(pr[0]+pr[2])/2:.1f}px')
 
-# --- footer row: ESC - EXIT and the word count share a baseline; insets 22 DIP
+# --- footer row: the exit label and the word count share a baseline; insets 22 DIP
 foot_y = pr[3] - int(16 * s) - int(22 * s)
 fb = (pr[0], foot_y - int(16 * s), pr[2], foot_y + int(16 * s))
 fdark, fy, fx = ink_rows(ref, fb, 150)

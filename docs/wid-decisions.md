@@ -1803,6 +1803,38 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   light and dark, focus ring), `TestHelpButtonSitsOnTheLogoRowAndTheCardPadding` on Windows, and Tart
   macOS 26.6.2 and 15.7.7 before/after captures in the PR.
 
+
+## D-092: The history is dimmed to .22 and .07 and dissolves over 320 ms when Return lands
+
+- Date: 2026-11-07
+- Decision: option B of the zen-fade prototype (PR #119) on writeitdown.app, the Mac room and the Windows room.
+  The unit stays D-088's: the line ended by Return, every visual row of a wrapped line one value. The values
+  are the prototype's: the live line 1, one line back .22, two back .07, older lines 0, in light. Dark takes the
+  same contrast on its own paper: .16 and .05 (ink `#ece7d9` on `#342e24`), which read 1.57:1 and 1.15:1 exactly
+  as .22 and .07 read in light (`#1c1917` on `#e9e2ce`). When Return moves a line to its next step, the line
+  dissolves there over 320 ms with CSS `ease-out` (`cubic-bezier(0, 0, .58, 1)`: the web transitions
+  `opacity`, the Mac and Windows rooms step the same curve per frame), so the lines above melt into the
+  paper; a line that is new, a restored or rebuilt draft, a theme change and Reduce Motion take the step at
+  once. The live line, including every wrapped row and any marked IME text, stays full ink. The aperture
+  keeps its hard clip and the one-pitch 180 ms shift.
+- Footer parity (carried from D-090, same wording and style, not re-decided): the Mac and Windows rooms' left
+  footer label reads `Esc to exit` (they have no touch variant) and the whole footer row, the label, the status
+  slot and the count, is 13 pt regular, no tracking, sentence case, replacing `ESC - EXIT` at 13 / 500 +4 %.
+- Contrast exception: the dimmed history lines are exempt from the 7:1 text-on-paper rule. Only the live line,
+  the quiet chrome and the pen red answer to 7:1. The history exists to be passed, not read.
+- Reason: the captain, 2026-11-07. First he picked C of the prototype (one flat dim, 120 ms), then
+  changed to B (`会对 我感觉 专注模式 B 方案比 C 好`): the lines above should dissolve gradually into the paper
+  with the older line fainter, not drop to one grey.
+- Supersedes: D-088's "ladder values are unchanged" (0.847 / 0.902 and 0.769 / 0.772 are gone) and the
+  instant step it described; D-077 and D-069 for the history values and the 9:1 / 7.1:1 floor on them (D-069's
+  7:1 floor for every other role stands); D-027's 22% / 7% gave the first values and this puts them back, with
+  the dissolve. The countdown bar (D-087) and D-089 are untouched.
+- Evidence: `RoundThreeTests.exitHintSharesTheExitRowBaselineAndTypeStyle` and `RoomTests` (the footer parity); `writeitdown/qa/history-fade.spec.mjs` (Return starts a 320 ms opacity transition; each Return
+  line measures exactly 1 / .22 / .07, .16 / .05 dark), `writeitdown/qa/paper.spec.mjs`,
+  `EditorFocusTests.returnStartsTheDissolveOfTheLineJustWrittenAndAFullStopDoesNot`,
+  `EditorFocusTests.everyReturnLineGetsExactlyItsStep`, `PaperContrastTests`,
+  `apps/windows/room` `TestReturnStartsTheHistoryDissolve`.
+
 ## D-093: The dark sheet is flat warm charcoal with one fine grain
 
 - Date: 2026-11-07
@@ -1822,4 +1854,20 @@ entry and names the entry it supersedes. The behaviour contract that implements 
   `writeitdown/qa/paper.spec.mjs` (the dark-sheet test fails on the old code: a 22-level lift),
   `TestDarkSheetIsFineGrain` on Windows, and Chrome 1x/2x plus macOS 26.6.2 and 15.7.7 before/after
   captures in `data/wid-dark-paper/final-before-after.pdf`.
+## D-094: `Esc to exit` in the room footer is a real quiet text button
 
+- Date: 2026-11-07
+- Decision: the label stays quiet text in the footer's one type style, but on the web, the Mac and the Windows
+  room it is a real button named `Exit`. A click or press does what Esc does (the same two-act confirmation), the
+  hover moves only its ink from the quiet role to the full ink, the keyboard focus draws the ink ring, and its hit
+  area is at least 44 pt tall. Hover and focus never move the label.
+- Windows detail: while a draft is being written, Tab stays swallowed (a stray Tab must never take the keyboard
+  off the draft), so the button is reached by pointer or assistive technology there. On the kept screen, where no
+  editor is live, Tab walks Copy, Begin again and Exit. The room's pointer handler now lets presses on any button
+  through to it, which the stopped and kept pills also needed.
+- Reason: the captain, 2026-11-07: the label should be a button, not a decoration. D-090 and D-092 fixed its
+  words and style; this gives it the behaviour its look promised.
+- Supersedes: nothing; D-090's footer style and D-092's footer parity stand.
+- Evidence: `writeitdown/qa/ink-footer.spec.mjs` (hover ink, 2 px ink outline, 44 px target, click and Esc share the
+  confirmation), `RoomTests.exitHasAQuietHoverInkFocusAndAFullHeightHitTarget`,
+  `RoomTests.clickAndEscapeShareOneConfirmation`, `apps/windows/room` `TestExit*` and `TestTabNeverTakesTheDraftsKeyboardWhileWriting`.

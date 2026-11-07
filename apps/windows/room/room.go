@@ -30,6 +30,9 @@ type Config struct {
 	Log func(format string, a ...any)
 	// Quit leaves the room (second Esc). Defaults to mygo.App.Quit.
 	Quit func()
+	// Copy puts the kept text on the clipboard. Defaults to mygo.Clipboard.WriteText (a test replaces it: the
+	// headless backend has no clipboard to answer).
+	Copy func(string)
 	// SyncPaper renders the paper texture on the calling goroutine (first frame carries it, tests).
 	SyncPaper bool
 	// Writing font size in pt (28 is the Mac default).
@@ -93,13 +96,17 @@ type Room struct {
 	scrollAt    time.Time
 	scrollTgt   float32
 	keptScroll  float32
-	hover       string // "exit" "copy" "run" "pill" or ""
-	pressed     string
-
-	// geometry published by the last frame for hit tests, relative to the element
-	hit    map[string]ui.Rect
+	// buttons holds the rects of the frame's buttons: the room box's pointer handler would take a press on one
+	// of them before the button saw it, so input lets those presses through
+	buttons []ui.Rect
+	// writing origin published by the last frame for IME bounds
 	ox, oy float32
 	boxH   float32
+
+	// history dissolve (D-092): the alpha each line is drawn at, by line index, and the dissolve in flight
+	hShown, hFrom, hTo []float32
+	hAt                time.Time
+	hDark              bool
 
 	// layout cache
 	layout    *ui.TextLayout
@@ -143,8 +150,11 @@ func New(cfg Config) *Room {
 	if cfg.Quit == nil {
 		cfg.Quit = func() { mygo.App.Quit() }
 	}
+	if cfg.Copy == nil {
+		cfg.Copy = func(s string) { mygo.Clipboard.WriteText(s) }
+	}
 	r := &Room{cfg: cfg, eng: session.New(cfg.Duration, cfg.Silence), copyLabel: tokens.StrCopyText,
-		hit: map[string]ui.Rect{}, shapes: map[string]*ui.TextLayout{}}
+		shapes: map[string]*ui.TextLayout{}}
 	r.ed = r.newEditor()
 	return r
 }
@@ -357,20 +367,23 @@ func (r *Room) View(c *ui.Context) {
 		r.themes[dark] = roomTheme(dark)
 	}
 	c.SetTheme(r.themes[dark])
-	if r.eng.Phase != session.Writing && r.eng.Phase != session.Danger && c.Shortcut(0, ui.KeyEscape) {
-		r.requestExit() // on the stopped and kept sheets a button holds the focus; Esc still asks to leave
+	if !r.ed.Composing() && c.Shortcut(0, ui.KeyEscape) {
+		r.requestExit() // Exit, stopped and kept buttons may hold focus; Esc still uses the same confirmation
 	}
 	W, H := c.Size()
 	box := ui.Box(c).Fill().Background(rc(tokens.Page, dark)).Label("Writing room").Role(ui.RoleTextField).
-		Value(r.ed.Text()).HandleInput(r.input).AutoFocus().KeepFocus().
-		Cursor(pick(r.hover != "", ui.CursorPointer, ui.CursorDefault))
+		Value(r.ed.Text()).HandleInput(r.input).AutoFocus().KeepFocus()
 	if r.eng.Phase != session.Success {
 		box = box.HandleTextInput(r.ed)
 	} else {
 		box = box.Focusable()
 	}
 	box.Draw(func(p *ui.Painter, rect ui.Rect) { r.draw(p, rect, now, dark) })
-	box.Children(func() { r.pills(c, W, H, dark) })
+	r.buttons = r.buttons[:0]
+	box.Children(func() {
+		r.exitButton(c, W, H, dark)
+		r.pills(c, W, H, dark)
+	})
 	r.schedule(c, now)
 }
 
@@ -380,6 +393,7 @@ func (r *Room) schedule(c *ui.Context, now time.Time) {
 	case r.eng.Phase == session.Failure && now.Before(r.cutUntil.Add(200*time.Millisecond)),
 		!r.denyAt.IsZero() && now.Sub(r.denyAt) < 300*time.Millisecond,
 		!r.scrollAt.IsZero() && now.Sub(r.scrollAt) < 250*time.Millisecond,
+		!r.hAt.IsZero() && now.Sub(r.hAt) < HistoryDissolve+20*time.Millisecond,
 		!r.fadeStart.IsZero() && r.lastWash > 0:
 		c.After(8 * time.Millisecond)
 	case r.eng.Phase == session.Writing && r.eng.HasStarted(), r.eng.Phase == session.Danger:
@@ -401,25 +415,11 @@ func (r *Room) input(ev ui.InputEvent) bool {
 		if r.key(ev) {
 			return true
 		}
-	case ui.InputPointerMove:
-		r.hover = r.hitName(ev.X, ev.Y)
-		return true
-	case ui.InputPointerDown:
-		r.pressed = r.hitName(ev.X, ev.Y)
-		if r.pressed != "" {
-			r.invalidate()
-			return true
-		}
-	case ui.InputPointerUp:
-		name := r.hitName(ev.X, ev.Y)
-		pressed := r.pressed
-		r.pressed = ""
-		if name != "" && name == pressed {
-			r.activate(name)
-			return true
-		}
-		if pressed != "" {
-			return true
+	case ui.InputPointerDown, ui.InputPointerUp, ui.InputPointerMove:
+		for _, b := range r.buttons {
+			if b.Contains(ev.X, ev.Y) {
+				return false
+			}
 		}
 	case ui.InputScroll:
 		if r.eng.Phase == session.Success {
@@ -429,7 +429,8 @@ func (r *Room) input(ev ui.InputEvent) bool {
 		}
 	}
 	if r.eng.Phase == session.Success {
-		return true
+		// no draft is being written: Tab walks the buttons instead of stopping on the room
+		return ev.Kind != ui.InputKeyDown || ev.Key != ui.KeyTab
 	}
 	return r.ed.Input(ev)
 }
@@ -457,22 +458,13 @@ func (r *Room) activate(name string) {
 	case "pill", "run":
 		r.restart()
 	case "copy":
-		mygo.Clipboard.WriteText(r.eng.Text)
+		r.cfg.Copy(r.eng.Text)
 		r.eng.CopiedKept = true
 		r.copyLabel = tokens.StrCopied
 		r.announce = append(r.announce, "Copied.")
 		r.logf("COPY %d words", r.eng.WordCount)
 	}
 	r.invalidate()
-}
-
-func (r *Room) hitName(x, y float32) string {
-	for _, n := range []string{"exit"} {
-		if rect, ok := r.hit[n]; ok && rect.Contains(x, y) {
-			return n
-		}
-	}
-	return ""
 }
 
 // imeBounds places candidate windows at the caret (or the preedit start) of the writing line.

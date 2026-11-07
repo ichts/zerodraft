@@ -39,7 +39,7 @@ export function wordCount(text) {
 // wraps is still one line, so its rows carry one rung and read as one grey, never as a staircase.
 // A full stop does not end a line. The Mac and Windows rooms cut the same lines (`HistoryLines.swift`,
 // `session/lines.go`); the three surfaces must not drift.
-// Rung 0 is the live line, 1 and 2 are the ladder's two readable steps, GONE is everything older.
+// Rung 0 is the live line, 1 and 2 are the history's two dimmed steps (D-092), GONE is everything older.
 export const GONE = 3;
 
 // The text cut into lines, each with its offsets and its rung. A hard break is LF, CRLF or a lone CR

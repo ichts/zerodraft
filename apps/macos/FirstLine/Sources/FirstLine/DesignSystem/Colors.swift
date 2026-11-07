@@ -46,12 +46,13 @@ enum FirstLineColors {
     /// the same colour instead of the Mac tinting the sheet with a pale pink meant for white.
     static var paperWashNSColor: NSColor { adaptive(light: 0xE8CFBB, dark: 0x453226) }
     static var paperWashDeepNSColor: NSColor { adaptive(light: 0xE6BCA7, dark: 0x573428) }
-    /// History opacity per line, current line first: one uniform step per completed line, older lines gone
-    /// (D-027's stepping). The steps are D-069's contrast ladder, solved per appearance so the first faded
-    /// line reads at 9:1 and the second at 7:1 on the paper (`--paper-history-1/2` in `tokens.css`). The
-    /// editor re-applies them when the appearance changes, so no step from the other theme stays baked in.
+    /// History opacity per line ended by Return, current line first, older lines gone (D-092, the captain's option B).
+    /// Live 1, one back .22, two back .07 in light; dark keeps the same contrast on its own paper: .16 and .05 (1.57:1
+    /// and 1.15:1, the light values' ratios). These dimmed lines are exempt from the 7:1 rule (`--paper-history-1/2`
+    /// in `tokens.css`). The editor re-applies them when the appearance changes, so no step from the other theme
+    /// stays baked in.
     static func paperHistoryOpacities(dark: Bool) -> [CGFloat] {
-        dark ? [1, 0.902, 0.772] : [1, 0.847, 0.769]
+        dark ? [1, 0.16, 0.05] : [1, 0.22, 0.07]
     }
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }

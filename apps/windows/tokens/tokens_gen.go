@@ -29,9 +29,9 @@ var (
 	Shadow        = Role{0x1C1917, 0x000000, 1, 1}
 )
 
-// HistoryOpacities is the D-069 ladder, current line first; lines beyond it are gone.
-var HistoryOpacitiesDark = []float32{1, 0.902, 0.772}
-var HistoryOpacitiesLight = []float32{1, 0.847, 0.769}
+// HistoryOpacities are the history steps (D-092), current line first; lines beyond them are gone.
+var HistoryOpacitiesDark = []float32{1, 0.16, 0.05}
+var HistoryOpacitiesLight = []float32{1, 0.22, 0.07}
 
 // 4-pt spacing and radii.
 const (
@@ -95,7 +95,7 @@ const (
 	StrBeginAgain            = "Begin again"
 	StrWarning               = "KEEP TYPING OR THE DRAFT IS DELETED."
 	StrTypeToBegin           = "Type to begin"
-	StrExitLink              = "ESC - EXIT"
+	StrExitLink              = "Esc to exit"
 	StrKeptHeading           = "You wrote it down."
 	StrKeptCaption           = "Nothing here is saved. Copy it before you leave."
 	StrRefusalNotice         = "FORWARD ONLY. DELETING IS BLOCKED."

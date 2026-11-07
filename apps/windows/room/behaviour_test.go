@@ -53,6 +53,114 @@ func TestExitNeedsTwoActsInsideTwoSeconds(t *testing.T) {
 	}
 }
 
+// keptRig reaches the kept screen, where no editor holds the keyboard, so Tab walks the buttons.
+func keptRig(t *testing.T) *rig {
+	g := newRig(t, 1040, 720)
+	for i := 0; i < 15; i++ {
+		g.tt.Type("A few more words in the draft. ")
+		g.tt.Advance(4 * time.Second)
+	}
+	g.tt.Advance(20 * time.Second)
+	if g.r.Engine().Phase != session.Success {
+		t.Fatalf("want success, got %v", g.r.Engine().Phase)
+	}
+	return g
+}
+
+// tabToExit walks the focus ring until Exit itself, not only its container, holds it.
+func tabToExit(t *testing.T, g *rig) {
+	for i := 0; i < 6; i++ {
+		g.tt.Key(0, ui.KeyTab)
+		g.tt.Frame()
+		if g.tt.Focused("Exit") && !g.tt.Focused("COPY TEXT") && !g.tt.Focused("BEGIN AGAIN") {
+			return
+		}
+	}
+	t.Fatal("Tab never reached Exit")
+}
+
+func TestExitIsAnAccessibleButtonThatSharesEscConfirmation(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	g.tt.Type("private draft")
+	rect, ok := g.tt.Find("Exit")
+	if !ok || rect.H < 44 {
+		t.Fatalf("Exit must be an accessible button at least 44 DIP tall: %v %v", rect, ok)
+	}
+	if err := g.tt.Click("Exit"); err != nil {
+		t.Fatal(err)
+	}
+	g.tt.Frame()
+	if g.quit || g.r.exitHintOff.IsZero() {
+		t.Fatal("one click only arms the exit")
+	}
+	g.tt.Key(0, ui.KeyEscape)
+	if !g.quit {
+		t.Fatal("click then Esc must leave")
+	}
+}
+
+func TestTabNeverTakesTheDraftsKeyboardWhileWriting(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	g.tt.Type("a")
+	g.tt.Key(0, ui.KeyTab)
+	g.tt.Type("b")
+	if g.r.Editor().Text() != "ab" {
+		t.Fatalf("a stray Tab must not move the keyboard off the draft: %q", g.r.Editor().Text())
+	}
+}
+
+func TestExitKeyboardActivationOnTheKeptScreen(t *testing.T) {
+	g := keptRig(t)
+	tabToExit(t, g)
+	g.tt.Key(0, ui.KeySpace)
+	g.tt.Frame()
+	if g.quit || g.r.exitHintOff.IsZero() {
+		t.Fatal("Space on Exit must arm the same confirmation as Esc")
+	}
+	g.tt.Key(0, ui.KeyEscape)
+	if !g.quit {
+		t.Fatal("Esc must confirm a button-armed exit")
+	}
+}
+
+func TestExitHoverAndFocusChangePixelsWithoutMovingTheTarget(t *testing.T) {
+	g := keptRig(t)
+	rect, ok := g.tt.Find("Exit")
+	if !ok {
+		t.Fatal("Exit button missing")
+	}
+	before := g.tt.Image()
+	g.tt.Move(rect.X+rect.W/2, rect.Y+rect.H/2)
+	g.tt.Frame()
+	hover := g.tt.Image()
+	changed := false
+	for y := int(rect.Y); y < int(rect.Y+rect.H); y++ {
+		for x := int(rect.X); x < int(rect.X+rect.W); x++ {
+			changed = changed || before.At(x, y) != hover.At(x, y)
+		}
+	}
+	if !changed {
+		t.Fatal("hover must tint the label from quiet to ink")
+	}
+	g.tt.Move(0, 0)
+	g.tt.Frame()
+	before = g.tt.Image()
+	tabToExit(t, g)
+	focused := g.tt.Image()
+	changed = false
+	for y := int(rect.Y) - 5; y < int(rect.Y+rect.H)+5; y++ {
+		for x := int(rect.X) - 5; x < int(rect.X+rect.W)+5; x++ {
+			changed = changed || before.At(x, y) != focused.At(x, y)
+		}
+	}
+	if !changed {
+		t.Fatal("keyboard focus must draw an ink ring on Exit")
+	}
+	if after, _ := g.tt.Find("Exit"); after != rect {
+		t.Fatal("hover and focus must not move the target")
+	}
+}
+
 func TestTypingDismissesTheExitConfirmation(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	g.tt.Type("hi")
@@ -136,13 +244,13 @@ func TestFailureCompositionKeepsTheLockedRatios(t *testing.T) {
 	}
 }
 
-func TestHistoryLadder(t *testing.T) {
-	for d, want := range map[int]float32{0: 1, 1: 0.847, 2: 0.769, 3: -1} {
+func TestHistorySteps(t *testing.T) {
+	for d, want := range map[int]float32{0: 1, 1: 0.22, 2: 0.07, 3: -1} {
 		if got := HistoryAlpha(d, false); got != want {
 			t.Errorf("light distance %d: %v want %v", d, got, want)
 		}
 	}
-	for d, want := range map[int]float32{1: 0.902, 2: 0.772, 3: -1} {
+	for d, want := range map[int]float32{1: 0.16, 2: 0.05, 3: -1} {
 		if got := HistoryAlpha(d, true); got != want {
 			t.Errorf("dark distance %d: %v want %v", d, got, want)
 		}
@@ -321,8 +429,8 @@ func TestANewSessionEarnsTheNoticeAgain(t *testing.T) {
 	}
 }
 
-// D-088: every visual row of one line carries one colour, the ladder counts lines ended by Return from the end, and
-// a full stop never steps it.
+// D-088 and D-092: every visual row of one line carries one colour, the steps count lines ended by Return from the
+// end, and a full stop never moves one.
 func TestHistorySpansColourWholeLines(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	text := "First line is long and wraps. Still the first line.\nSecond line is long too.\nThird one. Same line.\nFourth is live"
@@ -331,7 +439,7 @@ func TestHistorySpansColourWholeLines(t *testing.T) {
 	for _, s := range spans {
 		got = append(got, float32(s.Color.A)/255)
 	}
-	want := []float32{0, 0.769, 0.847, 1} // gone, two back, one back, live (alpha of the ink, 255 for the live line)
+	want := []float32{0, 0.07, 0.22, 1} // gone, two back, one back, live (alpha of the ink, 255 for the live line)
 	if len(got) != len(want) {
 		t.Fatalf("%d spans, want %d: %v", len(got), len(want), spans)
 	}
@@ -339,6 +447,45 @@ func TestHistorySpansColourWholeLines(t *testing.T) {
 		if math.Abs(float64(got[i]-want[i])) > 0.005 {
 			t.Errorf("span %d alpha %.3f want %.3f", i, got[i], want[i])
 		}
+	}
+}
+
+// D-092: Return starts the dissolve of the line just written; it lands on .22 after 320 ms, then .07 on the next Return.
+func TestReturnStartsTheHistoryDissolve(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	t0 := time.Unix(1000, 0)
+	at := func(ms int) time.Time { return t0.Add(time.Duration(ms) * time.Millisecond) }
+	alphas := func(text string, ms int) []float32 { a, _ := g.r.historyAlphas(text, false, at(ms)); return a }
+	near := func(got, want float32) bool { return math.Abs(float64(got-want)) < 0.005 }
+
+	if a := alphas("First line", 0); len(a) != 1 || a[0] != 1 {
+		t.Fatalf("the live line is full ink: %v", a)
+	}
+	a, moving := g.r.historyAlphas("First line\n", false, at(10))
+	if !moving || a[0] < 0.99 {
+		t.Fatalf("Return starts the dissolve from full ink: %v moving=%v", a, moving)
+	}
+	if a = alphas("First line\n", 170); a[0] > 0.9 || a[0] < 0.3 {
+		t.Fatalf("half way the line is between ink and its step: %v", a)
+	}
+	if a = alphas("First line\n", 400); !near(a[0], 0.22) {
+		t.Fatalf("the dissolve lands on one back: %v", a)
+	}
+	if _, moving = g.r.historyAlphas("First line\n", false, at(500)); moving {
+		t.Fatal("a settled history asks for no more frames")
+	}
+	if a = alphas("First line\nSecond line", 600); !near(a[0], 0.22) || a[1] < 0.99 {
+		t.Fatalf("typing on the new line moves nothing above it: %v", a)
+	}
+	text := "First line\nSecond line\n"
+	if a = alphas(text, 610); a[0] < 0.2 || a[1] < 0.99 {
+		t.Fatalf("Return starts both dissolves from where the lines are: %v", a)
+	}
+	if a = alphas(text, 1000); !near(a[0], 0.07) || !near(a[1], 0.22) {
+		t.Fatalf("every Return line gets exactly its step, 1 / .22 / .07: %v", a)
+	}
+	if a = alphas("a\nb\nc\nd\ne", 5000); !near(a[4], 1) {
+		t.Fatalf("a rebuilt draft is drawn at its steps at once: %v", a)
 	}
 }
 

@@ -34,7 +34,7 @@ func newRig(t *testing.T, w, h int) *rig {
 			return time.Unix(1_800_000_000, 0)
 		}
 		return tt.Now()
-	}, Quit: func() { g.quit = true }})
+	}, Copy: func(string) {}, Quit: func() { g.quit = true }})
 	tt = ui.NewTester(g.r.View, w, h)
 	g.tt = tt
 	tt.Frame()

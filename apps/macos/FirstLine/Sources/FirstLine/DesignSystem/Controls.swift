@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing, DesignSystem/SurfaceViews.
- * [OUTPUT]: After-language segmented control (a segment never compresses below its label), fill bar and status line used by the picker, room, activation, settings and kept sheet.
+ * [OUTPUT]: After-language segmented control (a segment never compresses below its label), rounded top-edge fill bar and status line used by the picker, room, activation, settings and kept sheet.
  * [POS]: Shared After-language controls; keyboard reachability stays AppKit's, focus rings come from InkFocus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -178,12 +178,14 @@ private final class FirstLineSegmentButton: FirstLineInkFocusButton {
 // MARK: - Status
 
 @MainActor
-/// A hairline room bar drawn by one fill layer. The caller can animate the fill
-/// width over the remaining session time; the layer runs off the main thread, so
-/// the bar stays smooth even when the room is re-laying out.
+/// A 2 pt top border following the paper corners. An animated width mask reveals
+/// the fixed border, so the corners never stretch as the remaining time drains.
 final class FirstLineFillBar: NSView {
     private static let fractionAnimationKey = "fraction"
     private let fillLayer = CALayer()
+    private let borderLayer = CAShapeLayer()
+    var cornerRadius: CGFloat = FirstLineRadius.sheet { didSet { needsLayout = true } }
+    var borderPath: CGPath? { borderLayer.path }
 
     /// The model target, readable by tests and snapshot fixtures. While a live
     /// session animates, the presentation layer shows the current fraction.
@@ -210,7 +212,9 @@ final class FirstLineFillBar: NSView {
         fillLayer.anchorPoint = .zero
         fillLayer.position = .zero
         fillLayer.masksToBounds = true
-        layer?.addSublayer(fillLayer)
+        fillLayer.backgroundColor = NSColor.black.cgColor
+        borderLayer.mask = fillLayer
+        layer?.addSublayer(borderLayer)
         applyFillColor()
     }
 
@@ -221,7 +225,32 @@ final class FirstLineFillBar: NSView {
 
     override func layout() {
         super.layout()
+        borderLayer.frame = bounds
+        borderLayer.path = topBorderPath()
         fillLayer.frame = CGRect(x: 0, y: 0, width: bounds.width * fraction, height: bounds.height)
+    }
+
+    // CSS border-top with zero-width side borders: both arcs taper to the side edge.
+    private func topBorderPath() -> CGPath {
+        let r = min(cornerRadius, bounds.width / 2, bounds.height)
+        let inner = max(0, r - 2)
+        let w = bounds.width
+        let h = bounds.height
+        let k: CGFloat = 0.5522847498
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: 0, y: h - r))
+        path.addCurve(to: CGPoint(x: r, y: h), control1: CGPoint(x: 0, y: h - r + k * r),
+                      control2: CGPoint(x: r - k * r, y: h))
+        path.addLine(to: CGPoint(x: w - r, y: h))
+        path.addCurve(to: CGPoint(x: w, y: h - r), control1: CGPoint(x: w - r + k * r, y: h),
+                      control2: CGPoint(x: w, y: h - r + k * r))
+        path.addCurve(to: CGPoint(x: w - r, y: h - 2), control1: CGPoint(x: w, y: h - r + k * inner),
+                      control2: CGPoint(x: w - r + k * r, y: h - 2))
+        path.addLine(to: CGPoint(x: r, y: h - 2))
+        path.addCurve(to: CGPoint(x: 0, y: h - r), control1: CGPoint(x: r - k * r, y: h - 2),
+                      control2: CGPoint(x: 0, y: h - r + k * inner))
+        path.closeSubpath()
+        return path
     }
 
     /// Set the target fraction. With a duration and motion enabled, one linear
@@ -261,7 +290,7 @@ final class FirstLineFillBar: NSView {
 
     private func applyFillColor() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            fillLayer.backgroundColor = fillColor.cgColor
+            borderLayer.fillColor = fillColor.cgColor
         }
     }
 

@@ -1717,3 +1717,16 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Supersedes: the wording of D-085's exclusions and of D-076 items 5 and 6 (the trial line and the rules
   sheet) and the one-placeholder-on-both-surfaces rule of the Mac audit's activation fixes (#111: the card
   now has a label and no placeholder). Behaviour and geometry stand.
+
+## D-087: The session bar is the paper's rounded top edge, not a straight bar inside the corners
+
+- Date: 2026-11-07
+- Decision: the 2 px session bar on web (room, demo) and Mac is the sheet's own top border: it follows the
+  16 px corner arcs and tapers to the side edges, and the remaining time reveals it from the right with a
+  clip (web `clip-path: inset(0 R% 0 0)`) or a width mask (Mac), so the curve never stretches. A full bar
+  touches the card edge at both ends. Thickness, colour, linear timing, direction and the one-bar rule are
+  unchanged.
+- Reason: a straight 2 px bar clipped inside rounded corners starts and ends short of the card edge, so
+  the bar looks like it never reaches the end (captain, 2026-11-07).
+- Supersedes: the "straight 2 pt bar" shape in D-014; the bar's box is now the corner radius tall, only the
+  top 2 px paint.

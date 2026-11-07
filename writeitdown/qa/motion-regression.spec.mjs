@@ -1,18 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { TIMELINE } from '../demo-timeline.mjs';
+import { barFraction } from './bar-clip.mjs';
 
 const loop = TIMELINE.typeEnd + 5000 + 3000 + 200 + 2000;
 
 async function barAnchor(page, selector, clockSelector) {
-  return page.locator(selector).evaluate((bar, clockSelector) => {
+  const anchor = await page.locator(selector).evaluate((bar, clockSelector) => {
     const animation = bar.getAnimations()[0];
     const clock = document.querySelector(clockSelector).textContent.split(':').map(Number);
     return {
-      fraction: Number(animation.effect.getKeyframes()[0].transform.match(/scaleX\(([^)]+)\)/)[1]),
+      clip: animation.effect.getKeyframes()[0].clipPath,
       duration: animation.effect.getTiming().duration,
       seconds: clock[0] * 60 + clock[1],
     };
   }, clockSelector);
+  return { ...anchor, fraction: barFraction(anchor.clip) };
 }
 
 function expectAligned(anchor) {
@@ -75,7 +77,7 @@ test('room bar reanchors to the deadline after motion preference changes', async
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.runFor(50);
   await expect.poll(() => page.locator('#room-bar').evaluate(bar => bar.getAnimations().length)).toBe(0);
-  const stepped = await page.locator('#room-bar').evaluate(bar => new DOMMatrixReadOnly(getComputedStyle(bar).transform).m11);
+  const stepped = barFraction(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath));
   expect(stepped).toBeCloseTo(0.5, 1);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.runFor(50);
@@ -92,7 +94,7 @@ test('room bar starts a fresh session full under Reduce Motion', async ({ page }
   await page.keyboard.insertText('Start');
   for (const ms of [500, 4900, 2000, 500, 100]) await page.clock.fastForward(ms);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe');
-  const scale = () => page.locator('#room-bar').evaluate(bar => Number(bar.style.transform.match(/scaleX\(([^)]+)\)/)[1]));
+  const scale = async () => barFraction(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath));
   expect(await scale()).toBe(0);
   await page.keyboard.insertText('A');
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');

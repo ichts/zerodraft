@@ -98,8 +98,8 @@ import { statusSlot } from './status-slot.js';
     if (barAnimation) barAnimation.cancel();
     barDeadline = deadline;
     var remaining = Math.max(0, deadline - Date.now());
-    barEl.style.transform = "scaleX(" + remaining / 60000 + ")";
-    barAnimation = barEl.animate([{ transform: barEl.style.transform }, { transform: "scaleX(0)" }],
+    barEl.style.clipPath = "inset(0 " + (1 - remaining / 60000) * 100 + "% 0 0)";
+    barAnimation = barEl.animate([{ clipPath: barEl.style.clipPath }, { clipPath: "inset(0 100% 0 0)" }],
       { duration: remaining, easing: "linear", fill: "forwards" });
   }
   function finishShift() {
@@ -153,7 +153,7 @@ import { statusSlot } from './status-slot.js';
       if (barAnimation) barAnimation.cancel();
       barAnimation = null;
       barDeadline = null;
-      barEl.style.transform = 'scaleX(0)';
+      barEl.style.clipPath = 'inset(0 100% 0 0)';
     }
     if (t < SILENT_END) {
       setPhase("type");
@@ -206,7 +206,7 @@ import { statusSlot } from './status-slot.js';
     barAnimation = null;
     barDeadline = null;
     finishShift();
-    barEl.style.transform = "scaleX(1)";
+    barEl.style.clipPath = "inset(0 0% 0 0)";
     setWash(null);
     numeralEl.textContent = "";
     captionEl.textContent = "";

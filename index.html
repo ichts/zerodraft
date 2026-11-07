@@ -89,11 +89,24 @@ window.FirstLineLandingDemo = (() => {
   function fmtClock(seconds) {
     return Math.floor(seconds / 60) + ":" + String(seconds % 60).padStart(2, "0");
   }
+  // The count rule of the rooms (D-094): Han, Hiragana and Katakana count one per character, other words by
+  // Unicode word boundary; the label says characters when CJK letters are at least half of the draft.
+  const wordSegments = new Intl.Segmenter(undefined, { granularity: "word" });
+  const CJK = String.raw`[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC]`;
+  const cjkUnits = new RegExp(`(${CJK}\\p{Mark}*)`, "gu");
+  const cjkLetter = new RegExp(CJK, "gu");
   function wordCount(text) {
-    const zh = text.match(/[\u4e00-\u9fff]/g) || [];
-    const nonHan = text.replace(/[\u4e00-\u9fff]/g, " ");
-    const words = nonHan.match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu) || [];
-    return zh.length + words.length;
+    const separated = text.replace(cjkUnits, " $1 ");
+    return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
+  }
+  function usesCharacterCount(text) {
+    const cjk = (text.match(cjkLetter) || []).length;
+    const letters = (text.match(/[\p{Letter}\p{Number}]/gu) || []).length;
+    return cjk > 0 && cjk * 2 >= letters;
+  }
+  function countLabel(text) {
+    const count = wordCount(text);
+    return count + " " + (usesCharacterCount(text) ? "character" : "word") + (count === 1 ? "" : "s");
   }
   function shouldReduceMotion() { return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches; }
 
@@ -422,12 +435,12 @@ window.FirstLineLandingDemo = (() => {
 
   // onComplete / onFail: DOM side-effects of state changes (called from the
   // data-effect expression that watches _session.complete / _session.failed).
-  function onComplete(words) {
+  function onComplete(text) {
     const el = trialEditor();
     if (el) { el.blur(); el.setAttribute("contenteditable", "false"); }
     document.querySelector(".trial-writing-surface")?.scrollTo({ top: 0 });
     clearDeny();
-    setSrStatus("0:00 - " + words + " words kept.");
+    setSrStatus("0:00 - " + countLabel(text) + " kept.");
     requestAnimationFrame(() => document.querySelector(".copy-door")?.focus({ preventScroll: true }));
   }
   function onFail(report) {
@@ -669,6 +682,7 @@ window.FirstLineLandingDemo = (() => {
     bind,
     // pure helpers / action targets called from data-on + data-on-interval + data-effect expressions
     tickDispatch,
+    countLabel,
     onComplete,
     onFail,
     // action targets called from data-on:click (and flroutecheck events)
@@ -1555,7 +1569,7 @@ if (document.readyState === "loading") {
 <body
   data-signals='{"_session":{"context":"demo","active":false,"failed":false,"complete":false,"text":"","startedAt":0,"duration":60,"lastInputAt":0,"remaining":60,"dangerSeconds":0,"dangerActive":false,"wiping":false,"resultText":"","resultWordCount":0,"wipeReport":"","copied":false,"srStatus":"","denyActive":false,"denyHair":false}}'
   data-computed:_session.clock="Math.floor($_session.remaining/60)+':'+String($_session.remaining%60).padStart(2,'0')"
-  data-computed:_session.livewords="($_session.text.match(/[\u4e00-\u9fff]/g)||[]).length + ($_session.text.replace(/[\u4e00-\u9fff]/g,' ').match(/[\p{L}\p{N}]+(?:[-'][\p{L}\p{N}]+)*/gu)||[]).length"
+  data-computed:_session.livewords="FirstLineLandingDemo.countLabel($_session.text)"
   data-class:trial-mode="$_session.context === 'trial'"
   data-class:danger="$_session.dangerActive"
   data-class:wiping="$_session.wiping"
@@ -1566,7 +1580,7 @@ if (document.readyState === "loading") {
   data-class:wash-2="$_session.dangerActive &amp;&amp; $_session.dangerSeconds === 2"
   data-class:wash-3="$_session.dangerActive &amp;&amp; $_session.dangerSeconds === 1"
   data-on-interval__duration.100ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
-  data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.resultWordCount); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.wipeReport)"
+  data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.resultText); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.wipeReport)"
   data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; ($_session.failed || $_session.complete) &amp;&amp; ($_session.failed = false, $_session.complete = false, $_session.remaining = 60, $_session.resultText = '', $_session.resultWordCount = 0, $_session.wipeReport = '', $_session.copied = false, $_session.wiping = false, $_session.startedAt = 0); $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
   data-on:flentertrial="$_session.context = 'trial'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.wiping = false; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false"
   data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.wiping = false; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false"
@@ -1631,7 +1645,7 @@ if (document.readyState === "loading") {
       <p class="chrome chrome-tl"><span class="label rules-full">Forward only / 5s warn / 8s wipe / 60s</span><span class="label rules-compact">Fwd only / 5s / 8s / 60s</span></p>
       <p class="chrome chrome-tr"><span class="trial-timer" data-text="$_session.clock">1:00</span></p>
       <p class="chrome chrome-bl"><button type="button" class="trial-exit" data-on:click="FirstLineLandingDemo.exitTrial()">Esc - Exit</button></p>
-      <p class="chrome chrome-br"><span class="label" data-text="$_session.livewords + ' words'">0 words</span></p>
+      <p class="chrome chrome-br"><span class="label" data-text="$_session.livewords">0 words</span></p>
       <div class="trial-column">
         <div class="trial-editor" data-ignore contenteditable="true" role="textbox" aria-multiline="true" aria-label="Zero Draft trial editor" spellcheck="false"></div>
         <p class="trial-hint label" data-show="$_session.context === 'trial' &amp;&amp; !$_session.failed &amp;&amp; !$_session.complete &amp;&amp; $_session.text.trim().length === 0">Type here. The law is live: 5s warn, 8s wipe, 60s to keep.</p>
@@ -1656,7 +1670,7 @@ if (document.readyState === "loading") {
           </div>
           <article class="kept-text" data-text="$_session.resultText"></article>
           <div class="kept-receipt">
-            <span class="receipt-line system" data-text="'0:00 - ' + $_session.resultWordCount + ' words kept.'">0:00 - 0 words kept.</span>
+            <span class="receipt-line system" data-text="'0:00 - ' + FirstLineLandingDemo.countLabel($_session.resultText) + ' kept.'">0:00 - 0 words kept.</span>
             <button type="button" class="copy-door" data-text="$_session.copied ? 'Copied' : 'Copy text'" data-class:is-copied="$_session.copied" data-on:click="FirstLineLandingDemo.copyText($_session.resultText)">Copy text</button>
           </div>
         </div>

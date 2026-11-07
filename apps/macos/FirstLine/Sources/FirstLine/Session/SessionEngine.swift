@@ -27,11 +27,17 @@ final class SessionEngine {
         durationChoices.contains(value) ? value : defaultDurationSeconds
     }
 
-    nonisolated private static let cjkPattern = try! NSRegularExpression(
-        pattern: "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]")
+    /// Han, Hiragana, Katakana and the prolonged sound mark are written without spaces: each is one unit (D-094).
+    nonisolated private static let cjkClass = "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\u30FC]"
+    private static let cjkUnitPattern = try! NSRegularExpression(pattern: "(\(cjkClass)\\p{Mark}*)")
+    nonisolated private static let cjkPattern = try! NSRegularExpression(pattern: cjkClass)
+    nonisolated private static let letterPattern = try! NSRegularExpression(pattern: "[\\p{L}\\p{N}]")
 
+    /// The label says characters only when CJK letters are at least half of the draft's letters and digits.
     nonisolated static func usesCharacterCount(_ text: String) -> Bool {
-        cjkPattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+        let range = NSRange(text.startIndex..., in: text)
+        let cjk = cjkPattern.numberOfMatches(in: text, range: range)
+        return cjk > 0 && cjk * 2 >= letterPattern.numberOfMatches(in: text, range: range)
     }
 
     private let now: () -> TimeInterval
@@ -64,14 +70,13 @@ final class SessionEngine {
     var secondsUntilDeletion: Int { max(0, Int(ceil(Double(silenceLimit.rawValue) - idleSeconds))) }
 
     private static func countWords(in text: String) -> Int {
-        if usesCharacterCount(text) {
-            return text.filter { $0.unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) }.count
-        }
+        let source = text as NSString
+        let separated = cjkUnitPattern.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: source.length), withTemplate: " $1 ")
         let tokenizer = NLTokenizer(unit: .word)
-        tokenizer.string = text
+        tokenizer.string = separated
         var count = 0
-        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
-            if text[range].unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) {
+        tokenizer.enumerateTokens(in: separated.startIndex..<separated.endIndex) { range, _ in
+            if separated[range].unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) {
                 count += 1
             }
             return true

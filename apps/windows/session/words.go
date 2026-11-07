@@ -1,41 +1,39 @@
 package session
 
-import (
-	"unicode"
+import "unicode"
 
-	"github.com/go-text/typesetting/segmenter"
-)
-
-func UsesCharacterCount(s string) bool {
-	for _, r := range s {
-		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
-			return true
-		}
-	}
-	return false
+// isCJK is a script written without spaces, so each character is one unit: Han, Hiragana, Katakana and the
+// prolonged sound mark (D-094). The Mac and the web rooms use the same rule.
+func isCJK(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) || r == '\u30FC'
 }
 
-// WordCount uses characters for CJK drafts and word runs otherwise; punctuation and emoji do not count.
-func WordCount(s string) int {
-	if UsesCharacterCount(s) {
-		var seg segmenter.Segmenter
-		seg.Init([]rune(s))
-		graphemes := seg.GraphemeIterator()
-		n := 0
-		for graphemes.Next() {
-			for _, r := range graphemes.Grapheme().Text {
-				if unicode.IsLetter(r) || unicode.IsNumber(r) {
-					n++
-					break
-				}
-			}
+// UsesCharacterCount reports whether the draft's count is labelled characters: CJK letters are at least half
+// of its letters and digits.
+func UsesCharacterCount(s string) bool {
+	cjk, letters := 0, 0
+	for _, r := range s {
+		if isCJK(r) {
+			cjk++
 		}
-		return n
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			letters++
+		}
 	}
+	return cjk > 0 && cjk*2 >= letters
+}
+
+// WordCount counts like the Mac room: each CJK character is one word, other words are runs of letters and
+// digits (an apostrophe or a connecting mark inside a run stays in the word), punctuation and emoji do not
+// count.
+func WordCount(s string) int {
 	n, in := 0, false
 	rs := []rune(s)
 	for i, r := range rs {
 		switch {
+		case isCJK(r):
+			n++
+			in = false
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r):
 			if !in {
 				n++

@@ -4,6 +4,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,13 +54,18 @@ func (g *rig) snap(name string) {
 	f.Close()
 }
 
-func TestCJKCountLabelsCharactersAndReceiptUsesSentenceCase(t *testing.T) {
-	text := "我们是"
-	n := session.WordCount(text)
-	if got := wordLabel(n, text); got != "3 characters" {
-		t.Fatalf("CJK count = %q", got)
+func TestCountLabelFollowsTheCJKShareOfTheDraft(t *testing.T) {
+	english := strings.Repeat("word ", 500) + "你好"
+	for text, want := range map[string]string{
+		"我们是": "3 characters", "我": "1 character", "こんにちは世界": "7 characters", "コーヒー": "4 characters",
+		"hello world 中文测试": "6 words", english: "502 words", "你好，world！": "3 words",
+		"hello world": "2 words", "one": "1 word", "한글 한글": "2 words", "": "0 words",
+	} {
+		if got := wordLabel(session.WordCount(text), text); got != want {
+			t.Errorf("wordLabel(%.20q) = %q, want %q", text, got, want)
+		}
 	}
-	if got := keptReceipt(n, time.Minute, text); got != "1 minute. 3 characters." {
+	if got := keptReceipt(3, time.Minute, "我们是"); got != "1 minute. 3 characters." {
 		t.Fatalf("CJK receipt = %q", got)
 	}
 	if got := keptReceipt(47, time.Minute, "hello"); got != "1 minute. 47 words." {

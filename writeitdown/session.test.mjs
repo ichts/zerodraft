@@ -94,20 +94,22 @@ test('clock and word labels', () => {
 
 test('Unicode words, individual Han characters, and non-word input', () => {
   const cases = [
-    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 14],
-    ['你好，world！', 7], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
-    ['こんにちは世界', 7], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
-    ['𠀀中文', 3], ['你好👩🏽‍💻world', 7], ['한글', 2]
+    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 6],
+    ['你好，world！', 3], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
+    ['こんにちは世界', 7], ['コーヒー', 4], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
+    ['𠀀中文', 3], ['你好👩🏽‍💻world', 3]
   ];
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
 });
 
-test('CJK drafts count characters, never label them words', () => {
-  assert.equal(countLabel('我们是'), '3 characters');
-  assert.equal(countLabel('我'), '1 character');
-  assert.equal(countLabel('你好，world！'), '7 characters');
-  assert.equal(countLabel('こんにちは世界'), '7 characters');
-  assert.equal(countLabel('hello world'), '2 words');
+test('the label says characters only when CJK letters are at least half of the draft (D-094)', () => {
+  const english = `${'word '.repeat(500)}你好`;
+  const cases = [
+    ['我们是', '3 characters'], ['我', '1 character'], ['こんにちは世界', '7 characters'], ['コーヒー', '4 characters'],
+    ['hello world 中文测试', '6 words'], [english, '502 words'], ['你好，world！', '3 words'],
+    ['hello world', '2 words'], ['one', '1 word'], ['한글 한글', '2 words'], ['', '0 words']
+  ];
+  for (const [text, expected] of cases) assert.equal(countLabel(text), expected, text.slice(0, 20));
 });
 
 test('the history ladder counts lines ended by Return, never sentences (D-088)', () => {

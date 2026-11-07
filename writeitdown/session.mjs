@@ -28,17 +28,22 @@ export function clock(seconds) {
 
 const wordSegments = new Intl.Segmenter(undefined, { granularity: 'word' });
 
-export function usesCharacterCount(text) {
-  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(text);
-}
-
-const characterSegments = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+// Han, Hiragana and Katakana (and the prolonged sound mark) are written without spaces, so each one is a
+// unit; every other script uses Unicode word boundaries (D-094). The Mac and Windows rooms use the same rule.
+const CJK = String.raw`[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC]`;
+const cjkUnits = new RegExp(`(${CJK}\\p{Mark}*)`, 'gu');
+const cjkLetter = new RegExp(CJK, 'gu');
 
 export function wordCount(text) {
-  if (usesCharacterCount(text)) {
-    return Array.from(characterSegments.segment(text)).filter(part => /[\p{Letter}\p{Number}]/u.test(part.segment)).length;
-  }
-  return Array.from(wordSegments.segment(text)).filter(part => part.isWordLike).length;
+  const separated = text.replace(cjkUnits, ' $1 ');
+  return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
+}
+
+// The label says characters only when CJK letters are at least half of the draft's letters and digits.
+export function usesCharacterCount(text) {
+  const cjk = (text.match(cjkLetter) || []).length;
+  const letters = (text.match(/[\p{Letter}\p{Number}]/gu) || []).length;
+  return cjk > 0 && cjk * 2 >= letters;
 }
 
 export function countLabel(text, count = wordCount(text)) {

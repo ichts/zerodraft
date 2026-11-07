@@ -116,8 +116,8 @@ func TestNumeral(t *testing.T) {
 
 func TestWordCount(t *testing.T) {
 	for in, want := range map[string]int{
-		"": 0, "hello world": 2, "don't stop": 2, "你好世界": 4, "你好 world": 7, "one, two... three!": 3,
-		"well-known": 2, "😀 😀": 0, "我们 write 代码": 9, "1,000": 1, "我们是": 3, "こんにちは世界": 7, "한글": 2,
+		"": 0, "hello world": 2, "don't stop": 2, "你好世界": 4, "你好 world": 3, "one, two... three!": 3,
+		"well-known": 2, "😀 😀": 0, "我们 write 代码": 5, "1,000": 1, "我们是": 3, "こんにちは世界": 7, "コーヒー": 4,
 	} {
 		if got := WordCount(in); got != want {
 			t.Errorf("WordCount(%q)=%d want %d", in, got, want)

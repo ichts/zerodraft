@@ -74,14 +74,20 @@ struct RoomTests {
         #expect(RoomPresentation.wordLabel(1) == "1 word")
     }
 
-    @Test func cjkCountUsesCharactersOnTheRoomAndReceipt() {
-        let engine = SessionEngine()
-        engine.start(duration: 60)
-        engine.registerCommittedText("我们是")
-        #expect(RoomPresentation.wordLabel(engine.wordCount, text: engine.text) == "3 characters")
-        #expect(RoomPresentation.keptReceipt(wordCount: engine.wordCount, duration: 60, text: engine.text)
-            == "1 minute. 3 characters.")
-        #expect(RoomPresentation.wordLabel(1, text: "我") == "1 character")
+    @Test func theLabelSaysCharactersOnlyWhenCJKLettersAreHalfTheDraft() {
+        let english = String(repeating: "word ", count: 500) + "你好"
+        let cases: [(String, String)] = [
+            ("我们是", "3 characters"), ("我", "1 character"), ("こんにちは世界", "7 characters"), ("コーヒー", "4 characters"),
+            ("hello world 中文测试", "6 words"), (english, "502 words"), ("你好，world！", "3 words"),
+            ("hello world", "2 words"), ("one", "1 word"), ("한글 한글", "2 words"), ("", "0 words"),
+        ]
+        for (text, expected) in cases {
+            let engine = SessionEngine()
+            engine.start(duration: 60)
+            engine.registerCommittedText(text)
+            #expect(RoomPresentation.wordLabel(engine.wordCount, text: text) == expected, "\(text.prefix(20))")
+        }
+        #expect(RoomPresentation.keptReceipt(wordCount: 3, duration: 60, text: "我们是") == "1 minute. 3 characters.")
     }
 
     @Test func copyPutsExactDraftOnPasteboard() {

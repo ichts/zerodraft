@@ -417,12 +417,12 @@ struct SessionEngineTests {
     @Test func wordCountMatchesWebCases() {
         let cases: [(String, Int)] = [
             ("  two\nwords ", 2), ("", 0), (" \n\t", 0), ("中文测试", 4),
-            ("hello world 中文测试", 14), ("你好，world！", 7),
+            ("hello world 中文测试", 6), ("你好，world！", 3),
             ("café cafe\u{0301}", 2), ("مرحبا بالعالم", 2),
-            ("こんにちは世界", 7), ("これはテストです。明日も書きます。", 15),
+            ("こんにちは世界", 7), ("コーヒー", 4), ("これはテストです。明日も書きます。", 15),
             ("👨‍👩‍👧‍👦 👍🏽 🇨🇳", 0),
-            ("...，！？", 0), ("𠀀中文", 3), ("你好👩🏽‍💻world", 7),
-            ("我们是", 3), ("한글", 2)
+            ("...，！？", 0), ("𠀀中文", 3), ("你好👩🏽‍💻world", 3),
+            ("我们是", 3)
         ]
         let engine = SessionEngine()
         for (text, count) in cases {
@@ -444,7 +444,7 @@ struct SessionEngineTests {
         engine.tick()
         #expect(engine.wordCount == 1)
         engine.registerCommittedText(" 中文")
-        #expect(engine.wordCount == 7)
+        #expect(engine.wordCount == 3)
         time = 12
         engine.tick()
         #expect(engine.phase == .failure)

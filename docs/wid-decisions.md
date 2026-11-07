@@ -1871,18 +1871,22 @@ entry and names the entry it supersedes. The behaviour contract that implements 
 - Evidence: `writeitdown/qa/ink-footer.spec.mjs` (hover ink, 2 px ink outline, 44 px target, click and Esc share the
   confirmation), `RoomTests.exitHasAQuietHoverInkFocusAndAFullHeightHitTarget`,
   `RoomTests.clickAndEscapeShareOneConfirmation`, `apps/windows/room` `TestExit*` and `TestTabNeverTakesTheDraftsKeyboardWhileWriting`.
-## D-094: The result screen is sentence case, and a draft in Chinese, Japanese or Korean counts characters
+## D-094: The result screen is sentence case, and a Chinese or Japanese draft counts in characters
 
 - Date: 2026-11-07
 - Decision: the kept screen's receipt, its two actions and the copy states read as sentences on the Mac,
-  Windows and web: `5 minutes. 63 words.`, `Copy text`, `Copied`, `Try copy again`, `Begin again`. The one
-  count rule is: a draft that contains any Han, Hiragana, Katakana or Hangul character counts characters
-  (letters and digits, one per grapheme) and labels them `characters`; every other draft counts words and
-  labels them `words`. Singular is `1 character` / `1 word`. No `words` label ever sits on a CJK count.
-  The count tooltip text and the root landing trial's own receipt are not part of this decision.
+  Windows and web room: `5 minutes. 63 words.`, `Copy text`, `Copied`, `Try copy again`, `Begin again`.
+  One count rule holds on the Mac, Windows, the web room and the root landing trial. The number: each Han,
+  Hiragana or Katakana character (and the prolonged sound mark) counts 1, every other script counts one per
+  Unicode word run, punctuation and emoji count 0. The label: it says `characters` (`1 character`) only
+  when CJK letters are at least half of the draft's letters and digits, otherwise the unchanged `words`
+  (`1 word`). So `hello world 中文测试` stays `6 words`, an English essay with one quoted `你好` stays words,
+  a Chinese or Japanese draft reads characters. Hangul is not CJK here: Korean separates words with spaces,
+  so it counts and reads as words. The root trial changes only its count and the unit in its receipt and
+  corner (`0:00 - 3 characters kept.`); its other copy is untouched. The count tooltip text is unchanged.
 - Reason: the caps receipt and buttons shouted at the one quiet screen of the product, and a Chinese draft
   of 40 characters read as `6 words` or `14 words`, a number the writer cannot check against what they wrote.
+  A contains-any rule would have turned one quoted `你好` in a long English draft into a letter count.
 - Supersedes: the caps wording of D-059, D-074 and D-076 where they name `COPY TEXT`, `COPIED`,
-  `BEGIN AGAIN` or `5 MINUTES. 63 WORDS.`, and D-023's Han-only count rule (Han counted one per character,
-  kana runs one per run). Their geometry and behaviour stand.
-
+  `BEGIN AGAIN` or `5 MINUTES. 63 WORDS.`, and D-023's Han-only count (kana now count one per character
+  instead of one per run, so the label never sits on a word-run number). Their geometry and behaviour stand.

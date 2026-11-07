@@ -16,12 +16,12 @@
   --sheet:#ffffff;
   /* The writing sheet is the Wheat paper (D-069), the one object the writer writes on; the page, the
      cards and the controls keep the white identity. Quiet, history and danger are measured roles:
-     every word on the paper clears 7:1 against the paper's own tone, the history ladder sits at
-     9:1 then 7:1, and the pen red is deepened until the numeral and the exit hint clear it too. */
+     every word on the paper clears 7:1 against the paper's own tone, except the dimmed history lines
+     (D-092: one back 1.57:1, two back 1.15:1), and the pen red is deepened until the numeral and the exit hint clear it too. */
   --paper-tone:#e9e2ce;
   --paper-quiet:#464746;
-  --paper-history-1:.847;
-  --paper-history-2:.769;
+  --paper-history-1:.22;
+  --paper-history-2:.07;
   --paper-danger:#63140b;
   /* The warn wash of the sheet: the root landing's `color-mix(in oklab, paper 88%, #C8392F)` and its
      76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-069). */
@@ -68,8 +68,8 @@
   --sheet:#26231c;
   --paper-tone:#342e24;
   --paper-quiet:#c2bfb7;
-  --paper-history-1:.902;
-  --paper-history-2:.772;
+  --paper-history-1:.16; /* the same 1.57:1 on the dark paper */
+  --paper-history-2:.05; /* the same 1.15:1 */
   --paper-danger:#ffc2b4;
   --paper-wash:#453226;
   --paper-wash-deep:#573428;

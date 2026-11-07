@@ -238,12 +238,12 @@ struct EditorFocusTests {
         textView.appearance = NSAppearance(named: .aqua)
         textView.configureSessionTypography()
         textView.loadRestoredText("one\ntwo\nthree")
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.847) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.769) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.22) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.07) < 0.001)
         textView.appearance = NSAppearance(named: .darkAqua)
         textView.viewDidChangeEffectiveAppearance()
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.902) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.772) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.16) < 0.001)
+        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.05) < 0.001)
         #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001)
     }
 
@@ -399,9 +399,10 @@ struct EditorFocusTests {
         window.orderOut(nil)
     }
 
-    /// D-088: a full stop fades nothing and Return fades the line just written, one rung, on the live editor path.
+    /// D-088 and D-092: a full stop fades nothing; Return starts the dissolve of the line just written, which lands on
+    /// its step (.22, then .07) after 320 ms; reached through the live editor path.
     @Test
-    func returnFadesTheLineJustWrittenAndAFullStopDoesNot() throws {
+    func returnStartsTheDissolveOfTheLineJustWrittenAndAFullStopDoesNot() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let engine = SessionEngine()
@@ -417,19 +418,63 @@ struct EditorFocusTests {
         RoomWindowKeeper.windows.append(window)
         let editor = try #require(descendants(of: room.view, as: AppendOnlyTextView.self).first)
         let ladder = editor.historyLineOpacities
+        var now: CFTimeInterval = 100
+        editor.dissolveClock = { now }
         func type(_ text: String) {
             editor.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         }
+        func firstLineAlpha() throws -> CGFloat {
+            let colour = try #require(editor.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+            return colour.alphaComponent
+        }
 
         type("First thought. Still the first line.")
-        #expect(try sentenceRows(in: editor).map { $0.alphas } == [[1]], "sentences on the live line fade nothing")
+        #expect(abs(try firstLineAlpha() - 1) < 0.001, "sentences on the live line fade nothing")
+        #expect(editor.isDissolvingHistory == false)
 
         type("\n")
-        #expect(try sentenceRows(in: editor).map { $0.alphas } == [[ladder[1]]], "Return steps the written line back one rung")
+        #expect(editor.isDissolvingHistory, "Return starts the dissolve of the line just written")
+        #expect(abs(try firstLineAlpha() - 1) < 0.05, "the dissolve starts from the full ink, not a jump")
+        now += AppendOnlyTextView.historyDissolveDuration / 2
+        editor.tickDissolve()
+        let mid = try firstLineAlpha()
+        #expect(mid < 0.95 && mid > ladder[1] + 0.02, "half way through the dissolve the line is between ink and its step: \(mid)")
+        now += AppendOnlyTextView.historyDissolveDuration / 2
+        editor.tickDissolve()
+        #expect(editor.isDissolvingHistory == false)
+        #expect(abs(try firstLineAlpha() - ladder[1]) < 0.001, "the dissolve lands on one back: .22")
 
         type("Second line. Third sentence.\n")
+        #expect(editor.isDissolvingHistory)
+        now += AppendOnlyTextView.historyDissolveDuration + 0.1
+        editor.tickDissolve()
         #expect(try sentenceRows(in: editor).map { $0.alphas } == [[ladder[2]], [ladder[1]]])
         window.orderOut(nil)
+    }
+
+    /// Reduce Motion: the step is taken at once, with no dissolve running (D-092).
+    @Test
+    func reduceMotionStepsTheHistoryAtOnce() throws {
+        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        editor.configureSessionTypography()
+        editor.animatesHistoryScroll = false
+        editor.insertText("one", replacementRange: NSRange(location: NSNotFound, length: 0))
+        editor.insertText("\n", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(editor.isDissolvingHistory == false)
+        let colour = try #require(editor.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        #expect(abs(colour.alphaComponent - editor.historyLineOpacities[1]) < 0.001)
+    }
+
+    /// D-092: every Return line carries exactly its step - 1, .22, .07 - and all rows of a wrapped line carry one.
+    @Test
+    func everyReturnLineGetsExactlyItsStep() throws {
+        let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 400))
+        editor.appearance = NSAppearance(named: .aqua)
+        editor.configureSessionTypography()
+        editor.loadRestoredText("Oldest line that is long enough to wrap onto several rows of the narrow column.\nThree back.\nTwo back is long enough to wrap onto a second row.\nOne back.\nLive")
+        let rows = try sentenceRows(in: editor)
+        #expect(rows.map { $0.alphas } == [[0], [0], [0.07], [0.22], [1]])
+        #expect(rows[2].rows >= 2 && rows[2].alphas.count == 1, "a wrapped line keeps one value on every row")
     }
 
     /// The aperture is the scroll view's own clip: no gradient mask, so a line cut by its edge keeps its rung and is
@@ -465,6 +510,7 @@ struct EditorFocusTests {
 
     /// Per logical line: how many visual rows it wraps onto and the set of opacities those rows carry.
     private func sentenceRows(in textView: AppendOnlyTextView) throws -> [(rows: Int, alphas: Set<CGFloat>)] {
+        textView.settleHistoryDissolve()
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
         let storage = try #require(textView.textStorage)
@@ -486,6 +532,7 @@ struct EditorFocusTests {
     }
 
     private func lineAlpha(in textView: AppendOnlyTextView, lineIndex: Int) throws -> CGFloat {
+        textView.settleHistoryDissolve()
         let layout = try #require(textView.layoutManager)
         let container = try #require(textView.textContainer)
         layout.ensureLayout(for: container)

@@ -33,6 +33,12 @@ final class RootWindowController: NSWindowController {
             defer: false
         )
         window.title = "Write It Down"
+        if PaperBackgroundOption.current == .b {
+            // Evidence only (wid-paper-bg B): the paper runs under a transparent title bar to the window edge.
+            window.styleMask.insert(.fullSizeContentView)
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+        }
         window.acceptsMouseMovedEvents = true
         window.contentMinSize = NSSize(width: 980, height: 680)
 

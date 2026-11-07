@@ -7,6 +7,21 @@
 
 import AppKit
 
+/// Evidence only (wid-paper-bg): `WID_PAPER_BG=a|b|c` picks a page/paper option for the room, anything else is
+/// today. A: the room's page is a warm neutral from the paper's hue. B: the paper fills the whole window.
+/// C: a less yellow paper. Read once at launch; the captain's pick replaces this switch with one value.
+enum PaperBackgroundOption {
+    case keep, a, b, c
+    static let current: PaperBackgroundOption = {
+        switch ProcessInfo.processInfo.environment["WID_PAPER_BG"] {
+        case "a": return .a
+        case "b": return .b
+        case "c": return .c
+        default: return .keep
+        }
+    }()
+}
+
 enum FirstLineColors {
     private static func adaptive(light: UInt32, dark: UInt32) -> NSColor {
         NSColor(name: nil) { appearance in
@@ -37,21 +52,32 @@ enum FirstLineColors {
        included, so the quiet chrome is its own role and the pen red is deep enough to read on the paper
        and on its wash. The values are the web's `tokens.css` roles, one paper on both surfaces, except the light
        quiet grey, which the Mac warms to a brown-grey (D-084). */
-    static var paperNSColor: NSColor { adaptive(light: 0xE9E2CE, dark: 0x342E24) }
+    static var paperNSColor: NSColor {
+        PaperBackgroundOption.current == .c ? adaptive(light: 0xE9E2D8, dark: 0x332E29) : adaptive(light: 0xE9E2CE, dark: 0x342E24)
+    }
+    /// The page behind the room's sheet. Option A warms it from the paper's hue (#f5f2eb / #16130f).
+    static var roomWallNSColor: NSColor {
+        PaperBackgroundOption.current == .a ? adaptive(light: 0xF5F2EB, dark: 0x16130F) : pageNSColor
+    }
     static var paperQuietNSColor: NSColor { adaptive(light: 0x48443E, dark: 0xC2BFB7) }
     static var paperDangerNSColor: NSColor { adaptive(light: 0x63140B, dark: 0xFFC2B4) }
     /// The sheet's warn wash: `color-mix(in oklab, paper 88%, #C8392F)` and its deeper 76% step of the
     /// eighth second, the exact recipe the web paints (`--wash-paper`, `--wash-paper-deep`). The values
     /// are the browser compositor's own output, so both surfaces warm through the same ramp and land on
     /// the same colour instead of the Mac tinting the sheet with a pale pink meant for white.
-    static var paperWashNSColor: NSColor { adaptive(light: 0xE8CFBB, dark: 0x453226) }
-    static var paperWashDeepNSColor: NSColor { adaptive(light: 0xE6BCA7, dark: 0x573428) }
+    static var paperWashNSColor: NSColor {
+        PaperBackgroundOption.current == .c ? adaptive(light: 0xE8CFC3, dark: 0x45322B) : adaptive(light: 0xE8CFBB, dark: 0x453226)
+    }
+    static var paperWashDeepNSColor: NSColor {
+        PaperBackgroundOption.current == .c ? adaptive(light: 0xE6BCAF, dark: 0x56352C) : adaptive(light: 0xE6BCA7, dark: 0x573428)
+    }
     /// History opacity per line, current line first: one uniform step per completed line, older lines gone
     /// (D-027's stepping). The steps are D-069's contrast ladder, solved per appearance so the first faded
     /// line reads at 9:1 and the second at 7:1 on the paper (`--paper-history-1/2` in `tokens.css`). The
     /// editor re-applies them when the appearance changes, so no step from the other theme stays baked in.
     static func paperHistoryOpacities(dark: Bool) -> [CGFloat] {
-        dark ? [1, 0.902, 0.772] : [1, 0.847, 0.769]
+        if PaperBackgroundOption.current == .c { return dark ? [1, 0.905, 0.775] : [1, 0.844, 0.768] }
+        return dark ? [1, 0.902, 0.772] : [1, 0.847, 0.769]
     }
     static var inkNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9) }
     static var muteNSColor: NSColor { adaptive(light: 0x6B655C, dark: 0xA39D8E) }

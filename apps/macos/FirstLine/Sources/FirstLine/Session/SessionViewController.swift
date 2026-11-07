@@ -285,7 +285,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
+        view = FloodCanvasView(fillColor: FirstLineColors.roomWallNSColor)
         buildRoom()
         configureEditor()
         applyPhase()
@@ -342,18 +342,24 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         return field
     }
 
+    /// Option B (wid-paper-bg, evidence only): the sheet is the whole window, no card, no ring, no shadow.
+    static var paperFillsWindow: Bool { PaperBackgroundOption.current == .b }
+    static var sheetCorner: CGFloat { paperFillsWindow ? 0 : FirstLineRadius.sheet }
+    static var sheetMargin: CGFloat { paperFillsWindow ? 0 : 32 }
+
     private func buildRoom() {
-        paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.paperNSColor)
+        paperShadow = FirstLineShadowView(cornerRadius: Self.sheetCorner, fillColor: FirstLineColors.paperNSColor)
+        paperShadow.isHidden = Self.paperFillsWindow
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
         // The paper is the Wheat sheet (D-069): tone and texture are rendered by the view itself.
         paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
-        paper.cornerRadius = FirstLineRadius.sheet
+        paper.cornerRadius = Self.sheetCorner
         paper.clipsContent = true
         paper.borderColor = FirstLineColors.sheetRingNSColor
-        paper.borderWidth = 1
+        paper.borderWidth = Self.paperFillsWindow ? 0 : 1
         view.addSubview(paper)
 
         textView = AppendOnlyTextView()
@@ -384,14 +390,14 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         paperWash = PaperWashView(fillColor: FirstLineColors.paperWashNSColor)
         paperWash.translatesAutoresizingMaskIntoConstraints = false
-        paperWash.cornerRadius = FirstLineRadius.sheet
+        paperWash.cornerRadius = Self.sheetCorner
         paperWash.alphaValue = 0
         paper.textureDidChange = { [weak paperWash] texture in paperWash?.texture = texture }
         paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
         outline = RoomWashView(fillColor: .clear)
         outline.translatesAutoresizingMaskIntoConstraints = false
-        outline.cornerRadius = FirstLineRadius.sheet
+        outline.cornerRadius = Self.sheetCorner
         outline.wantsLayer = true
         outline.layer?.borderWidth = 1
         outline.alphaValue = 0
@@ -399,6 +405,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
         progressBar = FirstLineFillBar(frame: .zero)
         progressBar.fillColor = FirstLineColors.inkNSColor
+        progressBar.cornerRadius = Self.sheetCorner
         paper.addSubview(progressBar)
 
         timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.inkNSColor)
@@ -513,10 +520,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             paperShadow.topAnchor.constraint(equalTo: paper.topAnchor),
             paperShadow.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
-            paper.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 32),
-            paper.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -32),
-            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 32),
-            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -32),
+            paper.leadingAnchor.constraint(equalTo: Self.paperFillsWindow ? view.leadingAnchor : safe.leadingAnchor, constant: Self.sheetMargin),
+            paper.trailingAnchor.constraint(equalTo: Self.paperFillsWindow ? view.trailingAnchor : safe.trailingAnchor, constant: -Self.sheetMargin),
+            paper.topAnchor.constraint(equalTo: Self.paperFillsWindow ? view.topAnchor : safe.topAnchor, constant: Self.sheetMargin),
+            paper.bottomAnchor.constraint(equalTo: Self.paperFillsWindow ? view.bottomAnchor : safe.bottomAnchor, constant: -Self.sheetMargin),
             progressBar.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
             progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             progressBar.topAnchor.constraint(equalTo: paper.topAnchor),

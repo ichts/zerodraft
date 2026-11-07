@@ -69,7 +69,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    canvas that sits in the sheet's own stacking context behind every word. Nothing repaints while
    the writer types - the texture only redraws when the sheet's size or the theme changes. */
 [data-paper]{background:var(--paper-tone);isolation:isolate}
-.sheet-paper{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:inherit;pointer-events:none}
+.sheet-paper{position:absolute;left:calc(-1 * var(--bleed-x,0px));top:calc(-1 * var(--bleed-t,0px));z-index:-1;width:calc(100% + 2 * var(--bleed-x,0px));height:calc(100% + var(--bleed-t,0px) + var(--bleed-b,0px));border-radius:inherit;pointer-events:none}
 .room .wash{transition:opacity 120ms linear;opacity:0}
 .room-paper-wash{background:var(--paper-wash);border-radius:inherit}
 .room[data-phase="typing"]{--chrome:var(--paper-quiet);--timer:var(--paper-quiet)}
@@ -155,6 +155,20 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .room{--room-gut:12px}.writing-area{inset:64px 20px}
 }
 @media (prefers-reduced-motion: reduce){.room .wash{transition:none}}
+
+/* ---------- Evidence only (wid-paper-bg): paper and page options for the room, ?paperbg=a|b|c ----------
+   Absent = today. A: the room's page is a warm neutral derived from the paper (tokens.css --room-wall).
+   B: the paper fills the whole window - the sheet loses its card (radius, shadow, gutter) and its grain and
+   tone bleed to the window edges, so the writing, the chrome and the anchor stay exactly where they were.
+   C: a less yellow paper (tokens.css and paper.js TONES_C). */
+.room.home{background:var(--room-wall,var(--page))}
+[data-paperbg="b"] .room.home{--bleed-t:var(--nav-h);--bleed-x:var(--room-gut);--bleed-b:var(--room-gut);background:var(--paper-tone)}
+[data-paperbg="b"] .room-nav{position:relative;z-index:3}
+[data-paperbg="b"] .room-paper{border-radius:0;box-shadow:0 0 0 100vmax var(--paper-tone);overflow:visible}
+[data-paperbg="b"] .room-paper-wash{box-shadow:0 0 0 100vmax var(--paper-wash)}
+[data-paperbg="b"] .room[data-cut="true"] .room-paper-wash{box-shadow:0 0 0 100vmax var(--paper-wash-deep)}
+[data-paperbg="b"] .room .bar{top:calc(-1 * var(--bleed-t));left:calc(-1 * var(--bleed-x));width:calc(100% + 2 * var(--bleed-x));border-radius:0}
+[data-paperbg="b"] .room .hairline{inset:calc(-1 * var(--bleed-t)) calc(-1 * var(--bleed-x)) calc(-1 * var(--bleed-b))}
 
 /* ---------- Landing: design system v2 components ("Paper in light", approved 2026-10-22) ----------
    Shared design roles come from tokens.css; its header owns their scope. The hero sheet is the real demo.js preview;

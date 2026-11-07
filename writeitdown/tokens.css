@@ -91,3 +91,10 @@
    a shorter sheet instead of being pushed onto it (D-068, Q-02). */
 @media (max-height:700px){.home .paper{--t-numeral:min(15vh,140px)}}
 @media (max-width:767px){.home{--t-write:21px}}
+
+/* Evidence only (wid-paper-bg). A: the room's page is a warm neutral from the paper's hue (L .962/.189, C ~.010).
+   C: a less yellow paper (light #e9e2d8, dark #332e29) with its wash mixes and history rungs re-solved. */
+:root[data-paperbg="a"][data-theme="light"]{--room-wall:#f5f2eb}
+:root[data-paperbg="a"][data-theme="dark"]{--room-wall:#16130f}
+:root[data-paperbg="c"][data-theme="light"] .home{--paper-tone:#e9e2d8;--paper-history-1:.844;--paper-history-2:.768;--paper-wash:#e8cfc3;--paper-wash-deep:#e6bcaf}
+:root[data-paperbg="c"][data-theme="dark"] .home{--paper-tone:#332e29;--paper-history-1:.905;--paper-history-2:.775;--paper-wash:#45322b;--paper-wash-deep:#56352c}

@@ -165,7 +165,8 @@ enum PaperField {
     }
 
     private static func tone(dark: Bool) -> (r: Double, g: Double, b: Double) {
-        dark ? darkTone : lightTone
+        if PaperBackgroundOption.current == .c { return dark ? (r: 51.0, g: 46.0, b: 41.0) : (r: 233.0, g: 226.0, b: 216.0) }
+        return dark ? darkTone : lightTone
     }
 
     private static func hex(_ tone: (r: Double, g: Double, b: Double)) -> String {

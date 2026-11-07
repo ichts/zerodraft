@@ -8,6 +8,9 @@
       button.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
     });
   }
+  // Evidence only (wid-paper-bg): ?paperbg=a|b|c selects a paper/page option for the room; absent = today.
+  const option = new URLSearchParams(location.search).get('paperbg');
+  if (/^[abc]$/.test(option || '')) document.documentElement.dataset.paperbg = option;
   // Light is the default; dark is an explicit choice that the toggle stores.
   apply(preference === 'dark' ? 'dark' : 'light');
   document.addEventListener('DOMContentLoaded', () => {

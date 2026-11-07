@@ -16,6 +16,9 @@
 
   /* The locked sheet (D-069): tone Wheat, grain 70 of 100 at size 1.00. */
   const TONES = { light: '#e9e2ce', dark: '#342e24' };
+  /* Evidence only (wid-paper-bg): option C is a less yellow Wheat, picked by ?paperbg=c. */
+  const TONES_C = { light: '#e9e2d8', dark: '#332e29' };
+  const tonesNow = () => (document.documentElement.dataset.paperbg === 'c' ? TONES_C : TONES);
   const GRAIN = 0.70;
   const SIZE = 1.00;
   const TOOTH = 44;
@@ -184,7 +187,7 @@
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {
     const dark = theme === 'dark';
-    const tone = hexToRgb(TONES[theme]);
+    const tone = hexToRgb(tonesNow()[theme]);
     const canvasWidth = Math.max(1, Math.round(width * dpr));
     const canvasHeight = Math.max(1, Math.round(height * dpr));
     canvas.width = canvasWidth;
@@ -196,7 +199,7 @@
     drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, dark);
     const shift = textureDelta(ctx, canvasWidth, canvasHeight, tone);
     const corrected = tone.map((channel, index) => Math.max(0, Math.min(255, channel - shift[index])));
-    return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now(), base: rgbToHex(corrected) };
+    return { width: canvasWidth, height: canvasHeight, theme, dpr, option: document.documentElement.dataset.paperbg, at: performance.now(), base: rgbToHex(corrected) };
   }
 
   /* Repaint only when the sheet itself changed: a new size, theme or pixel ratio. Typing changes
@@ -206,15 +209,18 @@
      background, so the warn wash and the ink-in-the-paper step still tint the paper, and the
      sheet never shows a colour the texture cannot be laid over. */
   function paint(sheet) {
-    const width = sheet.element.clientWidth;
-    const height = sheet.element.clientHeight;
+    /* The sheet may bleed past its box (--bleed-t/-x/-b): the canvas is then that much larger on each side. */
+    const style = getComputedStyle(sheet.element);
+    const bleed = name => parseFloat(style.getPropertyValue(name)) || 0;
+    const width = sheet.element.clientWidth + 2 * bleed('--bleed-x');
+    const height = sheet.element.clientHeight + bleed('--bleed-t') + bleed('--bleed-b');
     if (width < 2 || height < 2) return;
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const theme = currentTheme();
     const painted = sheet.painted;
     if (painted && painted.width === Math.round(width * dpr)
       && painted.height === Math.round(height * dpr)
-      && painted.theme === theme && painted.dpr === dpr) return;
+      && painted.theme === theme && painted.dpr === dpr && painted.option === document.documentElement.dataset.paperbg) return;
     const next = render(sheet.canvas, width, height, dpr, theme);
     if (next.base && next.base !== sheet.base) {
       sheet.base = next.base;

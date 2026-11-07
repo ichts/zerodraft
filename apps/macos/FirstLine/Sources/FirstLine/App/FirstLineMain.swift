@@ -17,6 +17,7 @@ import AppKit
 enum FirstLineMain {
     @MainActor
     static func main() {
+        TextSmoothing.matchWeb()
         let app = NSApplication.shared
         let delegate = FirstLineAppDelegate()
         app.delegate = delegate

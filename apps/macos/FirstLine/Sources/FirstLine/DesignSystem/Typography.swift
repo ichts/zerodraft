@@ -11,6 +11,18 @@
 
 import AppKit
 
+/// The web room sets `-webkit-font-smoothing: antialiased`, which draws plain grey-scale glyphs. CoreText on the
+/// Mac thickens every stem unless the process turns smoothing off, so the same Newsreader line carried about 54%
+/// more ink on the Mac (measured, D-098). `AppleFontSmoothing = 0` in the app's own preference domain is the
+/// documented switch; it must be written before the first window draws text.
+enum TextSmoothing {
+    static let key = "AppleFontSmoothing"
+
+    static func matchWeb(_ defaults: UserDefaults = .standard) {
+        defaults.set(0, forKey: key)
+    }
+}
+
 enum FirstLineTypography {
     static func displayNSFont(size: CGFloat = 34) -> NSFont {
         .systemFont(ofSize: size, weight: .semibold)

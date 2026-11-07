@@ -150,6 +150,45 @@ struct PaperContrastTests {
         }
     }
 
+    /// D-093: the dark sheet is flat warm charcoal with one very fine grain. Measured on the rendered pixels:
+    /// peak +-3 levels about the tone, no blotch at the 32 px scale, and ink and quiet text clear 7:1 on the
+    /// brightest pixel the sheet paints, not only on the mean.
+    @Test func theDarkSheetIsFineGrainWithNoBlotchesAndEveryPixelClearsSevenToOne() throws {
+        let image = try #require(PaperField.render(width: 640, height: 384, scale: 2, dark: true))
+        let width = image.width
+        let height = image.height
+        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                             bytesPerRow: width * 4,
+                                             space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        let raw = try #require(context.data)
+        let pixels = raw.bindMemory(to: UInt8.self, capacity: width * height * 4)
+        var brightest = (r: 0.0, g: 0.0, b: 0.0)
+        var peak = 0.0
+        var block = [Double](repeating: 0, count: (width / 32) * (height / 32))
+        var mean = 0.0
+        for y in 0..<height {
+            for x in 0..<width {
+                let i = (y * width + x) * 4
+                let luma = 0.2126 * Double(pixels[i]) + 0.7152 * Double(pixels[i + 1]) + 0.0722 * Double(pixels[i + 2])
+                mean += luma
+                if luma > peak { peak = luma; brightest = (Double(pixels[i]), Double(pixels[i + 1]), Double(pixels[i + 2])) }
+                if x / 32 < width / 32, y / 32 < height / 32 { block[(y / 32) * (width / 32) + x / 32] += luma / 1024 }
+            }
+        }
+        mean /= Double(width * height)
+        #expect(peak - mean <= 3.5, "the brightest pixel lifts \(peak - mean) levels, past the +-3 grain")
+        let blockMean = block.reduce(0, +) / Double(block.count)
+        let blotch = (block.map { pow($0 - blockMean, 2) }.reduce(0, +) / Double(block.count)).squareRoot()
+        #expect(blotch < 0.2, "the 32 px blocks vary by \(blotch) levels: that is a blotch, not a grain")
+        let pixel = NSColor(srgbRed: brightest.r / 255, green: brightest.g / 255, blue: brightest.b / 255, alpha: 1)
+        let ink = try resolved(FirstLineColors.inkNSColor, .darkAqua)
+        let quiet = try resolved(FirstLineColors.paperQuietNSColor, .darkAqua)
+        #expect(contrast(ink, pixel) >= 7, "the ink on the brightest pixel")
+        #expect(contrast(quiet, pixel) >= 7, "the quiet text on the brightest pixel")
+    }
+
     private func meanColour(of image: CGImage) throws -> (r: Double, g: Double, b: Double) {
         let width = image.width
         let height = image.height

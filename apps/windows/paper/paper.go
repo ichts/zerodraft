@@ -151,12 +151,12 @@ func distSeg(px, py, ax, ay, bx, by float64) float64 {
 	return math.Hypot(px-(ax+t*dx), py-(ay+t*dy))
 }
 
-func fibres(img *image.RGBA, scale float64, t RGB, r *rng, dark bool) {
+func fibres(img *image.RGBA, scale float64, t RGB, r *rng) {
 	W, H := img.Rect.Dx(), img.Rect.Dy()
 	count := int(math.Round(float64(W*H) / (scale * scale) * 0.0026))
 	for n := 0; n < count; n++ {
-		pale := r.next() < pick(dark, 0.2, 0.44)
-		spread := (12 + r.next()*34) * pick(dark, 0.32, 1) * pick(pale, 0.7, 1)
+		pale := r.next() < 0.44
+		spread := (12 + r.next()*34) * pick(pale, 0.7, 1)
 		sign := -1.0
 		if pale {
 			sign = 1
@@ -196,9 +196,9 @@ func fibres(img *image.RGBA, scale float64, t RGB, r *rng, dark bool) {
 	}
 }
 
-func flecks(img *image.RGBA, scale float64, r *rng, dark bool) {
+func flecks(img *image.RGBA, scale float64, r *rng) {
 	W, H := img.Rect.Dx(), img.Rect.Dy()
-	count := int(math.Round(float64(W*H) / (scale * scale) * 0.0030 * pick(dark, 0.22, 1)))
+	count := int(math.Round(float64(W*H) / (scale * scale) * 0.0030))
 	for n := 0; n < count; n++ {
 		x, y := r.next()*float64(W), r.next()*float64(H)
 		pale := r.next() < 0.14
@@ -213,9 +213,9 @@ func flecks(img *image.RGBA, scale float64, r *rng, dark bool) {
 		}
 		var alpha float64
 		if pale {
-			alpha = (0.16 + r.next()*0.24) * pick(dark, 0.5, 1)
+			alpha = 0.16 + r.next()*0.24
 		} else {
-			alpha = (0.26 + r.next()*0.46) * pick(dark, 0.5, 1)
+			alpha = 0.26 + r.next()*0.46
 		}
 		radius := (0.4 + r.next()*1.0) * scale * math.Max(0.7, tokens.PaperSize*0.85)
 		lobes := 2
@@ -267,6 +267,9 @@ func pick[T any](c bool, a, b T) T {
 func Render(width, height int, scale float64, dark bool) *Sheet {
 	t := tone(dark)
 	tex := image.NewRGBA(image.Rect(0, 0, width, height))
+	if dark {
+		return finish(darkGrain(tex, t), t, width, height)
+	}
 	coarse := &rng{seed("coarse" + hexOf(t))}
 	fine := &rng{seed("fine" + hexOf(t))}
 	for i, l := range []struct {
@@ -282,15 +285,28 @@ func Render(width, height int, scale float64, dark bool) *Sheet {
 	}
 	grain := image.NewRGBA(image.Rect(0, 0, width, height))
 	r := &rng{seed("tooth" + hexOf(t) + "1")}
-	lift := pick(dark, 0.4, 1.0)
-	over(grain, noise(width, height, tokens.PaperTooth*lift, t, r), 1)
+	over(grain, noise(width, height, tokens.PaperTooth, t, r), 1)
 	pc := max(2, int(math.Round(scale*0.8)))
-	overScaled(grain, noise(max(2, (width+pc-1)/pc), max(2, (height+pc-1)/pc), tokens.PaperPulp*lift, t, r))
-	fibres(grain, scale, t, r, dark)
-	flecks(grain, scale, r, dark)
+	overScaled(grain, noise(max(2, (width+pc-1)/pc), max(2, (height+pc-1)/pc), tokens.PaperPulp, t, r))
+	fibres(grain, scale, t, r)
+	flecks(grain, scale, r)
 	over(tex, grain, tokens.PaperGrain)
+	return finish(tex, t, width, height)
+}
 
-	// The locked tone wins at the pixel: choose the base so the finished mean equals the token.
+// darkGrainAmount is the dark sheet's whole texture: one fine grain, peak +-3 levels (D-093).
+const darkGrainAmount = 3
+
+// darkGrain paints it. No mottle, pulp, fibres or flecks, so no pixel lifts far enough to cost a text role its 7:1.
+func darkGrain(tex *image.RGBA, t RGB) *image.RGBA {
+	r := &rng{seed("tooth" + hexOf(t) + "1")}
+	over(tex, noise(tex.Rect.Dx(), tex.Rect.Dy(), darkGrainAmount, t, r), 1)
+	return tex
+}
+
+// finish keeps the locked tone: it picks the base so the finished mean equals the token.
+func finish(tex *image.RGBA, t RGB, width, height int) *Sheet {
+
 	var sum [3]float64
 	var asum float64
 	for i := 0; i < len(tex.Pix); i += 4 {

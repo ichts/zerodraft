@@ -171,7 +171,8 @@ test.describe('the sheet', () => {
     await waitForPaper(page, '#paper');
     const demoGrain = await patch(page, '#paper', 0.75);
     expect(demoGrain.spread, 'the demo sheet carries grain').toBeGreaterThan(2);
-    expect(demoGrain.distinct).toBeGreaterThan(40);
+    // The dark grain is one fine layer (D-093), so it has fewer distinct values than the light sheet's mottle.
+    expect(demoGrain.distinct).toBeGreaterThan(mode === 'dark' ? 8 : 40);
     expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
 
     await enterRoom(page);
@@ -283,5 +284,47 @@ test.describe('the sheet', () => {
     // The not-saved caption is a text role on the sheet, so it answers to the same floor (D-061).
     expect(contrast(parseColour(await style(page, '#kept-note', 'color')), paper),
       'the kept not-saved caption on the paper').toBeGreaterThanOrEqual(7);
+  });
+  test('the dark sheet is one fine grain: about +-3 levels, no blotch, every pixel clears 7:1 (D-093)', async ({ page }) => {
+    await page.goto('./');
+    test.skip((await theme(page)) !== 'dark', 'the dark sheet only exists in dark');
+    await page.waitForFunction(() => window.WriteItDownPaper);
+    const sheet = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      const info = window.WriteItDownPaper.render(canvas, 640, 384, 1, 'dark');
+      const out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = info.base;
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(canvas, 0, 0);
+      const { data, width, height } = ctx.getImageData(0, 0, out.width, out.height);
+      const luma = i => 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      let mean = 0;
+      let peak = 0;
+      let peakAt = 0;
+      const blocks = new Array(Math.floor(width / 32) * Math.floor(height / 32)).fill(0);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * 4;
+          const l = luma(i);
+          mean += l;
+          if (l > peak) { peak = l; peakAt = i; }
+          const bx = Math.floor(x / 32);
+          const by = Math.floor(y / 32);
+          if (bx < Math.floor(width / 32) && by < Math.floor(height / 32)) blocks[by * Math.floor(width / 32) + bx] += l / 1024;
+        }
+      }
+      mean /= width * height;
+      const blockMean = blocks.reduce((a, b) => a + b, 0) / blocks.length;
+      const blotch = Math.sqrt(blocks.reduce((a, b) => a + (b - blockMean) ** 2, 0) / blocks.length);
+      return { base: info.base, lift: peak - mean, blotch, brightest: [data[peakAt], data[peakAt + 1], data[peakAt + 2]] };
+    });
+    expect(sheet.lift, 'no pixel lifts more than the +-3 grain').toBeLessThanOrEqual(3.5);
+    expect(sheet.blotch, 'no blotch at the 32 px scale').toBeLessThan(0.2);
+    const pixel = { r: sheet.brightest[0], g: sheet.brightest[1], b: sheet.brightest[2] };
+    expect(contrast(parseColour(`rgb(${channels(INK.dark).join(',')})`), pixel), 'ink on the brightest pixel').toBeGreaterThanOrEqual(7);
+    expect(contrast(parseColour(`rgb(${channels(QUIET.dark).join(',')})`), pixel), 'quiet text on the brightest pixel').toBeGreaterThanOrEqual(7);
   });
 });

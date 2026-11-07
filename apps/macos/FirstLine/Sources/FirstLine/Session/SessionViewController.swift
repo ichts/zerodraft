@@ -420,8 +420,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         numeralLabel.isHidden = true
         warningHint.isHidden = true
 
-        exitButton = FirstLineButtons.link(title: "ESC - EXIT", target: self, action: #selector(exitTapped))
-        styleQuietLink(exitButton, title: "ESC - EXIT")
+        exitButton = FirstLineButtons.link(title: Self.exitLabel, target: self, action: #selector(exitTapped))
+        styleQuietLink(exitButton, title: Self.exitLabel)
         exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
         exitHintLabel.attributedStringValue = Self.exitHintString()
         exitHintLabel.maximumNumberOfLines = 1
@@ -889,7 +889,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.toolTip = typePrompt ? nil : RoomPresentation.countRule
         countLabel.setAccessibilityHelp(typePrompt ? "Type to begin." : RoomPresentation.countRule)
         // The count shares the footer row's 1.6 line box, so its baseline meets the
-        // ESC - EXIT title baseline instead of sitting about 5 pt lower.
+        // exit label's title baseline instead of sitting about 5 pt lower.
         countLabel.attributedStringValue = Self.rowText(
             typePrompt ? "Type to begin" : wordLabel, font: FirstLineTypography.smallNSFont,
             color: chrome, alignment: .right, kernEm: 0)
@@ -959,7 +959,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     /// A footer-row run with the row's shared 1.6 line box. The count and the inline
     /// confirmation use it so centring their frames lands their baselines on the
-    /// ESC - EXIT title baseline instead of a few points below it.
+    /// exit label's title baseline instead of a few points below it.
     private static func rowText(_ text: String, font: NSFont, color: NSColor,
                                 alignment: NSTextAlignment, kernEm: CGFloat) -> NSAttributedString {
         let paragraph = NSMutableParagraphStyle()
@@ -973,11 +973,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         ])
     }
 
-    /// One type style for the footer row and its inline confirmation: same face,
-    /// size, weight and tracking, so the two runs share a baseline and rhythm.
+    /// The footer's left label (D-090): sentence case, as the web room says it. The Mac has no touch input, so the
+    /// web's `Exit` variant has no counterpart here.
+    static let exitLabel = "Esc to exit"
+
+    /// One type style for the whole footer row (D-090): the exit label, its status slot and the count are 13 pt
+    /// regular, no tracking, so the runs share a face, a baseline and a rhythm, as on the web.
     private static func quietRowText(_ text: String, color: NSColor, truncates: Bool = false,
-                                     kernEm: CGFloat = 0.04) -> NSAttributedString {
-        let font = FirstLineTypography.smallMediumNSFont
+                                     kernEm: CGFloat = 0) -> NSAttributedString {
+        let font = FirstLineTypography.smallNSFont
         let text = NSMutableAttributedString(attributedString: FirstLineTypography.trackedText(
             text, font: font, color: color, kernEm: kernEm))
         if truncates {
@@ -995,7 +999,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private func styleQuietLink(_ button: NSButton, title: String) {
         let color = FirstLineColors.paperQuietNSColor
         button.title = title
-        button.font = FirstLineTypography.smallMediumNSFont
+        button.font = FirstLineTypography.smallNSFont
         button.contentTintColor = color
         button.attributedTitle = Self.quietRowText(title, color: color)
     }
@@ -1146,7 +1150,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private func showRefusalNotice() {
         isShowingRefusalNotice = true
         exitHintLabel.attributedStringValue = Self.quietRowText(Self.refusalNoticeText,
-            color: FirstLineColors.paperQuietNSColor, truncates: true, kernEm: 0.04)
+            color: FirstLineColors.paperQuietNSColor, truncates: true)
         exitHintLabel.isHidden = false
         announce(Self.refusalNoticeText)
         refusalNoticeWork?.cancel()

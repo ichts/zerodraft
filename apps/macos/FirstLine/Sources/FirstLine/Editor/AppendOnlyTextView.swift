@@ -20,9 +20,22 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var compositionAnchorY: CGFloat = 0
     private let insetEpsilon: CGFloat = 0.5
     /// The room sets this from Reduce Motion; history scrolls then snap.
-    var animatesHistoryScroll = true
-    /// One uniform ink step per line ended by Return, closest line first, older lines gone (D-027 stepping, D-088 unit), at
-    /// D-069's contrast ladder for the effective appearance.
+    var animatesHistoryScroll = true {
+        didSet { if !animatesHistoryScroll { settleHistoryDissolve() } }
+    }
+    /// How long the lines above dissolve to their next step when Return lands (D-092). The web's `.editor-ink` transition
+    /// is the same 320 ms ease-out; Reduce Motion steps at once.
+    static let historyDissolveDuration: TimeInterval = 0.32
+    /// The alpha each line is drawn at right now, by line index (lines only ever append). A dissolve starts from it.
+    private var shownLineAlphas: [CGFloat] = []
+    private var dissolve: (start: CFTimeInterval, from: [CGFloat], to: [CGFloat])?
+    private var dissolveTimer: Timer?
+    /// The dissolve's clock; tests drive it by hand so the half-way frame is exact.
+    var dissolveClock: () -> CFTimeInterval = { CACurrentMediaTime() }
+    /// True while the lines above are still dissolving to their step.
+    var isDissolvingHistory: Bool { dissolve != nil }
+    /// One uniform ink step per line ended by Return, closest line first, older lines gone (D-088 unit, D-092 values:
+    /// 1, .22, .07 light; 1, .16, .05 dark) for the effective appearance.
     var historyLineOpacities: [CGFloat] {
         FirstLineColors.paperHistoryOpacities(dark: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
     }
@@ -174,6 +187,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         // range in the now-empty editor and the first letter would vanish.
         if hadComposition { inputContext?.discardMarkedText() }
         compositionRange = nil
+        settleHistoryDissolve()
+        shownLineAlphas = []
         textStorage?.setAttributedString(NSAttributedString(string: ""))
         setSelectedRange(NSRange(location: 0, length: 0))
         // A long draft leaves the scroll view at the bottom; the room's next layout
@@ -507,27 +522,112 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         applyLineOpacity(in: range, textStorage: textStorage)
     }
 
-    /// The ladder differs per appearance, so a theme switch re-steps every completed line.
+    /// The ladder differs per appearance, so a theme switch re-steps every completed line, at once.
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         guard hasMarkedText() == false, let textStorage, textStorage.length > 0 else { return }
+        settleHistoryDissolve()
+        shownLineAlphas = []
         applyLineOpacity(in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
     }
 
     /// Each line (the text up to a hard break, D-088) gets one uniform opacity on every row it wraps onto; the live
-    /// line is full and older lines are gone. The opacities are the appearance's
-    /// history ladder (D-069). The rule reads the text only, so a width change never re-steps a line.
+    /// line is full and older lines are gone. The opacities are the appearance's history steps (D-092). The rule reads
+    /// the text only, so a width change never re-steps a line. When Return moves a line to its next step, the line
+    /// dissolves there over `historyDissolveDuration` instead of jumping; a line that is new, or a draft that is
+    /// restored, is drawn at its step at once.
     private func applyLineOpacity(in range: NSRange, textStorage: NSTextStorage) {
         guard textStorage.length > 0 else { return }
-        for line in HistoryLines.lines(in: string) {
-            let alpha: CGFloat = line.rung < historyLineOpacities.count ? historyLineOpacities[line.rung] : 0
+        let lines = HistoryLines.lines(in: string)
+        let steps = historyLineOpacities
+        let targets = lines.map { $0.rung < steps.count ? steps[$0.rung] : 0 }
+        let known = shownLineAlphas.count
+        let moving = animatesHistoryScroll && known > 0 && known <= targets.count
+            && targets.indices.contains { $0 < known && abs(targets[$0] - (dissolve?.to[$0] ?? shownLineAlphas[$0])) > 0.0005 }
+        if moving {
+            let from = targets.indices.map { $0 < known ? shownLineAlphas[$0] : targets[$0] }
+            dissolve = (dissolveClock(), from, targets)
+            startDissolveTimer()
+        } else if dissolve != nil, animatesHistoryScroll, known <= targets.count {
+            let running = dissolve!
+            let from = targets.indices.map { $0 < running.from.count ? running.from[$0] : targets[$0] }
+            let to = targets.indices.map { $0 < running.to.count ? running.to[$0] : targets[$0] }
+            dissolve = (running.start, from, to)
+        } else {
+            dissolve = nil
+            dissolveTimer?.invalidate()
+            dissolveTimer = nil
+        }
+        paintLineOpacity(lines: lines, targets: targets, in: range, textStorage: textStorage)
+    }
+
+    private func paintLineOpacity(lines: [HistoryLines.Line], targets: [CGFloat], in range: NSRange, textStorage: NSTextStorage) {
+        var shown = targets
+        if let running = dissolve, running.from.count == targets.count, running.to.count == targets.count {
+            let progress = Self.dissolveEase(min(1, (dissolveClock() - running.start) / Self.historyDissolveDuration))
+            shown = targets.indices.map { running.from[$0] + (running.to[$0] - running.from[$0]) * progress }
+            if progress >= 1 { shown = running.to; dissolve = nil; dissolveTimer?.invalidate(); dissolveTimer = nil }
+        }
+        for (index, line) in lines.enumerated() {
             let clipped = NSIntersectionRange(line.range, range)
             guard clipped.length > 0 else { continue }
+            let alpha = shown[index]
             textStorage.addAttribute(.foregroundColor,
                                       value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
                                       range: clipped)
             textStorage.addAttribute(.shadow, value: Self.inkSpread(step: alpha), range: clipped)
         }
+        shownLineAlphas = shown
+    }
+
+    private func startDissolveTimer() {
+        guard dissolveTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.tickDissolve() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dissolveTimer = timer
+    }
+
+    /// One frame of the dissolve, from the clock.
+    func tickDissolve() {
+        guard dissolve != nil else { dissolveTimer?.invalidate(); dissolveTimer = nil; return }
+        // A composition owns the storage until it commits; the dissolve resumes from the clock afterwards.
+        guard hasMarkedText() == false, let textStorage, textStorage.length > 0 else { return }
+        paintHistoryTargets(in: textStorage)
+    }
+
+    /// Ends a running dissolve on its steps now (Reduce Motion, an appearance change, and tests).
+    func settleHistoryDissolve() {
+        guard dissolve != nil else { return }
+        dissolve = nil
+        dissolveTimer?.invalidate()
+        dissolveTimer = nil
+        guard hasMarkedText() == false, let textStorage, textStorage.length > 0 else { return }
+        paintHistoryTargets(in: textStorage)
+    }
+
+    private func paintHistoryTargets(in textStorage: NSTextStorage) {
+        let lines = HistoryLines.lines(in: string)
+        let steps = historyLineOpacities
+        let targets = lines.map { $0.rung < steps.count ? steps[$0.rung] : 0 }
+        paintLineOpacity(lines: lines, targets: targets, in: NSRange(location: 0, length: textStorage.length), textStorage: textStorage)
+    }
+
+    /// CSS `ease-out`, cubic-bezier(0, 0, .58, 1): the web's dissolve curve, so both surfaces move alike.
+    static func dissolveEase(_ t: Double) -> CGFloat {
+        guard t > 0 else { return 0 }
+        guard t < 1 else { return 1 }
+        let (x1, y1, x2, y2) = (0.0, 0.0, 0.58, 1.0)
+        func bezier(_ u: Double, _ a: Double, _ b: Double) -> Double {
+            3 * a * u * (1 - u) * (1 - u) + 3 * b * u * u * (1 - u) + u * u * u
+        }
+        var low = 0.0, high = 1.0
+        for _ in 0..<32 {
+            let mid = (low + high) / 2
+            if bezier(mid, x1, x2) < t { low = mid } else { high = mid }
+        }
+        return CGFloat(bezier((low + high) / 2, y1, y2))
     }
 
     func setCompositionAnchor(_ y: CGFloat) {

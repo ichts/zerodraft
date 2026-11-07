@@ -1343,8 +1343,8 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   if (info.project.use.reducedMotion !== 'reduce') await seek(typeEnd + 250);
   await expect(page.locator('#prev-0')).toHaveText(LINES[2]);
   await expect(page.locator('#cur')).toHaveText(LINES[3]);
-  // The history ladder is the room's ladder: the theme's first history stop one line up, the second
-  // two lines up (D-056; the stops are contrast steps on the Note paper, not the old 22% / 7%).
+  // The demo's history is the room's: the theme's first history step one line up, the second two lines up
+  // (D-092: .22 and .07 light, .16 and .05 dark, exempt from 7:1).
   const ladder = await page.evaluate(() => {
     const sheet = getComputedStyle(document.querySelector('#paper'));
     return {

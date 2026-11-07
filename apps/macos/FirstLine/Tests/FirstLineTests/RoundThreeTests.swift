@@ -46,7 +46,7 @@ struct RoundThreeTests {
             as? FirstLineInkFocusButton)
         let secondary = try #require(FirstLineButtons.secondary(title: "BEGIN AGAIN", target: nil, action: action)
             as? FirstLineInkFocusButton)
-        let quiet = try #require(FirstLineButtons.link(title: "ESC - EXIT", target: nil, action: action)
+        let quiet = try #require(FirstLineButtons.link(title: "Esc to exit", target: nil, action: action)
             as? FirstLineInkFocusButton)
         #expect(primary.inkFocusRingInset == 0)
         #expect(roomPrimary.inkFocusRingInset == 0)
@@ -674,7 +674,7 @@ struct RoundThreeTests {
         let paper = try #require(editor.enclosingScrollView?.superview)
         let timer = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "1:00" })
         let count = try #require(descendants(of: room.view, of: NSTextField.self).first { $0.stringValue == "Type to begin" })
-        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
+        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "Esc to exit" })
 
         // Fixed edges only: the clock's text width changes, its right edge must not.
         func chrome() -> [CGFloat] {
@@ -719,7 +719,7 @@ struct RoundThreeTests {
         room.requestExit()
         room.view.layoutSubtreeIfNeeded()
 
-        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "ESC - EXIT" })
+        let exit = try #require(descendants(of: room.view, of: NSButton.self).first { $0.title == "Esc to exit" })
         let hint = try #require(descendants(of: room.view, of: NSTextField.self)
             .first { $0.attributedStringValue.string == "Press Esc again to leave and delete the draft." })
         #expect(!hint.isHidden)
@@ -734,10 +734,12 @@ struct RoundThreeTests {
         #expect(exitFont.fontDescriptor.symbolicTraits == hintFont.fontDescriptor.symbolicTraits)
         let exitKern = try #require(exitTitle.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
         let hintKern = try #require(hintText.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat)
-        // Caps keep their tracking; sentence case drops it, so its lowercase is not
-        // letterspaced. The row still shares one baseline and line box.
-        #expect(abs(exitKern - 0.52) <= 0.01, "ESC - EXIT lost its caps tracking")
+        // One footer style (D-090): sentence case everywhere, so no run of the row carries caps tracking, and the
+        // label, the confirmation and the count are all 13 pt regular on one baseline and line box.
+        #expect(abs(exitKern) <= 0.01, "the exit label still carries caps tracking")
         #expect(abs(hintKern) <= 0.01, "the sentence-case confirmation still carries caps tracking")
+        #expect(exitFont.fontName == FirstLineTypography.smallNSFont.fontName && exitFont.pointSize == 13,
+                "the footer label is 13 pt regular, like the count")
 
         // Same baseline: read the first ink row of each run from one rendered frame.
         // The count shares the row too, with its own type role.
@@ -746,9 +748,9 @@ struct RoundThreeTests {
                 && !$0.isHiddenOrHasHiddenAncestor })
         let rows = try firstInkRows(of: [exit, hint, count], in: room.view)
         #expect(abs(rows[0] - rows[1]) <= 1,
-                "ESC - EXIT and its confirmation are not on one baseline (\(rows))")
+                "the exit label and its confirmation are not on one baseline (\(rows))")
         #expect(abs(rows[0] - rows[2]) <= 1,
-                "the word count is not on the ESC - EXIT baseline (\(rows))")
+                "the word count is not on the exit label's baseline (\(rows))")
         window.orderOut(nil)
     }
 

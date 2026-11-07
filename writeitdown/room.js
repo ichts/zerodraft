@@ -90,8 +90,10 @@ function syncBar(now) {
     { duration: remaining, easing: 'linear', fill: 'forwards' });
 }
 
-// The ink layer repeats the draft one span per line (ended by Return), each at its rung of the history ladder
-// (D-088). It is rebuilt only when the draft or the composing boundary changes, never per tick.
+// The ink layer repeats the draft one span per line (ended by Return), each at its rung of the history (D-092). Spans
+// are reused and only their rung changes, so the lines above dissolve to their next step through the CSS transition
+// the moment Return lands instead of being rebuilt at their final value. It is repainted only when the draft or the
+// composing boundary changes, never per tick.
 function paintInk() {
   const base = compositionBase === null ? -1 : compositionBase.length;
   const key = `${base}|${editor.value}`;
@@ -104,15 +106,17 @@ function paintInk() {
     const pieces = cut === null ? [[line.start, line.end]] : [[line.start, cut], [cut, line.end]];
     for (const [start, end] of pieces) parts.push({ text: value.slice(start, end), rung: line.rung, composing: base >= 0 && start >= base });
   }
-  const spans = parts.map(part => {
-    const span = document.createElement('span');
-    span.dataset.rung = String(part.rung);
-    if (part.composing) span.className = 'composing';
-    span.textContent = part.text;
-    return span;
-  });
   // A draft that ends on a hard break owes the textarea's empty last line to the ink layer too.
-  ink.replaceChildren(...spans, ...(value.endsWith('\n') ? ['\n'] : []));
+  while (ink.lastChild && ink.lastChild.nodeType === Node.TEXT_NODE) ink.lastChild.remove();
+  const spans = Array.from(ink.children);
+  parts.forEach((part, index) => {
+    const span = spans[index] ?? ink.appendChild(document.createElement('span'));
+    span.dataset.rung = String(part.rung);
+    span.classList.toggle('composing', part.composing);
+    if (span.textContent !== part.text) span.textContent = part.text;
+  });
+  spans.slice(parts.length).forEach(span => span.remove());
+  if (value.endsWith('\n')) ink.append('\n');
 }
 
 function setScroll(top) {

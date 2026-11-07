@@ -2,20 +2,40 @@ package session
 
 import (
 	"unicode"
+
+	"github.com/go-text/typesetting/segmenter"
 )
 
-// WordCount counts like the Mac room: each Han character is one word, other words are runs of letters and
-// digits (an apostrophe or a connecting mark inside a run stays in the word), punctuation and emoji do not
-// count. NLTokenizer is not available off Apple platforms, so this is the same rule written down (SYNC.md:
-// deliberately different mechanism, same stated rule; kana runs count as one word per run).
+func UsesCharacterCount(s string) bool {
+	for _, r := range s {
+		if unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul) {
+			return true
+		}
+	}
+	return false
+}
+
+// WordCount uses characters for CJK drafts and word runs otherwise; punctuation and emoji do not count.
 func WordCount(s string) int {
+	if UsesCharacterCount(s) {
+		var seg segmenter.Segmenter
+		seg.Init([]rune(s))
+		graphemes := seg.GraphemeIterator()
+		n := 0
+		for graphemes.Next() {
+			for _, r := range graphemes.Grapheme().Text {
+				if unicode.IsLetter(r) || unicode.IsNumber(r) {
+					n++
+					break
+				}
+			}
+		}
+		return n
+	}
 	n, in := 0, false
 	rs := []rune(s)
 	for i, r := range rs {
 		switch {
-		case unicode.Is(unicode.Han, r):
-			n++
-			in = false
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r):
 			if !in {
 				n++

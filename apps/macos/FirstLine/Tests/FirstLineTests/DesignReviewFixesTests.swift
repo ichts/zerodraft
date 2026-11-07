@@ -23,11 +23,11 @@ struct DesignReviewFixesTests {
             let paperCentre = fixture.room.view.convert(paper.bounds, from: paper).midX
             let fields = descendants(of: fixture.room.view, as: NSTextField.self)
             let heading = try #require(fields.first { $0.stringValue == "You wrote it down." })
-            let receipt = try #require(fields.first { $0.stringValue.contains("WORDS.") })
+            let receipt = try #require(fields.first { $0.stringValue.contains("words.") })
             let copy = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-                .first { $0.title == "COPY TEXT" })
+                .first { $0.title == "Copy text" })
             let restart = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-                .first { $0.title == "BEGIN AGAIN" })
+                .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
             for (name, view) in [("heading", heading as NSView), ("receipt", receipt)] {
                 let centre = fixture.room.view.convert(view.bounds, from: view).midX
                 #expect(abs(centre - paperCentre) <= 1,
@@ -414,14 +414,14 @@ struct DesignReviewFixesTests {
         }
     }
 
-    // MARK: - D-030: COPIED keeps the copy control's width
+    // MARK: - D-030: Copied keeps the copy control's width
 
     @Test func copiedKeepsTheCopyWidthSoTheRowDoesNotShift() throws {
         let fixture = try keptRoom(size: NSSize(width: 1040, height: 720))
         let copy = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-            .first { $0.title == "COPY TEXT" })
+            .first { $0.title == "Copy text" })
         let restart = try #require(descendants(of: fixture.room.view, as: NSButton.self)
-            .first { $0.title == "BEGIN AGAIN" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         fixture.room.view.layoutSubtreeIfNeeded()
         let restingWidth = copy.frame.width
         let restingRestart = fixture.room.view.convert(restart.bounds, from: restart)
@@ -429,12 +429,12 @@ struct DesignReviewFixesTests {
                                                    from: copy.superview ?? copy)
         fixture.room.copyKeptText()
         fixture.room.view.layoutSubtreeIfNeeded()
-        #expect(copy.title == "COPIED")
+        #expect(copy.title == "Copied")
         #expect(abs(copy.frame.width - restingWidth) <= 0.5,
-                "COPIED is \(copy.frame.width) pt wide against COPY TEXT's \(restingWidth) pt")
+                "Copied is \(copy.frame.width) pt wide against Copy text's \(restingWidth) pt")
         let copiedRestart = fixture.room.view.convert(restart.bounds, from: restart)
         #expect(abs(copiedRestart.minX - restingRestart.minX) <= 0.5,
-                "BEGIN AGAIN moved \(copiedRestart.minX - restingRestart.minX) pt under the pointer")
+                "Begin again moved \(copiedRestart.minX - restingRestart.minX) pt under the pointer")
         let copiedRow = fixture.room.view.convert(copy.superview?.bounds ?? .zero, from: copy.superview ?? copy)
         #expect(abs(copiedRow.midX - restingRow.midX) <= 0.5)
         fixture.window.orderOut(nil)

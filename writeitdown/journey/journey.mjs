@@ -316,11 +316,11 @@ async function run(size, browser) {
       ok(Date.now() - started >= 60000, 'session finished before sixty seconds');
       ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
       ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
-      ok(/^1 MINUTE\. \d+ WORDS?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
-      ok(await page.getByRole('button', { name: 'COPY TEXT', exact: true }).isVisible(), 'COPY TEXT missing');
+      ok(/^1 minute\. \d+ words?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
+      ok(await page.getByRole('button', { name: 'Copy text', exact: true }).isVisible(), 'Copy text missing');
       await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
       await page.locator('#copy').click();
-      await page.getByRole('button', { name: 'COPIED', exact: true }).waitFor({ state: 'visible' });
+      await page.getByRole('button', { name: 'Copied', exact: true }).waitFor({ state: 'visible' });
       const copied = await page.evaluate(() => navigator.clipboard.readText());
       ok(copied === typed, 'clipboard differs from the finished draft');
       const touch = await page.evaluate(() => matchMedia('(hover: none), (any-pointer: coarse)').matches);

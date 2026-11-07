@@ -53,6 +53,20 @@ func (g *rig) snap(name string) {
 	f.Close()
 }
 
+func TestCJKCountLabelsCharactersAndReceiptUsesSentenceCase(t *testing.T) {
+	text := "我们是"
+	n := session.WordCount(text)
+	if got := wordLabel(n, text); got != "3 characters" {
+		t.Fatalf("CJK count = %q", got)
+	}
+	if got := keptReceipt(n, time.Minute, text); got != "1 minute. 3 characters." {
+		t.Fatalf("CJK receipt = %q", got)
+	}
+	if got := keptReceipt(47, time.Minute, "hello"); got != "1 minute. 47 words." {
+		t.Fatalf("receipt = %q", got)
+	}
+}
+
 func TestSnapshots(t *testing.T) {
 	g := newRig(t, 1040, 720)
 	g.snap("00-empty")

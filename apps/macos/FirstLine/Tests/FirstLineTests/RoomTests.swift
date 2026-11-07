@@ -61,17 +61,27 @@ struct RoomTests {
         #expect(room.stoppedAnnouncement.hasSuffix(
             "Three free sessions used. A license is needed to keep writing."))
         let beginAgain = try #require(descendants(room.view, of: NSButton.self)
-            .first { $0.title == "Begin again" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(beginAgain.accessibilityHelp() ==
             "Three free sessions used. Return opens activation to keep writing.")
     }
 
     @Test func keptReceiptNamesTheDurationAndCount() {
-        #expect(RoomPresentation.keptReceipt(wordCount: 63, duration: 300) == "5 MINUTES. 63 WORDS.")
-        #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 60) == "1 MINUTE. 1 WORD.")
+        #expect(RoomPresentation.keptReceipt(wordCount: 63, duration: 300) == "5 minutes. 63 words.")
+        #expect(RoomPresentation.keptReceipt(wordCount: 1, duration: 60) == "1 minute. 1 word.")
         #expect(!RoomPresentation.keptReceipt(wordCount: 63, duration: 300).contains("KEPT"))
         #expect(RoomPresentation.wordLabel(0) == "0 words")
         #expect(RoomPresentation.wordLabel(1) == "1 word")
+    }
+
+    @Test func cjkCountUsesCharactersOnTheRoomAndReceipt() {
+        let engine = SessionEngine()
+        engine.start(duration: 60)
+        engine.registerCommittedText("我们是")
+        #expect(RoomPresentation.wordLabel(engine.wordCount, text: engine.text) == "3 characters")
+        #expect(RoomPresentation.keptReceipt(wordCount: engine.wordCount, duration: 60, text: engine.text)
+            == "1 minute. 3 characters.")
+        #expect(RoomPresentation.wordLabel(1, text: "我") == "1 character")
     }
 
     @Test func copyPutsExactDraftOnPasteboard() {
@@ -380,7 +390,7 @@ struct RoomTests {
         let bar = try #require(descendants(fixture.room.view, of: FirstLineFillBar.self).first)
         #expect(bar.isHiddenOrHasHiddenAncestor, "the session bar is part of the stopped screen")
         let beginAgain = try #require(descendants(fixture.room.view, of: NSButton.self)
-            .first { $0.title == "Begin again" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(!beginAgain.isHiddenOrHasHiddenAncestor)
         #expect(beginAgain.keyEquivalent == "\r")
     }
@@ -399,14 +409,14 @@ struct RoomTests {
         #expect(fixture.engine.phase == .success)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
         #expect(fields.contains { $0.stringValue == "You wrote it down." && !$0.isHidden })
-        let receipt = try #require(fields.first { $0.stringValue == "1 MINUTE. 15 WORDS." })
+        let receipt = try #require(fields.first { $0.stringValue == "1 minute. 15 words." })
         #expect(!receipt.isHiddenOrHasHiddenAncestor)
         let body = try #require(fields.first { $0.isSelectable && !$0.isEditable && $0.stringValue.contains("promotion") })
         #expect(body.alignment == .center)
         #expect(body.isHiddenOrHasHiddenAncestor == false)
         let buttons = descendants(fixture.room.view, of: NSButton.self)
-        #expect(buttons.contains { $0.title == "COPY TEXT" && !$0.isHiddenOrHasHiddenAncestor })
-        #expect(buttons.contains { $0.title == "BEGIN AGAIN" && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(buttons.contains { $0.title == "Copy text" && !$0.isHiddenOrHasHiddenAncestor })
+        #expect(buttons.contains { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(buttons.contains { $0.title == "Esc to exit" && !$0.isHiddenOrHasHiddenAncestor })
         #expect(fields.contains { $0.stringValue == "0:00" })
 
@@ -420,7 +430,7 @@ struct RoomTests {
         // One caption under the actions says what the writer must do with the draft.
         let caption = try #require(fields.first { $0.stringValue == SessionKeptView.unsavedCaption })
         #expect(!caption.isHiddenOrHasHiddenAncestor)
-        let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "COPY TEXT" })
+        let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "Copy text" })
         let captionFrame = fixture.room.view.convert(caption.bounds, from: caption)
         let copyFrame = fixture.room.view.convert(copy.bounds, from: copy)
         let receiptFrame = fixture.room.view.convert(receipt.bounds, from: receipt)
@@ -478,8 +488,8 @@ struct RoomTests {
 
         let recreated = SessionViewController(appState: fixture.state)
         window(recreated)
-        let copy = try #require(descendants(recreated.view, of: NSButton.self).first { $0.title == "COPIED" })
-        #expect(descendants(copy, of: NSTextField.self).contains { $0.stringValue == "COPIED" })
+        let copy = try #require(descendants(recreated.view, of: NSButton.self).first { $0.title == "Copied" })
+        #expect(descendants(copy, of: NSTextField.self).contains { $0.stringValue == "Copied" })
         recreated.view.window?.orderOut(nil)
     }
 
@@ -492,22 +502,22 @@ struct RoomTests {
         }
         fixture.clock.now = 60
         fixture.room.tick()
-        let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "COPY TEXT" })
+        let copy = try #require(descendants(fixture.room.view, of: NSButton.self).first { $0.title == "Copy text" })
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
         let originalWidth = copy.frame.width
-        let copyLabel = try #require(descendants(copy, of: NSTextField.self).first { $0.stringValue == "COPY TEXT" })
+        let copyLabel = try #require(descendants(copy, of: NSTextField.self).first { $0.stringValue == "Copy text" })
         let originalPadding = copy.frame.width - copyLabel.intrinsicContentSize.width
         #expect(originalPadding >= 40 && originalPadding <= 56,
-                "the pill carries \(originalPadding) pt of padding around COPY TEXT")
+                "the pill carries \(originalPadding) pt of padding around Copy text")
         copy.performClick(nil)
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.viewDidLayout()
-        // The pill hugs its label down to the resting width: COPIED never narrows the control, so the
+        // The pill hugs its label down to the resting width: Copied never narrows the control, so the
         // row stays where it was under the pointer (D-030 as amended by D-076).
-        #expect(copy.title == "COPIED")
+        #expect(copy.title == "Copied")
         #expect(abs(copy.frame.width - originalWidth) <= 0.5,
-                "COPIED is \(copy.frame.width) pt wide, COPY TEXT was \(originalWidth) pt")
+                "Copied is \(copy.frame.width) pt wide, Copy text was \(originalWidth) pt")
         fixture.room.tick()
         let move = try #require(NSEvent.mouseEvent(with: .mouseMoved, location: .zero,
             modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil,
@@ -516,13 +526,13 @@ struct RoomTests {
         fixture.room.mouseExited(with: move)
         fixture.state.settings.writingFontSize = .large
         fixture.room.tick()
-        #expect(copy.title == "COPIED")
+        #expect(copy.title == "Copied")
         let kept = try #require(descendants(fixture.room.view, of: SessionKeptView.self).first)
         #expect(kept.draft == "draft")
         fixture.state.abandonSession()
         fixture.state.startSession(duration: 60)
         fixture.room.refreshRoom()
-        #expect(copy.title == "COPY TEXT")
+        #expect(copy.title == "Copy text")
         #expect(kept.draft.isEmpty)
     }
 
@@ -672,7 +682,7 @@ struct RoomTests {
         window.makeKeyAndOrderFront(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         let copy = try #require(window.firstResponder as? NSButton)
-        #expect(copy.title == "COPY TEXT")
+        #expect(copy.title == "Copy text")
         #expect(copy.focusRingType == .none)
         let outline = try #require(copy.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }.first)
         #expect(!outline.isHidden)

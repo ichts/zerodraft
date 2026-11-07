@@ -41,10 +41,10 @@ struct RoundThreeTests {
         let action = #selector(NSResponder.selectAll(_:))
         let primary = try #require(FirstLineButtons.primary(title: "Begin", target: nil, action: action)
             as? FirstLineInkFocusButton)
-        let roomPrimary = try #require(FirstLineButtons.roomPrimary(title: "COPY TEXT", target: nil,
+        let roomPrimary = try #require(FirstLineButtons.roomPrimary(title: "Copy text", target: nil,
                                                                    action: action, reducesMotion: { true })
             as? FirstLineInkFocusButton)
-        let secondary = try #require(FirstLineButtons.secondary(title: "BEGIN AGAIN", target: nil, action: action)
+        let secondary = try #require(FirstLineButtons.secondary(title: "Begin again", target: nil, action: action)
             as? FirstLineInkFocusButton)
         let quiet = try #require(FirstLineButtons.link(title: "Esc to exit", target: nil, action: action)
             as? FirstLineInkFocusButton)
@@ -615,7 +615,7 @@ struct RoundThreeTests {
         let room = fixture.room
         let bar = try #require(descendants(of: room.view, of: FirstLineFillBar.self).first)
         let beginAgain = try #require(descendants(of: room.view, of: NSButton.self)
-            .first { $0.title == "Begin again" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         beginAgain.performClick(nil)
         room.view.layoutSubtreeIfNeeded()
         room.viewDidLayout()

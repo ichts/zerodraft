@@ -28,10 +28,22 @@ export function clock(seconds) {
 
 const wordSegments = new Intl.Segmenter(undefined, { granularity: 'word' });
 
-// Han characters count individually; other scripts use Unicode word boundaries.
+export function usesCharacterCount(text) {
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(text);
+}
+
+const characterSegments = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 export function wordCount(text) {
-  const separated = text.replace(/(\p{Script=Han}\p{Mark}*)/gu, ' $1 ');
-  return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
+  if (usesCharacterCount(text)) {
+    return Array.from(characterSegments.segment(text)).filter(part => /[\p{Letter}\p{Number}]/u.test(part.segment)).length;
+  }
+  return Array.from(wordSegments.segment(text)).filter(part => part.isWordLike).length;
+}
+
+export function countLabel(text, count = wordCount(text)) {
+  const unit = usesCharacterCount(text) ? 'character' : 'word';
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 
 // The history ladder's unit is the line the writer ended with Return (D-088, superseding D-077's

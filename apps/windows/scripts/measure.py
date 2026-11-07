@@ -175,19 +175,19 @@ if len(full):
     rowsany = np.where(tight[:, px0:px1].sum(axis=1) >= 3)[0]
     top_i, bot_i = rowsany.min(), rowsany.max() + 1
     pill_h = bot_i - top_i
-    check('kept: COPY TEXT pill is 48 DIP tall', abs(pill_h - 48 * s) <= 1.5 * s + 1, f'{pill_h}px vs {48*s:.0f}px')
+    check('kept: Copy text pill is 48 DIP tall', abs(pill_h - 48 * s) <= 1.5 * s + 1, f'{pill_h}px vs {48*s:.0f}px')
     lab = (kp[pr3[1] + int(150 * s) + top_i: pr3[1] + int(150 * s) + bot_i, pr3[0] + px0 + int(20 * s): pr3[0] + px1 - int(20 * s)].mean(axis=2) > 200)
     ly = np.where(lab.sum(axis=1) > 0)[0]
     if len(ly):
         c_ink = (ly.min() + ly.max() + 1) / 2
-        check('kept: COPY TEXT label sits on the pill centre', abs(c_ink - pill_h / 2) <= 1.5 * s + 0.5, f'label ink centre {c_ink:.1f}px vs pill centre {pill_h/2:.1f}px')
+        check('kept: Copy text label sits on the pill centre', abs(c_ink - pill_h / 2) <= 1.5 * s + 0.5, f'label ink centre {c_ink:.1f}px vs pill centre {pill_h/2:.1f}px')
     # the two pills are one row centred on the paper: ink pill left edge .. outlined pill right edge
     wide = ((kp[pr3[1] + int(150 * s) + top_i + pill_h // 2, pr3[0]: pr3[2]]).mean(axis=1) > 250) | tight[top_i + pill_h // 2]
     rowx = np.where(wide)[0]
     if len(rowx):
         check('kept: action row is centred on the paper', abs((rowx.min() + rowx.max()) / 2 - (pr3[2] - pr3[0]) / 2) <= 6 * s, f'row centre {(rowx.min()+rowx.max())/2:.0f}px vs paper centre {(pr3[2]-pr3[0])/2:.0f}px')
 else:
-    check('kept: COPY TEXT pill found', False, 'no ink pill in the header band')
+    check('kept: Copy text pill found', False, 'no ink pill in the header band')
 
 # --- Q-06: chrome does not move between states (clock, exit link, count keep one place)
 def chrome_marks(name):

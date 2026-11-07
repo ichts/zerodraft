@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """drv script: every room state at one display scale. usage: mkcapture.py SCALE(100|125|150) OUTNAME EXE [home]
 Two launches: the 60 s room (empty, first char, typing with history fade, warn 3/2/1, stopped, restart, exit
-confirmation, deny) and a 15 s room that reaches the kept sheet (kept, COPIED, focus ring)."""
+confirmation, deny) and a 15 s room that reaches the kept sheet (kept, Copied, focus ring)."""
 import os, sys
 scale, out, exe = sys.argv[1:4]
 home = sys.argv[4] if len(sys.argv) > 4 else '150'

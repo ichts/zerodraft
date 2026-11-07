@@ -827,7 +827,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         if phase == .success, lastPhase != .success {
             updateKeptContent()
-            keptView.setCopyTitle(engine.copiedKeptText ? "COPIED" : "COPY TEXT")
+            keptView.setCopyTitle(engine.copiedKeptText ? "Copied" : "Copy text")
             DispatchQueue.main.async { [weak self] in
                 self?.keptView.layoutContent()
                 self?.focusForPhase()
@@ -877,7 +877,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         // The clock comes off the stopped sheet with the bar; a new session shows the fresh minute.
         let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
-        let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
+        let wordLabel = RoomPresentation.wordLabel(engine.wordCount, text: engine.text)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
         let chrome = FirstLineColors.paperQuietNSColor
         // Empty room: the bottom-right count slot itself carries the instruction.
@@ -1184,7 +1184,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     @objc private func copyText() {
         let copied = RoomPresentation.copy(engine.text, to: pasteboard)
         engine.registerCopiedKeptText(copied)
-        keptView.setCopyTitle(copied ? "COPIED" : "TRY COPY AGAIN")
+        keptView.setCopyTitle(copied ? "Copied" : "Try copy again")
         announce(copied ? "Copied." : "Copy failed. Select your kept text and copy it manually.")
         focusForPhase()
     }

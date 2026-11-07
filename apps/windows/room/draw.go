@@ -309,16 +309,20 @@ func (r *Room) cornerLabel(failure, kept bool) string {
 	case kept && ime.Break != "keptcount": // keptcount is the known-broken build the capture gate must fail on
 		return ""
 	case r.eng.HasStarted() || failure:
-		return wordLabel(r.eng.WordCount)
+		return wordLabel(r.eng.WordCount, r.eng.Text)
 	}
 	return tokens.StrTypeToBegin
 }
 
-func wordLabel(n int) string {
-	if n == 1 {
-		return "1 word"
+func wordLabel(n int, text string) string {
+	unit := "word"
+	if session.UsesCharacterCount(text) {
+		unit = "character"
 	}
-	return fmt.Sprintf("%d words", n)
+	if n != 1 {
+		unit += "s"
+	}
+	return fmt.Sprintf("%d %s", n, unit)
 }
 
 // ---- writing
@@ -608,12 +612,12 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	y := top + hh + tokens.KeptHeadingGap
 	// the receipt and the caption are 13 pt labels in the Mac's 1.6 line box, bottom-aligned: the next block starts a
 	// whole box (macLabelBox) under the box's top, whatever the glyphs inside it do
-	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration), family: sans, size: 13, weight: 500, spacing: 0.02})
+	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration, e.Text), family: sans, size: 13, weight: 500, spacing: 0.02})
 	rw, _ := g.receipt.Size()
 	g.rx, g.ry = pr.X+(pr.W-rw)/2, labelBoxTop(y, 13, 500)
 	y += macLabelBox(13) + tokens.KeptReceiptGap
-	// the copy pill hugs its label but never narrows below the resting COPY TEXT width, so COPIED does not move the row
-	// or land BEGIN AGAIN under the pointer; the longer retry label does widen it (D-076 item 7)
+	// the copy pill hugs its label but never narrows below the resting Copy text width, so Copied does not move the row
+	// or land Begin again under the pointer; the longer retry label does widen it (D-076 item 7)
 	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 500), r.labelWidth(r.copyLabel, 15, 500)) + 48
 	runW := r.labelWidth(tokens.StrKeptBeginAgain, 15, 500) + 40
 	x := pr.X + (pr.W-(copyW+tokens.KeptActionSpacing+runW))/2
@@ -665,15 +669,12 @@ func orSpace(s string) string {
 	return s
 }
 
-// keptReceipt is RoomPresentation.keptReceipt: `1 MINUTE. 63 WORDS.`
-func keptReceipt(words int, d time.Duration) string {
+// keptReceipt matches RoomPresentation.keptReceipt on the Mac.
+func keptReceipt(words int, d time.Duration, text string) string {
 	minutes := max(int(d.Minutes()+0.5), 1)
-	mu, wu := "MINUTES", "WORDS"
+	unit := "minutes"
 	if minutes == 1 {
-		mu = "MINUTE"
+		unit = "minute"
 	}
-	if words == 1 {
-		wu = "WORD"
-	}
-	return fmt.Sprintf("%d %s. %d %s.", minutes, mu, words, wu)
+	return fmt.Sprintf("%d %s. %s.", minutes, unit, wordLabel(words, text))
 }

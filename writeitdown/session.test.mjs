@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { fresh, advance, append, clock, wordCount, historyLines, GONE } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, countLabel, historyLines, GONE } from './session.mjs';
 import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
 test('rest has no running deadline', () => {
@@ -94,12 +94,20 @@ test('clock and word labels', () => {
 
 test('Unicode words, individual Han characters, and non-word input', () => {
   const cases = [
-    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 6],
-    ['你好，world！', 3], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
-    ['こんにちは世界', 3], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
-    ['𠀀中文', 3], ['你好👩🏽‍💻world', 3]
+    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 14],
+    ['你好，world！', 7], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
+    ['こんにちは世界', 7], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
+    ['𠀀中文', 3], ['你好👩🏽‍💻world', 7], ['한글', 2]
   ];
   for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
+});
+
+test('CJK drafts count characters, never label them words', () => {
+  assert.equal(countLabel('我们是'), '3 characters');
+  assert.equal(countLabel('我'), '1 character');
+  assert.equal(countLabel('你好，world！'), '7 characters');
+  assert.equal(countLabel('こんにちは世界'), '7 characters');
+  assert.equal(countLabel('hello world'), '2 words');
 });
 
 test('the history ladder counts lines ended by Return, never sentences (D-088)', () => {

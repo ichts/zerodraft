@@ -27,7 +27,12 @@ final class SessionEngine {
         durationChoices.contains(value) ? value : defaultDurationSeconds
     }
 
-    private static let hanPattern = try! NSRegularExpression(pattern: "(\\p{Script=Han}\\p{Mark}*)")
+    nonisolated private static let cjkPattern = try! NSRegularExpression(
+        pattern: "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]")
+
+    nonisolated static func usesCharacterCount(_ text: String) -> Bool {
+        cjkPattern.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil
+    }
 
     private let now: () -> TimeInterval
     var phase: SessionPhase = .idle
@@ -59,13 +64,14 @@ final class SessionEngine {
     var secondsUntilDeletion: Int { max(0, Int(ceil(Double(silenceLimit.rawValue) - idleSeconds))) }
 
     private static func countWords(in text: String) -> Int {
-        let source = text as NSString
-        let separated = Self.hanPattern.stringByReplacingMatches(in: text, range: NSRange(location: 0, length: source.length), withTemplate: " $1 ")
+        if usesCharacterCount(text) {
+            return text.filter { $0.unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) }.count
+        }
         let tokenizer = NLTokenizer(unit: .word)
-        tokenizer.string = separated
+        tokenizer.string = text
         var count = 0
-        tokenizer.enumerateTokens(in: separated.startIndex..<separated.endIndex) { range, _ in
-            if separated[range].unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) {
+        tokenizer.enumerateTokens(in: text.startIndex..<text.endIndex) { range, _ in
+            if text[range].unicodeScalars.contains(where: CharacterSet.alphanumerics.contains) {
                 count += 1
             }
             return true

@@ -9,6 +9,9 @@
  * [PROTOCOL]: Keep the generator in step with writeitdown/paper.js (same seeds, amplitudes and pigments);
  *             paint on size/appearance change only, never on typing. Then check FirstLine/AGENTS.md.
  *
+ * EVIDENCE ONLY (dark sheet): WID_DARK_PAPER (environment) or the WIDDarkPaper default picks the candidate
+ * texture a, b or c; unset is today's sheet (see Recipe). The light sheet is untouched; nothing here is decided.
+ *
  * Why a cached image: the field is ~5 M device pixels at 2x. Drawing it in draw(_:) each frame would
  * re-generate it under every keystroke; one image per size costs about a tenth of a second once and is then
  * free. The image is built synchronously on first draw, so the window's first paint already carries the paper
@@ -88,7 +91,7 @@ final class PaperSheetView: NSView {
         let height = Int((bounds.height * scale).rounded())
         guard width > 1, height > 1 else { return nil }
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let key = "\(width)x\(height)@\(scale)-\(dark ? "dark" : "light")"
+        let key = "\(width)x\(height)@\(scale)-\(dark ? "dark-\(PaperField.darkVariant)" : "light")"
         if key == imageKey, let paperImage { return paperImage }
         guard let sheet = PaperField.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
         imageKey = key
@@ -140,6 +143,52 @@ enum PaperField {
     static let size = 1.00
     static let tooth = 44.0
     static let pulp = 24.0
+
+    /// The texture recipe of one sheet (mirrors RECIPES in writeitdown/paper.js). `light` is the locked sheet.
+    /// The dark sheet has four candidates behind `WID_DARK_PAPER` / the `WIDDarkPaper` default (evidence only):
+    /// keep (today), a (flat + per-pixel grain +-3 levels), b (flat, no texture), c (light recipe x0.2, no brown flecks).
+    struct Recipe {
+        var mottle: [(cell: Double, amount: Double)]
+        var tooth: Double
+        var pulp: Double
+        var grain: Double
+        var fibrePale: Double
+        var fibreSpread: Double
+        var fibreCount: Double
+        var fleckAlpha: Double
+        var fleckCount: Double
+        var fleckBrown: Bool
+
+        static let light = Recipe(mottle: [(34, 9.0), (9, 4.5)], tooth: PaperField.tooth, pulp: PaperField.pulp,
+                                  grain: PaperField.grain, fibrePale: 0.44, fibreSpread: 1, fibreCount: 1,
+                                  fleckAlpha: 1, fleckCount: 1, fleckBrown: true)
+        static let keep = Recipe(mottle: [(34, 9.0), (9, 4.5)], tooth: PaperField.tooth * 0.4, pulp: PaperField.pulp * 0.4,
+                                 grain: PaperField.grain, fibrePale: 0.2, fibreSpread: 0.32, fibreCount: 1,
+                                 fleckAlpha: 0.5, fleckCount: 0.22, fleckBrown: true)
+        static let a = Recipe(mottle: [], tooth: 3, pulp: 0, grain: 1, fibrePale: 0.2, fibreSpread: 0, fibreCount: 0,
+                              fleckAlpha: 0, fleckCount: 0, fleckBrown: false)
+        static let c = Recipe(mottle: [(34, 1.8), (9, 0.9)], tooth: PaperField.tooth * 0.2, pulp: PaperField.pulp * 0.2,
+                              grain: PaperField.grain, fibrePale: 0.2, fibreSpread: 0.2, fibreCount: 1,
+                              fleckAlpha: 0.2, fleckCount: 0.22, fleckBrown: false)
+    }
+
+    /// The dark sheet's candidate: `keep` unless `WID_DARK_PAPER` (environment) or the `WIDDarkPaper` default says a, b or c.
+    static let darkVariant: String = {
+        let asked = ProcessInfo.processInfo.environment["WID_DARK_PAPER"]
+            ?? UserDefaults.standard.string(forKey: "WIDDarkPaper")
+        return ["a", "b", "c"].contains(asked ?? "") ? asked! : "keep"
+    }()
+
+    /// nil is variant b: a flat sheet with no texture at all.
+    static func recipe(dark: Bool) -> Recipe? {
+        guard dark else { return .light }
+        switch darkVariant {
+        case "a": return .a
+        case "b": return nil
+        case "c": return .c
+        default: return .keep
+        }
+    }
 
     /// mulberry32, the web renderer's generator; the same seed yields the same field.
     struct Random {
@@ -233,14 +282,18 @@ enum PaperField {
         paper.setShouldAntialias(true)
         paper.setFillColor(CGColor(srgbRed: colour.r / 255, green: colour.g / 255, blue: colour.b / 255, alpha: 1))
         paper.fill(full)
+        guard let recipe = recipe(dark: dark) else {
+            // No texture at all: the sheet is its token, and the wash gets a transparent texture.
+            guard let image = paper.makeImage(), let empty = texture.makeImage() else { return nil }
+            return Sheet(image: image, texture: Texture(image: empty, shift: (r: 0, g: 0, b: 0)))
+        }
 
         // Two scales of mottle, each generated small and upscaled with smoothing.
         var coarse = Random(seed: seed("coarse" + hex(colour)))
         var fine = Random(seed: seed("fine" + hex(colour)))
-        let mottle: [(cell: Int, amount: Double)] = [
-            (max(2, Int((34.0 * scale).rounded())), 9.0),
-            (max(2, Int((9.0 * scale).rounded())), 4.5),
-        ]
+        let mottle: [(cell: Int, amount: Double)] = recipe.mottle.map {
+            (max(2, Int(($0.cell * Double(scale)).rounded())), $0.amount)
+        }
         for (index, layer) in mottle.enumerated() {
             let smallWidth = max(2, (width + layer.cell - 1) / layer.cell)
             let smallHeight = max(2, (height + layer.cell - 1) / layer.cell)
@@ -258,9 +311,8 @@ enum PaperField {
         // The seed's size is serialised the way the web's `'tooth' + hex + SIZE` prints 1.00: "1".
         guard let grainContext = makeContext(width: width, height: height) else { return nil }
         var random = Random(seed: seed("tooth" + hex(colour) + "1"))
-        let lift = dark ? 0.4 : 1.0
 
-        if let toothImage = noiseImage(width: width, height: height, amount: tooth * lift,
+        if let toothImage = noiseImage(width: width, height: height, amount: recipe.tooth,
                                        tone: colour, random: &random) {
             grainContext.interpolationQuality = .none
             grainContext.draw(toothImage, in: full)
@@ -268,20 +320,20 @@ enum PaperField {
         let pulpCell = max(2, Int((Double(scale) * 0.8).rounded()))
         let pulpWidth = max(2, (width + pulpCell - 1) / pulpCell)
         let pulpHeight = max(2, (height + pulpCell - 1) / pulpCell)
-        if let pulpImage = noiseImage(width: pulpWidth, height: pulpHeight, amount: pulp * lift,
+        if let pulpImage = noiseImage(width: pulpWidth, height: pulpHeight, amount: recipe.pulp,
                                       tone: colour, random: &random) {
             grainContext.interpolationQuality = .high
             grainContext.draw(pulpImage, in: full)
         }
         drawFibres(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random, dark: dark)
+                   tone: colour, random: &random, recipe: recipe)
         drawFlecks(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random, dark: dark)
+                   tone: colour, random: &random, recipe: recipe)
 
         if let grainLayer = grainContext.makeImage() {
             for context in [paper, texture] {
                 context.saveGState()
-                context.setAlpha(grain)
+                context.setAlpha(recipe.grain)
                 context.interpolationQuality = .none
                 context.draw(grainLayer, in: full)
                 context.restoreGState()
@@ -340,13 +392,13 @@ enum PaperField {
 
     /// Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches.
     private static func drawFibres(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random, dark: Bool) {
+                                   tone: (r: Double, g: Double, b: Double), random: inout Random, recipe: Recipe) {
         let dpr = Double(scale)
-        let count = Int((Double(width * height) / (dpr * dpr) * 0.0026).rounded())
+        let count = Int((Double(width * height) / (dpr * dpr) * 0.0026 * recipe.fibreCount).rounded())
         ctx.setLineCap(.round)
         for _ in 0..<count {
-            let pale = random.next() < (dark ? 0.2 : 0.44)
-            let spread = (12 + random.next() * 34) * (dark ? 0.32 : 1) * (pale ? 0.7 : 1)
+            let pale = random.next() < recipe.fibrePale
+            let spread = (12 + random.next() * 34) * recipe.fibreSpread * (pale ? 0.7 : 1)
             ctx.setAlpha(alpha(delta: (pale ? 1.0 : -1.0) * spread, tone: tone) * (0.55 + random.next() * 0.45))
             ctx.setStrokeColor(CGColor(srgbRed: pale ? 1 : 0, green: pale ? 1 : 0, blue: pale ? 1 : 0, alpha: 1))
             ctx.setLineWidth((0.5 + random.next() * 0.7) * dpr)
@@ -366,18 +418,18 @@ enum PaperField {
 
     /// Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones.
     private static func drawFlecks(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random, dark: Bool) {
+                                   tone: (r: Double, g: Double, b: Double), random: inout Random, recipe: Recipe) {
         let dpr = Double(scale)
-        let count = Int((Double(width * height) / (dpr * dpr) * 0.0030 * (dark ? 0.22 : 1)).rounded())
+        let count = Int((Double(width * height) / (dpr * dpr) * 0.0030 * recipe.fleckCount).rounded())
         for _ in 0..<count {
             let x = random.next() * Double(width)
             let y = random.next() * Double(height)
             let pale = random.next() < 0.14
             let pigment: (r: Double, g: Double, b: Double) = pale
                 ? (255, 250, 240)
-                : (random.next() < 0.7 ? (36, 29, 21) : (91, 67, 39))
+                : (random.next() < 0.7 || !recipe.fleckBrown ? (36, 29, 21) : (91, 67, 39))
             ctx.setFillColor(CGColor(srgbRed: pigment.r / 255, green: pigment.g / 255, blue: pigment.b / 255, alpha: 1))
-            ctx.setAlpha((pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46) * (dark ? 0.5 : 1))
+            ctx.setAlpha((pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46) * recipe.fleckAlpha)
             let radius = (0.4 + random.next() * 1.0) * dpr * max(0.7, size * 0.85)
             let lobes = random.next() < 0.7 ? 1 : 2
             for _ in 0..<lobes {

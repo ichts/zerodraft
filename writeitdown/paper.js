@@ -9,6 +9,9 @@
    [PROTOCOL] paint once per size/theme/DPR and never again while writing; type always sits above
               the canvas (z-index:-1 inside an isolated stacking context); values are D-069 (D-056's grain and ink).
 
+   EVIDENCE ONLY (dark sheet): ?dark-paper=a|b|c picks a candidate texture, anything else is today's sheet (see
+   RECIPES). The light sheet is untouched; nothing here is decided.
+
    The field is deterministic: the same seed yields the same sheet, so the room, the demo and the
    Mac read as one paper. Nothing here animates, loops, or listens to typing. */
 (function () {
@@ -20,6 +23,35 @@
   const SIZE = 1.00;
   const TOOTH = 44;
   const PULP = 24;
+
+  /* The texture recipe per sheet. `light` is the locked Wheat sheet and never changes. The dark sheet has
+     four candidates behind the `?dark-paper=` switch (evidence only, nothing here is decided):
+       keep  today's dark sheet: the light recipe pushed through the dark lift (tooth/pulp x0.4, fibres x0.32,
+             flecks x0.22 count and x0.5 alpha), mottle 9 and 4.5 levels, which reads as blotches.
+       a     flat tone and a very fine per-pixel grain only: +-3 levels peak (sigma 1.1), no mottle, pulp, fibres or flecks.
+       b     flat tone, no texture at all.
+       c     the light recipe at its own pattern scale, every amplitude x0.2 (the dark tone is 0.2 of the light
+             tone's level, so the same relative contrast): mottle 1.8 and 0.9, tooth 8.8, pulp 4.8, fibres x0.2,
+             fleck alpha x0.2 and only the dark pigment (the brown fleck is lighter than the dark sheet and reads as a stain).
+     `mottle` is [css cell px, peak levels]; `tooth` and `pulp` are peak levels before `grain`; `fibres` and
+     `flecks` carry the amplitude (spread, alpha) and pale share; `count` scales how many are drawn. */
+  const RECIPES = {
+    light: { mottle: [[34, 9.0], [9, 4.5]], tooth: TOOTH, pulp: PULP, grain: GRAIN,
+      fibres: { pale: 0.44, spread: 1, count: 1 }, flecks: { alpha: 1, count: 1, brown: true } },
+    keep: { mottle: [[34, 9.0], [9, 4.5]], tooth: TOOTH * 0.4, pulp: PULP * 0.4, grain: GRAIN,
+      fibres: { pale: 0.2, spread: 0.32, count: 1 }, flecks: { alpha: 0.5, count: 0.22, brown: true } },
+    a: { mottle: [], tooth: 3, pulp: 0, grain: 1,
+      fibres: { pale: 0.2, spread: 0, count: 0 }, flecks: { alpha: 0, count: 0, brown: false } },
+    b: null,
+    c: { mottle: [[34, 1.8], [9, 0.9]], tooth: TOOTH * 0.2, pulp: PULP * 0.2, grain: GRAIN,
+      fibres: { pale: 0.2, spread: 0.2, count: 1 }, flecks: { alpha: 0.2, count: 0.22, brown: false } }
+  };
+
+  const darkVariant = () => {
+    const asked = new URLSearchParams(window.location.search).get('dark-paper');
+    return ['a', 'b', 'c'].includes(asked) ? asked : 'keep';
+  };
+  const recipeFor = theme => (theme === 'dark' ? RECIPES[darkVariant()] : RECIPES.light);
 
   const hexToRgb = hex => {
     const h = hex.replace('#', '');
@@ -83,12 +115,12 @@
   };
 
   /* Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches. */
-  const drawFibres = (ctx, width, height, dpr, tone, rnd, dark) => {
-    const count = Math.round((width * height) / (dpr * dpr) * 0.0026);
+  const drawFibres = (ctx, width, height, dpr, tone, rnd, recipe) => {
+    const count = Math.round((width * height) / (dpr * dpr) * 0.0026 * recipe.fibres.count);
     ctx.lineCap = 'round';
     for (let i = 0; i < count; i += 1) {
-      const pale = rnd() < (dark ? 0.2 : 0.44);
-      const delta = (pale ? 1 : -1) * (12 + rnd() * 34) * (dark ? 0.32 : 1) * (pale ? 0.7 : 1);
+      const pale = rnd() < recipe.fibres.pale;
+      const delta = (pale ? 1 : -1) * (12 + rnd() * 34) * recipe.fibres.spread * (pale ? 0.7 : 1);
       ctx.globalAlpha = alphaFor(delta, tone) * (0.55 + rnd() * 0.45);
       ctx.strokeStyle = pale ? '#ffffff' : '#000000';
       ctx.lineWidth = (0.5 + rnd() * 0.7) * dpr;
@@ -111,14 +143,14 @@
   };
 
   /* Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones. */
-  const drawFlecks = (ctx, width, height, dpr, tone, rnd, dark) => {
-    const count = Math.round((width * height) / (dpr * dpr) * 0.0030 * (dark ? 0.22 : 1));
+  const drawFlecks = (ctx, width, height, dpr, tone, rnd, recipe) => {
+    const count = Math.round((width * height) / (dpr * dpr) * 0.0030 * recipe.flecks.count);
     for (let i = 0; i < count; i += 1) {
       const x = rnd() * width;
       const y = rnd() * height;
       const pale = rnd() < 0.14;
-      ctx.fillStyle = pale ? '#fffaf0' : (rnd() < 0.7 ? '#241d15' : '#5b4327');
-      ctx.globalAlpha = (pale ? 0.16 + rnd() * 0.24 : 0.26 + rnd() * 0.46) * (dark ? 0.5 : 1);
+      ctx.fillStyle = pale ? '#fffaf0' : (rnd() < 0.7 || !recipe.flecks.brown ? '#241d15' : '#5b4327');
+      ctx.globalAlpha = (pale ? 0.16 + rnd() * 0.24 : 0.26 + rnd() * 0.46) * recipe.flecks.alpha;
       const radius = (0.4 + rnd() * 1.0) * dpr * Math.max(0.7, SIZE * 0.85);
       const lobes = rnd() < 0.7 ? 1 : 2;
       for (let lobe = 0; lobe < lobes; lobe += 1) {
@@ -135,24 +167,23 @@
 
   /* Grain sits on its own layer and is composited once at the locked strength, so the sheet's
      tone is decided by the base layer alone. */
-  const drawGrain = (ctx, width, height, dpr, tone, dark) => {
+  const drawGrain = (ctx, width, height, dpr, tone, recipe) => {
     const layer = canvasWith(width, height);
     const grain = contextWith(layer);
     const rnd = prng(seedFrom('tooth' + rgbToHex(tone) + SIZE));
-    const lift = dark ? 0.4 : 1;
     /* Two scales of surface: tooth at device-pixel size, then a coarser pulp cloud upscaled with
        smoothing. One scale alone reads as dither or as sponge. */
-    grain.putImageData(noiseLayer(width, height, TOOTH * lift, tone, rnd), 0, 0);
+    grain.putImageData(noiseLayer(width, height, recipe.tooth, tone, rnd), 0, 0);
     const cell = Math.max(2, Math.round(dpr * 0.8));
     const pulp = canvasWith(Math.max(2, Math.ceil(width / cell)), Math.max(2, Math.ceil(height / cell)));
-    contextWith(pulp).putImageData(noiseLayer(pulp.width, pulp.height, PULP * lift, tone, rnd), 0, 0);
+    contextWith(pulp).putImageData(noiseLayer(pulp.width, pulp.height, recipe.pulp, tone, rnd), 0, 0);
     grain.imageSmoothingEnabled = true;
     grain.drawImage(pulp, 0, 0, width, height);
-    drawFibres(grain, width, height, dpr, tone, rnd, dark);
-    drawFlecks(grain, width, height, dpr, tone, rnd, dark);
+    drawFibres(grain, width, height, dpr, tone, rnd, recipe);
+    drawFlecks(grain, width, height, dpr, tone, rnd, recipe);
 
     ctx.save();
-    ctx.globalAlpha = GRAIN;
+    ctx.globalAlpha = recipe.grain;
     ctx.drawImage(layer, 0, 0);
     ctx.restore();
   };
@@ -183,7 +214,7 @@
      moves its mean, so the pixels on screen measure the token and not a slightly warmer or greyer paper. The
      correction rides on the sheet's tone property, so a state wash still mixes from the same base. */
   function render(canvas, width, height, dpr, theme) {
-    const dark = theme === 'dark';
+    const recipe = recipeFor(theme);
     const tone = hexToRgb(TONES[theme]);
     const canvasWidth = Math.max(1, Math.round(width * dpr));
     const canvasHeight = Math.max(1, Math.round(height * dpr));
@@ -191,9 +222,11 @@
     canvas.height = canvasHeight;
     const ctx = contextWith(canvas);
     ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 34, 9.0, 'coarse');
-    mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, 9, 4.5, 'fine');
-    drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, dark);
+    if (!recipe) return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now(), base: rgbToHex(tone) };
+    recipe.mottle.forEach(([cell, amplitude], index) => {
+      mottleLayer(ctx, canvasWidth, canvasHeight, dpr, tone, cell, amplitude, index === 0 ? 'coarse' : 'fine');
+    });
+    drawGrain(ctx, canvasWidth, canvasHeight, dpr, tone, recipe);
     const shift = textureDelta(ctx, canvasWidth, canvasHeight, tone);
     const corrected = tone.map((channel, index) => Math.max(0, Math.min(255, channel - shift[index])));
     return { width: canvasWidth, height: canvasHeight, theme, dpr, at: performance.now(), base: rgbToHex(corrected) };
@@ -258,6 +291,8 @@
 
   const api = {
     TONES,
+    RECIPES,
+    darkVariant,
     GRAIN,
     SIZE,
     render,

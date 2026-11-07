@@ -284,4 +284,51 @@ test.describe('the sheet', () => {
     expect(contrast(parseColour(await style(page, '#kept-note', 'color')), paper),
       'the kept not-saved caption on the paper').toBeGreaterThanOrEqual(7);
   });
+  test('the dark sheet candidates: keep is today, a and b are flat, c is the light recipe at a fifth of the contrast', async ({ page }) => {
+    test.skip(await (async () => { await page.goto('./'); return (await theme(page)) !== 'dark'; })(), 'the candidates only exist on the dark sheet');
+    const measure = async variant => {
+      await page.goto(`./?dark-paper=${variant}`);
+      await page.waitForFunction(() => window.WriteItDownPaper);
+      return page.evaluate(() => {
+        const canvas = document.createElement('canvas');
+        const info = window.WriteItDownPaper.render(canvas, 600, 400, 1, 'dark');
+        const base = info.base.match(/\w\w/g).map(h => parseInt(h, 16));
+        const out = document.createElement('canvas');
+        out.width = canvas.width;
+        out.height = canvas.height;
+        const ctx = out.getContext('2d');
+        ctx.fillStyle = info.base;
+        ctx.fillRect(0, 0, out.width, out.height);
+        ctx.drawImage(canvas, 0, 0);
+        const data = ctx.getImageData(0, 0, out.width, out.height).data;
+        let sum = 0;
+        let sumSquares = 0;
+        let max = 0;
+        const count = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+          const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+          sum += lum;
+          sumSquares += lum * lum;
+          max = Math.max(max, lum);
+        }
+        const mean = sum / count;
+        return { base: info.base, variant: window.WriteItDownPaper.darkVariant(), spread: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)), lift: max - mean };
+      });
+    };
+    const keep = await measure('keep');
+    const a = await measure('a');
+    const b = await measure('b');
+    const c = await measure('c');
+    expect([keep.variant, a.variant, b.variant, c.variant]).toEqual(['keep', 'a', 'b', 'c']);
+    expect(await (async () => { await page.goto('./?dark-paper=nonsense'); return page.evaluate(() => window.WriteItDownPaper.darkVariant()); })(), 'an unknown value is today\'s sheet').toBe('keep');
+    expect(b.spread, 'b is one flat tone').toBe(0);
+    expect(b.base, 'b is the token itself').toBe(TONES.dark);
+    expect(a.base, 'a stays on the token').toBe(TONES.dark);
+    expect(a.spread, 'a is a very fine grain').toBeGreaterThan(0.5);
+    expect(a.spread).toBeLessThan(1.5);
+    expect(a.lift, 'a never lifts a pixel more than 3 levels').toBeLessThanOrEqual(3.5);
+    expect(c.spread, 'c carries the light recipe at lower contrast').toBeGreaterThan(a.spread);
+    expect(c.spread).toBeLessThan(keep.spread / 1.5);
+    expect(keep.spread, 'keep is the sheet that shipped').toBeGreaterThan(4);
+  });
 });

@@ -260,6 +260,29 @@ struct RoomTests {
         #expect(!exit.isHiddenOrHasHiddenAncestor)
     }
 
+    /// The numeral is placed from the live caret line, not from the layout pass that last happened to run: on
+    /// macOS 15 no layout pass follows the first warning second, and the digits were left 700 pt down, below the
+    /// paper (the captain's Air, 2026-11-07). Whatever ran before, the digits sit on the paper under the caret line.
+    @Test func silenceCountdownSitsOnThePaperUnderTheWritingLine() throws {
+        let fixture = try roomFixture(typed: false)
+        fixture.room.view.layoutSubtreeIfNeeded()
+        fixture.editor.insertText("keep going here", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.room.tick()
+        let numeral = try #require(descendants(fixture.room.view, of: NSTextField.self).first { $0.isHidden && $0.font?.pointSize ?? 0 > 100 })
+        let paper = try #require(numeral.superview)
+        let top = try #require(paper.constraints.first { ($0.firstItem as? NSView) === numeral && $0.firstAttribute == .top })
+        // The placement a layout pass left before the warning began is stale by then, and on macOS 15 no
+        // layout pass follows: the placement the tick itself writes is what the digits get.
+        top.constant = 9999
+        fixture.clock.now = 5.1
+        fixture.room.tick()
+        let baseline = paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: try #require(fixture.editor.currentInsertionBaseline())),
+                                                          from: fixture.editor).y
+        #expect(top.constant > baseline && top.constant < baseline + 120,
+                "the digits sit just under the writing line: top \(top.constant), baseline \(baseline)")
+        #expect(top.constant < paper.bounds.height, "the digits are on the paper")
+    }
+
     /// The 3-2-1 is a warning, not chrome: Focus Mode hides the clock and the count until the pointer is near an
     /// edge, and the silence digits stay on the paper whatever the pointer does.
     @Test func focusModeNeverHidesTheSilenceCountdown() throws {

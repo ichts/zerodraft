@@ -901,6 +901,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             warningHint.attributedStringValue = FirstLineTypography.trackedText(
                 "KEEP TYPING OR THE DRAFT IS DELETED.", font: FirstLineTypography.smallMediumNSFont,
                 color: FirstLineColors.inkNSColor, kernEm: 0.04, lineHeightMultiple: 1.5)
+            // The digits are placed from the live caret line each time they show: the layout pass that last ran
+            // (before any text, at width 0) left them below the paper on macOS 15, where none follows (D-089).
+            layoutWarning()
         }
         let strength = warning ? RoomPresentation.washOpacity(idle: engine.idleSeconds, reducesMotion: reducesMotion, limit: engine.silenceLimit) : 0
         if cutWork == nil { setWash(strength, cut: false) }

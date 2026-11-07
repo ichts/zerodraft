@@ -4,6 +4,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -51,6 +52,25 @@ func (g *rig) snap(name string) {
 	f, _ := os.Create(filepath.Join(dir, name+".png"))
 	png.Encode(f, g.tt.Image())
 	f.Close()
+}
+
+func TestCountLabelFollowsTheCJKShareOfTheDraft(t *testing.T) {
+	english := strings.Repeat("word ", 500) + "你好"
+	for text, want := range map[string]string{
+		"我们是": "3 characters", "我": "1 character", "こんにちは世界": "7 characters", "コーヒー": "4 characters",
+		"hello world 中文测试": "6 words", english: "502 words", "你好，world！": "3 words",
+		"hello world": "2 words", "one": "1 word", "한글 한글": "2 words", "": "0 words",
+	} {
+		if got := wordLabel(session.WordCount(text), text); got != want {
+			t.Errorf("wordLabel(%.20q) = %q, want %q", text, got, want)
+		}
+	}
+	if got := keptReceipt(3, time.Minute, "我们是"); got != "1 minute. 3 characters." {
+		t.Fatalf("CJK receipt = %q", got)
+	}
+	if got := keptReceipt(47, time.Minute, "hello"); got != "1 minute. 47 words." {
+		t.Fatalf("receipt = %q", got)
+	}
 }
 
 func TestSnapshots(t *testing.T) {

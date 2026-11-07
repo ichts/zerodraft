@@ -51,7 +51,7 @@ func TestMacPairSnapshots(t *testing.T) {
 	}
 	g.tt.Advance(5 * time.Second)
 	g.snap("room-kept-light")
-	if err := g.tt.Click("COPY TEXT"); err == nil {
+	if err := g.tt.Click("Copy text"); err == nil {
 		g.snap("room-copied-light")
 	}
 }

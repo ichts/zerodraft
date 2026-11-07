@@ -72,7 +72,7 @@ func tabToExit(t *testing.T, g *rig) {
 	for i := 0; i < 6; i++ {
 		g.tt.Key(0, ui.KeyTab)
 		g.tt.Frame()
-		if g.tt.Focused("Exit") && !g.tt.Focused("COPY TEXT") && !g.tt.Focused("BEGIN AGAIN") {
+		if g.tt.Focused("Exit") && !g.tt.Focused("Copy text") && !g.tt.Focused("Begin again") {
 			return
 		}
 	}

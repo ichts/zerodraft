@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
-import { clock, wordCount } from '../session.mjs';
+import { clock, wordCount, countLabel } from '../session.mjs';
 import { barFraction, EMPTY_BAR } from './bar-clip.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
@@ -96,6 +96,26 @@ async function enter(page) {
 async function settle(page, ms = 400) {
   await page.clock.fastForward(ms);
 }
+
+test('CJK counts characters and kept actions use sentence case', async ({ page }, info) => {
+  await page.goto('index.html');
+  await enter(page);
+  await page.keyboard.insertText('我们是');
+  await expect(page.locator('#room-count')).toHaveText('3 characters');
+  await capture(page, info, 'cjk-count');
+  for (let i = 0; i < 11; i++) {
+    await page.clock.fastForward(5000);
+    await page.keyboard.insertText('我');
+  }
+  await page.clock.fastForward(5000);
+  await expect(page.locator('#receipt')).toHaveText('1 minute. 14 characters.');
+  await expect(page.locator('#restart')).toHaveText('Begin again');
+  await expect(page.locator('#copy-label')).toHaveText('Copy text');
+  await capture(page, info, 'cjk-kept');
+  await page.locator('#copy').click();
+  await expect(page.locator('#copy-label')).toHaveText('Copied');
+  await capture(page, info, 'cjk-copied');
+});
 
 async function assertRoom(page) {
   const geometry = await editor(page).evaluate(e => {
@@ -331,7 +351,7 @@ test('history is stepped per line and a new line shifts it exactly one pitch', a
   }
   await settle(page);
   expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line keeps the same pitch').toBeCloseTo(topology.scroll + 4 * topology.line, 0);
-  await expect(page.locator('#room-count')).toHaveText(`${wordCount('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。')} words`);
+  await expect(page.locator('#room-count')).toHaveText(countLabel('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。'));
 });
 
 test('warning numeral and caption are placed by ink under the writing line', async ({ page }, info) => {
@@ -816,9 +836,11 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   }
   await page.clock.fastForward(3000);
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+  // The one-pixel hover lift is deliberate; measure the row at rest, with the pointer off both controls.
+  await page.mouse.move(0, 0);
   await expect(page.locator('#kept h1')).toHaveText('You wrote it down.');
-  const words = wordCount(await page.locator('#kept-text').textContent());
-  await expect(page.locator('#receipt')).toHaveText(`1 MINUTE. ${words} WORDS.`);
+  const keptDraft = await page.locator('#kept-text').textContent();
+  await expect(page.locator('#receipt')).toHaveText(`1 minute. ${countLabel(keptDraft)}.`);
   const kept = await page.evaluate(() => {
     const copy = document.querySelector('#copy');
     const restart = document.querySelector('#restart');
@@ -917,16 +939,16 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   expect(kept.restartStyle.background).not.toBe(kept.pill.background);
   await capture(page, info, 'kept');
   await page.locator('#copy').click();
-  await expect(page.locator('#copy-label')).toHaveText('COPIED');
-  await expect(page.locator('#copy')).toHaveAccessibleName('COPIED');
+  await expect(page.locator('#copy-label')).toHaveText('Copied');
+  await expect(page.locator('#copy')).toHaveAccessibleName('Copied');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await page.locator('#kept-text').textContent());
   const copied = await readCopy();
   // The press swaps the label and moves nothing: the pill keeps its floor, the row keeps its
-  // anchor, and BEGIN AGAIN stays under no pointer at all (D-059).
+  // anchor, and Begin again stays under no pointer at all (D-059).
   expect(copied.copyBox.width, 'the pill keeps one width across labels').toBeCloseTo(keptCopy.copyBox.width, 1);
   expectOneLabel(copied);
   expect(copied.copyBox.left).toBeCloseTo(keptCopy.copyBox.left, 1);
-  expect(copied.restartBox.left, 'BEGIN AGAIN does not move').toBeCloseTo(keptCopy.restartBox.left, 1);
+  expect(copied.restartBox.left, 'Begin again does not move').toBeCloseTo(keptCopy.restartBox.left, 1);
   expect(copied.restartBox.top).toBeCloseTo(keptCopy.restartBox.top, 1);
   expect(copied.restartBox.width).toBeCloseTo(keptCopy.restartBox.width, 1);
   if (!stacked) {
@@ -937,10 +959,10 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
     document.execCommand = () => false;
   });
   await page.locator('#copy').click();
-  await expect(page.locator('#copy-label')).toHaveText('TRY AGAIN');
-  await expect(page.locator('#copy')).toHaveAccessibleName('TRY AGAIN');
+  await expect(page.locator('#copy-label')).toHaveText('Try copy again');
+  await expect(page.locator('#copy')).toHaveAccessibleName('Try copy again');
   const failed = await readCopy();
-  expect(failed.text).toBe('TRY AGAIN');
+  expect(failed.text).toBe('Try copy again');
   expect(failed.copyBox.width, 'the failed label keeps the same pill width').toBeCloseTo(keptCopy.copyBox.width, 1);
   expectOneLabel(failed);
   expect(failed.copyBox.left).toBeCloseTo(keptCopy.copyBox.left, 1);
@@ -1069,7 +1091,7 @@ test('the kept screen offers one route to the app, and the writing screen none',
     return { text: element.textContent.trim(), ring: element.matches(':focus-visible'),
       outline: `${style.outlineWidth} ${style.outlineStyle}`, radius: style.borderRadius, top: element.getBoundingClientRect().top };
   });
-  expect(focused.text, 'one Tab from BEGIN AGAIN reaches the app').toBe('Mac app');
+  expect(focused.text, 'one Tab from Begin again reaches the app').toBe('Mac app');
   expect(focused.ring, 'the ring is visible').toBe(true);
   expect(focused.outline).toBe('2px solid');
   expect(focused.radius, 'a text control keeps its shape under focus').toBe('0px');

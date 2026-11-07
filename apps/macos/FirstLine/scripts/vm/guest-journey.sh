@@ -368,19 +368,19 @@ for used in 1 2 3; do
     [[ $(( $(now_ms) - started )) -ge 60000 ]] \
       && pass 'session 3: the deadline was a real minute, not a shortened one' \
       || bad 'session 3: completed before a full minute elapsed'
-    has_re '1 MINUTE\. ' && has_re ' WORDS\.' && ! has_re 'DRAFT DELETED AT ' \
+    has_re '1 minute\. ' && has_re ' words\.' && ! has_re 'DRAFT DELETED AT ' \
       && pass 'session 3: kept receipt names a full minute and a word count' \
       || bad 'session 3: kept receipt is missing or wrong'
     [[ "$(screen_text)" == *"$typed"* ]] && pass 'session 3: the exact kept draft is on screen' \
       || bad 'session 3: the kept draft text differs from what was typed'
     snap 'session-3-kept-after'
     printf 'journey clipboard sentinel' | pbcopy
-    click_el AXButton 'COPY TEXT' || { bad 'session 3: COPY TEXT is missing'; exit 1; }
+    click_el AXButton 'Copy text' || { bad 'session 3: Copy text is missing'; exit 1; }
     sleep 1
     snap 'session-3-copied-after'
-    if has_re 'COPIED'; then pass 'session 3: COPY TEXT flipped to COPIED'; else bad 'session 3: COPY TEXT did not confirm'; fi
+    if has_re 'Copied'; then pass 'session 3: Copy text flipped to Copied'; else bad 'session 3: Copy text did not confirm'; fi
     if [[ "$(pbpaste)" == "$typed" ]]; then pass 'session 3: the clipboard holds exactly the kept draft'; else bad 'session 3: clipboard differs from the kept draft'; fi
-    click_el AXButton 'BEGIN AGAIN' || { bad 'session 3: BEGIN AGAIN is missing'; exit 1; }
+    click_el AXButton 'Begin again' || { bad 'session 3: Begin again is missing'; exit 1; }
   fi
   if [[ "$used" -lt 3 ]]; then
     "$rig" key --name escape >/dev/null

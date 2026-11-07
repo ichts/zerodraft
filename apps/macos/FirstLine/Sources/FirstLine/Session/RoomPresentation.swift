@@ -49,20 +49,19 @@ enum RoomPresentation {
         }
     }
 
-    static func wordLabel(_ count: Int) -> String {
-        "\(count) \(count == 1 ? "word" : "words")"
+    static func wordLabel(_ count: Int, text: String = "") -> String {
+        let unit = SessionEngine.usesCharacterCount(text) ? "character" : "word"
+        return "\(count) \(unit)\(count == 1 ? "" : "s")"
     }
 
     /// Count rule shared by the room count and the kept acknowledgement.
     static let countRule = "Counts words. Each Chinese character counts as one. Punctuation and emoji do not count."
 
-    /// `5 MINUTES. 63 WORDS.` The quiet small-caps counterpart of the counted word labels:
-    /// the real session duration, then the count.
-    static func keptReceipt(wordCount: Int, duration: TimeInterval) -> String {
+    /// The real session duration followed by the draft's word or character count.
+    static func keptReceipt(wordCount: Int, duration: TimeInterval, text: String = "") -> String {
         let minutes = max(Int((duration / 60).rounded()), 1)
-        let minuteUnit = minutes == 1 ? "MINUTE" : "MINUTES"
-        let wordUnit = wordCount == 1 ? "WORD" : "WORDS"
-        return "\(minutes) \(minuteUnit). \(wordCount) \(wordUnit)."
+        let minuteUnit = minutes == 1 ? "minute" : "minutes"
+        return "\(minutes) \(minuteUnit). \(wordLabel(wordCount, text: text))."
     }
 
     static func washOpacity(idle: TimeInterval, reducesMotion: Bool, limit: SilenceLimit) -> CGFloat {

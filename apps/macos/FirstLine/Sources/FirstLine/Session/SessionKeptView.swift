@@ -1,6 +1,6 @@
 /*
  * [INPUT]: Engine text, word count, real session duration, writing/heading fonts, copied state callbacks, and the live kept-measure constant.
- * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the small-caps duration/count receipt, copy/restart controls, and the unsaved caption) and a scrollable draft below; the block spans the sheet's inner width so its centre is the paper's; the copy pill hugs its label down to the resting COPY TEXT width (COPIED never narrows it), the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
+ * [OUTPUT]: The kept sheet: a fixed top block (the "You wrote it down." heading, the sentence-case duration/count receipt, copy/restart controls, and the unsaved caption) and a scrollable draft below; the block spans the sheet's inner width so its centre is the paper's; the copy pill hugs its label down to the resting Copy text width (Copied never narrows it), the restart is a quiet secondary outline, and both labels sit on the row's optical centre.
  * [POS]: One cohesive AppKit view for the room's completed state; the actions are always reachable without scrolling, the draft keeps the live measure and CJK fallback.
  * [PROTOCOL]: Keep strings, measure and centring aligned with the kept contract; check nearest AGENTS.md.
  */
@@ -46,10 +46,10 @@ final class SessionKeptView: NSView {
 
     init(copyTarget: AnyObject?, copyAction: Selector, restartTarget: AnyObject?, restartAction: Selector,
          reducesMotion: @escaping () -> Bool) {
-        copyButton = FirstLineButtons.roomPrimary(title: "COPY TEXT", target: copyTarget, action: copyAction,
+        copyButton = FirstLineButtons.roomPrimary(title: "Copy text", target: copyTarget, action: copyAction,
                                                   reducesMotion: reducesMotion)
         copyButton.font = .systemFont(ofSize: 15, weight: .medium)
-        restartButton = FirstLineButtons.secondary(title: "BEGIN AGAIN", target: restartTarget,
+        restartButton = FirstLineButtons.secondary(title: "Begin again", target: restartTarget,
                                                    action: restartAction, height: 48)
         self.reducesMotion = reducesMotion
         super.init(frame: .zero)
@@ -69,7 +69,7 @@ final class SessionKeptView: NSView {
             NSLayoutConstraint.activate([
                 label.centerXAnchor.constraint(equalTo: button.centerXAnchor),
                 label.centerYAnchor.constraint(equalTo: button.centerYAnchor,
-                                               constant: -Self.pillLabelLift),
+                                               constant: -(Self.pillLabelLift + 1.5)), // Sentence-case descenders extend the kept labels' ink.
             ])
         }
 
@@ -98,7 +98,7 @@ final class SessionKeptView: NSView {
             Self.unsavedCaption, font: FirstLineTypography.smallMediumNSFont,
             color: FirstLineColors.paperQuietNSColor, kernEm: 0.02)
 
-        // The action row is fixed at the top so a long draft never hides COPY TEXT.
+        // The action row is fixed at the top so a long draft never hides Copy text.
         let actions = NSStackView(views: [copyButton, restartButton])
         actions.translatesAutoresizingMaskIntoConstraints = false
         actions.orientation = .horizontal
@@ -128,7 +128,7 @@ final class SessionKeptView: NSView {
         // The pill hugs its label; the title change may resize it (the row re-centres).
         // The pill hugs its label, but never below the resting label's width: a state
         // change must not move a control out from under the pointer (D-030, D-056).
-        setCopyTitle("COPY TEXT")
+        setCopyTitle("Copy text")
         copyWidthFloor = copyButton.widthAnchor.constraint(
             greaterThanOrEqualToConstant: copyButton.intrinsicContentSize.width)
         copyWidthFloor?.isActive = true
@@ -167,7 +167,7 @@ final class SessionKeptView: NSView {
         receipt.isHidden = false
         receipt.font = FirstLineTypography.smallMediumNSFont
         receipt.attributedStringValue = FirstLineTypography.trackedText(
-            RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration),
+            RoomPresentation.keptReceipt(wordCount: wordCount, duration: duration, text: text),
             font: FirstLineTypography.smallMediumNSFont,
             color: FirstLineColors.paperQuietNSColor, kernEm: 0.02)
         header.setCustomSpacing(12, after: heading)
@@ -182,13 +182,13 @@ final class SessionKeptView: NSView {
         renderedDuration = nil
         body.stringValue = ""
         heading.stringValue = "You wrote it down."
-        setCopyTitle("COPY TEXT")
+        setCopyTitle("Copy text")
     }
 
     /// The copy label keeps the pill's 1.6 line box and sits on the pill's optical
     /// centre. It is a pass-through label so it can sit there while the button's own
     /// transparent title keeps its width and AX name. The pill hugs the label down to
-    /// the resting `COPY TEXT` width floor, so `COPIED` never narrows the control and
+    /// the resting `Copy text` width floor, so `Copied` never narrows the control and
     /// the row never shifts under the pointer.
     func setCopyTitle(_ title: String) {
         copyButton.title = title
@@ -244,11 +244,11 @@ final class SessionKeptView: NSView {
 
     private func styleRestart() {
         let font = NSFont.systemFont(ofSize: 15, weight: .medium)
-        restartButton.title = "BEGIN AGAIN"
+        restartButton.title = "Begin again"
         restartButton.font = font
-        restartButton.attributedTitle = transparentTitle("BEGIN AGAIN", font: font, kernEm: 0.04)
+        restartButton.attributedTitle = transparentTitle("Begin again", font: font, kernEm: 0.04)
         restartTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
-            "BEGIN AGAIN", font: font, color: FirstLineColors.inkNSColor, kernEm: 0.04,
+            "Begin again", font: font, color: FirstLineColors.inkNSColor, kernEm: 0.04,
             lineHeightMultiple: 1.6)
         restartButton.invalidateIntrinsicContentSize()
     }

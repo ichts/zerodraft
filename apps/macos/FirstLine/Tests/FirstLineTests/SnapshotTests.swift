@@ -334,7 +334,7 @@ struct SnapshotTests {
         controller.view.cacheDisplay(in: controller.view.bounds, to: rep)
         if focus, controller is SessionViewController {
             let button = try #require(window.firstResponder as? NSButton)
-            #expect(["COPY TEXT", "COPIED"].contains(button.title))
+            #expect(["Copy text", "Copied"].contains(button.title))
             #expect(button.focusRingType == .none)
             let ringing = try #require(button as? FirstLineInkFocusRinging)
             #expect(ringing.showsInkFocusRing)

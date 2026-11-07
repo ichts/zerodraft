@@ -1,4 +1,4 @@
-import { fresh, advance, append, clock, wordCount, historyLines } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, countLabel, historyLines } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot } from './status-slot.js';
 
@@ -173,7 +173,7 @@ function render(now = performance.now()) {
   // as a receipt (D-070); the restart brings both back at a fresh minute.
   $('room-clock').textContent = clock(kept ? 0 : remaining);
   const count = wordCount(state.text);
-  const words = `${count} ${count === 1 ? 'word' : 'words'}`;
+  const words = countLabel(state.text, count);
   // Empty room: the count slot itself carries the instruction; after a wipe the block does,
   // and the slot returns to the count (the Mac's cases 18/19/50). On the kept screen the receipt
   // is the only place the session's size is printed, so the corner stays silent (D-062).
@@ -200,7 +200,7 @@ function render(now = performance.now()) {
     compositionBase = null;
     $('kept-text').textContent = state.text;
     const minutes = Math.max(Math.round((state.ended - state.started) / 60000), 1);
-    $('receipt').textContent = `${minutes} ${minutes === 1 ? 'MINUTE' : 'MINUTES'}. ${count} ${count === 1 ? 'WORD' : 'WORDS'}.`;
+    $('receipt').textContent = `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}. ${words}.`;
     placeStatus();
     announce('You wrote it down. Copy your text before you leave. Nothing is saved.');
     $('copy').focus({ preventScroll: true });
@@ -286,7 +286,7 @@ function reset() {
   editor.value = '';
   $('kept-text').textContent = '';
   $('receipt').textContent = '';
-  $('copy-label').textContent = 'COPY TEXT';
+  $('copy-label').textContent = 'Copy text';
   $('status').textContent = '';
   render();
   fitEditor();
@@ -410,16 +410,16 @@ $('copy').addEventListener('click', async () => {
     try { fallbackCopy(text); copied = true; } catch {}
   }
   if (generation !== copyGeneration) return;
-  $('copy-label').textContent = copied ? 'COPIED' : 'TRY AGAIN';
+  $('copy-label').textContent = copied ? 'Copied' : 'Try copy again';
   announce(copied ? 'Copied.' : 'Copy failed. Select your kept text and copy it manually.');
 });
 
 // The kept pill keeps the width of its widest label on whatever face the device supplies, so the
 // floor is measured from the three labels in that face instead of a constant tuned on one machine
-// (D-059). "COPIED" and "TRY AGAIN" only exist after a press, so they cannot be measured from the
+// (D-059). "Copied" and "Try copy again" only exist after a press, so they cannot be measured from the
 // live label, and the probe sits on the body: the room is hidden until the writer opens it, and a
 // hidden descendant would measure 0.
-const COPY_LABELS = ['COPY TEXT', 'COPIED', 'TRY AGAIN'];
+const COPY_LABELS = ['Copy text', 'Copied', 'Try copy again'];
 function sizeCopyFloor() {
   const label = $('copy-label');
   const style = getComputedStyle(label);

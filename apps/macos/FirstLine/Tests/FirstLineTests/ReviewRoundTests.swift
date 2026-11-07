@@ -46,9 +46,9 @@ struct ReviewRoundTests {
     @Test func keptActionsShareOneOpticalCentreAndThePillFitsItsLabel() throws {
         let fixture = keptRoom()
         let copy = try #require(descendants(of: fixture.room.view, of: NSButton.self)
-            .first { $0.title == "COPY TEXT" })
+            .first { $0.title == "Copy text" })
         let restart = try #require(descendants(of: fixture.room.view, of: NSButton.self)
-            .first { $0.title == "BEGIN AGAIN" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         fixture.room.view.layoutSubtreeIfNeeded()
         fixture.room.view.displayIfNeeded()
 
@@ -69,10 +69,10 @@ struct ReviewRoundTests {
         let copyInkCentre = (CGFloat(copyInk.lowerBound) + CGFloat(copyInk.upperBound)) / 2
         let restartInkCentre = (CGFloat(restartInk.lowerBound) + CGFloat(restartInk.upperBound)) / 2
         let centreDelta = abs(copyInkCentre - restartInkCentre) / scale
-        #expect(centreDelta <= 1, "COPY TEXT and BEGIN AGAIN ink centres are \(centreDelta) pt apart")
+        #expect(centreDelta <= 1, "Copy text and Begin again ink centres are \(centreDelta) pt apart")
         #expect(abs(copy.frame.height - 48) <= 0.5)
-        #expect(abs(restart.frame.height - 48) <= 0.5, "BEGIN AGAIN is not the primary height")
-        #expect(restart.layer?.borderWidth == 1, "BEGIN AGAIN is not a quiet outlined control")
+        #expect(abs(restart.frame.height - 48) <= 0.5, "Begin again is not the primary height")
+        #expect(restart.layer?.borderWidth == 1, "Begin again is not a quiet outlined control")
         // The pill label must be optically centred: the ink gaps above and below
         // are equal within 1 pt (the fourth hands-on report: it sat low).
         let height = CGFloat(rep.pixelsHigh) / scale
@@ -81,18 +81,18 @@ struct ReviewRoundTests {
         let topGap = (CGFloat(copyInk.lowerBound) - pillTopRow) / scale
         let bottomGap = (pillBottomRow - CGFloat(copyInk.upperBound)) / scale
         #expect(abs(topGap - bottomGap) <= 1,
-                "COPY TEXT ink sits \(topGap) pt from the top and \(bottomGap) pt from the bottom")
+                "Copy text ink sits \(topGap) pt from the top and \(bottomGap) pt from the bottom")
 
         let copyLabel = try #require(descendants(of: copy, of: NSTextField.self)
-            .first { $0.stringValue == "COPY TEXT" })
+            .first { $0.stringValue == "Copy text" })
         let padding = copy.frame.width - copyLabel.intrinsicContentSize.width
         #expect(padding >= 40 && padding <= 56,
                 "the copy pill carries \(padding) pt around its label")
         let originalWidth = copy.frame.width
         fixture.room.copyKeptText()
         fixture.room.view.layoutSubtreeIfNeeded()
-        #expect(copy.title == "COPIED")
-        #expect(abs(copy.frame.width - originalWidth) <= 0.5, "COPIED changed the pill width from \(originalWidth) to \(copy.frame.width)")
+        #expect(copy.title == "Copied")
+        #expect(abs(copy.frame.width - originalWidth) <= 0.5, "Copied changed the pill width from \(originalWidth) to \(copy.frame.width)")
         let actions = try #require(copy.superview)
         let rowCentre = fixture.room.view.convert(actions.bounds, from: actions).midX
         #expect(abs(rowCentre - fixture.room.view.bounds.midX) <= 1,
@@ -103,7 +103,7 @@ struct ReviewRoundTests {
     @Test func keptRestartEntersTheWritingRoomWithoutATick() throws {
         let fixture = keptRoom()
         let restart = try #require(descendants(of: fixture.room.view, of: NSButton.self)
-            .first { $0.title == "BEGIN AGAIN" })
+            .first { $0.title == "Begin again" && !$0.isHiddenOrHasHiddenAncestor })
         let editor = try #require(descendants(of: fixture.room.view, of: AppendOnlyTextView.self).first)
         let scroll = try #require(editor.enclosingScrollView)
         #expect(fixture.engine.phase == .success)
@@ -436,8 +436,8 @@ struct ReviewRoundTests {
         let copyFrame = fixture.room.view.convert(copy.bounds, from: copy)
         let restartFrame = fixture.room.view.convert(restart.bounds, from: restart)
         let scrollFrame = fixture.room.view.convert(search.bounds, from: search)
-        #expect(copyFrame.minY > scrollFrame.maxY, "COPY TEXT is not above the draft area")
-        #expect(restartFrame.minY > scrollFrame.maxY, "BEGIN AGAIN is not above the draft area")
+        #expect(copyFrame.minY > scrollFrame.maxY, "Copy text is not above the draft area")
+        #expect(restartFrame.minY > scrollFrame.maxY, "Begin again is not above the draft area")
         #expect(!copy.isHiddenOrHasHiddenAncestor)
         #expect(search.documentView!.frame.height > search.contentSize.height,
                 "the long draft does not scroll under the fixed actions")

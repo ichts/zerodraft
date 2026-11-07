@@ -1,21 +1,44 @@
 package session
 
-import (
-	"unicode"
-)
+import "unicode"
 
-// WordCount counts like the Mac room: each Han character is one word, other words are runs of letters and
+// isCJK is a script written without spaces, so each character is one unit: Han, Hiragana, Katakana and the
+// prolonged sound mark (D-095). The Mac and the web rooms use the same rule.
+func isCJK(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) || r == '\u30FC'
+}
+
+// UsesCharacterCount reports whether the draft's count is labelled characters: CJK letters are at least half
+// of its letters and digits.
+func UsesCharacterCount(s string) bool {
+	cjk, letters := 0, 0
+	for _, r := range s {
+		if isCJK(r) {
+			cjk++
+		}
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			letters++
+		}
+	}
+	return cjk > 0 && cjk*2 >= letters
+}
+
+// WordCount counts like the Mac room: each CJK character is one word, other words are runs of letters and
 // digits (an apostrophe or a connecting mark inside a run stays in the word), punctuation and emoji do not
-// count. NLTokenizer is not available off Apple platforms, so this is the same rule written down (SYNC.md:
-// deliberately different mechanism, same stated rule; kana runs count as one word per run).
+// count.
 func WordCount(s string) int {
-	n, in := 0, false
+	n, in, afterCJK := 0, false, false
 	rs := []rune(s)
 	for i, r := range rs {
+		if afterCJK && unicode.IsMark(r) {
+			continue
+		}
+		afterCJK = false
 		switch {
-		case unicode.Is(unicode.Han, r):
+		case isCJK(r):
 			n++
 			in = false
+			afterCJK = true
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsMark(r):
 			if !in {
 				n++

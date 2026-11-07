@@ -242,7 +242,7 @@ struct EditingCommandTests {
         room.tick()
         #expect(engine.phase == .success)
         room.refreshRoom()
-        // The room moves focus onto COPY TEXT on the next main-queue turn.
+        // The room moves focus onto Copy text on the next main-queue turn.
         RunLoop.current.run(until: Date().addingTimeInterval(0.2))
 
         let delegate = FirstLineAppDelegate(appState: state, windowController: controller)

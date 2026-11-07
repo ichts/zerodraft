@@ -179,7 +179,7 @@ for used in 1 2 3; do
     has 'You stopped.' && has 'Draft deleted.' && has 'Begin again' && has '0 words' \
       && ! has 'DRAFT DELETED AT' && ! has '1:00' \
       && jq -e '[.elements[] | select(.role == "AXTextArea" and .value == "")] | length == 1' "$snapf" >/dev/null \
-      && ! has 'COPY TEXT' \
+      && ! has 'Copy text' \
       && pass 'session 2 silence deleted the draft into the stopped screen' \
       || { bad 'session 2 did not show the stopped screen after nine seconds of silence'; exit 1; }
   elif [[ "$used" -eq 3 ]]; then
@@ -195,19 +195,19 @@ for used in 1 2 3; do
     wait_has kept-third 'You wrote it down.' || { bad 'session 3 never reached the kept receipt'; exit 1; }
     python3 -c 'import sys,time; sys.exit(time.monotonic() - float(sys.argv[1]) < 60)' "$started" \
       || { bad 'session 3 completed before a full minute'; exit 1; }
-    has '1 MINUTE. ' && has ' WORDS.' && ! has 'DRAFT DELETED AT ' \
+    has '1 minute. ' && has ' words.' && ! has 'DRAFT DELETED AT ' \
       && jq -e --arg text "$typed" '[.elements[] | select((.value // "") == $text)] | length > 0' "$snapf" >/dev/null \
       || { bad 'session 3 kept text or receipt differs from the completed draft'; exit 1; }
-    tok="$(token button 'COPY TEXT')"
-    [[ -n "$tok" ]] || { bad 'session 3 COPY TEXT affordance missing'; exit 1; }
-    pass 'session 3 completed a full minute with exact kept text and COPY TEXT'
+    tok="$(token button 'Copy text')"
+    [[ -n "$tok" ]] || { bad 'session 3 Copy text affordance missing'; exit 1; }
+    pass 'session 3 completed a full minute with exact kept text and Copy text'
     printf 'journey clipboard sentinel' | pbcopy || { bad 'could not seed clipboard for the copy assertion'; exit 1; }
     cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
-      && wait_has copied-third 'COPIED' \
+      && wait_has copied-third 'Copied' \
       && python3 -c 'import subprocess,sys; sys.exit(subprocess.check_output(["pbpaste"]).decode() != sys.argv[1])' "$typed" \
       && pass 'session 3 copied exactly the kept draft' \
       || { bad 'session 3 copy failed or clipboard differs from kept text'; exit 1; }
-    tok="$(token button 'BEGIN AGAIN')"
+    tok="$(token button 'Begin again')"
     [[ -n "$tok" ]] && cua click "{\"pid\":$pid,\"element_token\":\"$tok\"}" >/dev/null \
       || { bad 'session 3 restart affordance missing or failed'; exit 1; }
   fi

@@ -28,10 +28,27 @@ export function clock(seconds) {
 
 const wordSegments = new Intl.Segmenter(undefined, { granularity: 'word' });
 
-// Han characters count individually; other scripts use Unicode word boundaries.
+// Han, Hiragana and Katakana (and the prolonged sound mark) are written without spaces, so each one is a
+// unit; every other script uses Unicode word boundaries (D-095). The Mac and Windows rooms use the same rule.
+const CJK = String.raw`[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u30FC]`;
+const cjkUnits = new RegExp(`(${CJK}\\p{Mark}*)`, 'gu');
+const cjkLetter = new RegExp(CJK, 'gu');
+
 export function wordCount(text) {
-  const separated = text.replace(/(\p{Script=Han}\p{Mark}*)/gu, ' $1 ');
+  const separated = text.replace(cjkUnits, ' $1 ');
   return Array.from(wordSegments.segment(separated)).filter(part => part.isWordLike).length;
+}
+
+// The label says characters only when CJK letters are at least half of the draft's letters and digits.
+export function usesCharacterCount(text) {
+  const cjk = (text.match(cjkLetter) || []).length;
+  const letters = (text.match(/[\p{Letter}\p{Number}]/gu) || []).length;
+  return cjk > 0 && cjk * 2 >= letters;
+}
+
+export function countLabel(text, count = wordCount(text)) {
+  const unit = usesCharacterCount(text) ? 'character' : 'word';
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
 }
 
 // The history ladder's unit is the line the writer ended with Return (D-088, superseding D-077's

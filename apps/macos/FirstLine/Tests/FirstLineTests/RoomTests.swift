@@ -260,6 +260,25 @@ struct RoomTests {
         #expect(!exit.isHiddenOrHasHiddenAncestor)
     }
 
+    /// The 3-2-1 is a warning, not chrome: Focus Mode hides the clock and the count until the pointer is near an
+    /// edge, and the silence digits stay on the paper whatever the pointer does.
+    @Test func focusModeNeverHidesTheSilenceCountdown() throws {
+        let fixture = try roomFixture()
+        fixture.state.updateFocusMode(true)
+        advance(fixture, to: .danger)
+        fixture.room.tick()
+        fixture.room.view.layoutSubtreeIfNeeded()
+        let fields = descendants(fixture.room.view, of: NSTextField.self)
+        let clock = try #require(fields.first { $0.stringValue == "0:55" })
+        #expect(clock.alphaValue == 0, "Focus Mode hides the clock while the pointer rests mid-window")
+        let numeral = try #require(fields.first { $0.stringValue == "3" })
+        let caption = try #require(fields.first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
+        for warning in [numeral, caption] {
+            #expect(!warning.isHiddenOrHasHiddenAncestor)
+            #expect(warning.alphaValue == 1)
+        }
+    }
+
     @Test func stoppedScreenStatesTheDeletionAndTakesTheChromeOff() throws {
         let fixture = try roomFixture()
         fixture.editor.insertText("one sentence", replacementRange: NSRange(location: NSNotFound, length: 0))

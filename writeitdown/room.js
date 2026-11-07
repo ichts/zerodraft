@@ -90,8 +90,8 @@ function syncBar(now) {
     { duration: remaining, easing: 'linear', fill: 'forwards' });
 }
 
-// The ink layer repeats the draft one span per logical line, each at its rung of the history ladder
-// (D-077). It is rebuilt only when the draft or the composing boundary changes, never per tick.
+// The ink layer repeats the draft one span per line (ended by Return), each at its rung of the history ladder
+// (D-088). It is rebuilt only when the draft or the composing boundary changes, never per tick.
 function paintInk() {
   const base = compositionBase === null ? -1 : compositionBase.length;
   const key = `${base}|${editor.value}`;

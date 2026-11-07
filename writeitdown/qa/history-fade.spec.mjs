@@ -1,6 +1,6 @@
-// D-077: the room's history fades per logical line, and the first refused delete of a session says why.
+// D-077 and D-088: the room's history fades per line, and the first refused delete of a session says why.
 //
-// Fade: every row of one sentence shares one measured opacity (the ink layer's span, read from the computed
+// Fade: the unit is the line ended by Return, never a sentence (D-088). Every row of one line shares one measured opacity (the ink layer's span, read from the computed
 // style and from the pixels), the ladder is D-069's and every step clears 7:1 on the Wheat sheet in both
 // themes, and the aperture is a hard clip, so a partial line is cut at its edge and never given an alpha.
 // Refusal: the 200 ms shake stays on every refusal; the first refused delete of a session also names the
@@ -79,7 +79,7 @@ test('every row of one logical line carries one opacity, measured in the DOM and
   expect(long.rung, 'the line above the live one is rung 1').toBe('1');
   expect(long.rows.length, `the long line wraps to several rows: ${JSON.stringify(long.rows)}`).toBeGreaterThanOrEqual(2);
   const token = await page.evaluate(() => Number(getComputedStyle(document.querySelector('#editor-ink')).getPropertyValue('--paper-history-1')));
-  expect(long.opacity, 'one measured opacity for every row of the sentence').toBeCloseTo(token, 3);
+  expect(long.opacity, 'one measured opacity for every row of the line').toBeCloseTo(token, 3);
   expect(lines.at(-1).opacity).toBe(1);
 
   // The two rows that sit in the aperture above the live row read the same in the pixels, and lighter than it.
@@ -118,13 +118,35 @@ test('the ladder is D-069 per theme, each step clears 7:1, and older lines are g
   }
 });
 
-test('a sentence that ends mid-row keeps one rung on each side, and each is cut at the sentence', async ({ page }) => {
+test('a full stop never ends a line: one line holds every sentence typed before Return (D-088)', async ({ page }) => {
   await enter(page);
   await page.keyboard.insertText('One short sentence. And another one follows it. Third');
   await page.waitForTimeout(450);
   const lines = await inkLines(page);
-  expect(lines.map(line => line.text.trim())).toEqual(['One short sentence.', 'And another one follows it.', 'Third']);
-  expect(lines.map(line => line.rung)).toEqual(['2', '1', '0']);
+  expect(lines.map(line => line.text.trim())).toEqual(['One short sentence. And another one follows it. Third']);
+  expect(lines.map(line => line.rung)).toEqual(['0']);
+  expect(lines[0].opacity, 'typing sentences on the live line fades nothing').toBe(1);
+});
+
+test('pressing Return fades the line just written, one rung, and not before', async ({ page }) => {
+  await enter(page);
+  const token = await page.evaluate(() => Number(getComputedStyle(document.querySelector('#editor-ink')).getPropertyValue('--paper-history-1')));
+  await page.keyboard.insertText('First thought. Still the first line');
+  await page.waitForTimeout(450);
+  expect((await inkLines(page)).map(line => [line.rung, line.opacity])).toEqual([['0', 1]]);
+
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(450);
+  let lines = await inkLines(page);
+  expect(lines.map(line => line.rung), 'the written line steps back the moment Return lands').toEqual(['1']);
+  expect(lines[0].opacity).toBeCloseTo(token, 3);
+
+  await page.keyboard.insertText('Second line. Third sentence');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(450);
+  lines = await inkLines(page);
+  expect(lines.map(line => line.rung)).toEqual(['2', '1']);
+  expect(lines.map(line => line.text.trim())).toEqual(['First thought. Still the first line', 'Second line. Third sentence']);
 });
 
 test('the aperture clips a partial line at its edge and never fades it', async ({ page }) => {

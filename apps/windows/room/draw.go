@@ -411,9 +411,9 @@ func abs32(v float32) float32 {
 	return v
 }
 
-// shapeWriting lays the draft out centred in the measure: one span per logical line (a sentence or the text up to a
-// hard break, D-077) in its rung's colour, so every visual row of one sentence shares one opacity and a sentence that
-// ends mid-row keeps one rung on each side of its boundary. The preedit is underlined in ink.
+// shapeWriting lays the draft out centred in the measure: one span per line (the text up to a hard break, D-088)
+// in its rung's colour, so every visual row of one wrapped line shares one opacity and a full stop never steps the
+// ladder. The preedit is underlined in ink.
 func (r *Room) shapeWriting(text string, w float32, font ui.Font, dark bool) *ui.TextLayout {
 	return ui.ShapeRichTextWith(r.historySpans(text, dark), font, ui.TextShape{Width: w, Align: ui.Center})
 }

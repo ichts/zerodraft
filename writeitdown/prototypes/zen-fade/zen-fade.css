@@ -1,0 +1,43 @@
+/* Zen fade options prototype. The sheet, the type and the 5-row aperture are the room's own
+   (tokens.css, paper.js, 28 px / 1.6 pitch scaled by --u for the side-by-side grid). */
+body{margin:0;background:var(--page);font-family:var(--sans);color:var(--ink)}
+.bar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:10px 24px;font-size:13px;color:var(--paper-quiet)}
+.bar button{font:500 13px var(--sans);padding:6px 12px;border:1px solid var(--hair-2);background:#fff;border-radius:var(--r-ctl);cursor:pointer}
+.bar label{display:flex;gap:6px;align-items:center}
+.bar output{min-width:3ch;font-variant-numeric:tabular-nums}
+#grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:0 24px 24px}
+body[data-only] #grid{grid-template-columns:1fr;max-width:1200px;margin:0 auto}
+.panel{display:flex;flex-direction:column;gap:8px}
+.panel>h2{margin:0;font:600 13px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--paper-quiet)}
+.panel>h2 span{font-weight:400;text-transform:none;letter-spacing:0}
+.sheet{position:relative;border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip;height:calc(7 * var(--lh));display:flex;align-items:center;justify-content:center;--script:calc(28px * var(--u));--lh:calc(1.6 * var(--script))}
+[data-paper]{background:var(--paper-tone);isolation:isolate}
+.sheet-paper{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:inherit;pointer-events:none}
+.stack{position:relative;width:100%;max-width:62ch;height:calc(5 * var(--lh));font:400 var(--script)/var(--lh) var(--serif)}
+.scroller{height:100%;box-sizing:border-box;padding:calc(2 * var(--lh)) 0;overflow:hidden;text-align:center;white-space:pre-wrap;overflow-wrap:break-word;color:var(--ink)}
+.mark{display:inline-block;width:0;height:var(--lh);vertical-align:top}
+.caret{display:inline-block;width:1px;height:1em;vertical-align:text-bottom;margin-left:1px;background:var(--ink);animation:blink 1.06s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.scroller .l{transition:opacity var(--ms,0ms) ease-out}
+/* NOW: D-088 as shipped on main - Return-line ladder, hard clip at the third pitch. */
+[data-v="now"] .stack{mask-image:linear-gradient(to bottom,#000 calc(3 * var(--lh)),transparent calc(3 * var(--lh)))}
+[data-v="now"] .l[data-rung="1"]{opacity:var(--paper-history-1)}
+[data-v="now"] .l[data-rung="2"]{opacity:var(--paper-history-2)}
+[data-v="now"] .l:not([data-rung="0"],[data-rung="1"],[data-rung="2"]){opacity:0}
+[data-v="now"] .l{transition:none}
+/* KEEP: the original mask, byte for byte (writeitdown/site.css before 2026-10-25), fixed to the viewport box. */
+[data-v="old"] .stack{mask-image:linear-gradient(transparent,rgba(0,0,0,.07) 10%,rgba(0,0,0,.22) 30%,#000 40%,#000 60%,rgba(0,0,0,.22) 70%,transparent)}
+/* A: the same gradient, hung on the first row of the live line (--live, px from the stack top). Return moves
+   the boundary one pitch with the shift; a wrapped live line or a wrapped history line moves nothing. */
+[data-v="a"] .stack{mask-image:linear-gradient(to bottom,transparent calc(var(--live) - 2 * var(--lh)),rgba(0,0,0,.07) calc(var(--live) - 1.5 * var(--lh)),rgba(0,0,0,.22) calc(var(--live) - .5 * var(--lh)),#000 var(--live))}
+/* B: one opacity per Return line, the old gradient's numbers sampled at the row centres, dissolving over --ms. */
+[data-v="b"] .stack{mask-image:linear-gradient(to bottom,#000 calc(3 * var(--lh)),transparent calc(3 * var(--lh)))}
+[data-v="b"] .l[data-rung="1"]{opacity:var(--h1)}
+[data-v="b"] .l[data-rung="2"]{opacity:var(--h2)}
+[data-v="b"] .l:not([data-rung="0"],[data-rung="1"],[data-rung="2"]){opacity:0}
+/* C: the apps writers praise (iA Writer, Typora, Calmly Writer): the line you left drops at once to one flat
+   dim, every older line sits at the same dim, the live line stays full; only the aperture's top edge softens. */
+[data-v="c"] .stack{mask-image:linear-gradient(to bottom,transparent,#000 var(--lh),#000 calc(3 * var(--lh)),transparent calc(3 * var(--lh)))}
+[data-v="c"] .l:not([data-rung="0"]){opacity:var(--flat)}
+@media (prefers-reduced-motion:reduce){.scroller .l{transition:none}.mark{display:inline-block;width:0;height:var(--lh);vertical-align:top}
+.caret{animation:none}}

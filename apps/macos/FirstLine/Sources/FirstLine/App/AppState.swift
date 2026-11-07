@@ -29,7 +29,7 @@ final class AppState {
         if Bundle.main.bundleURL.pathExtension == "app" { return Bundle.main.infoDictionary ?? [:] }
         return (NSDictionary(contentsOf: configurationURL) as? [String: Any]) ?? [:]
     }
-    /// The one placeholder of the licence field, on the activation card and in Settings.
+    /// The placeholder of Settings' licence field; the activation card has a label instead, so no placeholder.
     static let licenseFieldPlaceholder = "License key"
     static var displayPrice: String { configuration["WIDDisplayPrice"] as? String ?? "" }
     /// Marketing version shown in Settings > About; the same configuration source as the price,
@@ -105,10 +105,8 @@ final class AppState {
         if hasFullAccess { return licenseStatusText }
         if let trialAccessError { return trialAccessError }
         if trialSessionsRemaining > 0 {
-            // The counter moves on the first typed character, not on opening the room;
-            // the line states that rule instead of leaving "session" undefined.
-            return "Free trial: \(trialSessionsRemaining) of \(Self.trialSessionLimit) sessions left, "
-                + "counted at the first character."
+            return trialSessionsRemaining == 1 ? "1 free session left."
+                : "\(trialSessionsRemaining) free sessions left."
         }
         return licenseStatusText
     }
@@ -151,7 +149,7 @@ final class AppState {
         } catch {
             self.settings = .defaultValue
             self.settings.trialSessionsUsed = Self.trialSessionLimit
-            self.trialAccessError = "Could not read trial usage. Check access to the app's settings and reopen the app."
+            self.trialAccessError = "We could not read your free sessions, so reopen the app and try again."
         }
         self.licenseValidationInFlight = (settings.licenseStatus == .active || settings.licenseStatus == .unknown) &&
             settings.hasLicenseKey && settings.licenseInstanceID != nil
@@ -209,7 +207,7 @@ final class AppState {
             return true
         } catch {
             settings = previous
-            trialAccessError = "Could not save trial usage. Check access to the app's settings and reopen the app."
+            trialAccessError = "We could not save your free sessions, so reopen the app and try again."
             sessionEngine.abandon()
             selectedSurface = .upgrade
             return false
@@ -550,26 +548,26 @@ final class AppState {
     }
 
     var licenseStatusText: String {
-        if licenseValidationInFlight { return "Checking license…" }
+        if licenseValidationInFlight { return "Checking your license…" }
         if settings.licenseKey != nil && settings.licenseInstanceID == nil {
-            return "License not activated on this Mac. Enter your license key."
+            return "This Mac is not activated, so enter your license key."
         }
         if settings.licenseStatus == .active && !hasFullAccess {
             if settings.licenseKey != nil && !productID.isEmpty &&
                 settings.licenseProductID == productID && !licenseWithinGrace {
-                return "License needs online validation. Reopen the app when connected."
+                return "We need to check your license online, so reopen the app when you are connected."
             }
-            return "License does not match the configured writeitdown product."
+            return "This license key is for a different app, so use the one from your Write It Down purchase."
         }
         switch settings.licenseStatus {
         case .active:
             return "License active."
         case .revoked:
-            return "License revoked. Enter a valid license key."
+            return "This license is no longer valid, so enter a different license key."
         case .invalid:
-            return "License invalid. Activate this Mac again."
+            return "We could not confirm your license, so activate this Mac again."
         case .unknown:
-            return "License status unknown. Reconnect to validate."
+            return "We could not check your license, so connect to the internet and try again."
         case .inactive:
             return "Activate this Mac to begin writing."
         }

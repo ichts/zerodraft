@@ -26,8 +26,11 @@ final class RulesViewController: NSViewController {
     static let contentInsets = NSEdgeInsets(top: 40, left: cardInset, bottom: 36, right: cardInset)
 
     private let doneButton: NSButton
+    /// The picker's silence limit in seconds: the one number the second rule states.
+    private let silenceSeconds: Int
 
-    init() {
+    init(silenceSeconds: Int = SilenceLimit.standard.rawValue) {
+        self.silenceSeconds = silenceSeconds
         doneButton = FirstLineButtons.primary(title: "Done", target: nil, action: #selector(close))
         super.init(nibName: nil, bundle: nil)
         doneButton.target = self
@@ -50,17 +53,11 @@ final class RulesViewController: NSViewController {
                             color: FirstLineColors.inkNSColor)
         heading.maximumNumberOfLines = 2
         let measure = Self.bodyMeasure
-        let sub = body("Open it, start typing, say the thing you have been avoiding. The only way out is through.",
-                       color: FirstLineColors.muteNSColor)
-        sub.preferredMaxLayoutWidth = measure
 
         let rules = NSStackView(views: [
-            rule("No way back",
-                 "Deleting, pasting, cutting and undo are blocked. You can only add the next word."),
-            rule("Eight seconds of silence",
-                 "Stop typing for eight seconds and the draft is deleted. A warning appears at five."),
-            rule("Reach zero, keep it",
-                 "Make it to the end of the clock and the text is yours to copy. Nothing is uploaded."),
+            rule("No way back", "You can only add the next word."),
+            rule("Silence deletes it", "Stop for \(silenceSeconds) seconds and the draft is deleted."),
+            rule("Reach zero, keep it", "The text is yours to copy."),
         ])
         rules.translatesAutoresizingMaskIntoConstraints = false
         rules.orientation = .vertical
@@ -77,14 +74,13 @@ final class RulesViewController: NSViewController {
             doneButton.bottomAnchor.constraint(equalTo: doneRow.bottomAnchor),
         ])
 
-        let stack = NSStackView(views: [eyebrow, heading, sub, rules, doneRow])
+        let stack = NSStackView(views: [eyebrow, heading, rules, doneRow])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 0
         stack.setCustomSpacing(10, after: eyebrow)
-        stack.setCustomSpacing(12, after: heading)
-        stack.setCustomSpacing(24, after: sub)
+        stack.setCustomSpacing(24, after: heading)
         stack.setCustomSpacing(28, after: rules)
         view.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -92,7 +88,6 @@ final class RulesViewController: NSViewController {
             stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.cardInset),
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.contentInsets.top),
             stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.contentInsets.bottom),
-            sub.widthAnchor.constraint(equalToConstant: measure),
             rules.widthAnchor.constraint(equalToConstant: measure),
             doneRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])

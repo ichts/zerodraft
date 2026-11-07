@@ -311,12 +311,12 @@ if [[ "$gatekeeper_clicked" -eq 1 ]]; then
 else
   pass 'no Gatekeeper question appeared: the notarized build was approved silently'
 fi
-wait_re 'Free trial: 3 of 3 sessions left\.' 40 && pass 'first launch shows the untouched 3-of-3 free trial' \
-  || bad 'first launch does not show "Free trial: 3 of 3 sessions left."'
+wait_re '3 free sessions left\.' 40 && pass 'first launch shows the untouched 3-of-3 free trial' \
+  || bad 'first launch does not show "3 free sessions left."'
 snap 'first-launch-after'
 watch_never "$evidence/launch-trial.jsonl" 'Activate Write It Down' 'trial launch'
 watch_never "$evidence/launch-trial.jsonl" 'License active' 'trial launch'
-watch_seen "$evidence/launch-trial.jsonl" 'Free trial: 3 of 3 sessions left\.' 'trial launch'
+watch_seen "$evidence/launch-trial.jsonl" '3 free sessions left\.' 'trial launch'
 [[ "$(watch_frames "$evidence/launch-trial.jsonl")" -ge 20 ]] && pass "launch watcher sampled $(watch_frames "$evidence/launch-trial.jsonl") frames" \
   || bad "launch watcher sampled too few frames ($(watch_frames "$evidence/launch-trial.jsonl"))"
 
@@ -390,7 +390,7 @@ for used in 1 2 3; do
     snap "session-$used-exit-hint"
     "$rig" key --name escape >/dev/null
     left=$((3 - used))
-    wait_re "Free trial: $left of 3 sessions left\." 20 \
+    wait_re "$left free sessions? left\." 20 \
       && pass "session $used: leaving returned home with $left of 3 left" \
       || { bad "session $used: home does not say $left of 3 left"; exit 1; }
     snap "session-$used-home-after"
@@ -460,7 +460,7 @@ if [[ -n "$fixture_bin" && -x "$fixture_bin" ]]; then
       launch_watched "$qa_app" 5 "$evidence/launch-licensed-$round.jsonl" || { bad "licensed relaunch $round: the app did not launch"; exit 1; }
       wait_re 'Begin writing' 40 && pass "licensed relaunch $round: goes straight to the licensed home" \
         || bad "licensed relaunch $round: did not reach the licensed home"
-      has_re 'Free trial:' && bad "licensed relaunch $round: the licensed home still advertises the free trial" \
+      has_re '[0-9] free sessions? left' && bad "licensed relaunch $round: the licensed home still advertises the free trial" \
         || pass "licensed relaunch $round: the licensed home does not advertise the trial"
       snap "licensed-relaunch-$round-after"
       watch_never "$evidence/launch-licensed-$round.jsonl" 'Activate Write It Down' "licensed launch $round" 'licensed-launch-no-activation-page'

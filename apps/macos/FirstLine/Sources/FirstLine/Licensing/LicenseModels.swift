@@ -36,25 +36,25 @@ enum LicenseActivationError: Error, Equatable, Sendable, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidKey:
-            return "Order not available. Check the license key or contact support if you just paid."
+            return "We could not find that license key, so check it or contact support if you have just paid."
         case .activationLimitReached:
-            return "This license has reached its 2-Mac activation limit."
+            return "This license key is already on 2 Macs, so contact support to move it to this one."
         case .networkFailure:
-            return "Could not reach the license service. Check your connection and try again."
+            return "We could not connect, so check your internet connection and try again."
         case .emptyKey:
-            return "Enter your Waffo license key."
-        case .unexpected(let statusCode):
-            return "Activation failed (HTTP \(statusCode))."
+            return "Enter your license key."
+        case .unexpected:
+            return "Activation did not work, so try again in a moment or contact support if it keeps happening."
         case .storageFailure:
-            return "Could not save the license on this Mac. Check disk permissions and try again."
+            return "We could not save your license on this Mac, so check your disk and try again."
         case .productNotConfigured:
-            return "License activation is not configured in this build."
+            return "This copy of Write It Down cannot activate a license, so download it again from writeitdown.app."
         case .wrongProduct:
-            return "This license is not for writeitdown."
+            return "This license key is for a different app, so use the one from your Write It Down purchase."
         case .invalidToken:
-            return "The license could not be verified. Reconnect and activate again."
+            return "We could not verify your license, so connect to the internet and activate again."
         case .cleanupFailure:
-            return "Activation could not be undone. Contact support with your receipt to free the device slot."
+            return "This Mac could not be activated and still counts toward your 2 Macs, so contact support with your receipt to free it."
         }
     }
 }

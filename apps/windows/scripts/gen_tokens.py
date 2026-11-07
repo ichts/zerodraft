@@ -117,8 +117,8 @@ checkout = rd('Licensing/CheckoutClient.swift')
 WIN_SUBS = [('On the Mac: ', ''), ('2-Mac', '2-PC'), ('2 Macs', '2 PCs'), ('this Mac', 'this PC'), ('Waffo license key', 'license key'), ('This Mac', 'This PC')]
 WIN_OVERRIDES = {
     # the licence lives in the Windows Credential Manager, not a file on disk (no "disk permissions" to check)
-    'storageFailure': ('Could not save the license on this Mac. Check disk permissions and try again.',
-                       'Could not save the license on this PC. Check access to the Windows Credential Manager and try again.'),
+    'storageFailure': ('We could not save your license on this Mac, so check your disk and try again.',
+                       'We could not save your license on this PC, so check access to the Windows Credential Manager and try again.'),
 }
 def win(s):
     for a, b in WIN_SUBS: s = s.replace(a, b)
@@ -154,17 +154,18 @@ P.append('\tSilenceChoices = []int{%s, %s, %s}' % sl.groups())
 P.append('\tSilenceLabels = []string{%s}' % ', '.join(q(l) for _, l in labels))
 # rules sheet
 const('RulesEyebrow', lit(rules, 'How it works', 'RulesEyebrow')); const('RulesHeading', lit(rules, 'Forward only. Nothing kept.', 'RulesHeading'))
-const('RulesSub', lit(rules, 'Open it, start typing, say the thing you have been avoiding. The only way out is through.', 'RulesSub'))
 rl = re.findall(r'rule\("([^"]+)",\s*"([^"]+)"\)', rules)
 assert len(rl) == 3
-for i, (t, b) in enumerate(rl, 1): const(f'Rule{i}Title', win(t)); const(f'Rule{i}Body', win(b))
+for i, (t, b) in enumerate(rl, 1):
+    const(f'Rule{i}Title', win(t))
+    if '\\(silenceSeconds)' in b: const(f'Rule{i}BodyFormat', win(b).replace('\\(silenceSeconds)', '%d'))  # the picker's silence limit
+    else: const(f'Rule{i}Body', win(b))
 const('RulesDone', lit(rules, 'Done', 'RulesDone'))
 # activation (upgrade) card
 const('UpgradeTitle', lit(upgrade, 'Activate Write It Down', 'UpgradeTitle')); const('UpgradeTitleLicensed', 'Write It Down')
 const('UpgradeSubtitle', lit(upgrade, 'A license is required to keep writing on this Mac.', 'UpgradeSubtitle'))
 const('UpgradeSubtitleLicensed', lit(upgrade, 'This Mac is licensed.', 'UpgradeSubtitleLicensed'))
 const('UpgradeFieldLabel', lit(upgrade, 'License key', 'UpgradeFieldLabel'))
-const('UpgradePlaceholder', lit(state, 'License key', 'UpgradePlaceholder'))  # one placeholder for both surfaces: AppState.licenseFieldPlaceholder, shown by the activation card and Settings
 const('UpgradeActivate', lit(upgrade, 'Activate', 'UpgradeActivate')); const('UpgradeActivating', lit(upgrade, 'Activating', 'UpgradeActivating'))
 const('UpgradeBegin', lit(upgrade, 'Begin', 'UpgradeBegin'))
 const('UpgradeEnterFirst', lit(upgrade, 'Enter your license key first.', 'UpgradeEnterFirst'))
@@ -184,16 +185,16 @@ num('RulesTitleGap', s1(r'stack\.setCustomSpacing\((\d+), after: titleLabel\)', 
 num('ChipEmWidth', s1(r'static let emWidth: CGFloat = ([0-9.]+)', chip)); num('ChipEmHeight', s1(r'static let emHeight: CGFloat = ([0-9.]+)', chip))
 num('ChipCornerShare', s1(r'static let plateCornerShare: CGFloat = ([0-9.]+)', chip)); num('ChipPickerTypeSize', s1(r'static let pickerTypeSize: CGFloat = (\d+)', chip))
 # licence and access status (AppState), activation errors (LicenseModels)
-for k, t in [('StatusChecking', 'Checking license…'), ('StatusNotActivated', 'License not activated on this Mac. Enter your license key.'),
-             ('StatusNeedsValidation', 'License needs online validation. Reopen the app when connected.'), ('StatusWrongProduct', 'License does not match the configured writeitdown product.'),
-             ('StatusActive', 'License active.'), ('StatusRevoked', 'License revoked. Enter a valid license key.'),
-             ('StatusInvalid', 'License invalid. Activate this Mac again.'), ('StatusUnknown', 'License status unknown. Reconnect to validate.'),
+for k, t in [('StatusChecking', 'Checking your license…'), ('StatusNotActivated', 'This Mac is not activated, so enter your license key.'),
+             ('StatusNeedsValidation', 'We need to check your license online, so reopen the app when you are connected.'), ('StatusWrongProduct', 'This license key is for a different app, so use the one from your Write It Down purchase.'),
+             ('StatusActive', 'License active.'), ('StatusRevoked', 'This license is no longer valid, so enter a different license key.'),
+             ('StatusInvalid', 'We could not confirm your license, so activate this Mac again.'), ('StatusUnknown', 'We could not check your license, so connect to the internet and try again.'),
              ('StatusInactive', 'Activate this Mac to begin writing.'),
-             ('TrialReadError', "Could not read trial usage. Check access to the app's settings and reopen the app."),
-             ('TrialSaveError', "Could not save trial usage. Check access to the app's settings and reopen the app.")]:
+             ('TrialReadError', "We could not read your free sessions, so reopen the app and try again."),
+             ('TrialSaveError', "We could not save your free sessions, so reopen the app and try again.")]:
     const(k, lit(state, t, k))
-assert 'Free trial: \\(trialSessionsRemaining) of \\(Self.trialSessionLimit) sessions left, "' in state and '"counted at the first character."' in state
-const('TrialLeftFormat', 'Free trial: %d of %d sessions left, counted at the first character.')
+assert '"1 free session left."' in state and '"\\(trialSessionsRemaining) free sessions left."' in state
+const('TrialLeftOne', '1 free session left.'); const('TrialLeftFormat', '%d free sessions left.')
 for m in re.finditer(r'case \.(\w+)(?:\(let statusCode\))?:\s*return "([^"]*)"', models):
     name, text = m.groups()
     text = text.replace('\\(statusCode)', '%d')

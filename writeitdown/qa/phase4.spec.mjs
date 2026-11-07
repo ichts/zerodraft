@@ -1768,8 +1768,8 @@ test('the landing states the warning lead-in and never labels a moment with anot
   expect(copy.stopped).toEqual(['You stopped.', 'Draft deleted.']);
   // One form for a silence mark everywhere.
   expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
-  // The lead-in is stated once, on the card and in the answer the schema repeats word for word.
-  expect(copy.card).toMatch(/warning starts three seconds before/i);
+  // The card says the one rule (D-086) and the marker above it shows the warning; the lead-in is stated in the answer the schema repeats word for word.
+  expect(copy.card).toMatch(/Silence deletes it ?Stop for 8 seconds and the draft is deleted\.$/);
   expect(copy.faq).toMatch(/warning always starts three seconds before/i);
   expect(copy.faq).toBe(copy.schema);
 });

@@ -39,7 +39,7 @@ func (e *ActivationError) Error() string {
 	case KindEmptyKey:
 		return tokens.ErrEmptyKey
 	case KindUnexpected:
-		return fmt.Sprintf(tokens.ErrUnexpected, e.Status)
+		return tokens.ErrUnexpected
 	case KindStorageFailure:
 		return tokens.ErrStorageFailure
 	case KindProductNotConfigured:

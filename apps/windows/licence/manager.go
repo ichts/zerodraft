@@ -182,8 +182,10 @@ func (m *Manager) accessStatusText() string {
 	if m.trialAccessError != "" {
 		return m.trialAccessError
 	}
-	if n := m.trialRemaining(); n > 0 {
-		return fmt.Sprintf(tokens.TrialLeftFormat, n, tokens.TrialSessionLimit)
+	if n := m.trialRemaining(); n == 1 {
+		return tokens.TrialLeftOne
+	} else if n > 0 {
+		return fmt.Sprintf(tokens.TrialLeftFormat, n)
 	}
 	return m.licenseStatusText()
 }

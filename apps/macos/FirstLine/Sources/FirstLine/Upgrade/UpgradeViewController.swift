@@ -73,7 +73,6 @@ final class UpgradeViewController: NSViewController {
 
         licenseField = NSTextField(string: "")
         licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.placeholderString = AppState.licenseFieldPlaceholder
         licenseField.font = FirstLineTypography.fieldNSFont
         licenseField.textColor = FirstLineColors.inkNSColor
         licenseField.backgroundColor = FirstLineColors.sheetNSColor
@@ -81,6 +80,7 @@ final class UpgradeViewController: NSViewController {
         licenseField.isBezeled = true
         licenseField.bezelStyle = .roundedBezel
         licenseField.focusRingType = .default
+        licenseField.setAccessibilityLabel("License key")
         licenseField.target = self
         licenseField.action = #selector(activateTapped)
         licenseField.cell?.sendsActionOnEndEditing = false

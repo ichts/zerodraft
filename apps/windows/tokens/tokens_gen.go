@@ -124,7 +124,6 @@ const (
 	TrialSessionLimit           = 3
 	LicenseOfflineGraceSeconds  = 604800
 	LicenseTokenLifetimeSeconds = 604800
-	HomeTitle                   = "How long?"
 	HomeMinutes                 = "Minutes"
 	HomeSilence                 = "Delete after silence"
 	HomeBegin                   = "Begin"

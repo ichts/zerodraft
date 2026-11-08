@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState choices, observable access status (free-trial count or license), the chip-and-wordmark lockup
  *          and AppKit focus.
- * [OUTPUT]: "How long?" white card with the A mark chip and wordmark, minute/silence segmented controls, Begin, the card's 560 pt resting (not fixed) width, and
+ * [OUTPUT]: Untitled white card (the "Minutes" label carries the meaning, D-096) with the A mark chip and wordmark, minute/silence segmented controls, Begin, the card's 560 pt resting (not fixed) width, and
  *           the live access line.
  * [POS]: Pre-writing surface in the After language with the chip-and-wordmark lockup; selections persist, Begin enters
  *        the room.
@@ -10,12 +10,19 @@
 import AppKit
 
 @MainActor
-final class HomeViewController: NSViewController {
+final class HomeViewController: NSViewController, NSPopoverDelegate {
     private let appState: AppState
     private var durationControl: FirstLineSegmentedControl!
     private var silenceControl: FirstLineSegmentedControl!
     private var statusView: FirstLineStatusView!
     private var beginButton: NSButton!
+    private var card: FirstLineCardView!
+    private var rulesButton: NSButton!
+    /// The how-it-works popover while it is open (D-097); it grows from the `?` and closes back into it.
+    private(set) var rulesPopover: NSPopover?
+    /// The card's frame in the picker's own coordinates, the rect the room's paper grows out of (D-096).
+    var cardFrame: NSRect { card.frame }
+    private var liveResizeObserver: NSObjectProtocol?
 
     init(appState: AppState) {
         self.appState = appState
@@ -35,10 +42,46 @@ final class HomeViewController: NSViewController {
         super.viewDidAppear()
         view.window?.makeFirstResponder(beginButton)
         view.window?.defaultButtonCell = beginButton.cell as? NSButtonCell
+        prewarmRoomPaper()
+        liveResizeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didEndLiveResizeNotification, object: view.window, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.prewarmRoomPaper() }
+        }
+    }
+
+    /// Closing the rules hands focus back to the `?` that opened them, so a keyboard writer is not stranded.
+    func popoverDidClose(_ notification: Notification) {
+        view.window?.makeFirstResponder(rulesButton)
+    }
+
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        if !view.inLiveResize { prewarmRoomPaper() }
+    }
+
+    override func viewWillDisappear() {
+        super.viewWillDisappear()
+        // The rules popover is not a sheet: it would stay over the room if the picker left under it.
+        rulesPopover?.close()
+        if let liveResizeObserver { NotificationCenter.default.removeObserver(liveResizeObserver) }
+        liveResizeObserver = nil
+    }
+
+    /// The room's paper is the content area inset 32 pt on every side (SessionViewController.buildRoom). The
+    /// picker renders that sheet in the background while the writer chooses, so Begin shows the finished
+    /// paper on its first frame instead of building the texture on the click (D-096).
+    func prewarmRoomPaper() {
+        guard let window = view.window else { return }
+        let area = view.safeAreaRect.insetBy(dx: 32, dy: 32)
+        let scale = window.backingScaleFactor
+        let dark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        PaperSheetCache.shared.prewarm(width: Int((area.width * scale).rounded()),
+                                       height: Int((area.height * scale).rounded()), scale: scale, dark: dark)
     }
 
     private func buildInterface() {
-        let card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 44, left: 48, bottom: 44, right: 48))
+        card = FirstLineCardView(contentInsets: NSEdgeInsets(top: 44, left: 48, bottom: 44, right: 48))
         view.addSubview(card)
         // 560 is the resting width; a longer label widens the card instead of squeezing a segment.
         let restingWidth = card.widthAnchor.constraint(equalToConstant: 560)
@@ -55,8 +98,7 @@ final class HomeViewController: NSViewController {
         // then the wordmark on the same baseline (D-075).
         let lockup = BrandChipLockupView(typeSize: BrandChipLockupView.pickerTypeSize)
 
-        let title = label("How long?", font: FirstLineTypography.displayNSFont(), color: FirstLineColors.inkNSColor)
-        let rulesButton = FirstLineButtons.iconCircle(title: "?", target: self, action: #selector(showRules))
+        rulesButton = FirstLineButtons.iconCircle(title: "?", target: self, action: #selector(showRules))
         rulesButton.setAccessibilityLabel("How it works")
         rulesButton.setAccessibilityHelp("How it works: no way back, silence deletes it, reach zero and keep it.")
         durationControl = FirstLineSegmentedControl(
@@ -96,14 +138,15 @@ final class HomeViewController: NSViewController {
         // The picker keeps the trial/session line only; a licensed Mac shows no access line.
         statusView.isHidden = appState.hasFullAccess
 
-        let stack = NSStackView(views: [lockup, title, minutes, durationControl,
+        let stack = NSStackView(views: [lockup, minutes, durationControl,
                                         silenceLabel, silenceControl, beginButton, statusView])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 0
-        stack.setCustomSpacing(20, after: lockup)
-        stack.setCustomSpacing(24, after: title)
+        // The "Minutes" label carries the meaning (D-096), so the lockup row opens straight onto the controls with one
+        // gap, larger than the 20 pt between the picker groups so the brand row still reads as the card's header.
+        stack.setCustomSpacing(32, after: lockup)
         stack.setCustomSpacing(8, after: minutes)
         stack.setCustomSpacing(20, after: durationControl)
         stack.setCustomSpacing(8, after: silenceLabel)
@@ -156,7 +199,20 @@ final class HomeViewController: NSViewController {
     }
 
     @objc private func showRules() {
-        presentAsSheet(RulesViewController(silenceSeconds: appState.settings.silenceLimit.rawValue))
+        if let rulesPopover, rulesPopover.isShown { rulesPopover.performClose(nil); return }
+        let popover = NSPopover()
+        let rules = RulesViewController(silenceSeconds: appState.settings.silenceLimit.rawValue)
+        rules.popover = popover
+        popover.contentViewController = rules
+        popover.behavior = .transient
+        popover.delegate = self
+        let reduce = switch appState.settings.reducedMotion {
+        case .system: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        case .always: true
+        case .never: false
+        }
+        popover.animates = !reduce
+        rulesPopover = popover
+        popover.show(relativeTo: rulesButton.bounds, of: rulesButton, preferredEdge: .maxY)
     }
 }
-

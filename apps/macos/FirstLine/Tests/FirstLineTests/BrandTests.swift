@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
+@Suite(.serialized)
 @MainActor
 struct BrandTests {
     @Test func infoPlistNamesWriteItDown() throws {
@@ -32,7 +33,7 @@ struct BrandTests {
         let lockups = descendants(of: BrandChipLockupView.self, in: home.view)
         #expect(lockups.count == 1)
         #expect(lockups.first?.accessibilityLabel() == "Write It Down")
-        #expect(labels.contains("How long?"))
+        #expect(!labels.contains("How long?"))
         #expect(!labels.contains("Forward only. Nothing is saved."))
         #expect(labels.contains("Minutes") || labels.contains("minutes"))
         #expect(labels.contains("Delete after silence"))
@@ -82,7 +83,7 @@ struct BrandTests {
         #expect(window.firstResponder === help, "the question mark is not keyboard reachable")
         help.performClick(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.15))
-        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        let rules = try #require(home.rulesPopover?.contentViewController as? RulesViewController)
         rules.view.layoutSubtreeIfNeeded()
         let labels = allLabels(in: rules.view)
         let ordered = ["How it works", "Forward only. Nothing kept.", "No way back",
@@ -100,8 +101,8 @@ struct BrandTests {
             timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: rules.view.window!.windowNumber,
             context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36))
         #expect(rules.view.window?.performKeyEquivalent(with: ret) == true)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        #expect(home.presentedViewControllers?.isEmpty != false, "Return did not dismiss the rules")
+        RunLoop.main.run(until: Date().addingTimeInterval(2.0))
+        #expect(home.rulesPopover?.isShown != true, "Return did not dismiss the rules")
         window.orderOut(nil)
     }
 
@@ -121,7 +122,7 @@ struct BrandTests {
         window.makeFirstResponder(help)
         help.performClick(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.15))
-        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        let rules = try #require(home.rulesPopover?.contentViewController as? RulesViewController)
         rules.view.layoutSubtreeIfNeeded()
         let sheet = try #require(rules.view.window)
         let escape = try #require(NSEvent.keyEvent(
@@ -130,13 +131,13 @@ struct BrandTests {
             context: nil, characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}",
             isARepeat: false, keyCode: 53))
         sheet.sendEvent(escape)
-        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
-        #expect(home.presentedViewControllers?.isEmpty == true, "Escape did not dismiss the rules")
+        RunLoop.main.run(until: Date().addingTimeInterval(2.0))
+        #expect(home.rulesPopover?.isShown != true, "Escape did not dismiss the rules")
         window.orderOut(nil)
     }
 
-    /// Mac design audit A3: the system sheet is the one rounded panel. The content sits straight on it,
-    /// so the sheet is exactly its content's size and no second card, shadow or rounded fill sits inside.
+    /// Mac design audit A3: the popover is the one rounded panel. The content sits straight on it,
+    /// so the popover is exactly its content's size and no second card, shadow or rounded fill sits inside.
     @Test func rulesSheetHasOneRoundedEdgeAndNoEmptyBand() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -152,7 +153,7 @@ struct BrandTests {
         let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
         help.performClick(nil)
         RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-        let rules = try #require(home.presentedViewControllers?.first as? RulesViewController)
+        let rules = try #require(home.rulesPopover?.contentViewController as? RulesViewController)
         rules.view.layoutSubtreeIfNeeded()
         func surfaces(_ view: NSView) -> [NSView] {
             let own: [NSView] = (view is FirstLineCardView || view is FirstLineShadowView || view is FloodCanvasView) ? [view] : []
@@ -169,7 +170,7 @@ struct BrandTests {
         // Done is the last row: the bottom inset is the declared one, so nothing empty trails it.
         #expect(abs(doneFrame.minY - RulesViewController.contentInsets.bottom) <= 1,
                 "Done sits \(doneFrame.minY) pt above the sheet's bottom, expected \(RulesViewController.contentInsets.bottom)")
-        rules.dismiss(nil)
+        home.rulesPopover?.close()
         RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         window.orderOut(nil)
     }
@@ -357,5 +358,68 @@ struct BrandTests {
         view.subviews.flatMap { child in
             ((child as? T).map { [$0] } ?? []) + descendants(of: type, in: child)
         }
+    }
+
+    /// Audit fix 2 (D-097): the how-it-works panel grows from the `?` that opened it and closes back into it,
+    /// anchored on the button with a transient popover, not a window-wide sheet that slides from the title bar.
+    /// Spins the run loop until the condition holds or three seconds pass: a popover closes on its own animation.
+    private func spin(until condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(3)
+        while !condition(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    }
+
+    @Test func rulesPopoverIsAnchoredOnTheQuestionMark() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let popover = try #require(home.rulesPopover)
+        #expect(popover.isShown && popover.behavior == .transient)
+        #expect(home.presentedViewControllers?.isEmpty != false, "the rules are still a window-wide sheet")
+        let panel = try #require(popover.contentViewController?.view.window)
+        let anchor = window.convertToScreen(help.convert(help.bounds, to: nil))
+        // The panel touches the button's column: its frame spans the button's centre line horizontally.
+        #expect(panel.frame.minX - 40 < anchor.midX && anchor.midX < panel.frame.maxX + 40,
+                "the panel is nowhere near the question mark: \(panel.frame) vs \(anchor)")
+        #expect(abs(panel.frame.maxY - anchor.minY) < 60 || abs(panel.frame.minY - anchor.maxY) < 60,
+                "the panel does not sit against the button: \(panel.frame) vs \(anchor)")
+        // Leaving the picker under an open popover (a menu command, say) must take the popover with it: it is not a
+        // sheet and would otherwise float over the writing room.
+        home.viewWillDisappear()
+        spin(until: { !popover.isShown })
+        #expect(!popover.isShown, "the rules popover stayed open after the picker left")
+        window.orderOut(nil)
+    }
+
+    @Test func closingTheRulesPopoverReturnsFocusToTheQuestionMark() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let popover = try #require(home.rulesPopover)
+        popover.performClose(nil)
+        spin(until: { window.firstResponder === help })
+        #expect(window.firstResponder === help, "focus did not come back to the ? after the popover closed")
+        window.orderOut(nil)
     }
 }

@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
  * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
- * [POS]: Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [POS]: Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -790,6 +790,63 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         case .always: true
         case .never: false
         }
+    }
+
+    static let growDuration = 0.24
+    static let growAnimationKey = "paperGrow"
+
+    /// Begin (D-096): the paper's first frame is the picker card's rectangle in the paper's own tone and texture,
+    /// so the room is on screen at once, then it grows to the sheet's place with an ease-out over `growDuration`
+    /// while a veil of the same paper hides the writing layer until the sheet is nearly there. Only the layer is
+    /// animated: the layout is final from the first frame, so typing and the caret never wait for the motion.
+    /// Reduce Motion cuts straight to the finished room.
+    /// The transform that lays the sheet exactly on the card, whatever anchor the layer keeps: the card's centre is
+    /// the anchor-scaled centre plus a translation, so the first frame is the card's own centre and size.
+    static func growStart(layer: CALayer, target: NSRect, card: NSRect) -> CATransform3D {
+        let sx = card.width / target.width, sy = card.height / target.height
+        let anchor = CGPoint(x: target.minX + layer.anchorPoint.x * target.width,
+                             y: target.minY + layer.anchorPoint.y * target.height)
+        let tx = card.midX - anchor.x - sx * (target.midX - anchor.x)
+        let ty = card.midY - anchor.y - sy * (target.midY - anchor.y)
+        return CATransform3DScale(CATransform3DMakeTranslation(tx, ty, 0), sx, sy, 1)
+    }
+
+    func growPaper(from card: NSRect) {
+        view.layoutSubtreeIfNeeded()
+        let target = paper.frame
+        guard !reducesMotion, target.width > 1, target.height > 1, card.width > 1, card.height > 1,
+              let paperLayer = paper.layer, let shadowLayer = paperShadow.layer else { return }
+        let curtain = PaperSheetView()
+        curtain.cornerRadius = FirstLineRadius.sheet
+        curtain.clipsContent = true
+        curtain.borderColor = FirstLineColors.sheetRingNSColor
+        curtain.borderWidth = 1
+        curtain.passesHitTests = true
+        curtain.frame = paper.bounds
+        paper.addSubview(curtain)
+
+        let ease = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { MainActor.assumeIsolated { curtain.removeFromSuperview() } }
+        for layer in [paperLayer, shadowLayer] {
+            let grow = CABasicAnimation(keyPath: "transform")
+            grow.fromValue = NSValue(caTransform3D: Self.growStart(layer: layer, target: target, card: card))
+            grow.toValue = NSValue(caTransform3D: CATransform3DIdentity)
+            grow.duration = Self.growDuration
+            grow.timingFunction = ease
+            grow.fillMode = .backwards
+            layer.add(grow, forKey: Self.growAnimationKey)
+        }
+        let lift = CABasicAnimation(keyPath: "opacity")
+        lift.fromValue = 1
+        lift.toValue = 0
+        lift.beginTime = CACurrentMediaTime() + Self.growDuration * 0.3
+        lift.duration = Self.growDuration * 0.7
+        lift.fillMode = .both
+        lift.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        curtain.layer?.opacity = 0
+        curtain.layer?.add(lift, forKey: "veil")
+        CATransaction.commit()
     }
 
     func refreshRoom() { applyPhase() }

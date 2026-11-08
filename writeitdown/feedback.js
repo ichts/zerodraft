@@ -4,6 +4,9 @@
 // state instead of being dropped. Reduce Motion keeps the flash alone. This is
 // the Mac room's case 44 treatment on the web; the two surfaces must not drift.
 
+// The door opens (D-097): the landing's demo paper grows into the room's paper over this long; the Mac's picker card
+// grows into its room's paper over the same 240 ms (SessionViewController.growDuration). Reduce Motion cuts at once.
+export const GROW_MS = 240;
 export const LINE_SHIFT_MS = 180;
 export const lineShiftProgress = progress => 1 - (1 - progress) ** 3;
 

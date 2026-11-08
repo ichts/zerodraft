@@ -181,11 +181,10 @@ func (a *App) homeView(c *ui.Context, dark bool) {
 			}
 			ui.Box(c).Size(chipW, chipH).Label(tokens.HomeLockupLabel).Role(ui.RoleImage).
 				Draw(func(pp *ui.Painter, r ui.Rect) { chipLockup(pp, r, p) })
-			// the vertical gaps below are the Mac's (20, 24, 8, 20, 8, 26, 18) less what Segoe UI Variable's taller line box
-			// adds, measured ink to ink against the Mac picker at 1040 x 720 (scripts/screens.sh, SYNC.md row 34)
-			gap(c, 17)
-			display(c, p, tokens.HomeTitle, 34)
-			gap(c, 20)
+			// the vertical gaps below are the Mac's (32, 8, 20, 8, 26, 18) less what Segoe UI Variable's taller line box
+			// adds, measured ink to ink against the Mac picker at 1040 x 720 (scripts/screens.sh, SYNC.md row 34);
+			// the picker has no title (D-096), the "Minutes" label carries the meaning
+			gap(c, 28)
 			smallLabel(c, p, tokens.HomeMinutes)
 			gap(c, 7)
 			mins := make([]string, len(tokens.DurationChoices))

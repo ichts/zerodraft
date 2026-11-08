@@ -142,7 +142,7 @@ num('LicenseOfflineGraceSeconds', 7 * 24 * 60 * 60) if 'licenseOfflineGraceInter
 num('LicenseTokenLifetimeSeconds', 7 * 24 * 60 * 60) if 'static let lifetime: Int64 = 7 * 24 * 60 * 60' in rd('Licensing/LicenseTokenVerifier.swift') else sys.exit('lifetime changed')
 assert 'url.scheme == "https", url.host != nil' in state.replace('\n', ' ') or 'scheme == "https"' in state
 # home
-const('HomeTitle', lit(home, 'How long?', 'HomeTitle')); const('HomeMinutes', lit(home, 'Minutes', 'HomeMinutes'))
+const('HomeMinutes', lit(home, 'Minutes', 'HomeMinutes'))
 const('HomeSilence', lit(home, 'Delete after silence', 'HomeSilence')); const('HomeBegin', lit(home, 'Begin', 'HomeBegin'))
 const('HomeRulesHelp', lit(home, 'How it works', 'HomeRulesHelp'))
 const('HomeLockupLabel', 'Write It Down')

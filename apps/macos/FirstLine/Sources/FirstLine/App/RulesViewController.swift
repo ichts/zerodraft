@@ -1,8 +1,8 @@
 /**
  * [INPUT]: The shipped copy tokens, the type scale and the landing page's "How it works" wording.
- * [OUTPUT]: The system sheet's own content, with no card inside it: how it works, the landing's three rules in order, and a Done action; body text is the
+ * [OUTPUT]: The popover's own content, with no card inside it: how it works, the landing's three rules in order, and a Done action; body text is the
  *           scale's 15 pt at 1.5 leading on a 60ch measure, and each rule title is one step up in weight, not down in size.
- * [POS]: Opened from the picker's small "?" control; Esc or Return dismisses it; light and dark follow the sheet surface.
+ * [POS]: Opened from the picker's small "?" control as a popover that grows from it and closes back into it (D-097); Esc, Return, Done or a click outside dismisses it; light and dark follow the system popover surface.
  * [PROTOCOL]: Keep the wording and order identical to writeitdown/index.html's How it works cards.
  */
 import AppKit
@@ -25,6 +25,8 @@ final class RulesViewController: NSViewController {
     static var cardWidth: CGFloat { bodyMeasure + cardInset * 2 }
     static let contentInsets = NSEdgeInsets(top: 40, left: cardInset, bottom: 36, right: cardInset)
 
+    /// The popover this view is open in (D-097); nil when presented any other way.
+    weak var popover: NSPopover?
     private let doneButton: NSButton
     /// The picker's silence limit in seconds: the one number the second rule states.
     private let silenceSeconds: Int
@@ -45,7 +47,7 @@ final class RulesViewController: NSViewController {
     override func loadView() {
         // The system sheet is the one rounded panel: the content sits directly on it, on the plain
         // surface fill, with no card of its own inside.
-        view = FloodCanvasView(fillColor: FirstLineColors.sheetNSColor)
+        view = FloodCanvasView(fillColor: .clear)
 
         let eyebrow = label("How it works", font: FirstLineTypography.smallSemiboldNSFont,
                             color: FirstLineColors.chromeNSColor)
@@ -107,6 +109,7 @@ final class RulesViewController: NSViewController {
     }
 
     @objc private func close() {
+        if let popover { popover.performClose(nil); return }
         guard let presenter = presentingViewController else { return }
         presenter.dismiss(self)
     }

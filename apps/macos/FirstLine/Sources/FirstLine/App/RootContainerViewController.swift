@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController 的 SurfaceFactory、Update/UpdateController、DesignSystem/Colors
  * [OUTPUT]: 常驻窗口内容容器，原地切换 surface 子 VC 并转发当前房间菜单动作与新篇同步刷新
- * [POS]: FirstLine AppKit 壳的 surface 宿主；窗口只设一次尺寸，切 surface 只换子视图，同一 surface
+ * [POS]: FirstLine AppKit 壳的 surface 宿主；Begin（Home -> Session）时把选择器卡片矩形交给房间的 growPaper（D-097）；窗口只设一次尺寸，切 surface 只换子视图，同一 surface
  *        重复 show 不重建（保留房间的瞬态状态如 COPIED），避免每次换 contentViewController 触发的
  *        窗口 resize / 0x0 fitting-size / 递归 layout
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -54,6 +54,11 @@ final class RootContainerViewController: NSViewController {
         incomingView.frame = view.bounds
         incomingView.autoresizingMask = [.width, .height]
         view.addSubview(incomingView)
+
+        // Begin: the room's paper grows out of the picker's card rather than cutting in (D-096).
+        if let home = current as? HomeViewController, let room = incoming as? SessionViewController {
+            room.growPaper(from: home.cardFrame)
+        }
 
         if let outgoing = current {
             outgoing.view.removeFromSuperview()

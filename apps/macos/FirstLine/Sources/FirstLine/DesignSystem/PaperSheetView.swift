@@ -3,8 +3,10 @@
  *          and the locked paper constants (tone Wheat #e9e2ce / #342e24 per D-069, superseding D-056's Note
  *          tone; grain 70 of 100, size 1.00 per D-056).
  * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone with, in light, two-scale mottle and grain and, in
- *           dark, one fine grain (D-093), rendered once
- *           into a cached CGImage per size and appearance, with the sheet ring and rounded clip the room needs.
+ *           dark, one fine grain (D-093), rendered once into a cached CGImage per size and appearance, with the
+ *           sheet ring and rounded clip the room needs;
+ *           PaperSheetCache - the small cache that lets the picker render the room's sheet off the main thread
+ *           before Begin, so the room's first paint finds the finished paper instead of building it.
  * [POS]: The Mac half of the sheet the web renders in writeitdown/paper.js; the room, its failure screen and
  *        the kept sheet all sit on this one paper. Cards, fields and controls keep FirstLineColors.sheetNSColor.
  * [PROTOCOL]: Keep the generator in step with writeitdown/paper.js (same seeds, amplitudes and pigments);
@@ -15,6 +17,12 @@
  * free. The image is built synchronously on first draw, so the window's first paint already carries the paper
  * instead of flashing a flat tone; a live window drag reuses the previous image stretched and rebuilds it when
  * the drag ends.
+ *
+ * Why the cache is warmed ahead: a texture built on the click's own turn put the room ~0.5 s behind Begin
+ * (D-096). The picker already knows the room's paper size, so it renders that sheet in the background while
+ * the writer chooses; the sheet is a pure function of size, scale and appearance, so a hit is identical to
+ * what the room would have built, and a miss (a resize, a click before the render ends) still builds it
+ * synchronously and never paints a flat tone.
  */
 
 import AppKit
@@ -56,6 +64,10 @@ final class PaperSheetView: NSView {
 
     override var isOpaque: Bool { false }
 
+    /// A veil that never takes a click or a key (the room's entrance curtain, D-096).
+    var passesHitTests = false
+    override func hitTest(_ point: NSPoint) -> NSView? { passesHitTests ? nil : super.hitTest(point) }
+
     private func updateLayerShape() {
         layer?.cornerRadius = cornerRadius
         layer?.masksToBounds = clipsContent
@@ -89,9 +101,9 @@ final class PaperSheetView: NSView {
         let height = Int((bounds.height * scale).rounded())
         guard width > 1, height > 1 else { return nil }
         let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let key = "\(width)x\(height)@\(scale)-\(dark ? "dark" : "light")"
+        let key = PaperSheetCache.key(width: width, height: height, scale: scale, dark: dark)
         if key == imageKey, let paperImage { return paperImage }
-        guard let sheet = PaperField.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
+        guard let sheet = PaperSheetCache.shared.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
         imageKey = key
         paperImage = sheet.image
         textureDidChange?(sheet.texture)
@@ -130,6 +142,76 @@ final class PaperSheetView: NSView {
             ctx.strokePath()
             ctx.restoreGState()
         }
+    }
+}
+
+/// One finished sheet kept for the next room. The sheet is immutable once rendered, so sharing it between the
+/// render queue and the main thread is safe.
+private struct RenderedSheet: @unchecked Sendable {
+    let sheet: PaperField.Sheet
+}
+
+/// The most recent rendered sheets, keyed by pixel size, scale and appearance. Three entries cover the live
+/// window, one resize behind it and the other appearance; the oldest goes first.
+@MainActor
+final class PaperSheetCache {
+    static let shared = PaperSheetCache()
+    static let capacity = 3
+
+    private var entries: [(key: String, sheet: PaperField.Sheet)] = []
+    private var warming: Set<String> = []
+    private var builds: [String: Int] = [:]
+
+    nonisolated static func key(width: Int, height: Int, scale: CGFloat, dark: Bool) -> String {
+        "\(width)x\(height)@\(scale)-\(dark ? "dark" : "light")"
+    }
+
+    /// How many times this size was built on the caller's turn because the cache missed; tests assert it stays
+    /// unchanged across a picker-to-room transition.
+    func synchronousBuilds(width: Int, height: Int, scale: CGFloat, dark: Bool) -> Int {
+        builds[Self.key(width: width, height: height, scale: scale, dark: dark)] ?? 0
+    }
+
+    /// True once the sheet for this size is cached.
+    func holds(width: Int, height: Int, scale: CGFloat, dark: Bool) -> Bool {
+        cached(Self.key(width: width, height: height, scale: scale, dark: dark)) != nil
+    }
+
+    /// The sheet for this size: the cached one when it matches, otherwise built now and remembered.
+    func sheet(width: Int, height: Int, scale: CGFloat, dark: Bool) -> PaperField.Sheet? {
+        let wanted = Self.key(width: width, height: height, scale: scale, dark: dark)
+        if let hit = cached(wanted) { return hit }
+        builds[wanted, default: 0] += 1
+        guard let built = PaperField.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
+        store(built, as: wanted)
+        return built
+    }
+
+    /// Renders the sheet for this size off the main thread unless it is already cached or on its way.
+    func prewarm(width: Int, height: Int, scale: CGFloat, dark: Bool) {
+        guard width > 1, height > 1 else { return }
+        let wanted = Self.key(width: width, height: height, scale: scale, dark: dark)
+        guard cached(wanted) == nil, warming.insert(wanted).inserted else { return }
+        Task.detached(priority: .userInitiated) {
+            let built = PaperField.sheet(width: width, height: height, scale: scale, dark: dark).map(RenderedSheet.init)
+            await MainActor.run {
+                let cache = PaperSheetCache.shared
+                cache.warming.remove(wanted)
+                if let built, cache.cached(wanted) == nil { cache.store(built.sheet, as: wanted) }
+            }
+        }
+    }
+
+    private func cached(_ key: String) -> PaperField.Sheet? {
+        guard let index = entries.firstIndex(where: { $0.key == key }) else { return nil }
+        let entry = entries.remove(at: index)
+        entries.append(entry)
+        return entry.sheet
+    }
+
+    private func store(_ sheet: PaperField.Sheet, as key: String) {
+        entries.append((key, sheet))
+        if entries.count > Self.capacity { entries.removeFirst() }
     }
 }
 

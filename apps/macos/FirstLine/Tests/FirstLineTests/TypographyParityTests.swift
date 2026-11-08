@@ -161,4 +161,14 @@ struct TypographyParityTests {
                     "\(role.role) \"\(role.string)\" at \(role.size): the Mac draws \(measured), the shared baseline says \(role.advancePt)")
         }
     }
+
+    /// Web draws plain grey-scale glyphs (`-webkit-font-smoothing: antialiased`); the Mac must switch CoreText's
+    /// stem thickening off the same way or the same text reads heavier (D-098).
+    @Test func glyphSmoothingIsOffLikeTheWeb() throws {
+        let suite = try #require(UserDefaults(suiteName: "wid-text-smoothing-\(UUID().uuidString)"))
+        #expect(suite.object(forKey: TextSmoothing.key) == nil)
+        TextSmoothing.matchWeb(suite)
+        #expect(suite.object(forKey: TextSmoothing.key) != nil)
+        #expect(suite.integer(forKey: TextSmoothing.key) == 0)
+    }
 }

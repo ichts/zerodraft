@@ -1923,3 +1923,26 @@ is `docs/wid-world-table.md`.
 - Reason: the captain, 2026-11-07: Begin must not cut from picker to room, the paper should grow out of the card; the motion audit (`wid-motion-audit`, tables B1 and B2) found every state change a hard cut and these two as the ones that lose the eye (the clicked card or CTA vanishes; the sheet slides in from the top edge unrelated to the `?`). Rulebook v3 14.4 f: the acted-on element must be tied between consecutive frames, with no blink and no full crossfade.
 - Supersedes: D-096's implicit cut at Begin (the 100 ms budget to first paper stands and is now the first frame of the grow); D-091's "?" opening a system sheet (the 32 pt quiet circle itself stands); D-076's sheet chrome for the rules (type scale, measure and wording stand).
 - Evidence: `BeginLatencyTests.beginGrowsThePaperOutOfThePickerCard` (the first frame sits on the card's centre and size, Reduce Motion has no animation), `BrandTests.rulesPopoverIsAnchoredOnTheQuestionMark`, `writeitdown/qa/door-grow.spec.mjs` (first frame equals the demo paper's box and the brand row has not moved, widths only grow, 240 ms, no blank frame, editor focused, Reduce Motion one change; fails on the cut), and the frame-by-frame before (main 4357fa0) / after recordings in `data/wid-picker-begin/`. The Windows picker still cuts and keeps its dialog; it follows in a later change.
+
+## D-098: The Mac draws the same glyph weight as the web
+
+- Date: 2026-11-08
+- Decision: the Mac app turns CoreText font smoothing off for the whole process (`AppleFontSmoothing = 0` in
+  its own preference domain, written in `main()` before any window draws). The web room already sets
+  `-webkit-font-smoothing: antialiased`, so the Mac moves to the web, not the reverse. Light and dark both.
+  Windows already draws plain grey antialiasing and is unchanged.
+- Reason: the captain saw the same text visibly heavier on the Mac than on the web. Ink units are summed glyph
+  coverage of the live line in logical px squared (paper grain is zero-mean and a text-free strip is the zero
+  point). Measured on the same typed text, same size, same paper, real keystrokes in the Tart VM on macOS
+  15.7.7 and 26.6.2 against Chrome 1x (Chrome 2x measures the same): Latin 28 pt light web 2184, Mac before
+  2874 (+32%), after 2372 (+9%); dark web 2181, before 3314 (+52%), after 2402 (+10%); Latin 23 pt light web
+  1454, before 1909 (+31%), after 1560 (+7%); Chinese 28 pt light web 1599, before 2254 (+41%), after 1791
+  (+12%). The two macOS versions agree within 1%. Same font file, same size; the difference is CoreText stem
+  thickening, which Chrome's `antialiased` switches off. What remains (+7% to +12%) is probably CoreText's own
+  rasteriser and hinting. The web's lighter look is the approved one (D-069's reading contrast ladder was set
+  against it). The VM display is 1x; no Retina capture exists.
+- Supersedes: nothing recorded; `apps/windows/SYNC.md` row 18's remark that the Mac kept draft reads heavier
+  than the grey-antialiased Windows one is now closed for the live and kept text alike.
+- Evidence: `TypographyParityTests.glyphSmoothingIsOffLikeTheWeb`, and the same-text three-way captures
+  (Chrome, Mac before = main build, Mac after = this build) on both macOS versions, with the ink-unit table, in
+  `data/wid-ink-weight/before-after.pdf`.

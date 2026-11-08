@@ -2005,3 +2005,33 @@ is `docs/wid-world-table.md`.
 - Evidence: `writeitdown/qa/history-fade.spec.mjs` (placement against the line and the footer, centring within
   1 px, frames before/during/after, 2 s once, 200 ms fade and the Reduce Motion step, 1440 and 390),
   `RoomTests` (the same on the Mac), `room/behaviour_test.go` (pixel-measured on Windows), and the frame strips in the PR.
+
+## D-101: The `?` sheet is three short lines at one level
+
+- Date: 2026-11-08
+- Decision: the Mac `?` popover and the Windows rules sheet drop the eyebrow `How it works`, the big title
+  `Forward only. Nothing kept.` and the bold-title-plus-grey-text groups. They show three lines at one level, in
+  ink, in the existing 15 pt body face: line 1 `Forward only, no deleting.`; line 2 `N seconds of silence
+  deletes the draft.`, where N is the silence limit in use (the user's 5, 8 or 12 on the Mac and Windows, default
+  8, never a literal; the web's fixed 8 is not shown on a `?` sheet because the web has none); line 3 `Write to 0:00 and the text is yours.` (the captain picked it from
+  `(1) Write to 0:00 and the text is yours.`, `(2) Reach 0:00 to keep your text.` and `(3) Make it to 0:00 and keep
+  what you wrote.`). The three lines are
+  held in one string (`RulesViewController.lines(silenceSeconds:)`; Windows is generated from it), so a copy change
+  is a one-line change plus a token regeneration. The popover now hugs its longest line (never past the
+  60-character measure) instead of always being the measure wide. The picker's `?` keeps its accessible name
+  `How it works`; its accessibility help sentence, which repeated the old three claims, is removed. The font
+  and size stay (15 pt system body); the 21 pt serif alternative is an open captain call.
+- Reason: the captain read the three options in `data/wid-help-copy-options/` and chose option B for lines 1
+  and 2 ("At 0:00, copy your text" was rejected, then "B+A" was preferred), then picked option (1) for line 3. Rulebook
+  rule 13 (delete filler): the eyebrow repeated the `?` button's name, the title summed up the three lines and
+  contradicted `Reach zero, keep it`, and each bold title said what its grey text said.
+- Supersedes: D-086's three titled rules on the `?` sheet (`No way back` / `You can only add the next word.`,
+  `Silence deletes it` / `Stop for N seconds and the draft is deleted.`, `Reach zero, keep it` / `The text is
+  yours to copy.`); D-076's rule-title weight step on that sheet (there are no titles); D-097's sheet content (the
+  anchored popover itself stands). Not changed: the landing page's `#how` section and its h2 (the web has no
+  `?` sheet), the first-delete hint (`wid-first-delete-hint`), every other string. The landing `#how` cards still
+  carry the old titles and bodies.
+- Evidence: `BrandTests.rulesViewReusesTheLandingExplanationAndDismisses`,
+  `BrandTests.rulesSecondLineFollowsTheSilenceSetting` (5, 8 and 12),
+  `DesignReviewFixesTests.rulesSheetUsesTheScaleForLeadingAndOneLevel`, `LongStringTests.rulesRowsGrowWithTheirText`;
+  Windows `TestRulesSheetFollowsTheTypeScale` (N = 5, 8, 12); captures in `data/wid-help-copy-build/`.

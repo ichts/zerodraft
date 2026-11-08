@@ -339,46 +339,46 @@ struct DesignReviewFixesTests {
 
     // MARK: - Problem 21: the rules sheet follows the type scale
 
-    @Test func rulesSheetUsesTheScaleForLeadingAndSubheads() throws {
+    @Test func rulesSheetUsesTheScaleForLeadingAndOneLevel() throws {
         let rules = RulesViewController()
-        let window = host(rules, size: NSSize(width: RulesViewController.cardWidth + 40, height: 760))
+        let window = host(rules, size: NSSize(width: RulesViewController.cardWidth() + 40, height: 760))
         let bodySize = RulesViewController.bodyFont.pointSize
         let expectedLeading = bodySize * RulesViewController.bodyLeading
-        let bodies = ["You can only add", "Stop for 8 seconds", "The text is yours"]
+        let lines = RulesViewController.lines(silenceSeconds: 8)
         var bodyLabels: [NSTextField] = []
-        for prefix in bodies {
+        for line in lines {
             let field = try #require(descendants(of: rules.view, as: NSTextField.self)
-                .first { $0.stringValue.hasPrefix(prefix) }, "missing the body run beginning \(prefix)")
+                .first { $0.stringValue == line }, "missing the line \(line)")
             bodyLabels.append(field)
             let paragraph = try #require(field.attributedStringValue.attribute(
                 .paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
-            #expect(field.font?.pointSize == bodySize, "\(prefix) is \(field.font?.pointSize ?? 0) pt, not the body role")
+            #expect(field.font?.pointSize == bodySize, "\(line) is \(field.font?.pointSize ?? 0) pt, not the body role")
             #expect(abs(paragraph.maximumLineHeight - expectedLeading) <= 0.01,
-                    "\(prefix) leads at \(paragraph.maximumLineHeight), the scale says \(expectedLeading)")
+                    "\(line) leads at \(paragraph.maximumLineHeight), the scale says \(expectedLeading)")
             #expect(abs(paragraph.minimumLineHeight - expectedLeading) <= 0.01)
             #expect(paragraph.lineBreakMode == .byWordWrapping)
+            #expect(abs(field.frame.height - expectedLeading) <= 1, "\(line) wraps: \(field.frame.height) pt tall")
         }
-        // Rendered pitch: a two-line body run is exactly two line boxes tall.
-        let oneLine = try #require(bodyLabels.first)
-        let lines = max(1, Int((oneLine.frame.height / expectedLeading).rounded()))
-        #expect(abs(oneLine.frame.height - CGFloat(lines) * expectedLeading) <= 1,
-                "a \(lines)-line body is \(oneLine.frame.height) pt tall, expected \(CGFloat(lines) * expectedLeading)")
-
-        // Subheads are one step up in weight at the body size, never smaller than their text.
-        for title in ["No way back", "Silence deletes it", "Reach zero, keep it"] {
-            let field = try #require(descendants(of: rules.view, as: NSTextField.self)
-                .first { $0.stringValue == title })
-            let size = try #require(field.font?.pointSize)
-            #expect(size >= bodySize, "the \(title) subhead is \(size) pt above \(bodySize) pt body text")
-            #expect(field.font?.fontDescriptor.symbolicTraits.contains(.bold) == true,
-                    "the \(title) subhead carries no weight step")
+        // One level: the three lines share one font, one colour and one left edge.
+        #expect(Set(bodyLabels.map { $0.font?.fontName ?? "" }).count == 1, "the lines use different faces")
+        func resolved(_ color: NSColor?) -> [CGFloat] {
+            var parts: [CGFloat] = []
+            NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
+                let c = color?.usingColorSpace(.sRGB)
+                parts = [c?.redComponent ?? -1, c?.greenComponent ?? -1, c?.blueComponent ?? -1, c?.alphaComponent ?? -1]
+            }
+            return parts
         }
-
-        // The measure is 60 characters of the body face.
+        #expect(bodyLabels.allSatisfy { resolved($0.textColor) == resolved(FirstLineColors.inkNSColor) }, "the lines are not all ink")
+        let edges = bodyLabels.map { rules.view.convert($0.bounds, from: $0).minX }
+        #expect((edges.max() ?? 0) - (edges.min() ?? 0) <= 0.5, "the lines do not share a left edge: \(edges)")
+        // The sheet hugs its longest line (as the label cell draws it) and never exceeds the 60 character measure.
+        let widest = bodyLabels.map { $0.intrinsicContentSize.width }.max() ?? 0
+        #expect(abs(RulesViewController.cardWidth() - (widest.rounded(.up) + 2 * RulesViewController.cardInset)) <= 5,  // the label cell's 2 pt inset each side
+                "the card is \(RulesViewController.cardWidth()) wide for a \(widest) pt line")
         let character = ("0" as NSString).size(withAttributes: [.font: RulesViewController.bodyFont]).width
-        let measure = try #require(bodyLabels.first).preferredMaxLayoutWidth
-        #expect(abs(measure - 60 * character) <= 1,
-                "the body measure is \(measure) pt, not 60 characters (\(60 * character) pt)")
+        #expect(abs(RulesViewController.bodyMeasure - 60 * character) <= 1, "the measure is not 60 characters")
+        #expect(RulesViewController.cardWidth() <= RulesViewController.bodyMeasure + 2 * RulesViewController.cardInset)
         window.orderOut(nil)
     }
 

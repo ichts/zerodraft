@@ -226,7 +226,7 @@ it exactly the `no-cache` it already had.
 decides: an unchanged file answers `304 Not Modified`, a changed file answers `200` with a new ETag.
 That is a deploy showing up on an ordinary reload, with no hard refresh and no `?v=` argument.
 - The pages, stylesheets, scripts, text, images and fonts are served under a name that survives a
-new deploy: `site.css`, `tokens.css`, `paper.js`, `room.js`, `demo.js`, the pages and the fonts
+new deploy: `site.css`, `tokens.css`, `paper-render.js`, `paper.js`, `room.js`, `demo.js`, the pages and the fonts
 (`newsreader-latin.woff2`, `newsreader-latin-italic.woff2`, the thirteen `zhuque-fangsong-NN.woff2`
 subsets, `fonts/reenie-beanie.woff2`) all keep their file name when their bytes change, so none of
 them is cached as `immutable`. Only the Sparkle payloads qualify, and only because their name

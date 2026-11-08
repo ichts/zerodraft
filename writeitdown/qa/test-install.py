@@ -12,7 +12,7 @@ source = Path(__file__).resolve().parents[1]
 files = {
     'download/index.html', 'index.html', 'mac.html', 'privacy.html',
     'terms.html', 'impressum.html', 'support.html', 'site.css', 'tokens.css',
-'theme.js', 'paper.js', 'demo.js',
+'theme.js', 'paper-render.js', 'paper.js', 'demo.js',
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
     'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html',
     'write-it-down-free-trial.html', 'write-it-down-price.html',

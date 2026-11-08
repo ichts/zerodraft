@@ -359,6 +359,32 @@ function route() {
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
 }
 
+// The room's sheet is hidden until the door opens, so its texture used to be painted on the page in the click's
+// own task - a 4 MP canvas, over a second on a 2x screen (D-103). Instead the room is measured while it is
+// hidden (shown and hidden again inside one task, so no frame sees it) and paper.js's worker textures the sheet
+// at exactly that size before anyone clicks. The click then finds the sheet painted.
+function warmPaper() {
+  if (!room.hidden || !window.WriteItDownPaper) return;
+  const root = document.documentElement;
+  const focused = document.activeElement;
+  const { scrollX, scrollY } = window;
+  root.classList.add('in-trial');
+  room.hidden = false;
+  const [width, height] = [paper.clientWidth, paper.clientHeight];
+  room.hidden = true;
+  root.classList.remove('in-trial');
+  // The in-trial page does not scroll, so the landing's offset would be lost with it.
+  if (window.scrollY !== scrollY) window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+  if (document.activeElement !== focused) focused?.focus?.({ preventScroll: true });
+  window.WriteItDownPaper.warm(paper, width, height);
+}
+
+let warmTimer = 0;
+function warmSoon(delay = 200) {
+  clearTimeout(warmTimer);
+  warmTimer = setTimeout(() => (window.requestIdleCallback || (f => f()))(warmPaper, { timeout: 500 }), delay);
+}
+
 function exit() {
   history.replaceState(null, '', location.pathname + location.search);
   route();
@@ -487,8 +513,8 @@ function sizeCopyFloor() {
   if (widest > 0) label.style.setProperty('--copy-floor', `${Math.ceil(widest)}px`);
 }
 
-window.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
-window.visualViewport?.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+window.addEventListener('resize', () => { warmSoon(); syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+window.visualViewport?.addEventListener('resize', () => { warmSoon(); syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
 document.fonts.ready.then(() => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
 touchInput.addEventListener('change', () => { syncExitCopy(); slot.invalidate(); placeStatus(); });
 reduced.addEventListener('change', tick);
@@ -497,6 +523,8 @@ window.addEventListener('pagehide', reset);
 window.addEventListener('pageshow', event => { if (event.persisted) route(); });
 document.addEventListener('visibilitychange', tick);
 setInterval(tick, 50);
+new MutationObserver(() => warmSoon()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 syncExitCopy();
 sizeCopyFloor();
 route();
+warmSoon(0);

@@ -2065,3 +2065,29 @@ is `docs/wid-world-table.md`.
   clear grounds on every surface, page colour in full screen) and Tart macOS 15.7.7 and 26.6.2 before/after
   captures on a light, a dark and a busy wallpaper in the PR.
 
+
+## D-103: Red as words is brighter in dark mode; red fills do not move
+
+- Date: 2026-11-08
+- Decision: dark-mode red TEXT gets its own tokens so it clears contrast; the fill red, the hue (H about 32), the
+  typeface and every light-mode value stay as they are. Web (`writeitdown/tokens.css`): `--red-text` (light
+  `#b02a1e`, dark `#f6715a`) for the hand-lettered words (`.home .hand`, `.h1 .hand`) and the warning numeral
+  (`.mo .n`), and `--red-text-small` (light `#b02a1e`, dark `#ff9b88`) for the 12 px `5 s · warning` label
+  (`.line8 .lab b`). Mac (`Colors.swift`): `redTextNSColor` (light `0xB02A1E`, dark `0xFF9B88`) for the five small
+  red text sites (the home status line, the two activation messages, the two Settings messages). `--red` and
+  `redNSColor` stay for fills and borders only (`.hairline`, `.tag b`, `.key.no::after`, `.line8 .track i`, the
+  Mac session border); `paperDangerNSColor` is untouched.
+- Bar (APCA Lc and WCAG 2 on the real backgrounds): big text Lc 45, small text Lc 60. Dark before to after: the
+  hand and numeral on the page `#15140f` Lc 39.6 to 47.5 (WCAG 5.33 to 6.52), the numeral on the red card
+  `#3a1c15` Lc 37.4 to 45.3 (4.47 to 5.47), the small label and the Mac messages on the card `#26231c` Lc 37.7 to
+  60.3 (4.53 to 7.69). Light is unchanged (`#b02a1e`, 6.13:1 on the page).
+- Two dark text values on purpose: the one value that clears Lc 60 (`#ff9b88`) turns the big hand-lettered red
+  pink, so big text takes the smallest lift that clears Lc 45 and small text takes the Lc 60 value.
+- Parity: the web and the Mac use the same two dark values. The Mac has only small red text, so it uses the small
+  value. The Windows token table (`apps/windows/tokens`, generated) is not part of this decision.
+- Reason: the captain, 2026-11-08, picked option 3 of the accent-text options (dark red text brighter, fills
+  and light unchanged). The audit found the hand-lettered words and the red small labels below the bar in dark.
+- Supersedes: the use of the fill red as the text colour in dark in D-057's pen accent and in the pen-red
+  roles of the Mac error messages. Fill values, hue and typeface stand.
+- Evidence: `DesignTokenTests.redTextIsBrighterInDarkOnly`; `qa/mac.spec.mjs` (computed colours in dark and light, the
+  track fill still `#e4604a`); the contrast table and the before/after captures in the PR.

@@ -64,6 +64,8 @@ enum FirstLineColors {
     static var tagBackgroundNSColor: NSColor { adaptive(light: 0xF2F2F0, dark: 0x2E2A22) }
     static var segmentTrackNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0xECE7D9, lightAlpha: 0.06, darkAlpha: 0.10) }
     static var redNSColor: NSColor { adaptive(light: 0xB02A1E, dark: 0xE4604A) }
+    /// Red as words (D-103): the fill red brightened in dark so small red text clears APCA Lc 60 on the card.
+    static var redTextNSColor: NSColor { adaptive(light: 0xB02A1E, dark: 0xFF9B88) }
     static var onInkNSColor: NSColor { adaptive(light: 0xFFFFFF, dark: 0x15140F) }
     static var shadowNSColor: NSColor { adaptive(light: 0x1C1917, dark: 0x000000) }
     static var separatorNSColor: NSColor { hairNSColor }

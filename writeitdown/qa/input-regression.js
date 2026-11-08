@@ -36,10 +36,10 @@ async () => {
   check('composition starts session', room.dataset.phase === 'typing');
   editor.value = '你';
   editor.dispatchEvent(new InputEvent('input', { bubbles: true, data: '你', inputType: 'insertCompositionText', isComposing: true }));
-  check('composition replacement not denied', editor.value === '你' && count.textContent === '1 character');
+  check('composition replacement not denied', editor.value === '你' && count.textContent === '1 word');
   editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '你' }));
   input('好');
-  check('composition commit plus next character', editor.value === '你好' && count.textContent === '2 characters');
+  check('composition commit plus next character', editor.value === '你好' && count.textContent === '2 words');
   reset();
   input(' \n\t');
   check('whitespace excluded', count.textContent === '0 words');

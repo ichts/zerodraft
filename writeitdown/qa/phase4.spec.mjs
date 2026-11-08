@@ -99,18 +99,18 @@ async function settle(page, ms = 400) {
   await page.clock.fastForward(ms);
 }
 
-test('CJK counts characters and kept actions use sentence case', async ({ page }, info) => {
+test('CJK counts words and kept actions use sentence case', async ({ page }, info) => {
   await page.goto('index.html');
   await enter(page);
   await page.keyboard.insertText('我们是');
-  await expect(page.locator('#room-count')).toHaveText('3 characters');
+  await expect(page.locator('#room-count')).toHaveText('3 words');
   await capture(page, info, 'cjk-count');
   for (let i = 0; i < 11; i++) {
     await page.clock.fastForward(5000);
     await page.keyboard.insertText('我');
   }
   await page.clock.fastForward(5000);
-  await expect(page.locator('#receipt')).toHaveText('1 minute. 14 characters.');
+  await expect(page.locator('#receipt')).toHaveText('1 minute. 14 words.');
   await expect(page.locator('#restart')).toHaveText('Begin again');
   await expect(page.locator('#copy-label')).toHaveText('Copy text');
   await capture(page, info, 'cjk-kept');

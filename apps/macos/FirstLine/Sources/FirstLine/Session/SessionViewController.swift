@@ -934,7 +934,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         // The clock comes off the stopped sheet with the bar; a new session shows the fresh minute.
         let seconds = max(0, Int(ceil(phase == .failure ? engine.duration : engine.remaining)))
         timerLabel.stringValue = RoomPresentation.clock(seconds)
-        let wordLabel = RoomPresentation.wordLabel(engine.wordCount, text: engine.text)
+        let wordLabel = RoomPresentation.wordLabel(engine.wordCount)
         timerLabel.setAccessibilityLabel("Time remaining \(timerLabel.stringValue)")
         let chrome = FirstLineColors.paperQuietNSColor
         // Empty room: the bottom-right count slot itself carries the instruction.

@@ -1,0 +1,225 @@
+{
+ "_": "Shared by the web room, the root landing, the Mac room and the Windows room (D-099). Each suite loads this file; the unit is always word or words, one word per CJK character, punctuation and emoji count zero.",
+ "counts": [
+  {
+   "name": "empty",
+   "text": "",
+   "words": 0
+  },
+  {
+   "name": "spaces only",
+   "text": "  \n\t ",
+   "words": 0
+  },
+  {
+   "name": "one latin word",
+   "text": "hello",
+   "words": 1
+  },
+  {
+   "name": "two latin words",
+   "text": "hello world",
+   "words": 2
+  },
+  {
+   "name": "surrounding whitespace and a newline",
+   "text": "  two\nwords ",
+   "words": 2
+  },
+  {
+   "name": "lines",
+   "text": "line one\nline two",
+   "words": 4
+  },
+  {
+   "name": "one Han character",
+   "text": "我",
+   "words": 1
+  },
+  {
+   "name": "two Han characters",
+   "text": "你好",
+   "words": 2
+  },
+  {
+   "name": "three Han characters",
+   "text": "我们是",
+   "words": 3
+  },
+  {
+   "name": "Han and a Latin word",
+   "text": "你好 world",
+   "words": 3
+  },
+  {
+   "name": "Han glued to a Latin word",
+   "text": "你好world",
+   "words": 3
+  },
+  {
+   "name": "Han with fullwidth punctuation",
+   "text": "你好，世界。",
+   "words": 4
+  },
+  {
+   "name": "Han with fullwidth punctuation and a Latin word",
+   "text": "你好，world！",
+   "words": 3
+  },
+  {
+   "name": "Latin with Han tail",
+   "text": "hello world 中文测试",
+   "words": 6
+  },
+  {
+   "name": "hiragana and Han",
+   "text": "こんにちは世界",
+   "words": 7
+  },
+  {
+   "name": "katakana with the prolonged sound mark",
+   "text": "コーヒー",
+   "words": 4
+  },
+  {
+   "name": "hangul keeps space separated words",
+   "text": "한글 한글",
+   "words": 2
+  },
+  {
+   "name": "apostrophe stays in the word",
+   "text": "don't stop",
+   "words": 2
+  },
+  {
+   "name": "thousands separator is one number",
+   "text": "1,000 dollars",
+   "words": 2
+  },
+  {
+   "name": "decimal is one number",
+   "text": "3.14",
+   "words": 1
+  },
+  {
+   "name": "hyphen splits",
+   "text": "well-known",
+   "words": 2
+  },
+  {
+   "name": "Latin punctuation counts zero",
+   "text": "Hello, world!",
+   "words": 2
+  },
+  {
+   "name": "only punctuation",
+   "text": "...!!!",
+   "words": 0
+  },
+  {
+   "name": "emoji count zero",
+   "text": "😀",
+   "words": 0
+  },
+  {
+   "name": "emoji between words",
+   "text": "hello 😀 world",
+   "words": 2
+  },
+  {
+   "name": "combining accent stays in the word",
+   "text": "café au lait",
+   "words": 3
+  },
+  {
+   "name": "ideographic space separates",
+   "text": "a　b",
+   "words": 2
+  },
+  {
+   "name": "Han only",
+   "text": "中文测试",
+   "words": 4
+  },
+  {
+   "name": "Arabic words",
+   "text": "مرحبا بالعالم",
+   "words": 2
+  },
+  {
+   "name": "emoji sequences with skin tone, ZWJ and flags",
+   "text": "👨‍👩‍👧‍👦 👍🏽 🇨🇳",
+   "words": 0
+  },
+  {
+   "name": "CJK punctuation only",
+   "text": "...，！？",
+   "words": 0
+  },
+  {
+   "name": "Han from the extension B plane",
+   "text": "𠀀中文",
+   "words": 3
+  },
+  {
+   "name": "Han, emoji with ZWJ and a Latin word",
+   "text": "你好👩🏽‍💻world",
+   "words": 3
+  },
+  {
+   "name": "a long English draft with one Han greeting",
+   "text": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word 你好",
+   "words": 502
+  }
+ ],
+ "labels": [
+  {
+   "text": "",
+   "label": "0 words"
+  },
+  {
+   "text": "我",
+   "label": "1 word"
+  },
+  {
+   "text": "hello",
+   "label": "1 word"
+  },
+  {
+   "text": "你好",
+   "label": "2 words"
+  },
+  {
+   "text": "我们是",
+   "label": "3 words"
+  },
+  {
+   "text": "こんにちは世界",
+   "label": "7 words"
+  },
+  {
+   "text": "コーヒー",
+   "label": "4 words"
+  },
+  {
+   "text": "hello world 中文测试",
+   "label": "6 words"
+  },
+  {
+   "text": "hello world",
+   "label": "2 words"
+  },
+  {
+   "text": "한글 한글",
+   "label": "2 words"
+  },
+  {
+   "text": "你好，world！",
+   "label": "3 words"
+  },
+  {
+   "text": "",
+   "label": "0 words"
+  }
+ ]
+}

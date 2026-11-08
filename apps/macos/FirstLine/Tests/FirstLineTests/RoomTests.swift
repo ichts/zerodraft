@@ -74,20 +74,44 @@ struct RoomTests {
         #expect(RoomPresentation.wordLabel(1) == "1 word")
     }
 
-    @Test func theLabelSaysCharactersOnlyWhenCJKLettersAreHalfTheDraft() {
-        let english = String(repeating: "word ", count: 500) + "你好"
-        let cases: [(String, String)] = [
-            ("我们是", "3 characters"), ("我", "1 character"), ("こんにちは世界", "7 characters"), ("コーヒー", "4 characters"),
-            ("hello world 中文测试", "6 words"), (english, "502 words"), ("你好，world！", "3 words"),
-            ("hello world", "2 words"), ("one", "1 word"), ("한글 한글", "2 words"), ("", "0 words"),
-        ]
-        for (text, expected) in cases {
-            let engine = SessionEngine()
-            engine.start(duration: 60)
-            engine.registerCommittedText(text)
-            #expect(RoomPresentation.wordLabel(engine.wordCount, text: text) == expected, "\(text.prefix(20))")
+    /// The web rooms, the Mac room and the Windows room load the same fixture (D-099): same text, same number, same label.
+    private struct WordCountFixture: Decodable {
+        struct Count: Decodable { let name: String; let text: String; let words: Int }
+        struct Label: Decodable { let text: String; let label: String }
+        let counts: [Count]
+        let labels: [Label]
+
+        static func load() throws -> WordCountFixture {
+            var root = URL(fileURLWithPath: #filePath)
+            for _ in 0..<6 { root.deleteLastPathComponent() }
+            let data = try Data(contentsOf: root.appendingPathComponent("tests/fixtures/word-count.json"))
+            return try JSONDecoder().decode(WordCountFixture.self, from: data)
         }
-        #expect(RoomPresentation.keptReceipt(wordCount: 3, duration: 60, text: "我们是") == "1 minute. 3 characters.")
+    }
+
+    private func engineCount(of text: String) -> Int {
+        let engine = SessionEngine()
+        engine.start(duration: 60)
+        engine.registerCommittedText(text)
+        return engine.wordCount
+    }
+
+    @Test func theCountMatchesTheSharedFixture() throws {
+        let fixture = try WordCountFixture.load()
+        #expect(!fixture.counts.isEmpty)
+        for entry in fixture.counts {
+            #expect(engineCount(of: entry.text) == entry.words, "\(entry.name): \(entry.text.prefix(20))")
+        }
+    }
+
+    @Test func theUnitIsAlwaysWordsInEveryLanguage() throws {
+        let fixture = try WordCountFixture.load()
+        #expect(!fixture.labels.isEmpty)
+        for entry in fixture.labels {
+            #expect(RoomPresentation.wordLabel(engineCount(of: entry.text)) == entry.label, "\(entry.text.prefix(20))")
+        }
+        #expect(RoomPresentation.keptReceipt(wordCount: 3, duration: 60) == "1 minute. 3 words.")
+        #expect(RoomPresentation.wordLabel(1) == "1 word")
     }
 
     @Test func copyPutsExactDraftOnPasteboard() {

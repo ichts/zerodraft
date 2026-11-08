@@ -81,7 +81,7 @@ type Room struct {
 	// presentation clocks
 	exitArmedAt time.Time
 	exitHintOff time.Time
-	noticeUntil time.Time // the first refused delete's notice holds the footer's status slot until here (D-077)
+	noticeUntil time.Time // the first refused delete's note holds under the live line until here, then fades (D-077, D-100)
 	cutUntil    time.Time
 	lastWash    float32
 	lastDeep    bool
@@ -223,14 +223,15 @@ func (r *Room) onMark() {
 }
 
 // onDeny is the refusal feedback: the shake and hairline on every refusal, and once per session, on the first
-// refused delete, the rule named in the footer's status slot for two seconds. An armed exit confirmation keeps the
-// slot, so a delete refused meanwhile does not spend the notice (SessionViewController D-077).
+// refused delete, the rule said once under the live line for two seconds (D-100, moved out of the footer). The
+// warning numeral and the stopped group own that space, so a delete refused there waits unspent
+// (SessionViewController).
 func (r *Room) onDeny(why string, deleting bool) {
 	now := r.now()
 	r.denyShake0 = r.shakeOffset(now)
 	r.denyAt = now
 	before := r.eng.RefusalNoticeAt
-	r.eng.RegisterDeny(now, deleting && r.exitHintOff.IsZero())
+	r.eng.RegisterDeny(now, deleting && (r.eng.Phase == session.Idle || r.eng.Phase == session.Writing))
 	if earned := before.IsZero() && !r.eng.RefusalNoticeAt.IsZero() && ime.Break != "nonotice"; earned {
 		r.noticeUntil = now.Add(tokens.RefusalNoticeSeconds * time.Second)
 		r.announce = append(r.announce, tokens.StrRefusalNotice)
@@ -270,6 +271,14 @@ func (r *Room) restart() {
 	r.invalidate()
 }
 
+// noticeFade is how long the note fades out after its hold: 0.2 s, none under Reduce Motion (an opacity step).
+func (r *Room) noticeFade() time.Duration {
+	if r.ctx != nil && r.ctx.Preferences().ReduceMotion {
+		return 0
+	}
+	return time.Duration(tokens.RefusalNoticeFadeSeconds * float64(time.Second))
+}
+
 func (r *Room) dismissExit() { r.exitArmedAt, r.exitHintOff = time.Time{}, time.Time{} }
 
 // requestExit is the two-step exit: the first Esc or click arms the inline confirmation, a second inside the
@@ -283,7 +292,6 @@ func (r *Room) requestExit() {
 	}
 	r.exitArmedAt = now
 	r.exitHintOff = now.Add(tokens.ExitWindowSeconds * time.Second)
-	r.noticeUntil = time.Time{} // arming the exit takes the slot back from a notice that is still showing
 	sound.Play(sound.Open)
 	r.announce = append(r.announce, tokens.StrExitHint)
 	r.logf("EXIT armed")
@@ -297,7 +305,7 @@ func (r *Room) step(now time.Time) {
 	if !r.exitHintOff.IsZero() && !now.Before(r.exitHintOff) {
 		r.dismissExit()
 	}
-	if !r.noticeUntil.IsZero() && !now.Before(r.noticeUntil) {
+	if !r.noticeUntil.IsZero() && !now.Before(r.noticeUntil.Add(r.noticeFade())) {
 		r.noticeUntil = time.Time{}
 	}
 	ph := r.eng.Phase
@@ -342,8 +350,8 @@ func (r *Room) step(now time.Time) {
 		sound.Play(sound.Success)
 		r.announce = append(r.announce, tokens.StrAnnounceKept)
 	}
-	if ph == session.Failure || ph == session.Success {
-		r.noticeUntil = time.Time{} // a session that ends takes its notice with it
+	if ph == session.Danger || ph == session.Failure || ph == session.Success {
+		r.noticeUntil = time.Time{} // the warning and a session that ends take the space and the notice with them
 	}
 	r.lastPhase = ph
 }

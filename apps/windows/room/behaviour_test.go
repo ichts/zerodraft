@@ -1,6 +1,7 @@
 package room
 
 import (
+	"image"
 	"math"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/ichts/zerodraft/apps/windows/session"
+	"github.com/ichts/zerodraft/apps/windows/tokens"
 )
 
 func TestReturnRestartsTheStoppedRoom(t *testing.T) {
@@ -356,8 +358,8 @@ func TestHistoryDoesNotMoveWhileTheCurrentLineGrows(t *testing.T) {
 	}
 }
 
-// D-077: the first refused delete of a session names the rule for two seconds in the status slot; later refusals,
-// paste, cut and undo only shake; an armed exit keeps the slot and the notice waits; a new session earns it again.
+// D-100 (moving D-077's notice): the first refused delete of a session says the rule once under the live line for two
+// seconds, then fades; later refusals, paste, cut and undo only shake; a new session earns it again.
 func TestFirstRefusedDeleteNamesTheRuleOncePerSession(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	g.tt.Type("private draft")
@@ -376,7 +378,7 @@ func TestFirstRefusedDeleteNamesTheRuleOncePerSession(t *testing.T) {
 		t.Fatal("the first refused delete must show the notice")
 	}
 	if d := until.Sub(g.r.Engine().RefusalNoticeAt); d != 2*time.Second {
-		t.Fatalf("the notice lasts %v, want 2s", d)
+		t.Fatalf("the notice holds %v, want 2s", d)
 	}
 	g.tt.Key(0, ui.KeyDelete)
 	g.tt.Advance(1500 * time.Millisecond)
@@ -384,33 +386,98 @@ func TestFirstRefusedDeleteNamesTheRuleOncePerSession(t *testing.T) {
 		t.Fatal("a second refusal inside the window must not restart the notice")
 	}
 	g.tt.Type(" ")
-	g.tt.Advance(700 * time.Millisecond)
+	g.tt.Advance(700 * time.Millisecond) // 2.25 s after the refusal: held 2 s, 0.2 s fade done
 	if !g.r.noticeUntil.IsZero() {
-		t.Fatal("the slot must return after two seconds")
+		t.Fatal("the note must be gone after the hold and the fade")
 	}
 	g.tt.Key(0, ui.KeyBackspace)
 	g.tt.Advance(50 * time.Millisecond)
 	if !g.r.noticeUntil.IsZero() {
-		t.Fatal("a later refusal in the same session says nothing in the slot")
+		t.Fatal("a later refusal in the same session shows nothing")
 	}
 }
 
-func TestAnArmedExitKeepsTheSlotAndTheNoticeWaits(t *testing.T) {
+// diffBox is the bounding box of the pixels that differ between two frames below row y0.
+func diffBox(a, b image.Image, y0 int) (minX, minY, maxX, maxY int, any bool) {
+	r := a.Bounds()
+	minX, minY, maxX, maxY = r.Max.X, r.Max.Y, -1, -1
+	for y := max(y0, r.Min.Y); y < r.Max.Y; y++ {
+		for x := r.Min.X; x < r.Max.X; x++ {
+			if a.At(x, y) != b.At(x, y) {
+				minX, minY, maxX, maxY, any = min(minX, x), min(minY, y), max(maxX, x), max(maxY, y), true
+			}
+		}
+	}
+	return
+}
+
+// The note's place is measured from pixels: centred on the sheet, under the live line's baseline (never over the
+// line), clear of the footer, and nothing else on the sheet changes while it shows or after it goes.
+func TestRefusalNoteSitsCentredUnderTheLiveLineAndMovesNothing(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("private draft")
+	g.tt.Advance(600 * time.Millisecond)
+	g.tt.Frame()
+	before := g.tt.Image()
+	g.tt.Key(0, ui.KeyBackspace)
+	g.tt.Advance(300 * time.Millisecond) // the 200 ms shake is over, the note holds
+	g.tt.Frame()
+	during := g.tt.Image()
+
+	pr := PaperRect(1040, 620)
+	baseline := int(pr.Y + AnchorY(pr.H) + g.r.writingFont().Size*tokens.LineHeight/2)
+	// rows from the descenders down: the caret blinks above them
+	x0, y0, x1, y1, shown := diffBox(before, during, baseline+8)
+	if !shown {
+		t.Fatal("the note must be drawn under the live line")
+	}
+	if mid := float32(x0+x1) / 2; math.Abs(float64(mid-(pr.X+pr.W/2))) > 2 {
+		t.Fatalf("the note's ink is centred at %.1f, the sheet's centre is %.1f", mid, pr.X+pr.W/2)
+	}
+	if y0 < baseline+16 || y0 > baseline+tokens.RefusalNoticeBelow {
+		t.Fatalf("the note's ink top is %d px under the live baseline, want 16 to %v (just beneath, never over the line)", y0-baseline, tokens.RefusalNoticeBelow)
+	}
+	if foot := int(pr.Y + pr.H - 16 - tokens.FooterHeight); y1 >= foot {
+		t.Fatalf("the note's ink reaches %d, the footer row starts at %d", y1, foot)
+	}
+	if _, _, _, _, moved := diffBox(before, during, int(pr.Y+pr.H)-16-int(tokens.FooterHeight)); moved {
+		t.Fatal("the footer (Esc to exit, the count) must not change while the note shows")
+	}
+
+	g.tt.Advance(2 * time.Second)
+	g.tt.Frame()
+	if _, _, _, _, left := diffBox(before, g.tt.Image(), baseline+8); left {
+		t.Fatal("nothing may be left under the line after the note is gone")
+	}
+}
+
+// The warning numeral owns the space under the line: a delete refused during it only shakes and the note waits.
+func TestTheWarningOwnsTheSpaceSoTheNoticeWaits(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("draft")
+	g.tt.Advance(5500 * time.Millisecond)
+	if g.r.Engine().Phase != session.Danger {
+		t.Fatalf("phase %v, want the warning", g.r.Engine().Phase)
+	}
+	g.tt.Key(0, ui.KeyBackspace)
+	if !g.r.noticeUntil.IsZero() || !g.r.Engine().RefusalNoticeAt.IsZero() {
+		t.Fatal("no note over the warning numeral, and it must not be spent")
+	}
+	g.tt.Type("x")
+	g.tt.Key(0, ui.KeyBackspace)
+	if g.r.noticeUntil.IsZero() {
+		t.Fatal("the waiting note must show on the next refused delete")
+	}
+}
+
+// An armed exit confirmation keeps its footer slot and no longer blocks the note, which lives under the line.
+func TestAnArmedExitKeepsItsFooterSlotAndDoesNotBlockTheNotice(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	g.tt.Type("draft")
 	g.tt.Key(0, ui.KeyEscape)
 	g.tt.Key(0, ui.KeyBackspace)
-	if !g.r.noticeUntil.IsZero() || !g.r.Engine().RefusalNoticeAt.IsZero() {
-		t.Fatal("the notice must not be spent while the exit confirmation holds the slot")
-	}
-	g.tt.Type("x") // typing disarms the confirmation
-	g.tt.Key(0, ui.KeyBackspace)
-	if g.r.noticeUntil.IsZero() {
-		t.Fatal("the waiting notice must show on the next refused delete")
-	}
-	g.tt.Key(0, ui.KeyEscape) // arming takes the slot back from a notice still showing
-	if !g.r.noticeUntil.IsZero() || g.r.exitHintOff.IsZero() {
-		t.Fatal("arming the exit takes the slot back")
+	if g.r.noticeUntil.IsZero() || g.r.exitHintOff.IsZero() {
+		t.Fatal("the note shows while the exit confirmation holds its own slot")
 	}
 }
 

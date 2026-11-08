@@ -865,25 +865,26 @@ struct RoomTests {
         }
     }
 
-    // MARK: - The first refused delete names the rule (D-077)
+    // MARK: - The first refused delete says the rule once, under the line (D-100, moving D-077's notice)
 
-    private static let refusalText = "FORWARD ONLY. DELETING IS BLOCKED."
+    private static let refusalText = "You can only add the next word."
 
-    @Test func firstRefusedDeleteNamesTheRuleForTwoSecondsAndMovesNothing() async throws {
+    @Test func firstRefusedDeleteSaysTheRuleOnceCentredUnderTheLine() async throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         let room = fixture.room
         let paper = try #require(fixture.editor.enclosingScrollView?.superview)
         let exit = try #require(exitButton(in: room))
         let count = try #require(descendants(room.view, of: NSTextField.self).first { $0.stringValue.hasSuffix("words") || $0.stringValue.hasSuffix("word") })
+        let notice = try #require(refusalLabel(in: room))
         room.view.layoutSubtreeIfNeeded()
         let before = frames(room, [exit, count, fixture.editor])
-        #expect(refusalLabel(in: room) == nil)
+        #expect(notice.isHidden, "nothing shows before any refusal")
+        #expect(Self.refusalText != Self.refusalText.uppercased(), "sentence case, never all capitals")
 
         fixture.editor.deleteBackward(nil)
         fixture.clock.now += 0.05
         room.tick()
-        let notice = try #require(refusalLabel(in: room))
         #expect(!notice.isHidden)
         #expect(paper.layer?.animation(forKey: "deny-shake") != nil, "the 200 ms shake still runs on the first refusal")
         // The quiet role, which clears 7:1 on the sheet (PaperContrastTests), not the pen.
@@ -891,9 +892,21 @@ struct RoomTests {
             #expect(attributeColor(of: notice, appearance: name, matches: FirstLineColors.paperQuietNSColor))
         }
         room.view.layoutSubtreeIfNeeded()
-        #expect(frames(room, [exit, count, fixture.editor]) == before, "nothing else moves while the notice shows")
+        #expect(frames(room, [exit, count, fixture.editor]) == before, "the footer and the writing keep their frames while the note shows")
+        #expect(hintLabel(in: room)?.isHidden ?? true, "the footer slot stays empty")
+        #expect(!notice.isAccessibilityElement(), "announced once through the announcement, not read again as a label")
 
-        // A second refusal inside the window neither restarts nor repeats the notice.
+        // Centred on the writing column, just beneath the line being written, clear of the footer.
+        let frame = room.view.convert(notice.bounds, from: notice)
+        let column = room.view.convert(fixture.editor.enclosingScrollView!.bounds, from: fixture.editor.enclosingScrollView!)
+        #expect(abs(frame.midX - column.midX) <= 1, "centred on the writing column")
+        let baseline = room.view.convert(NSPoint(x: 0, y: try #require(fixture.editor.currentInsertionBaseline())), from: fixture.editor).y
+        #expect(frame.maxY < baseline, "beneath the live line, not over it")
+        #expect(baseline - frame.maxY < 44, "just beneath the line: \(baseline - frame.maxY) pt from the baseline to the note's top")
+        let exitFrame = room.view.convert(exit.bounds, from: exit)
+        #expect(frame.minY > exitFrame.maxY, "fully visible above the footer")
+
+        // A second refusal inside the window neither restarts nor repeats the note.
         fixture.editor.deleteForward(nil)
         fixture.clock.now += 0.05
         room.tick()
@@ -901,10 +914,10 @@ struct RoomTests {
 
         try await Task.sleep(nanoseconds: 1_700_000_000)
         #expect(!notice.isHidden, "still showing before two seconds")
-        try await Task.sleep(nanoseconds: 500_000_000)
-        #expect(notice.isHidden, "the slot returns after two seconds")
+        try await Task.sleep(nanoseconds: 800_000_000)
+        #expect(notice.isHidden, "gone after two seconds and the 0.2 s fade")
         room.view.layoutSubtreeIfNeeded()
-        #expect(frames(room, [exit, count, fixture.editor]) == before, "the slot returns with no layout shift")
+        #expect(frames(room, [exit, count, fixture.editor]) == before, "nothing moved after it went")
 
         // Later refusals in the same session shake only.
         paper.layer?.removeAnimation(forKey: "deny-shake")
@@ -912,29 +925,44 @@ struct RoomTests {
         fixture.clock.now += 0.05
         room.tick()
         #expect(paper.layer?.animation(forKey: "deny-shake") != nil)
-        #expect(notice.isHidden, "a later refusal says nothing in the slot")
+        #expect(notice.isHidden, "a later refusal shows no text")
     }
 
-    @Test func aNewSessionEarnsTheNoticeAgain() throws {
+    @Test func underReduceMotionTheNoteOnlyStepsOut() async throws {
         let fixture = try roomFixture()
+        fixture.state.settings.reducedMotion = .always
         let room = fixture.room
+        let notice = try #require(refusalLabel(in: room))
         fixture.editor.deleteBackward(nil)
         fixture.clock.now += 0.05
         room.tick()
-        #expect(!(try #require(refusalLabel(in: room))).isHidden)
+        #expect(!notice.isHidden)
+        try await Task.sleep(nanoseconds: 2_100_000_000)
+        #expect(notice.isHidden, "no fade to wait for: it is gone when the two seconds end")
+        #expect(notice.layer?.animationKeys() ?? [] == [], "no animation of any kind")
+    }
+
+    @Test func aNewSessionEarnsTheNoteAgain() throws {
+        let fixture = try roomFixture()
+        let room = fixture.room
+        let notice = try #require(refusalLabel(in: room))
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!notice.isHidden)
 
         fixture.state.abandonSession()
         fixture.state.startSession(duration: 60)
         room.tick()
-        #expect(refusalLabel(in: room) == nil, "a session that ends takes its notice with it")
+        #expect(notice.isHidden, "a session that ends takes its note with it")
         fixture.editor.insertText("again", replacementRange: NSRange(location: NSNotFound, length: 0))
         fixture.editor.deleteBackward(nil)
         fixture.clock.now += 0.05
         room.tick()
-        #expect(!(try #require(refusalLabel(in: room))).isHidden, "the new session's first refused delete says it again")
+        #expect(!notice.isHidden, "the new session's first refused delete says it again")
     }
 
-    @Test func onlyADeleteEarnsTheNotice() throws {
+    @Test func onlyADeleteEarnsTheNote() throws {
         let fixture = try roomFixture()
         fixture.editor.paste(nil)
         fixture.clock.now += 0.05
@@ -943,34 +971,44 @@ struct RoomTests {
         fixture.clock.now += 0.05
         fixture.room.tick()
         #expect(fixture.engine.lastDenyAt != nil)
-        #expect(refusalLabel(in: fixture.room) == nil, "paste and cut only shake")
+        #expect(try #require(refusalLabel(in: fixture.room)).isHidden, "paste and cut only shake")
         #expect(fixture.engine.refusalNoticeAt == nil)
     }
 
-    @Test func anArmedExitConfirmationKeepsTheSlotAndTheNoticeWaits() throws {
+    @Test func theWarningOwnsTheSpaceSoTheNoteWaitsUnspent() throws {
+        let fixture = try roomFixture()
+        let room = fixture.room
+        let notice = try #require(refusalLabel(in: room))
+        fixture.clock.now = 5.5
+        room.tick()
+        #expect(fixture.engine.phase == .danger)
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(notice.isHidden, "no note over the warning numeral")
+        #expect(fixture.engine.refusalNoticeAt == nil, "and the note was not spent")
+        fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+        room.tick()
+        fixture.editor.deleteBackward(nil)
+        fixture.clock.now += 0.05
+        room.tick()
+        #expect(!notice.isHidden, "the waiting note shows on the next refused delete")
+    }
+
+    @Test func anArmedExitConfirmationKeepsItsFooterSlotAndDoesNotBlockTheNote() throws {
         let fixture = try roomFixture()
         let room = fixture.room
         room.exitConfirmation = ExitConfirmation(window: 2)
         room.confirmationClock = { 100 }
         room.requestExit()
         let hint = try #require(hintLabel(in: room))
+        let notice = try #require(refusalLabel(in: room))
         fixture.editor.deleteBackward(nil)
         fixture.clock.now += 0.05
         room.tick()
+        #expect(!notice.isHidden, "the note lives under the line, so the confirmation does not displace it")
         #expect(!hint.isHidden)
         #expect(hint.stringValue == "Press Esc again to leave and delete the draft.")
-        #expect(fixture.engine.refusalNoticeAt == nil, "the notice was not spent while the confirmation held the slot")
-
-        fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
-        #expect(hint.isHidden)
-        fixture.editor.deleteBackward(nil)
-        fixture.clock.now += 0.05
-        room.tick()
-        #expect(!(try #require(refusalLabel(in: room))).isHidden)
-        // Arming the exit takes the slot back from a notice that is still showing.
-        room.requestExit()
-        #expect(hint.stringValue == "Press Esc again to leave and delete the draft.")
-        #expect(!hint.isHidden)
     }
 
     // MARK: - Helpers
@@ -1142,6 +1180,7 @@ struct RoomTests {
         }
     }
 
+    /// The one label that carries the rule's sentence; it is always in the room, shown only while earned.
     private func refusalLabel(in room: SessionViewController) -> NSTextField? {
         descendants(room.view, of: NSTextField.self).first { $0.stringValue == Self.refusalText }
     }

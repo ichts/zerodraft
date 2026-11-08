@@ -60,7 +60,9 @@ const (
 	FooterHeight         = {re.search(r"footerHeight: CGFloat = (\d+)", svc).group(1)}
 	PaperMargin          = 32 // paper inset from the window (installConstraints)
 
-	RefusalNoticeSeconds = {re.search(r"refusalNoticeDuration: TimeInterval = (\d+)", svc).group(1)} // the first refused delete's notice (D-077)
+	RefusalNoticeSeconds = {re.search(r"refusalNoticeDuration: TimeInterval = (\d+)", svc).group(1)} // the first refused delete's notice (D-077, moved under the live line by D-100)
+	RefusalNoticeFadeSeconds = {re.search(r"refusalNoticeFade: TimeInterval = ([0-9.]+)", svc).group(1)} // the note fades out over this long after its hold (D-100)
+	RefusalNoticeBelow   = {re.search(r"refusalNoticeBelow: CGFloat = (\d+)", svc).group(1)} // its baseline sits this far under the live line's baseline (D-100)
 	KeptHeadingGap       = {kept_gap('heading')} // the kept block's vertical rhythm, SessionKeptView.init
 	KeptReceiptGap       = {kept_gap('receipt')}
 	KeptActionsGap       = {kept_gap('actions')}

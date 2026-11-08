@@ -100,9 +100,9 @@ real input and the Microsoft IMEs, so they are not CI. Host and desktop user com
   Pinyin, WeType, Japanese Microsoft IME); prints PASS/FAIL per check, 33 checks. Known-broken proofs that must fail:
   `WID_BREAK=nodeny scripts/ime-suite.sh pinyin`, `WID_BREAK=keepeditor scripts/ime-suite.sh pinyin`.
 - `scripts/capture.sh 100|125|150` - every room state at that display scale, then `measure.py` (33 geometry/timing
-  checks, including the kept caption and silent corner count and the first refused delete's notice). Known-broken proofs that
+  checks, including the kept caption and silent corner count and the first refused delete's note under the line). Known-broken proofs that
   must fail: `WID_BREAK=anchor35 scripts/capture.sh 150` (anchor), `WID_BREAK=keptcount` and `WID_BREAK=nonotice`
-  (`-tags imebreak` builds), and `WID_BREAK=armedexit` (the script arms the exit first, so the notice must not show).
+  (`-tags imebreak` builds).
 - `scripts/pair.sh` and `scripts/screens.sh` - the Mac pair: every room state and the picker/activation cards in the Mac's own
   1040 x 720 page area at 100% (`WID_WINDOW=1040x720`), compared with the Mac's `SnapshotTests` PNGs by
   `scripts/compare_mac.py` (one detector over both images, rows of ink and pills in DIPs). Produce the Mac side with
@@ -135,7 +135,6 @@ Last run (2026-11-01, vivobook-1, the QA build of 19:36 that the PC could still 
 |---|---|
 | IME suite, Microsoft Pinyin / WeType / Japanese IME | 11 + 11 + 11 = 33 of 33 pass (the rewritten `vcall` activates each text service: `activate hr=0x0 active hr=0x0`) |
 | `capture.sh 150` and `100` | 33 of 33 pass at each scale |
-| `capture.sh 150` with `WID_BREAK=armedexit` | 32 of 33: the D-077 notice check fails, as it must |
 | `pair.sh` against the Mac snapshots (7 room states) | every Newsreader row within 1 DIP of the Mac's (heading 1 to 2); footer row baseline 660 = 660; chrome-face widths and the oldest line's thin strokes are the documented differences (SYNC.md rows 18, 22) |
 | `screens.sh` (picker, activation card) | every row within 2 DIP except the picker's title ink (+4 at the bottom, a taller bold) and the focused Begin's ring |
 | `measure_screens.py` on the e2e captures | 51 of 51 at 150 and at 100 |

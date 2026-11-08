@@ -283,15 +283,10 @@ func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, i
 	exW, _ := ex.Size()
 	exX := pr.X + tokens.RoomInset
 	top := base - sansAscent(13, 400)
-	// the status slot beside the exit link: the armed exit confirmation in the pen, else the first refused delete's
-	// notice in the quiet role (the pen is kept for warnings); the slot is one place, so nothing moves
-	switch {
-	case !r.exitHintOff.IsZero():
+	// the status slot beside the exit link holds the armed exit confirmation, in the pen
+	if !r.exitHintOff.IsZero() {
 		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 400})
 		p.TextLayout(h, exX+exW+12, top, danger)
-	case !r.noticeUntil.IsZero():
-		h := r.shape(textSpec{s: tokens.StrRefusalNotice, family: sans, size: 13, weight: 400})
-		p.TextLayout(h, exX+exW+12, top, quiet)
 	}
 	label := r.cornerLabel(failure, kept)
 	if label == "" {
@@ -387,7 +382,25 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 
 	if r.eng.Phase == session.Danger {
 		r.drawWarning(p, pr, ink, dark, anchor, pitch, font)
+	} else if !r.noticeUntil.IsZero() {
+		r.drawRefusalNote(p, pr, now, rc(tokens.PaperQuiet, dark), anchor+pitch/2)
 	}
+}
+
+// drawRefusalNote is the first refused delete's note (D-100): the rule once, centred on the sheet, its baseline
+// tokens.RefusalNoticeBelow under the live line's baseline, in the quiet role. It appears at once, holds for the
+// notice's two seconds and fades out over tokens.RefusalNoticeFadeSeconds (a step under Reduce Motion). It sits
+// on the paper, so it moves nothing; it is lifted only if the footer row would otherwise be touched.
+func (r *Room) drawRefusalNote(p *ui.Painter, pr ui.Rect, now time.Time, quiet ui.Color, baseline float32) {
+	alpha := float32(1)
+	if f := r.noticeFade(); f > 0 && now.After(r.noticeUntil) {
+		alpha = 1 - float32(now.Sub(r.noticeUntil))/float32(f)
+	}
+	l := r.shape(textSpec{s: tokens.StrRefusalNotice, family: sans, size: 13, weight: 400})
+	w, h := l.Size()
+	top := baseline + tokens.RefusalNoticeBelow - sansAscent(13, 400)
+	top = min(top, pr.Y+pr.H-16-tokens.FooterHeight-h)
+	p.TextLayout(l, pr.X+(pr.W-w)/2, top, withAlpha(quiet, alpha))
 }
 
 // leadingAbove is how far the Mac's bottom-aligned glyphs sit lower in a 1.6 line box than mygo's evenly split leading

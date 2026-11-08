@@ -149,8 +149,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The two-step exit: the inline confirmation is on the footer row's own 1.6 line box, so its
    baseline meets ESC - EXIT and the count instead of sitting a few points lower (case 37). */
 .exit-hint{margin:0 0 0 12px;flex:1;min-width:0;font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--paper-danger);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* The first refused delete borrows the slot for two seconds in the quiet role (7:1 on the sheet), not the pen: it explains, it does not warn. */
-.exit-hint[data-kind="refusal"]{color:var(--paper-quiet);letter-spacing:.04em}
+/* The first refused delete's note (D-100): centred on the paper under the live line, the quiet role (7:1 on the sheet), not the pen: it explains, it does not warn. room.js sets its top. It appears at once and fades out in 200 ms; Reduce Motion steps. */
+.refusal-note{position:absolute;left:20px;right:20px;top:0;margin:0;text-align:center;font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;color:var(--paper-quiet);pointer-events:none;opacity:0;visibility:hidden;transition:opacity 200ms var(--ease-out),visibility 0s 200ms}
+.refusal-note[data-shown="true"]{opacity:1;visibility:visible;transition:none}
+@media (prefers-reduced-motion:reduce){.refusal-note{transition:none}}
 /* Glyphs are never filtered, displaced or stroked (D-090): the ink is the colour and nothing else. */
 .paper > .paper-foot{justify-content:flex-end}
 @media(max-width:767px){

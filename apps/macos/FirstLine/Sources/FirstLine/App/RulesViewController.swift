@@ -1,17 +1,16 @@
 /**
- * [INPUT]: The shipped copy tokens, the type scale and the landing page's "How it works" wording.
- * [OUTPUT]: The popover's own content, with no card inside it: how it works, the landing's three rules in order, and a Done action; body text is the
- *           scale's 15 pt at 1.5 leading on a 60ch measure, and each rule title is one step up in weight, not down in size.
+ * [INPUT]: The shipped copy tokens, the type scale and the picker's silence limit (5, 8 or 12 seconds).
+ * [OUTPUT]: The popover's own content, with no card inside it: three short rule lines at one level (forward only, the silence limit, reaching 0:00) and a Done action;
+ *           body text is the scale's 15 pt at 1.5 leading, at most a 60ch measure wide, hugging its longest line.
  * [POS]: Opened from the picker's small "?" control as a popover that grows from it and closes back into it (D-097); Esc, Return, Done or a click outside dismisses it; light and dark follow the system popover surface.
- * [PROTOCOL]: Keep the wording and order identical to writeitdown/index.html's How it works cards.
+ * [PROTOCOL]: `lines(silenceSeconds:)` is the one source of the three lines: apps/windows/scripts/gen_tokens.py reads it for the Windows sheet. Line 3 is the captain's pick (D-101).
  */
 import AppKit
 
 @MainActor
 final class RulesViewController: NSViewController {
-    /// The type scale's body role and its one-step-up subhead role.
+    /// The type scale's body role.
     static var bodyFont: NSFont { FirstLineTypography.uiNSFont }
-    static var subheadFont: NSFont { FirstLineTypography.uiSemiboldNSFont }
     /// 15 pt at 1.5 leading, the scale's body ratio rather than the system default 1.27.
     static let bodyLeading: CGFloat = 1.5
     static var bodyLineHeight: CGFloat { bodyFont.pointSize * bodyLeading }
@@ -20,14 +19,34 @@ final class RulesViewController: NSViewController {
         let character = ("0" as NSString).size(withAttributes: [.font: bodyFont]).width
         return (60 * character).rounded()
     }
-    /// The sheet is the measure plus the same 44 pt inset on both sides.
+    /// The sheet is its longest line (never past the measure) plus the same 44 pt inset on both sides.
     static let cardInset: CGFloat = 44
-    static var cardWidth: CGFloat { bodyMeasure + cardInset * 2 }
+    static func cardWidth(silenceSeconds: Int = SilenceLimit.standard.rawValue) -> CGFloat {
+        let widest = lines(silenceSeconds: silenceSeconds)
+            .map { lineWidth($0) }.max() ?? 0
+        return min(bodyMeasure, widest.rounded(.up)) + cardInset * 2
+    }
+    /// A line's natural width as the label cell draws it, with the cell's own side insets.
+    private static func lineWidth(_ line: String) -> CGFloat {
+        let cell = NSTextFieldCell(textCell: line)
+        cell.attributedStringValue = bodyText(line, color: .labelColor)
+        return cell.cellSize.width
+    }
+    /// The three rules, in the order the writer meets them. The silence limit is the picker's setting, never a literal.
+    /// One string per line, so a copy change is a one-line edit (D-101); Windows is generated from here.
+    static func lines(silenceSeconds: Int) -> [String] {
+        [
+            "Forward only, no deleting.",
+            "\(silenceSeconds) seconds of silence deletes the draft.",
+            "Write to 0:00 and the text is yours.",
+        ]
+    }
     static let contentInsets = NSEdgeInsets(top: 40, left: cardInset, bottom: 36, right: cardInset)
 
     /// The popover this view is open in (D-097); nil when presented any other way.
     weak var popover: NSPopover?
     private let doneButton: NSButton
+    private var rulesStack: NSStackView?
     /// The picker's silence limit in seconds: the one number the second rule states.
     private let silenceSeconds: Int
 
@@ -49,22 +68,12 @@ final class RulesViewController: NSViewController {
         // surface fill, with no card of its own inside.
         view = FloodCanvasView(fillColor: .clear)
 
-        let eyebrow = label("How it works", font: FirstLineTypography.smallSemiboldNSFont,
-                            color: FirstLineColors.chromeNSColor)
-        let heading = label("Forward only. Nothing kept.", font: FirstLineTypography.writingMediumNSFont(size: 34),
-                            color: FirstLineColors.inkNSColor)
-        heading.maximumNumberOfLines = 2
-        let measure = Self.bodyMeasure
-
-        let rules = NSStackView(views: [
-            rule("No way back", "You can only add the next word."),
-            rule("Silence deletes it", "Stop for \(silenceSeconds) seconds and the draft is deleted."),
-            rule("Reach zero, keep it", "The text is yours to copy."),
-        ])
+        let rules = NSStackView(views: Self.lines(silenceSeconds: silenceSeconds).map(ruleLine))
         rules.translatesAutoresizingMaskIntoConstraints = false
         rules.orientation = .vertical
         rules.alignment = .leading
-        rules.spacing = 18
+        rules.spacing = 12
+        rulesStack = rules
 
         let doneRow = NSView()
         doneRow.translatesAutoresizingMaskIntoConstraints = false
@@ -76,26 +85,37 @@ final class RulesViewController: NSViewController {
             doneButton.bottomAnchor.constraint(equalTo: doneRow.bottomAnchor),
         ])
 
-        let stack = NSStackView(views: [eyebrow, heading, rules, doneRow])
+        let stack = NSStackView(views: [rules, doneRow])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 0
-        stack.setCustomSpacing(10, after: eyebrow)
-        stack.setCustomSpacing(24, after: heading)
-        stack.setCustomSpacing(28, after: rules)
+        stack.setCustomSpacing(32, after: rules)
+        for line in rules.arrangedSubviews { line.widthAnchor.constraint(equalTo: rules.widthAnchor).isActive = true }
         view.addSubview(stack)
+        // The sheet gives the lines its width up to the measure; past it, the lines stop and the extra width is empty.
+        let trailing = stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.cardInset)
+        trailing.priority = .defaultHigh
+        trailing.isActive = true
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Self.cardInset),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Self.cardInset),
             stack.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.contentInsets.top),
             stack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -Self.contentInsets.bottom),
-            rules.widthAnchor.constraint(equalToConstant: measure),
             doneRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            rules.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            stack.widthAnchor.constraint(lessThanOrEqualToConstant: Self.bodyMeasure),
         ])
         // The sheet is exactly as tall as its content, so no empty band shows under Done.
-        preferredContentSize = NSSize(width: Self.cardWidth,
+        preferredContentSize = NSSize(width: Self.cardWidth(silenceSeconds: silenceSeconds),
                                       height: stack.fittingSize.height + Self.contentInsets.top + Self.contentInsets.bottom)
+    }
+
+    /// A wrapping line asks for the height of the width it was given, so a line longer than the sheet wraps instead of clipping.
+    override func viewDidLayout() {
+        super.viewDidLayout()
+        for case let field as NSTextField in rulesStack?.arrangedSubviews ?? [] where field.preferredMaxLayoutWidth != field.frame.width {
+            field.preferredMaxLayoutWidth = field.frame.width
+        }
     }
 
     override func viewDidAppear() {
@@ -114,19 +134,9 @@ final class RulesViewController: NSViewController {
         presenter.dismiss(self)
     }
 
-    private func rule(_ title: String, _ text: String) -> NSView {
-        // The subhead is one step up in weight at the same size as its paragraph, never
-        // smaller than the text it introduces (problem 21).
-        let titleLabel = label(title, font: Self.subheadFont, color: FirstLineColors.inkNSColor)
-        let bodyLabel = body(text, color: FirstLineColors.muteNSColor)
-        bodyLabel.preferredMaxLayoutWidth = Self.bodyMeasure
-        let stack = NSStackView(views: [titleLabel, bodyLabel])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 0
-        stack.setCustomSpacing(4, after: titleLabel)
-        bodyLabel.widthAnchor.constraint(equalToConstant: Self.bodyMeasure).isActive = true
-        return stack
+    /// One rule: a single body-face line in ink, the same level as its neighbours.
+    private func ruleLine(_ text: String) -> NSView {
+        body(text, color: FirstLineColors.inkNSColor)
     }
 
     /// Readable body text: the scale's body face, its 1.5 leading and the 60ch measure,
@@ -156,14 +166,5 @@ final class RulesViewController: NSViewController {
             .foregroundColor: color,
             .paragraphStyle: paragraph,
         ])
-    }
-
-    private func label(_ text: String, font: NSFont?, color: NSColor) -> NSTextField {
-        let field = NSTextField(labelWithString: text)
-        field.translatesAutoresizingMaskIntoConstraints = false
-        field.font = font
-        field.textColor = color
-        field.maximumNumberOfLines = 1
-        return field
     }
 }

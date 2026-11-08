@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -297,7 +298,7 @@ func TestOfflineKeepsAccessAndRevalidationFailureDoesNotRevoke(t *testing.T) {
 func TestSettingsRulesAndTheOtherScreensRender(t *testing.T) {
 	g := newRig(t)
 	g.click("How it works")
-	g.wantText("Forward only. Nothing kept.")
+	g.wantText(tokens.RulesLine1)
 	g.snap("rules")
 	g.click("Close how it works")
 	g.click("Settings")
@@ -386,28 +387,53 @@ func TestActivationInFlightSaysCheckingYourKey(t *testing.T) {
 	}
 }
 
-// D-076 item 5: the rules sheet is the scale's 15 pt on a 1.5 line box over a 60 character measure, and each rule
-// title is never smaller than its paragraph.
+// D-101: the rules sheet is three short lines at one level on the scale's 15 pt on a 1.5 line box, no eyebrow, no title;
+// the second line states the picker's silence limit (5, 8 or 12), never a literal.
 func TestRulesSheetFollowsTheTypeScale(t *testing.T) {
-	g := newRig(t)
-	g.click("How it works")
-	title, ok1 := g.tt.Find(tokens.Rule1Title)
-	body, ok2 := g.tt.Find(tokens.Rule1Body)
-	if !ok1 || !ok2 {
-		t.Fatalf("rules not on screen: %q", g.tt.Texts())
+	for _, seconds := range tokens.SilenceChoices {
+		g := newRig(t)
+		g.a.ui.silIdx = slices.Index(tokens.SilenceChoices, seconds) // the picker's own control, as the writer sets it
+		g.tt.Frame()
+		g.click("How it works")
+		lines := rulesLines(seconds)
+		if want := fmt.Sprintf("%d seconds of silence deletes the draft.", seconds); lines[1] != want {
+			t.Fatalf("second line %q, want %q", lines[1], want)
+		}
+		const line = 15 * tokens.RulesBodyLeading
+		var left float32
+		for i, l := range lines {
+			el, ok := g.tt.Find(l)
+			if !ok {
+				t.Fatalf("N=%d: line %q not on screen: %q", seconds, l, g.tt.Texts())
+			}
+			if el.H != line {
+				t.Errorf("N=%d: %q is %.2f tall, want one %.1f line", seconds, l, el.H, line)
+			}
+			if i == 0 {
+				left = el.X
+			} else if d := el.X - left; d < -0.5 || d > 0.5 {
+				t.Errorf("N=%d: %q starts %.2f off the first line's left edge", seconds, l, d)
+			}
+		}
+		for _, gone := range []string{"Forward only. Nothing kept.", "No way back", "Silence deletes it", "Reach zero, keep it"} {
+			if _, ok := g.tt.Find(gone); ok {
+				t.Errorf("N=%d: the old copy %q is still on the sheet", seconds, gone)
+			}
+		}
+		for _, other := range tokens.SilenceChoices {
+			if other == seconds {
+				continue
+			}
+			if _, ok := g.tt.Find(fmt.Sprintf(tokens.RulesLine2Format, other)); ok {
+				t.Errorf("N=%d: the sheet still states %d s", seconds, other)
+			}
+		}
+		limit := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
+		if m := rulesMeasure(lines); m > limit || m < 200 {
+			t.Errorf("N=%d: measure %.1f outside 200..%.1f", seconds, m, limit)
+		}
+		g.snap(fmt.Sprintf("rules-scale-%d", seconds))
 	}
-	const line = 15 * tokens.RulesBodyLeading
-	if title.H != line {
-		t.Errorf("rule title box %.2f tall, want one %.1f line", title.H, line)
-	}
-	if lines := body.H / line; lines != float32(int(lines)) || lines < 1 {
-		t.Errorf("rule body %.2f tall: not a whole number of %.1f lines", body.H, line)
-	}
-	measure := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
-	if body.W > measure+0.5 || measure < 480 {
-		t.Errorf("rule body %.1f wide on a %.1f measure", body.W, measure)
-	}
-	g.snap("rules-scale")
 }
 
 // D-091: the help button is a 32 DIP circle on the lockup's centre line, flush with the card's inner padding.

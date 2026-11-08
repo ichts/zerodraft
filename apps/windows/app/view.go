@@ -224,28 +224,20 @@ func (a *App) rulesView(c *ui.Context, dark bool) {
 	if c.Shortcut(0, ui.KeyEscape) || c.Shortcut(0, ui.KeyEnter) {
 		a.closeRules()
 	}
-	// The scale's 15 pt body on a 1.5 line box over a 60-character measure; the card carries the measure plus the same
-	// inset each side. Each rule title is one step up in weight at the paragraph's own size, never smaller (D-076).
-	measure := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
-	body := func(s string, col ui.Color) ui.Element {
-		return text(c, s, 15, 400, col).LineHeight(tokens.RulesBodyLeading).Width(measure)
-	}
-	page(c, p, tokens.RulesEyebrow, func() {
+	// Three short lines at one level (D-101): the scale's 15 pt body in ink on a 1.5 line box. The card hugs its longest
+	// line, never past the 60-character measure, plus the same inset each side.
+	lines := rulesLines(a.prefs.SilenceSeconds)
+	measure := rulesMeasure(lines)
+	page(c, p, tokens.HomeRulesHelp, func() {
 		card(c, p, measure+2*tokens.RulesCardInset, 40, tokens.RulesCardInset, func() {
 			ui.Column(c).Width(measure).AlignItems(ui.Start).Children(func() {
-				smallLabel(c, p, tokens.RulesEyebrow)
-				gap(c, 10)
-				text(c, tokens.RulesHeading, 34, 500, p.ink()).Font(roomSerif).LineHeight(1.1)
-				gap(c, 24)
-				for i, r := range [][2]string{{tokens.Rule1Title, tokens.Rule1Body}, {tokens.Rule2Title, fmt.Sprintf(tokens.Rule2BodyFormat, a.prefs.SilenceSeconds)}, {tokens.Rule3Title, tokens.Rule3Body}} {
+				for i, line := range lines {
 					if i > 0 {
 						gap(c, tokens.RulesRuleGap)
 					}
-					text(c, r[0], 15, 600, p.ink()).LineHeight(tokens.RulesBodyLeading)
-					gap(c, tokens.RulesTitleGap)
-					body(r[1], p.mute())
+					text(c, line, 15, 400, p.ink()).LineHeight(tokens.RulesBodyLeading).Width(measure)
 				}
-				gap(c, 28)
+				gap(c, tokens.RulesDoneGap)
 			})
 			done := primary(c, tokens.RulesDone).Label("Close how it works").AutoFocus()
 			if done.Clicked() {
@@ -253,6 +245,21 @@ func (a *App) rulesView(c *ui.Context, dark bool) {
 			}
 		})
 	})
+}
+
+// rulesLines is the sheet's copy: the tokens' three lines with the picker's silence limit in the second.
+func rulesLines(silenceSeconds int) []string {
+	return []string{tokens.RulesLine1, fmt.Sprintf(tokens.RulesLine2Format, silenceSeconds), tokens.RulesLine3}
+}
+
+// rulesMeasure is the widest line, rounded up, but never wider than 60 characters of the body face.
+func rulesMeasure(lines []string) float32 {
+	var widest float32
+	for _, l := range lines {
+		widest = max(widest, room.TextWidth(l, 15, 400))
+	}
+	limit := float32(math.Round(float64(tokens.RulesMeasureChars * room.TextWidth("0", 15, 400))))
+	return min(limit, float32(math.Ceil(float64(widest))))
 }
 
 const roomSerif = fonts.DisplayStack // the rules heading is Newsreader 500 at its own size (the Mac sets the optical axis to the size)

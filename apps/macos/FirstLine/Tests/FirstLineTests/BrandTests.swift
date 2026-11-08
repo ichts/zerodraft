@@ -86,14 +86,18 @@ struct BrandTests {
         let rules = try #require(home.rulesPopover?.contentViewController as? RulesViewController)
         rules.view.layoutSubtreeIfNeeded()
         let labels = allLabels(in: rules.view)
-        let ordered = ["How it works", "Forward only. Nothing kept.", "No way back",
-                       "Silence deletes it", "Reach zero, keep it"]
+        // D-101: three short lines at one level, no eyebrow, no title, no second tier.
+        let ordered = ["Forward only, no deleting.", "8 seconds of silence deletes the draft."]
         for text in ordered {
             #expect(labels.contains(text), "missing rule text: \(text)")
         }
         let positions = ordered.compactMap { labels.firstIndex(of: $0) }
-        #expect(positions == positions.sorted(), "the rules are not in the landing page's order")
-        #expect(labels.contains("Stop for 8 seconds and the draft is deleted."))
+        #expect(positions == positions.sorted(), "the rules are out of order")
+        #expect(labels.contains("Write to 0:00 and the text is yours."), "the keep line is missing")
+        #expect(labels.filter { $0 != "Done" }.count == 3, "the sheet carries more than the three lines: \(labels)")
+        for gone in ["How it works", "Forward only. Nothing kept.", "No way back", "Silence deletes it", "Reach zero, keep it"] {
+            #expect(!labels.contains(gone), "the old copy is still on the sheet: \(gone)")
+        }
         #expect(!labels.contains { $0.contains("!") })
         let done = try #require(allButtons(in: rules.view).first { $0.title == "Done" })
         #expect(done.keyEquivalent == "\r")
@@ -103,6 +107,38 @@ struct BrandTests {
         #expect(rules.view.window?.performKeyEquivalent(with: ret) == true)
         RunLoop.main.run(until: Date().addingTimeInterval(2.0))
         #expect(home.rulesPopover?.isShown != true, "Return did not dismiss the rules")
+        window.orderOut(nil)
+    }
+
+    /// D-101: the second line states the silence limit the picker uses (5, 8 or 12), never a literal 8.
+    @Test(arguments: SilenceLimit.allCases) func rulesSecondLineFollowsTheSilenceSetting(limit: SilenceLimit) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        state.updateSilenceLimit(limit)
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        let rules = try #require(home.rulesPopover?.contentViewController as? RulesViewController)
+        rules.view.layoutSubtreeIfNeeded()
+        let labels = allLabels(in: rules.view)
+        let seconds = limit.rawValue
+        #expect(labels.contains("\(seconds) seconds of silence deletes the draft."),
+                "the sheet does not state the \(seconds) s limit: \(labels)")
+        let others = SilenceLimit.allCases.map(\.rawValue).filter { $0 != seconds }
+        for other in others {
+            #expect(!labels.contains { $0.hasPrefix("\(other) seconds") }, "the sheet still states \(other) s at \(seconds) s")
+        }
+        home.rulesPopover?.close()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         window.orderOut(nil)
     }
 

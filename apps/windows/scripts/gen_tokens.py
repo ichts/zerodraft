@@ -155,13 +155,13 @@ labels = re.findall(r'case \.(\w+): "([^"]+)"', re.search(r'enum SilenceLimit.*?
 P.append('\tSilenceChoices = []int{%s, %s, %s}' % sl.groups())
 P.append('\tSilenceLabels = []string{%s}' % ', '.join(q(l) for _, l in labels))
 # rules sheet
-const('RulesEyebrow', lit(rules, 'How it works', 'RulesEyebrow')); const('RulesHeading', lit(rules, 'Forward only. Nothing kept.', 'RulesHeading'))
-rl = re.findall(r'rule\("([^"]+)",\s*"([^"]+)"\)', rules)
-assert len(rl) == 3
-for i, (t, b) in enumerate(rl, 1):
-    const(f'Rule{i}Title', win(t))
-    if '\\(silenceSeconds)' in b: const(f'Rule{i}BodyFormat', win(b).replace('\\(silenceSeconds)', '%d'))  # the picker's silence limit
-    else: const(f'Rule{i}Body', win(b))
+# the three rule lines come from RulesViewController.lines(silenceSeconds:), the one source of the sheet's copy (D-101)
+fn = re.search(r'static func lines\(silenceSeconds: Int\) -> \[String\] \{\s*\[(.*?)\]\s*\}', rules, re.S)
+rl = re.findall(r'"((?:[^"\\]|\\.)*)"', fn.group(1)) if fn else []
+assert len(rl) == 3, 'RulesViewController.lines must hold exactly three strings'
+for i, b in enumerate(rl, 1):
+    if '\\(silenceSeconds)' in b: const(f'RulesLine{i}Format', win(b).replace('\\(silenceSeconds)', '%d'))  # the picker's silence limit
+    else: const(f'RulesLine{i}', win(b))
 const('RulesDone', lit(rules, 'Done', 'RulesDone'))
 # activation (upgrade) card
 const('UpgradeTitle', lit(upgrade, 'Activate Write It Down', 'UpgradeTitle')); const('UpgradeTitleLicensed', 'Write It Down')
@@ -183,7 +183,7 @@ const('UpgradeCleanupActive', 'License active on this PC.') if 'License active o
 chip = rd('DesignSystem/BrandChipLockupView.swift')
 num('RulesBodyLeading', s1(r'static let bodyLeading: CGFloat = ([0-9.]+)', rules)); num('RulesCardInset', s1(r'static let cardInset: CGFloat = (\d+)', rules))
 num('RulesMeasureChars', s1(r'return \((\d+) \* character\)\.rounded\(\)', rules)); num('RulesRuleGap', s1(r'rules\.spacing = (\d+)', rules))
-num('RulesTitleGap', s1(r'stack\.setCustomSpacing\((\d+), after: titleLabel\)', rules))
+num('RulesDoneGap', s1(r'stack\.setCustomSpacing\((\d+), after: rules\)', rules))
 num('ChipEmWidth', s1(r'static let emWidth: CGFloat = ([0-9.]+)', chip)); num('ChipEmHeight', s1(r'static let emHeight: CGFloat = ([0-9.]+)', chip))
 num('ChipCornerShare', s1(r'static let plateCornerShare: CGFloat = ([0-9.]+)', chip)); num('ChipPickerTypeSize', s1(r'static let pickerTypeSize: CGFloat = (\d+)', chip))
 # licence and access status (AppState), activation errors (LicenseModels)

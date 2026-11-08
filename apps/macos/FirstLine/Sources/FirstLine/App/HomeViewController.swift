@@ -100,7 +100,6 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
 
         rulesButton = FirstLineButtons.iconCircle(title: "?", target: self, action: #selector(showRules))
         rulesButton.setAccessibilityLabel("How it works")
-        rulesButton.setAccessibilityHelp("How it works: no way back, silence deletes it, reach zero and keep it.")
         durationControl = FirstLineSegmentedControl(
             items: SessionEngine.durationChoices.map { duration in
                 let minutes = Int(duration / 60)

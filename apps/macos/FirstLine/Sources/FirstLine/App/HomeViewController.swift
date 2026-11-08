@@ -33,7 +33,7 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
+        view = FloodCanvasView(fillColor: .clear)
         buildInterface()
         armLicenseObservation()
     }

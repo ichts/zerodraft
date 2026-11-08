@@ -2035,3 +2035,33 @@ is `docs/wid-world-table.md`.
   `BrandTests.rulesSecondLineFollowsTheSilenceSetting` (5, 8 and 12),
   `DesignReviewFixesTests.rulesSheetUsesTheScaleForLeadingAndOneLevel`, `LongStringTests.rulesRowsGrowWithTheirText`;
   Windows `TestRulesSheetFollowsTheTypeScale` (N = 5, 8, 12); captures in `data/wid-help-copy-build/`.
+
+## D-102: The Mac window has no ground of its own; the writer's wallpaper shows around the paper
+
+- Date: 2026-11-07
+- Decision: the Mac window is clear. Its background, the page colour behind the paper and the white strip of the
+  title bar are gone, so the writer's own desktop shows around the paper (and around the picker, settings and
+  activation cards). The paper keeps today's size and place (32 pt gutter, 16 pt radius, the sheet shadow) and
+  the window's own shadow is off so the paper's is the only one. The title bar is clear: the traffic lights float
+  over the wallpaper, there is no rule under them (and the system's lit 1 px top edge, its title bar decoration
+  view, is kept hidden through resizes and focus changes), and the title is hidden (it stays the window name for Mission Control
+  and the Window menu). Once the first character lands the traffic lights step out (alpha 0, no animation) so
+  nothing but the paper is on screen while writing; they come back when the pointer reaches the title strip and
+  whenever the room is not live (empty, stopped, kept, picker, settings).
+  The minimum content size grows by the title bar's height so the paper's minimum stays 980 x 680. Dragging the
+  clear margin moves the window. Full screen has no wallpaper behind it, so the page colour is the ground there.
+  The window ground is one alpha step above 0 so a click in the margin stays on the window instead of falling
+  through to the app behind. Nav, clock and footer already sit on the paper, not on the old page, so no text
+  moves onto the wallpaper.
+- Parity exception (intentional): this is Mac only. A web page cannot see the visitor's desktop, so the web
+  landing and trial keep the page colour behind the paper (D-069, D-056 unchanged); the nearest web equivalent
+  would be an invented backdrop, which this record does not add. The Windows app is not part of this decision.
+- Reason: the captain, 2026-11-07, after the paper-vs-page options round (PR 125, options A, B and C): "on the
+  desktop just remove the background and show the user's own background; the paper keeps its size; but do not
+  use that white background". The white page and the wheat paper fought; removing the page leaves one surface.
+- Supersedes: the page-colour ground behind the paper on the Mac in D-069's room description and the 32 pt gutter
+  being drawn on `pageNSColor`. Paper colour, size, shadow and the writing contract stand.
+- Evidence: `WallpaperWindowTests` (clear, non-opaque, shadow off, clear title bar, paper 32 pt from the edges,
+  clear grounds on every surface, page colour in full screen) and Tart macOS 15.7.7 and 26.6.2 before/after
+  captures on a light, a dark and a busy wallpaper in the PR.
+

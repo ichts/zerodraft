@@ -36,6 +36,28 @@ final class FirstLineShadowView: NSView {
     ]
     private var shadowLayers: [CALayer] = []
 
+    /// How far the shadow may reach past the sheet, in pt; nil leaves the approved spec untouched. A window with no
+    /// ground of its own (D-102) clips the shadow at its edge, which is a hard step over a wallpaper, so the room's
+    /// paper asks for the gutter it has and each layer's radius and offset shrink together until their reach fits.
+    var reach: CGFloat? {
+        didSet { updateLayers() }
+    }
+
+    /// The farthest any layer of the current appearance's shadow reaches below the sheet.
+    var effectiveReach: CGFloat {
+        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return (dark ? darkSpecs : lightSpecs).map { fitted($0).radius + abs(fitted($0).offset.height) }.max() ?? 0
+    }
+
+    private func fitted(_ spec: Spec) -> Spec {
+        let natural = spec.radius + abs(spec.offset.height)
+        guard let reach, natural > reach else { return spec }
+        let scale = reach / natural
+        return Spec(opacity: spec.opacity, radius: spec.radius * scale,
+                    offset: CGSize(width: spec.offset.width * scale, height: spec.offset.height * scale),
+                    inkTinted: spec.inkTinted)
+    }
+
     init(cornerRadius: CGFloat = FirstLineRadius.card, fillColor: NSColor = FirstLineColors.sheetNSColor) {
         self.cornerRadius = cornerRadius
         self.fillColor = fillColor
@@ -73,7 +95,8 @@ final class FirstLineShadowView: NSView {
         let visible = Array(shadowLayers.prefix(specs.count))
         // Hidden spare layers stay out of the render tree when the mode uses fewer layers.
         for sublayer in shadowLayers where !visible.contains(sublayer) { sublayer.isHidden = true }
-        for (sublayer, spec) in zip(visible, specs) {
+        for (sublayer, natural) in zip(visible, specs) {
+            let spec = fitted(natural)
             sublayer.isHidden = false
             sublayer.frame = bounds
             sublayer.cornerRadius = cornerRadius

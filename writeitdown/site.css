@@ -259,6 +259,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .card .txt{padding:22px var(--s5) 26px}
 .card h3{margin:0 0 var(--s2);font:500 var(--t-h3)/1.15 var(--serif);letter-spacing:-.01em}
 .card p{margin:0;color:var(--mute);font:400 var(--t-body)/1.55 var(--sans)}
+.card .txt p{color:var(--ink);font:500 var(--t-h3)/1.25 var(--serif);letter-spacing:-.01em}
 .keys{display:flex;gap:var(--s3)}
 .line8{width:78%}
 .line8 .track{height:8px;border-radius:var(--r-pill);background:var(--hair-2);overflow:hidden}

@@ -1822,7 +1822,7 @@ test('the landing states the warning lead-in and never labels a moment with anot
     numeral: document.querySelector('#core .mo .n').textContent.trim(),
     stopped: [...document.querySelectorAll('#core .mo.m3 .t, #core .mo.m3 .r')].map(e => e.textContent.trim()),
     marker: [...document.querySelectorAll('#how .line8 .lab span, #how .line8 .lab b')].map(e => e.textContent.trim()),
-    card: document.querySelectorAll('#how .card')[1].textContent.replace(/\s+/g, ' ').trim(),
+    card: document.querySelectorAll('#how .card .txt')[1].textContent.replace(/\s+/g, ' ').trim(),
     faq: document.querySelector('#faq details p').textContent.replace(/\s+/g, ' ').trim(),
     schema: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'][1].mainEntity[0].acceptedAnswer.text,
   }));
@@ -1837,8 +1837,8 @@ test('the landing states the warning lead-in and never labels a moment with anot
   expect(copy.stopped).toEqual(['You stopped.', 'Draft deleted.']);
   // One form for a silence mark everywhere.
   expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
-  // The card says the one rule (D-086) and the marker above it shows the warning; the lead-in is stated in the answer the schema repeats word for word.
-  expect(copy.card).toMatch(/Silence deletes it ?Stop for 8 seconds and the draft is deleted\.$/);
+  // The card says the one rule (D-101) and the marker above it shows the warning; the lead-in is stated in the answer the schema repeats word for word.
+  expect(copy.card).toBe('8 seconds of silence deletes the draft.');
   expect(copy.faq).toMatch(/warning always starts three seconds before/i);
   expect(copy.faq).toBe(copy.schema);
 });

@@ -199,9 +199,11 @@ async function run(size, browser) {
     });
   });
   await block('landing/how-it-works', async () => {
-    await step('3 cards: no way back, silence, reach zero', async () => {
-      await show('#how'); const t = await page.locator('#how .cards .card h3').allInnerTexts();
-      ok(t.length === 3 && /no way back/i.test(t[0]) && /silence deletes it/i.test(t[1]) && /reach zero/i.test(t[2]), `cards ${JSON.stringify(t)}`);
+    await step('3 cards: one approved line each, no titles', async () => {
+      await show('#how');
+      const t = await page.locator('#how .cards .card .txt').allInnerTexts();
+      ok(JSON.stringify(t.map(x => x.trim())) === JSON.stringify(['Forward only, no deleting.', '8 seconds of silence deletes the draft.', 'Write to 0:00 and the text is yours.']), `cards ${JSON.stringify(t)}`);
+      const h3 = await page.locator('#how .cards .card h3').count(); ok(h3 === 0, `cards carry ${h3} h3 titles, expected none`);
     });
   });
   await block('landing/mac-block', async () => {

@@ -28,10 +28,11 @@ async function openTheDoor(page) {
         t: now - t0, blank: document.getElementById('landing').hidden && room.hidden,
         shown: !room.hidden, landing: !document.getElementById('landing').hidden,
         paper: rect(roomPaper), brand: rect(roomBrand), focused: document.activeElement?.id === 'editor',
-        animations: roomPaper.getAnimations().length,
-        duration: roomPaper.getAnimations()[0]?.effect.getTiming().duration ?? 0,
+        animations: roomPaper.getAnimations().filter(a => a.id === 'door').length,
+        duration: roomPaper.getAnimations().find(a => a.id === 'door')?.effect.getTiming().duration ?? 0,
       });
-      if (now - t0 < 600) requestAnimationFrame(sample); else resolve({ demo, brand, frames, inView: demo.y + demo.h > 0 && demo.y < innerHeight });
+      const settled = now - t0 >= 600 && !roomPaper.getAnimations().some(a => a.id === 'door');
+      if (!settled && now - t0 < 3000) requestAnimationFrame(sample); else resolve({ demo, brand, frames, inView: demo.y + demo.h > 0 && demo.y < innerHeight });
     };
     cta.addEventListener('click', e => { t0 = e.timeStamp; requestAnimationFrame(sample); }, { once: true });
     cta.click();

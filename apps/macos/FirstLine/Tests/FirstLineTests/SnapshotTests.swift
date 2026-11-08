@@ -315,7 +315,8 @@ struct SnapshotTests {
     private func snapshot(_ controller: NSViewController, name: String, appearance: NSAppearance.Name,
                           output: URL?, sheetPoint: NSPoint? = nil, paperPoint: NSPoint? = nil,
                           washPoint: (point: NSPoint, fraction: CGFloat)? = nil,
-                          focus: Bool = false, cornerFill: NSColor = FirstLineColors.pageNSColor) throws {
+                          focus: Bool = false, cornerFill: NSColor = .clear) throws {
+        // D-102: the window has no ground, so a surface's corners are clear and the writer's desktop shows there.
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled], backing: .buffered, defer: false)
         window.appearance = NSAppearance(named: appearance)

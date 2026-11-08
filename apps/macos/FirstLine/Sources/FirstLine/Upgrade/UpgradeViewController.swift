@@ -32,7 +32,7 @@ final class UpgradeViewController: NSViewController {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        self.view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
+        self.view = FloodCanvasView(fillColor: .clear)
         if appState.licenseActivationError != .cleanupFailure {
             appState.clearLicenseActivationError()
         }

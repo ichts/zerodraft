@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
  * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
- * [POS]: Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [POS]: Clear window ground (D-102): the traffic lights step out once the first character lands and return on a title-strip hover or when the room stops. Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -226,6 +226,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var textView: AppendOnlyTextView!
     private var scrollView: NSScrollView!
     private var paper: PaperSheetView!
+    /// The clear gutter between the window edge and the paper; the paper's shadow is fitted to it (D-102).
+    static let sheetMargin: CGFloat = 32
     private var paperShadow: FirstLineShadowView!
     private var paperWash: PaperWashView!
     private var outline: RoomWashView!
@@ -268,6 +270,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var refusalNoteTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
     private var chromeHover = false
+    private var titleBarHover = false
     /// Cadence for the stepped Reduce Motion bar; the normal bar is one continuous
     /// Core Animation over the remaining time.
     var barNow: () -> TimeInterval = { SessionEngine.continuousNowSeconds() }
@@ -290,7 +293,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func loadView() {
-        view = FloodCanvasView(fillColor: FirstLineColors.pageNSColor)
+        view = FloodCanvasView(fillColor: .clear)
         buildRoom()
         configureEditor()
         applyPhase()
@@ -328,6 +331,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     override func viewWillDisappear() {
         super.viewWillDisappear()
+        syncTrafficLights(restore: true)
         ticker?.invalidate()
         ticker = nil
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
@@ -350,6 +354,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func buildRoom() {
         paperShadow = FirstLineShadowView(cornerRadius: FirstLineRadius.sheet, fillColor: FirstLineColors.paperNSColor)
+        paperShadow.reach = Self.sheetMargin
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
@@ -526,10 +531,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paperShadow.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             paperShadow.topAnchor.constraint(equalTo: paper.topAnchor),
             paperShadow.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
-            paper.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: 32),
-            paper.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -32),
-            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: 32),
-            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -32),
+            paper.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: Self.sheetMargin),
+            paper.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -Self.sheetMargin),
+            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: Self.sheetMargin),
+            paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -Self.sheetMargin),
             progressBar.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
             progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             progressBar.topAnchor.constraint(equalTo: paper.topAnchor),
@@ -987,6 +992,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if !textView.hasMarkedText(), !engine.text.isEmpty, textView.string.isEmpty { textView.loadRestoredText(engine.text) }
         syncProgressBar(phase: phase)
         if !textView.hasMarkedText() { prepareViewport() }
+        syncTrafficLights()
     }
 
     /// One linear fill animation runs over the remaining session time and is only
@@ -1086,12 +1092,25 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     override func mouseMoved(with event: NSEvent) {
         let position = paper.convert(event.locationInWindow, from: nil)
         chromeHover = position.y > paper.bounds.height - 90 || position.y < 90
+        titleBarHover = view.window.map { event.locationInWindow.y > $0.contentLayoutRect.maxY } ?? false
         applyVisualSettings()
+        syncTrafficLights()
     }
 
     override func mouseExited(with event: NSEvent) {
         chromeHover = false
+        titleBarHover = false
         applyVisualSettings()
+        syncTrafficLights()
+    }
+
+    /// While the room is live the window's traffic lights step out of the margin so nothing but the paper is
+    /// on screen; they return when the pointer reaches the title strip and whenever the room is not live (D-102).
+    private func syncTrafficLights(restore: Bool = false) {
+        let live = engine.hasStarted && (engine.phase == .writing || engine.phase == .danger)
+        let alpha: CGFloat = (restore || !live || titleBarHover) ? 1 : 0
+        let kinds: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+        for kind in kinds { view.window?.standardWindowButton(kind)?.alphaValue = alpha }
     }
 
     /// `fraction` is how warm the sheet is, 0...1. The view is fully visible whenever there is any wash and

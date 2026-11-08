@@ -6,13 +6,13 @@ import { doorSettled } from './door.mjs';
 // two back .07, older gone, per theme; the lines above dissolve to their next step over 320 ms when Return lands. The
 // dimmed lines are exempt from the 7:1 floor (the captain's exception); the live line keeps the full ink. The aperture is
 // a hard clip, so a partial line is cut at its edge and never given an alpha.
-// Refusal: the 200 ms shake stays on every refusal; the first refused delete of a session also names the
-// rule in the footer's status slot for two seconds, and nothing else moves.
+// Refusal: the 200 ms shake stays on every refusal; the first refused delete of a session also says the rule once,
+// centred just under the line being written, for two seconds (D-100, moved out of the footer), and nothing else moves.
 import { test, expect } from '@playwright/test';
 
 const TONES = { light: '#e9e2ce', dark: '#342e24' };
 const QUIET = { light: '#464746', dark: '#c2bfb7' };
-const REFUSAL = 'FORWARD ONLY. DELETING IS BLOCKED.';
+const REFUSAL = 'You can only add the next word.';
 
 const rgb = value => String(value).match(/[\d.]+/g).slice(0, 3).map(Number);
 const lum = ([r, g, b]) => [r, g, b].map(v => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; })
@@ -192,74 +192,120 @@ test('the aperture clips a partial line at its edge and never fades it', async (
 
 // --- Refusal --------------------------------------------------------------------------------------------
 
-const frames = page => page.evaluate(() => Object.fromEntries(['#exit', '#room-count', '#room-clock', '.room-paper', '.editor-stack', '#editor-ink']
+// The footer, the count, the clock, the paper and the writing layer: none may move while the note shows (D-100).
+const frames = page => page.evaluate(() => Object.fromEntries(['#exit', '#room-count', '#room-clock', '.room-paper', '.editor-stack', '#editor-ink', '#exit-hint']
   .map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return [selector, [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100)]; })));
-const slotText = page => page.locator('#exit-hint').textContent();
+const noteShown = page => page.locator('#refusal-note').getAttribute('data-shown');
 // The paper's shake and its red hairline are both animations under the paper; Reduce Motion keeps the hairline alone.
 const shakes = page => page.evaluate(() => document.querySelector('.room-paper').getAnimations({ subtree: true }).length);
+// Where the note sits against the writing: its box, the live line's box bottom and the footer's top, all in page pixels.
+const geometry = page => page.evaluate(() => {
+  const box = selector => document.querySelector(selector).getBoundingClientRect();
+  const note = box('#refusal-note');
+  const stack = box('.editor-stack');
+  const lh = parseFloat(getComputedStyle(document.querySelector('#editor')).lineHeight);
+  return { note: { x: note.x, y: note.y, width: note.width, height: note.height }, stack: { x: stack.x, width: stack.width },
+    lineBottom: stack.y + 3 * lh, lh, footerTop: box('.room-paper .paper-foot').top, paper: box('.room-paper') };
+});
 
-test('the first refused delete names the rule for two seconds; later refusals only shake; a new session resets it', async ({ page }, info) => {
+test('the first refused delete says the rule once, centred under the line being written; later refusals only shake', async ({ page }, info) => {
   await enter(page);
   const mode = await theme(page);
   await page.keyboard.insertText('Some words');
-  expect(await slotText(page), 'the slot is empty before any refusal').toBe('');
+  expect(await noteShown(page), 'nothing shows before any refusal').toBe('false');
   const before = await frames(page);
+  // The note's own clock, read in the page so a slow screenshot cannot change what is measured.
+  await page.evaluate(() => {
+    const note = document.getElementById('refusal-note');
+    window.__noteFlips = [];
+    new MutationObserver(() => window.__noteFlips.push([note.dataset.shown, performance.now()])).observe(note, { attributes: true, attributeFilter: ['data-shown'] });
+  });
 
   await page.keyboard.press('Backspace');
-  const shownAt = Date.now();
-  await expect(page.locator('#exit-hint')).toHaveText(REFUSAL);
+  await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
+  await expect(page.locator('#refusal-note')).toHaveText(REFUSAL);
+  expect(REFUSAL, 'sentence case, never all capitals').not.toBe(REFUSAL.toUpperCase());
   expect(await shakes(page), 'the 200 ms shake still runs on the first refusal').toBeGreaterThan(0);
-  await page.waitForTimeout(300);
-  await page.screenshot({ path: info.outputPath('refusal-first.png') });
-  const during = await frames(page);
-  expect(during, 'nothing else moves while the notice shows').toEqual(before);
+  expect(await frames(page), 'the footer and the writing keep their frames while the note shows').toEqual(before);
+  await expect(page.locator('#exit'), 'Esc to exit stays in the footer').toHaveText(/^(Esc to exit|Exit)$/);
+  await expect(page.locator('#exit-hint'), 'the footer slot stays empty').toHaveText('');
 
-  // The status text is the quiet role: 4.5:1 on the sheet at the least, 7:1 in fact.
-  const colour = await page.locator('#exit-hint').evaluate(e => getComputedStyle(e).color);
+  // Centred on the writing column, just beneath the live line, clear of the footer, and not over the caret line.
+  const g = await geometry(page);
+  expect(Math.abs(g.note.x + g.note.width / 2 - (g.stack.x + g.stack.width / 2)), 'centred on the writing column').toBeLessThanOrEqual(1);
+  expect(g.note.y, 'beneath the live line, not over it').toBeGreaterThanOrEqual(g.lineBottom);
+  expect(g.note.y - g.lineBottom, 'just beneath the line').toBeLessThan(g.lh);
+  expect(g.note.y + g.note.height, 'fully visible above the footer').toBeLessThanOrEqual(g.footerTop);
+
+  // The quiet role: 7:1 on the sheet, announced once (the visible note is hidden from assistive tech).
+  const colour = await page.locator('#refusal-note').evaluate(e => getComputedStyle(e).color);
   expect(rgb(colour)).toEqual(hex(QUIET[mode]));
-  expect(contrast(rgb(colour), hex(TONES[mode]))).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(rgb(colour), hex(TONES[mode]))).toBeGreaterThanOrEqual(7);
+  await expect(page.locator('#refusal-note')).toHaveAttribute('aria-hidden', 'true');
+  expect(await page.locator('#status').textContent(), 'announced once, in the live region').toBe(REFUSAL);
 
-  // A second refusal inside the window restarts nothing and says nothing new.
+  // A second refusal inside the window restarts nothing and says nothing new on screen.
   await page.keyboard.press('Delete');
-  expect(await slotText(page)).toBe(REFUSAL);
+  expect(await noteShown(page)).toBe('true');
 
-  await page.waitForTimeout(Math.max(0, 1800 - (Date.now() - shownAt)));
-  expect(await slotText(page), 'still showing just before two seconds').toBe(REFUSAL);
-  await expect(page.locator('#exit-hint')).toHaveText('', { timeout: 1200 });
-  const elapsed = Date.now() - shownAt;
-  expect(elapsed, `the notice lasted ${elapsed} ms`).toBeGreaterThanOrEqual(1950);
-  expect(elapsed).toBeLessThan(2600);
-  expect(await frames(page), 'the slot returns with no layout shift').toEqual(before);
+  await page.screenshot({ path: info.outputPath('refusal-first.png') });
+  await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'false', { timeout: 2600 });
+  const flips = await page.evaluate(() => window.__noteFlips);
+  expect(flips.map(([value]) => value), 'shown once, then hidden once; the second refusal restarted nothing').toEqual(['true', 'false']);
+  const lasted = flips[1][1] - flips[0][1];
+  expect(lasted, `the note lasted ${Math.round(lasted)} ms`).toBeGreaterThanOrEqual(1990);
+  expect(lasted).toBeLessThan(2200);
+  await expect(page.locator('#refusal-note'), 'it fades out and is gone').toHaveCSS('opacity', '0');
+  expect(await frames(page), 'nothing moved after it went').toEqual(before);
 
-  // Later refusals in the same session shake only.
+  // Later refusals in the same session shake only and show nothing.
   await page.keyboard.press('Backspace');
   expect(await shakes(page), 'a later refusal still shakes').toBeGreaterThan(0);
-  expect(await slotText(page), 'a later refusal says nothing in the slot').toBe('');
+  expect(await noteShown(page), 'a later refusal shows no text').toBe('false');
+  expect(await page.locator('#status').textContent()).toBe('Blocked. Forward only.');
   await page.keyboard.insertText(' more');
 
   // A session that ends starts the next one clean: stop typing until the draft is wiped, then refuse again.
   await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe', { timeout: 9000 });
+  await page.keyboard.press('Backspace');
+  expect(await noteShown(page), 'the stopped screen owns the space: the note waits').toBe('false');
   await page.keyboard.insertText('Fresh');
   await page.keyboard.press('Backspace');
-  await expect(page.locator('#exit-hint')).toHaveText(REFUSAL);
+  await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
 });
 
-test('only a delete earns the notice, and an armed exit confirmation keeps the slot', async ({ page }) => {
+test('the note fades out in 200 ms, and under Reduce Motion it only steps', async ({ page }) => {
+  await enter(page);
+  const reduce = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  await page.keyboard.insertText('Words');
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
+  const timing = await page.locator('#refusal-note').evaluate(e => getComputedStyle(e).transitionDuration);
+  expect(timing.split(',')[0].trim(), 'shown: no transition in, so the note is there on the refusal frame').toBe('0s');
+  await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'false', { timeout: 2600 });
+  const out = await page.locator('#refusal-note').evaluate(e => getComputedStyle(e).transitionDuration.split(',')[0].trim());
+  expect(out, reduce ? 'Reduce Motion: no fade, an opacity step' : 'fades out over 200 ms').toBe(reduce ? '0s' : '0.2s');
+  const moved = await page.locator('#refusal-note').evaluate(e => getComputedStyle(e).transform);
+  expect(moved, 'it never moves').toBe('none');
+});
+
+test('only a delete earns the note; the warning owns the space; an armed exit confirmation does not block it', async ({ page }) => {
   await enter(page);
   await page.keyboard.insertText('Words');
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('Control+z');
-  expect(await slotText(page), 'caret moves and undo only shake').toBe('');
-  const hint = await page.locator('#exit-hint').getAttribute('data-hint');
+  expect(await noteShown(page), 'caret moves and undo only shake').toBe('false');
+  // Silence: the warning numeral takes the space under the line, so a refused delete waits unspent.
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'warn', { timeout: 6500 });
+  await page.keyboard.press('Backspace');
+  expect(await noteShown(page), 'no note over the warning numeral').toBe('false');
+  await page.keyboard.insertText(' typed');
   await page.keyboard.press('Escape');
+  const hint = await page.locator('#exit-hint').getAttribute('data-hint');
   await expect(page.locator('#exit-hint')).toHaveText(hint);
   await page.keyboard.press('Backspace');
-  expect(await slotText(page), 'the pending confirmation is not displaced').toBe(hint);
-  expect(await shakes(page), 'the refusal still shakes').toBeGreaterThan(0);
-  await page.keyboard.insertText(' typed');
-  await expect(page.locator('#exit-hint')).toHaveText('');
-  await page.keyboard.press('Backspace');
-  await expect(page.locator('#exit-hint'), 'the notice was not spent while the confirmation held the slot').toHaveText(REFUSAL);
+  await expect(page.locator('#refusal-note'), 'the waiting note shows now').toHaveAttribute('data-shown', 'true');
+  await expect(page.locator('#exit-hint'), 'the confirmation keeps its footer slot').toHaveText(hint);
 });
 
 test('a composition is drawn by the ink layer with its underline, and commits into the history', async ({ page }) => {

@@ -184,10 +184,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private static let roomInset: CGFloat = 22
     private static let footerHeight: CGFloat = 44
     private static let exitHintText = "Press Esc again to leave and delete the draft."
-    /// The first refused delete of a session names the rule in the footer's status slot for two seconds, then the
-    /// slot goes back to what it held (D-077 amends D-046). Later refusals only shake.
-    private static let refusalNoticeText = "FORWARD ONLY. DELETING IS BLOCKED."
+    /// The first refused delete of a session says the rule once, centred just under the line being written, for two
+    /// seconds (D-100 moves D-077's notice out of the footer). Later refusals only shake.
+    private static let refusalNoticeText = "You can only add the next word."
     static let refusalNoticeDuration: TimeInterval = 2
+    /// The note's baseline sits this far under the live line's baseline, the same on the web and Windows rooms.
+    static let refusalNoticeBelow: CGFloat = 34
+    static let refusalNoticeFade: TimeInterval = 0.2
     /// The stopped screen's composition (D-070): one group whose midpoint sits on the room's one
     /// anchor, `RoomPresentation.paperAnchorFraction`. The pill height is the group's base and the
     /// headline is 1.0 of it; every other value - the two gaps, the line's 1.6 box and its size, the
@@ -233,6 +236,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var warningHint: NSTextField!
     private var exitButton: NSButton!
     private var exitHintLabel: NSTextField!
+    private var refusalNoteLabel: NSTextField!
     private var failureHeadlineLabel: NSTextField!
     private var failureNoteLabel: NSTextField!
     private var failureRestartButton: NSButton!
@@ -261,6 +265,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var refusalNoticeWork: DispatchWorkItem?
     private(set) var isShowingRefusalNotice = false
     private var numeralTop: NSLayoutConstraint!
+    private var refusalNoteTop: NSLayoutConstraint!
     private var captionTop: NSLayoutConstraint!
     private var chromeHover = false
     /// Cadence for the stepped Reduce Motion bar; the normal bar is one continuous
@@ -314,6 +319,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         super.viewDidLayout()
         prepareViewport()
         layoutWarning()
+        layoutRefusalNote()
         syncProgressBar(phase: engine.phase)
         updateFailureComposition()
         layoutFailureBlock()
@@ -426,6 +432,13 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
         exitHintLabel.isHidden = true
+        refusalNoteLabel = label(font: FirstLineTypography.smallNSFont, color: FirstLineColors.paperQuietNSColor)
+        refusalNoteLabel.attributedStringValue = Self.quietRowText(Self.refusalNoticeText,
+            color: FirstLineColors.paperQuietNSColor, truncates: true)
+        refusalNoteLabel.maximumNumberOfLines = 1
+        refusalNoteLabel.lineBreakMode = .byTruncatingTail
+        refusalNoteLabel.isHidden = true
+        refusalNoteLabel.setAccessibilityElement(false)
 
         failureHeadlineLabel = label(font: FirstLineTypography.writingMediumNSFont(size: 44),
                                      color: FirstLineColors.inkNSColor)
@@ -484,7 +497,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         ])
 
         for element in [timerLabel!, countLabel!, numeralLabel!, warningHint!, exitButton!,
-                        exitHintLabel!, failureHeadlineLabel!, failureNoteLabel!, failureRestartButton!] {
+                        exitHintLabel!, refusalNoteLabel!, failureHeadlineLabel!, failureNoteLabel!, failureRestartButton!] {
             paper.addSubview(element)
         }
         buildKeptView()
@@ -503,6 +516,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let safe = view.safeAreaLayoutGuide
         numeralTop = numeralLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         captionTop = warningHint.topAnchor.constraint(equalTo: paper.topAnchor)
+        refusalNoteTop = refusalNoteLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         // The stopped group is placed from its own height; `layoutFailureBlock` owns the constant.
         failureTop = failureHeadlineLabel.topAnchor.constraint(equalTo: paper.topAnchor)
         failureNoteTop = failureNoteLabel.topAnchor.constraint(equalTo: failureHeadlineLabel.bottomAnchor)
@@ -542,6 +556,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             exitHintLabel.trailingAnchor.constraint(lessThanOrEqualTo: countLabel.leadingAnchor, constant: -12),
             numeralLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             numeralTop,
+            refusalNoteLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
+            refusalNoteTop,
+            refusalNoteLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
+            refusalNoteLabel.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
             warningHint.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             captionTop,
             warningHint.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
@@ -595,8 +613,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
         textView.onDeny = { [weak self] in
             guard let self else { return }
-            // An armed exit confirmation is the writer's pending decision and keeps the slot; the notice waits.
-            self.engine.registerDeny(deleting: self.textView.lastDenyWasDeletion && !self.exitConfirmation.isArmed)
+            // Only a live line has room under it: on the warning and the stopped screen the notice waits unspent.
+            let liveLine = self.engine.phase == .idle || self.engine.phase == .writing
+            self.engine.registerDeny(deleting: self.textView.lastDenyWasDeletion && liveLine)
         }
     }
 
@@ -873,8 +892,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             textView.clearWipedText()
             keptView.reset()
             dismissExitConfirmation()
-            endRefusalNotice()
+            endRefusalNotice(fade: false)
         }
+        // The warning numeral and the stopped group own the space under the line, so a note still showing steps aside.
+        if phase != .idle, phase != .writing { endRefusalNotice(fade: false) }
         if phase == .failure, lastPhase != .failure {
             showCut()
             // The stopped sheet keeps the editor first responder so the first keystroke, including an
@@ -1162,7 +1183,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func showExitHint() {
-        endRefusalNotice()
         setExitHint(visible: true)
         announce(Self.exitHintText)
         exitHintWork?.cancel()
@@ -1183,8 +1203,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func setExitHint(visible: Bool) {
-        // A refusal notice finishes its own two seconds; disarming the confirmation does not cut it short.
-        if isShowingRefusalNotice, !visible { return }
         if exitHintLabel.isHidden == visible { exitHintLabel.isHidden = !visible }
     }
 
@@ -1192,13 +1210,15 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         quietRowText(exitHintText, color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
     }
 
-    /// The status slot is the exit hint's footer slot, so the notice moves nothing: the label's frame is fixed by
-    /// its constraints, hidden or not. The quiet role (7:1 on the sheet) says it, the pen is kept for warnings.
+    /// The note sits on the paper under the live line and moves nothing: it is placed by the caret line's baseline
+    /// and never takes part in the writing layer's layout. The quiet role (7:1 on the sheet) says it; the pen is
+    /// kept for warnings. It appears at once, fades out over 0.2 s, and under Reduce Motion only steps.
     private func showRefusalNotice() {
         isShowingRefusalNotice = true
-        exitHintLabel.attributedStringValue = Self.quietRowText(Self.refusalNoticeText,
-            color: FirstLineColors.paperQuietNSColor, truncates: true)
-        exitHintLabel.isHidden = false
+        refusalNoteLabel.layer?.removeAllAnimations()
+        refusalNoteLabel.alphaValue = 1
+        refusalNoteLabel.isHidden = false
+        layoutRefusalNote()
         announce(Self.refusalNoticeText)
         refusalNoticeWork?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.endRefusalNotice() }
@@ -1206,13 +1226,37 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.refusalNoticeDuration, execute: work)
     }
 
-    private func endRefusalNotice() {
+    private func endRefusalNotice(fade: Bool = true) {
         refusalNoticeWork?.cancel()
         refusalNoticeWork = nil
         guard isShowingRefusalNotice else { return }
         isShowingRefusalNotice = false
-        exitHintLabel.attributedStringValue = Self.exitHintString()
-        exitHintLabel.isHidden = true
+        guard fade, !reducesMotion else {
+            refusalNoteLabel.isHidden = true
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.refusalNoticeFade
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            refusalNoteLabel.animator().alphaValue = 0
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.refusalNoticeFade) { [weak self] in
+            guard let self, !self.isShowingRefusalNotice else { return }
+            self.refusalNoteLabel.isHidden = true
+        }
+    }
+
+    /// The note's baseline is `refusalNoticeBelow` under the caret line's baseline, lifted if the footer row would
+    /// otherwise be touched. The caret line is on the room's one anchor, so this is a fixed place, not a scroll.
+    private func layoutRefusalNote() {
+        guard isShowingRefusalNotice, paper.bounds.height > 0,
+              let baseline = textView.currentInsertionBaseline() else { return }
+        let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
+        let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
+        let top = baselineFromTop + Self.refusalNoticeBelow - refusalNoteLabel.firstBaselineOffsetFromTop
+        let limit = paper.bounds.height - 16 - Self.footerHeight - refusalNoteLabel.fittingSize.height
+        let constant = round(max(0, min(top, limit)))
+        if abs(refusalNoteTop.constant - constant) > 0.5 { refusalNoteTop.constant = constant }
     }
 
     private func leaveRoom() { appState.abandonSession() }

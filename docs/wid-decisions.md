@@ -1969,3 +1969,39 @@ is `docs/wid-world-table.md`.
   `apps/windows` `TestWordCountMatchesTheSharedFixture` and `TestCountLabelIsAlwaysWords`,
   `writeitdown/session.test.mjs`, `tests/cjk-count.spec.mjs`, `writeitdown/qa/phase4.spec.mjs`, and the
   Chinese before/after captures on macOS 15 and 26 and the web in `data/wid-word-count/`.
+
+## D-100: The first refused delete's note sits centred under the line being written, not in the footer
+
+- Date: 2026-11-08
+- Decision: item 2 of D-077 moves; nothing else in it changes. The first refused delete of a session (Backspace
+  or Delete, a word, line or paragraph delete, or the delete input types a touch keyboard sends) shows one
+  sentence, `You can only add the next word.`, horizontally centred on the writing column and with its
+  baseline 34 px (pt, DIP) under the live line's baseline, so it follows the caret line and stays fully visible,
+  lifted only if the footer row would otherwise be touched. Quiet role (`--paper-quiet`, 7:1 on the sheet), the
+  footer's 13 / 400 style, sentence case, no tracking (rule 27: no all caps). It appears on the refusal frame,
+  holds two seconds, then fades out over 200 ms; under Reduce Motion it is an opacity step with no fade. It
+  moves no text, never covers the live line, and is announced once (the visible note is hidden from assistive
+  technology; the room's live region says the sentence instead of `Blocked. Forward only.`). The footer keeps
+  `Esc to exit` and the count as they were, and its status slot is the exit confirmation's alone again.
+  Later refusals in the same session show no text; the 200 ms shake and the 220 ms hairline stay on every
+  refusal, the first included (D-022, D-046, unchanged). A session that ends (wipe, kept, a new start) earns
+  its own note. Paste, cut, undo and caret moves only shake. The warning numeral and the stopped screen own the
+  space under the line, so a note still showing steps aside and a delete refused there waits unspent. An armed
+  exit confirmation no longer holds the note back, because the two no longer share a place.
+- Reason: the captain saw the note at the bottom left, next to `Esc to exit`, far from where he was looking
+  and where the rule was just broken. The writer's eyes are on the line; the note belongs one step under it.
+  The sentence is the captain's pick (2026-11-08, from the help-copy options; the first draft read `Forward only.
+  Deleting is blocked.`). It lives in one place per platform (`REFUSAL` in `writeitdown/room.js`, `refusalNoticeText` in `SessionViewController.swift`, generated
+  into `tokens.StrRefusalNotice` on Windows), so changing it is a one-line edit.
+- Why the footer was used (history): D-077 (c2b70e3, PR #81) put the note in the footer status slot, which is
+  the exit confirmation's existing slot, so that nothing could move (D-077's own reason). No earlier
+  decision said "below the text" for this note. The nearest is D-017, which puts the warning numeral and the
+  wipe receipt under the writing line (ink top 44 pt under the baseline), and that is the numeral's space, which
+  is why the note steps aside for the warning rather than sharing it. Windows took the footer slot over in
+  b6ec572 (PR #85) from the Mac.
+- Supersedes: D-077 item 2 on the place, the casing and the fade (D-077's footer slot, `FORWARD ONLY. DELETING
+  IS BLOCKED.` in capitals, and "an armed exit confirmation keeps the slot and the notice waits"). D-088's
+  remark that D-077's second item stands is read with this entry.
+- Evidence: `writeitdown/qa/history-fade.spec.mjs` (placement against the line and the footer, centring within
+  1 px, frames before/during/after, 2 s once, 200 ms fade and the Reduce Motion step, 1440 and 390),
+  `RoomTests` (the same on the Mac), `room/behaviour_test.go` (pixel-measured on Windows), and the frame strips in the PR.

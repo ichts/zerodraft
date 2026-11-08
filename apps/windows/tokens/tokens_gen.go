@@ -71,12 +71,14 @@ const (
 	FooterHeight         = 44
 	PaperMargin          = 32 // paper inset from the window (installConstraints)
 
-	RefusalNoticeSeconds = 2  // the first refused delete's notice (D-077)
-	KeptHeadingGap       = 12 // the kept block's vertical rhythm, SessionKeptView.init
-	KeptReceiptGap       = 20
-	KeptActionsGap       = 12
-	KeptActionSpacing    = 24
-	KeptDraftGap         = 24
+	RefusalNoticeSeconds     = 2   // the first refused delete's notice (D-077, moved under the live line by D-100)
+	RefusalNoticeFadeSeconds = 0.2 // the note fades out over this long after its hold (D-100)
+	RefusalNoticeBelow       = 34  // its baseline sits this far under the live line's baseline (D-100)
+	KeptHeadingGap           = 12  // the kept block's vertical rhythm, SessionKeptView.init
+	KeptReceiptGap           = 20
+	KeptActionsGap           = 12
+	KeptActionSpacing        = 24
+	KeptDraftGap             = 24
 )
 
 // Paper generator constants (PaperField).
@@ -98,7 +100,7 @@ const (
 	StrExitLink              = "Esc to exit"
 	StrKeptHeading           = "You wrote it down."
 	StrKeptCaption           = "Nothing here is saved. Copy it before you leave."
-	StrRefusalNotice         = "FORWARD ONLY. DELETING IS BLOCKED."
+	StrRefusalNotice         = "You can only add the next word."
 	StrCopyText              = "Copy text"
 	StrKeptBeginAgain        = "Begin again"
 	StrCopied                = "Copied"

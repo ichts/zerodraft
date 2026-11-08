@@ -322,25 +322,23 @@ if len(full):
     else:
         check('D-074 kept: one caption under the action row', False, 'no ink under the pills')
 
-# --- D-077: the first refused delete names the rule in the footer slot, in the quiet role, and the slot returns
-def slot_extent(name):
+# --- D-100 (moving D-077's notice): the first refused delete says the rule once, centred under the live line, in the quiet role,
+# and it is gone after two seconds and the 0.2 s fade with nothing moved. The live baseline is half a pitch under the anchor.
+def under_line(name):
     im = load(name); p = paper_rect(im, (0, 0, im.shape[1], im.shape[0]))
-    ft = p[3] - int(16 * s) - int(22 * s)
-    fd_, fy_, fx_ = ink_rows(im, (p[0], ft - int(16 * s), p[0] + (p[2] - p[0]) // 2, ft + int(16 * s)), 150)
-    cols_ = np.where(fd_.sum(axis=0) >= 2)[0]   # two dark pixels in a column: the paper's flecks are single
-    red_ = (np.abs(im - np.array([99, 20, 11])).sum(axis=2) <= 90)[p[3] - int(70 * s): p[3] - int(20 * s), p[0]: p[2]]
-    end = 0
-    for c in cols_:                      # the link and the notice are one run of ink; a stray fleck 24 DIP past it is not text
-        if end and c - end > 24 * s: break
-        end = c
-    return (end + 1) / s if len(cols_) else 0, int(red_.sum())
+    top = int(anchor + 0.5 * 41.6 * s) + int(16 * s)             # under the descenders of the live line
+    d_, y_, x_ = ink_rows(im, (p[0] + int(40 * s), top, p[2] - int(40 * s), top + int(40 * s)), 150)
+    cols_ = np.where(d_.sum(axis=0) >= 2)[0]                     # two dark pixels in a column: the paper's flecks are single
+    red_ = (np.abs(im - np.array([99, 20, 11])).sum(axis=2) <= 90)[top: top + int(40 * s), p[0]: p[2]]
+    if not len(cols_): return 0, 0, int(red_.sum())
+    return (cols_.max() - cols_.min() + 1) / s, (x_ + (cols_.min() + cols_.max()) / 2 - (p[0] + p[2]) / 2) / s, int(red_.sum())
 if os.path.exists(os.path.join(D, f'{S}-10b-refusal-notice.png')):
-    w1, r1 = slot_extent('10b-refusal-notice'); w2, r2 = slot_extent('10c-notice-gone')
-    check('D-077: the first refused delete names the rule in the footer slot, in the quiet role (not the pen)', w1 > 200 and r1 < 40, f'footer ink reaches {w1:.0f} DIP, {r1} pen-red pixels')
-    check('D-077: the slot returns after two seconds with nothing moved', w2 < 100, f'footer ink reaches {w2:.0f} DIP')
+    w1, c1, r1 = under_line('10b-refusal-notice'); w2, _, _ = under_line('10c-notice-gone')
+    check('D-100: the first refused delete says the rule under the live line, centred, in the quiet role (not the pen)', w1 > 100 and abs(c1) <= 6 and r1 < 40, f'note ink {w1:.0f} DIP wide, centre {c1:+.1f} DIP off the paper, {r1} pen-red pixels')
+    check('D-100: the note is gone after two seconds', w2 < 40, f'ink under the line {w2:.0f} DIP wide')
     mb = chrome_marks('10b-refusal-notice'); mc = chrome_marks('10c-notice-gone')
-    check('D-077: exit link, count and clock stay put while the notice shows', all(abs(mb[k] - base[k]) <= 1.5 * s for k in base if k in mb) and all(abs(mc[k] - base[k]) <= 1.5 * s for k in base if k in mc),
-          json.dumps({'notice': {k: int(v) for k, v in mb.items()}, 'gone': {k: int(v) for k, v in mc.items()}}))
+    check('D-100: exit link, count and clock stay put while the note shows', all(abs(mb[k] - base[k]) <= 1.5 * s for k in base if k in mb) and all(abs(mc[k] - base[k]) <= 1.5 * s for k in base if k in mc),
+          json.dumps({'note': {k: int(v) for k, v in mb.items()}, 'gone': {k: int(v) for k, v in mc.items()}}))
 
 fails = [r for r in rows if not r[0]]
 json.dump([{'ok': r[0], 'check': r[1], 'detail': r[2]} for r in rows], open(os.path.join(D, f'measure-{S}.json'), 'w'), indent=1)

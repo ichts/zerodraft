@@ -1,6 +1,6 @@
 import { fresh, advance, append, clock, wordCount, countLabel, historyLines } from './session.mjs';
 import { denyFeedback, GROW_MS, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
-import { statusSlot } from './status-slot.js';
+import { statusSlot, placeNote } from './status-slot.js';
 
 const $ = id => document.getElementById(id);
 const room = $('room');
@@ -8,6 +8,7 @@ const paper = room.querySelector('.room-paper');
 const editor = $('editor');
 const ink = $('editor-ink');
 const hintSlot = $('exit-hint');
+const refusalNote = $('refusal-note');
 const hairline = $('room-hairline');
 const bar = $('room-bar');
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -23,10 +24,12 @@ const EXIT_HINT = {
   touch: 'Tap EXIT again to leave and delete the draft.'
 };
 const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
-// The first refused delete of a session names the rule in the footer's status slot for two seconds,
-// then the slot goes back to what it held (D-077 amends D-046); later refusals only shake.
-const REFUSAL = 'FORWARD ONLY. DELETING IS BLOCKED.';
+// The first refused delete of a session names the rule once, centred just under the line being written,
+// for two seconds (D-100 moves D-077's notice out of the footer); later refusals only shake.
+const REFUSAL = 'You can only add the next word.';
 const REFUSAL_MS = 2000;
+// The note's baseline sits this far under the live line's baseline, the same on the Mac and Windows rooms.
+const REFUSAL_BELOW = 34;
 const hintFor = () => (touchInput.matches ? EXIT_HINT.touch : EXIT_HINT.keyboard);
 let state = fresh();
 let compositionBase = null;
@@ -156,8 +159,10 @@ function render(now = performance.now()) {
   const previous = room.dataset.phase;
   room.dataset.phase = state.phase;
   if (previous !== state.phase) slot.invalidate();
-  // A session that ends (wipe or kept) is spent; the next one earns its own notice.
+  // A session that ends (wipe or kept) is spent and takes its note with it; the next one earns its own.
   if (previous !== state.phase && (state.phase === 'wipe' || state.phase === 'kept')) refusalNoticed = false;
+  // The warning numeral owns the space under the line, so a note still showing steps aside.
+  if (previous !== state.phase && state.phase !== 'typing' && state.phase !== 'rest') endRefusalNotice();
   const failed = state.phase === 'wipe';
   const kept = state.phase === 'kept';
   const cut = failed && now - state.ended < 200;
@@ -218,17 +223,21 @@ function tick() {
 // a touch keyboard sends instead of keys. Paste, cut, undo and caret moves just shake.
 const isDeletion = event => (event.type === 'keydown' ? ['Backspace', 'Delete'].includes(event.key) : /^delete/.test(event.inputType ?? ''));
 
+function placeRefusalNote() {
+  placeNote({ paper, line: editor, pitches: 2, note: refusalNote, below: REFUSAL_BELOW });
+}
+
 function endRefusalNotice() {
   clearTimeout(refusalTimer);
-  if (hintSlot.dataset.kind !== 'refusal') return;
-  delete hintSlot.dataset.kind;
-  hintSlot.textContent = '';
+  refusalNote.dataset.shown = 'false';
 }
 
 function showRefusalNotice() {
   refusalNoticed = true;
-  hintSlot.dataset.kind = 'refusal';
-  hintSlot.textContent = REFUSAL;
+  refusalNote.textContent = REFUSAL;
+  placeRefusalNote();
+  refusalNote.dataset.shown = 'true';
+  announce(REFUSAL);
   clearTimeout(refusalTimer);
   refusalTimer = setTimeout(endRefusalNotice, REFUSAL_MS);
 }
@@ -236,8 +245,8 @@ function showRefusalNotice() {
 function deny(event) {
   event.preventDefault();
   denyFeedback(paper, hairline);
-  // An armed exit confirmation is the writer's pending decision and keeps the slot; the notice waits.
-  if (!refusalNoticed && exitArmedAt === null && isDeletion(event)) showRefusalNotice();
+  // Only a live line has room under it: on the warning and the stopped screen the notice waits unspent.
+  if (!refusalNoticed && (state.phase === 'typing' || state.phase === 'rest') && isDeletion(event)) showRefusalNotice();
   else announce('Blocked. Forward only.');
   render();
 }
@@ -246,12 +255,10 @@ function endCaret() {
   editor.setSelectionRange(editor.value.length, editor.value.length);
 }
 
-// The slot holds one thing at a time: arming the exit confirmation takes it from a refusal notice, and
-// disarming leaves a notice alone to finish its own two seconds.
 function clearExitHint() {
   exitArmedAt = null;
   clearTimeout(exitTimer);
-  if (hintSlot.dataset.kind !== 'refusal') hintSlot.textContent = '';
+  hintSlot.textContent = '';
 }
 
 // The control and its confirmation wear this input's wording. The confirmation's reserved footer
@@ -269,8 +276,6 @@ function syncExitCopy() {
 function requestExit() {
   if (exitArmedAt !== null && performance.now() - exitArmedAt <= CONFIRM_MS) { clearExitHint(); exit(); return; }
   exitArmedAt = performance.now();
-  clearTimeout(refusalTimer);
-  delete hintSlot.dataset.kind;
   hintSlot.textContent = hintFor();
   clearTimeout(exitTimer);
   exitTimer = setTimeout(clearExitHint, CONFIRM_MS);

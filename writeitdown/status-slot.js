@@ -94,6 +94,29 @@ function fontOf(el) {
     size: parseFloat(style.fontSize), lineHeight: parseFloat(style.lineHeight) };
 }
 
+// The live line's baseline and box top, in paper coordinates. The editor's padding holds `pitches` empty
+// lines above the live one, so its top plus that many pitches is the live line's top.
+function writingLine(paper, line, pitches) {
+  const paperTop = paper.getBoundingClientRect().top;
+  const writing = fontOf(line);
+  const writingInk = ink('H', writing.css, writing.lineHeight);
+  const lineTop = line.getBoundingClientRect().top - paperTop + writing.lineHeight * pitches;
+  return { lineTop, baseline: lineTop + writingInk.halfLeading + writingInk.ascent };
+}
+
+// The refusal note (D-100): horizontally centred by its own box, vertically with its baseline `below` px under the
+// live line's baseline, then lifted if the paper's footer would otherwise be touched. Nothing else is moved.
+export function placeNote({ paper, line, pitches, note, below }) {
+  const { baseline } = writingLine(paper, line, pitches);
+  const font = fontOf(note);
+  const metrics = ink(note.textContent, font.css, font.lineHeight);
+  const top = baseline + below - (metrics.halfLeading + metrics.ascent);
+  const footer = paper.querySelector('.paper-foot');
+  const footerTop = footer ? footer.getBoundingClientRect().top - paper.getBoundingClientRect().top : paper.clientHeight;
+  const height = note.getBoundingClientRect().height;
+  note.style.top = `${Math.max(0, Math.min(top, footerTop - height - 8))}px`;
+}
+
 export function statusSlot({ paper, line, pitches, numeral, caption, block }) {
   let placed = null;
   let dirty = true;
@@ -105,10 +128,7 @@ export function statusSlot({ paper, line, pitches, numeral, caption, block }) {
       const paperRect = paper.getBoundingClientRect();
       const paperTop = paperRect.top;
       const paperHeight = paperRect.height;
-      const writing = fontOf(line);
-      const writingInk = ink('H', writing.css, writing.lineHeight);
-      const lineTop = line.getBoundingClientRect().top - paperTop + writing.lineHeight * pitches;
-      const baseline = lineTop + writingInk.halfLeading + writingInk.ascent;
+      const { lineTop, baseline } = writingLine(paper, line, pitches);
       const numeralFont = fontOf(numeral);
       const numeralInk = ink(numeral.textContent, numeralFont.css, numeralFont.lineHeight);
       const footer = paper.querySelector('.paper-foot');

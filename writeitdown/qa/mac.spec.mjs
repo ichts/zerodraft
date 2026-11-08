@@ -244,7 +244,8 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#landing')).not.toContainText(/Real rules, real numbers|Straight answers|A native writing room/);
 
   await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
-  await expect(page.locator('.cards .card h3')).toHaveText(['No way back', 'Silence deletes it', 'Reach zero, keep it']);
+  await expect(page.locator('#how .card .txt')).toHaveText(['Forward only, no deleting.', '8 seconds of silence deletes the draft.', 'Write to 0:00 and the text is yours.']);
+  await expect(page.locator('#how .card h3'), 'each card carries one line and no title').toHaveCount(0);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
   await expect(mac.locator('.facts')).toContainText('$4.99 once');

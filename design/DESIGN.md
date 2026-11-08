@@ -133,7 +133,7 @@ A cut, not a ceremony: the text is gone in <=200ms, one pass. At the eighth seco
 
 ### 3.6 Kept (0:00 reached) - three objects
 
-The only quiet surface. The clock stops at 0:00; the paper returns to the wall (the room goes bone, the paper sits on it with the lift). Receipt, not praise: `0:00 - 148 WORDS KEPT.` (`148 CHARACTERS` when CJK letters are at least half of the draft, D-095). No confetti, no "well done." One action: COPY TEXT (its completed state is COPIED - same door, feedback in ink). One mono link: BEGIN AGAIN (fresh 60s, same room). One caption: NOTHING HERE IS SAVED. The words are the biggest thing on the surface; they won, let them.
+The only quiet surface. The clock stops at 0:00; the paper returns to the wall (the room goes bone, the paper sits on it with the lift). Receipt, not praise: `0:00 - 148 WORDS KEPT.` (always words, one per CJK character, D-099). No confetti, no "well done." One action: COPY TEXT (its completed state is COPIED - same door, feedback in ink). One mono link: BEGIN AGAIN (fresh 60s, same room). One caption: NOTHING HERE IS SAVED. The words are the biggest thing on the surface; they won, let them.
 
 ## 4. State matrix
 

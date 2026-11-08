@@ -1,10 +1,10 @@
 package room
 
 import (
+	"encoding/json"
 	"image/png"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -54,22 +54,46 @@ func (g *rig) snap(name string) {
 	f.Close()
 }
 
-func TestCountLabelFollowsTheCJKShareOfTheDraft(t *testing.T) {
-	english := strings.Repeat("word ", 500) + "你好"
-	for text, want := range map[string]string{
-		"我们是": "3 characters", "我": "1 character", "こんにちは世界": "7 characters", "コーヒー": "4 characters",
-		"hello world 中文测试": "6 words", english: "502 words", "你好，world！": "3 words",
-		"hello world": "2 words", "one": "1 word", "한글 한글": "2 words", "": "0 words",
-	} {
-		if got := wordLabel(session.WordCount(text), text); got != want {
-			t.Errorf("wordLabel(%.20q) = %q, want %q", text, got, want)
+// The unit is always word or words, in every language (D-099); the shared fixture pins the numbers and labels.
+func TestCountLabelIsAlwaysWords(t *testing.T) {
+	raw, err := os.ReadFile("../../../tests/fixtures/word-count.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Labels []struct{ Text, Label string }
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.Labels) == 0 {
+		t.Fatal("the shared fixture has no labels")
+	}
+	for _, c := range fixture.Labels {
+		if got := wordLabel(session.WordCount(c.Text)); got != c.Label {
+			t.Errorf("wordLabel(%.20q) = %q, want %q", c.Text, got, c.Label)
 		}
 	}
-	if got := keptReceipt(3, time.Minute, "我们是"); got != "1 minute. 3 characters." {
+	if got := keptReceipt(3, time.Minute); got != "1 minute. 3 words." {
 		t.Fatalf("CJK receipt = %q", got)
 	}
-	if got := keptReceipt(47, time.Minute, "hello"); got != "1 minute. 47 words." {
+	if got := keptReceipt(1, time.Minute); got != "1 minute. 1 word." {
 		t.Fatalf("receipt = %q", got)
+	}
+}
+
+// The live corner slot reads the same for a Chinese draft: typed 你 is `1 word`, 你好 is `2 words`.
+func TestCornerCountReadsWordsForAChineseDraft(t *testing.T) {
+	g := newRig(t, 1040, 720)
+	g.tt.Type("你")
+	g.tt.Advance(100 * time.Millisecond)
+	if got := g.r.cornerLabel(false, false); got != "1 word" {
+		t.Fatalf("one Han character = %q", got)
+	}
+	g.tt.Type("好")
+	g.tt.Advance(100 * time.Millisecond)
+	if got := g.r.cornerLabel(false, false); got != "2 words" {
+		t.Fatalf("two Han characters = %q", got)
 	}
 }
 

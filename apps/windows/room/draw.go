@@ -309,16 +309,14 @@ func (r *Room) cornerLabel(failure, kept bool) string {
 	case kept && ime.Break != "keptcount": // keptcount is the known-broken build the capture gate must fail on
 		return ""
 	case r.eng.HasStarted() || failure:
-		return wordLabel(r.eng.WordCount, r.eng.Text)
+		return wordLabel(r.eng.WordCount)
 	}
 	return tokens.StrTypeToBegin
 }
 
-func wordLabel(n int, text string) string {
+// wordLabel is the count with its unit: always word or words, in every language (D-099).
+func wordLabel(n int) string {
 	unit := "word"
-	if session.UsesCharacterCount(text) {
-		unit = "character"
-	}
 	if n != 1 {
 		unit += "s"
 	}
@@ -612,7 +610,7 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	y := top + hh + tokens.KeptHeadingGap
 	// the receipt and the caption are 13 pt labels in the Mac's 1.6 line box, bottom-aligned: the next block starts a
 	// whole box (macLabelBox) under the box's top, whatever the glyphs inside it do
-	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration, e.Text), family: sans, size: 13, weight: 500, spacing: 0.02})
+	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration), family: sans, size: 13, weight: 500, spacing: 0.02})
 	rw, _ := g.receipt.Size()
 	g.rx, g.ry = pr.X+(pr.W-rw)/2, labelBoxTop(y, 13, 500)
 	y += macLabelBox(13) + tokens.KeptReceiptGap
@@ -670,11 +668,11 @@ func orSpace(s string) string {
 }
 
 // keptReceipt matches RoomPresentation.keptReceipt on the Mac.
-func keptReceipt(words int, d time.Duration, text string) string {
+func keptReceipt(words int, d time.Duration) string {
 	minutes := max(int(d.Minutes()+0.5), 1)
 	unit := "minutes"
 	if minutes == 1 {
 		unit = "minute"
 	}
-	return fmt.Sprintf("%d %s. %s.", minutes, unit, wordLabel(words, text))
+	return fmt.Sprintf("%d %s. %s.", minutes, unit, wordLabel(words))
 }

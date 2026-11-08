@@ -1946,3 +1946,26 @@ is `docs/wid-world-table.md`.
 - Evidence: `TypographyParityTests.glyphSmoothingIsOffLikeTheWeb`, and the same-text three-way captures
   (Chrome, Mac before = main build, Mac after = this build) on both macOS versions, with the ink-unit table, in
   `data/wid-ink-weight/before-after.pdf`.
+
+## D-099: The unit is always `words`, in every language
+
+- Date: 2026-11-08
+- Decision: every count reads `word` or `words` on the Mac, Windows, the web room and the root landing
+  trial: `0 words`, `1 word`, `2 words`, in the live corner, its accessibility label, the kept receipt
+  (`1 minute. 3 words.`, `0:00 - 3 words kept.`) and the landing receipt. There is no switch to
+  `characters` for a Chinese or Japanese draft. The number is unchanged from D-095: each Han, Hiragana or
+  Katakana character (and the prolonged sound mark) is one word, each space-separated Latin, Hangul or other
+  word is one, punctuation and emoji are zero. `usesCharacterCount` and its equivalents are deleted on all
+  four surfaces. One fixture, `tests/fixtures/word-count.json`, holds the texts, their numbers and their
+  labels; the web unit and Playwright tests, the Mac XCTest suite and the Windows Go tests all load it, so a
+  surface that drifts fails its own suite. The count tooltip text is unchanged.
+- Reason: the captain, 2026-11-08: a Chinese draft showed `1 character`, and
+  asked why not `word`, which works for Chinese and English alike. A unit that changes with the language makes
+  two writers read two different products, and the mostly-CJK threshold meant one quoted `你好` could flip a
+  whole draft's label.
+- Supersedes: D-095's label rule only (the `characters` unit and its half-of-the-letters threshold). D-095's
+  sentence-case result screen, its Hangul note and its number rule stand.
+- Evidence: `RoomTests.theCountMatchesTheSharedFixture`, `RoomTests.theUnitIsAlwaysWordsInEveryLanguage`,
+  `apps/windows` `TestWordCountMatchesTheSharedFixture` and `TestCountLabelIsAlwaysWords`,
+  `writeitdown/session.test.mjs`, `tests/cjk-count.spec.mjs`, `writeitdown/qa/phase4.spec.mjs`, and the
+  Chinese before/after captures on macOS 15 and 26 and the web in `data/wid-word-count/`.

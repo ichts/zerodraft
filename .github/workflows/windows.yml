@@ -6,12 +6,14 @@ name: windows
 # The real-hardware IME suite, screen capture and end-to-end scripts run on the Windows test PC, never here
 # (apps/windows/README.md).
 # The Mac sources the generator reads are in the path filter on purpose: a Mac token or sentence change must fail
-# here until apps/windows/tokens/tokens_gen.go is regenerated.
+# here until apps/windows/tokens/tokens_gen.go is regenerated. The shared word-count fixture is in it too: the Windows
+# tests load it (D-099).
 on:
   pull_request:
     paths:
       - 'apps/windows/**'
       - 'apps/macos/FirstLine/Sources/FirstLine/**'
+      - 'tests/fixtures/word-count.json'
       - '.github/workflows/windows.yml'
 
 jobs:

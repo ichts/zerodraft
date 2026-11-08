@@ -3,24 +3,10 @@ package session
 import "unicode"
 
 // isCJK is a script written without spaces, so each character is one unit: Han, Hiragana, Katakana and the
-// prolonged sound mark (D-095). The Mac and the web rooms use the same rule.
+// prolonged sound mark (D-095). The Mac and the web rooms use the same rule, pinned by
+// tests/fixtures/word-count.json (D-099).
 func isCJK(r rune) bool {
 	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana) || r == '\u30FC'
-}
-
-// UsesCharacterCount reports whether the draft's count is labelled characters: CJK letters are at least half
-// of its letters and digits.
-func UsesCharacterCount(s string) bool {
-	cjk, letters := 0, 0
-	for _, r := range s {
-		if isCJK(r) {
-			cjk++
-		}
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
-			letters++
-		}
-	}
-	return cjk > 0 && cjk*2 >= letters
 }
 
 // WordCount counts like the Mac room: each CJK character is one word, other words are runs of letters and

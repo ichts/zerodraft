@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fresh, advance, append, clock, wordCount, countLabel, historyLines, GONE } from './session.mjs';
 import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
@@ -92,24 +93,18 @@ test('clock and word labels', () => {
   assert.equal(wordCount(''), 0);
 });
 
-test('Unicode words, individual Han characters, and non-word input', () => {
-  const cases = [
-    ['', 0], [' \n\t', 0], ['中文测试', 4], ['hello world 中文测试', 6],
-    ['你好，world！', 3], ['café cafe\u0301', 2], ['مرحبا بالعالم', 2],
-    ['こんにちは世界', 7], ['コーヒー', 4], ['👨‍👩‍👧‍👦 👍🏽 🇨🇳', 0], ['...，！？', 0],
-    ['𠀀中文', 3], ['你好👩🏽‍💻world', 3]
-  ];
-  for (const [text, expected] of cases) assert.equal(wordCount(text), expected, text);
+// One fixture for the web rooms, the Mac room and the Windows room: same text, same number, same label (D-099).
+const fixture = JSON.parse(readFileSync(new URL('../tests/fixtures/word-count.json', import.meta.url), 'utf8'));
+
+test('each CJK character is one word and punctuation and emoji are none (shared fixture)', () => {
+  for (const { name, text, words } of fixture.counts) assert.equal(wordCount(text), words, name);
 });
 
-test('the label says characters only when CJK letters are at least half of the draft (D-095)', () => {
-  const english = `${'word '.repeat(500)}你好`;
-  const cases = [
-    ['我们是', '3 characters'], ['我', '1 character'], ['こんにちは世界', '7 characters'], ['コーヒー', '4 characters'],
-    ['hello world 中文测试', '6 words'], [english, '502 words'], ['你好，world！', '3 words'],
-    ['hello world', '2 words'], ['one', '1 word'], ['한글 한글', '2 words'], ['', '0 words']
-  ];
-  for (const [text, expected] of cases) assert.equal(countLabel(text), expected, text.slice(0, 20));
+test('the unit is always word or words, in every language (D-099)', () => {
+  for (const { text, label } of fixture.labels) assert.equal(countLabel(text), label, text.slice(0, 20));
+  assert.equal(countLabel('', 0), '0 words');
+  assert.equal(countLabel('', 1), '1 word');
+  assert.equal(countLabel('', 2), '2 words');
 });
 
 test('the history ladder counts lines ended by Return, never sentences (D-088)', () => {

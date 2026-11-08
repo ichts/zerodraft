@@ -27,18 +27,9 @@ final class SessionEngine {
         durationChoices.contains(value) ? value : defaultDurationSeconds
     }
 
-    /// Han, Hiragana, Katakana and the prolonged sound mark are written without spaces: each is one unit (D-095).
+    /// Han, Hiragana, Katakana and the prolonged sound mark are written without spaces: each is one unit (D-095). The unit label is always `word` (D-099).
     nonisolated private static let cjkClass = "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\u30FC]"
     private static let cjkUnitPattern = try! NSRegularExpression(pattern: "(\(cjkClass)\\p{Mark}*)")
-    nonisolated private static let cjkPattern = try! NSRegularExpression(pattern: cjkClass)
-    nonisolated private static let letterPattern = try! NSRegularExpression(pattern: "[\\p{L}\\p{N}]")
-
-    /// The label says characters only when CJK letters are at least half of the draft's letters and digits.
-    nonisolated static func usesCharacterCount(_ text: String) -> Bool {
-        let range = NSRange(text.startIndex..., in: text)
-        let cjk = cjkPattern.numberOfMatches(in: text, range: range)
-        return cjk > 0 && cjk * 2 >= letterPattern.numberOfMatches(in: text, range: range)
-    }
 
     private let now: () -> TimeInterval
     var phase: SessionPhase = .idle

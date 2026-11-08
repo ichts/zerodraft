@@ -25,6 +25,7 @@ var (
 	TagBackground = Role{0xF2F2F0, 0x2E2A22, 1, 1}
 	SegmentTrack  = Role{0x1C1917, 0xECE7D9, 0.06, 0.10}
 	Red           = Role{0xB02A1E, 0xE4604A, 1, 1}
+	RedText       = Role{0xB02A1E, 0xFF9B88, 1, 1}
 	OnInk         = Role{0xFFFFFF, 0x15140F, 1, 1}
 	Shadow        = Role{0x1C1917, 0x000000, 1, 1}
 )

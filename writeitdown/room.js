@@ -312,10 +312,10 @@ function boxes() {
 const inView = r => r && r.width > 0 && r.bottom > 0 && r.top < innerHeight;
 
 function growInto(from) {
-  growing.forEach(a => a.cancel());
-  growing = [];
   if (reduced.matches || !inView(from.paper)) return;
-  const options = { duration: GROW_MS, easing: 'cubic-bezier(.22,1,.36,1)' };
+  // The site's one ease-out (tokens.css), the same curve the Mac grow uses.
+  const easing = getComputedStyle(paper).getPropertyValue('--ease-out').trim() || 'ease-out';
+  const options = { duration: GROW_MS, easing };
   const to = paper.getBoundingClientRect();
   if (!to.width || !to.height) return;
   growing.push(paper.animate([
@@ -341,6 +341,8 @@ function growInto(from) {
 function route() {
   const returning = !room.hidden;
   const active = location.hash === '#trial';
+  growing.forEach(a => a.cancel());
+  growing = [];
   const from = active && !returning && routed ? boxes() : null;
   document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;

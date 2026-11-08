@@ -3,6 +3,7 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
+@Suite(.serialized)
 @MainActor
 struct BrandTests {
     @Test func infoPlistNamesWriteItDown() throws {
@@ -361,6 +362,12 @@ struct BrandTests {
 
     /// Audit fix 2 (D-097): the how-it-works panel grows from the `?` that opened it and closes back into it,
     /// anchored on the button with a transient popover, not a window-wide sheet that slides from the title bar.
+    /// Spins the run loop until the condition holds or three seconds pass: a popover closes on its own animation.
+    private func spin(until condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(3)
+        while !condition(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.05)) }
+    }
+
     @Test func rulesPopoverIsAnchoredOnTheQuestionMark() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -386,7 +393,33 @@ struct BrandTests {
                 "the panel is nowhere near the question mark: \(panel.frame) vs \(anchor)")
         #expect(abs(panel.frame.maxY - anchor.minY) < 60 || abs(panel.frame.minY - anchor.maxY) < 60,
                 "the panel does not sit against the button: \(panel.frame) vs \(anchor)")
-        popover.close()
+        // Leaving the picker under an open popover (a menu command, say) must take the popover with it: it is not a
+        // sheet and would otherwise float over the writing room.
+        home.viewWillDisappear()
+        spin(until: { !popover.isShown })
+        #expect(!popover.isShown, "the rules popover stayed open after the picker left")
+        window.orderOut(nil)
+    }
+
+    @Test func closingTheRulesPopoverReturnsFocusToTheQuestionMark() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(settingsStore: SettingsStore(configDirectory: root),
+                             installIDStore: InstallIDStore(configDirectory: root))
+        let home = HomeViewController(appState: state)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentViewController = home
+        window.setContentSize(NSSize(width: 1040, height: 720))
+        window.makeKeyAndOrderFront(nil)
+        home.view.layoutSubtreeIfNeeded()
+        let help = try #require(allButtons(in: home.view).first { $0.title == "?" })
+        help.performClick(nil)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        let popover = try #require(home.rulesPopover)
+        popover.performClose(nil)
+        spin(until: { window.firstResponder === help })
+        #expect(window.firstResponder === help, "focus did not come back to the ? after the popover closed")
         window.orderOut(nil)
     }
 }

@@ -10,7 +10,7 @@
 import AppKit
 
 @MainActor
-final class HomeViewController: NSViewController {
+final class HomeViewController: NSViewController, NSPopoverDelegate {
     private let appState: AppState
     private var durationControl: FirstLineSegmentedControl!
     private var silenceControl: FirstLineSegmentedControl!
@@ -50,6 +50,11 @@ final class HomeViewController: NSViewController {
         }
     }
 
+    /// Closing the rules hands focus back to the `?` that opened them, so a keyboard writer is not stranded.
+    func popoverDidClose(_ notification: Notification) {
+        view.window?.makeFirstResponder(rulesButton)
+    }
+
     override func viewDidLayout() {
         super.viewDidLayout()
         if !view.inLiveResize { prewarmRoomPaper() }
@@ -57,6 +62,8 @@ final class HomeViewController: NSViewController {
 
     override func viewWillDisappear() {
         super.viewWillDisappear()
+        // The rules popover is not a sheet: it would stay over the room if the picker left under it.
+        rulesPopover?.close()
         if let liveResizeObserver { NotificationCenter.default.removeObserver(liveResizeObserver) }
         liveResizeObserver = nil
     }
@@ -198,6 +205,7 @@ final class HomeViewController: NSViewController {
         rules.popover = popover
         popover.contentViewController = rules
         popover.behavior = .transient
+        popover.delegate = self
         let reduce = switch appState.settings.reducedMotion {
         case .system: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         case .always: true

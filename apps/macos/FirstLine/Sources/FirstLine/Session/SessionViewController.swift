@@ -825,7 +825,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         curtain.frame = paper.bounds
         paper.addSubview(curtain)
 
-        let ease = CAMediaTimingFunction(controlPoints: 0.23, 1, 0.32, 1)
+        let ease = CAMediaTimingFunction(controlPoints: 0.22, 1, 0.36, 1)
         CATransaction.begin()
         CATransaction.setCompletionBlock { MainActor.assumeIsolated { curtain.removeFromSuperview() } }
         for layer in [paperLayer, shadowLayer] {

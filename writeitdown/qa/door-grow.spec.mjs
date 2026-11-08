@@ -30,6 +30,8 @@ async function openTheDoor(page) {
         paper: rect(roomPaper), brand: rect(roomBrand), focused: document.activeElement?.id === 'editor',
         animations: roomPaper.getAnimations().filter(a => a.id === 'door').length,
         duration: roomPaper.getAnimations().find(a => a.id === 'door')?.effect.getTiming().duration ?? 0,
+        easing: roomPaper.getAnimations().find(a => a.id === 'door')?.effect.getTiming().easing ?? '',
+        siteEase: getComputedStyle(roomPaper).getPropertyValue('--ease-out').trim(),
       });
       const settled = now - t0 >= 600 && !roomPaper.getAnimations().some(a => a.id === 'door');
       if (!settled && now - t0 < 3000) requestAnimationFrame(sample); else resolve({ demo, brand, frames, inView: demo.y + demo.h > 0 && demo.y < innerHeight });
@@ -73,5 +75,7 @@ test('the room paper grows out of the demo paper and the room is live at once', 
   }
   // The grow is one 240 ms animation (measured from the animation itself: a loaded host stretches frame gaps).
   expect(first.duration).toBe(240);
+  const norm = curve => curve.replace(/\s/g, '').replace(/\b0\./g, '.');
+  expect(norm(first.easing), "the door uses the site's one ease-out").toBe(norm(first.siteEase));
   expect(near(last.brand, shown.at(-1).brand, 0.5)).toBe(true);
 });

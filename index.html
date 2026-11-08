@@ -189,13 +189,13 @@ window.FirstLineLandingDemo = (() => {
 
   // --- Session input bridge. Reads DOM text; emits flinput. -------------------
   // `inserted` is the text this very event put in the room, taken from the
-  // browser (InputEvent.data, or the line break those input types do not carry
-  // there). The post-wipe draft starts from exactly this text instead of a DOM
-  // diff: an IME commit replaces the marked text the model holds with the
-  // chosen candidate, so the model is not a prefix of what the room shows.
+  // browser's InputEvent.data. The post-wipe draft starts from exactly this text
+  // instead of a DOM diff: an IME commit replaces the marked text the model
+  // holds with the chosen candidate, so the model is not a prefix of what the
+  // room shows. An input that carries no data (a paragraph break) inserts no
+  // words, and a whitespace-only insert is normalized to "" below.
   function insertedText(evt) {
-    if (typeof evt?.data === "string") return evt.data;
-    return evt?.inputType === "insertParagraph" || evt?.inputType === "insertLineBreak" ? "\n" : "";
+    return typeof evt?.data === "string" ? evt.data : "";
   }
   function commitInput(el, inserted) {
     const raw = el.innerText || "";

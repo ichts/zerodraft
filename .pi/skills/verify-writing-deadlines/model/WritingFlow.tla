@@ -1,0 +1,108 @@
+--------------------------- MODULE WritingFlow ---------------------------
+EXTENDS Integers, FiniteSets, TLC
+CONSTANTS Duration, Silence, Times
+VARIABLES surface, credential, used, phase, now, started, last, text,
+          hint, hintCount, armed, expected, event, receipt, charged
+vars == <<surface, credential, used, phase, now, started, last, text,
+          hint, hintCount, armed, expected, event, receipt, charged>>
+Live == phase \in {"writing", "warn"}
+Access == surface # "Mac" \/ credential = "valid" \/
+          (credential = "fresh" /\ used < 3)
+Finish == started + Duration
+Limit == IF surface = "Mac" THEN Silence ELSE 8
+WarnAt == Limit - 3
+Wipe == last + Limit
+Decision(t) == IF started = -1 THEN "live"
+               ELSE IF t >= Wipe /\ Wipe <= Finish THEN "wipe"
+               ELSE IF t >= Finish THEN "keep" ELSE "live"
+Init == /\ surface \in {"Root", "Web", "Mac"}
+        /\ credential \in {"fresh", "valid", "residue"}
+        /\ used \in {0, 2, 3}
+        /\ (surface # "Mac" => credential = "fresh" /\ used = 0)
+        /\ phase = "home" /\ now = 0 /\ started = -1 /\ last = -1
+        /\ text = {} /\ hint = FALSE /\ hintCount = 0 /\ armed = -1
+        /\ expected = "none" /\ event = "init" /\ receipt = -1 /\ charged = FALSE
+Enter == /\ phase = "home"
+         /\ phase' = IF Access THEN "empty" ELSE "locked"
+         /\ event' = "enter" /\ expected' = "none"
+         /\ UNCHANGED <<surface, credential, used, now, started, last, text,
+                        hint, hintCount, armed, receipt, charged>>
+FirstInput == /\ phase = "empty" /\ started = -1
+              /\ phase' = "writing" /\ started' = 0 /\ last' = 0 /\ now' = 0
+              /\ text' = {"old"} /\ event' = "first" /\ expected' = "live"
+              /\ charged' = (surface = "Mac" /\ credential = "fresh")
+              /\ used' = IF charged' THEN used + 1 ELSE used
+              /\ armed' = -1
+              /\ UNCHANGED <<surface, credential, hint, hintCount, receipt>>
+InputAt(t) == /\ Live /\ t \in Times /\ t >= now
+              /\ expected' = Decision(t) /\ event' = "input" /\ now' = t
+              /\ IF surface = "Root" \/ Decision(t) = "live"
+                 THEN /\ phase' = "writing" /\ last' = t /\ text' = text \cup {"new"}
+                      /\ UNCHANGED <<started, used, charged>>
+                 ELSE IF Decision(t) = "keep"
+                      THEN /\ phase' = "kept" /\ UNCHANGED <<last, text, started, used, charged>>
+                      ELSE /\ text' = IF Access THEN {"new"} ELSE {}
+                           /\ phase' = IF Access THEN "restarted" ELSE "locked"
+                           /\ used' = IF surface = "Mac" /\ credential = "fresh" /\ Access THEN used + 1 ELSE used
+                           /\ last' = t /\ started' = t /\ charged' = FALSE
+              /\ armed' = -1 /\ hint' = IF Decision(t) = "live" THEN hint ELSE FALSE
+              /\ UNCHANGED <<surface, credential, hintCount, receipt>>
+Max0(n) == IF n < 0 THEN 0 ELSE n
+TickAt(t) == /\ Live /\ t \in Times /\ t >= now
+             /\ expected' = Decision(t) /\ event' = "tick" /\ now' = t
+             /\ phase' = CASE Decision(t) = "wipe" -> "wiped"
+                              [] Decision(t) = "keep" -> "kept"
+                              [] started # -1 /\ t - last >= WarnAt -> "warn"
+                              [] OTHER -> "writing"
+             /\ text' = IF Decision(t) = "wipe" THEN {} ELSE text
+             /\ receipt' = IF Decision(t) = "wipe"
+                            THEN IF surface = "Root" THEN Max0(Duration - (t-started))
+                                 ELSE Max0(Finish-Wipe)
+                            ELSE receipt
+             /\ hint' = IF phase' # "writing" THEN FALSE ELSE hint
+             /\ UNCHANGED <<surface, credential, used, started, last, hintCount, armed, charged>>
+Delete == /\ phase \in {"empty", "writing", "warn", "wiped"}
+          /\ event' = "delete" /\ expected' = "none"
+          /\ hint' = IF surface # "Root" /\ phase \in {"empty", "writing"} /\ hintCount = 0 THEN TRUE ELSE hint
+          /\ hintCount' = IF hint' THEN 1 ELSE hintCount
+          /\ UNCHANGED <<surface, credential, used, phase, now, started, last, text, armed, receipt, charged>>
+Escape == /\ phase \in {"empty", "writing", "warn", "wiped", "kept"}
+          /\ event' = "escape" /\ expected' = IF armed # -1 /\ now - armed <= 2 THEN "secondExit" ELSE "firstExit"
+          /\ IF surface = "Root" \/ (armed # -1 /\ now - armed <= 2)
+             THEN /\ phase' = "left" /\ text' = {} /\ armed' = -1 /\ hint' = FALSE
+             ELSE /\ armed' = now /\ UNCHANGED <<phase, text, hint>>
+          /\ UNCHANGED <<surface, credential, used, now, started, last, hintCount, receipt, charged>>
+ExpireExit == /\ armed # -1
+              /\ \E t \in Times: t >= now /\ t - armed > 2 /\ now' = t
+              /\ armed' = -1 /\ event' = "expire" /\ expected' = "none"
+              /\ UNCHANGED <<surface, credential, used, phase, started, last, text, hint, hintCount, receipt, charged>>
+Restart == /\ phase = "wiped"
+           /\ phase' = IF Access THEN "restarted" ELSE "locked"
+           /\ event' = "restart" /\ expected' = "none" /\ hint' = FALSE /\ hintCount' = 0
+           /\ UNCHANGED <<surface, credential, used, now, started, last, text, armed, receipt, charged>>
+Done == /\ phase \in {"left", "locked", "restarted", "kept"}
+        /\ UNCHANGED vars
+Next == Enter \/ FirstInput \/ (\E t \in Times: InputAt(t)) \/
+        (\E t \in Times: TickAt(t)) \/ Delete \/ Escape \/ ExpireExit \/ Restart \/ Done
+Spec == Init /\ [][Next]_vars
+
+NoLateRescue == event = "input" /\ expected = "wipe" => "old" \notin text
+DeadlineBeforeInput == event = "input" /\ expected = "keep" => phase = "kept"
+EarlierDeadlineWins == event = "tick" /\ expected = "keep" => phase = "kept"
+TieAndSilenceDelete == event = "tick" /\ expected = "wipe" => phase = "wiped" /\ text = {}
+DeadlineReceipt == event = "tick" /\ expected = "wipe" => receipt = Max0(Finish-Wipe)
+OnlyAuthorizedEntry == phase \in {"empty", "writing", "warn"} /\ surface = "Mac" =>
+                        credential = "valid" \/ (credential = "fresh" /\ (used < 3 \/ charged))
+TrialBound == used <= 3
+FirstInputCharges == event = "first" /\ surface = "Mac" /\ credential = "fresh" => charged
+LicenseIndependentOfTrial == phase = "locked" /\ event = "enter" =>
+                             surface = "Mac" /\ credential # "valid"
+NoticeOnce == hintCount \in {0,1}
+WarningOwnsNote == phase \in {"warn", "wiped", "kept", "left", "locked", "restarted"} => ~hint
+ExitClearsText == phase = "left" => text = {}
+InputCancelsExit == event \in {"first", "input"} => armed = -1
+NoEmptyKept == phase = "kept" => text # {}
+ClockWaitsForFirst == phase = "empty" => started = -1
+DeletionNeverErasesCommitted == event = "delete" /\ Live => "old" \in text
+TwoActExit == phase = "left" /\ surface # "Root" => expected = "secondExit"
+=============================================================================

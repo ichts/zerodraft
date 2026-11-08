@@ -329,33 +329,52 @@ window.FirstLineLandingDemo = (() => {
     }
   }
 
-  // --- Ticker (pure). Called from a data-on-interval expression with the
-  //     current signal values; emits fldanger / flwipe+flfail / flcomplete. ---
-  // Session end adjudication (written into DESIGN.md): the 60s deadline and the
-  // 8s wipe line race as absolute deadlines on the same tick. Whichever comes
-  // first wins: a pause at 0:54 warns at 0:59 but the wipe line (1:02) is never
-  // reached - the 1:00 deadline lands first and the draft is KEPT. A pause at
-  // 0:52 reaches the wipe line at exactly 1:00 - a tie, and the tie goes to the
-  // wipe: eight seconds of silence means eight seconds. A single catch-up tick
-  // after background-tab throttling can land past both at once; the same
-  // absolute-deadline comparison honors whichever occurred first.
-  function tickDispatch(active, failed, complete, context, startedAt, lastInputAt, duration, text) {
-    if (!active || failed || complete) return;
-    if (context !== "trial") return;
-    const now = Date.now();
-    const elapsed = Math.floor((now - startedAt) / 1000);
-    const remaining = Math.max(0, duration - elapsed);
+  // --- Session end adjudication (design/DESIGN.md section 5) -----------------
+  // The 60s deadline and the 8s wipe line race as absolute deadlines. Whichever
+  // comes first wins: a pause at 0:54 warns at 0:59 but the wipe line (1:02) is
+  // never reached - the 1:00 deadline lands first and the draft is KEPT. A pause
+  // at 0:52 reaches the wipe line at exactly 1:00 - a tie, and the tie goes to
+  // the wipe: eight seconds of silence means eight seconds.
+  //
+  // The 100ms tick and every keystroke ask this one function, and each key is
+  // judged at its own instant. A key that lands between a deadline and the
+  // pending tick therefore cannot be judged by a different rule than the tick
+  // would apply. The same absolute-deadline comparison covers a single catch-up
+  // tick after background-tab throttling landing past both deadlines at once.
+  function adjudicate(startedAt, lastInputAt, duration, now) {
+    if (!startedAt) return "live";
     const completionDeadline = startedAt + duration * 1000;
     const silenceDeadline = lastInputAt + WIPE_SECONDS * 1000;
     const completionPassed = now >= completionDeadline;
     const silencePassed = lastInputAt > 0 && now >= silenceDeadline;
-    if (completionPassed && silencePassed) {
-      if (silenceDeadline <= completionDeadline) { sessionWipe(remaining); return; }
-      sessionComplete(text);
-      return;
-    }
-    if (completionPassed) { sessionComplete(text); return; }
-    if (silencePassed) { sessionWipe(remaining); return; }
+    if (completionPassed && silencePassed) return silenceDeadline <= completionDeadline ? "wipe" : "keep";
+    if (completionPassed) return "keep";
+    if (silencePassed) return "wipe";
+    return "live";
+  }
+
+  // The receipt reports the deadline that fired, not the moment the callback
+  // arrived: a throttled tick prints the same unused time as an on-time one.
+  // The arithmetic matches writeitdown/session.mjs and the Mac session engine.
+  function sessionUnusedSeconds(startedAt, lastInputAt, duration) {
+    const finish = startedAt + duration * 1000;
+    const wipe = lastInputAt + WIPE_SECONDS * 1000;
+    return Math.max(0, Math.ceil((finish - wipe) / 1000));
+  }
+  function wipeReport(startedAt, lastInputAt, duration) {
+    return "Draft wiped - " + fmtClock(sessionUnusedSeconds(startedAt, lastInputAt, duration)) + " unused.";
+  }
+
+  // --- Ticker (pure). Called from a data-on-interval expression with the
+  //     current signal values; emits fldanger / flwipe+flfail / flcomplete. ---
+  function tickDispatch(active, failed, complete, context, startedAt, lastInputAt, duration, text) {
+    if (!active || failed || complete) return;
+    if (context !== "trial") return;
+    const now = Date.now();
+    const remaining = Math.max(0, duration - Math.floor((now - startedAt) / 1000));
+    const decision = adjudicate(startedAt, lastInputAt, duration, now);
+    if (decision === "wipe") { sessionWipe(startedAt, lastInputAt, duration); return; }
+    if (decision === "keep") { sessionComplete(text); return; }
     const idle = (now - lastInputAt) / 1000;
     if (idle >= WARN_SECONDS) {
       emit("fldanger", { remaining, dangerSeconds: Math.max(1, Math.ceil(WIPE_SECONDS - idle)), dangerActive: true });
@@ -368,9 +387,21 @@ window.FirstLineLandingDemo = (() => {
   // for the <=200ms cut beat (the debounced flwipe handler clears it), flfail
   // clears the draft and writes the machine report. The wash then exits on the
   // 120ms snap. No ash, no fade, no condolences.
-  function sessionWipe(remaining) {
+  function sessionWipe(startedAt, lastInputAt, duration) {
     emit("flwipe");
-    emit("flfail", { report: "Draft wiped - " + fmtClock(remaining) + " unused." });
+    emit("flfail", { report: wipeReport(startedAt, lastInputAt, duration) });
+  }
+  // A key that lands after the wipe line starts a fresh draft: the cut fires,
+  // the expired text is gone from the model, and the room is rewritten to show
+  // only what this key inserted. The report is announced, not drawn, because
+  // the room is live again in the same keystroke.
+  function beginFreshDraft(text, now, report) {
+    emit("flwipe");
+    emit("flfresh", { tail: text, now, report });
+    const el = trialEditor();
+    if (!el) return;
+    el.textContent = text;
+    moveCaretToEnd(el);
   }
   function sessionComplete(text) {
     const trimmed = (text || "").trim();
@@ -676,9 +707,13 @@ window.FirstLineLandingDemo = (() => {
     bind,
     // pure helpers / action targets called from data-on + data-on-interval + data-effect expressions
     tickDispatch,
+    adjudicate,
+    wipeReport,
     countLabel,
     onComplete,
     onFail,
+    sessionComplete,
+    beginFreshDraft,
     // action targets called from data-on:click (and flroutecheck events)
     startTrial,
     exitTrial,
@@ -1575,7 +1610,8 @@ if (document.readyState === "loading") {
   data-class:wash-3="$_session.dangerActive &amp;&amp; $_session.dangerSeconds === 1"
   data-on-interval__duration.100ms="FirstLineLandingDemo.tickDispatch($_session.active, $_session.failed, $_session.complete, $_session.context, $_session.startedAt, $_session.lastInputAt, $_session.duration, $_session.text)"
   data-effect="$_session.complete &amp;&amp; FirstLineLandingDemo.onComplete($_session.resultText); $_session.failed &amp;&amp; FirstLineLandingDemo.onFail($_session.wipeReport)"
-  data-on:flinput="$_session.text = evt.detail.text; $_session.lastInputAt = evt.detail.now; $_session.active = true; ($_session.failed || $_session.complete) &amp;&amp; ($_session.failed = false, $_session.complete = false, $_session.remaining = 60, $_session.resultText = '', $_session.resultWordCount = 0, $_session.wipeReport = '', $_session.copied = false, $_session.wiping = false, $_session.startedAt = 0); $_session.startedAt = $_session.startedAt || evt.detail.now; $_session.dangerSeconds = 0; $_session.dangerActive = false"
+  data-on:flinput="const decision = FirstLineLandingDemo.adjudicate($_session.startedAt, $_session.lastInputAt, $_session.duration, evt.detail.now); const tail = evt.detail.text.startsWith($_session.text) ? evt.detail.text.slice($_session.text.length) : evt.detail.text; ($_session.failed || $_session.complete) &amp;&amp; ($_session.failed = false, $_session.complete = false, $_session.remaining = 60, $_session.resultText = '', $_session.resultWordCount = 0, $_session.wipeReport = '', $_session.copied = false, $_session.wiping = false, $_session.startedAt = 0); decision === 'wipe' ? FirstLineLandingDemo.beginFreshDraft(tail, evt.detail.now, FirstLineLandingDemo.wipeReport($_session.startedAt, $_session.lastInputAt, $_session.duration)) : decision === 'keep' ? FirstLineLandingDemo.sessionComplete($_session.text) : ($_session.text = evt.detail.text, $_session.lastInputAt = evt.detail.now, $_session.active = true, $_session.startedAt = $_session.startedAt || evt.detail.now, $_session.dangerSeconds = 0, $_session.dangerActive = false)"
+  data-on:flfresh="$_session.active = true; $_session.failed = false; $_session.complete = false; $_session.text = evt.detail.tail; $_session.startedAt = evt.detail.now; $_session.lastInputAt = evt.detail.now; $_session.remaining = $_session.duration; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.srStatus = evt.detail.report"
   data-on:flentertrial="$_session.context = 'trial'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.wiping = false; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false"
   data-on:flexittrial="$_session.context = 'demo'; $_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.wiping = false; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false"
   data-on:flreset="$_session.active = false; $_session.failed = false; $_session.complete = false; $_session.text = ''; $_session.startedAt = 0; $_session.lastInputAt = 0; $_session.remaining = 60; $_session.dangerSeconds = 0; $_session.dangerActive = false; $_session.wiping = false; $_session.resultText = ''; $_session.resultWordCount = 0; $_session.wipeReport = ''; $_session.copied = false"

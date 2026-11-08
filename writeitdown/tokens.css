@@ -33,6 +33,7 @@
   --hair:rgba(28,25,23,.10);
   --hair-2:rgba(28,25,23,.16);
   --red:#b02a1e;
+  --red-text:#b02a1e;--red-text-small:#b02a1e; /* red as words; dark brightens it for APCA (D-103) */
   --red-soft:#f6e2dc;--red-deep:#ebc8bd;
   --tag-bg:#f2f2f0;
   --on-ink:#ffffff;
@@ -79,6 +80,7 @@
   --hair:rgba(236,231,217,.10);
   --hair-2:rgba(236,231,217,.18);
   --red:#e4604a;
+  --red-text:#f6715a;--red-text-small:#ff9b88; /* Lc 45 big on the page and the red card, Lc 60 small on the card */
   --red-soft:#3a1c15;--red-deep:#4a2318;
   --tag-bg:#2e2a22;
   --on-ink:#15140f;

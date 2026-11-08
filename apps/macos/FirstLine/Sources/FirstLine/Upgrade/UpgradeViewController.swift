@@ -193,7 +193,7 @@ final class UpgradeViewController: NSViewController {
         let badStatus = appState.licenseActivationError != nil || appState.trialAccessError != nil ||
             appState.settings.licenseStatus == .revoked || appState.settings.licenseStatus == .invalid
         feedbackLabel.textColor = checking || !badStatus
-            ? FirstLineColors.muteNSColor : FirstLineColors.redNSColor
+            ? FirstLineColors.muteNSColor : FirstLineColors.redTextNSColor
         let showEntry = !active
         fieldLabel.isHidden = !showEntry
         licenseField.isHidden = !showEntry
@@ -245,7 +245,7 @@ final class UpgradeViewController: NSViewController {
         let key = licenseField.stringValue
         guard !AppSettings.trimmedLicenseKey(key).isEmpty, !appState.licenseActivationInFlight else {
             feedbackLabel.stringValue = "Enter your license key first."
-            feedbackLabel.textColor = FirstLineColors.redNSColor
+            feedbackLabel.textColor = FirstLineColors.redTextNSColor
             feedbackLabel.isHidden = false
             return
         }

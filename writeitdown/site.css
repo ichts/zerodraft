@@ -204,7 +204,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .hero{text-align:center;padding:var(--s4) var(--gut) 0}
 .home .h1{margin:0;display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font:500 var(--t-display)/1.05 var(--serif);letter-spacing:-.02em}
 .home .h1 .l1{white-space:nowrap}
-.home .hand{font-family:var(--hand);font-weight:400;color:var(--red);letter-spacing:0;white-space:nowrap}
+.home .hand{font-family:var(--hand);font-weight:400;color:var(--red-text);letter-spacing:0;white-space:nowrap}
 .home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
 @keyframes wid-write{to{clip-path:inset(-10% -4% -20% 0)}}
 /* sheet (the paper): the demo.js preview */
@@ -265,7 +265,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .line8 .track{height:8px;border-radius:var(--r-pill);background:var(--hair-2);overflow:hidden}
 .line8 .track i{display:block;height:100%;width:62%;background:var(--red);border-radius:var(--r-pill)}
 .line8 .lab{display:flex;justify-content:space-between;margin-top:var(--s3);font:400 12px/1.4 var(--sans);color:var(--chrome)}
-.line8 .lab b{color:var(--red);font-weight:600}
+.line8 .lab b{color:var(--red-text-small);font-weight:600}
 .keep{display:flex;flex-direction:column;align-items:center;gap:14px}
 .keep .z{font:400 56px/1 var(--serif);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .keep .btn{height:34px;padding:0 var(--s4);font-size:13px;pointer-events:none}
@@ -275,7 +275,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mo.m2{background:var(--red-soft)}
 .mo.m3{background:var(--red-deep);flex-direction:column;gap:var(--s2)}
 .mo .t{font:400 30px/1.3 var(--serif)}
-.mo .n{font:italic 400 150px/1 var(--serif);color:var(--red)}
+.mo .n{font:italic 400 150px/1 var(--serif);color:var(--red-text)}
 .mo .r{font:400 var(--t-ui)/1.6 var(--sans);color:var(--ink)}
 .mo .cur{display:inline-block;width:2px;height:.9em;background:var(--ink);vertical-align:-.1em;margin-left:2px}
 /* Mac block: card + price facts. The heading and the two actions sit as one group beside the four

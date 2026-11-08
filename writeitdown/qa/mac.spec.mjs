@@ -181,7 +181,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(families.every(f => ['Newsreader', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
   const ink = await hero.evaluate(h => {
     const probe = document.createElement('i');
-    probe.style.color = getComputedStyle(h).getPropertyValue('--red');
+    probe.style.color = getComputedStyle(h).getPropertyValue('--red-text');
     h.append(probe);
     const hand = getComputedStyle(probe).color;
     probe.remove();
@@ -279,6 +279,16 @@ test.describe('light is the default theme', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
     expect(bg).toBe('rgb(21, 20, 15)');
+    // D-103: red as words is brightened in dark (big Lc 45, small Lc 60); the fill red keeps its value.
+    const reds = () => page.evaluate(() => {
+      const color = (selector, prop = 'color') => getComputedStyle(document.querySelector(selector))[prop];
+      return { hand: color('#landing h1 .hand'), numeral: color('.mo .n'), label: color('.line8 .lab b'), track: color('.line8 .track i', 'backgroundColor') };
+    });
+    expect(await reds()).toEqual({ hand: 'rgb(246, 113, 90)', numeral: 'rgb(246, 113, 90)', label: 'rgb(255, 155, 136)', track: 'rgb(228, 96, 74)' });
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    expect(await reds(), 'light keeps the one pen red everywhere').toEqual({ hand: 'rgb(176, 42, 30)', numeral: 'rgb(176, 42, 30)', label: 'rgb(176, 42, 30)', track: 'rgb(176, 42, 30)' });
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });

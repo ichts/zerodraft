@@ -353,6 +353,6 @@ final class FirstLineStatusView: NSView {
     }
 
     private func applyTone() {
-        label.textColor = tone == .bad ? FirstLineColors.redNSColor : FirstLineColors.chromeNSColor
+        label.textColor = tone == .bad ? FirstLineColors.redTextNSColor : FirstLineColors.chromeNSColor
     }
 }

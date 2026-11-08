@@ -171,7 +171,7 @@ final class SettingsViewController: NSViewController {
         block.addArrangedSubview(licenseStatusLabel)
 
         licenseCleanupWarningLabel = muted("")
-        licenseCleanupWarningLabel.textColor = FirstLineColors.redNSColor
+        licenseCleanupWarningLabel.textColor = FirstLineColors.redTextNSColor
         block.addArrangedSubview(licenseCleanupWarningLabel)
 
         licenseDetails = (0..<2).map { _ in muted("") }
@@ -241,7 +241,7 @@ final class SettingsViewController: NSViewController {
             (appState.licenseActivationError?.errorDescription ?? appState.accessStatusText)
         licenseStatusLabel.stringValue = statusText
         licenseStatusLabel.textColor = (checking || active || !badStatus)
-            ? FirstLineColors.chromeNSColor : FirstLineColors.redNSColor
+            ? FirstLineColors.chromeNSColor : FirstLineColors.redTextNSColor
         licenseCleanupWarningLabel.stringValue = LicenseActivationError.cleanupFailure.errorDescription ?? ""
         licenseCleanupWarningLabel.isHidden = !active || appState.licenseActivationError != .cleanupFailure
         // Activation dates only; the instance id is an implementation detail.

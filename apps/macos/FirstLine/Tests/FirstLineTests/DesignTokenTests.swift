@@ -37,6 +37,11 @@ struct DesignTokenTests {
         assertPalette(.darkAqua, expected: [(FirstLineColors.redNSColor, 0xE4604A)])
     }
 
+    @Test func redTextIsBrighterInDarkOnly() {
+        assertPalette(.aqua, expected: [(FirstLineColors.redTextNSColor, 0xB02A1E)])
+        assertPalette(.darkAqua, expected: [(FirstLineColors.redTextNSColor, 0xFF9B88)])
+    }
+
     private func assertPalette(_ appearance: NSAppearance.Name, expected: [(NSColor, Int)]) {
         for (token, hex) in expected {
             var actual: [Int] = []

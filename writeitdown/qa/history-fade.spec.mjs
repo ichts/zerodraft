@@ -226,6 +226,9 @@ test('the first refused delete says the rule once, centred under the line being 
   await expect(page.locator('#refusal-note')).toHaveText(REFUSAL);
   expect(REFUSAL, 'sentence case, never all capitals').not.toBe(REFUSAL.toUpperCase());
   expect(await shakes(page), 'the 200 ms shake still runs on the first refusal').toBeGreaterThan(0);
+  // The paper's own shake and hairline are the refusal's animations, not the note's: let the short ones (the shake, the hairline) end, then the note must still be on screen and nothing may have moved.
+  await page.waitForFunction(() => document.querySelector('.room-paper').getAnimations({ subtree: true }).every(a => a.effect.getComputedTiming().endTime > 1000));
+  expect(await noteShown(page), 'the note outlives the shake').toBe('true');
   expect(await frames(page), 'the footer and the writing keep their frames while the note shows').toEqual(before);
   await expect(page.locator('#exit'), 'Esc to exit stays in the footer').toHaveText(/^(Esc to exit|Exit)$/);
   await expect(page.locator('#exit-hint'), 'the footer slot stays empty').toHaveText('');

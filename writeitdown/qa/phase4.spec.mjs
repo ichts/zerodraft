@@ -1,3 +1,4 @@
+import { doorSettled } from './door.mjs';
 import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
@@ -88,6 +89,7 @@ const INK = () => {
 
 async function enter(page) {
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(editor(page)).toBeFocused();
 }
 
@@ -1495,6 +1497,7 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
   await expect(page.locator('#warn')).toBeVisible();
   await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
   await page.clock.fastForward(CUT_END + 2000 - (SILENT_END + 150) + 1000);
   await page.keyboard.press('Escape');
@@ -1662,6 +1665,7 @@ test.describe('a thumb on the phone', () => {
     expect(loaded.status(), 'the page loads from the suite origin').toBeLessThan(400);
     expect(new URL(page.url()).protocol, 'the page has a real http(s) origin').toMatch(/^https?:$/);
     await page.locator('#landing .cta a[href="#trial"]').tap();
+    await doorSettled(page);
     await expect(editor(page)).toBeFocused();
     await page.clock.runFor(50);
     await page.keyboard.insertText('Typed with a thumb.');
@@ -1696,6 +1700,7 @@ test.describe('a landscape phone', () => {
   test('a wide touch screen still names the control it can press', async ({ page }) => {
     expect(await touchInput(page), 'the touch profile reports coarse input').toBe(true);
     await page.locator('#landing .cta a[href="#trial"]').tap();
+    await doorSettled(page);
     await expect(editor(page)).toBeFocused();
     await expect(page.locator('#exit')).toHaveText('Exit');
     const tap = async selector => {
@@ -1717,6 +1722,7 @@ test.describe('a wide fine pointer', () => {
   test('a wide fine pointer keeps the Escape wording', async ({ page }) => {
     expect(await touchInput(page), 'the desktop profile reports a fine pointer').toBe(false);
     await page.locator('#landing .cta a[href="#trial"]').click();
+    await doorSettled(page);
     await expect(editor(page)).toBeFocused();
     await expect(page.locator('#exit')).toHaveText('Esc to exit');
     await page.locator('#exit').click();

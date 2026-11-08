@@ -38,9 +38,10 @@ struct SnapshotTests {
             let exhaustedSettings = try trialState(used: 3)
             try snapshot(SettingsViewController(appState: exhaustedSettings), name: "settings-entry-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
-            // The rules sheet has no card: its whole surface is the sheet fill, so the corners are that fill.
+            // The rules panel is a popover's content (D-097): it has no card and no fill of its own, the system
+            // popover surface sits behind it, so the corners are clear.
             try snapshot(RulesViewController(), name: "rules-\(suffix)", appearance: appearance, output: output,
-                         cornerFill: FirstLineColors.sheetNSColor)
+                         cornerFill: .clear)
             try snapshot(HomeViewController(appState: try trialState(used: 2)), name: "picker-focus-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360), focus: true)
             try snapshot(UpgradeViewController(appState: try trialState(used: 3)), name: "activation-focus-\(suffix)",

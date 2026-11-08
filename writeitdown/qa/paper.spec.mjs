@@ -1,3 +1,4 @@
+import { doorSettled } from './door.mjs';
 // The Wheat paper on the writeitdown site (D-069, superseding D-056's Note tone): tone, grain and ink,
 // measured rather than eyeballed, on the landing demo sheet and in the room, light and dark.
 //
@@ -118,6 +119,7 @@ async function patch(page, selector, where = 0.6) {
 async function enterRoom(page) {
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
   await waitForPaper(page, '.room-paper');
 }

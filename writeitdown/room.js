@@ -1,5 +1,5 @@
 import { fresh, advance, append, clock, wordCount, countLabel, historyLines } from './session.mjs';
-import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
+import { denyFeedback, GROW_MS, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot } from './status-slot.js';
 
 const $ = id => document.getElementById(id);
@@ -298,15 +298,57 @@ function restart() {
   editor.focus({ preventScroll: true });
 }
 
+let routed = false;
+let growing = [];
+
+// The door opens (D-097): the room's paper is the landing's demo paper grown, and the brand row slides to its
+// place, instead of the demo vanishing and a new paper appearing 160 px away. Only transforms and an opacity
+// fade run; the room's layout is final from the first frame, so the editor is live at once.
+function boxes() {
+  const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+  return { paper: rect('#landing #paper'), brand: rect('#landing .home-nav .brand'), end: rect('#landing .home-nav .nav-end') };
+}
+
+const inView = r => r && r.width > 0 && r.bottom > 0 && r.top < innerHeight;
+
+function growInto(from) {
+  growing.forEach(a => a.cancel());
+  growing = [];
+  if (reduced.matches || !inView(from.paper)) return;
+  const options = { duration: GROW_MS, easing: 'cubic-bezier(.22,1,.36,1)' };
+  const to = paper.getBoundingClientRect();
+  if (!to.width || !to.height) return;
+  growing.push(paper.animate([
+    { transformOrigin: '0 0', transform: `translate(${from.paper.left - to.left}px, ${from.paper.top - to.top}px) scale(${from.paper.width / to.width}, ${from.paper.height / to.height})` },
+    { transformOrigin: '0 0', transform: 'none' }
+  ], options));
+  for (const el of paper.children) {
+    if (el.hidden || el.matches('.sheet-paper, .bar, .wash, .hairline')) continue;
+    const end = getComputedStyle(el).opacity;
+    growing.push(el.animate([{ opacity: 0 }, { opacity: end }],
+      { duration: GROW_MS * 0.7, delay: GROW_MS * 0.3, easing: 'ease-out', fill: 'backwards' }));
+  }
+  for (const [selector, was] of [['.room-nav .brand', from.brand], ['.room-nav .nav-end', from.end]]) {
+    const el = room.querySelector(selector);
+    const now = el.getBoundingClientRect();
+    if (!inView(was) || !now.width) continue;
+    growing.push(el.animate([{ transform: `translate(${was.left - now.left}px, ${was.top - now.top}px)` }, { transform: 'none' }], options));
+  }
+  // Named so the browser suite can wait for the door to finish before it measures geometry.
+  for (const a of growing) a.id = 'door';
+}
+
 function route() {
   const returning = !room.hidden;
   const active = location.hash === '#trial';
+  const from = active && !returning && routed ? boxes() : null;
   document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;
   room.hidden = !active;
+  routed = true;
   slot.invalidate();
   reset();
-  if (active) { fitEditor(); editor.focus({ preventScroll: true }); }
+  if (active) { fitEditor(); editor.focus({ preventScroll: true }); if (from) growInto(from); }
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
 }
 

@@ -1,3 +1,4 @@
+import { doorSettled } from './door.mjs';
 // D-077, D-088 and D-092: the room's history fades per line ended by Return, and the first refused delete of a session says why.
 //
 // Fade: the unit is the line ended by Return, never a sentence (D-088). Every row of one line shares one measured opacity
@@ -23,6 +24,7 @@ const over = (ink, alpha, paper) => ink.map((v, i) => v * alpha + paper[i] * (1 
 async function enter(page) {
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(page.locator('#editor')).toBeFocused();
 }
 

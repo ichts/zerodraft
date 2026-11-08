@@ -1,3 +1,4 @@
+import { doorSettled } from './door.mjs';
 // D-090: glyph outlines are never filtered, displaced or stroked, and the room's footer is one type style.
 //
 // Ink: a 2 px SVG feDisplacementMap over fractal noise sat on the writing layer (D-056) and bent every
@@ -10,6 +11,7 @@ import { test, expect } from '@playwright/test';
 async function enter(page) {
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(page.locator('#editor')).toBeFocused();
 }
 

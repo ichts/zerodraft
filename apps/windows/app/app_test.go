@@ -135,7 +135,10 @@ func (g *rig) spend() {
 func TestHomeAndTheThreeFreeSessions(t *testing.T) {
 	g := newRig(t)
 	g.snap("home-fresh")
-	g.wantText("How long?")
+	if _, ok := g.tt.Find("How long?"); ok {
+		t.Errorf("the picker carries no title (D-096): %q", g.tt.Texts())
+	}
+	g.wantText(tokens.HomeMinutes)
 	g.wantText(fmt.Sprintf(tokens.TrialLeftFormat, 3))
 	// entering an empty room and leaving it spends nothing
 	g.click("Begin writing")
@@ -411,13 +414,13 @@ func TestRulesSheetFollowsTheTypeScale(t *testing.T) {
 func TestHelpButtonSitsOnTheLogoRowAndTheCardPadding(t *testing.T) {
 	g := newRig(t)
 	help, ok1 := g.tt.Find(tokens.HomeRulesHelp)
-	title, ok2 := g.tt.Find(tokens.HomeTitle)
+	minutes, ok2 := g.tt.Find(tokens.HomeMinutes)
 	if !ok1 || !ok2 {
-		t.Fatalf("help or title not on screen: %q", g.tt.Texts())
+		t.Fatalf("help or minutes label not on screen: %q", g.tt.Texts())
 	}
-	// the lockup sits 17 DIP above the title (homeView's first gap); its box is the chip's measured size
+	// the lockup sits 28 DIP above the Minutes label (homeView's first gap); its box is the chip's measured size
 	const chipH = tokens.ChipPickerTypeSize * tokens.ChipEmHeight
-	lockupMid := title.Y - 17 - chipH/2
+	lockupMid := minutes.Y - 28 - chipH/2
 	if help.W != 32 || help.H != 32 {
 		t.Errorf("help button %.2f x %.2f, want 32 x 32", help.W, help.H)
 	}

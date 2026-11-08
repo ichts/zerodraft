@@ -1891,3 +1891,35 @@ is `docs/wid-world-table.md`.
 - Supersedes: the caps wording of D-059, D-074 and D-076 where they name `COPY TEXT`, `COPIED`,
   `BEGIN AGAIN` or `5 MINUTES. 63 WORDS.`, and D-023's Han-only count (kana now count one per character
   instead of one per run, so the label never sits on a word-run number). Their geometry and behaviour stand.
+
+
+## D-096: The picker has no title, and Begin shows the paper before it builds it
+
+- Date: 2026-11-07
+- Decision: (1) The picker's `How long?` heading is deleted on the Mac and on Windows. The card opens with the
+  lockup row, 32 pt (Windows 28 DIP) above the `Minutes` label, which now carries the meaning alone. The web
+  trial has no picker. (2) Begin shows the room's paper within 100 ms of the click. The picker renders the room's
+  sheet (its tone, mottle and grain) on a background queue as soon as it is on screen and again after a resize or
+  theme change, into a three-entry `PaperSheetCache`; the room's first paint reads it. A miss (a click before
+  the render ends, an unexpected size) still builds the sheet synchronously, so no frame ever shows a flat tone.
+- Reason: the captain, 2026-11-07, from 120 fps recordings: `delete the HOW LONG? text it is not necessary`, and
+  Begin `takes like half a second to go into the room`. The recording shows no fade: the room arrives as one
+  frame after the main thread was busy. The ~5 M pixel paper texture was generated on the click's own turn
+  (D-056's "built synchronously on first draw"); the picker already knows the room's paper size, so the work moves
+  to idle time. Waiting for a wipe or countdown timing was never involved; D-077's 120 ms wash fade and the
+  <=200 ms cut are untouched.
+- Supersedes: D-031 and D-036's `How long?` heading (the lockup placement inside the card stands); D-056's
+  "the image is built synchronously on first draw" as the only build path (it stays the fallback).
+- Evidence: `BeginLatencyTests` (fails on the old code at 388 ms of main-thread CPU in a debug build; passes under
+  100 ms with zero synchronous paper builds), the Windows `TestHomeAndTheThreeFreeSessions` and
+  `TestHelpButtonSitsOnTheLogoRowAndTheCardPadding`, and the before/after recordings in
+  `data/wid-picker-begin/picker-before-after.pdf`.
+
+
+## D-097: The door opens - the paper grows out of the card, and the rules panel grows out of the `?`
+
+- Date: 2026-11-07
+- Decision: (1) Begin on the Mac and `Give it 60 seconds` on the web no longer cut to the room. The room's paper is on screen on the first frame in the rectangle of the thing that was clicked (the picker card on the Mac; the landing's demo paper on the web), then grows to its own place in 240 ms (`cubic-bezier(.23,1,.32,1)` on the Mac, the site's `--ease-out` on the web). The writing layer (editor, chrome, count) fades in over the last 70% of the grow behind a veil of the same paper; only transforms and opacity run, the layout is final from the first frame, so the editor is live and focused at once. On the web the brand row and the nav end slide from their landing positions to the room's, so nothing jumps 160 px at desktop width; a landing scrolled out of view cuts instead. Reduce Motion is one change with no in-between frame. Esc and exit stay a cut back. (2) The Mac's how-it-works panel is a transient popover anchored on the `?` that opened it (system grow-from-anchor animation, Esc, Return, Done or a click outside closes it back into the button), not a window-wide sheet that slides from the title bar. Its content sits clear on the system popover surface.
+- Reason: the captain, 2026-11-07: Begin must not cut from picker to room, the paper should grow out of the card; the motion audit (`wid-motion-audit`, tables B1 and B2) found every state change a hard cut and these two as the ones that lose the eye (the clicked card or CTA vanishes; the sheet slides in from the top edge unrelated to the `?`). Rulebook v3 14.4 f: the acted-on element must be tied between consecutive frames, with no blink and no full crossfade.
+- Supersedes: D-096's implicit cut at Begin (the 100 ms budget to first paper stands and is now the first frame of the grow); D-091's "?" opening a system sheet (the 32 pt quiet circle itself stands); D-076's sheet chrome for the rules (type scale, measure and wording stand).
+- Evidence: `BeginLatencyTests.beginGrowsThePaperOutOfThePickerCard` (the first frame sits on the card's centre and size, Reduce Motion has no animation), `BrandTests.rulesPopoverIsAnchoredOnTheQuestionMark`, `writeitdown/qa/door-grow.spec.mjs` (first frame equals the demo paper's box and the brand row has not moved, widths only grow, 240 ms, no blank frame, editor focused, Reduce Motion one change; fails on the cut), and the frame-by-frame before (main 4357fa0) / after recordings in `data/wid-picker-begin/`. The Windows picker still cuts and keeps its dialog; it follows in a later change.

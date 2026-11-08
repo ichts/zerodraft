@@ -1,3 +1,4 @@
+import { doorSettled } from './door.mjs';
 import { test, expect } from '@playwright/test';
 import { TIMELINE } from '../demo-timeline.mjs';
 import { barFraction } from './bar-clip.mjs';
@@ -66,6 +67,7 @@ test('room bar reanchors to the deadline after motion preference changes', async
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.runFor(50);
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await page.keyboard.insertText('Start');
   for (let i = 0; i < 10; i++) {
     await page.clock.fastForward(3000);
@@ -89,6 +91,7 @@ test('room bar starts a fresh session full under Reduce Motion', async ({ page }
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.clock.runFor(50);
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
   await expect(page.locator('#editor')).toBeFocused();
   await page.keyboard.insertText('Start');
@@ -105,6 +108,7 @@ test('demo bar reanchors after hidden loops and motion preference changes', asyn
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.clock.runFor(50);
   await page.locator('#landing .cta a[href="#trial"]').click();
+  await doorSettled(page);
   await page.clock.fastForward(loop * 3 + 5000);
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');

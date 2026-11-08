@@ -1,6 +1,6 @@
 --------------------------- MODULE WritingFlow ---------------------------
 EXTENDS Integers, FiniteSets, TLC
-CONSTANTS Duration, Silence, Times
+CONSTANTS Surfaces, Duration, Silence, Times, RootRule
 VARIABLES surface, credential, used, phase, now, started, last, text,
           hint, hintCount, armed, expected, event, receipt, charged
 vars == <<surface, credential, used, phase, now, started, last, text,
@@ -12,10 +12,11 @@ Finish == started + Duration
 Limit == IF surface = "Mac" THEN Silence ELSE 8
 WarnAt == Limit - 3
 Wipe == last + Limit
+LegacyRoot == surface = "Root" /\ RootRule = "prefix"
 Decision(t) == IF started = -1 THEN "live"
                ELSE IF t >= Wipe /\ Wipe <= Finish THEN "wipe"
                ELSE IF t >= Finish THEN "keep" ELSE "live"
-Init == /\ surface \in {"Root", "Web", "Mac"}
+Init == /\ surface \in Surfaces
         /\ credential \in {"fresh", "valid", "residue"}
         /\ used \in {0, 2, 3}
         /\ (surface # "Mac" => credential = "fresh" /\ used = 0)
@@ -36,7 +37,7 @@ FirstInput == /\ phase = "empty" /\ started = -1
               /\ UNCHANGED <<surface, credential, hint, hintCount, receipt>>
 InputAt(t) == /\ Live /\ t \in Times /\ t >= now
               /\ expected' = Decision(t) /\ event' = "input" /\ now' = t
-              /\ IF surface = "Root" \/ Decision(t) = "live"
+              /\ IF Decision(t) = "live" \/ LegacyRoot
                  THEN /\ phase' = "writing" /\ last' = t /\ text' = text \cup {"new"}
                       /\ UNCHANGED <<started, used, charged>>
                  ELSE IF Decision(t) = "keep"
@@ -56,7 +57,7 @@ TickAt(t) == /\ Live /\ t \in Times /\ t >= now
                               [] OTHER -> "writing"
              /\ text' = IF Decision(t) = "wipe" THEN {} ELSE text
              /\ receipt' = IF Decision(t) = "wipe"
-                            THEN IF surface = "Root" THEN Max0(Duration - (t-started))
+                            THEN IF LegacyRoot THEN Max0(Duration - (t-started))
                                  ELSE Max0(Finish-Wipe)
                             ELSE receipt
              /\ hint' = IF phase' # "writing" THEN FALSE ELSE hint

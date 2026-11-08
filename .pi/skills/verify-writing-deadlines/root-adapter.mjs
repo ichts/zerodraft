@@ -59,11 +59,12 @@ export function rootAdapter(html) {
     context.$_session.context = 'trial';
     editor.innerText = '';
   }
-  // The browser writes the new text into the contenteditable, then fires input.
-  function input(value, time) {
+  // The browser writes the new text into the contenteditable, then fires input
+  // with the text that event inserted (`InputEvent.data`).
+  function input(value, time, inserted = "") {
     now = time;
     editor.innerText = value;
-    listeners.get('input')();
+    listeners.get('input')({ data: inserted, inputType: 'insertText' });
   }
   function tick(time) {
     now = time;

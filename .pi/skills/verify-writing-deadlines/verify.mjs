@@ -61,10 +61,18 @@ if (surface === 'root' || surface === 'all') {
         check('root.receipt.deadlineNotCallback', root.state.wipeReport === report, { ...detail, expectedReport: report, actual: root.state.wipeReport });
       }
       root.restore(before);
-      root.input(before.text + ' new', time);
-      if (expected === 'wipe') check('root.input.noLateRescue', !root.state.text.includes('old'), { ...detail, actualText: root.state.text });
+      root.input(before.text + ' new', time, ' new');
+      if (expected === 'wipe') check('root.input.noLateRescue', root.state.text === ' new', { ...detail, actualText: root.state.text });
       if (expected === 'kept') check('root.input.deadlineBeforeAppend', root.state.complete && root.state.resultText === before.text, { ...detail, actualText: root.state.text, complete: root.state.complete });
       if (expected === 'typing' || expected === 'warn') check('root.input.liveAppend', root.state.text === before.text + ' new' && !root.state.failed && !root.state.complete, detail);
+      // An IME commit replaces the marked text the model already holds, so the
+      // committed DOM text is not an append of the model. The fresh draft is
+      // still exactly what the commit inserted.
+      if (expected === 'wipe') {
+        root.restore(before);
+        root.input(before.text.slice(0, -1) + '日本', time, '日本');
+        check('root.input.noLateRescue', root.state.text === '日本', { ...detail, shape: 'composition', actualText: root.state.text });
+      }
     }
   }
 }

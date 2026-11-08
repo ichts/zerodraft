@@ -106,3 +106,59 @@ test('a tie between 0:00 and the wipe line goes to the wipe', async ({ page }) =
   await expect(page.locator('.trial-report')).toBeVisible();
   await expect(page.locator(reportLine)).toHaveText('Draft wiped - 0:00 unused.');
 });
+
+// The browser's composition order: compositionstart, one insertCompositionText
+// per keystroke inside the composition, then compositionend followed by
+// insertFromComposition. The editor is a plain contenteditable, so the event
+// order itself is the contract the bridge reads.
+async function startComposition(page, text, data) {
+  await page.evaluate(([text, data]) => {
+    const el = document.querySelector('.trial-editor');
+    el.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data }));
+  }, [text, data]);
+}
+
+async function commitComposition(page, text, data) {
+  await page.evaluate(([text, data]) => {
+    const el = document.querySelector('.trial-editor');
+    el.textContent = text;
+    el.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data }));
+    el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertFromComposition', data }));
+  }, [text, data]);
+}
+
+test('a composition committed after the wipe line starts a fresh draft with only the committed text', async ({ page }) => {
+  const origin = await openTrial(page);
+  await page.keyboard.type('old');
+  // Composing counts as activity, so the wipe line is the last composition
+  // keystroke plus 8 s. The candidate window then stays open past it, with the
+  // pending 100 ms tick not yet delivered.
+  await page.clock.setSystemTime(origin + 100);
+  await startComposition(page, 'oldに', 'に');
+  await page.clock.setSystemTime(origin + 200);
+  await startComposition(page, 'oldにほ', 'ほ');
+  await page.clock.setSystemTime(origin + 8900);
+  // Committing the kanji replaces the marked text: the committed DOM text is
+  // not an append of the draft the model holds.
+  await commitComposition(page, 'old日本', '日本');
+  await expect(page.locator(editor)).toHaveText('日本');
+  await expect(page.locator('.trial-timer')).toHaveText('1:00');
+  await expect(page.locator('.trial-report')).toBeHidden();
+});
+
+test('a composition committed after the wipe line keeps the text it inserted', async ({ page }) => {
+  const origin = await openTrial(page);
+  await page.keyboard.type('old');
+  await page.clock.setSystemTime(origin + 100);
+  await startComposition(page, 'oldに', 'に');
+  await page.clock.setSystemTime(origin + 200);
+  await startComposition(page, 'oldにほ', 'ほ');
+  await page.clock.setSystemTime(origin + 8900);
+  // The candidate the writer picks equals the marked text, which is already in
+  // the model: committing it inserts nothing new and must not blank the room.
+  await commitComposition(page, 'oldにほ', 'にほ');
+  await expect(page.locator(editor)).toHaveText('にほ');
+  await expect(page.locator('.trial-timer')).toHaveText('1:00');
+});

@@ -27,12 +27,12 @@ Every rule below is a permanent assertion. A failure is a real product bug, not 
 |---|---|---|
 | `root.tick.earliestDeadline` | the tick applies the earlier absolute deadline | mutation proof below |
 | `root.receipt.deadlineNotCallback` | the receipt reports `0:00` minus the wipe deadline | at `fa63af1` a 9 s catch-up tick printed `Draft wiped - 0:51 unused.` instead of `0:52` |
-| `root.input.noLateRescue` | a key after the wipe line starts a fresh draft and never keeps the expired text | at `fa63af1` a key at 8.1 s left the editor holding `oldn` |
+| `root.input.noLateRescue` | a key or composition commit after the wipe line starts a fresh draft holding exactly the text that event inserted | at `fa63af1` a key at 8.1 s left the editor holding `oldn` |
 | `root.input.deadlineBeforeAppend` | a key after 0:00 is dropped and the draft is kept with the text it had | at `fa63af1` the session stayed live and grew to `old… new` |
 | `root.input.liveAppend` | a live key appends exactly once | guard |
 | `web.tick.earliestDeadline`, `web.tick.clearsDraft`, `web.receipt.deadlineNotCallback`, `web.input.noLateRescue`, `web.input.deadlineBeforeAppend`, `web.input.liveAppend` | the same rules on the shipped `writeitdown/session.mjs` | guard; these never failed |
 
-At `fa63af1` (before the input path adjudicated its own keys and before the receipt used the triggering deadline) the unfiltered run reported exactly the three root-page failures above. At the current tree it reports `16940` checks with no failure; the three cases are kept as assertions so the regression cannot come back.
+At `fa63af1` (before the input path adjudicated its own keys and before the receipt used the triggering deadline) the unfiltered run reported exactly the three root-page failures above. At the current tree it reports `18952` checks with no failure; the three cases are kept as assertions so the regression cannot come back.
 
 ## How it runs the real code
 
@@ -45,9 +45,9 @@ Last checked against the fix commit recorded in `git log -1 --format=%H -- .pi/s
 
 ## Scope and bounds
 
-The finite input universe is 60 reachable committed-text prefixes, with latest input at each integral second 0 through 59. Prefixes keep typing at most four seconds apart. For each prefix, explore all integral callback/input times from that latest input through second 68, plus one millisecond before, exactly at, and one millisecond after warning, wipe and finish boundaries. Check tick alone and input delivered before the pending tick. The first input uses a positive epoch. Duration is 60 seconds, silence 8 seconds, warning 5 seconds. Text is nonempty ASCII.
+The finite input universe is 60 reachable committed-text prefixes, with latest input at each integral second 0 through 59. Prefixes keep typing at most four seconds apart. For each prefix, explore all integral callback/input times from that latest input through second 68, plus one millisecond before, exactly at, and one millisecond after warning, wipe and finish boundaries. Check tick alone and input delivered before the pending tick. The first input uses a positive epoch. Duration is 60 seconds, silence 8 seconds, warning 5 seconds. Text is nonempty ASCII, and every post-wipe case is fed twice: an append, and a composition commit whose text replaces the marked text the model already holds, so the committed DOM text is not an append of the model.
 
-This is exhaustive over that finite universe, not a mathematical proof over arbitrary JS values or a symbolic proof of JavaScript. It does not cover actual Datastar scheduling, DOM effects, browser rendering, IME, wall-clock jumps, the Mac runtime, licence cryptography, or storage. The TLA+ model in `model/` is a separate design-level exploration, not a generated proof of source equivalence.
+This is exhaustive over that finite universe, not a mathematical proof over arbitrary JS values or a symbolic proof of JavaScript. It does not cover actual Datastar scheduling, DOM effects, browser rendering, a real IME candidate window, wall-clock jumps, the Mac runtime, licence cryptography, or storage. The TLA+ model in `model/` is a separate design-level exploration, not a generated proof of source equivalence.
 
 ## Prove it can fail
 
@@ -61,8 +61,14 @@ This copies `index.html` under the chosen evidence directory, changes the real t
 
 Each failed rule prints the first concrete last-input time, callback/input time, expected outcome and actual outcome, plus the number of failing cases in the stated universe. One cause can fail many cases. If a counterexample cannot happen in the source, fix the adapter or model and document why. If it can happen, keep the finding. Never weaken a property to obtain a pass.
 
-The Playwright suite asserts the same behaviour through the real browser and a controlled clock: `tests/trial-deadlines.spec.mjs` (`npm test`) covers the fresh draft after the wipe line, the dropped key after 0:00, the deadline-based receipt, the delayed keep, and the tie.
+The Playwright suite asserts the same behaviour through the real browser and a controlled clock: `tests/trial-deadlines.spec.mjs` (`npm test`) covers the fresh draft after the wipe line, the dropped key after 0:00, the deadline-based receipt, the delayed keep, the tie, and a composition committed after the wipe line (a committed candidate that replaces the marked text, and one that equals it).
 
 ## Model
 
-`model/WritingFlow.tla` and its configs are the design-level model of the room and the Mac admission boundary: 18 named invariants, one per rule a writer relies on. The `WritingFlow-{5,8,12}.cfg` configs include the three rules that broke at `fa63af1`; `WritingFlow-hold-n{5,8,12}.cfg` drop them so TLC can check the other 14 plus deadlock without hitting its 100,000-state bound. Run it with `/statechart` and read the result with that skill's report, not as a proof of the source.
+`model/WritingFlow.tla` and its configs are the design-level model of the room and the Mac admission boundary: 17 named invariants, one per rule a writer relies on. The model encodes the shipped rule on every surface: an input consults its own deadline (`InputAt` reads `Decision(t)`), so a post-wipe key replaces the draft instead of appending to it, and the wipe receipt names the deadline that fired rather than the callback. `WritingFlow-{5,8,12}.cfg` check all 17 plus deadlock and pass.
+
+`WritingFlow-historical-fa63af1.cfg` is history, not a claim about today. Its `RootRule = "prefix"` restores the Root surface as it behaved at `fa63af1` - every input appended whatever the decision said, and the receipt was measured at the callback - so the three pre-fix violations (`NoLateRescue`, `DeadlineBeforeInput`, `DeadlineReceipt`) stay reproducible. `WritingFlow-chart.cfg` is the chart-size config: the writer's room alone with the instants its story turns on, all 17 rules kept, 410 states. Run the model with `/statechart` and read the result with that skill's report, not as a proof of the source.
+
+## Chart
+
+`chart.mmd` is the Mermaid source the chart config produces, and `chart.png` is its render: 8 states, 15 arrows, Chinese labels, the whole room from `入口` to `已保留` / `已删除` / `已离开`. Regenerate them from `WritingFlow-chart.cfg` whenever the model changes; a chart above 500 states is drawn only as bug paths, which this model no longer has.

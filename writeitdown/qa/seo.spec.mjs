@@ -95,6 +95,8 @@ test('llms.txt is served as plain text, not the HTML fallback', async ({ request
   ])
     expect(text).toContain(fact);
   expect(text).not.toMatch(/\b(openai|chatgpt|anthropic|claude|perplexity|gemini|gpt-?\d|google|cloudflare)\b/i);
+  // Only the Mac app ships, so this public summary names no Windows app until a Store listing is live (C3).
+  expect(text).not.toMatch(/windows/i);
   for (const path of [...pages, '/mac.html'])
     expect(text, path).toContain(origin + path);
 });

@@ -2100,3 +2100,31 @@ is `docs/wid-world-table.md`.
 - Supersedes: nothing recorded. D-097's door (the grow, 240 ms, Reduce Motion one change) stands unchanged; D-056/D-069's "painted once per size" stands, now ahead of the click.
 - Evidence: `writeitdown/qa/door-instant.spec.mjs` (2x screen: longest main-thread task after the click under 150 ms, editor focused within 250 ms, the canvas is exactly the warmed one and the click does not repaint it, the landing's scroll, focus and visibility are untouched by the warm, and a resize re-warms; fails on the previous build), `door-grow.spec.mjs` unchanged, and the frame-by-frame before/after recordings and traces in `data/wid-web-trial-instant/`.
 
+
+## D-105: The site sells only the Mac app until a Windows listing is live
+
+- Date: 2026-11-09
+- Decision: while no Microsoft Store listing is live, `mac.html` carries no Windows sale, price,
+  activation or download claim. The licence reads `one license covers 2 computers` and `One license
+  works on two computers`, with no `Mac or Windows` clause; the price row reads `2 computers. No
+  subscription.`; the meta description stops at `for two computers`; and the Requirements section ends
+  at macOS, with the Windows requirement and activation sentences deleted. `privacy.html` loses its
+  `#windows` section whole (memory-only draft, the 3-session trial terms and the $4.99 price, Credential
+  Manager entries and their removal, Stripe checkout, no update check of its own), and its
+  outside-request list names `the Mac app` instead of `the Mac and Windows apps`. `llms.txt` describes
+  the privacy page as what the browser and the Mac app keep and send. Nothing replaces them: no Windows
+  download, no Store link, no placeholder and no coming-soon line. D-083 stands unchanged: the kept
+  screen's `Mac app` link becomes `Mac and Windows app` when the listing is live, and nothing else on
+  that row changes.
+- Reason: the captain, 2026-11-09, on C3 of the web design audit: the site must say only what actually
+  ships today. The Windows app cannot be downloaded and no Store listing exists, so those sentences
+  sold a product with no purchase path on any page. This retires the Windows copy PR #100 shipped on an
+  earlier approval that assumed a live listing.
+- Supersedes: the Windows strings approved in PR #100 (the `mac.html` requirement sentence,
+  `privacy.html#windows`, the `Mac or Windows` licence clauses, the `llms.txt` privacy summary). It
+  supersedes no recorded decision; D-083 is not superseded.
+- Evidence: `writeitdown/qa/mac.spec.mjs` (no Windows text on `mac.html` and no Store or Windows href
+  anywhere in it, its meta description included; `privacy.html` carries no Windows block and its
+  outside-request sentence names the Mac app), `writeitdown/qa/seo.spec.mjs` (`llms.txt` names no
+  Windows app); each new assertion fails on a page with the claim put back. Before/after captures of
+  `mac.html` and `privacy.html` at 1440 and 390 in `data/wid-design-c3-windows/`.

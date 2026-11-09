@@ -277,9 +277,9 @@ async function run(size, browser) {
       const m = await page.evaluate(() => ({ c: document.querySelector('link[rel=canonical]')?.href, t: document.querySelector('meta[property="og:title"]')?.content, d: document.querySelector('meta[name=description]')?.content, u: document.querySelector('meta[property="og:url"]')?.content }));
       ok(m.c === 'https://writeitdown.app/download/' && m.u === 'https://writeitdown.app/download/' && m.t && m.d, `meta ${JSON.stringify(m)}`);
     });
-    await step('download page: Install / Activate / Refunds sections', async () => {
+    await step('download page: Install / Activate sections', async () => {
       const t = await page.locator('.steps3 .card > h2').allInnerTexts();
-      ok(t.join('|') === 'Install|Activate|Refunds', `sections ${JSON.stringify(t)}`);
+      ok(t.join('|') === 'Install|Activate', `sections ${JSON.stringify(t)}`);
     });
     await step('DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published', async () => {
       const r = await ctx.request.get(url(new URL(DMG_URL).pathname));

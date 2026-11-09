@@ -2190,7 +2190,7 @@ is `docs/wid-world-table.md`.
   fill, its hairline border, its panel padding and its 12 px tighter panel padding below 365 px. The
   hash's two atomic 32-character halves, its 13 px mono in the ink role with the mute label, the
   command's argument-boundary break, and the no-scroll, no-fade and exact-copy rules all stand
-  unchanged. D-075's parenthetical that the 14 px and 12 px panel paddings on `/download/` are left
+  unchanged. D-079's parenthetical that the 14 px and 12 px panel paddings on `/download/` are left
   alone because moving them changes the width the hash halves and the command wrap against no longer
   applies: those paddings are gone. The `.dlbox` 22 px padding between 365 and 820 px stays.
 - Evidence: `writeitdown/qa/mac.spec.mjs` (the download page has no `#refunds`, the Activate card no

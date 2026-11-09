@@ -19,6 +19,7 @@
   };
 
   function sizeLabelFloors() {
+    const floors = {};
     for (const [selector, labels] of Object.entries(LABELS)) {
       const control = document.querySelector(selector);
       if (!control || !control.offsetParent) continue;
@@ -32,8 +33,14 @@
         widest = Math.max(widest, probe.getBoundingClientRect().width);
       }
       probe.remove();
-      if (widest > 0) control.style.setProperty('--copy-floor', `${Math.ceil(widest)}px`);
+      if (widest > 0) {
+        floors[selector] = `${Math.ceil(widest)}px`;
+        control.style.setProperty('--copy-floor', floors[selector]);
+      }
     }
+    // Stacked on a phone, the row's ghost sits directly under the primary, so it shares that floor
+    // there (site.css, the phone step) instead of ending 18 px short of it.
+    if (floors['#buy-form button']) buy.closest('.doc-actions')?.style.setProperty('--copy-floor', floors['#buy-form button']);
   }
 
   sizeLabelFloors();

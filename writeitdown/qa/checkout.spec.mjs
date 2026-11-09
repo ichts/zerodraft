@@ -362,6 +362,36 @@ test('both controls keep their one width on a wider default sans', async ({ page
   expect(idle, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...labels.map(label => label.width)));
 });
 
+// On a phone the buy row stacks, so the two controls sit one under the other and any width difference
+// reads as a near-miss rather than a hierarchy: before the phone rule the ghost stayed 182 px beside a
+// 200 px primary. Stacked, the ghost takes the primary's measured floor and stays secondary by its own
+// surface and colour, not by being narrower; side by side at desktop width it keeps its natural width.
+test('the stacked buy row keeps one width and stays secondary', async ({ page }) => {
+  await page.goto('mac.html');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const ghost = page.locator('#buy .doc-actions > .btn-ghost');
+    const buy = page.locator('#buy-form button');
+    const [ghostBox, buyBox] = [await ghost.boundingBox(), await buy.boundingBox()];
+    expect(ghostBox.y + ghostBox.height, `the row stacks at ${width}px`).toBeLessThanOrEqual(buyBox.y);
+    expect(+ghostBox.width.toFixed(1), `ghost and primary share one width at ${width}px`).toBe(+buyBox.width.toFixed(1));
+    const ghostPaint = await ghost.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, weight: style.fontWeight, family: style.fontFamily };
+    });
+    const buyPaint = await buy.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, weight: style.fontWeight, family: style.fontFamily };
+    });
+    expect(ghostPaint.background, 'the ghost stays a ghost').not.toBe(buyPaint.background);
+    expect(ghostPaint.weight, 'the ghost keeps one type style with the primary').toBe(buyPaint.weight);
+    expect(ghostPaint.family, 'the ghost keeps one family with the primary').toBe(buyPaint.family);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const [ghostWide, buyWide] = [await widthOf(page, '#buy .doc-actions > .btn-ghost'), await widthOf(page, '#buy-form button')];
+  expect(ghostWide, 'side by side the ghost keeps its natural width').toBeLessThan(buyWide);
+});
+
 // A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
 // refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
 // every width, including the 480 px band where the current note wraps onto a second line.

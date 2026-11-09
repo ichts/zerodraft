@@ -459,6 +459,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .license-key code{font:inherit;color:var(--ink)}
 @media(max-width:767px){
   .home main.doc{padding-top:var(--s6)}
+  /* Stacked, the row's ghost sits directly under the primary, so it takes that control's measured
+     floor: 182 px beside 192 px reads as a near-miss, and equal widths read as one deliberate column.
+     The ghost still looks secondary by its own surface and colour, not by being narrower. */
+  .home #buy .doc-actions>.btn-ghost{min-width:var(--copy-floor)}
 }
 /* Q-01: on a phone the room's nav keeps the mark and the theme icon only, and the Mac link moves down into
    the exit row, so nothing in the header competes with the clock. */

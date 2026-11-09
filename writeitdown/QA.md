@@ -843,6 +843,8 @@ clipboard logic or Windows sentence changed.
 | `#buy` | card height at 1440 / 390 | 348.1 / 501.9 px | 277.7 / 377.2 px |
 | `#buy` | height idle / error at 1440 and 390 | 277.7 / 298.5, 377.2 / 418.8 px | unchanged: the inline error still opens one line at 1440 and two at 390 |
 | `#buy .doc-actions` | top edge in idle / pending / error | 484.4 at 1440, 529.5 at 390 | unchanged, so the controls never move under the pointer |
+| `#buy .doc-actions` stacked at 390 and 320 | ghost / primary width | 182.2 / 183.9 px before A3, 182.2 / 192 px after the measured floor | 192 / 192 px |
+| `#buy .doc-actions` side by side at 1440 | ghost / primary width | 182.2 / 183.9 px | 182.2 / 192 px, the inline composition and its hierarchy unchanged |
 | whole page | horizontal overflow at 320 / 360 / 390 | 0 | 0 |
 
 ## Captures
@@ -864,3 +866,20 @@ one shell). Q-24 pass, and this is the row the work moves forward: a control tha
 the width of its widest label, now asserted on the purchase surface by `qa/checkout.spec.mjs`, under
 the default face and under a deliberately wider one. Q-28 pass
 (the refund window no longer breaks; the key still wraps whole at 320).
+
+## Follow-up: the stacked buy row shares one width
+
+The independent review of this batch's captures found the one thing this pass had recorded as "not
+changed" and was wrong about: on a phone the row stacks, and the measured floor left the ghost at
+182.2 px under a 192 px primary, where the pre-A3 page had them 1.7 px apart. Equal widths now come
+from the primary's own measured floor, so the ghost carries no second number: `buy.js` writes the
+same `--copy-floor` on the row, and the phone step in `site.css` gives `.home #buy
+.doc-actions>.btn-ghost` that `min-width`. The ghost keeps its own surface (`rgb(255,255,255)` light,
+the sheet fill in dark) and its 600 weight, so it still reads as the secondary action; side by side at
+1440 px it keeps its natural 182.2 px. `qa/checkout.spec.mjs` "the stacked buy row keeps one width and
+stays secondary" fails on the pre-fix tree (Expected 192, Received 182.2) at 390 and 320, asserts the
+row is stacked there, and pins that the ghost keeps a different fill and the same weight and family.
+`after/buy-idle-390-light.png`, `after/buy-idle-390-dark.png` and `after/buy-error-390-light.png`
+were re-shot; the other captures still describe the shipped layout. Two filled primaries in the ready
+state, the 44 vs 48 px button heights, the duplicated `Opening checkout...` line and the 390 px error
+wrapping `a moment.` stay out of scope and were recorded as pre-existing by that review.

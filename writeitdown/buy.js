@@ -5,22 +5,28 @@
   const form = document.getElementById('buy-form');
   const buy = form.querySelector('button');
   const checkoutStatus = document.getElementById('checkout-status');
-  const buyLabel = buy.textContent;
   const service = new URL(form.action).origin;
   const options = { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' };
+
+  // One source per label: the probe measures the strings the state machine writes, so a copy edit
+  // cannot drift between the reserved width and the label that lands in it.
+  const LABELS = {
+    buy: { idle: buy.textContent, busy: 'Opening checkout...', retry: 'Try again' },
+    copy: { idle: 'Copy license key', done: 'Copied' },
+  };
 
   // Both controls swap their label with the state machine, and a control that resizes under the
   // pointer reads as a different control. Each one reserves the width of its widest label in the face
   // the device actually renders, the measured floor room.js gives the kept pill's copy control (D-059):
   // a width tuned on one machine's sans moves the control again on the next.
-  const LABELS = {
-    '#buy-form button': ['Buy for $4.99 once', 'Opening checkout...', 'Try again'],
-    '#copy-license': ['Copy license key', 'Copied'],
+  const WIDTH_PROBES = {
+    '#buy-form button': [LABELS.buy.idle, LABELS.buy.busy, LABELS.buy.retry],
+    '#copy-license': [LABELS.copy.idle, LABELS.copy.done],
   };
 
   function sizeLabelFloors() {
     const floors = {};
-    for (const [selector, labels] of Object.entries(LABELS)) {
+    for (const [selector, labels] of Object.entries(WIDTH_PROBES)) {
       const control = document.querySelector(selector);
       if (!control || !control.offsetParent) continue;
       const probe = control.cloneNode(false);
@@ -48,7 +54,7 @@
 
   window.addEventListener('pageshow', () => {
     buy.disabled = false;
-    buy.textContent = buyLabel;
+    buy.textContent = LABELS.buy.idle;
     buy.removeAttribute('aria-busy');
     checkoutStatus.textContent = '';
     checkoutStatus.setAttribute('role', 'status');
@@ -58,10 +64,10 @@
     event.preventDefault();
     if (buy.disabled) return;
     buy.disabled = true;
-    buy.textContent = 'Opening checkout...';
+    buy.textContent = LABELS.buy.busy;
     buy.setAttribute('aria-busy', 'true');
     checkoutStatus.setAttribute('role', 'status');
-    checkoutStatus.textContent = 'Opening checkout...';
+    checkoutStatus.textContent = LABELS.buy.busy;
     try {
       const response = await fetch(form.action, { ...options, method: 'POST', headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('Checkout unavailable');
@@ -74,7 +80,7 @@
       checkoutStatus.textContent = 'Checkout is unavailable. Please try again in a moment.';
       checkoutStatus.setAttribute('role', 'alert');
       buy.disabled = false;
-      buy.textContent = 'Try again';
+      buy.textContent = LABELS.buy.retry;
       buy.removeAttribute('aria-busy');
     }
   });
@@ -142,7 +148,7 @@
   copy.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(deliveredKey);
-      copy.textContent = 'Copied';
+      copy.textContent = LABELS.copy.done;
       document.getElementById('copy-status').textContent = '';
     } catch {
       document.getElementById('copy-status').textContent = 'Copy failed. Select the key above and copy it.';

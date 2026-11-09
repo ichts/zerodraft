@@ -152,7 +152,7 @@ The landing page implements visual constitution v2, defined in `design/DESIGN.md
 
 - interrogation-room minimal: one paper, one clock, one door; the trial is the cleaner room, not a different product
 - canvas: bone `#f1f0eb`; the sheet is the Wheat paper `#e9e2ce` (D-069, superseding D-056's Note), textured by grain, never tinted by the wall - the wall, the chrome and the header keep their white identity; radius 0; one shadow (the paper's lift)
-- every role that carries words sits on the sheet and is measured against the sheet, not against white: ink `#1c1917` (13.52:1), the quiet role `#464746` (7.21:1), the pen `#63140b` (9.93:1), the dimmed history lines (.22 and .07, D-092) are the one exception. Nothing else on the sheet reads below 7:1.
+- every role that carries words sits on the sheet and is measured against the sheet, not against white: ink `#1c1917` (13.52:1), the quiet role `#48443E` (7.47:1), the pen `#63140b` (9.93:1), the dimmed history lines (.22 and .07, D-092) are the one exception. Nothing else on the sheet reads below 7:1.
 - the warn wash is the sheet's own mix (`--wash-paper`, `--wash-paper-deep` above), painted identically by the landing demo, the trial, the writeitdown room and the Mac room, so the alarm tints the same paper the same way on every surface.
 - Newsreader (the human) + IBM Plex Mono (the machine); red is spent only on the warn numeral and the wipe cut - on the wall `#c8392f`, on the sheet `#63140b` so it clears the floor there too; blue usage is zero; the logotype underscore is ink
 - danger appears only while the writer pauses: the wash ramps bone/paper to 88% color-mix danger over seconds 5-8, steps one step deeper at the eighth second, and exits on the 120ms snap; the numeral 3-2-1 never tweens

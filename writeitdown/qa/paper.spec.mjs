@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 
 const TONES = { light: '#e9e2ce', dark: '#342e24' };
 const INK = { light: '#1c1917', dark: '#ece7d9' };
-const QUIET = { light: '#464746', dark: '#c2bfb7' };
+const QUIET = { light: '#48443e', dark: '#c2bfb7' };
 const DANGER = { light: '#63140b', dark: '#ffc2b4' };
 const WASH = { light: '#e8cfbb', dark: '#453226' };
 const WASH_DEEP = { light: '#e6bca7', dark: '#573428' };

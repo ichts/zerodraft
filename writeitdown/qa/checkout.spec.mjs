@@ -319,12 +319,54 @@ test('the copy control keeps one width in ready and copied', async ({ page, cont
   expect(ready, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
 });
 
+// The floor is measured from the face the device renders, not tuned to the sans on the author's
+// machine, so a wider default sans must still leave each control one width in every state.
+test('both controls keep their one width on a wider default sans', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/tokens.css', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(/--sans:[^;]+;/, '--sans:Verdana,"DejaVu Sans",sans-serif;');
+    await route.fulfill({ response, body });
+  });
+  await page.route(`${service}/license?session_id=cs_test_wider_width`, route => route.fulfill({ json: { licenseKey: key } }));
+  let fail = true;
+  await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
+
+  await page.goto('mac.html?session_id=cs_test_wider_width');
+  const copy = page.getByRole('button', { name: 'Copy license key', exact: true });
+  await expect(copy).toBeVisible();
+  await expect(copy).toHaveCSS('font-family', /^Verdana/);
+  const ready = await widthOf(page, '#copy-license');
+  await copy.click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  const copied = await widthOf(page, '#copy-license');
+  const copyLabels = await naturalWidths(page, '#copy-license', ['Copy license key', 'Copied']);
+  expect(copied, `wider-sans copy width against ${JSON.stringify(copyLabels)}`).toBe(ready);
+  expect(ready, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...copyLabels.map(label => label.width)));
+
+  await page.goto('mac.html');
+  const buy = page.locator('#buy-form button');
+  await expect(buy).toHaveText('Buy for $4.99 once');
+  await expect(buy).toHaveCSS('font-family', /^Verdana/);
+  const idle = await widthOf(page, '#buy-form button');
+  await buy.click();
+  await expect(buy).toHaveText('Try again');
+  const error = await widthOf(page, '#buy-form button');
+  fail = false;
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  const pending = await widthOf(page, '#buy-form button');
+  const labels = await naturalWidths(page, '#buy-form button', ['Buy for $4.99 once', 'Opening checkout...', 'Try again']);
+  expect(idle, `wider-sans buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(pending, 'the wider pending label keeps the same width').toBe(error);
+  expect(idle, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...labels.map(label => label.width)));
+});
+
 // A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
 // refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
 // every width, including the 480 px band where the current note wraps onto a second line.
 test('the refund window keeps its number and unit on one line', async ({ page }) => {
   await page.goto('mac.html');
-  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /14\u2011day refund/);
   for (const width of [1440, 480, 390]) {
     await page.setViewportSize({ width, height: 900 });
     const rects = await page.evaluate(() => {

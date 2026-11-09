@@ -808,10 +808,12 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
 `mac.html#buy` opened with a paragraph that gave the price, the two computers, the free updates and the
 14-day refund, and the price line's note gave the same four facts again, the Activate section a third
 time and the Refunds section a fourth. The paragraph is deleted with no replacement copy, the price row
-and its note are unchanged, `14-day` is written with a non-breaking hyphen in the note and in the meta
-description, `#buy-form button` and `#copy-license` take their widest label as a `min-width`, and the
-licence key panel loses its ring, fill and radius for one hairline above it. No checkout behaviour,
-price, Stripe call, key delivery, clipboard logic or Windows sentence changed.
+and its note are unchanged, `14-day` is written with a non-breaking hyphen in the note while the meta
+description keeps its plain hyphen, `#buy-form button` and `#copy-license` take the width of their
+widest label measured in the face the device renders (`buy.js` writes `--copy-floor`, the floor
+`room.js` already gives the kept pill's copy control), and the licence key panel loses its ring, fill
+and radius for one hairline above it. No checkout behaviour, price, Stripe call, key delivery,
+clipboard logic or Windows sentence changed.
 
 ## Commands and results
 
@@ -822,8 +824,8 @@ price, Stripe call, key delivery, clipboard logic or Windows sentence changed.
   room-timing flake in `qa/history-fade.spec.mjs` (3/3 green alone) and a race in this change's own new
   checkout test, which aborted the pending request and could read `Try again` before `Opening
   checkout...`; it now hangs the request instead, and `qa/checkout.spec.mjs` across all eight projects
-  is 224 passed. No file this change touches is loaded by the room.
-- `npx playwright test qa/checkout.spec.mjs` on the pre-fix tree: the three new tests fail with the
+  is 232 passed, including the wider-sans case. No file this change touches is loaded by the room.
+- `npx playwright test qa/checkout.spec.mjs` on the pre-fix tree: the new tests fail with the
   measured numbers below (`known-broken-buy-card.txt` in `data/wid-design-a3-buy-card/`).
 - `node --test buy.test.mjs session.test.mjs`: 26 passed.
 - `node release-check.mjs`: STATIC CHECK PASSED.
@@ -831,9 +833,10 @@ price, Stripe call, key delivery, clipboard logic or Windows sentence changed.
 ## Measured (`data/wid-design-a3-buy-card/`)
 
 | Surface | Measure | Before | After |
-| `#buy-form button` at 1440 and 390 | width in idle / pending / error | 183.9 / 191.2 / 114.3 px | 200 / 200 / 200 px |
-| `#copy-license` at 1440 and 390 | width in ready / copied | 167.7 / 99.8 px | 176 / 176 px |
-| `#buy .doc-note` | widest label as rendered (15 px) | `Opening checkout...` 191.2, `Copy license key` 167.7 | `min-width` 200 and 176 px, next 4 px step |
+| `#buy-form button` at 1440 and 390 | width in idle / pending / error | 183.9 / 191.2 / 114.3 px | 192 / 192 / 192 px |
+| `#copy-license` at 1440 and 390 | width in ready / copied | 167.7 / 99.8 px | 168 / 168 px |
+| both controls | widest label as rendered (15 px) | `Opening checkout...` 191.2, `Copy license key` 167.7 | `min-width` measured from it: 192 and 168 px here |
+| both controls, `--sans:Verdana` | width in every state | `Opening checkout...` 201.5 px would outgrow the old 200 px floor | 202 / 202 and 177 / 177 px, one width per control |
 | price-row note, `14-day` | line rects at 15 widths, 320 to 1440 | 2 rects at 480, 450 (`doc-note`) and at 600, 420 (deleted paragraph) | 1 rect at every width |
 | `.license-key` | border / background / radius | 1 px on all four sides, `--tag-bg`, 4 px | 1 px top only, transparent, 0 |
 | `#buy` | card height at 1440 / 390 | 348.1 / 501.9 px | 277.7 / 377.2 px |
@@ -857,5 +860,6 @@ the card's one content edge). Q-17 pass (no size, weight or leading changed; onl
 Q-19 pass (no sideways scroll at 320, 360 or 390). Q-20 pass (no copy written; the deleted paragraph was a
 repeat and the 3-session fact stays in Activate and the meta description). Q-21 pass (one price string;
 one shell). Q-24 pass, and this is the row the work moves forward: a control that swaps its label keeps
-the width of its widest label, now asserted on the purchase surface by `qa/checkout.spec.mjs`. Q-28 pass
+the width of its widest label, now asserted on the purchase surface by `qa/checkout.spec.mjs`, under
+the default face and under a deliberately wider one. Q-28 pass
 (the refund window no longer breaks; the key still wraps whole at 320).

@@ -446,11 +446,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .doc-actions form{margin:0;display:flex}
 /* One width per control. Both labels change with the state machine - `Buy for $4.99 once` becomes
    `Opening checkout...` and then `Try again`, `Copy license key` becomes `Copied` - and a control that
-   resizes under the pointer reads as a different control. Each min-width is its own widest label as
-   measured at 15 px (191.2 px and 167.7 px) rounded up to the next 4 px step, so neither width moves
-   between idle, pending, error, copied and the rest of the licence card. */
-.home #buy-form button{min-width:200px}
-.home #copy-license{min-width:176px}
+   resizes under the pointer reads as a different control. buy.js writes --copy-floor from each
+   control's widest label measured in the face the device actually renders, the same measured floor
+   room.js sets on the kept pill's copy control (D-059), so no width depends on one machine's sans. */
+.home #buy-form button,.home #copy-license{min-width:var(--copy-floor)}
 /* The licence card is the buyer's return surface: pending, ready, copied and unpaid all live here. */
 .home .license-card{--pad:clamp(24px,4vw,40px);margin-top:var(--s5);padding:var(--pad);scroll-margin-top:var(--s4)}
 .home .license-card h2{margin:0}

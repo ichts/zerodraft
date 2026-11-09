@@ -31,7 +31,9 @@ async function deliver(licenseKey, { succeed = true, failures = 0 } = {}) {
   };
   const context = vm.createContext({
     URL, URLSearchParams,
-    document: { getElementById: element },
+    // No layout in this double: the label floors are proved in the browser spec, so the control lookup
+    // finds nothing here and these tests stay about the credential and key paths.
+    document: { getElementById: element, querySelector: () => null, fonts: { ready: Promise.resolve() } },
     window: { addEventListener() {} },
     location: {
       search: '?session_id=cs_test_fixture',

@@ -32,7 +32,7 @@ Tokens ship as CSS custom properties in the `:root` block of `index.html`. Value
 | `--bone` | `#f1f0eb` | The wall. Environment, everywhere. |
 | `--paper` | `#e9e2ce` | The one object: the Wheat sheet (D-069, which supersedes D-056's Note). Nothing else is the paper. |
 | `--ink` | `#1c1917` | Words, primary chrome, the door. 13.52:1 on the paper. |
-| `--paper-quiet` | `#464746` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.21:1, measured, never assumed. |
+| `--paper-quiet` | `#48443E` | Every quiet role **on the paper**: clock, count, hint, receipt, exit link. 7.47:1, measured, never assumed. The Mac's own warm `paperQuiet` (D-084): one value on both surfaces. |
 | `--paper-danger` | `#63140b` | The pen **on the paper**: the warn numeral and the exit confirmation hint. Clears 7:1 on the sheet and on the wash the numeral sits on. |
 | `--dim` | `#6b665b` | Secondary chrome **on the wall**. |
 | `--faint` | `#b3ada0` | Receded wall chrome, the quietest legal text on the wall. Never used on the paper. |

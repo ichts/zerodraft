@@ -19,7 +19,7 @@
      every word on the paper clears 7:1 against the paper's own tone, except the dimmed history lines
      (D-092: one back 1.57:1, two back 1.15:1), and the pen red is deepened until the numeral and the exit hint clear it too. */
   --paper-tone:#e9e2ce;
-  --paper-quiet:#464746;
+  --paper-quiet:#48443E; /* the Mac's warm `paperQuiet` (D-084): one quiet grey on both surfaces */
   --paper-history-1:.22;
   --paper-history-2:.07;
   --paper-danger:#63140b;

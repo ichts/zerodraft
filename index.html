@@ -754,9 +754,10 @@ if (document.readyState === "loading") {
     --dim: #6b665b;       /* secondary chrome, reports, receipts */
     --faint: #b3ada0;     /* receded chrome while typing; the quietest legal text */
     /* Sheet roles: measured against the paper's own tone, never eyeballed. Every word on the
-       paper clears 7:1 - the quiet chrome at 7.21, the danger numeral at 9.93 - because the tone
-       is darker than white and the wall's greys would sink into it (D-056). */
-    --paper-quiet: #464746;
+       paper clears 7:1 - the quiet chrome at 7.47, the danger numeral at 9.93 - because the tone
+       is darker than white and the wall's greys would sink into it (D-056). The quiet grey is the
+       Mac's own warm `paperQuiet` (D-084): one value on both surfaces, never a second grey. */
+    --paper-quiet: #48443E;
     --paper-danger: #63140b;  /* 9.93:1 on the sheet, 7.43:1 on the deepest wash */
     --line: #dedcd5;      /* hairlines only, 1px, never thicker */
     --danger: #c8392f;    /* the warn numeral and the wipe cut; nothing else */

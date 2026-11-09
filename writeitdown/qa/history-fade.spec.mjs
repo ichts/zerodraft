@@ -11,7 +11,7 @@ import { doorSettled } from './door.mjs';
 import { test, expect } from '@playwright/test';
 
 const TONES = { light: '#e9e2ce', dark: '#342e24' };
-const QUIET = { light: '#464746', dark: '#c2bfb7' };
+const QUIET = { light: '#48443e', dark: '#c2bfb7' };
 const REFUSAL = 'You can only add the next word.';
 
 const rgb = value => String(value).match(/[\d.]+/g).slice(0, 3).map(Number);

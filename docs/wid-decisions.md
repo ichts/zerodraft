@@ -1674,6 +1674,8 @@ is `docs/wid-world-table.md`.
   sources (`apps/windows/scripts/gen_tokens.py`), so Windows follows in the same change. The web
   (`tokens.css`, the landing demo, the trial) keeps `#464746` until the same change is decided there; the
   web parity of this one role is a follow-up.
+- Web parity (2026-11-09): `writeitdown/tokens.css` and the landing/trial token in `index.html` now also
+  read `#48443E`, so one quiet grey serves both surfaces and the dark role `#C2BFB7` is unchanged.
 - Reason: the Mac design audit (rule 6, warm greys only) found `#464746` the one cool grey on the Wheat
   paper. `#48443E` keeps the red-green-blue order of the paper's own tone, and it reads 7.47:1 on
   `#E9E2CE` (was 7.21:1), so the 7:1 floor of D-069 holds with more margin. Bound tests:

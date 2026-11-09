@@ -10,10 +10,13 @@
 //      while the writer types), device-exact (no resampling at 1x) and not tiled;
 //   4. the texture exists before the demo sheet's first paint.
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
 const PAPER = '#e9e2ce';
 const INK = '#1c1917';
-const QUIET = '#464746';
+// D-084: the quiet grey is the Mac's own warm paperQuiet, one value on both surfaces. Pinned by
+// 'the quiet grey is one value on every surface' below, so the web and the Mac cannot drift apart.
+const QUIET = '#48443e';
 const DANGER = '#63140b';
 
 const parseColour = value => {
@@ -137,6 +140,24 @@ async function sheetTone(page, selector) {
 }
 
 test.describe('the demo sheet at rest', () => {
+  // D-084 warmed the Mac's light `paperQuiet` to #48443E and the Windows tokens follow it there. The two
+  // web surfaces declare the role in two files, so the pair can drift apart silently: this pins the
+  // rendered pairing, both declared web values and the Mac source to one literal. The dark role is pinned
+  // too, because it must stay where D-084 left it.
+  test('the quiet grey is one value on every surface', async () => {
+    const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+    const declarations = (source, pattern) => [...source.matchAll(pattern)].map(match => match[1].toUpperCase());
+
+    const root = declarations(read('../index.html'), /--paper-quiet:\s*(#[0-9a-f]{6})/gi);
+    const site = declarations(read('../writeitdown/tokens.css'), /--paper-quiet:\s*(#[0-9a-f]{6})/gi);
+    const mac = read('../apps/macos/FirstLine/Sources/FirstLine/DesignSystem/Colors.swift')
+      .match(/paperQuietNSColor[^\n]*light: 0x([0-9a-f]{6}), dark: 0x([0-9a-f]{6})/i);
+
+    expect(root).toEqual(['#48443E']);
+    expect(site).toEqual(['#48443E', '#C2BFB7']);
+    expect(mac && [`#${mac[1]}`.toUpperCase(), `#${mac[2]}`.toUpperCase()]).toEqual(['#48443E', '#C2BFB7']);
+  });
+
   test('carries the Wheat tone, the ink and the grain before its first paint', async ({ page }) => {
     // Every animation frame from the first one records whether the sheet is on screen and whether it
     // is already textured. A frame that sees the sheet plain is the flash this test exists to forbid.

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readdirSync, readFileSync } from 'node:fs';
+import { openPage, sweepTimeout } from './page-sweep.mjs';
 
 // Indexed pages, in sitemap order. mac.html ships and is linked, but stays out of the sitemap until sales open.
 const answers = [
@@ -19,7 +20,7 @@ const servedPath = path => '/writeitdown' + (path.endsWith('/') ? path + 'index.
 const localPath = path => (path === '/' ? 'index.html' : path.slice(1));
 
 async function faqData(page, path) {
-  await page.goto(localPath(path));
+  await openPage(page, localPath(path));
   return page.evaluate(() => {
     const blocks = [...document.querySelectorAll('script[type="application/ld+json"]')];
     const nodes = blocks.flatMap(block => {
@@ -51,6 +52,8 @@ async function faqData(page, path) {
 }
 
 test('public URLs have a single apex canonical and a discoverable sitemap', async ({ request }) => {
+  // Thirteen page fetches in one body: budget the walk, not the harness's flat 30 s (#146).
+  test.setTimeout(sweepTimeout(shipped.length));
   const robots = await request.get('/writeitdown/robots.txt');
   expect(robots.ok()).toBe(true);
   expect(await robots.text()).toContain(`Sitemap: ${origin}/sitemap.xml`);
@@ -102,6 +105,8 @@ test('llms.txt is served as plain text, not the HTML fallback', async ({ request
 });
 
 test('every JSON-LD block parses and every FAQPage matches the visible FAQ word for word', async ({ page }) => {
+  // Thirteen shipped pages, then the landing and its six answer pages: twenty navigations in one body.
+  test.setTimeout(sweepTimeout(shipped.length + 1 + answers.length));
   for (const path of shipped) {
     await page.goto(localPath(path));
     const blocks = await page.evaluate(() => [...document.querySelectorAll('script[type="application/ld+json"]')]

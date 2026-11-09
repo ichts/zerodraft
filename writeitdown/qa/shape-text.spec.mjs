@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
 // Text wrapping and corner shape, measured from computed styles and bounding boxes rather than eyeballed.
@@ -189,10 +188,44 @@ test('a button label never breaks onto a second line, even on a 320 px phone', a
   }
 });
 
-test('the stylesheets never turn the line-breaking rules off', () => {
-  for (const file of ['site.css', 'tokens.css']) {
-    const css = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
-    expect(css, `${file} has no line-break: anywhere`).not.toMatch(/line-break\s*:\s*anywhere/);
-    expect(css, `${file} has no word-break: break-all`).not.toMatch(/word-break\s*:\s*break-all/);
+test('body copy never cuts a word in half', async ({ page }) => {
+  // A long unbreakable token is what `word-break: break-all` and `line-break: anywhere` were for: they let the
+  // browser fill every line to the edge by cutting inside a word. Body copy must not do that - the whole token
+  // moves to the next line, or overflows, and no line ever draws half of it.
+  const token = 'incomprehensibilities'.repeat(6);
+  for (const url of ['./', 'privacy.html', 'support.html']) {
+    await page.goto(url);
+    await page.evaluate(() => document.fonts.ready);
+    const measured = await page.evaluate(token => {
+      // A prose paragraph, not code: `overflow-wrap: anywhere` on a code block is deliberate, because a key or a
+      // URL has no spaces to break at.
+      const host = [...document.querySelectorAll('main p, .doc p, p')]
+        .find(paragraph => paragraph.getClientRects().length && paragraph.textContent.trim().split(/\s+/).length > 12);
+      if (!host) return null;
+      const probe = document.createElement('p');
+      probe.className = host.className;
+      probe.textContent = `before ${token} after`;
+      host.after(probe);
+      const range = document.createRange();
+      range.setStart(probe.firstChild, 7);
+      range.setEnd(probe.firstChild, 7 + token.length);
+      const rects = [...range.getClientRects()];
+      const lines = new Set(rects.map(rect => Math.round(rect.top))).size;
+      const column = Math.round(probe.getBoundingClientRect().width);
+      // The token's own width, measured where nothing can wrap it: the wrapping probe's first line is only as
+      // wide as its column once a word is being cut.
+      const ruler = document.createElement('span');
+      ruler.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap';
+      ruler.textContent = token;
+      probe.append(ruler);
+      const width = Math.round(ruler.getBoundingClientRect().width);
+      probe.remove();
+      return { lines, column, token: width };
+    }, token);
+    expect(measured, `${url} has no body paragraph to measure`).not.toBeNull();
+    expect(measured.token, `${url}: the probe token fits its ${measured.column}px column, so nothing is proven`)
+      .toBeGreaterThan(measured.column);
+    expect(measured.lines, `${url}: the ${measured.token}px token was cut across ${measured.lines} lines of a ${measured.column}px column`)
+      .toBe(1);
   }
 });

@@ -38,6 +38,15 @@ for (const waiver of waivers) {
   console.log(`  ${waiver.step}: ${waiver.reason} Approved by ${waiver.approved_by}; unwaive when ${waiver.unwaive_when}.`);
 }
 const NOISE = /cloudflareinsights|favicon|Access-Control-Allow-Origin|access control checks/i; // third-party beacon / local-server noise
+// Two budgets, because the two waits are different things. Measured on this machine (2026-11-09, load
+// average 5-88): one navigation of this site 0.02-0.13 s quiet, 2-6 s at load 85, 5.8 s censored at the
+// old ceiling. A document load is the network, the parse and the first paint, so it gets five times the
+// worst one measured. An assertion reads a DOM that has already arrived, so it keeps the 5 s ceiling: a
+// check that needs longer than that is a hang and should say so. `setDefaultTimeout` covers both, which
+// is why one line used to give `page.goto` the assertion budget and fail the gate with
+// "page.goto: Timeout 5000ms exceeded" on a busy machine while the site was healthy.
+const NAVIGATION_MS = 30_000;
+const ACTION_MS = 5_000;
 // The unpaid-licence fixture answers 404 on purpose. That console entry is the harness's own
 // probe, not a missing site resource, so exactly that URL and status is expected; every other
 // console error still fails the gate.
@@ -60,7 +69,8 @@ async function run(size, browser) {
     recordVideo: { dir, size: { width: size.width, height: size.height } },
   });
   const page = await ctx.newPage();
-  page.setDefaultTimeout(5000);
+  page.setDefaultTimeout(ACTION_MS);
+  page.setDefaultNavigationTimeout(NAVIGATION_MS);
   const errors = [];
   page.on('console', m => { if (m.type() === 'error' && !isExpected404(m) && !NOISE.test(m.text() + (m.location().url || ''))) errors.push(`${m.text()} @ ${m.location().url}`); });
   page.on('pageerror', e => { if (!NOISE.test(String(e))) errors.push(String(e)); });
@@ -80,7 +90,18 @@ async function run(size, browser) {
     if (scenarios && !scenarios.includes(name)) return;
     current = name; await fn();
   };
-  const show = sel => page.locator(sel).first().evaluate(e => e.scrollIntoView({ block: 'start' }));
+  // A step that scrolls resolves its element first, so the wait names the element it is waiting for
+  // instead of failing inside the scroll expression.
+  const show = async sel => {
+    const target = page.locator(sel).first();
+    await target.waitFor({ state: 'attached' });
+    await target.evaluate(e => e.scrollIntoView({ block: 'start' }));
+  };
+  // The room's own clock, as the writer sees it.
+  const roomClock = async () => {
+    const [minutes, seconds] = (await page.locator('#room-clock').innerText()).trim().split(':').map(Number);
+    return minutes * 60 + seconds;
+  };
   // The room stage repeats the landing header inside the hidden #room section, so the landing
   // nav and entrance locators are anchored to the visible #landing stage.
   const landingNav = page.locator('#landing nav[aria-label=Main]');
@@ -306,25 +327,45 @@ async function run(size, browser) {
       await page.locator('#editor').click();
       const prose = 'I walked to the station this morning and watched the sun rise over the roofs. The next train was late, so I had time to think about the letter I wanted to write. I am putting those thoughts on paper now, one sentence at a time. ';
       let typed = '';
+      // Characters typed while the room's clock still showed time remaining. Everything in this prefix
+      // must be in the finished draft.
+      let confirmed = 0;
       const started = Date.now();
-      while (Date.now() - started < 59000) {
-        ok(await page.locator('#editor').isVisible(), 'session finished before sixty seconds');
+      // The session starts at the first keystroke, not at page load, so a loop that counts from before
+      // the door was clicked runs past the deadline by however long the setup took, and then reads a
+      // finished draft as a lost character (measured 2026-11-09: one character short at 60.179 s, the
+      // draft kept and the editor hidden, which is the product behaving correctly). Reading the clock
+      // the writer reads removes that arithmetic, and with it the dependence on how long one keystroke
+      // takes on a busy machine.
+      while (await roomClock() > 1) {
+        ok(await page.locator('#editor').isVisible(), 'session finished before the clock reached zero');
+        ok(Date.now() - started < 90000, 'the session clock never reached zero');
         const char = prose[typed.length % prose.length];
         await page.keyboard.type(char, { delay: 90 });
         typed += char;
-        ok(await page.locator('#editor').inputValue() === typed, 'input lost or draft wiped during continuous typing');
+        // A keystroke can land after a deadline the room has not painted yet. That one is the session's
+        // last and may be dropped; every character typed while the clock still ran must be in the draft.
+        if (await roomClock() > 0) {
+          ok(await page.locator('#editor').inputValue() === typed, 'input lost or draft wiped during continuous typing');
+          confirmed = typed.length;
+        }
       }
       await page.locator('#kept').waitFor({ state: 'visible', timeout: 5000 });
       ok(Date.now() - started >= 60000, 'session finished before sixty seconds');
-      ok((await page.locator('#room-clock').innerText()).trim() === '0:00', 'clock did not reach zero');
-      ok(await page.locator('#kept-text').textContent() === typed, 'kept draft differs from typed text');
+      ok(await roomClock() === 0, 'clock did not reach zero');
+      // The kept draft is the typed stream: it invents nothing, and it holds every character typed while
+      // the room still had time on its clock.
+      const kept = await page.locator('#kept-text').textContent();
+      ok(confirmed > 0, 'no keystroke was confirmed before the deadline');
+      ok(kept.length <= typed.length, `kept ${kept.length} characters, more than the ${typed.length} typed`);
+      ok(kept.startsWith(typed.slice(0, confirmed)), `kept ${kept.length} characters, missing one of the first ${confirmed} typed`);
       ok(/^1 minute\. \d+ words?\.$/.test(await page.locator('#receipt').innerText()), 'kept receipt missing');
       ok(await page.getByRole('button', { name: 'Copy text', exact: true }).isVisible(), 'Copy text missing');
       await page.evaluate(() => navigator.clipboard.writeText('journey clipboard sentinel'));
       await page.locator('#copy').click();
       await page.getByRole('button', { name: 'Copied', exact: true }).waitFor({ state: 'visible' });
       const copied = await page.evaluate(() => navigator.clipboard.readText());
-      ok(copied === typed, 'clipboard differs from the finished draft');
+      ok(copied === kept, 'clipboard differs from the finished draft');
       const touch = await page.evaluate(() => matchMedia('(hover: none), (any-pointer: coarse)').matches);
       await page.locator('#exit').click();
       ok((await page.locator('#exit').innerText()).trim() === (touch ? 'Exit' : 'Esc to exit'), 'exit control missing');

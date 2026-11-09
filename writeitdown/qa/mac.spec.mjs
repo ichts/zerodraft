@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sweepTimeout } from './page-sweep.mjs';
 
 const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
 const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.1.dmg';
@@ -53,6 +54,8 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
 });
 
 test('every shipped link resolves and every fragment exists', async ({ page, request }, info) => {
+  // Thirteen pages and every link on them: the walk, not the harness's flat 30 s, owns the budget.
+  test.setTimeout(sweepTimeout(shipped.length));
   // Derived from the configured baseURL so the suite still holds its own origin when it runs on
   // another port; the default remains http://127.0.0.1:8015/writeitdown/.
   const base = new URL('/writeitdown/', info.project.use.baseURL);
@@ -460,6 +463,8 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
 // wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
 // solid tile without the split.
 test('the header lockup shows the A mark chip beside the wordmark', async ({ page }, info) => {
+  // Fourteen pages, each measured at its rendered header size: budget the walk (#146).
+  test.setTimeout(sweepTimeout(shellPages.length));
   for (const path of shellPages) {
     await page.goto(path);
     const brands = page.locator('.brand:visible');
@@ -494,6 +499,7 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
 // same lockup read as a chip on the landing and as a bare mark on the mac page. This reads the rendered
 // ::before background, so a page-level override or a reintroduced fallback chain fails here.
 test('the header chip paints one plate colour on every page', async ({ page }) => {
+  test.setTimeout(sweepTimeout(shellPages.length));
   const samples = [];
   for (const path of shellPages) {
     await page.goto(path);
@@ -535,8 +541,9 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
 // below owns the every-width fit.
 for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
   // Thirteen pages at three widths, each with a load, the fonts and a measurement: under parallel load
-  // this sweep timed out at the 30 s default budget while every assertion inside it held.
-  test.slow();
+  // this sweep timed out at the 30 s default budget while every assertion inside it held. The budget is
+  // the walk's page count, not a flat multiplier on the harness's ceiling (#146).
+  test.setTimeout(sweepTimeout(3 * shellPages.length));
   for (const width of [360, 375, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const lockups = [];
@@ -601,6 +608,7 @@ test('the header holds its gutter at every width from 320 to 1440 px', async ({ 
 });
 
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
+  test.setTimeout(sweepTimeout(shellPages.length));
   for (const path of shellPages) {
     await page.goto(path);
     const brands = page.locator('.brand:visible');
@@ -701,10 +709,10 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   await expect(second.locator('p')).toBeVisible();
   await second.locator('summary').click();
   await expect(second.locator('p')).toBeHidden();
-  const visible = await questions.evaluateAll(list => list.map(d => [d.querySelector('summary').textContent.trim(), d.querySelector('p').textContent.trim()]));
+  // The visible FAQ's word-for-word match against its `FAQPage` schema is `qa/seo.spec.mjs`'s: it walks every
+  // shipped page's JSON-LD in one place. This page test keeps the part that is about this page's markup - the
+  // question tree and the accordion's first item - and reads the schema only for the Mac facts below.
   const graph = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent())['@graph'];
-  const faq = graph.find(node => node['@type'] === 'FAQPage');
-  expect(faq.mainEntity.map(q => [q.name, q.acceptedAnswer.text]), 'the FAQ schema matches the visible FAQ').toEqual(visible);
   const app = graph.find(node => node['@type'] === 'SoftwareApplication');
   expect(app.offers).toEqual({ '@type': 'Offer', price: '4.99', priceCurrency: 'USD', availability: 'https://schema.org/PreOrder' });
   expect(app.operatingSystem).toBe('macOS 14 or later');
@@ -1062,6 +1070,8 @@ test('the download head breaks without an orphan and its checksum block reads', 
 });
 
 test('legal pages state the 3-session trial, the local counter and the opt-in updates', async ({ page }) => {
+  // Four pages read in one body.
+  test.setTimeout(sweepTimeout(4));
   await page.goto('privacy.html');
   const privacy = page.locator('#mac + p');
   await expect(privacy).toContainText('Your first 3 writing sessions are free.');

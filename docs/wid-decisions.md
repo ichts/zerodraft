@@ -2107,7 +2107,8 @@ is `docs/wid-world-table.md`.
 - Decision: while no Microsoft Store listing is live, `mac.html` carries no Windows sale, price,
   activation or download claim. The licence reads `one license covers 2 computers` and `One license
   works on two computers`, with no `Mac or Windows` clause; the price row reads `2 computers. No
-  subscription.`; the meta description stops at `for two computers`; and the Requirements section ends
+  subscription.`; the meta description drops the `Mac or Windows` clause and reads `... for two
+  computers. Free updates and a 14-day refund.`; and the Requirements section ends
   at macOS, with the Windows requirement and activation sentences deleted. `privacy.html` loses its
   `#windows` section whole (memory-only draft, the 3-session trial terms and the $4.99 price, Credential
   Manager entries and their removal, Stripe checkout, no update check of its own), and its

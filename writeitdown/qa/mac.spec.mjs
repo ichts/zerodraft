@@ -34,8 +34,9 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await expect(page.locator('#activate + p')).toContainText('One license works on two computers.');
   await expect(page.locator('#refund + p')).toContainText('the license stops working on every computer.');
   // The page sells only what ships: the Mac app. No Windows sale, price, activation or download claim,
-  // anywhere on the page or in its search description, until a Store listing is actually live (C3).
-  await expect(page.locator('main')).not.toContainText(/Windows/i);
+  // anywhere in the rendered page or in its search description, until a Store listing is actually live (C3).
+  await expect(page.locator('body')).not.toContainText(/Windows/i);
+  await expect(page.locator('meta[name="description"]')).toHaveCount(1);
   await expect(page.locator('meta[name="description"]')).not.toHaveAttribute('content', /Windows/i);
   await expect(page.locator('a[href*="windows" i], a[href*="microsoft" i]')).toHaveCount(0);
   await page.locator('.doc-buy a[href="index.html#trial"]').click();
@@ -1049,10 +1050,8 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await expect(updateNotice).toContainText('Check for Updates…');
 
   // Only the Mac app ships, so the Windows app block and its licence terms are gone (C3).
-  const privacyHeadings = await page.locator('main h2').allTextContents();
-  expect(privacyHeadings).not.toContain('Windows app');
   await expect(page.locator('#windows')).toHaveCount(0);
-  await expect(page.locator('main')).not.toContainText(/Windows/i);
+  await expect(page.locator('body')).not.toContainText(/Windows/i);
   // Checkout names Stripe, word for word, in the Mac app block.
   const stripeSentence = "Checkout uses Stripe's page under its privacy policy. Stripe shares your email address and order details with us for support and refunds; we do not receive your card details.";
   const macCheckout = page.locator('#mac ~ p').filter({ hasText: 'Downloading the app makes an ordinary request' });

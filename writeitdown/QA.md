@@ -802,3 +802,60 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
   corner count and the caption are untouched; the row adds no number). Q-29 pass (a new tab with
   `noopener`, so the link cannot throw the live draft away). Q-33 pass (the block still centres on the sheet
   axis). Q-36 pass (the new row, asserted by the new phase4 test).
+
+# 2026-11-09: The Mac purchase card states its facts once and neither control resizes (web, A3)
+
+`mac.html#buy` opened with a paragraph that gave the price, the two computers, the free updates and the
+14-day refund, and the price line's note gave the same four facts again, the Activate section a third
+time and the Refunds section a fourth. The paragraph is deleted with no replacement copy, the price row
+and its note are unchanged, `14-day` is written with a non-breaking hyphen in the note and in the meta
+description, `#buy-form button` and `#copy-license` take their widest label as a `min-width`, and the
+licence key panel loses its ring, fill and radius for one hairline above it. No checkout behaviour,
+price, Stripe call, key delivery, clipboard logic or Windows sentence changed.
+
+## Commands and results
+
+- `npx playwright test` (writeitdown suite, 8 projects, two full runs): the second run reported
+  1326 passed / 81 skipped and one failure, a 30 s test timeout in `qa/phase4.spec.mjs` "empty room
+  shows only the caret..." under the eight-project load; the same test on the same project passes 3/3
+  when run alone (3.5-4.6 s). The first run reported 1325 passed and two failures: the same class of
+  room-timing flake in `qa/history-fade.spec.mjs` (3/3 green alone) and a race in this change's own new
+  checkout test, which aborted the pending request and could read `Try again` before `Opening
+  checkout...`; it now hangs the request instead, and `qa/checkout.spec.mjs` across all eight projects
+  is 224 passed. No file this change touches is loaded by the room.
+- `npx playwright test qa/checkout.spec.mjs` on the pre-fix tree: the three new tests fail with the
+  measured numbers below (`known-broken-buy-card.txt` in `data/wid-design-a3-buy-card/`).
+- `node --test buy.test.mjs session.test.mjs`: 26 passed.
+- `node release-check.mjs`: STATIC CHECK PASSED.
+
+## Measured (`data/wid-design-a3-buy-card/`)
+
+| Surface | Measure | Before | After |
+| `#buy-form button` at 1440 and 390 | width in idle / pending / error | 183.9 / 191.2 / 114.3 px | 200 / 200 / 200 px |
+| `#copy-license` at 1440 and 390 | width in ready / copied | 167.7 / 99.8 px | 176 / 176 px |
+| `#buy .doc-note` | widest label as rendered (15 px) | `Opening checkout...` 191.2, `Copy license key` 167.7 | `min-width` 200 and 176 px, next 4 px step |
+| price-row note, `14-day` | line rects at 15 widths, 320 to 1440 | 2 rects at 480, 450 (`doc-note`) and at 600, 420 (deleted paragraph) | 1 rect at every width |
+| `.license-key` | border / background / radius | 1 px on all four sides, `--tag-bg`, 4 px | 1 px top only, transparent, 0 |
+| `#buy` | card height at 1440 / 390 | 348.1 / 501.9 px | 277.7 / 377.2 px |
+| `#buy` | height idle / error at 1440 and 390 | 277.7 / 298.5, 377.2 / 418.8 px | unchanged: the inline error still opens one line at 1440 and two at 390 |
+| `#buy .doc-actions` | top edge in idle / pending / error | 484.4 at 1440, 529.5 at 390 | unchanged, so the controls never move under the pointer |
+| whole page | horizontal overflow at 320 / 360 / 390 | 0 | 0 |
+
+## Captures
+
+`buy-{idle,pending,error,unavailable,ready,copied}-{1440,390}-{light,dark}.png` in
+`data/wid-design-a3-buy-card/before/` and `after/`, full page at real size.
+
+## UI quality checklist (`../docs/ui-quality.md`), the rows this change touches
+
+Q-06 pass (the rows above: the control row's top edge and the card's top edge are identical in all three
+buy states; the inline status legitimately opens its own line below the controls). Q-07 pass (one helper
+paragraph removed, nothing added). Q-08 pass (the Mac app's own purchase strings are untouched; the note
+keeps its exact words). Q-09 pass (every state captured in light and dark at both sizes). Q-13 pass (both
+controls stay real 48 px buttons with the 2 px ink ring). Q-14 pass (price, note, buttons and key all share
+the card's one content edge). Q-17 pass (no size, weight or leading changed; only the hyphen's character).
+Q-19 pass (no sideways scroll at 320, 360 or 390). Q-20 pass (no copy written; the deleted paragraph was a
+repeat and the 3-session fact stays in Activate and the meta description). Q-21 pass (one price string;
+one shell). Q-24 pass, and this is the row the work moves forward: a control that swaps its label keeps
+the width of its widest label, now asserted on the purchase surface by `qa/checkout.spec.mjs`. Q-28 pass
+(the refund window no longer breaks; the key still wraps whole at 320).

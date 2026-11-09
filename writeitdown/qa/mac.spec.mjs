@@ -18,8 +18,13 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} once`);
-  await expect(main).toContainText('Your first 3 writing sessions are free.');
-  await expect(main).toContainText('one license covers 2 computers for $4.99 once, with free updates and a 14-day refund.');
+  // The card states its facts once (A3): the price line and the note under it. The paragraph that
+  // repeated the price, the 2 computers, the free updates and the refund is gone, and so are its
+  // twin echoes in Activate and Refunds - but the 3 free sessions stay, where they now live.
+  await expect(page.locator('#buy-heading + #price-row'), 'the price line follows the heading').toHaveCount(1);
+  await expect(main).not.toContainText('one license covers 2 computers');
+  await expect(page.locator('#price-row .doc-note')).toHaveText('2 computers. No subscription. Free updates. 14\u2011day refund.');
+  await expect(page.locator('#activate + p')).toContainText('3 free sessions');
   await expect(main).not.toContainText(/buying opens soon|not open yet|coming soon/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
   await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('method', 'post');

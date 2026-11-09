@@ -258,3 +258,88 @@ test('a checkout retry announces Opening checkout as status, not alert', async (
   await expect(status).toHaveAttribute('role', 'alert');
   expect(calls).toBe(2);
 });
+
+// A control whose label changes must not change size: a purchase surface that reflows under the
+// pointer reads as a different control, and the reader loses the button they were aiming at.
+// Measured, not assumed: each control's widest label is rendered in place, and every state must
+// match it, so the assertion fails on today's 183.9 / 191.2 / 114.3 px buy button and 167.7 / 99.8 px
+// copy button.
+async function naturalWidths(page, selector, labels) {
+  return page.evaluate(([selector, labels]) => labels.map(text => {
+    const source = document.querySelector(selector);
+    const clone = source.cloneNode(false);
+    clone.textContent = text;
+    clone.style.cssText += ';position:absolute;left:-9999px;top:0;visibility:hidden;min-width:0;width:auto';
+    source.parentElement.append(clone);
+    const width = clone.getBoundingClientRect().width;
+    clone.remove();
+    return { text, width: +width.toFixed(1) };
+  }), [selector, labels]);
+}
+
+const widthOf = (page, selector) => page.locator(selector).evaluate(el => +el.getBoundingClientRect().width.toFixed(1));
+
+test('the buy control keeps one width in idle, pending and error', async ({ page }) => {
+  // The first click is refused, so the label becomes `Try again`; the second hangs on the wire, so the
+  // pending label stays on screen long enough to measure. An aborted request would fail in a frame and
+  // the label would already be back to `Try again` when the assertion reads it.
+  let fail = true;
+  await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
+  await page.goto('mac.html');
+  const buy = page.locator('#buy-form button');
+  await expect(buy).toHaveText('Buy for $4.99 once');
+  const idle = await widthOf(page, '#buy-form button');
+  await buy.click();
+  await expect(buy).toHaveText('Try again');
+  const error = await widthOf(page, '#buy-form button');
+  fail = false;
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  const pending = await widthOf(page, '#buy-form button');
+  const labels = await naturalWidths(page, '#buy-form button', ['Buy for $4.99 once', 'Opening checkout...', 'Try again']);
+  const widest = Math.max(...labels.map(label => label.width));
+  expect(idle, `idle buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(pending, `pending buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(idle, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
+});
+
+test('the copy control keeps one width in ready and copied', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route(`${service}/license?session_id=cs_test_copy_width`, route => route.fulfill({ json: { licenseKey: key } }));
+  await page.goto('mac.html?session_id=cs_test_copy_width');
+  const copy = page.getByRole('button', { name: 'Copy license key', exact: true });
+  await expect(copy).toBeVisible();
+  const ready = await widthOf(page, '#copy-license');
+  await copy.click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  const copied = await widthOf(page, '#copy-license');
+  const labels = await naturalWidths(page, '#copy-license', ['Copy license key', 'Copied']);
+  const widest = Math.max(...labels.map(label => label.width));
+  expect(copied, `copied width against ${JSON.stringify(labels)}`).toBe(ready);
+  expect(ready, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
+});
+
+// A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
+// refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
+// every width, including the 480 px band where the current note wraps onto a second line.
+test('the refund window keeps its number and unit on one line', async ({ page }) => {
+  await page.goto('mac.html');
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute('content', /14\u2011day refund/);
+  for (const width of [1440, 480, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const rects = await page.evaluate(() => {
+      const note = document.querySelector('#price-row .doc-note');
+      const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.nodeValue.indexOf('14\u2011day');
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 6);
+        return [...range.getClientRects()].filter(rect => rect.width > 0).length;
+      }
+      return 0;
+    });
+    expect(rects, `the refund window splits at ${width}px`).toBe(1);
+  }
+});

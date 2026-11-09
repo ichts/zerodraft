@@ -102,15 +102,22 @@ for (const width of [1440, 700, 360]) {
   });
 }
 
-test('nested radius r = R - p on the license card of the Mac page', async ({ page }) => {
+// The key belongs to the licence card (A3): one hairline above it, and no ring, fill or radius of its
+// own. The nested panel was a fourth box on a surface that needs one.
+test('the licence key is a line in the card, not a card inside it', async ({ page }) => {
   await page.goto('mac.html');
   await page.evaluate(() => {
     document.querySelector('#license-delivery').hidden = false;
     document.querySelector('#license-result').hidden = false;
   });
-  const [row] = await measureNested(page, [nested('#license-delivery', '.license-key')]);
-  expect(row.R).toBe(24);
-  expect(row.r, `license card (R ${row.R}, p ${row.p})`).toBe(Math.max(4, row.R - row.p));
+  const box = await page.locator('.license-key').evaluate(el => {
+    const style = getComputedStyle(el);
+    return { top: style.borderTopWidth, right: style.borderRightWidth, bottom: style.borderBottomWidth,
+      left: style.borderLeftWidth, style: style.borderTopStyle, radius: style.borderTopLeftRadius,
+      background: style.backgroundColor };
+  });
+  expect(box, 'one hairline on top, nothing on the other three sides').toEqual({
+    top: '1px', right: '0px', bottom: '0px', left: '0px', style: 'solid', radius: '0px', background: 'rgba(0, 0, 0, 0)' });
 });
 
 test('numbers that update or sit in a column keep their width', async ({ page }) => {

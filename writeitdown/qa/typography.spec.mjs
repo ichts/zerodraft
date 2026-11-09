@@ -124,6 +124,12 @@ test('the site serves its own faces and never asks another host for one', async 
 
 test('chinese in the room draws in the Mac room\'s fangsong', async ({ page }) => {
   await page.goto('index.html#trial');
+  // D-109: the room fixes its Chinese face at a draft's first Chinese character - Zhuque if the file is already
+  // resident, the platform serif if it is not - and never revisits it until the sheet is empty again. This measures the face the room draws
+  // with on the normal path, where a trial link the visitor touched has prefetched the file, so it waits for the face
+  // itself rather than for `document.fonts.check()`, which reports true while the file is still only loading.
+  await page.waitForFunction(() => [...document.fonts]
+    .some(face => face.family.includes('Zhuque') && face.status === 'loaded'), null, { timeout: 30_000 });
   await page.click('#editor');
   const text = '我写中文草稿';
   await page.keyboard.insertText(text);

@@ -42,6 +42,9 @@
      Chinese face is named in exactly one place. */
   --cjk:'Zhuque Fangsong';
   --serif:'Newsreader',var(--cjk),Georgia,'Times New Roman',serif;
+  /* the stack the room freezes to when its first Chinese character finds the Chinese face not yet resident (D-109):
+     `serif` sits before the Latin tail so Chinese resolves to the platform's serif, not to its sans */
+  --serif-platform:'Newsreader',serif,Georgia,'Times New Roman',serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
   --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
   /* writing size and placement for the web room: 28pt, active line at 35% of the sheet (the Mac's D-025

@@ -48,7 +48,7 @@ InputAt(t) == /\ Live /\ t \in Times /\ t >= now
                            /\ used' = IF surface = "Mac" /\ credential = "fresh" /\ Access THEN used + 1 ELSE used
                            /\ charged' = FALSE
                            /\ receipt' = Max0(Finish - Wipe)
-                           /\ UNCHANGED <<started, last>>
+                           /\ started' = t /\ last' = t
               /\ armed' = -1 /\ hint' = IF Decision(t) = "live" THEN hint ELSE FALSE
               /\ UNCHANGED <<surface, credential, hintCount>>
 TickAt(t) == /\ Live /\ t \in Times /\ t >= now
@@ -99,7 +99,8 @@ NoLateRescue == event = "input" /\ expected = "wipe" => "old" \notin text
 DeadlineBeforeInput == event = "input" /\ expected = "keep" => phase = "kept"
 EarlierDeadlineWins == event = "tick" /\ expected = "keep" => phase = "kept"
 TieAndSilenceDelete == event = "tick" /\ expected = "wipe" => phase = "wiped" /\ text = {}
-DeadlineReceipt == event \in {"tick", "input"} /\ expected = "wipe" => receipt = Max0(Finish-Wipe)
+DeadlineReceipt == event = "tick" /\ expected = "wipe" => receipt = Max0(Finish-Wipe)
+FreshClockStartsAtKey == event = "input" /\ expected = "wipe" => started = now /\ last = now
 OnlyAuthorizedEntry == phase \in {"empty", "writing", "warn"} /\ surface = "Mac" =>
                         credential = "valid" \/ (credential = "fresh" /\ (used < 3 \/ charged))
 TrialBound == used <= 3

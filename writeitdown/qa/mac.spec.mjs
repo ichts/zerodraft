@@ -37,8 +37,7 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   // anywhere on the page or in its search description, until a Store listing is actually live (C3).
   await expect(page.locator('main')).not.toContainText(/Windows/i);
   await expect(page.locator('meta[name="description"]')).not.toHaveAttribute('content', /Windows/i);
-  await expect(page.locator('main a[href*="windows" i], main a[href*="microsoft" i]')).toHaveCount(0);
-  expect(await page.content()).not.toMatch(/apps\.microsoft|microsoft\.com\/store/i);
+  await expect(page.locator('a[href*="windows" i], a[href*="microsoft" i]')).toHaveCount(0);
   await page.locator('.doc-buy a[href="index.html#trial"]').click();
   await expect(page.locator('#editor')).toBeFocused();
   await page.goto('mac.html');

@@ -606,11 +606,12 @@ window.FirstLineLandingDemo = (() => {
   // wash steps one step deeper for the cut beat and exits on the snap, the
   // machine report states the cost, the clock rearms to 1:00.
   function demoWipe() {
-    const remaining = Math.max(0, SESSION_SECONDS - Math.floor(demoElapsedMs() / 1000));
+    const wipeDeadlineMs = demoElapsedMs() - Math.max(0, demoPhaseMs() - WIPE_SECONDS * 1000);
+    const unused = Math.max(0, Math.ceil((SESSION_SECONDS * 1000 - wipeDeadlineMs) / 1000));
     emit("fldanger", { dangerSeconds: 0, dangerActive: false });
     emit("flwipe");
     renderDemoText("");
-    setDemoReport("Draft wiped - " + fmtClock(remaining) + " unused.");
+    setDemoReport("Draft wiped - " + fmtClock(unused) + " unused.");
     setDemoClock(fmtClock(SESSION_SECONDS));
     demoSetPhase("report");
     // The demo clock shows the rearmed 1:00 through the report: freeze the

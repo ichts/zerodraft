@@ -25,7 +25,7 @@ files = {
 fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/reenie-beanie.woff2',
          'fonts/newsreader-latin.woff2', 'fonts/newsreader-latin-italic.woff2',
          'fonts/OFL-Newsreader.txt', 'fonts/OFL-ZhuqueFangsong.txt', 'fonts/OFL-ReenieBeanie.txt'}
-fonts |= {f'fonts/zhuque-fangsong-{index:02d}.woff2' for index in range(1, 14)}
+fonts |= {'fonts/zhuque-fangsong-gb2312.woff2'}
 files |= fonts
 # Host files a page may link that no deploy bundle contains: the archived 1.0 disk image lives in
 # download/releases/ on the host, outside the installed set (README, "The 1.0 archive").

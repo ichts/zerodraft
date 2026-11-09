@@ -9,7 +9,7 @@
    the same roles in Chinese, Reenie Beanie is the landing's hand accent alone, and everything the tool says - labels,
    nav, buttons, clock, count, captions, receipts, quiet links - is the system sans. No monospace face carries text.
    Every face is served from this site: fonts.css declares them (fonts/build-fonts.py generates it), fonts-cjk.css
-   holds the Chinese slices and is linked by index.html alone. Dark keeps the same names. */
+   holds the Chinese face as one file and is linked by index.html alone. Dark keeps the same names. */
 :root{--page:#f7f7f5;--stage-a:var(--page);--stage-b:var(--page);--brand-plate:#ffffff}
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */

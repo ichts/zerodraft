@@ -239,7 +239,7 @@ check '/llms.txt' "$STABLE" 200 'text/plain'
 check '/favicon.svg' "$STABLE" 200 'image/svg+xml'
 check '/og.png' "$STABLE" 200 'image/png'
 check '/fonts/newsreader-latin.woff2' "$STABLE" 200 'font/woff2'
-check '/fonts/zhuque-fangsong-01.woff2' "$STABLE" 200 'font/woff2'
+check '/fonts/zhuque-fangsong-gb2312.woff2' "$STABLE" 200 'font/woff2'
 check '/fonts/OFL-Newsreader.txt' "$STABLE" 200 'text/plain'
 # The DMG name carries the marketing version only, so a rebuild inside one version reuses the URL.
 check '/download/Write-It-Down-1.1.dmg' "$STABLE" 200 'application/x-apple-diskimage'

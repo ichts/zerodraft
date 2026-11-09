@@ -808,7 +808,7 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
 `mac.html#buy` opened with a paragraph that gave the price, the two computers, the free updates and the
 14-day refund, and the price line's note gave the same four facts again, the Activate section a third
 time and the Refunds section a fourth. The paragraph is deleted with no replacement copy, the price row
-and its note are unchanged, `14-day` is written with a non-breaking hyphen in the note while the meta
+and the note's words are unchanged, the note's `14-day` takes a non-breaking hyphen while the meta
 description keeps its plain hyphen, `#buy-form button` and `#copy-license` take the width of their
 widest label measured in the face the device renders (`buy.js` writes `--copy-floor`, the floor
 `room.js` already gives the kept pill's copy control), and the licence key panel loses its ring, fill
@@ -871,14 +871,16 @@ the default face and under a deliberately wider one. Q-28 pass
 
 The independent review of this batch's captures found the one thing this pass had recorded as "not
 changed" and was wrong about: on a phone the row stacks, and the measured floor left the ghost at
-182.2 px under a 192 px primary, where the pre-A3 page had them 1.7 px apart. Equal widths now come
-from the primary's own measured floor, so the ghost carries no second number: `buy.js` writes the
-same `--copy-floor` on the row, and the phone step in `site.css` gives `.home #buy
+182.2 px under a 192 px primary, where the pre-A3 page had them 1.7 px apart. The width lock itself
+created that ragged pair, so closing it is basic polish rather than a new visual choice: equal widths
+now come from the primary's own measured floor, so the ghost carries no second number: `buy.js`
+writes the same `--copy-floor` on the row, and the phone step in `site.css` gives `.home #buy
 .doc-actions>.btn-ghost` that `min-width`. The ghost keeps its own surface (`rgb(255,255,255)` light,
-the sheet fill in dark) and its 600 weight, so it still reads as the secondary action; side by side at
-1440 px it keeps its natural 182.2 px. `qa/checkout.spec.mjs` "the stacked buy row keeps one width and
-stays secondary" fails on the pre-fix tree (Expected 192, Received 182.2) at 390 and 320, asserts the
-row is stacked there, and pins that the ghost keeps a different fill and the same weight and family.
+the sheet fill in dark) and the 500 weight `.home .btn` gives both controls, so it still reads as the
+secondary action; side by side at 1440 px it keeps its natural 182.2 px. `qa/checkout.spec.mjs` "the
+stacked buy row keeps one width and stays secondary" fails on the pre-fix tree (Expected 192, Received
+182.2) at 390 and 320, asserts the row is stacked there, and pins that the ghost keeps a different fill
+and the same weight and family.
 `after/buy-idle-390-light.png`, `after/buy-idle-390-dark.png` and `after/buy-error-390-light.png`
 were re-shot; the other captures still describe the shipped layout. Two filled primaries in the ready
 state, the 44 vs 48 px button heights, the duplicated `Opening checkout...` line and the 390 px error

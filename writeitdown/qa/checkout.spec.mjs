@@ -262,8 +262,8 @@ test('a checkout retry announces Opening checkout as status, not alert', async (
 // A control whose label changes must not change size: a purchase surface that reflows under the
 // pointer reads as a different control, and the reader loses the button they were aiming at.
 // Measured, not assumed: each control's widest label is rendered in place, and every state must
-// match it, so the assertion fails on today's 183.9 / 191.2 / 114.3 px buy button and 167.7 / 99.8 px
-// copy button.
+// match it, so the assertion fails on the pre-change 183.9 / 191.2 / 114.3 px buy button and
+// 167.7 / 99.8 px copy button.
 async function naturalWidths(page, selector, labels) {
   return page.evaluate(([selector, labels]) => labels.map(text => {
     const source = document.querySelector(selector);
@@ -363,9 +363,10 @@ test('both controls keep their one width on a wider default sans', async ({ page
 });
 
 // On a phone the buy row stacks, so the two controls sit one under the other and any width difference
-// reads as a near-miss rather than a hierarchy: before the phone rule the ghost stayed 182 px beside a
-// 200 px primary. Stacked, the ghost takes the primary's measured floor and stays secondary by its own
-// surface and colour, not by being narrower; side by side at desktop width it keeps its natural width.
+// reads as a near-miss rather than a hierarchy: the width lock left the ghost 182.2 px beside the
+// 192 px primary, 1.7 px from what the pre-change page had. Stacked, the ghost takes the primary's
+// measured floor and stays secondary by its own surface and colour, not by being narrower; side by
+// side at desktop width it keeps its natural width.
 test('the stacked buy row keeps one width and stays secondary', async ({ page }) => {
   await page.goto('mac.html');
   for (const width of [390, 320]) {

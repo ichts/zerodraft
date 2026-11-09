@@ -77,6 +77,9 @@ test('a fresh draft announces the receipt for the deadline that fired', async ({
   await expect(page.locator(editor)).toHaveText('n');
   await expect(page.locator('.sr-only')).toHaveText('Draft wiped - 0:44 unused.');
   await expect(page.locator('.trial-report')).toBeHidden();
+  // The fresh draft's clock starts at the key, so the next tick still reads 1:00.
+  await page.clock.runFor(100);
+  await expect(page.locator('.trial-timer')).toHaveText('1:00');
 });
 
 test('a key after 0:00 cannot append to the kept draft', async ({ page }) => {

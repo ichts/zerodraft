@@ -69,6 +69,7 @@ if (surface === 'root' || surface === 'all') {
         const report = wipeReportFor(last);
         check('root.input.noLateRescue', root.state.text === ' new', { ...detail, actualText: root.state.text });
         check('root.input.receiptDeadline', root.state.srStatus === report && root.state.wipeReport === '', { ...detail, expectedReport: report, actualSr: root.state.srStatus, actualReport: root.state.wipeReport });
+        check('root.input.freshClock', root.state.startedAt === time && root.state.lastInputAt === time, { ...detail, expectedStart: time, actualStart: root.state.startedAt, actualLast: root.state.lastInputAt });
       }
       if (expected === 'kept') check('root.input.deadlineBeforeAppend', root.state.complete && root.state.resultText === before.text, { ...detail, actualText: root.state.text, complete: root.state.complete });
       if (expected === 'typing' || expected === 'warn') check('root.input.liveAppend', root.state.text === before.text + ' new' && !root.state.failed && !root.state.complete, detail);
@@ -80,6 +81,7 @@ if (surface === 'root' || surface === 'all') {
         root.input(before.text.slice(0, -1) + '日本', time, '日本');
         check('root.input.noLateRescue', root.state.text === '日本', { ...detail, shape: 'composition', actualText: root.state.text });
         check('root.input.receiptDeadline', root.state.srStatus === wipeReportFor(last), { ...detail, shape: 'composition', expectedReport: wipeReportFor(last), actualSr: root.state.srStatus });
+        check('root.input.freshClock', root.state.startedAt === time && root.state.lastInputAt === time, { ...detail, shape: 'composition', expectedStart: time, actualStart: root.state.startedAt, actualLast: root.state.lastInputAt });
       }
     }
   }

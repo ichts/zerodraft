@@ -966,3 +966,128 @@ list, the computed borders and backgrounds, and the page height for each capture
   or clipping; the new hairline takes no width from either string.
 - Design rulebook 14.4 d pass: 3 card-in-card panels before, 0 after, asserted by
   `qa/mac.spec.mjs` (`nestedPanels`) and `qa/shape-text.spec.mjs`.
+
+# 2026-11-09: The room's Chinese is one blocking face (D-108)
+
+The captain typed Chinese in `https://writeitdown.app/#trial` and watched characters change shape after
+they were already on screen. The cause was the face pipeline, not the input path: 13 GB2312 slices
+declared `font-display:swap`, so any character whose slice was not resident was painted by the platform
+serif and repainted in Zhuque when the slice landed. `fonts-cjk.css` now declares that face once with
+`font-display:block`, `room.js` asks for it while the door opens, and the composing span still carries
+no face of its own.
+
+## Commands and results
+
+- The specs this change touches, all eight projects: `npx playwright test qa/chinese-face.spec.mjs
+  qa/typography.spec.mjs qa/door-grow.spec.mjs qa/door-instant.spec.mjs` -> 112 passed, 0 failed. The
+  new file is `qa/chinese-face.spec.mjs`, four tests.
+- `cd writeitdown && npm test`, the full site suite, was run twice on this box and is not the gate for
+  this change (fast tier). Run one reached 1,382 passed and one failure (`qa/door-grow.spec.mjs`, a 7 px
+  frame-to-frame shrink at 390 px while the box sat at load average 90; that spec then passed 48/48 in
+  isolation on this branch and on its parent). Run two reached 1,371 passed and one failure
+  (`qa/shell.spec.mjs`, the purchase-price test timing out at 31 s, which this change does not touch)
+  when it was stopped under the fast-tier instruction.
+- `python3 qa/test-install.py` -> `PASS: 51 exact production files, preserved backup, repeat
+  installation, rejected symlinks.` The installed set now carries `fonts/zhuque-fangsong-gb2312.woff2`
+  and no slice.
+- `npm run cache-headers` -> `all 32 assertions match the policy in README.md`, including the new single
+  face at `no-cache` with an ETag.
+- `npm test` at the repository root -> 22 passed. The root landing links no CJK stylesheet (D-057) and
+  is untouched by this change; the run is here because the writeitdown README and decision log are part
+  of the same change.
+- Measurement rig, outside the repository: a Chrome 157 screencast (`Page.startScreencast`, 20 fps) plus
+  an injected probe recording `document.fonts` loading, `loadingdone` and per-frame ink spans, in a
+  macOS 26.6 VM driving the built-in Pinyin input with synthetic hardware keys. Sources and the raw
+  frames are in `data/wid-ime-font-swap/` (`cdp.mjs`, `probe.js`, `analyze.py`).
+
+## Measured (the live site, before)
+
+`wo jintian kaishi xiezuo`, Space commits, seven new Chinese characters. Five changed face after being
+drawn; the two whose slice was already resident did not.
+
+| character | painted | face it used | slice | slice status at paint | slice landed | repainted |
+|---|---|---|---|---|---|---|
+| 我 | 14.421 s | platform serif | `-08` | `loading` | 14.610 s | 14.682 s, 439 px |
+| 今 | 18.103 s | platform serif | `-04` | `loading` | 18.229 s | 18.265 s, 700 px |
+| 天 | 18.103 s | platform serif | `-07` | `loading` | 18.229 s | 18.265 s |
+| 始 | 21.440 s | Zhuque | `-07` | `loaded` | already resident | none |
+| 开 | 21.440 s | platform serif | `-05` | `loading` | 21.510 s | 21.499 s, 1,922 px + 21.549 s, 744 px |
+| 作 | 24.785 s | platform serif | `-09` | `loading` | 24.847 s | 24.832 s, 2,532 px + 24.932 s, 935 px |
+| 写 | 24.785 s | Zhuque | `-08` | `loaded` | already resident | none |
+
+The lag between the keystroke that commits a character and its repaint is 60-360 ms, and a repaint is
+not one frame: 开 and 作 repainted twice, 35-45 ms apart, because two slices arrived in sequence.
+
+## Measured (after)
+
+Same VM, same Pinyin input, same sentence, the built room served from a local origin: seven new Chinese
+characters, 0 changed face, 0 font requests during the draft. The face request opens when the door
+opens (167 ms after the click, 1,726 ms to a complete 2,589,548 B face on the VM's link) instead of
+waiting for the first character that needs it.
+
+`evidence/chinese-face-before-after.png` is the same character at the two moments, both builds, four
+panels: 我 in the platform serif and then in Zhuque (before), 我 in Zhuque at both moments (after).
+
+## Why one blocking file, with the numbers
+
+| arrangement | bytes | requests | behaviour on a cold cache |
+|---|---|---|---|
+| 13 slices, preloaded or warmed after first paint | 2,726,540 | 13 | still wrong: a slice that lands mid-draft repaints the characters already drawn in it. Preloading all 13 defers 2.7 MB to the room's first seconds, which is the same bytes but a heavier start. |
+| one slice set, `font-display:swap` | 2,589,548 | 1 | no invisible window, but a guaranteed fallback repaint on a cold cache: the reported bug, reproduced. |
+| **one file, `font-display:block`, asked for at the door (taken)** | **2,589,548** | **1** | a glyph is either not drawn yet or drawn in the face the room means; on the measured link the face is resident 1.7 s after the click, before a writer can type. |
+
+One file is also 136,992 B smaller than the 13 slices, because the table overhead is paid once.
+
+## Known-broken proofs for the new gates
+
+The same spec run against the sliced arrangement (`git checkout <parent> -- writeitdown`, spec copied
+in) fails three of its four tests:
+
+- `the Chinese face is one file that blocks instead of swapping`: `Expected length: 1, Received length:
+  13`.
+- `the room asks for the face when its door opens, before any character needs it`: `Expected: 1,
+  Received: 0`, after a 5 s poll: no face is requested while the room is open and empty.
+- `a drawn character is never repainted in another face`: fails at the frame taken while the face is
+  held open, because the character was already drawn in the platform face.
+
+The fourth test, `composition text carries no face of its own`, passes on both: it is a guard against a
+future regression, and the composing span was never the cause.
+
+## Captures
+
+All in `data/wid-ime-font-swap/evidence/`, all captured in a disposable macOS 26.6 VM (`tart`), which is
+deleted afterwards:
+
+- `chrome-before/`: 800 screencast frames (40 s) of the live site with `frames.json` and `probe.json`.
+- `chrome-after/`: 687 frames of the built room, same typing.
+- `videos/before-slowmo.mp4`, `videos/after-slowmo.mp4`: the writing line, 2x slow motion, Chinese
+  labels naming each moment, the red box marking the line while it is being repainted.
+- `chinese-face-before-after.png`: the four-panel still described above.
+- `safari-before.mov`, `safari-after.mov`, `safari-before-cold.mov`: Safari, same VM, same input.
+
+## Not reproduced, and limits
+
+- Safari on the same VM did not show the swap: with a cold cache the first committed 我 was drawn once
+  in Zhuque and never repainted (frames 88, 100, 170 and 190 of `safari-before-cold.mov` are the same
+  glyph, same advance). WebKit appears to hold the glyph until the face is ready rather than painting a
+  fallback first, so Safari's evidence here is "no visible change after the fix", not a before/after.
+- `font-display:block` has a bounded invisible window (Chrome: ~3 s). The warm request measured 167 ms
+  to start and 1,726 ms to finish on the VM's link, so a writer normally never sees it; on a link slower
+  than about 0.9 MB/s a character typed in the first second could stay invisible until the window ends,
+  then appear in the platform face and change once when the file lands. Still one change on a slow link,
+  never a change on a normal one.
+- Characters outside GB2312 still fall back to the platform face. That is unchanged by this decision and
+  was true of the slices too.
+- The room still cannot be tested against a real iOS keyboard from this repository; the VM drives the
+  built-in macOS Pinyin input, which is the input path the captain used.
+
+## Quality checklist rows this change touches
+
+- Q-07 pass: no label, helper line or caption is added; the room's copy is untouched.
+- Q-09 pass: the face, the sheet and the room are unchanged in light and dark; the eight-project suite
+  covers both.
+- Q-21 pass: no token value changes; the only edit in `tokens.css` is the sentence that says how the
+  Chinese face is delivered.
+- Q-23 pass: `qa/typography.spec.mjs` still passes on all eight projects, including the shared advances
+  from `qa/shared-type-baseline.json` (the GB2312 glyph advances are the same face, so nothing moved).
+- Q-14 pass: no geometry change; the room's measure, anchor and line height are untouched.

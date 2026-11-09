@@ -152,7 +152,9 @@ Reduced motion removes ramps, never information. Warn still lands at 5.0s - red,
 
 The timing contract is 5s warn, 8s wipe, 60s session, 100ms tick. It does not bend.
 
-Session end adjudication is explicit: the 60s deadline and the 8s wipe line race as absolute deadlines on the same tick, and whichever comes first wins. A pause at 0:54 warns at 0:59, but the wipe line (1:02) is never reached - the 1:00 deadline lands first and the draft is KEPT. A pause at 0:52 reaches the wipe line at exactly 1:00 - a tie, and the tie goes to the wipe: eight seconds of silence means eight seconds. A catch-up tick after background-tab throttling can land past both deadlines at once; the same comparison honors whichever occurred first.
+Session end adjudication is explicit: the 60s deadline and the 8s wipe line race as absolute deadlines in one comparison, and whichever comes first wins. A pause at 0:54 warns at 0:59, but the wipe line (1:02) is never reached - the 1:00 deadline lands first and the draft is KEPT. A pause at 0:52 reaches the wipe line at exactly 1:00 - a tie, and the tie goes to the wipe: eight seconds of silence means eight seconds. A catch-up tick after background-tab throttling can land past both deadlines at once; the same comparison honors whichever occurred first.
+
+The same comparison judges every key at the key's own instant, not only on the next tick. A key that lands after the wipe line starts a FRESH draft: the expired text is gone, the cut fires, and the room shows only what that key inserted (the wipe report is announced to the screen reader, not drawn, because the room is live again in the same keystroke). A key that lands after 0:00 is dropped and the draft is kept exactly as it stood. The receipt names the deadline that fired, so a throttled catch-up tick prints the same unused time as an on-time one.
 
 Three things in plain words:
 
@@ -208,7 +210,7 @@ The test: if a frame would hang comfortably in any of these rooms, keep deleting
 - Desktop 1440x900 and phone 390x844: landing at rest, demo typing/warn/wipe/report, trial at rest, typing, warn, recovery, wipe aftermath, kept, COPIED state, ESC and EXIT outcomes; `scrollWidth` equals viewport; no console errors.
 - Forward-only: Backspace/Delete/Cmd+Z/X/A, paste, cut, drop, selection-replace all blocked with the deny body; IME composes and counts as activity.
 - Demo: loop timing is exact (warn at 5.0s of silence, wipe at 8.0s, report 2s, rearm); pauses offscreen and when hidden; static under reduced motion.
-- Timing: warn at 5.0s, wipe at 8.0s, kept at 60s; the 54s-pause adjudication keeps the draft; the tie goes to the wipe.
+- Timing: warn at 5.0s, wipe at 8.0s, kept at 60s; the 54s-pause adjudication keeps the draft; the tie goes to the wipe; a key after the wipe line starts a fresh draft and a key after 0:00 is dropped; a throttled tick's receipt still names the deadline.
 - Danger is felt in a full-page screenshot without reading any text.
 - `grep` for U+2014 and U+2013 returns nothing.
 - Focus ring (1px ink, 3px offset) on every interactive element; the numeral is announced via `aria-live`.

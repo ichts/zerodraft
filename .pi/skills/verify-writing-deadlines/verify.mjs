@@ -40,6 +40,10 @@ function times(last) {
 
 if (surface === 'root' || surface === 'all') {
   const root = rootAdapter(fs.readFileSync(path.join(repo, 'index.html'), 'utf8'));
+  function wipeReportFor(lastInputAt) {
+    const unused = Math.max(0, Math.ceil((origin + duration - lastInputAt - silence) / 1000));
+    return `Draft wiped - ${Math.floor(unused / 60)}:${String(unused % 60).padStart(2, '0')} unused.`;
+  }
   for (let second = 0; second < 60; second++) {
     const last = origin + second * 1000;
     root.reset();
@@ -56,13 +60,16 @@ if (surface === 'root' || surface === 'all') {
       const actual = root.state.failed ? 'wipe' : root.state.complete ? 'kept' : root.state.dangerActive ? 'warn' : 'typing';
       check('root.tick.earliestDeadline', actual === expected, { ...detail, actual });
       if (expected === 'wipe') {
-        const unused = Math.max(0, Math.ceil((origin + duration - last - silence) / 1000));
-        const report = `Draft wiped - ${Math.floor(unused / 60)}:${String(unused % 60).padStart(2, '0')} unused.`;
+        const report = wipeReportFor(last);
         check('root.receipt.deadlineNotCallback', root.state.wipeReport === report, { ...detail, expectedReport: report, actual: root.state.wipeReport });
       }
       root.restore(before);
       root.input(before.text + ' new', time, ' new');
-      if (expected === 'wipe') check('root.input.noLateRescue', root.state.text === ' new', { ...detail, actualText: root.state.text });
+      if (expected === 'wipe') {
+        const report = wipeReportFor(last);
+        check('root.input.noLateRescue', root.state.text === ' new', { ...detail, actualText: root.state.text });
+        check('root.input.receiptDeadline', root.state.srStatus === report && root.state.wipeReport === '', { ...detail, expectedReport: report, actualSr: root.state.srStatus, actualReport: root.state.wipeReport });
+      }
       if (expected === 'kept') check('root.input.deadlineBeforeAppend', root.state.complete && root.state.resultText === before.text, { ...detail, actualText: root.state.text, complete: root.state.complete });
       if (expected === 'typing' || expected === 'warn') check('root.input.liveAppend', root.state.text === before.text + ' new' && !root.state.failed && !root.state.complete, detail);
       // An IME commit replaces the marked text the model already holds, so the
@@ -72,6 +79,7 @@ if (surface === 'root' || surface === 'all') {
         root.restore(before);
         root.input(before.text.slice(0, -1) + '日本', time, '日本');
         check('root.input.noLateRescue', root.state.text === '日本', { ...detail, shape: 'composition', actualText: root.state.text });
+        check('root.input.receiptDeadline', root.state.srStatus === wipeReportFor(last), { ...detail, shape: 'composition', expectedReport: wipeReportFor(last), actualSr: root.state.srStatus });
       }
     }
   }

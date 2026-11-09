@@ -26,13 +26,14 @@ Every rule below is a permanent assertion. A failure is a real product bug, not 
 | Rule | What must hold | Failure this rule caught |
 |---|---|---|
 | `root.tick.earliestDeadline` | the tick applies the earlier absolute deadline | mutation proof below |
-| `root.receipt.deadlineNotCallback` | the receipt reports `0:00` minus the wipe deadline | at `fa63af1` a 9 s catch-up tick printed `Draft wiped - 0:51 unused.` instead of `0:52` |
+| `root.receipt.deadlineNotCallback` | the receipt reports `0:00` minus the wipe deadline, on the tick path and on the fresh-draft path | at `fa63af1` a 9 s catch-up tick printed `Draft wiped - 0:51 unused.` instead of `0:52` |
 | `root.input.noLateRescue` | a key or composition commit after the wipe line starts a fresh draft holding exactly the text that event inserted | at `fa63af1` a key at 8.1 s left the editor holding `oldn` |
+| `root.input.receiptDeadline` | a fresh draft announces the receipt for the deadline that fired, and the wipe report stays off the live room | a scratch break that measured the receipt at the key's instant announced `0:52` for a deadline that left `0:44` |
 | `root.input.deadlineBeforeAppend` | a key after 0:00 is dropped and the draft is kept with the text it had | at `fa63af1` the session stayed live and grew to `old… new` |
 | `root.input.liveAppend` | a live key appends exactly once | guard |
 | `web.tick.earliestDeadline`, `web.tick.clearsDraft`, `web.receipt.deadlineNotCallback`, `web.input.noLateRescue`, `web.input.deadlineBeforeAppend`, `web.input.liveAppend` | the same rules on the shipped `writeitdown/session.mjs` | guard; these never failed |
 
-At `fa63af1` (before the input path adjudicated its own keys and before the receipt used the triggering deadline) the unfiltered run reported exactly the three root-page failures above. At the current tree it reports `18952` checks with no failure; the three cases are kept as assertions so the regression cannot come back.
+At `fa63af1` (before the input path adjudicated its own keys and before the receipt used the triggering deadline) the unfiltered run reported exactly the three root-page failures above. At the current tree it reports `22976` checks with no failure; the three cases are kept as assertions so the regression cannot come back.
 
 ## How it runs the real code
 
@@ -61,14 +62,14 @@ This copies `index.html` under the chosen evidence directory, changes the real t
 
 Each failed rule prints the first concrete last-input time, callback/input time, expected outcome and actual outcome, plus the number of failing cases in the stated universe. One cause can fail many cases. If a counterexample cannot happen in the source, fix the adapter or model and document why. If it can happen, keep the finding. Never weaken a property to obtain a pass.
 
-The Playwright suite asserts the same behaviour through the real browser and a controlled clock: `tests/trial-deadlines.spec.mjs` (`npm test`) covers the fresh draft after the wipe line, the dropped key after 0:00, the deadline-based receipt, the delayed keep, the tie, and a composition committed after the wipe line (a committed candidate that replaces the marked text, and one that equals it).
+The Playwright suite asserts the same behaviour through the real browser and a controlled clock: `tests/trial-deadlines.spec.mjs` (`npm test`) covers the fresh draft after the wipe line and the receipt it announces, the dropped key after 0:00, the deadline-based receipt, the delayed keep, the tie, and a composition committed after the wipe line (a committed candidate that replaces the marked text, and one that equals it).
 
 ## Model
 
-`model/WritingFlow.tla` and its configs are the design-level model of the room and the Mac admission boundary: 17 named invariants, one per rule a writer relies on. The model encodes the shipped rule on every surface: an input consults its own deadline (`InputAt` reads `Decision(t)`), so a post-wipe key replaces the draft instead of appending to it, and the wipe receipt names the deadline that fired rather than the callback. `WritingFlow-{5,8,12}.cfg` check all 17 plus deadlock and pass.
+`model/WritingFlow.tla` and its configs are the design-level model of the room and the Mac admission boundary: 17 named invariants, one per rule a writer relies on. The model encodes the shipped rule on every surface: an input consults its own deadline (`InputAt` reads `Decision(t)`), so a post-wipe key replaces the draft instead of appending to it, and the wipe receipt names the deadline that fired rather than the callback, on the tick path and on the key path alike. `BeginAgain` is the kept room's way forward: `已保留` opens an armed empty room again, the next first key charges a Mac trial session as any first key does, and a spent trial goes to the activation screen instead. `WritingFlow-{5,8,12}.cfg` check all 17 plus deadlock and pass.
 
-`WritingFlow-historical-fa63af1.cfg` is history, not a claim about today. Its `RootRule = "prefix"` restores the Root surface as it behaved at `fa63af1` - every input appended whatever the decision said, and the receipt was measured at the callback - so the three pre-fix violations (`NoLateRescue`, `DeadlineBeforeInput`, `DeadlineReceipt`) stay reproducible. `WritingFlow-chart.cfg` is the chart-size config: the writer's room alone with the instants its story turns on, all 17 rules kept, 410 states. Run the model with `/statechart` and read the result with that skill's report, not as a proof of the source.
+`WritingFlow-historical-fa63af1.cfg` is history, not a claim about today. Its `RootRule = "prefix"` restores the Root surface as it behaved at `fa63af1` - every input appended whatever the decision said, and the receipt was measured at the callback - so the three pre-fix violations (`NoLateRescue`, `DeadlineBeforeInput`, `DeadlineReceipt`) stay reproducible. `WritingFlow-chart.cfg` is the chart-size config: the writer's room alone with the instants its story turns on, all 17 rules kept, 475 states. Run the model with `/statechart` and read the result with that skill's report, not as a proof of the source.
 
 ## Chart
 
-`chart.mmd` is the Mermaid source the chart config produces, and `chart.png` is its render: 8 states, 15 arrows, Chinese labels, the whole room from `入口` to `已保留` / `已删除` / `已离开`. Regenerate them from `WritingFlow-chart.cfg` whenever the model changes; a chart above 500 states is drawn only as bug paths, which this model no longer has.
+`chart.mmd` is the Mermaid source the chart config produces, and `chart.png` is its render: 8 states, 16 arrows, Chinese labels, the whole room from `入口` to `已保留` / `已删除` / `已离开`, including the two ways forward out of a dead end: `已保留` goes back to `空房间` with `再次开写`, and the wiped room stays armed for the next key. Regenerate them from `WritingFlow-chart.cfg` whenever the model changes; a chart above 500 states is drawn only as bug paths, which this model no longer has.

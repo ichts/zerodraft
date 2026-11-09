@@ -15,5 +15,5 @@ export function step(action, from, to) {
     if (to.expected === 'keep') return '写满一分钟';
     return to.phase === 'warn' ? '安静满五秒' : '时钟还在走';
   }
-  return {Enter:'进入房间或被拦住',FirstInput:'输入首字',InputAt:'输入到达',TickAt:'时钟回调',Delete:'尝试删除',Escape:'按退出',ExpireExit:'确认超时',Restart:'下一个字就是新稿',Done:'结束'}[action] ?? action;
+  return {Enter:'进入房间或被拦住',FirstInput:'输入首字',InputAt:'输入到达',TickAt:'时钟回调',Delete:'尝试删除',Escape:'按退出',ExpireExit:'确认超时',Restart:'下一个字就是新稿',BeginAgain:'再次开写',Done:'结束'}[action] ?? action;
 }

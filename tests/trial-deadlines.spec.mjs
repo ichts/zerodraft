@@ -66,6 +66,19 @@ test('a key after the wipe line starts a fresh draft instead of rescuing the old
   await expect(page.locator('.trial-timer')).toHaveText('1:00');
 });
 
+test('a fresh draft announces the receipt for the deadline that fired', async ({ page }) => {
+  const origin = await openTrial(page);
+  // Last key at 0:08, so the draft was due at 0:16 and 0:44 was unused. The key
+  // lands four seconds past that line, before the pending tick: a receipt
+  // measured at the key's instant would read 0:40.
+  await typeThrough(page, origin, 8000);
+  await page.clock.setSystemTime(origin + 20_000);
+  await page.keyboard.type('n');
+  await expect(page.locator(editor)).toHaveText('n');
+  await expect(page.locator('.sr-only')).toHaveText('Draft wiped - 0:44 unused.');
+  await expect(page.locator('.trial-report')).toBeHidden();
+});
+
 test('a key after 0:00 cannot append to the kept draft', async ({ page }) => {
   const origin = await openTrial(page);
   const draft = await typeThrough(page, origin, 55_000);

@@ -35,20 +35,22 @@ FirstInput == /\ phase = "empty" /\ started = -1
               /\ used' = IF charged' THEN used + 1 ELSE used
               /\ armed' = -1
               /\ UNCHANGED <<surface, credential, hint, hintCount, receipt>>
+Max0(n) == IF n < 0 THEN 0 ELSE n
 InputAt(t) == /\ Live /\ t \in Times /\ t >= now
               /\ expected' = Decision(t) /\ event' = "input" /\ now' = t
               /\ IF Decision(t) = "live" \/ LegacyRoot
                  THEN /\ phase' = "writing" /\ last' = t /\ text' = text \cup {"new"}
-                      /\ UNCHANGED <<started, used, charged>>
+                      /\ UNCHANGED <<started, used, charged, receipt>>
                  ELSE IF Decision(t) = "keep"
-                      THEN /\ phase' = "kept" /\ UNCHANGED <<last, text, started, used, charged>>
+                      THEN /\ phase' = "kept" /\ UNCHANGED <<last, text, started, used, charged, receipt>>
                       ELSE /\ text' = IF Access THEN {"new"} ELSE {}
                            /\ phase' = IF Access THEN "restarted" ELSE "locked"
                            /\ used' = IF surface = "Mac" /\ credential = "fresh" /\ Access THEN used + 1 ELSE used
-                           /\ last' = t /\ started' = t /\ charged' = FALSE
+                           /\ charged' = FALSE
+                           /\ receipt' = Max0(Finish - Wipe)
+                           /\ UNCHANGED <<started, last>>
               /\ armed' = -1 /\ hint' = IF Decision(t) = "live" THEN hint ELSE FALSE
-              /\ UNCHANGED <<surface, credential, hintCount, receipt>>
-Max0(n) == IF n < 0 THEN 0 ELSE n
+              /\ UNCHANGED <<surface, credential, hintCount>>
 TickAt(t) == /\ Live /\ t \in Times /\ t >= now
              /\ expected' = Decision(t) /\ event' = "tick" /\ now' = t
              /\ phase' = CASE Decision(t) = "wipe" -> "wiped"
@@ -81,17 +83,23 @@ Restart == /\ phase = "wiped"
            /\ phase' = IF Access THEN "restarted" ELSE "locked"
            /\ event' = "restart" /\ expected' = "none" /\ hint' = FALSE /\ hintCount' = 0
            /\ UNCHANGED <<surface, credential, used, now, started, last, text, armed, receipt, charged>>
-Done == /\ phase \in {"left", "locked", "restarted", "kept"}
+BeginAgain == /\ phase = "kept"
+              /\ phase' = IF Access THEN "empty" ELSE "locked"
+              /\ text' = {} /\ started' = -1 /\ last' = -1 /\ charged' = FALSE
+              /\ event' = "again" /\ expected' = "none" /\ hint' = FALSE /\ hintCount' = 0
+              /\ armed' = -1
+              /\ UNCHANGED <<surface, credential, used, now, receipt>>
+Done == /\ phase \in {"left", "locked", "restarted"}
         /\ UNCHANGED vars
 Next == Enter \/ FirstInput \/ (\E t \in Times: InputAt(t)) \/
-        (\E t \in Times: TickAt(t)) \/ Delete \/ Escape \/ ExpireExit \/ Restart \/ Done
+        (\E t \in Times: TickAt(t)) \/ Delete \/ Escape \/ ExpireExit \/ Restart \/ BeginAgain \/ Done
 Spec == Init /\ [][Next]_vars
 
 NoLateRescue == event = "input" /\ expected = "wipe" => "old" \notin text
 DeadlineBeforeInput == event = "input" /\ expected = "keep" => phase = "kept"
 EarlierDeadlineWins == event = "tick" /\ expected = "keep" => phase = "kept"
 TieAndSilenceDelete == event = "tick" /\ expected = "wipe" => phase = "wiped" /\ text = {}
-DeadlineReceipt == event = "tick" /\ expected = "wipe" => receipt = Max0(Finish-Wipe)
+DeadlineReceipt == event \in {"tick", "input"} /\ expected = "wipe" => receipt = Max0(Finish-Wipe)
 OnlyAuthorizedEntry == phase \in {"empty", "writing", "warn"} /\ surface = "Mac" =>
                         credential = "valid" \/ (credential = "fresh" /\ (used < 3 \/ charged))
 TrialBound == used <= 3

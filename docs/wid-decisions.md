@@ -2129,3 +2129,35 @@ is `docs/wid-world-table.md`.
   outside-request sentence names the Mac app), `writeitdown/qa/seo.spec.mjs` (`llms.txt` names no
   Windows app); each new assertion fails on a page with the claim put back. Before/after captures of
   `mac.html` and `privacy.html` at 1440 and 390 in `data/wid-design-c3-windows/`.
+
+## D-106: The Mac purchase card states each term once, and neither purchase control resizes
+
+- Date: 2026-11-09
+- Decision: `mac.html#buy` states each purchase fact once. The paragraph above the price row is
+  deleted with no replacement copy, so the price line reads `$4.99 once` and its note carries
+  `2 computers. No subscription. Free updates. 14-day refund.`, where the hyphen is U+2011 so the
+  window never splits into `14-` / `day refund.`. The 3-session trial stays in the Activate
+  section and the meta description, the one-license-two-computers rule in Activate, and the refund
+  window in Refunds. `#buy-form button` and `#copy-license` reserve the width of their widest label
+  measured in the face the device renders: `buy.js` writes `--copy-floor` from that measurement, the
+  same floor `room.js` gives the kept pill's copy control, so idle, pending, error, ready and copied
+  share one width on any default sans stack. The licence key is a line in its card, not a panel: one
+  hairline above it, padding at the top only, no fill, no ring, no radius.
+- Reason: the page stated the price, the two computers, the free updates and the refund four times (a
+  paragraph, the note, Activate, Refunds); `14-` broke apart from `day refund.`; the key was a card
+  inside a card; and the buy control measured 183.9 px idle, 191.2 px pending and 114.3 px on error. A
+  pixel floor tuned to one machine's sans moves the control again on the next machine: the type
+  baseline in `writeitdown/qa/shared-type-baseline.json` records face substitution moving an advance by
+  1 to 9 %, so the width is measured where it is painted.
+- Supersedes: D-079's licence-key clause (the key is 4 px at its current padding) and its tests line
+  (nested `r = R - p` on the license card): the key no longer nests, so `qa/shape-text.spec.mjs`
+  asserts one hairline instead. D-105's `mac.html` clause `one license covers 2 computers`, which the
+  deleted paragraph carried; the Activate section keeps `One license works on two computers`. Every
+  other clause of D-079 and D-105 stands.
+- Evidence: `writeitdown/qa/checkout.spec.mjs` (the buy control in idle, pending and error, the copy
+  control in ready and copied, both under a deliberately wider `--sans` where the superseded 200 px
+  floor would have failed, and the refund window's single rect at 1440, 480 and 390),
+  `writeitdown/qa/mac.spec.mjs` (the card states the note once and the trial stays in Activate),
+  `writeitdown/qa/shape-text.spec.mjs` (the key's one hairline, no radius, transparent);
+  measurements, states and captures in `writeitdown/QA.md` (2026-11-09) and
+  `data/wid-design-a3-buy-card/`.

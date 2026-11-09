@@ -833,6 +833,7 @@ clipboard logic or Windows sentence changed.
 ## Measured (`data/wid-design-a3-buy-card/`)
 
 | Surface | Measure | Before | After |
+| --- | --- | --- | --- |
 | `#buy-form button` at 1440 and 390 | width in idle / pending / error | 183.9 / 191.2 / 114.3 px | 192 / 192 / 192 px |
 | `#copy-license` at 1440 and 390 | width in ready / copied | 167.7 / 99.8 px | 168 / 168 px |
 | both controls | widest label as rendered (15 px) | `Opening checkout...` 191.2, `Copy license key` 167.7 | `min-width` measured from it: 192 and 168 px here |

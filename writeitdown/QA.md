@@ -808,11 +808,11 @@ The CLI's `wait` and script `run` APIs failed in this environment. Approval was 
 `mac.html#buy` opened with a paragraph that gave the price, the two computers, the free updates and the
 14-day refund, and the price line's note gave the same four facts again, the Activate section a third
 time and the Refunds section a fourth. The paragraph is deleted with no replacement copy, the price row
-and the note's words are unchanged, the note's `14-day` takes a non-breaking hyphen while the meta
-description keeps its plain hyphen, `#buy-form button` and `#copy-license` take the width of their
-widest label measured in the face the device renders (`buy.js` writes `--copy-floor`, the floor
-`room.js` already gives the kept pill's copy control), and the licence key panel loses its ring, fill
-and radius for one hairline above it. No checkout behaviour, price, Stripe call, key delivery,
+is unchanged, the note's words are unchanged, its `14-day` hyphen became a non-breaking hyphen while
+the meta description keeps its plain hyphen, `#buy-form button` and `#copy-license` take the width
+of their widest label measured in the face the device renders (`buy.js` writes `--copy-floor`, the
+floor `room.js` already gives the kept pill's copy control), and the licence key panel loses its ring,
+fill and radius for one hairline above it. No checkout behaviour, price, Stripe call, key delivery,
 clipboard logic or Windows sentence changed.
 
 ## Commands and results

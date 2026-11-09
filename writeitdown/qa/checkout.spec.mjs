@@ -319,6 +319,54 @@ test('the copy control keeps one width in ready and copied', async ({ page, cont
   expect(ready, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
 });
 
+// One source per label: each control's idle label comes from the markup it renders, so the width it
+// reserves tracks a copy edit. A buyer only ever sees the one width they were promised, so the guard
+// is that edit itself: widen both markup labels and the reserved widths must follow them. When the
+// probes held their own literals instead, a copy edit that lengthened a markup label left the floor
+// tuned to the shorter string, and the control shrank when its state machine swapped the label.
+const wideBuyLabel = 'Buy Write It Down for $4.99 once';
+const wideCopyLabel = 'Copy your license key to the clipboard';
+
+test('the reserved width follows the labels the markup renders', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/mac.html?session_id=cs_test_wide_labels', async route => {
+    const response = await route.fetch();
+    const body = (await response.text())
+      .replace('>Buy for $4.99 once</button>', `>${wideBuyLabel}</button>`)
+      .replace('>Copy license key</button>', `>${wideCopyLabel}</button>`);
+    await route.fulfill({ response, body });
+  });
+  await page.route(`${service}/license?session_id=cs_test_wide_labels`, route => route.fulfill({ json: { licenseKey: key } }));
+  let fail = true;
+  await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
+
+  await page.goto('mac.html?session_id=cs_test_wide_labels');
+  const buy = page.locator('#buy-form button');
+  await expect(buy).toHaveText(wideBuyLabel);
+  const idle = await widthOf(page, '#buy-form button');
+  await buy.click();
+  await expect(buy).toHaveText('Try again');
+  const error = await widthOf(page, '#buy-form button');
+  fail = false;
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  const pending = await widthOf(page, '#buy-form button');
+  const buyLabels = await naturalWidths(page, '#buy-form button', [wideBuyLabel, 'Opening checkout...', 'Try again']);
+  expect(idle, `idle buy width against ${JSON.stringify(buyLabels)}`).toBe(error);
+  expect(pending, 'pending buy width against the markup label').toBe(error);
+  expect(idle, 'the markup buy label fits without a resize').toBeGreaterThanOrEqual(Math.max(...buyLabels.map(label => label.width)));
+
+  const copy = page.getByRole('button', { name: wideCopyLabel, exact: true });
+  await expect(copy).toBeVisible();
+  const ready = await widthOf(page, '#copy-license');
+  await copy.click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  const copied = await widthOf(page, '#copy-license');
+  const copyLabels = await naturalWidths(page, '#copy-license', [wideCopyLabel, 'Copied']);
+  expect(copied, `copied width against ${JSON.stringify(copyLabels)}`).toBe(ready);
+  expect(ready, 'the markup copy label fits without a resize').toBeGreaterThanOrEqual(Math.max(...copyLabels.map(label => label.width)));
+});
+
 // The floor is measured from the face the device renders, not tuned to the sans on the author's
 // machine, so a wider default sans must still leave each control one width in every state.
 test('both controls keep their one width on a wider default sans', async ({ page, context }) => {

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openPage, sweepTimeout } from './page-sweep.mjs';
 
 // The legal notice (Impressum): the operator block the captain approved, verbatim, and the footer
 // link on every shipped page. The footer geometry is measured, not eyeballed.
@@ -25,12 +26,13 @@ test('the Impressum names the operator, address and email exactly, and nothing e
 });
 
 test('the Impressum is canonical, in the sitemap and linked from every footer', async ({ page, request }) => {
+  test.setTimeout(sweepTimeout(pages.length));
   const xml = await (await request.get('/writeitdown/sitemap.xml')).text();
   expect(xml).toContain('<loc>https://writeitdown.app/impressum.html</loc>');
-  await page.goto('impressum.html');
+  await openPage(page, 'impressum.html');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://writeitdown.app/impressum.html');
   for (const path of pages) {
-    await page.goto(path);
+    await openPage(page, path);
     const link = page.locator('.home-foot nav[aria-label="Legal"] a', { hasText: 'Impressum' });
     await expect(link, path).toHaveCount(1);
     await link.click();
@@ -39,6 +41,7 @@ test('the Impressum is canonical, in the sitemap and linked from every footer', 
 });
 
 test('the Legal footer column stays aligned with its siblings on every page', async ({ page }) => {
+  test.setTimeout(sweepTimeout(pages.length));
   const read = () => page.evaluate(() => {
     const box = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right }; };
     const columns = [...document.querySelectorAll('.foot-grid nav')].map(nav => ({
@@ -52,7 +55,7 @@ test('the Legal footer column stays aligned with its siblings on every page', as
   });
   const reference = {};
   for (const path of pages) {
-    await page.goto(path);
+    await openPage(page, path);
     const m = await read();
     const legal = m.columns[2];
     expect(legal.links.length, `${path}: Legal links`).toBe(3);

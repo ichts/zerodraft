@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
+import { fontsSettled, openPage, sweepTimeout } from './page-sweep.mjs';
 
 // The shared type set (D-057). The Mac app and writeitdown.app draw text with the same faces:
 // Newsreader for what the writer writes and for every heading, Zhuque Fangsong for the same roles in
@@ -58,9 +59,10 @@ const faceOf = row => Object.entries(SHARED)
   .find(([, pattern]) => pattern.test(firstFamily(row.family)))?.[0] ?? `unknown:${firstFamily(row.family)}`;
 
 test('every text role on every shipped page stays in the shared type set', async ({ page }) => {
+  test.setTimeout(sweepTimeout(pages.length));
   const found = new Map();
   for (const path of pages) {
-    await page.goto(path);
+    await openPage(page, path);
     const rows = await page.evaluate(census);
     for (const row of rows) {
       const face = faceOf(row);
@@ -83,6 +85,7 @@ test('every text role on every shipped page stays in the shared type set', async
 });
 
 test('the site serves its own faces and never asks another host for one', async ({ page }, info) => {
+  test.setTimeout(sweepTimeout(pages.length));
   // Derived from the configured baseURL so the suite holds its own origin on another port.
   const origin = new URL(info.project.use.baseURL).origin;
   const foreign = [];
@@ -92,13 +95,17 @@ test('the site serves its own faces and never asks another host for one', async 
       if (fontHosts.test(url) || /\.(woff2?|ttf|otf)(\?|$)/.test(url)) foreign.push(url);
     }
   });
-  for (const path of pages) await page.goto(path);
+  for (const path of pages) {
+    await openPage(page, path);
+    // The request log is the assertion, so wait for the faces this page loads before reading it.
+    await fontsSettled(page);
+  }
   expect(foreign, 'no page fetches a face from another origin').toEqual([]);
 
   // The known-broken proof for the old Google-hosted serif: with both font hosts refused, the writing
   // face must still be the bundled Newsreader rather than a local fallback such as Georgia.
   await page.route(fontHosts, route => route.abort());
-  await page.goto('index.html');
+  await openPage(page, 'index.html');
   const resolved = await page.evaluate(async () => {
     await document.fonts.load('400 28px Newsreader');
     await document.fonts.ready;

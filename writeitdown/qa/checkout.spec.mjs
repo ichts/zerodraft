@@ -363,10 +363,11 @@ test('both controls keep their one width on a wider default sans', async ({ page
 });
 
 // On a phone the buy row stacks, so the two controls sit one under the other and any width difference
-// reads as a near-miss rather than a hierarchy: the width lock left the ghost 182.2 px beside the
-// 192 px primary, 1.7 px from what the pre-change page had. Stacked, the ghost takes the primary's
-// measured floor and stays secondary by its own surface and colour, not by being narrower; side by
-// side at desktop width it keeps its natural width.
+// reads as a near-miss rather than a hierarchy: before the width lock the pair was 182.2 / 183.9 px
+// (1.7 px apart), with only the two controls floored it was 182.2 / 192 px (9.8 px apart), and stacked
+// it is now 192 / 192 px. Stacked, the ghost takes the primary's measured floor and stays secondary by
+// its own surface and colour, not by being narrower; side by side at desktop width it keeps its
+// natural width.
 test('the stacked buy row keeps one width and stays secondary', async ({ page }) => {
   await page.goto('mac.html');
   for (const width of [390, 320]) {

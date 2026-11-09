@@ -39,7 +39,7 @@
       }
     }
     // Stacked on a phone, the row's ghost sits directly under the primary, so it shares that floor
-    // there (site.css, the phone step) instead of ending 18 px short of it.
+    // there (site.css, the phone step) instead of ending 9.8 px short of it.
     if (floors['#buy-form button']) buy.closest('.doc-actions')?.style.setProperty('--copy-floor', floors['#buy-form button']);
   }
 

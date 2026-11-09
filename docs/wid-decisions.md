@@ -2200,3 +2200,33 @@ is `docs/wid-world-table.md`.
   Each assertion fails on the pre-fix page. Before/after captures at 1440x900 and 390x844 in light and
   dark, and the census that counts card-in-card panels on this page as 3 before and 0 after, are in
   `data/wid-design-a4-download/`.
+
+## D-108: The room's Chinese is one blocking face, asked for when the door opens
+
+- Date: 2026-11-09
+- Decision: `fonts-cjk.css` declares Zhuque Fangsong once, subset to GB2312 (2,589,548 B), with no
+  `unicode-range` slicing and `font-display:block`, and only `index.html` links it. `room.js` asks the
+  browser for that face as the room's route opens, before any character needs it, and the landing asks
+  for nothing. The composing span keeps carrying no face of its own, so composition and committed text
+  are the same face by construction. The Mac app is unchanged: it registers the same face from its own
+  bundle with `CTFontManagerRegisterFontsForURL` and resolves it by PostScript name, so it has no
+  webfont latency to hide.
+- Reason: the captain typed Chinese in `https://writeitdown.app/#trial` and watched characters change
+  shape after they were already on screen. 13 slices with `font-display:swap` meant the first character
+  of every new slice was painted by the platform serif and repainted in Zhuque when the slice landed.
+  Measured on the live site in a macOS 26.6 VM with real Pinyin input: 5 of the 7 characters in one
+  sentence changed face after being drawn, 150-360 ms after the keystroke that committed them, and the
+  2 whose slice was already resident did not. A sliced set only moves bytes a full draft spends anyway
+  (2,726,540 B across 13 requests) into the middle of the draft, where each late slice is a visible
+  repaint; one file is smaller (2,589,548 B, 5% saved by sharing the table overhead), arrives in one
+  request (503 ms for the whole set on the measured link, cold) and cannot repaint anything, because a
+  glyph is either not drawn yet or drawn in the face the room means.
+- Supersedes: D-057's clause that the Chinese face is "GB2312-subset and sliced into 13 `unicode-range`
+  files" and its measured "a visitor fetches a slice when Chinese characters reach the screen". The
+  faces themselves, the subset, the shared type set and the OFL licensing are unchanged.
+- Evidence: `writeitdown/qa/chinese-face.spec.mjs` holds the arrangement (one blocked face, no face of
+  its own on the composing span, the face requested by the door rather than by the first character, and
+  a drawn character whose pixels never change); the three browser assertions fail on the sliced
+  arrangement and pass after. Live-site before/after in a macOS 26.6 VM with real Pinyin input, plus
+  the per-character table of slice status, load time and repaint frames, are in
+  `data/wid-ime-font-swap/`.

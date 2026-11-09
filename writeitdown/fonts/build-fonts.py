@@ -5,7 +5,7 @@
         upright and italic variable, Zhuque Fangsong, and the committed
         writeitdown/fonts/reenie-beanie.woff2 hand accent.
 [OUTPUT] writeitdown/fonts/*.woff2 plus the generated writeitdown/fonts.css (the faces every page
-        links) and writeitdown/fonts-cjk.css (the Chinese slices, linked by index.html alone).
+        links) and writeitdown/fonts-cjk.css (the Chinese face, linked by index.html alone).
 [POS]   The one font build step for the static site; the committed woff2 files are its product.
 [PROTOCOL] Run `python3 fonts/build-fonts.py` after a face changes (needs fonttools + brotli); commit
         both the files and the generated CSS. Never hand-edit fonts.css, fonts-cjk.css or a .woff2.
@@ -13,16 +13,18 @@
 The site serves every face itself: a third-party font host that fails must not decide what a page
 renders (D-057). Latin is Newsreader subset to the Latin ranges the pages use, with its `wght` and
 `opsz` axes intact, so the web writes in the same variable font the Mac bundles. Chinese is Zhuque
-Fangsong, the Mac room's CJK face, subset to GB2312 and sliced by `unicode-range` so a visitor
-downloads only the slices their text touches. The landing's hand accent is one face with one glyph
-set and is declared here so every webfont face on the site has one owner.
+Fangsong, the Mac room's CJK face, subset to GB2312 as ONE file: the room takes any character, so a
+sliced set only moves the bytes it would have spent anyway into the middle of a draft, where every
+late slice repaints a character that is already on screen. `font-display:block` keeps that character
+from ever being drawn in a fallback face first (D-108). The landing's hand accent is one face with
+one glyph set and is declared here so every webfont face on the site has one owner.
 
 The subset must keep the source's vertical metrics: the room's 1.6 pitch is fixed in CSS, but where
 the glyph sits inside that pitch comes from hhea/OS-2. A 1px shift would break the writing anchor.
 """
 
 import argparse
-import math
+
 import shutil
 import subprocess
 import sys
@@ -41,14 +43,10 @@ LATIN_RANGES = (
     'U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
 )
 
-# GB2312 is the common simplified set: 6763 hanzi plus the symbol rows. Level 1 (rows 0xB0-0xD7) is
-# its 3755 everyday characters, level 2 (0xD8 and up) the 3008 rarer ones, so slicing by level keeps
-# a draft's first characters in the small half. Slice counts trade one request's size against the
-# number of files: at 8 + 4, a slice is 165-350 KB and the symbol slice 47 KB.
-SYMBOL_SLICES = 1
-LEVEL1_SLICES = 8
-LEVEL2_SLICES = 4
-# Full-width punctuation and the CJK punctuation block travel with the symbol slice, not the hanzi.
+# GB2312 is the common simplified set: 6763 hanzi plus the symbol rows, one file of about 2.5 MB.
+# A writer's draft can take any of them, so the room loads the whole set once when it opens instead
+# of one codepoint slice per new character.
+# Full-width punctuation and the CJK punctuation block belong to the same file.
 CJK_EXTRA_RANGES = 'U+00B7,U+2018-201D,U+2014,U+2026,U+3000-303F,U+FF01-FF60'
 
 CATALOG = {
@@ -74,12 +72,6 @@ def gb2312_charset():
                 level2.append(character)
     return symbols, level1, level2
 
-
-def chunked(characters, count):
-    if count == 1:
-        return [characters]
-    per = math.ceil(len(characters) / count)
-    return [characters[start:start + per] for start in range(0, len(characters), per)]
 
 
 def unicode_range(characters):
@@ -136,9 +128,9 @@ def _in_ranges(codepoint, ranges):
     return False
 
 
-def faces(family, style, weight, file, ranges):
+def faces(family, style, weight, file, ranges, display='swap'):
     return (f"@font-face{{font-family:'{family}';font-style:{style};font-weight:{weight};"
-            f"font-display:swap;src:url(fonts/{file.name}) format('woff2');unicode-range:{ranges}}}\n")
+            f"font-display:{display};src:url(fonts/{file.name}) format('woff2');unicode-range:{ranges}}}\n")
 
 
 def main():
@@ -171,14 +163,11 @@ def main():
         base.append(faces(family, style, '200 800', destination, ranges))
 
     symbols, level1, level2 = gb2312_charset()
-    slices = (chunked(symbols, SYMBOL_SLICES) + chunked(level1, LEVEL1_SLICES)
-              + chunked(level2, LEVEL2_SLICES))
-    for index, characters in enumerate(slices, start=1):
-        ranges = unicode_range(characters) + (',' + CJK_EXTRA_RANGES if index == 1 else '')
-        destination = OUT / f'zhuque-fangsong-{index:02d}.woff2'
-        subset(MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', destination, ranges)
-        report.append((destination.name, check(destination, MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', ranges)))
-        cjk.append(faces('Zhuque Fangsong', 'normal', '400', destination, ranges))
+    ranges = unicode_range(symbols + level1 + level2) + ',' + CJK_EXTRA_RANGES
+    destination = OUT / 'zhuque-fangsong-gb2312.woff2'
+    subset(MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', destination, ranges)
+    report.append((destination.name, check(destination, MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', ranges)))
+    cjk.append(faces('Zhuque Fangsong', 'normal', '400', destination, ranges, display='block'))
 
     for licence in ('OFL-Newsreader.txt', 'OFL-ZhuqueFangsong.txt'):
         shutil.copyfile(MAC_RESOURCES / licence, OUT / licence)
@@ -191,15 +180,16 @@ def main():
         + ''.join(base))
     (SITE / 'fonts-cjk.css').write_text(
         '/* GENERATED by fonts/build-fonts.py - do not hand-edit.\n'
-        '   Zhuque Fangsong, the Mac room\'s Chinese face, GB2312-subset and sliced by unicode-range so a\n'
-        '   draft downloads only the slices it touches. Linked by index.html alone, the only page that can\n'
-        '   render Chinese. Rebuild: python3 fonts/build-fonts.py */\n'
+        '   Zhuque Fangsong, the Mac room\'s Chinese face, GB2312-subset as one file and linked by\n'
+        '   index.html alone, the only page that can render Chinese. font-display:block, not swap: the\n'
+        '   room asks for this face when it opens, and a character must never be drawn in a fallback\n'
+        '   face and then change once this one lands (D-108). Rebuild: python3 fonts/build-fonts.py */\n'
         + ''.join(cjk))
 
     total = sum(size for _, size in report)
     for name, size in report:
         print(f'{size:>9} B  fonts/{name}')
-    print(f'{total:>9} B  {len(report)} files, {len(slices)} of them Zhuque Fangsong slices')
+    print(f'{total:>9} B  {len(report)} files')
 
 
 if __name__ == '__main__':

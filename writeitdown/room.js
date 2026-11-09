@@ -355,8 +355,20 @@ function route() {
   routed = true;
   slot.invalidate();
   reset();
-  if (active) { fitEditor(); editor.focus({ preventScroll: true }); if (from) growInto(from); }
+  if (active) { warmRoomFace(); fitEditor(); editor.focus({ preventScroll: true }); if (from) growInto(from); }
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
+}
+
+// Chinese is one GB2312 file declared `font-display:block`, so a character is drawn once, in the face the room
+// means, or not at all - never in the platform serif first and Zhuque a frame later (D-108). The room asks for it
+// as the door opens, in the second a writer spends reading the empty sheet, so the face is normally resident before
+// the first keystroke. Nothing on the landing asks for it, and the landing draws no Chinese (D-057). The request
+// waits out the door's own grow: decoding 2.5 MB of font is main-thread work and the grow owns those 240 ms.
+let faceWarmed = false;
+function warmRoomFace() {
+  if (faceWarmed || !document.fonts?.load) return;
+  faceWarmed = true;
+  setTimeout(() => { document.fonts.load('28px "Zhuque Fangsong"', '我').catch(() => {}); }, GROW_MS + 60);
 }
 
 // The room's sheet is hidden until the door opens, so its texture used to be painted on the page in the click's

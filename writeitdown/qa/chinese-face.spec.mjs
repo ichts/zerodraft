@@ -1,4 +1,3 @@
-import { readFileSync, statSync } from 'node:fs';
 import { test, expect } from '@playwright/test';
 
 // D-109: the room's Chinese has two hard requirements at once, and they constrain each other.
@@ -22,8 +21,6 @@ import { test, expect } from '@playwright/test';
 // the fallback and repainted it, block painted nothing at all. A held request makes the window as wide as the test
 // needs instead of racing a real network; a font request blocks the load event, so the page is opened to
 // DOMContentLoaded, which is already after room.js has routed and asked for the face.
-const cjkCss = readFileSync(new URL('../fonts-cjk.css', import.meta.url), 'utf8');
-const siteCss = readFileSync(new URL('../site.css', import.meta.url), 'utf8');
 const FACE = '**/fonts/zhuque-fangsong*.woff2';
 
 const holdFace = async page => {
@@ -38,25 +35,90 @@ const holdFace = async page => {
   return { held, release };
 };
 
+// What Chrome actually drew the text with, not what the stylesheet asked for.
+const platformFonts = async (page, selector) => {
+  const client = await page.context().newCDPSession(page);
+  await client.send('DOM.enable');
+  await client.send('CSS.enable');
+  const { root } = await client.send('DOM.getDocument');
+  const { nodeId } = await client.send('DOM.querySelector', { nodeId: root.nodeId, selector });
+  const { fonts } = await client.send('CSS.getPlatformFontsForNode', { nodeId });
+  return fonts.map(font => font.familyName);
+};
+
 const writingStack = page => page.locator('#editor').evaluate(editor => getComputedStyle(editor).fontFamily);
 
-test('the Chinese face is one file that never holds text invisible', async () => {
-  const faces = [...cjkCss.matchAll(/@font-face\{[^}]*Zhuque Fangsong[^}]*\}/g)].map(match => match[0]);
-  expect(faces).toHaveLength(1);
-  expect(faces[0]).toMatch(/font-display:swap/);
-  // `block` hides the character, `optional` lets the browser drop the face for the whole page load.
-  expect(faces[0]).not.toMatch(/font-display:(block|optional)/);
-  const file = faces[0].match(/url\(fonts\/([\w.-]+\.woff2)\)/)[1];
-  // GB2312 is 6763 hanzi; one file that carries them all is over 2 MB, a slice of them is not.
-  expect(statSync(new URL(`../fonts/${file}`, import.meta.url)).size).toBeGreaterThan(2_000_000);
+test('one draft keeps one Chinese face from its first character to its last', async ({ page }) => {
+  test.setTimeout(90_000);
+  // The promise a writer can see, measured on what Chrome drew with rather than on the stylesheet. Chinese used
+  // to arrive as 13 slices with `swap`, so a character whose slice was not resident was painted by the platform
+  // serif and repainted in Zhuque 150-360 ms later, while it sat on screen. The room decides the draft's face at
+  // its first Chinese character and keeps it until the sheet is empty, so the file landing - and a later
+  // character typed while it is resident - must leave the draft on the face it started with.
+  const { release } = await holdFace(page);
+  await page.goto('index.html#trial', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#room')).toBeVisible();
+  await page.locator('#editor').focus();
+  await page.keyboard.insertText('我');
+  await expect(page.locator('#editor')).toHaveValue('我');
+  await page.waitForTimeout(250);
+  const first = await platformFonts(page, '#editor-ink span');
+  expect(first.filter(family => /^Zhuque Fangsong/.test(family)), `the held draft drew in Zhuque: ${first}`)
+    .toHaveLength(0);
+  // The file lands now, which is the window the slices repainted in, and a second character arrives while it is
+  // resident. Neither may pull this draft onto the webfont.
+  release();
+  await page.evaluate(() => document.fonts.ready);
+  await page.keyboard.insertText('写');
+  await expect(page.locator('#editor')).toHaveValue('我写');
+  await page.waitForTimeout(250);
+  expect(await page.locator('#room').getAttribute('data-phase'), 'the measurement ran into the silence warning')
+    .toMatch(/^(typing|rest)$/);
+  const both = await platformFonts(page, '#editor-ink span');
+  expect(both, `the draft changed face when the file landed: ${first} then ${both}`).toEqual(first);
+  expect(both.filter(family => /^Zhuque Fangsong/.test(family)), `one draft drew in two faces: ${both}`).toHaveLength(0);
+  // The room's own record of the decision, read after the rendered evidence.
+  expect(await page.locator('#room').getAttribute('data-cjk-face'), 'the draft did not freeze to the face it had')
+    .toBe('platform');
+  expect(await writingStack(page), 'a frozen draft names the webfont it did not draw in').not.toMatch(/Zhuque/);
 });
 
-test('composition text carries no face of its own', async () => {
-  const rules = [...siteCss.matchAll(/\.editor-ink \.composing[^{]*\{([^}]*)\}/g)].map(match => match[1]);
-  expect(rules.length).toBeGreaterThan(0);
-  for (const body of rules) {
-    expect(body).not.toMatch(/(^|;)\s*(font|font-family|font-size|font-weight|font-style|line-height|letter-spacing)\s*:/);
-  }
+test('composition text is drawn in the draft\'s own face and stays in it when committed', async ({ page }) => {
+  test.setTimeout(90_000);
+  // A composing run is part of the draft's line: the underlined run the writer watches while choosing a character
+  // must be drawn by the same face, at the same size and the same spacing as the character it commits into. A face
+  // or a size declared only for the composing span would show up as a jump at the moment of commit.
+  await page.goto('./');
+  await page.locator('#landing .cta a[href="#trial"]').hover();
+  await page.waitForFunction(() => [...document.fonts]
+    .some(face => face.family.includes('Zhuque') && face.status === 'loaded'), null, { timeout: 60_000 });
+  await page.locator('#landing .cta a[href="#trial"]').click();
+  await expect(page.locator('#room')).toBeVisible();
+  await page.waitForFunction(() => document.activeElement?.id === 'editor');
+  await page.keyboard.insertText('Before. ');
+  const session = await page.context().newCDPSession(page);
+  await session.send('Input.imeSetComposition', { text: '我', selectionStart: 1, selectionEnd: 1 });
+  const composing = page.locator('#editor-ink .composing');
+  await expect(composing, 'the composing run is not on the ink layer').toHaveCount(1);
+  const own = await composing.evaluate(span => {
+    const style = getComputedStyle(span), draft = getComputedStyle(document.querySelector('#editor'));
+    return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.letterSpacing]
+      .map((value, index) => value === [draft.fontFamily, draft.fontSize, draft.fontWeight, draft.lineHeight,
+        draft.letterSpacing][index]);
+  });
+  expect(own, 'the composing run carries a face or a size of its own').toEqual([true, true, true, true, true]);
+  const chinese = fonts => fonts.filter(family => /^Zhuque Fangsong/.test(family));
+  const composingFonts = await platformFonts(page, '#editor-ink .composing');
+  expect(chinese(composingFonts), `the composing run drew in ${composingFonts}`).toHaveLength(1);
+  await session.send('Input.insertText', { text: '我' });
+  await expect(page.locator('#editor')).toHaveValue('Before. 我');
+  await expect(page.locator('#editor-ink .composing'), 'a commit leaves nothing underlined').toHaveCount(0);
+  await page.waitForTimeout(120);
+  // The committed span also holds the Latin draft, which is Newsreader by design; the Chinese glyph's own face is
+  // what must not change.
+  const committedFonts = await platformFonts(page, '#editor-ink span');
+  expect(chinese(committedFonts), `the character changed face when it was committed: ${committedFonts}`)
+    .toEqual(chinese(composingFonts));
 });
 
 test('the room asks for the face when its door opens, before any character needs it', async ({ page }) => {

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { LINES, TIMELINE } from '../demo-timeline.mjs';
 import { clock, wordCount, countLabel } from '../session.mjs';
-import { barFraction, EMPTY_BAR } from './bar-clip.mjs';
+import { barFraction } from './bar-clip.mjs';
 
 const capture = (page, info, state) => page.screenshot({ path: info.outputPath(`${state}.png`) });
 const editor = page => page.locator('#editor');
@@ -607,37 +607,39 @@ test('short rooms keep the writing aperture below the clock', async ({ page }, i
   expect(Math.abs(grown.activeCentre - empty.activeCentre)).toBeLessThan(1);
 });
 
-test('the session bar is one continuous linear animation, never a stepped tick', async ({ page }, info) => {
+test('the session bar drains continuously, never in steps', async ({ page }, info) => {
   await enter(page);
   await page.keyboard.insertText('A');
-  const bar = await page.evaluate(() => {
-    const bar = document.querySelector('#room-bar');
-    return bar.getAnimations().map(animation => ({ timing: animation.effect.getTiming(),
-      frames: animation.effect.getKeyframes().map(frame => frame.clipPath) }));
-  });
+  // The rendered bar, not the animation object: whatever drives it, the writer sees a bar that has moved a little
+  // further every quarter second. A stepped tick stands still between ticks and then jumps, which is exactly what
+  // reading the rendered value twice per half second catches - one 500 ms sample cannot tell a 500 ms step from a
+  // continuous drain.
+  const remaining = async () => barFraction(await page.locator('#room-bar')
+    .evaluate(bar => getComputedStyle(bar).clipPath));
   if (info.project.use.reducedMotion === 'reduce') {
-    // Reduce Motion steps the remaining bar at a 0.5 s cadence instead of animating it.
-    expect(bar).toHaveLength(0);
-    const first = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
-    await page.clock.fastForward(600);
-    const stepped = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
-    expect(stepped).not.toBe(first);
+    // Reduce Motion is the one place a step is the intended behaviour: the bar holds still between the 0.5 s ticks
+    // and moves at each one.
+    const held = await remaining();
+    await page.waitForTimeout(250);
+    expect(await remaining(), 'the bar moved between two reduced-motion ticks').toBe(held);
     await page.clock.fastForward(500);
-    expect(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath)).not.toBe(stepped);
+    const ticked = await remaining();
+    expect(ticked, 'the bar did not step at the 0.5 s tick').not.toBe(held);
+    await page.waitForTimeout(250);
+    expect(await remaining(), 'the bar moved between two reduced-motion ticks').toBe(ticked);
     return;
   }
-  expect(bar).toHaveLength(1);
-  expect(bar[0].timing.easing).toBe('linear');
-  expect(bar[0].frames).toHaveLength(2);
-  const startScale = barFraction(bar[0].frames[0]);
-  expect(startScale).toBeGreaterThan(0.99);
-  expect(startScale).toBeLessThanOrEqual(1);
-  expect(bar[0].frames[1]).toMatch(EMPTY_BAR);
-  expect(bar[0].timing.duration).toBeGreaterThan(59000);
-  expect(bar[0].timing.duration).toBeLessThanOrEqual(60000);
-  const before = await page.locator('#room-bar').evaluate(bar => bar.style.clipPath);
-  await page.clock.fastForward(1000);
-  expect(await page.locator('#room-bar').evaluate(bar => bar.style.clipPath), 'a tick never writes the bar').toBe(before);
+  let previous = await remaining();
+  for (let index = 0; index < 8; index += 1) {
+    for (const wait of [250, 250]) {
+      await page.waitForTimeout(wait);
+      const now = await remaining();
+      const drop = previous - now;
+      expect(drop, `the bar stood still ${index * 500 + wait} ms in: ${previous} then ${now}`).toBeGreaterThan(0.0005);
+      expect(drop, `the bar jumped ${index * 500 + wait} ms in: ${previous} then ${now}`).toBeLessThan(0.03);
+      previous = now;
+    }
+  }
 });
 
 test('the session bar is the paper\'s own rounded top edge at every fill', async ({ page }) => {

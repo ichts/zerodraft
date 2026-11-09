@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
+import { openPage, sweepTimeout } from './page-sweep.mjs';
 
 // The thirteen shipped pages. Every one of them carries the landing page's design system: the A mark
 // lockup on its paper plate, the theme button, the shared footer, and the v2 type and colour roles.
@@ -52,9 +53,11 @@ const readShell = page => page.evaluate(async () => {
 });
 
 test('thirteen shipped pages share one header, plate, canvas and body family', async ({ page }) => {
+  // Thirteen navigations in one body: budget the walk, not the harness's flat 30 s (#146).
+  test.setTimeout(sweepTimeout(pages.length));
   const shells = [];
   for (const path of pages) {
-    await page.goto(path);
+    await openPage(page, path);
     const shell = await readShell(page);
     shells.push({ path, ...shell });
   }
@@ -161,6 +164,8 @@ test('landing on #buy puts the heading and the price row in view', async ({ page
 });
 
 test('the purchase path states one price string', async ({ page, context }) => {
+  // Thirteen pages, then four visits to the purchase page: the walk is what needs the budget.
+  test.setTimeout(sweepTimeout(pages.length + 4));
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   const check = async label => {
@@ -171,7 +176,7 @@ test('the purchase path states one price string', async ({ page, context }) => {
   };
 
   for (const path of pages) {
-    await page.goto(path);
+    await openPage(page, path);
     await check(path);
   }
 
@@ -361,6 +366,8 @@ test('every document page still uses the landing measure, not a second reading m
 // read mac.html#buy as a narrow block stuck to the logo with an empty band on the right (D-055).
 test('every page puts its content on the header grid at 1440, 1024 and 390', async ({ page }, info) => {
   test.skip(info.project.name !== '1440-light-no-preference', 'the test drives its own three widths');
+  // Thirteen pages at three widths in one body: thirty-nine navigations, budgeted by the walk.
+  test.setTimeout(sweepTimeout(3 * pages.length));
   const read = () => page.evaluate(() => {
     const edges = element => {
       const box = element.getBoundingClientRect();
@@ -386,7 +393,7 @@ test('every page puts its content on the header grid at 1440, 1024 and 390', asy
   for (const width of [1440, 1024, 390]) {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 844 });
     for (const path of pages) {
-      await page.goto(path);
+      await openPage(page, path);
       await page.evaluate(() => document.fonts.ready);
       const { headerWidth, blocks } = await read();
       expect(headerWidth, `${path} @${width}: the header container has real width`).toBeGreaterThan(200);

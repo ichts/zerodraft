@@ -9,6 +9,43 @@
   const service = new URL(form.action).origin;
   const options = { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' };
 
+  // Both controls swap their label with the state machine, and a control that resizes under the
+  // pointer reads as a different control. Each one reserves the width of its widest label in the face
+  // the device actually renders, the measured floor room.js gives the kept pill's copy control (D-059):
+  // a width tuned on one machine's sans moves the control again on the next.
+  const LABELS = {
+    '#buy-form button': ['Buy for $4.99 once', 'Opening checkout...', 'Try again'],
+    '#copy-license': ['Copy license key', 'Copied'],
+  };
+
+  function sizeLabelFloors() {
+    const floors = {};
+    for (const [selector, labels] of Object.entries(LABELS)) {
+      const control = document.querySelector(selector);
+      if (!control || !control.offsetParent) continue;
+      const probe = control.cloneNode(false);
+      probe.removeAttribute('id');
+      probe.style.cssText = 'position:absolute;left:-10000px;top:0;visibility:hidden;min-width:0';
+      control.parentElement.append(probe);
+      let widest = 0;
+      for (const text of labels) {
+        probe.textContent = text;
+        widest = Math.max(widest, probe.getBoundingClientRect().width);
+      }
+      probe.remove();
+      if (widest > 0) {
+        floors[selector] = `${Math.ceil(widest)}px`;
+        control.style.setProperty('--copy-floor', floors[selector]);
+      }
+    }
+    // Stacked on a phone, the row's ghost sits directly under the primary, so it shares that floor
+    // there (site.css, the phone step) instead of ending 9.8 px short of it.
+    if (floors['#buy-form button']) buy.closest('.doc-actions')?.style.setProperty('--copy-floor', floors['#buy-form button']);
+  }
+
+  sizeLabelFloors();
+  document.fonts.ready.then(sizeLabelFloors);
+
   window.addEventListener('pageshow', () => {
     buy.disabled = false;
     buy.textContent = buyLabel;
@@ -88,6 +125,7 @@
       key.textContent = deliveredKey;
       status.textContent = 'Your license key is ready.';
       result.hidden = false;
+      sizeLabelFloors();
     } catch {
       if (request !== latestRequest) return;
       status.textContent = 'Your license is not ready yet.';

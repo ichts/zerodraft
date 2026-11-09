@@ -444,13 +444,25 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .price-row .doc-price{margin:0;font:500 32px/1.1 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .home .doc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .home .doc-actions form{margin:0;display:flex}
+/* One width per control. Both labels change with the state machine - `Buy for $4.99 once` becomes
+   `Opening checkout...` and then `Try again`, `Copy license key` becomes `Copied` - and a control that
+   resizes under the pointer reads as a different control. buy.js writes --copy-floor from each
+   control's widest label measured in the face the device actually renders, the same measured floor
+   room.js sets on the kept pill's copy control (D-059), so no width depends on one machine's sans. */
+.home #buy-form button,.home #copy-license{min-width:var(--copy-floor)}
 /* The licence card is the buyer's return surface: pending, ready, copied and unpaid all live here. */
 .home .license-card{--pad:clamp(24px,4vw,40px);margin-top:var(--s5);padding:var(--pad);scroll-margin-top:var(--s4)}
 .home .license-card h2{margin:0}
-.home .license-key{margin:var(--s4) 0;padding:var(--s4);border:1px solid var(--hair);border-radius:var(--r-panel);background:var(--tag-bg);font:500 var(--t-ui)/1.6 var(--sans);overflow-wrap:anywhere}
+/* The key belongs to the card, not to a card inside it: one hairline above it separates it from the
+   status line, and the sans key carries the block on its own - no fill, no ring, no radius. */
+.home .license-key{margin:var(--s4) 0;padding:var(--s4) 0 0;border-top:1px solid var(--hair);font:500 var(--t-ui)/1.6 var(--sans);overflow-wrap:anywhere}
 .home .license-key code{font:inherit;color:var(--ink)}
 @media(max-width:767px){
   .home main.doc{padding-top:var(--s6)}
+  /* Stacked, the row's ghost sits directly under the primary, so it takes that control's measured
+     floor: 182 px beside 192 px reads as a near-miss, and equal widths read as one deliberate column.
+     The ghost still looks secondary by its own surface and colour, not by being narrower. */
+  .home #buy .doc-actions>.btn-ghost{min-width:var(--copy-floor)}
 }
 /* Q-01: on a phone the room's nav keeps the mark and the theme icon only, and the Mac link moves down into
    the exit row, so nothing in the header competes with the clock. */

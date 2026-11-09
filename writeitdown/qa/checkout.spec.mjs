@@ -258,3 +258,162 @@ test('a checkout retry announces Opening checkout as status, not alert', async (
   await expect(status).toHaveAttribute('role', 'alert');
   expect(calls).toBe(2);
 });
+
+// A control whose label changes must not change size: a purchase surface that reflows under the
+// pointer reads as a different control, and the reader loses the button they were aiming at.
+// Measured, not assumed: each control's widest label is rendered in place, and every state must
+// match it, so the assertion fails on the pre-change 183.9 / 191.2 / 114.3 px buy button and
+// 167.7 / 99.8 px copy button.
+async function naturalWidths(page, selector, labels) {
+  return page.evaluate(([selector, labels]) => labels.map(text => {
+    const source = document.querySelector(selector);
+    const clone = source.cloneNode(false);
+    clone.textContent = text;
+    clone.style.cssText += ';position:absolute;left:-9999px;top:0;visibility:hidden;min-width:0;width:auto';
+    source.parentElement.append(clone);
+    const width = clone.getBoundingClientRect().width;
+    clone.remove();
+    return { text, width: +width.toFixed(1) };
+  }), [selector, labels]);
+}
+
+const widthOf = (page, selector) => page.locator(selector).evaluate(el => +el.getBoundingClientRect().width.toFixed(1));
+
+test('the buy control keeps one width in idle, pending and error', async ({ page }) => {
+  // The first click is refused, so the label becomes `Try again`; the second hangs on the wire, so the
+  // pending label stays on screen long enough to measure. An aborted request would fail in a frame and
+  // the label would already be back to `Try again` when the assertion reads it.
+  let fail = true;
+  await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
+  await page.goto('mac.html');
+  const buy = page.locator('#buy-form button');
+  await expect(buy).toHaveText('Buy for $4.99 once');
+  const idle = await widthOf(page, '#buy-form button');
+  await buy.click();
+  await expect(buy).toHaveText('Try again');
+  const error = await widthOf(page, '#buy-form button');
+  fail = false;
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  const pending = await widthOf(page, '#buy-form button');
+  const labels = await naturalWidths(page, '#buy-form button', ['Buy for $4.99 once', 'Opening checkout...', 'Try again']);
+  const widest = Math.max(...labels.map(label => label.width));
+  expect(idle, `idle buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(pending, `pending buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(idle, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
+});
+
+test('the copy control keeps one width in ready and copied', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route(`${service}/license?session_id=cs_test_copy_width`, route => route.fulfill({ json: { licenseKey: key } }));
+  await page.goto('mac.html?session_id=cs_test_copy_width');
+  const copy = page.getByRole('button', { name: 'Copy license key', exact: true });
+  await expect(copy).toBeVisible();
+  const ready = await widthOf(page, '#copy-license');
+  await copy.click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  const copied = await widthOf(page, '#copy-license');
+  const labels = await naturalWidths(page, '#copy-license', ['Copy license key', 'Copied']);
+  const widest = Math.max(...labels.map(label => label.width));
+  expect(copied, `copied width against ${JSON.stringify(labels)}`).toBe(ready);
+  expect(ready, 'the widest label fits without a resize').toBeGreaterThanOrEqual(widest);
+});
+
+// The floor is measured from the face the device renders, not tuned to the sans on the author's
+// machine, so a wider default sans must still leave each control one width in every state.
+test('both controls keep their one width on a wider default sans', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/tokens.css', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(/--sans:[^;]+;/, '--sans:Verdana,"DejaVu Sans",sans-serif;');
+    await route.fulfill({ response, body });
+  });
+  await page.route(`${service}/license?session_id=cs_test_wider_width`, route => route.fulfill({ json: { licenseKey: key } }));
+  let fail = true;
+  await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
+
+  await page.goto('mac.html?session_id=cs_test_wider_width');
+  const copy = page.getByRole('button', { name: 'Copy license key', exact: true });
+  await expect(copy).toBeVisible();
+  await expect(copy).toHaveCSS('font-family', /^Verdana/);
+  const ready = await widthOf(page, '#copy-license');
+  await copy.click();
+  await expect(page.locator('#copy-license')).toHaveText('Copied');
+  const copied = await widthOf(page, '#copy-license');
+  const copyLabels = await naturalWidths(page, '#copy-license', ['Copy license key', 'Copied']);
+  expect(copied, `wider-sans copy width against ${JSON.stringify(copyLabels)}`).toBe(ready);
+  expect(ready, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...copyLabels.map(label => label.width)));
+
+  await page.goto('mac.html');
+  const buy = page.locator('#buy-form button');
+  await expect(buy).toHaveText('Buy for $4.99 once');
+  await expect(buy).toHaveCSS('font-family', /^Verdana/);
+  const idle = await widthOf(page, '#buy-form button');
+  await buy.click();
+  await expect(buy).toHaveText('Try again');
+  const error = await widthOf(page, '#buy-form button');
+  fail = false;
+  await buy.click();
+  await expect(buy).toHaveText('Opening checkout...');
+  const pending = await widthOf(page, '#buy-form button');
+  const labels = await naturalWidths(page, '#buy-form button', ['Buy for $4.99 once', 'Opening checkout...', 'Try again']);
+  expect(idle, `wider-sans buy width against ${JSON.stringify(labels)}`).toBe(error);
+  expect(pending, 'the wider pending label keeps the same width').toBe(error);
+  expect(idle, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...labels.map(label => label.width)));
+});
+
+// On a phone the buy row stacks, so the two controls sit one under the other and any width difference
+// reads as a near-miss rather than a hierarchy: before the width lock the pair was 182.2 / 183.9 px
+// (1.7 px apart), with only the two controls floored it was 182.2 / 192 px (9.8 px apart), and stacked
+// it is now 192 / 192 px. Stacked, the ghost takes the primary's measured floor and stays secondary by
+// its own surface and colour, not by being narrower; side by side at desktop width it keeps its
+// natural width.
+test('the stacked buy row keeps one width and stays secondary', async ({ page }) => {
+  await page.goto('mac.html');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    const ghost = page.locator('#buy .doc-actions > .btn-ghost');
+    const buy = page.locator('#buy-form button');
+    const [ghostBox, buyBox] = [await ghost.boundingBox(), await buy.boundingBox()];
+    expect(ghostBox.y + ghostBox.height, `the row stacks at ${width}px`).toBeLessThanOrEqual(buyBox.y);
+    expect(+ghostBox.width.toFixed(1), `ghost and primary share one width at ${width}px`).toBe(+buyBox.width.toFixed(1));
+    const ghostPaint = await ghost.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, weight: style.fontWeight, family: style.fontFamily };
+    });
+    const buyPaint = await buy.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, weight: style.fontWeight, family: style.fontFamily };
+    });
+    expect(ghostPaint.background, 'the ghost stays a ghost').not.toBe(buyPaint.background);
+    expect(ghostPaint.weight, 'the ghost keeps one type style with the primary').toBe(buyPaint.weight);
+    expect(ghostPaint.family, 'the ghost keeps one family with the primary').toBe(buyPaint.family);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const [ghostWide, buyWide] = [await widthOf(page, '#buy .doc-actions > .btn-ghost'), await widthOf(page, '#buy-form button')];
+  expect(ghostWide, 'side by side the ghost keeps its natural width').toBeLessThan(buyWide);
+});
+
+// A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
+// refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
+// every width, including the 480 px band where the current note wraps onto a second line.
+test('the refund window keeps its number and unit on one line', async ({ page }) => {
+  await page.goto('mac.html');
+  for (const width of [1440, 480, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    const rects = await page.evaluate(() => {
+      const note = document.querySelector('#price-row .doc-note');
+      const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        const at = node.nodeValue.indexOf('14\u2011day');
+        if (at < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + 6);
+        return [...range.getClientRects()].filter(rect => rect.width > 0).length;
+      }
+      return 0;
+    });
+    expect(rects, `the refund window splits at ${width}px`).toBe(1);
+  }
+});

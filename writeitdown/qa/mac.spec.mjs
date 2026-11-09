@@ -18,8 +18,14 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   const main = page.locator('main');
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} once`);
-  await expect(main).toContainText('Your first 3 writing sessions are free.');
-  await expect(main).toContainText('one license covers 2 computers for $4.99 once, with free updates and a 14-day refund.');
+  // The card states its facts once (A3): the price line and the note under it carry the price, the two
+  // computers, the free updates and the refund window. The paragraph that repeated them is gone. The
+  // Activate section states the 3 free sessions and the one-license-two-computers rule, and Refunds
+  // states the 14-day window as the policy behind the note.
+  await expect(page.locator('#buy-heading + #price-row'), 'the price line follows the heading').toHaveCount(1);
+  await expect(main).not.toContainText('one license covers 2 computers');
+  await expect(page.locator('#price-row .doc-note')).toHaveText('2 computers. No subscription. Free updates. 14\u2011day refund.');
+  await expect(page.locator('#activate + p')).toContainText('3 free sessions');
   await expect(main).not.toContainText(/buying opens soon|not open yet|coming soon/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
   await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('method', 'post');
@@ -27,7 +33,7 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await expect(page.getByRole('button', { name: 'Buy for $4.99 once', exact: true })).toBeEnabled();
   await expect(page.locator('[data-launch="license"]')).toContainText("paste it into the app's activation field");
   await expect(page.locator('#waitlist-form')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
+  await expect(page.locator('#buy').getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
   await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down');
   await expect(page.locator('#price-row')).toContainText('2 computers. No subscription.');
   await expect(page.locator('#requirements + p')).toContainText('Requires macOS 14 Sonoma or later');

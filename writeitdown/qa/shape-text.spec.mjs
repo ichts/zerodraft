@@ -60,10 +60,9 @@ test('continuous corners: boxes are superellipse, pills round, the header chip k
   test.skip(!supported, 'no continuous corners in this browser');
   const shapes = await page.evaluate(() => {
     const shape = (selector, pseudo = null) => getComputedStyle(document.querySelector(selector), pseudo).cornerShape;
-    return { card: shape('.dlbox'), panel: shape('.dlbox .sha'), pill: shape('.btn'), theme: shape('.theme-btn'), chip: shape('.brand', '::before') };
+    return { card: shape('.dlbox'), pill: shape('.btn'), theme: shape('.theme-btn'), chip: shape('.brand', '::before') };
   });
   expect(shapes.card).toBe('superellipse(1.25)');
-  expect(shapes.panel).toBe('superellipse(1.25)');
   expect(shapes.pill).toBe(ROUND);
   expect(shapes.theme).toBe(ROUND);
   expect(shapes.chip).toBe(ROUND);
@@ -90,14 +89,28 @@ async function measureNested(page, pairs) {
   }), pairs);
 }
 
+// The download page keeps no panel inside its cards (finding 43, A4): the hash, the release note and
+// the install command open on one hairline rule and carry no fill, no radius and no closed box, so the
+// nested-radius rule has nothing left to apply to there.
 for (const width of [1440, 700, 360]) {
-  test(`nested radius r = R - p on the download page at ${width}px`, async ({ page }) => {
+  test(`the download page's copyable blocks stay hairlines, not panels, at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('download/');
-    const rows = await measureNested(page, [nested('.dlbox', '.dlbox .sha'), nested('.steps3 .card', '#install code')]);
-    for (const { card, R, p, r } of rows) {
-      expect(R, `${card} radius`).toBe(24);
-      expect(r, `${card} (R ${R}, p ${p}) panel radius`).toBe(Math.max(4, R - p));
+    const rows = await page.evaluate(() => ['.dlbox .sha', '#install code'].flatMap(selector =>
+      [...document.querySelectorAll(selector)].map(element => {
+        const style = getComputedStyle(element);
+        return {
+          selector, radius: parseFloat(style.borderTopLeftRadius), fill: style.backgroundColor,
+          top: [parseFloat(style.borderTopWidth), style.borderTopStyle],
+          closed: ['Right', 'Bottom', 'Left'].map(side => parseFloat(style['border' + side + 'Width'])),
+        };
+      })));
+    expect(rows.map(row => row.selector), 'the two checksum blocks and the install command').toEqual(['.dlbox .sha', '.dlbox .sha', '#install code']);
+    for (const row of rows) {
+      expect(row.radius, `${row.selector} takes no radius`).toBe(0);
+      expect(row.fill, `${row.selector} adds no fill`).toBe('rgba(0, 0, 0, 0)');
+      expect(row.top, `${row.selector} opens on one hairline`).toEqual([1, 'solid']);
+      expect(row.closed, `${row.selector} closes no box`).toEqual([0, 0, 0]);
     }
   });
 }

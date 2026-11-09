@@ -1091,3 +1091,77 @@ deleted afterwards:
 - Q-23 pass: `qa/typography.spec.mjs` still passes on all eight projects, including the shared advances
   from `qa/shared-type-baseline.json` (the GB2312 glyph advances are the same face, so nothing moved).
 - Q-14 pass: no geometry change; the room's measure, anchor and line height are untouched.
+
+# 2026-11-09: The room's Chinese arrives early and is never held invisible (D-109)
+
+D-108 stopped a character changing face after it was drawn and left a worse defect in the same place: a
+writer who clicks the door and types at once sees nothing while `font-display:block` waits for 2.5 MB.
+`fonts-cjk.css` now declares the face `font-display:swap`; `room.js` fixes the face at each draft's first
+Chinese character (Zhuque when its bytes are loaded, the platform serif when they are not) and holds that
+choice until the sheet is empty again, and it prefetches the file on an idle main thread after intent on a
+trial link, at low priority, so the next draft draws Zhuque. The room's own request at door-open stays as
+the backstop.
+
+## Commands and results
+
+- `npx playwright test qa/chinese-face.spec.mjs qa/door-instant.spec.mjs qa/door-grow.spec.mjs
+  qa/typography.spec.mjs` -> 136 passed, 0 failed, eight projects, and the same suite again 136/136 after
+  the last edit; `qa/door-instant.spec.mjs` alone 16/16 and `qa/door-grow.spec.mjs` alone 8/8 four times
+  in a row. `qa/chinese-face.spec.mjs` is now seven tests: one file with a visible-text display policy,
+  the composing span still carrying no face, the door asking for the face, a character typed while the
+  file is in flight painted at once and never repainted, a room that finds the file resident drawing
+  Zhuque, the draft after a wipe drawing the face that has landed by then, and a bounce that fetches no
+  Chinese while intent starts exactly one low-priority request. Two of them fail on `9b818ad` (the
+  display policy and the painted-at-once assertion), which is the red proof for the new gate.
+- One intermediate run (before the font engine's ask was held behind the door's grow) failed both
+  `qa/door-instant.spec.mjs` projects while the door was compositing during a 2.5 MB font decode. The
+  decode now waits for `growUntil`, and the four runs above are clean; the spec's own history of a
+  frame-to-frame shrink under a loaded host is unchanged by this batch.
+- `node .pi/skills/verify-writing-deadlines/verify.mjs` -> `27,000 checks, 0 failures` (the room's
+  session module is unchanged by this batch).
+- The full site suite was not run: fast tier, and this change touches one generated stylesheet, one
+  builder, `room.js`, `tokens.css`, `site.css` and two specs.
+
+## Measured (a disposable macOS 26.6 VM, the VM's own Chrome 157, real CDP throttling)
+
+The built site served inside the guest; the door clicked with a real HID click; three Chinese characters
+committed through the browser's IME entry point within 200 ms of the click; pixels from a
+`Page.screencast` at a 17 ms median frame interval, each frame timestamped on the same wall clock as the
+commit.
+
+| | Fast 3G | Slow 4G | `9b818ad`, Fast 3G |
+| --- | --- | --- | --- |
+| first frame showing the character | +5 ms | +10 ms | +12 ms, then nothing |
+| frames showing nothing in the 3.5 s after the commit | 0 of 210 | 0 of 177 | **59 of 209 (about 1.0 s)** |
+| ink at +100 ms / +1 s / +3 s | 59 / 57 / 57 px | 59 / 57 / 57 px | 1 / 0 / 57 px |
+| face the room drew | platform serif for the draft | platform serif for the draft | platform serif, then a repaint |
+| second draft after the wipe | Zhuque Fangsong | Zhuque Fangsong | Zhuque Fangsong |
+
+Page weight, cold cache: a bounce pays 514,588 B and none of the face; intent on the trial link adds
+2,589,738 B as one `Low` request, starting 4.6 s (Fast 3G) and 13.9 s (Slow 4G) after first contentful
+paint. FCP and LCP are unmoved by it (1,428-1,444 ms on Fast 3G with and without a hover, 4,972 ms on
+Slow 4G). The door is unmoved too: click to room visible 8-21 ms, click to editor focused 7-20 ms across
+five runs, with the 2.5 MB fetch already in flight in three of them. The frame-by-frame tables, the raw
+CDP reports and the harness are in `data/wid-ime-block-budget/` (`README.md` first).
+
+## Not reproduced, and limits
+
+- The VM cannot enable the macOS Pinyin input source (`TISSelectInputSource` -50,
+  `TISEnableInputSource` leaves it disabled, and the login agent drops it again). The composed sequence
+  therefore comes from Chrome's own IME entry point, and one run repeats the measurement with the
+  characters typed as real HID key events to show the result does not depend on that harness.
+- A cold slow session writes its first draft in the platform serif. That is the stated trade: on Slow 4G
+  the file lands at 65 s, long after the first draft's own silence deadline, and the draft that follows
+  draws Zhuque.
+- Characters outside GB2312 still fall back to the platform face, unchanged by this decision.
+
+## Quality checklist rows this change touches
+
+- Q-07 pass: no label, helper line or caption is added; the composer keeps its rule and the room's copy
+  is untouched.
+- Q-09 pass: the face, the sheet and the room are unchanged in light and dark at both widths.
+- Q-21 pass: no token value changes; `tokens.css` gains one derived stack (`--serif-platform`) built from
+  the same family names.
+- Q-23 pass: `qa/typography.spec.mjs` passes on all eight projects, including the shared advances.
+- Q-14 pass: no geometry change; the room's measure, anchor, line height and wrapped advances are
+  untouched.

@@ -45,6 +45,10 @@ let shiftTarget = -1;
 let inkKey = null;
 let refusalNoticed = false;
 let refusalTimer = 0;
+// 'webfont' or 'platform', chosen at the first Chinese character of a draft and then fixed until that draft ends
+// (D-109). A draft boundary is the room's own empty sheet - the door opening, a restart after a wipe - so a second
+// draft on a slow link draws the face that has landed by then instead of the one the first draft had to accept.
+let cjkFace = null;
 
 function announce(text) {
   if ($('status').textContent !== text) $('status').textContent = text;
@@ -195,6 +199,8 @@ function render(now = performance.now()) {
   if (warning) announce('Keep typing or the draft is deleted. Three seconds left.');
   if (failed) {
     compositionBase = null;
+    cjkFace = null;
+    delete room.dataset.cjkFace;
     editor.value = '';
     fitEditor();
     // The editor keeps focus under the transparent writing layer, so typing restarts in place.
@@ -285,6 +291,8 @@ function reset() {
   state = fresh();
   copyGeneration++;
   compositionBase = null;
+  cjkFace = null;
+  delete room.dataset.cjkFace;
   clearExitHint();
   refusalNoticed = false;
   endRefusalNotice();
@@ -305,6 +313,8 @@ function restart() {
 
 let routed = false;
 let growing = [];
+// The moment the door's grow stops owning the main thread; the font engine waits for it (D-109).
+let growUntil = 0;
 
 // The door opens (D-097): the room's paper is the landing's demo paper grown, and the brand row slides to its
 // place, instead of the demo vanishing and a new paper appearing 160 px away. Only transforms and an opacity
@@ -348,6 +358,7 @@ function route() {
   const active = location.hash === '#trial';
   growing.forEach(a => a.cancel());
   growing = [];
+  growUntil = 0;
   const from = active && !returning && routed ? boxes() : null;
   document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;
@@ -355,20 +366,113 @@ function route() {
   routed = true;
   slot.invalidate();
   reset();
-  if (active) { warmRoomFace(); fitEditor(); editor.focus({ preventScroll: true }); if (from) growInto(from); }
+  if (active) {
+    fitEditor();
+    editor.focus({ preventScroll: true });
+    if (from) { growInto(from); growUntil = performance.now() + GROW_MS; }
+    warmRoomFace();
+  }
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
 }
 
-// Chinese is one GB2312 file declared `font-display:block`, so a character is drawn once, in the face the room
-// means, or not at all - never in the platform serif first and Zhuque a frame later (D-108). The room asks for it
-// as the door opens, in the second a writer spends reading the empty sheet, so the face is normally resident before
-// the first keystroke. Nothing on the landing asks for it, and the landing draws no Chinese (D-057). The request
-// waits out the door's own grow: decoding 2.5 MB of font is main-thread work and the grow owns those 240 ms.
+// Chinese is one GB2312 file and a draft draws it in exactly one face (D-109). Which face is decided at the draft's
+// first Chinese character and never revisited until the sheet is empty again: Zhuque if its bytes are already
+// resident, the platform serif if they are not. That decision is what makes both promises true at once - the
+// character is on the sheet at once, and no character ever changes face afterwards no matter when the file lands.
+// `font-display:swap` in `fonts-cjk.css` is the second guard under the same promise: a path that painted Chinese
+// without reaching this decision falls back to visible text, never to an invisible one.
+//
+// Chrome cannot be trusted with `font-display:optional` here: it abandons an optional face for the whole document at
+// the first paint that happens without it, and it then keeps the platform face even when the file has been resident
+// for seconds before the first Chinese character (measured, and held in `qa/chinese-face.spec.mjs`).
+function adoptCjkFace(text) {
+  if (cjkFace || !/[\u3400-\u9fff\uf900-\ufaff]/.test(text)) return;
+  const face = [...document.fonts].find(candidate => candidate.family.includes('Zhuque Fangsong'));
+  cjkFace = face?.status === 'loaded' ? 'webfont' : 'platform';
+  room.dataset.cjkFace = cjkFace;
+}
+
+// The room asks the font engine for the face as its route opens, in the second a writer spends reading the empty
+// sheet; a trial link that has already shown intent has asked earlier (prefetchRoomFace), so the face is normally
+// resident before the first keystroke. Nothing on the landing asks for it, and the landing draws no Chinese
+// (D-057). The request waits out the door's own grow: decoding 2.5 MB of font is main-thread work and the grow owns
+// those 240 ms.
 let faceWarmed = false;
-function warmRoomFace() {
+let faceTimer = 0;
+function askForRoomFace() {
   if (faceWarmed || !document.fonts?.load) return;
+  // Decoding 2.5 MB is main-thread work and the door's grow owns the 240 ms after the route opens, so the ask
+  // (however early the bytes arrived) lands after it. One rule, whichever path got here.
+  const wait = growUntil - performance.now();
+  if (wait > 0) {
+    clearTimeout(faceTimer);
+    faceTimer = setTimeout(askForRoomFace, Math.ceil(wait) + 20);
+    return;
+  }
   faceWarmed = true;
-  setTimeout(() => { document.fonts.load('28px "Zhuque Fangsong"', '我').catch(() => {}); }, GROW_MS + 60);
+  document.fonts.load('28px "Zhuque Fangsong"', '我').catch(() => {});
+}
+
+function warmRoomFace() {
+  // A prefetch already in flight asks the font engine itself when its bytes land; asking here as well would send the
+  // same 2.5 MB twice on the link that can least afford it.
+  if (faceAsked) return;
+  askForRoomFace();
+}
+
+// The face is 2,589,548 B and it belongs to the room, not to the landing: a visitor who reads and leaves pays none
+// of it. Intent on a trial link - pointer, touch or focus - starts the fetch while they read, so on a slow link the
+// file is already arriving when the door opens instead of starting then (D-109). It runs after the frame that
+// painted the intent and on an idle main thread, so it can never delay first paint, LCP or the door's grow.
+// Two steps, because they have different priorities and only a preload can be told to be low: the bytes travel as a
+// low-priority preload (the only request on the wire, and `document.fonts.load()` here would be VeryHigh and would
+// compete with the landing's own paint), then the idle main thread hands those cached bytes to the font engine so
+// the first character finds a resident face instead of paying for the decode under the door.
+let faceAsked = false;
+
+// The face's file name lives in the generated `fonts-cjk.css`, so the preload reads it from there instead of
+// repeating a second copy that a rebuild could leave pointing at a file that no longer exists.
+function faceFile() {
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try { rules = sheet.cssRules; } catch { continue; }
+    for (const rule of rules) {
+      if (rule.constructor.name !== 'CSSFontFaceRule' || !rule.style.fontFamily.includes('Zhuque Fangsong')) continue;
+      const url = rule.style.src.match(/url\(["']?([^"')]+)["']?\)/);
+      if (url) return url[1];
+    }
+  }
+  return null;
+}
+
+const whenIdle = run => (window.requestIdleCallback || (later => setTimeout(later, 0)))(run, { timeout: 2000 });
+
+function prefetchRoomFace() {
+  if (faceAsked || faceWarmed || !room.hidden) return;
+  const href = faceFile();
+  if (!href) return;
+  faceAsked = true;
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'font';
+  link.type = 'font/woff2';
+  // A font preload without crossOrigin is a different fetch from the font request and is made twice;
+  // fetchpriority is the only lever that keeps the 2.5 MB off the landing's critical path.
+  link.crossOrigin = 'anonymous';
+  link.setAttribute('fetchpriority', 'low');
+  link.addEventListener('load', () => whenIdle(askForRoomFace), { once: true });
+  link.href = href;
+  document.head.append(link);
+}
+
+function prefetchSoon() {
+  requestAnimationFrame(() => whenIdle(prefetchRoomFace));
+}
+
+for (const entry of document.querySelectorAll('#landing a[href="#trial"]')) {
+  for (const type of ['pointerenter', 'pointerdown', 'touchstart', 'focus']) {
+    entry.addEventListener(type, prefetchSoon, { once: true, passive: true });
+  }
 }
 
 // The room's sheet is hidden until the door opens, so its texture used to be painted on the page in the click's
@@ -427,6 +531,7 @@ editor.addEventListener('input', event => {
     return;
   }
   const addition = editor.value.slice(base.length);
+  adoptCjkFace(addition);
   if (compositionBase !== null) {
     const active = append(state, addition || event.data || '', performance.now());
     state = { ...active, text: editor.value };

@@ -2201,8 +2201,59 @@ is `docs/wid-world-table.md`.
   dark, and the census that counts card-in-card panels on this page as 3 before and 0 after, are in
   `data/wid-design-a4-download/`.
 
+## D-109: The Chinese face is never held invisible, and it arrives before it is needed
+
+- Date: 2026-11-09
+- Decision: `fonts-cjk.css` keeps its one GB2312 file (2,589,548 B) but declares it
+  `font-display:swap`, so a Chinese character is painted the instant it is committed, in whatever face
+  is resident. The room then fixes the face for that draft: `room.js` reads the face's status at the
+  draft's first Chinese character - Zhuque if its bytes are already loaded, the platform serif if they
+  are not - writes the choice to `data-cjk-face` on `#room`, and never revisits it until the sheet is
+  empty again (the door opening, the restart after a wipe). `tokens.css` carries the frozen stack as
+  `--serif-platform` (`Newsreader, serif, Georgia, ...`), which `site.css` substitutes for `--serif`
+  when the room is frozen, so the whole room moves together and the CSS still names one face per draft.
+  The landing prefetches the file only after the visitor shows intent on a trial link (pointer, touch
+  or focus): a `rel=preload` at `fetchpriority=low` starts one request while they read, and its `load`
+  handler hands the cached bytes to the font engine on an idle main thread. The room's own request as
+  the door opens stays as the backstop for a deep link or a reload. Nothing on the landing asks for the
+  face on arrival, and the landing draws no Chinese (D-057).
+- Reason: D-108 fixed a character changing face after it was drawn, and created a worse defect in the
+  same place - being invisible. With `font-display:block`, a writer who clicks the door and types at
+  once watches an empty sheet until Chrome's 3 s block window ends: measured on a Fast 3G profile in the
+  VM, the character committed at the first keystroke was drawn 1.0 s later (59 blank frames at 17 ms),
+  and on a slower link the window is wider. `font-display:optional` cannot take its place: Chrome
+  abandons an optional face for the whole document at the first paint that happens without it, and then
+  keeps the platform face even when the file has been resident for seconds before the first Chinese
+  character (measured on a cached second load: still PingFang). So the visible-text policy has to be
+  `swap`, and the no-repaint guarantee has to be the room's own decision instead of the browser's.
+  Measured after the change, same rig, three Chinese characters committed within 200 ms of the click:
+  first ink at +5 ms (Fast 3G) and +10 ms (Slow 4G), zero frames without ink in the 3.5 s that follow,
+  and a flat ink count for 3 s, which is what a repaint would break. The trade is stated, not hidden: a
+  cold slow session writes its first draft in the platform serif, and every later draft in that page
+  load - the sheet being empty in between - is written in Zhuque. The page weight stays off a visitor
+  who is not interested: 0 B for the face on a bounce, 2,589,738 B after intent, one request at
+  `Low`, starting 4.6 s (Fast 3G) and 13.9 s (Slow 4G) after first contentful paint and after LCP, which
+  it does not move (1,428-1,444 ms with or without a hover; 4,972 ms on Slow 4G). The door is unchanged
+  with the fetch in flight: click to room on screen 8-21 ms, click to editor focused 7-20 ms.
+- Supersedes: D-108's `font-display:block` clause, its title's "one blocking face", and its reason that
+  a request at door-open keeps the text from being invisible. The single face, the GB2312 subset, the
+  one-file arrangement, the composing span carrying no face of its own, and the Mac's own registration
+  of the same face are unchanged.
+- Evidence: `writeitdown/qa/chinese-face.spec.mjs` - one face with a visible-text display policy, the
+  composing span still faceless, the door asking for the face, a character typed while the file is in
+  flight painted at once and never repainted afterwards, a room that finds the file resident drawing
+  Zhuque, and a bounce that fetches no Chinese while intent starts one low-priority request. The
+  painted-at-once and no-later-request assertions fail on `9b818ad`. The throttled VM measurements -
+  frame-by-frame visibility, the face census, the page weights, the door timings, and the same harness
+  run against `9b818ad` showing 59 blank frames - are in
+  `data/wid-ime-block-budget/` (`README.md`, then `harness/` and `evidence/`).
+
 ## D-108: The room's Chinese is one blocking face, asked for when the door opens
 
+- Status: superseded in part by D-109. The file arrangement, the single face and the subset stand. The
+  `font-display:block` clause and the reasoning that a request at door-open never holds text invisible
+  do not: block did hold it invisible, for about a second on the measured link. Read D-109 for what
+  replaced them.
 - Date: 2026-11-09
 - Decision: `fonts-cjk.css` declares Zhuque Fangsong once, subset to GB2312 (2,589,548 B), with no
   `unicode-range` slicing and `font-display:block`, and only `index.html` links it. `room.js` asks the

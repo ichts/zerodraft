@@ -97,6 +97,11 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media (prefers-reduced-motion:reduce){.editor-ink [data-rung]{transition:none}}
 /* The textarea's own composition underline is as transparent as its text, so the ink layer draws it. */
 .editor-ink .composing{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.12em}
+/* The room's Chinese face is fixed per draft, at that draft's first Chinese character (D-109): Zhuque if those bytes
+   are already resident, the platform serif if they are not, and never both within one draft. Nothing is drawn
+   between the two states, so the choice is invisible; freezing it is what keeps every drawn character in the face it
+   was first drawn in, however late the file lands. A later draft, on an empty sheet, decides again. */
+.room[data-cjk-face="platform"]{--serif:var(--serif-platform)}
 /* Only the writing surface itself takes the pointer; the rest of the aperture stays
    transparent so the result screens' controls above it stay clickable. */
 #editor{pointer-events:auto}

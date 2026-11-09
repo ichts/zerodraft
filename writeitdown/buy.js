@@ -12,7 +12,7 @@
   // cannot drift between the reserved width and the label that lands in it.
   const LABELS = {
     buy: { idle: buy.textContent, busy: 'Opening checkout...', retry: 'Try again' },
-    copy: { idle: 'Copy license key', done: 'Copied' },
+    copy: { idle: document.getElementById('copy-license').textContent, done: 'Copied' },
   };
 
   // Both controls swap their label with the state machine, and a control that resizes under the
@@ -20,8 +20,8 @@
   // the device actually renders, the measured floor room.js gives the kept pill's copy control (D-059):
   // a width tuned on one machine's sans moves the control again on the next.
   const WIDTH_PROBES = {
-    '#buy-form button': [LABELS.buy.idle, LABELS.buy.busy, LABELS.buy.retry],
-    '#copy-license': [LABELS.copy.idle, LABELS.copy.done],
+    '#buy-form button': Object.values(LABELS.buy),
+    '#copy-license': Object.values(LABELS.copy),
   };
 
   function sizeLabelFloors() {

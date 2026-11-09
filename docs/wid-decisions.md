@@ -2168,3 +2168,35 @@ is `docs/wid-world-table.md`.
   `writeitdown/qa/shape-text.spec.mjs` (the key's one hairline, no radius, transparent);
   measurements, states and captures in `writeitdown/QA.md` (2026-11-09) and
   `data/wid-design-a3-buy-card/`.
+
+## D-107: The download page states its terms once and keeps no card inside a card
+
+- Date: 2026-11-09
+- Decision: `/download/` states the trial, the price, the seats and the refund once, in its four
+  requirement rows. The Activate card keeps only the step those rows do not state: `Buy a license`,
+  then paste the key from the purchase page into the app. The Refunds card is deleted, and the 14-day
+  refund survives as the requirement row it duplicated. The published SHA-256, the optional release
+  note and the Install card's `shasum` command are text blocks, not panels: no background, no radius,
+  no closed border, one 1 px `--hair` rule above, the mono face kept on the hash and the command, and
+  their text aligned to the card's content edges. The card's own surface is therefore the only panel
+  on the page, and the Install and Activate cards sit two to a row on the 760 px grid, each at its own
+  height.
+- Reason: captain's intent on the web design audit, section A4 (findings 11 and 43). `3 free
+  sessions`, `$4.99 once`, `2 computers` and `14 days` appeared in the requirement rows and again in
+  the Activate and Refunds cards, and the hash, the release note and the install command each drew a
+  filled, rounded panel inside a bordered card, which design rulebook rule 14.4 d forbids. The
+  deletion adds no copy and removes no fact: every term still appears once on the page.
+- Supersedes: D-060's "the published SHA-256 sits in its own mono panel" clause, meaning its `--tag-bg`
+  fill, its hairline border, its panel padding and its 12 px tighter panel padding below 365 px. The
+  hash's two atomic 32-character halves, its 13 px mono in the ink role with the mute label, the
+  command's argument-boundary break, and the no-scroll, no-fade and exact-copy rules all stand
+  unchanged. D-075's parenthetical that the 14 px and 12 px panel paddings on `/download/` are left
+  alone because moving them changes the width the hash halves and the command wrap against no longer
+  applies: those paddings are gone. The `.dlbox` 22 px padding between 365 and 820 px stays.
+- Evidence: `writeitdown/qa/mac.spec.mjs` (the download page has no `#refunds`, the Activate card no
+  longer repeats `3 free sessions`, `$4.99` or `14 days`, and the hash declares no fill, no radius and
+  exactly one hairline top at five widths), `writeitdown/qa/shape-text.spec.mjs` (the two checksum
+  blocks and the install command take no radius, no fill and no closed box at 1440, 700 and 360 px).
+  Each assertion fails on the pre-fix page. Before/after captures at 1440x900 and 390x844 in light and
+  dark, and the census that counts card-in-card panels on this page as 3 before and 0 after, are in
+  `data/wid-design-a4-download/`.

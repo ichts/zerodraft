@@ -885,3 +885,84 @@ and the same weight and family.
 were re-shot; the other captures still describe the shipped layout. Two filled primaries in the ready
 state, the 44 vs 48 px button heights, the duplicated `Opening checkout...` line and the 390 px error
 wrapping `a moment.` stay out of scope and were recorded as pre-existing by that review.
+
+# 2026-11-09: The download page states its terms once and holds no card inside a card (D-107)
+
+`/download/` carried `3 free sessions`, `$4.99 once`, `2 computers` and `14 days` twice, in the four
+requirement rows and again in the Activate and Refunds cards, and it nested three filled, rounded
+panels inside its bordered cards: the published SHA-256, the release note and the Install card's
+`shasum` command. The Refunds card is deleted, the Activate card keeps only the activation step the
+requirement rows do not state, and those three blocks now open on one 1 px `--hair` rule with no fill,
+radius or closed border. No copy is added. The steps row carries two cards, each at its own height, on
+the same 760 px grid as the download card above it.
+
+## Commands and results
+
+- `cd writeitdown && npx playwright test`: exit 0, 1303 passed across the eight viewport, theme and
+  motion projects (14.2 min).
+- `npm run release-check -- --download`: `STATIC CHECK PASSED` and `Download page ready: the DMG link,
+  the Install command and its published SHA-256 agree`. The `data-launch` slots and the SHA node are
+  byte-for-byte untouched: `git diff` shows no line inside them.
+- Known-broken proof for the new gates: with only `download/index.html` and `site.css` restored from
+  `HEAD` and every test file kept, `npx playwright test qa/mac.spec.mjs qa/shape-text.spec.mjs -g
+  "download page states the trial|copyable blocks stay hairlines|the download head breaks without an
+  orphan"` fails 5 of 5 (`#refunds` count 1 against 0, nested panels 3 against 0, and the three
+  hairline rows reporting radius 4 px, a `--tag-bg` fill and four borders). On the fixed tree the same
+  selection passes 10 of 10 across 1440 and 390.
+
+## Measured
+
+- Card-in-card panels on `/download/`: 3 before, 0 after, at 1440x900 and 390x844 in both themes.
+  Full-page height 1908 to 1718 px at 1440 and 2612 to 2324 px at 390.
+- The hash, the release note and the install command: `background rgba(0, 0, 0, 0)`, `border-radius
+  0`, `border-top 1px solid` the same `--hair` value in both themes
+  (`rgba(28, 25, 23, 0.1)` light, `rgba(236, 231, 217, 0.1)` dark), and their text edges equal the
+  card's content edges (373 and 1067 px at 1440, 43 and 347 px at 390, 33 and 287 px at 320).
+- Text on the card, measured: the quiet role 5.77:1 light and 5.8:1 dark, the ink mono 17.49:1 light
+  and 12.69:1 dark. Nothing on the page reads below 4.5:1 at 1440, 1024, 390 or 320.
+- Two step cards: equal widths (372 px at 1440, 350 px at 390), one shared top edge, heights 363.9 and
+  128.5 px, no document overflow at any of the four widths.
+
+## Capture index
+
+`/Users/ichts/firstmate-homes/wid/data/wid-design-a4-download/captures/{before,after}/`: full-page
+`page-download-{1440,390}-{light,dark}.png` at deviceScaleFactor 1, plus `census.json` with the panel
+list, the computed borders and backgrounds, and the page height for each capture.
+
+## Standing UI review (emil passes over the changed page)
+
+- emil-ui-review: ship it. One visible primary action (the ink Download pill) and one ghost buy; the two
+  COPY controls keep their 36 px height and their labels. No motion was added, nothing shifts, and the
+  screen has no dynamic number to stabilise.
+- emil-design-foundations: pass. Token colours only (`--hair` replaces a `--tag-bg` fill), one hairline
+  weight, text and rules on the card's content edges, and the 62-character release note stays on one
+  line, so no reading measure is exceeded.
+- emil-surfaces: pass. No nested radius is left to derive; the one border kept is separation, not
+  elevation, which that skill keeps as the divider case. Its 0.5 px retina hairline advice is not
+  taken: this project holds one 1 px line weight site-wide (design rulebook 14.4 e), and a page-local
+  half-pixel rule would be the only one on the site.
+- emil-typography: pass. Monospace stays inside `code` for the two literal machine strings, line
+  heights are unitless, no orphaned word appears in the release note or the Activate sentence at 320,
+  390 or 1440, and all four text roles clear 4.5:1.
+- Not fixed here, both pre-existing and site-wide (bounded follow-ups, not caused by this change):
+  the shared `.btn` is 36 px tall, under the 44 px touch floor, and the download page still carries six
+  font sizes (13, 14, 15, 17, 20, 60), which A6 owns.
+
+## Quality checklist rows this change touches
+
+- Q-07 pass: three panels and one card lose their labels and their duplicate sentences; no label,
+  helper line or caption is added.
+- Q-09 pass: captured in light and dark at 1440x900 and 390x844, and the hairline flips with the theme
+  rather than staying a light-mode colour.
+- Q-14 pass: the hash, the release note and the install command start and end on their card's content
+  edges to the half pixel (measured above), and the two step cards share one top edge and one width.
+- Q-20 pass: the four facts appear once each, in the requirement rows; the Activate card states the
+  activation step and nothing else; `$4.99 once` is still one string site-wide (`qa/shell.spec.mjs`).
+- Q-21 pass: token colours only; a fill reference (`--tag-bg`) is removed, one hairline token is used.
+- Q-23 pass: both copyable strings stay in the system monospace inside `code`, and
+  `qa/typography.spec.mjs` passes at every project.
+- Q-28 pass: the 64-character hash's two unbroken halves and the install command's argument-boundary
+  break still fit and copy exactly at 1440, 1024, 390, 375 and 320 px, with no scroll container, fade
+  or clipping; the new hairline takes no width from either string.
+- Design rulebook 14.4 d pass: 3 card-in-card panels before, 0 after, asserted by
+  `qa/mac.spec.mjs` (`nestedPanels`) and `qa/shape-text.spec.mjs`.

@@ -743,7 +743,14 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
   await expect(page.locator('main a[href="../mac.html#buy"]').first()).toBeVisible();
   await expect(page.locator('h1')).toHaveCount(1);
-  for (const id of ['install', 'trial', 'refunds']) await expect(page.locator(`#${id} h2`)).toBeVisible();
+  for (const id of ['install', 'trial']) await expect(page.locator(`#${id} h2`)).toBeVisible();
+  // The facts rows state the trial, the price, the seats and the refund once. The Activate card
+  // keeps the one thing they do not say, how to activate, and the Refunds card is gone (finding 11).
+  await expect(page.locator('#refunds')).toHaveCount(0);
+  await expect(page.locator('#trial')).not.toContainText('3 free sessions');
+  await expect(page.locator('#trial')).not.toContainText('$4.99');
+  await expect(page.locator('#trial')).not.toContainText('14 days');
+  await expect(page.locator('#trial a[href="../mac.html#buy"]')).toHaveText('Buy a license');
   await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
@@ -981,7 +988,17 @@ test('the download head breaks without an orphan and its checksum block reads', 
         hashBlock: block(hash),
         hashColor: getComputedStyle(hashCode).color,
         panelBackground: getComputedStyle(hash).backgroundColor,
+        cardBackground: getComputedStyle(hash.closest('.card')).backgroundColor,
+        panelBorder: getComputedStyle(hash).borderTop, panelRadius: getComputedStyle(hash).borderTopLeftRadius,
         page: getComputedStyle(document.body).backgroundColor,
+        // Card in card (rule 14.4 d): a copyable block that still carries its own fill, a radius or a
+        // closed border is a panel inside the card. One hairline top is the only line it may keep.
+        nestedPanels: [hash, document.querySelector('#release-notes'), install].filter(element => {
+          const style = getComputedStyle(element);
+          const sides = ['Top', 'Right', 'Bottom', 'Left']
+            .filter(side => parseFloat(style['border' + side + 'Width']) > 0 && style['border' + side + 'Style'] !== 'none').length;
+          return style.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(style.borderTopLeftRadius) > 0 || sides > 1;
+        }).length,
         commandText: install.textContent,
         commandParts: [...install.children].map(span => ({ text: span.textContent, bands: lineBands(span), inside: inside(span) })),
         commandBlock: block(install),
@@ -1014,8 +1031,11 @@ test('the download head breaks without an orphan and its checksum block reads', 
     expect(strings.commandBlock.overflowX, `${width}: the command block is not a scroll container`).not.toMatch(/auto|scroll/);
     expect(strings.commandBlock.scrollWidth, `${width}: the command block does not overflow`).toBeLessThanOrEqual(strings.commandBlock.clientWidth + 1);
     expect(strings.ghost, `${width}: no scroller or fade remains`).toBe(0);
-    expect(strings.panelBackground, `${width}: the hash keeps its panel`).not.toBe(strings.page);
-    expect(contrast(strings.hashColor, strings.panelBackground), `${width}: the hash stays legible`).toBeGreaterThanOrEqual(4.5);
+    expect(strings.nestedPanels, `${width}: no copyable block is a card inside a card`).toBe(0);
+    expect(strings.panelBackground, `${width}: the hash adds no fill of its own`).toBe('rgba(0, 0, 0, 0)');
+    expect(strings.panelRadius, `${width}: the hash adds no radius`).toBe('0px');
+    expect(strings.panelBorder, `${width}: the hash opens on one hairline top`).toMatch(/^1px solid/);
+    expect(contrast(strings.hashColor, strings.cardBackground), `${width}: the hash stays legible`).toBeGreaterThanOrEqual(4.5);
     await page.locator('[data-copy="sha256"]').click();
     await expect(page.locator('#copy-sha256-status')).toHaveText('Copied.');
     await expect(page.locator('[data-copy="sha256"]')).toHaveText('COPIED');

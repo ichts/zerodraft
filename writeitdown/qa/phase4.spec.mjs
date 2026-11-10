@@ -444,6 +444,51 @@ test('the short trial sheet keeps its dynamic viewport minimum', async ({ page }
   expect(room.footBottom).toBeLessThanOrEqual(room.viewport);
 });
 
+// 320x568 is the smallest phone the room claims to hold, and nothing measured its stopped screen: the compact kept
+// layout (status-slot.js) runs there, where the title, the receipt, two pills, the note and the draft all share 470 px
+// of paper. Nothing may leave the sheet, the page may not scroll, and every control has to stay on screen.
+test('the stopped screen holds on the smallest phone', async ({ page }, info) => {
+  test.skip(info.project.name !== '390-light-no-preference', 'One project owns the smallest-phone geometry');
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('./');
+  await page.evaluate(() => document.fonts.ready);
+  await enter(page);
+  await page.keyboard.insertText('a');
+  for (let i = 0; i < 11; i++) {
+    await page.clock.fastForward(5000);
+    await page.keyboard.insertText(' a');
+  }
+  await page.clock.fastForward(5100);
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+  const kept = await page.evaluate(() => {
+    const box = selector => { const el = document.querySelector(selector); const r = el.getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, width: r.width, height: r.height,
+        viewportWidth: innerWidth, viewportHeight: innerHeight }; };
+    return { paper: box('#room .room-paper'), title: box('#kept h1'), receipt: box('#receipt'), copy: box('#copy'),
+      restart: box('#restart'), note: box('#kept-note'), draft: box('#kept-text'), exit: box('#exit'),
+      scrollHeight: document.documentElement.scrollHeight, viewportHeight: innerHeight, scrollWidth: document.documentElement.scrollWidth };
+  });
+  expect(kept.scrollWidth, 'the smallest phone does not scroll sideways').toBeLessThanOrEqual(320);
+  expect(kept.scrollHeight, 'the stopped screen fits the smallest phone without a page scroll').toBeLessThanOrEqual(kept.viewportHeight);
+  for (const [name, part] of Object.entries({ receipt: kept.receipt, copy: kept.copy, restart: kept.restart, note: kept.note, draft: kept.draft })) {
+    expect(part.width, `${name} has width`).toBeGreaterThan(0);
+    expect(part.top, `${name} starts inside the sheet`).toBeGreaterThanOrEqual(kept.paper.top - 0.5);
+    expect(part.bottom, `${name} ends inside the sheet`).toBeLessThanOrEqual(kept.paper.bottom + 0.5);
+    expect(part.left, `${name} starts inside the sheet`).toBeGreaterThanOrEqual(kept.paper.left - 0.5);
+    expect(part.right, `${name} ends inside the sheet`).toBeLessThanOrEqual(kept.paper.right + 0.5);
+  }
+  // The kept column reads top down on one centre line, and the receipt closes on the draft rather than the note
+  // being pushed out: a squeezed compact layout must not reorder or overlap anything.
+  expect(kept.title.bottom, 'the title comes before the receipt').toBeLessThanOrEqual(kept.receipt.top + 0.5);
+  expect(kept.receipt.bottom, 'the receipt comes before the copy pill').toBeLessThanOrEqual(kept.copy.top + 0.5);
+  expect(kept.copy.bottom, 'the copy pill comes before the restart pill').toBeLessThanOrEqual(kept.restart.top + 0.5);
+  expect(kept.restart.bottom, 'the restart pill comes before the note').toBeLessThanOrEqual(kept.note.top + 0.5);
+  expect(kept.note.bottom, 'the note comes before the draft').toBeLessThanOrEqual(kept.draft.top + 0.5);
+  expect(kept.draft.bottom, 'the draft comes before the exit row').toBeLessThanOrEqual(kept.exit.top + 0.5);
+  expect(kept.exit.bottom, 'the exit row stays on screen').toBeLessThanOrEqual(kept.viewportHeight);
+  await capture(page, info, 'kept-320x568');
+});
+
 test('short sheets keep the warning and result slots inside the paper', async ({ page }, info) => {
   for (const size of [{ width: 844, height: 390 }, { width: 1440, height: 350 }]) {
     await page.setViewportSize(size);

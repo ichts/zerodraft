@@ -1197,3 +1197,31 @@ test('the buy entry is no further down the landing than it is today, and the no-
   expect(detour, 'the download page still offers the purchase').not.toBeNull();
   expect(detour.inFirstScreen, 'the download page sells without scrolling').toBe(true);
 });
+
+// The buy line shipped after 320/375/390/1440 were measured. This sweeps the tablet band - the sizes between the
+// phone sweep and the desktop target - and holds the same three promises there: the line is on the first screen,
+// nothing overflows sideways, and the sheet keeps its 61% floor (D-110, D-068).
+test('the buy line holds through the tablet band', async ({ page }, info) => {
+  test.skip(!['1440-light-no-preference', '390-light-no-preference'].includes(info.project.name), 'One project sweeps the band');
+  for (const size of [{ width: 600, height: 800 }, { width: 768, height: 1024 }, { width: 834, height: 1112 }, { width: 1024, height: 768 }, { width: 1180, height: 820 }]) {
+    await page.setViewportSize(size);
+    await page.goto('index.html');
+    await page.evaluate(() => document.fonts.ready);
+    const read = await page.evaluate(() => {
+      const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
+      const door = box('#landing .cta .btn');
+      const buy = box('#landing .cta .cta-buy');
+      const sheet = box('#paper');
+      return { viewport: innerHeight, viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth,
+        door, buy, sheet, first: box('.first-screen') };
+    });
+    const label = `${size.width}x${size.height}`;
+    expect(await page.locator('#landing .cta a[href="mac.html#buy"]').count(), `${label}: one quiet buy line in the door band`).toBe(1);
+    expect(read.buy.top, `${label}: the buy line is on the first screen`).toBeLessThan(read.viewport);
+    expect(read.buy.top, `${label}: the buy line sits under the door`).toBeGreaterThanOrEqual(read.door.bottom - 0.5);
+    expect(Math.abs(read.buy.left + (read.buy.right - read.buy.left) / 2 - (read.door.left + read.door.right) / 2), `${label}: the line is centred on the door`).toBeLessThan(1);
+    expect(read.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(read.viewportWidth);
+    expect(read.sheet.height / read.viewport, `${label}: the sheet keeps its 61% floor`).toBeGreaterThanOrEqual(0.61 - 1 / read.viewport);
+    expect(Math.abs(read.sheet.bottom - read.first.bottom), `${label}: the sheet still owns the first screen's remainder`).toBeLessThanOrEqual(1);
+  }
+});

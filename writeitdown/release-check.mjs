@@ -72,11 +72,14 @@ function slot(html, name) {
   return { tag, text: contentOf(html, tag).replace(/<[^>]+>/g, '').trim() };
 }
 
-export function blockers({ mac, support, plist }) {
+export function blockers({ mac, buy, support, plist }) {
   mac = stripComments(mac);
+  buy = stripComments(buy);
   const found = [];
-  const checkout = slot(mac, 'checkout');
-  if (!checkout) found.push('Checkout URL: not confirmed in mac.html');
+  // The sale page is the one with the checkout form; mac.html is the checkout's fixed return URL and
+  // the key-delivery page, so the licence steps and the canonical stay there.
+  const checkout = slot(buy, 'checkout');
+  if (!checkout) found.push('Checkout URL: not confirmed in buy.html');
   else if (!/^<form\s/i.test(checkout.tag) || attr(checkout.tag, 'method') !== 'post')
     found.push('Checkout URL: not a POST form');
   else if (attr(checkout.tag, 'action') !== 'https://licenses.writeitdown.app/api/v1/checkout')
@@ -88,8 +91,11 @@ export function blockers({ mac, support, plist }) {
   const mail = contact.match(/href="mailto:([^"?]+)"/)?.[1];
   if (!mail || PLACEHOLDER_HOST.test(mail.split('@')[1] || '')) found.push('Support address: not listed in support.html#contact');
   const price = plistValue(plist, 'WIDDisplayPrice');
-  if (!price || !mac.toLowerCase().includes(`${price.toLowerCase()} once`))
-    found.push(`Price: mac.html does not show the app price ${price || '(empty)'} once`);
+  // Both pages carry the price and the licence sentence, and the sentence is the same on both (rule 2):
+  // a buyer reading the docs page and the buy page sees one set of terms, not two.
+  for (const [name, page] of [['buy.html', buy], ['mac.html', mac]])
+    if (!price || !page.toLowerCase().includes(`${price.toLowerCase()} once`))
+      found.push(`Price: ${name} does not show the app price ${price || '(empty)'} once`);
   const canonical = mac.match(/<link\s+rel="canonical"\s+href="([^"]+)"/)?.[1];
   if (!realURL(canonical) || plistValue(plist, 'WIDCheckoutURL') !== canonical)
     found.push('Checkout URL: Info.plist WIDCheckoutURL differs from mac.html');
@@ -186,6 +192,7 @@ async function liveBlockers({ mac, download }, { sale }) {
 export function readInputs(root = fileURLToPath(new URL('.', import.meta.url))) {
   return {
     mac: readFileSync(join(root, 'mac.html'), 'utf8'),
+    buy: readFileSync(join(root, 'buy.html'), 'utf8'),
     download: readFileSync(join(root, 'download/index.html'), 'utf8'),
     support: readFileSync(join(root, 'support.html'), 'utf8'),
     plist: readFileSync(join(root, '../apps/macos/FirstLine/Sources/FirstLine/Info.plist'), 'utf8'),
@@ -209,7 +216,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let found = [...downloadBlockers(inputs), ...(sale ? blockers(inputs) : [])];
   if (!found.length && args.includes('--live')) found = await liveBlockers(inputs, { sale });
   if (found.length) {
-    console.error(sale ? 'BLOCKED: the Mac sale page is not ready to publish.' : 'BLOCKED: the Mac download page is not ready to publish.');
+    console.error(sale ? 'BLOCKED: the Mac sale pages are not ready to publish.' : 'BLOCKED: the Mac download page is not ready to publish.');
     for (const line of found) console.error(`- ${line}`);
     process.exit(1);
   }

@@ -13,6 +13,10 @@
 
    node scripts/core-tasks/measure-web.mjs [--runs 2] [--tasks 1,2,3] [--viewports desktop,mobile]
                                            [--out <dir>] [--compare docs/core-tasks-baseline.json]
+                                           [--root <tree>]
+
+   `--root` serves another checkout of this repository instead of the working tree, so the same instrument can
+   measure before and after: `--root ../wid-baseline` against a worktree at the old commit.
 
    Wall clock is dominated by T2 by design: the web trial is a 60-second session, so each T2 run really types for
    a minute. `--tasks 1,3` is the fast shape while working on the buy path or the door. */
@@ -31,6 +35,7 @@ const args = Object.fromEntries(process.argv.slice(2).reduce((acc, a, i, all) =>
   if (a.startsWith('--')) acc.push([a.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : true]);
   return acc;
 }, []));
+const siteRoot = path.resolve(args.root ?? repo);
 const runs = Number(args.runs ?? 2);
 const tasks = String(args.tasks ?? '1,2,3').split(',').map(Number);
 const viewportNames = String(args.viewports ?? 'desktop,mobile').split(',');
@@ -223,9 +228,20 @@ async function taskThree(browser, vpName, base) {
   const scrolls = Math.round((await page.evaluate(() => scrollY) - scrollBefore) / await page.evaluate(() => innerHeight) * 100) / 100;
   const clickAt = await page.evaluate(() => performance.timeOrigin + performance.now());
   await page.locator('#landing a:has-text("Buy for $4.99")').first().click();
-  await page.waitForURL(/mac\.html/, { timeout: 15_000 });
+  // The page the landing buy line opens: the purchase page at /buy (D-113), or the manual's `#buy` card before it.
+  // Both carry the one checkout form, so `--root` can measure the old tree with this same instrument.
+  await page.waitForURL(/\/(buy|mac)\.html?(#buy)?$/, { timeout: 15_000 });
   await page.waitForSelector('#buy-form button', { state: 'visible' });
   const loadedAt = await page.evaluate(() => performance.timeOrigin + performance.now());
+  // The destination's own cost: how many screens of page a buyer lands on, and whether the control that pays is
+  // inside the first one. A sale behind a manual costs scrolling even when the landing link is one click away.
+  const purchase = await page.evaluate(() => {
+    const button = document.querySelector('#buy-form button').getBoundingClientRect();
+    return {
+      screens: Math.round((document.documentElement.scrollHeight / innerHeight) * 100) / 100,
+      buyInFirstScreen: button.top >= 0 && button.bottom <= innerHeight
+    };
+  });
   await page.screenshot({ path: path.join(out, 'shots', `${vpName}-t3-purchase-page.png`) });
   await page.locator('#buy-form button').click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 15_000 }).catch(() => {});
@@ -233,6 +249,7 @@ async function taskThree(browser, vpName, base) {
   await context.close();
   return {
     reach,
+    purchase,
     ms: {
       landing_click_to_purchase_page_loaded: since(clickAt, loadedAt),
       buy_click_to_checkout_post: postedAt == null ? null : postedAt - clickAt,
@@ -252,7 +269,7 @@ async function taskThreeB(browser, vpName, base) {
   await page.locator('.home-nav a:has-text("Download for Mac")').first().click();
   await page.waitForSelector('a:has-text("Buy for $4.99")', { timeout: 15_000 });
   await page.locator('a:has-text("Buy for $4.99")').first().click();
-  await page.waitForURL(/mac\.html/, { timeout: 15_000 });
+  await page.waitForURL(/\/(buy|mac)\.html?(#buy)?$/, { timeout: 15_000 });
   await page.waitForSelector('#buy-form button', { state: 'visible' });
   await page.locator('#buy-form button').click();
   await page.waitForURL(/checkout\.stripe\.com/, { timeout: 15_000 }).catch(() => {});
@@ -265,11 +282,11 @@ async function taskThreeB(browser, vpName, base) {
 let server;
 try {
   const port = await freePort();
-  server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '-d', repo], { stdio: 'ignore' });
+  server = spawn('python3', ['-m', 'http.server', String(port), '--bind', '127.0.0.1', '-d', siteRoot], { stdio: 'ignore' });
   await sleep(600);
   const base = `http://127.0.0.1:${port}/writeitdown/`;
   const browser = await chromium.launch({ channel: 'chrome' });
-  const raw = { meta: { base, repo, runs, tasks, viewports: viewportNames, at: new Date().toISOString(), browser: browser.version(), loadavgStart: loadavg().map(x => Math.round(x * 10) / 10) }, runs: [] };
+  const raw = { meta: { base, repo, root: siteRoot, runs, tasks, viewports: viewportNames, at: new Date().toISOString(), browser: browser.version(), loadavgStart: loadavg().map(x => Math.round(x * 10) / 10) }, runs: [] };
   for (let n = 1; n <= runs; n++) {
     for (const vpName of viewportNames) {
       const rec = { viewport: vpName, run: n, loadavg: loadavg()[0] };

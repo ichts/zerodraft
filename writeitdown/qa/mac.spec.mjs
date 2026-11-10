@@ -5,13 +5,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { sweepTimeout } from './page-sweep.mjs';
 
-const shipped = ['index.html', 'download/index.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
+const shipped = ['index.html', 'download/index.html', 'buy.html', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html', 'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html', 'write-it-down-free-trial.html', 'write-it-down-price.html', 'delete-a-draft.html', 'is-my-writing-saved.html'];
 const dmgURL = 'https://writeitdown.app/download/Write-It-Down-1.1.dmg';
 const dmgFile = new URL(dmgURL).pathname.split('/').pop();
 const plistPath = '../apps/macos/FirstLine/Sources/FirstLine/Info.plist';
 const appPrice = readFileSync(plistPath, 'utf8').match(/<key>WIDDisplayPrice<\/key>\s*<string>([^<]*)</)[1];
-// Every shipped page carries the same shell: the landing header lockup with its plate, the theme
-// button and the three-column footer. #trial is the room on the landing page.
+// Every shipped page carries the same shell: the landing header lockup with its plate and the theme
+// button; the three-column footer belongs to the document pages. #trial is the room on the landing page.
 const shellPages = [...shipped, 'index.html#trial'];
 
 test('Mac page offers the free trial and real Buy without dead or fake CTAs', async ({ page }, info) => {
@@ -20,23 +20,24 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   await expect(main.locator('h1')).toHaveText('Write It Down for Mac');
   await expect(page.locator('#price')).toHaveText(`${appPrice} once`);
   // The card states its facts once (A3): the price line and the note under it carry the price, the two
-  // computers, the free updates and the refund window. The paragraph that repeated them is gone. The
-  // Activate section states the 3 free sessions and the one-license-two-computers rule, and Refunds
-  // states the 14-day window as the policy behind the note.
+  // computers, no subscription and the free updates, word for word what the purchase page says (rule 2).
+  // The refund is a policy, so it lives in the Refunds section, /terms.html and the checkout, never
+  // beside a Buy control (rule 30).
   await expect(page.locator('#buy-heading + #price-row'), 'the price line follows the heading').toHaveCount(1);
   await expect(main).not.toContainText('one license covers 2 computers');
-  await expect(page.locator('#price-row .doc-note')).toHaveText('2 computers. No subscription. Free updates. 14\u2011day refund.');
+  await expect(page.locator('#price-row .doc-note')).toHaveText('One license for 2 computers. No subscription. Free updates included.');
   await expect(page.locator('#activate + p')).toContainText('3 free sessions');
   await expect(main).not.toContainText(/buying opens soon|not open yet|coming soon/i);
   await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
-  await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('method', 'post');
-  await expect(page.locator('[data-launch="checkout"]')).toHaveAttribute('action', 'https://licenses.writeitdown.app/api/v1/checkout');
-  await expect(page.getByRole('button', { name: 'Buy for $4.99 once', exact: true })).toBeEnabled();
+  // One purchase path, and it is not here: the card hands the sale to the purchase page, which owns the
+  // checkout. This page stays because it is the checkout's fixed return URL and the key is delivered here.
+  await expect(page.locator('[data-launch="checkout"]'), 'the docs page links to the sale, it does not run it').toHaveCount(0);
+  await expect(page.locator('#buy').getByRole('link', { name: 'Buy for $4.99 once', exact: true }), 'the card links to the purchase page').toHaveAttribute('href', 'buy.html');
   await expect(page.locator('[data-launch="license"]')).toContainText("paste it into the app's activation field");
   await expect(page.locator('#waitlist-form')).toHaveCount(0);
   await expect(page.locator('#buy').getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
   await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down');
-  await expect(page.locator('#price-row')).toContainText('2 computers. No subscription.');
+  await expect(page.locator('#price-row')).toContainText('One license for 2 computers.');
   await expect(page.locator('#requirements + p')).toContainText('Requires macOS 14 Sonoma or later');
   await expect(page.locator('#activate + p')).toContainText('One license works on two computers.');
   await expect(page.locator('#refund + p')).toContainText('the license stops working on every computer.');
@@ -54,7 +55,7 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
 });
 
 test('every shipped link resolves and every fragment exists', async ({ page, request }, info) => {
-  // Thirteen pages and every link on them: the walk, not the harness's flat 30 s, owns the budget.
+  // Fourteen pages and every link on them: the walk, not the harness's flat 30 s, owns the budget.
   test.setTimeout(sweepTimeout(shipped.length));
   // Derived from the configured baseURL so the suite still holds its own origin when it runs on
   // another port; the default remains http://127.0.0.1:8015/writeitdown/.
@@ -88,16 +89,17 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
   }
 });
 
-test('help pages route to the Mac page', async ({ page }) => {
+test('the footer buy line on the help pages opens the purchase page', async ({ page }) => {
   for (const file of ['support.html', 'privacy.html', 'terms.html']) {
     await page.goto(file);
     await page.locator('.home-foot a', { hasText: 'Buy for Mac' }).click();
-    await expect(page).toHaveURL(/\/mac\.html#buy$/);
+    await expect(page).toHaveURL(/\/buy\.html$/);
+    await expect(page.locator('.buy-price'), `${file}: the price is the page`).toHaveText(`${appPrice} once`);
   }
 });
 
 // Runs the real release gate CLI against a site copy and returns [exit code, output].
-function releaseCheck({ mac, support, download = readFileSync('download/index.html', 'utf8'), checkout = '' }, ...args) {
+function releaseCheck({ mac, buy = readFileSync('buy.html', 'utf8'), support, download = readFileSync('download/index.html', 'utf8'), checkout = '' }, ...args) {
   const root = mkdtempSync(join(tmpdir(), 'wid-release-'));
   const site = join(root, 'writeitdown');
   const plistDir = join(root, 'apps/macos/FirstLine/Sources/FirstLine');
@@ -105,6 +107,7 @@ function releaseCheck({ mac, support, download = readFileSync('download/index.ht
   mkdirSync(join(site, 'journey'), { recursive: true });
   writeFileSync(join(site, 'journey/waivers.json'), readFileSync('journey/waivers.json'));
   writeFileSync(join(site, 'mac.html'), mac);
+  writeFileSync(join(site, 'buy.html'), buy);
   writeFileSync(join(site, 'download/index.html'), download);
   writeFileSync(join(site, 'support.html'), support);
   writeFileSync(join(plistDir, 'Info.plist'), readFileSync(plistPath, 'utf8')
@@ -120,6 +123,7 @@ function releaseCheck({ mac, support, download = readFileSync('download/index.ht
 
 test('release gate rejects missing or invalid purchase and download configuration', () => {
   const mac = readFileSync('mac.html', 'utf8');
+  const buy = readFileSync('buy.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
   const publishedHash = download.match(/<code data-launch="sha256">([\s\S]*?)<\/code>/)?.[1].replace(/<[^>]+>/g, '') ?? '';
@@ -132,7 +136,7 @@ test('release gate rejects missing or invalid purchase and download configuratio
   // archived version without touching the rest of the page.
   const withArchive = href => download.replace(/(id="previous-version"[\s\S]*?<a\s[^>]*href=")[^"]*/, `$1${href}`);
   const checkout = 'https://writeitdown.app/mac.html';
-  const inputs = { mac, support, download, checkout };
+  const inputs = { mac, buy, support, download, checkout };
   const [ready, output] = releaseCheck(inputs);
   expect(ready, output).toBe(0);
   expect(output).toContain('Not verified live');
@@ -143,13 +147,15 @@ test('release gate rejects missing or invalid purchase and download configuratio
   expect(liveOutput).toContain('LIVE sales blocked: maintainer installed-DMG TEST acceptance is pending');
 
   const cases = [
-    [{ mac: mac.replace('data-launch="checkout"', 'data-launch-pending="checkout"') }, 'Checkout URL: not confirmed'],
-    [{ mac: mac.replace('method="post"', 'method="get"') }, 'Checkout URL: not a POST form'],
-    [{ mac: mac.replace('action="https://licenses.writeitdown.app/api/v1/checkout"', 'action="https://example.com/pay"') }, 'Checkout URL: not the license service'],
+    [{ buy: buy.replace('data-launch="checkout"', 'data-launch-pending="checkout"') }, 'Checkout URL: not confirmed'],
+    [{ buy: '' }, 'Checkout URL: not confirmed in buy.html'],
+    [{ buy: buy.replace('method="post"', 'method="get"') }, 'Checkout URL: not a POST form'],
+    [{ buy: buy.replace('action="https://licenses.writeitdown.app/api/v1/checkout"', 'action="https://example.com/pay"') }, 'Checkout URL: not the license service'],
     [{ mac: mac.replace('data-launch="license"', 'data-launch-pending="license"') }, 'activation steps: not confirmed'],
     [{ mac: mac.replace(/<p data-launch="license">.*?<\/p>/, '<p data-launch="license">TBD</p>') }, 'activation steps: placeholder copy'],
     [{ checkout: '' }, 'WIDCheckoutURL differs'],
-    [{ mac: mac.replaceAll(`${appPrice} once`, '$9 once') }, 'Price:'],
+    [{ buy: buy.replaceAll(`${appPrice} once`, '$9 once') }, 'Price: buy.html'],
+    [{ mac: mac.replaceAll(`${appPrice} once`, '$9 once') }, 'Price: mac.html'],
     [{ support: support.replace(/<a href="mailto:[^"]*">[^<]*<\/a>/g, 'TBD') }, 'Support address'],
     [{ download: download.replace('data-launch="dmg"', 'data-launch-pending="dmg"') }, 'DMG URL: not confirmed'],
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
@@ -224,7 +230,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(cta.locator('> a'), 'the entrance band holds two links and no other control').toHaveCount(2);
   const buyLine = cta.locator('a.cta-buy');
   await expect(buyLine, 'the buy line reuses the published price string').toHaveText('Buy for $4.99 once');
-  await expect(buyLine, 'the buy line goes to the purchase card').toHaveAttribute('href', 'mac.html#buy');
+  await expect(buyLine, 'the buy line goes to the purchase page').toHaveAttribute('href', 'buy.html');
   const buyLineInk = await buyLine.evaluate(e => {
     const s = getComputedStyle(e);
     return { decoration: s.textDecorationLine, colour: s.color, height: e.getBoundingClientRect().height,
@@ -289,7 +295,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(mac.locator('.facts')).toContainText('2 computers');
   await expect(mac.locator('.facts')).toContainText('14 days');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
-  await expect(mac.locator('a[href="mac.html#buy"]')).toHaveText('Buy for $4.99 once');
+  await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy for $4.99 once');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
   for (const label of ['Support', 'Privacy', 'Terms']) await expect(page.locator('.home-foot nav a', { hasText: label })).toBeVisible();
@@ -490,7 +496,7 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
 // wordmark. The mask is read at the rendered header size, so this fails on a wordmark-only lockup and on a
 // solid tile without the split.
 test('the header lockup shows the A mark chip beside the wordmark', async ({ page }, info) => {
-  // Fourteen pages, each measured at its rendered header size: budget the walk (#146).
+  // Fifteen pages, each measured at its rendered header size: budget the walk (#146).
   test.setTimeout(sweepTimeout(shellPages.length));
   for (const path of shellPages) {
     await page.goto(path);
@@ -567,7 +573,7 @@ test('the header chip paints one plate colour on every page', async ({ page }) =
 // responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
 // below owns the every-width fit.
 for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
-  // Thirteen pages at three widths, each with a load, the fonts and a measurement: under parallel load
+  // Fourteen pages at three widths, each with a load, the fonts and a measurement: under parallel load
   // this sweep timed out at the 30 s default budget while every assertion inside it held. The budget is
   // the walk's page count, not a flat multiplier on the harness's ceiling (#146).
   test.setTimeout(sweepTimeout(3 * shellPages.length));
@@ -670,9 +676,9 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
   }
 });
 
-// The purchase page is the last thing a buyer sees before paying, so it wears the same document
-// shell as every other shipped page: the landing header, the shared footer, the .home canvas and
-// the v2 pill, with no second button system left on the page.
+// The Mac page is the manual and the checkout's return page: the buyer reads it before paying and comes
+// back to it for the key, so it wears the same document shell as every other shipped page - the landing
+// header, the shared footer, the .home canvas and the v2 pill, with no second button system left on it.
 test('the Mac page is the shared document shell, not a second design system', async ({ page }) => {
   await page.goto('mac.html');
   const shell = await page.evaluate(() => {
@@ -708,7 +714,7 @@ test('the Mac page is the shared document shell, not a second design system', as
   });
   expect(shell.bodyHome, 'the page resolves the shared tokens').toBe(true);
   expect(shell.doc, 'the page uses the shared document shell').toBe(true);
-  expect(shell.legacy, 'no legacy shell class survives on the purchase page').toBe(0);
+  expect(shell.legacy, 'no legacy shell class survives on the Mac page').toBe(0);
   expect(shell.canvas, 'the page canvas is background A').toBe(shell.page);
   expect(shell.footer, 'the shared footer is present').toBe(true);
   expect(shell.radius, 'the primary control is the v2 pill').toBe('999px');
@@ -717,7 +723,7 @@ test('the Mac page is the shared document shell, not a second design system', as
   expect(shell.onInk, 'the on-ink token resolves').not.toBe('');
   await page.goto('index.html');
   const landing = await page.evaluate(() => getComputedStyle(document.querySelector('#landing')).backgroundColor);
-  expect(shell.canvas, 'the purchase page and the landing share one canvas').toBe(landing);
+  expect(shell.canvas, 'the Mac page and the landing share one canvas').toBe(landing);
 });
 
 test('landing sections: heading tree, Mac facts, FAQ matches its schema, the door enters the room', async ({ page }) => {
@@ -750,9 +756,9 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
     expect(schemaProperties(graph)).not.toContain(property);
 
   await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
-  await expect(page.locator('#mac a[href="mac.html#buy"]')).toHaveText('Buy for $4.99 once');
+  await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy for $4.99 once');
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
-  for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'mac.html#buy'])
+  for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'buy.html'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
   await page.locator('#landing .cta a.btn-primary').click();
   await expect(page.locator('#editor')).toBeFocused();
@@ -776,7 +782,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('#install')).toContainText(`shasum -a 256 ${dmgFile}`);
   await expect(main).toContainText('Free updates included.');
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
-  await expect(page.locator('main a[href="../mac.html#buy"]').first()).toBeVisible();
+  await expect(page.locator('main a[href="../buy.html"]').first()).toBeVisible();
   await expect(page.locator('h1')).toHaveCount(1);
   for (const id of ['install', 'trial']) await expect(page.locator(`#${id} h2`)).toBeVisible();
   // The facts rows state the trial, the price, the seats and the refund once. The Activate card
@@ -785,7 +791,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('#trial')).not.toContainText('3 free sessions');
   await expect(page.locator('#trial')).not.toContainText('$4.99');
   await expect(page.locator('#trial')).not.toContainText('14 days');
-  await expect(page.locator('#trial a[href="../mac.html#buy"]')).toHaveText('Buy a license');
+  await expect(page.locator('#trial a[href="../buy.html"]')).toHaveText('Buy a license');
   await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
@@ -1226,7 +1232,7 @@ test('the buy line holds through the tablet band', async ({ page }, info) => {
         door, buy, sheet, first: box('.first-screen') };
     });
     const label = `${size.width}x${size.height}`;
-    expect(await page.locator('#landing .cta a[href="mac.html#buy"]').count(), `${label}: one quiet buy line in the door band`).toBe(1);
+    expect(await page.locator('#landing .cta a[href="buy.html"]').count(), `${label}: one quiet buy line in the door band`).toBe(1);
     expect(read.buy.top, `${label}: the buy line is on the first screen`).toBeLessThan(read.viewport);
     expect(read.buy.top, `${label}: the buy line sits under the door`).toBeGreaterThanOrEqual(read.door.bottom - 0.5);
     expect(Math.abs(read.buy.left + (read.buy.right - read.buy.left) / 2 - (read.door.left + read.door.right) / 2), `${label}: the line is centred on the door`).toBeLessThan(1);

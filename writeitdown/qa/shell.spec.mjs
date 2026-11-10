@@ -9,6 +9,9 @@ import { openPage, sweepTimeout } from './page-sweep.mjs';
 const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
+// The purchase page is one screen with no footer and no second section, so it joins the shell identity
+// and the one-price-per-page guard, not the document-page and footer contracts the thirteen share.
+const purchasePage = 'buy.html';
 const documentPages = ['mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
   'write-it-down-free-trial.html', 'write-it-down-mac-vs-web.html', 'write-it-down-price.html'];
@@ -108,6 +111,94 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
   }
 });
 
+test('the purchase page wears the same shell and stops at its actions', async ({ page }) => {
+  await openPage(page, 'index.html');
+  const landing = await readShell(page);
+  await openPage(page, purchasePage);
+  const shell = await readShell(page);
+  expect(shell.brandTop, 'the mark sits at the landing y').toBe(landing.brandTop);
+  expect(shell.brandHeight, 'the mark is the landing size').toBe(landing.brandHeight);
+  expect(shell.plate, 'the theme button paints the same plate').toBe(landing.plate);
+  expect(shell.brandInk, 'the lockup wears the ink token').toBe(shell.inkToken);
+  expect(shell.canvas, 'the page canvas is background A').toBe(shell.pageToken);
+  expect(shell.family, 'the same body family as every other page').toBe(landing.family);
+  expect(shell.overflow, 'no horizontal overflow').toBeLessThanOrEqual(0);
+  await expect(page.locator('link[rel="canonical"]'), 'the clean URL is the canonical, not buy.html').toHaveAttribute('href', 'https://writeitdown.app/buy');
+  // Nothing below the actions: no footer, no second section, and no legal or refund band. The refund
+  // and the terms live on the checkout, /terms.html and mac.html#refund (rule 30).
+  expect(shell.footer, 'the purchase page carries no footer').toBe(false);
+  // Nothing else on the page: the price, the licence it buys in three lines, the two actions. An exact
+  // reading is the guard, so a fourth line - a reassurance, a payment-processor note, a refund promise -
+  // fails here instead of drifting in (rule 30).
+  const text = (await page.locator('main').innerText()).replace(/\s+/g, ' ').trim();
+  expect(text).toBe('$4.99 once One license for 2 computers. No subscription. Free updates included. Buy for $4.99 once Download free trial');
+  await expect(page.locator('main')).not.toContainText(/refund|guarantee|secure|stripe|money.back|risk.free/i);
+  await expect(page.locator('main a')).toHaveCount(1);
+  await expect(page.locator('main a')).toHaveText('Download free trial');
+});
+
+test('the purchase page is one screen at 320, 390 and 1440, with the price as its largest text', async ({ page }, info) => {
+  test.skip(info.project.name !== '1440-light-no-preference', 'one project drives its own three widths');  for (const [width, height] of [[320, 700], [390, 844], [1440, 900]]) {
+    await page.setViewportSize({ width, height });
+    await openPage(page, purchasePage);
+    await page.evaluate(() => document.fonts.ready);
+    const read = await page.evaluate(() => {
+      const box = selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return { top: +rect.top.toFixed(1), bottom: +rect.bottom.toFixed(1), left: +rect.left.toFixed(1), right: +rect.right.toFixed(1), width: +rect.width.toFixed(1) };
+      };
+      const fontOf = selector => parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+      // Every rank but the price, so "the largest thing on the page" is a measurement, not an assumption.
+      const largestOther = Math.max(...[...document.querySelectorAll('main *')]
+        .filter(element => element.getClientRects().length && !element.closest('.buy-price'))
+        .map(element => parseFloat(getComputedStyle(element).fontSize)));
+      return {
+        viewport: { width: innerWidth, height: innerHeight },
+        scrollWidth: document.documentElement.scrollWidth,
+        scrollHeight: document.documentElement.scrollHeight,
+        price: box('.buy-price'), priceFont: fontOf('.buy-price'), largestOther,
+        facts: box('.buy-facts'), actions: box('.doc-actions'),
+        primary: box('#buy-form button'), ghost: box('.doc-actions>.btn-ghost'),
+        factsFont: fontOf('.buy-facts li'),
+        text: document.querySelector('.buy-price').textContent.trim(),
+      };
+    });
+    const at = `${width}x${height}`;
+    expect(read.text, `${at}: the price is the published string`).toBe('$4.99 once');
+    expect(read.scrollWidth, `${at}: never scrolls sideways`).toBeLessThanOrEqual(read.viewport.width);
+    expect(read.scrollHeight, `${at}: the page is one screen`).toBeLessThanOrEqual(read.viewport.height);
+    expect(read.priceFont, `${at}: the price is the largest thing on the page`).toBeGreaterThan(read.largestOther * 2);
+    expect(read.priceFont / read.factsFont, `${at}: the price outranks the facts`).toBeGreaterThan(2);
+    expect(read.price.left, `${at}: the price is inside the viewport`).toBeGreaterThanOrEqual(0);
+    expect(read.price.right, `${at}: the price is inside the viewport`).toBeLessThanOrEqual(read.viewport.width);
+    expect(read.price.bottom, `${at}: the price is above the facts`).toBeLessThan(read.facts.top);
+    expect(read.facts.bottom, `${at}: the facts sit above the actions`).toBeLessThan(read.actions.top);
+    expect(read.actions.bottom, `${at}: the actions are the last thing on the page`).toBeLessThanOrEqual(read.viewport.height);
+    expect(read.primary.top, `${at}: Buy is the first action`).toBeLessThanOrEqual(read.ghost.top);
+    // Stacked on a phone, the pair shares one width, so the ghost's edge does not end short of the
+    // primary's (D-106). Side by side, each keeps its own.
+    if (read.ghost.top >= read.primary.bottom - 1) expect(read.ghost.width, `${at}: the stacked pair shares one width`).toBe(read.primary.width);
+    else expect(read.ghost.left, `${at}: side by side, the ghost follows the primary`).toBeGreaterThan(read.primary.right);
+  }
+});
+
+test('the licence sentence is written once and copied verbatim to the Mac page', async ({ page }) => {
+  const sentence = 'One license for 2 computers. No subscription. Free updates included.';
+  await page.goto('mac.html');
+  await expect(page.locator('#price-row .doc-note'), 'mac.html states the licence facts').toHaveText(sentence);
+  await page.goto(purchasePage);
+  const facts = await page.locator('.buy-facts li').allInnerTexts();
+  expect(facts.join(' '), 'the purchase page states the same facts, word for word').toBe(sentence);
+  // Safari drops list semantics from a `ul` whose markers are hidden unless the role is restated, and
+  // the phone that reads this page is WebKit. The three facts stay three list items to a screen reader.
+  await expect(page.locator('.buy-facts'), 'the facts stay a list in WebKit').toHaveAttribute('role', 'list');
+  // The refund is a legal term, not a line beside a Buy button (rule 30): it stays in the page and on
+  // /terms.html that own it.
+  await page.goto('mac.html');
+  await expect(page.locator('#refund + p')).toContainText('14 days from purchase');
+  await expect(page.locator('#price-row')).not.toContainText('refund');
+});
+
 test('every link on the migrated pages clears 4.5:1 against its canvas', async ({ page }) => {
   const luminance = color => {
     const channels = color.match(/[\d.]+/g).slice(0, 3).map(Number).map(value => {
@@ -164,8 +255,8 @@ test('landing on #buy puts the heading and the price row in view', async ({ page
 });
 
 test('the purchase path states one price string', async ({ page, context }) => {
-  // Thirteen pages, then four visits to the purchase page: the walk is what needs the budget.
-  test.setTimeout(sweepTimeout(pages.length + 4));
+  // Thirteen pages, the purchase page and four visits to it: the walk is what needs the budget.
+  test.setTimeout(sweepTimeout(pages.length + 5));
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   const check = async label => {
@@ -175,7 +266,7 @@ test('the purchase path states one price string', async ({ page, context }) => {
       expect(mention, `${label}: price mention "${mention}"`).toBe('$4.99 once');
   };
 
-  for (const path of pages) {
+  for (const path of [...pages, purchasePage]) {
     await openPage(page, path);
     await check(path);
   }
@@ -184,8 +275,8 @@ test('the purchase path states one price string', async ({ page, context }) => {
   const checkout = `${service}/checkout`;
   const buy = page.locator('#buy-form button');
 
-  await page.goto('mac.html');
-  await expect(page.locator('#price')).toHaveText('$4.99 once');
+  await page.goto(purchasePage);
+  await expect(page.locator('.buy-price')).toHaveText('$4.99 once');
   await expect(page.getByRole('button', { name: 'Buy for $4.99 once', exact: true })).toBeVisible();
 
   let finishPending;
@@ -196,16 +287,16 @@ test('the purchase path states one price string', async ({ page, context }) => {
   });
   await buy.click();
   await expect(buy).toHaveText('Opening checkout...');
-  await check('mac.html pending');
+  await check('buy.html pending');
   finishPending();
   await expect(page.locator('#checkout-status')).toHaveAttribute('role', 'alert');
   await page.unroute(checkout);
 
   await page.route(checkout, route => route.fulfill({ status: 503, json: {} }));
-  await page.goto('mac.html');
+  await page.goto(purchasePage);
   await buy.click();
   await expect(page.locator('#checkout-status')).toHaveAttribute('role', 'alert');
-  await check('mac.html error');
+  await check('buy.html error');
   await page.unroute(checkout);
 
   await page.route(`${service}/license?session_id=cs_test_price_ready`, route => route.fulfill({ json: { licenseKey } }));
@@ -228,11 +319,14 @@ test('the ghost pill keeps one text treatment on the buy path and the landing', 
     await page.goto(path);
     return page.locator(selector).evaluate(element => getComputedStyle(element).textDecorationLine);
   };
+  const purchase = await decoration(purchasePage, '#buy .doc-actions>.btn-ghost');
   const buy = await decoration('mac.html', '#buy a.btn-ghost');
   const landing = await decoration('index.html', '#mac a.btn-ghost');
+  expect(purchase, 'the purchase card ghost pill').toBe('none');
   expect(buy, 'the buy card ghost pill').toBe('none');
   expect(landing, 'the landing Mac card ghost pill').toBe('none');
   expect(buy).toBe(landing);
+  expect(purchase).toBe(landing);
 });
 
 test('the landing hand keeps its write-on reveal and drops it under reduced motion', async ({ page }, info) => {

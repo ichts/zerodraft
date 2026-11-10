@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlsplit
 
 source = Path(__file__).resolve().parents[1]
 files = {
-    'download/index.html', 'index.html', 'mac.html', 'privacy.html',
+    'download/index.html', 'index.html', 'buy.html', 'mac.html', 'privacy.html',
     'terms.html', 'impressum.html', 'support.html', 'site.css', 'tokens.css',
 'theme.js', 'paper-render.js', 'paper.js', 'demo.js',
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='install-check-', dir=source) as temp:
             assert output.read_bytes() == (source / name).read_bytes(), name
             assert stat.S_IMODE(output.stat().st_mode) == 0o644, name
         assert (target / 'index.html.dc-bak2').read_text() == 'original'
-        for name in ['index.html', 'download/index.html']:
+        for name in ['index.html', 'download/index.html', 'buy.html']:
             page = target / name
             parser = LocalReferences()
             parser.feed(page.read_text())

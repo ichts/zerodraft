@@ -19,6 +19,10 @@ http.createServer((req, res) => {
   let f = path.join(root, p);
   if (!f.startsWith(root + path.sep) && f !== root) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
+  // The host's page handler is `try_files {path} {path}/index.html {path}.html` (README, "Host routing"),
+  // so the clean URL /buy serves buy.html. Matching it here is what lets the release journey walk the
+  // address a visitor actually gets; a path with no file behind it is still a 404, never the landing.
+  if (!fs.existsSync(f) && fs.existsSync(`${f}.html`)) f = `${f}.html`;
   if (!fs.existsSync(f)) {
     // A missing page is a 404, never the landing page with a 200: a soft 404 makes every broken
     // link, stale DMG and mistyped URL look like the home page to a browser and to a crawler.

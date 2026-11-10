@@ -74,14 +74,20 @@ export function runsToMetrics(runs, meta) {
         landing_click_to_purchase_page_loaded: pick(t3, r => r.t3.ms.landing_click_to_purchase_page_loaded),
         buy_click_to_stripe_handoff: pick(t3, r => r.t3.ms.buy_click_to_stripe_handoff)
       };
+      const purchaseScreens = pick(t3, r => r.t3.purchase?.screens ?? null);
+      const purchaseOnFirst = t3.every(r => r.t3.purchase?.buyInFirstScreen);
       m.T3 = {
         steps: 2,
-        steps_detail: `2 clicks + ${pick(t3, r => r.t3.reach.screensDown)} screens of scrolling to find the landing Buy link`,
+        steps_detail: `2 clicks + ${pick(t3, r => r.t3.reach.screensDown)} screens of scrolling to find the landing Buy link;`
+          + (purchaseScreens == null ? ' purchase page unmeasured'
+            : ` the purchase page is ${purchaseScreens} screen${purchaseScreens === 1 ? '' : 's'} and its Buy control ${purchaseOnFirst ? 'is on the first screen' : 'needs scrolling'}`),
         ms: sum(segments),
         segments_ms: segments,
         n: t3.length,
         reach_screens_down: pick(t3, r => r.t3.reach.screensDown),
-        in_first_screen: t3.every(r => r.t3.reach.inFirstScreen)
+        in_first_screen: t3.every(r => r.t3.reach.inFirstScreen),
+        purchase_page_screens: purchaseScreens,
+        purchase_buy_on_first_screen: purchaseScreens == null ? null : purchaseOnFirst
       };
     }
     const t3b = rs.filter(r => r.t3b);

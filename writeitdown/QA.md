@@ -6,6 +6,108 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-11-10: The buy line opens a purchase page, not the manual
+
+`writeitdown.app/buy` is the sale (D-113). One screen at every width, holding the price `$4.99 once`
+as the page's largest text, the licence in three lines - `One license for 2 computers.`,
+`No subscription.`, `Free updates included.` - the primary `Buy for $4.99 once` form, and
+`Download free trial`. Nothing below the actions, no footer, and no refund, guarantee, trust badge or
+payment-provider line beside the button. The landing's buy line and every footer `Buy for Mac` point
+here; `mac.html` stays the manual and the checkout's return page, its `#buy` card carries the same
+price and the same three lines word for word and links to `/buy`; the refund left that card for
+`#refund`, `/terms.html` and the checkout. `/buy` is out of `sitemap.xml` until LIVE sales pass the
+real TEST loop, as `mac.html` is.
+
+## Commands and results
+
+- `npm run release-check`: `STATIC CHECK PASSED: inputs present. Not verified live; run with --live.`
+  The gate now reads the checkout slot from `buy.html`; `qa/mac.spec.mjs` carries the refusal cases
+  for a missing slot, a GET form, a wrong action and a wrong price on either page.
+- `python3 qa/test-install.py`: `PASS: 52 exact production files, preserved backup, repeat
+  installation, rejected symlinks.` `buy.html` is in `install.sh` and in the test's own list, and the
+  reference crawl now walks the purchase page's assets too.
+- `npm test` (8 projects, 1536 tests): 1433 passed, 2 failed, 1 real. The real failure was this
+  change's own drift: `installer installs the complete purchase bundle` failed until `buy.html`
+  joined `qa/test-install.py`; it passes now, and the installer's two negative controls still pass.
+  The other failure was `history-fade.spec.mjs` "the aperture clips a partial line at its edge and
+  never fades it" at 14.9 s under parallel load, which then passed 3/3 alone in 1.3 to 2.3 s. The
+  full-session journey step also flaked 1 of 2 runs on this machine against a clean HEAD worktree as
+  well; it passed in both full journey runs recorded below.
+- `npm run journey -- --base http://127.0.0.1:8127 --expect-sha b5796ac1…` (real 1.1 DMG served,
+  matching its published SHA-256): 86 passed, 0 failed, 2 WAIVED (sign-in absent; installed-DMG TEST
+  acceptance pending), both viewports, one continuous video each. The new `buy-page` block walks
+  landing -> buy line -> `/buy` -> hosted checkout on WebKit iPhone 14 and Chromium 1440x900 and
+  fails if the walk ever passes through `mac.html`.
+- The same journey against a server without the artifact: 84 passed, 2 failed, both the DMG step
+  answering 404, which is the documented `--dmg-file` requirement rather than a page defect.
+
+## Measured (what the new assertion holds)
+
+`scripts/core-tasks/measure-web.mjs --tasks 3 --runs 3` now also records the destination's own cost,
+so `--root` can measure a baseline worktree with the same instrument. Before this change the buy
+link landed on `mac.html#buy`; after, on `/buy`:
+
+| Item | Before (HEAD tree) | After (this branch) |
+| --- | --- | --- |
+| T3 steps | 2 clicks + 0.33 screens to the landing buy line | same |
+| Purchase page, desktop | 2.14 screens | 1 screen |
+| Purchase page, phone | 2.99 screens | 1 screen |
+| Buy control on the first screen | yes (inside the card, above Requirements/Install/Activate/Refunds) | yes |
+| T3 machine time | 350 to 390 ms desktop, 340 to 375 ms phone | 271 to 445 ms desktop, 302 to 495 ms phone (within noise, load 11 to 36) |
+
+- `qa/shell.spec.mjs` holds the purchase page's own contract: the landing shell (brand y, plate,
+  canvas, body family), an exact reading of `main` that is those five strings and nothing else, no
+  footer, no refund/guarantee/secure/stripe wording under the actions, exactly one link in `main`,
+  the clean canonical `https://writeitdown.app/buy`, one screen at 320, 390 and 1440 with the price
+  as the largest text on the page, and the licence sentence equal to `mac.html`'s word for word.
+- Measured at 320, 390 and 1440, light and dark: `overflowX: 0`, document height equal to the
+  viewport at all three widths, price 116 px Newsreader at 1440 and 52 px at 390/320, facts block
+  84.5 px, actions 48 px tall and 104 px stacked on a phone, the stacked pair sharing one 192 px
+  width.
+- `qa/typography.spec.mjs` now censuses the purchase page too: its roles resolve to Newsreader and
+  the system sans, and no face is fetched from another host.
+
+## Captures
+
+`data/wid-buy-page-c/captures/`: `{before,after}-destination-{1440,390}-{light,dark}.png` (the page
+the buy line opens, at the anchor as it resolves), `before-destination-390-light-full.png` (the 2.99
+screens of manual the buyer used to land in), and `{before,after}-landing-{1440,390}-light.png`
+(the door and its buy line). `data/wid-buy-page-c/core-{before2,after}/shots/` carries the meter's own
+captures of the landing, the purchase page and the hand-off.
+
+## Known-broken proof for the new gates
+
+The `buy-page` journey block fails on the old href: with `index.html`'s buy line pointing at
+`mac.html#buy`, `waitForURL(/\/buy/)` never resolves and the block records
+`the landing buy line opens the price, not the documentation` as FAIL - observed while the working
+tree was mid-edit, before the link was repointed. The one-screen gate fails on the pre-change
+destination by construction: `mac.html#buy` measures 2.14 screens at 1440 and 2.99 at 390.
+
+## Quality checklist rows this change touches
+
+- Q-07 pass: the purchase page adds no label, subtitle or helper sentence. It holds the price, the
+  licence and two actions, and nothing else.
+- Q-09 pass: both themes captured at 1440 and 390; the dark page is the same composition with the
+  site's dark tokens.
+- Q-14 pass: one centred column on the page's own axis; the price, the three lines and the action
+  pair share it within 1 px at 320, 390 and 1440.
+- Q-19 pass: the purchase page joins the header gutter, chip-plate, focus-ring and grid sweeps.
+- Q-24 pass: the two controls keep one width with the stacked phone row (192 / 192 px) and stay
+  distinct by surface and colour, not by width.
+- Q-28 pass: no wrapped unit, no clipped string, no horizontal overflow at 320, 390 or 1440; the
+  refund window's `14-day` guard moved to the `/download/` requirement card with the sale.
+- Q-30 pass: nothing beside the Buy button reassures; the refund, the licence terms and the payment
+  processor are stated on the checkout and the legal pages, where a buyer already expects them.
+
+## Limits
+
+- This is the web surface only. The purchase page hands off to the same Stripe checkout; no payment,
+  licence or checkout code changed, and no real card was used.
+- The journey recorded here is a local pre-deploy run against the real 1.1 DMG. Installed-DMG TEST
+  acceptance and LIVE sales remain the maintainer's next step, and the waiver is unchanged.
+- `mac.html#buy` keeps its section and its `scroll-margin` for old bookmarks and emails; nothing on
+  the site links to it any more.
+
 # 2026-11-05: The download page keeps 1.1 current and archives 1.0
 
 `/download/` links `Write-It-Down-1.1.dmg` and publishes that artifact's SHA-256, as it has since

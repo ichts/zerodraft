@@ -36,7 +36,7 @@ test('Buy posts once and follows the hosted checkout URL', async ({ page }) => {
     await route.fulfill({ json: { url: hosted } });
   });
   await page.route(hosted, route => route.fulfill({ body: '<h1>Hosted checkout fixture</h1>' }));
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   await noKey(page);
   await page.getByRole('button', { name: 'Buy for $4.99 once', exact: true }).click();
   await expect(page).toHaveURL(hosted);
@@ -52,7 +52,7 @@ test('Buy posts once and follows the hosted checkout URL', async ({ page }) => {
 
 test('the pending state is visible, and pageshow restores Buy without reloading', async ({ page }) => {
   await page.route(`${service}/checkout`, () => {});
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   const buy = page.locator('#buy-form button');
   await buy.click();
   await expect(buy).toBeDisabled();
@@ -222,7 +222,7 @@ for (const failure of ['network', 'http', 'invalid-url']) {
       if (failure === 'network') return route.abort();
       return route.fulfill({ status: failure === 'http' ? 503 : 200, json: { url: 'javascript:alert(1)' } });
     });
-    await page.goto('mac.html');
+    await page.goto('buy.html');
     const buy = page.locator('#buy-form button');
     await buy.click();
     await expect(page.locator('#checkout-status')).toHaveText('Checkout is unavailable. Please try again in a moment.');
@@ -243,7 +243,7 @@ test('a checkout retry announces Opening checkout as status, not alert', async (
     await retryPending;
     return route.abort();
   });
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   const buy = page.locator('#buy-form button');
   const status = page.locator('#checkout-status');
   await buy.click();
@@ -285,7 +285,7 @@ test('the buy control keeps one width in idle, pending and error', async ({ page
   // the label would already be back to `Try again` when the assertion reads it.
   let fail = true;
   await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   const buy = page.locator('#buy-form button');
   await expect(buy).toHaveText('Buy for $4.99 once');
   const idle = await widthOf(page, '#buy-form button');
@@ -329,18 +329,23 @@ const wideCopyLabel = 'Copy your license key to the clipboard';
 
 test('the reserved width follows the labels the markup renders', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  // One route per page: the purchase page renders the buy label, the checkout's return page renders the
+  // copy label. Rewriting both on one page would prove nothing now that the two controls live apart.
+  await page.route('**/buy.html', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace('>Buy for $4.99 once</button>', `>${wideBuyLabel}</button>`);
+    await route.fulfill({ response, body });
+  });
   await page.route('**/mac.html?session_id=cs_test_wide_labels', async route => {
     const response = await route.fetch();
-    const body = (await response.text())
-      .replace('>Buy for $4.99 once</button>', `>${wideBuyLabel}</button>`)
-      .replace('>Copy license key</button>', `>${wideCopyLabel}</button>`);
+    const body = (await response.text()).replace('>Copy license key</button>', `>${wideCopyLabel}</button>`);
     await route.fulfill({ response, body });
   });
   await page.route(`${service}/license?session_id=cs_test_wide_labels`, route => route.fulfill({ json: { licenseKey: key } }));
   let fail = true;
   await page.route(`${service}/checkout`, route => fail ? route.fulfill({ status: 503, json: {} }) : new Promise(() => {}));
 
-  await page.goto('mac.html?session_id=cs_test_wide_labels');
+  await page.goto('buy.html');
   const buy = page.locator('#buy-form button');
   await expect(buy).toHaveText(wideBuyLabel);
   const idle = await widthOf(page, '#buy-form button');
@@ -356,6 +361,7 @@ test('the reserved width follows the labels the markup renders', async ({ page, 
   expect(pending, 'pending buy width against the markup label').toBe(error);
   expect(idle, 'the markup buy label fits without a resize').toBeGreaterThanOrEqual(Math.max(...buyLabels.map(label => label.width)));
 
+  await page.goto('mac.html?session_id=cs_test_wide_labels');
   const copy = page.getByRole('button', { name: wideCopyLabel, exact: true });
   await expect(copy).toBeVisible();
   const ready = await widthOf(page, '#copy-license');
@@ -392,7 +398,7 @@ test('both controls keep their one width on a wider default sans', async ({ page
   expect(copied, `wider-sans copy width against ${JSON.stringify(copyLabels)}`).toBe(ready);
   expect(ready, 'the wider widest label fits without a resize').toBeGreaterThanOrEqual(Math.max(...copyLabels.map(label => label.width)));
 
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   const buy = page.locator('#buy-form button');
   await expect(buy).toHaveText('Buy for $4.99 once');
   await expect(buy).toHaveCSS('font-family', /^Verdana/);
@@ -415,15 +421,19 @@ test('both controls keep their one width on a wider default sans', async ({ page
 // (1.7 px apart), with only the two controls floored it was 182.2 / 192 px (9.8 px apart), and stacked
 // it is now 192 / 192 px. Stacked, the ghost takes the primary's measured floor and stays secondary by
 // its own surface and colour, not by being narrower; side by side at desktop width it keeps its
-// natural width.
+// natural width. The row lives on the purchase page, which is where the sale happens.
 test('the stacked buy row keeps one width and stays secondary', async ({ page }) => {
-  await page.goto('mac.html');
+  await page.goto('buy.html');
   for (const width of [390, 320]) {
     await page.setViewportSize({ width, height: 844 });
     const ghost = page.locator('#buy .doc-actions > .btn-ghost');
     const buy = page.locator('#buy-form button');
     const [ghostBox, buyBox] = [await ghost.boundingBox(), await buy.boundingBox()];
-    expect(ghostBox.y + ghostBox.height, `the row stacks at ${width}px`).toBeLessThanOrEqual(buyBox.y);
+    // One control per line on a shared left edge. Which of the two leads is the purchase page's order -
+    // the price, its facts, Buy, then the free trial - not this test's subject.
+    expect(Math.abs(ghostBox.x - buyBox.x), `the stacked row shares one left edge at ${width}px`).toBeLessThanOrEqual(1);
+    expect(ghostBox.y >= buyBox.y + buyBox.height - 1 || buyBox.y >= ghostBox.y + ghostBox.height - 1,
+      `the row stacks at ${width}px`).toBe(true);
     expect(+ghostBox.width.toFixed(1), `ghost and primary share one width at ${width}px`).toBe(+buyBox.width.toFixed(1));
     const ghostPaint = await ghost.evaluate(el => {
       const style = getComputedStyle(el);
@@ -442,26 +452,38 @@ test('the stacked buy row keeps one width and stays secondary', async ({ page })
   expect(ghostWide, 'side by side the ghost keeps its natural width').toBeLessThan(buyWide);
 });
 
-// A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
-// refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
-// every width, including the 480 px band where the current note wraps onto a second line.
+// A hyphen is a break opportunity, so `14-` / `day refund` split the number from its unit and the
+// refund window reads as `14-` until the next line. The one compact label that prints the window
+// (the `/download/` requirement card) is 200 px wide and never wraps at a page width, so a width
+// check alone could never fail. The gate therefore puts a copy of the real label, with the page's own
+// cascade, into a container swept from 40 px to 300 px: wherever the label is forced to wrap, the
+// number and its unit must still share one line.
 test('the refund window keeps its number and unit on one line', async ({ page }) => {
-  await page.goto('mac.html');
+  await page.goto('download/');
   for (const width of [1440, 480, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    const rects = await page.evaluate(() => {
-      const note = document.querySelector('#price-row .doc-note');
-      const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const at = node.nodeValue.indexOf('14\u2011day');
-        if (at < 0) continue;
-        const range = document.createRange();
-        range.setStart(node, at);
-        range.setEnd(node, at + 6);
-        return [...range.getClientRects()].filter(rect => rect.width > 0).length;
+    const splits = await page.evaluate(() => {
+      const item = [...document.querySelectorAll('#requirements li')].find(li => /14.day/.test(li.textContent));
+      const probe = item.cloneNode(true);
+      probe.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;margin:0;box-sizing:border-box';
+      item.parentNode.appendChild(probe);
+      const label = probe.querySelector('b');
+      const hits = [];
+      for (let box = 40; box <= 300; box += 1) {
+        probe.style.width = `${box}px`;
+        const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const at = node.nodeValue.search(/14[-\u2011]day/);
+          if (at < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, at);
+          range.setEnd(node, at + 6);
+          if ([...range.getClientRects()].filter(rect => rect.width > 0).length > 1) hits.push(box);
+        }
       }
-      return 0;
+      probe.remove();
+      return hits;
     });
-    expect(rects, `the refund window splits at ${width}px`).toBe(1);
+    expect(splits, `the refund window splits in a label box of these widths at ${width}px`).toEqual([]);
   }
 });

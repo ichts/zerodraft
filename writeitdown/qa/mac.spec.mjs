@@ -1151,3 +1151,32 @@ test('installer acceptance rejects an installer missing its logo-directory guard
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// T3 `Buy to checkout` is the income path, and its cost is reach: how far down the landing a buyer must scroll
+// before they can pay. Measured on main 89b4870 with scripts/core-tasks/measure-web.mjs: the landing's only buy
+// entry sits 2.64 screens down at 1440 and 3.92 at 390. That is the number to beat, not to grow - a section added
+// above the Mac card, or a taller demo, must not push the purchase further away without someone noticing. The
+// no-scroll detour (header `Download for Mac` -> the download page's own Buy) is asserted to stay in the first
+// screen for the same reason: it is the route a buyer can already take that costs no scrolling.
+test('the buy entry is no further down the landing than it is today, and the no-scroll detour still exists', async ({ page }) => {
+  await page.goto('index.html');
+  const reach = await page.evaluate(() => {
+    const a = [...document.querySelectorAll('#landing a')].find(x => /Buy for \$4\.99/.test(x.textContent));
+    if (!a) return null;
+    const r = a.getBoundingClientRect();
+    return { screens: Math.round(((r.top + scrollY) / innerHeight) * 100) / 100, inFirstScreen: r.top < innerHeight };
+  });
+  expect(reach, 'the landing still sells the Mac app from its Mac card').not.toBeNull();
+  // 2.75 / 4.05 leave room for a pixel of layout rounding, not for a new section.
+  const cap = page.viewportSize().width >= 1024 ? 2.75 : 4.05;
+  expect(reach.screens, `the landing buy entry is ${reach.screens} screens down, and its measured reach on 89b4870 was 2.64 at 1440 and 3.92 at 390`).toBeLessThanOrEqual(cap);
+  await page.goto('download/');
+  const detour = await page.evaluate(() => {
+    const a = [...document.querySelectorAll('a')].find(x => /Buy for \$4\.99/.test(x.textContent));
+    if (!a) return null;
+    const r = a.getBoundingClientRect();
+    return { top: Math.round(r.top), inFirstScreen: r.top < innerHeight && r.bottom > 0 };
+  });
+  expect(detour, 'the download page still offers the purchase').not.toBeNull();
+  expect(detour.inFirstScreen, 'the download page sells without scrolling').toBe(true);
+});

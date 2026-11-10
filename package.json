@@ -2,7 +2,9 @@
   "name": "zerodraft",
   "private": true,
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "core-tasks": "node scripts/core-tasks/measure-web.mjs",
+    "core-tasks:test": "node --test scripts/core-tasks/metrics.test.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0"

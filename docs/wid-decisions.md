@@ -2341,3 +2341,25 @@ is `docs/wid-world-table.md`.
   `secondsUntilNextDeadline`, the value the room arms its timer with.
 - Evidence: `data/wid-night-loop/out-deadline-{before,after}-{loaded,split}/` (raw runs and metrics), and the harness
   frame-budget check recorded in `data/wid-night-loop/log.md`.
+
+## D-112: The warning is a transition, so it gets its own instant
+
+- Status: in force on both surfaces.
+- Date: 2026-11-10
+- Decision: the fifth second of silence - the warning - is an absolute instant like the end, and both surfaces arm
+  one timer for the next automatic transition (`nextTransition` in `writeitdown/session.mjs`, `nextWake` in
+  `SessionEngine`). The 50 ms interval and the 0.1 s ticker keep drawing the clock, the numeral, the wash and the bar.
+- Reason: D-111 armed the end but left the warning on the sampler, which made it the one transition still owned by a
+  sample. Measured in the real browser with real timers under a paused clock (so no frame is involved), a keystroke
+  seven milliseconds off the room's 50 ms grid lit the warning **43 ms late**: +5043 ms after the keystroke instead of
+  +5000. After the change the same run lights it at **+5000 exactly**. On the Mac the sampler is 0.1 s, so the same
+  defect was up to twice as large there.
+- What a real person gets: with frames involved, the warning to wipe window measured 2.90 to 3.05 s over five runs
+  (median 3.03) on a host whose own frames cost 23 to 133 ms. The warning was never later than intended by more than
+  the host's frame time, so the writer's reaction window was never below about 2.9 s: this change removes the sampling
+  term (0 to 50 ms on web, 0 to 100 ms on the Mac), not a deficit a user could name.
+- Tests: `session.test.mjs` asserts the warning is the next transition while typing, that the wipe is next once the
+  warning shows, that an earlier finish wins, and that the phase becomes the warning exactly at that instant and not a
+  half-millisecond before. `SessionEngineTests` asserts the same three properties on the Mac.
+- Evidence: `data/wid-night-loop/log.md` for both scratch runs (`warn-grid.mjs`: +5043 before, +5000 after) and the
+  frame-window run (`warn-window.mjs`).

@@ -1,4 +1,4 @@
-import { fresh, advance, append, clock, wordCount, countLabel, historyLines, nextDeadline } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, countLabel, historyLines, nextTransition } from './session.mjs';
 import { denyFeedback, GROW_MS, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot, placeNote } from './status-slot.js';
 
@@ -218,14 +218,15 @@ function render(now = performance.now()) {
   }
 }
 
-/* The 50 ms interval draws the clock, but a sample can land up to 50 ms after the deadline and its callback can run
-   later still, so the transition would wait for the sampler instead of the deadline. The deadline is an absolute
-   time, so it gets its own timer, armed from `nextDeadline` after every tick (D-111). Re-arming on each tick also
-   means drift never accumulates: each arm is measured from the clock, not from the previous timer. */
+/* The 50 ms interval draws the clock, but a sample can land up to 50 ms after a transition and its callback can run
+   later still, so a transition would wait for the sampler instead of its instant. Both automatic transitions - the
+   warning at the fifth second of silence and the end - are absolute times, so they get their own timer, armed from
+   `nextTransition` after every tick (D-111, D-112). Re-arming on each tick also means drift never accumulates: each
+   arm is measured from the clock, not from the previous timer. */
 let deadlineTimer = 0;
 function armDeadline() {
   clearTimeout(deadlineTimer);
-  const next = nextDeadline(state);
+  const next = nextTransition(state);
   deadlineTimer = next === null ? 0 : setTimeout(() => { deadlineTimer = 0; tick(); }, Math.max(1, Math.ceil(next - performance.now())));
 }
 

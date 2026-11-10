@@ -1,6 +1,6 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
- * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-077）、下一次自动状态变化的绝对时刻 nextDeadline / secondsUntilNextDeadline（D-111）
+ * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-077）、下一次自动状态变化的绝对时刻 nextDeadline / nextWake / secondsUntilNextDeadline（D-111、D-112 警告也要叫醒）
  * [POS]: 首次输入启动时钟与绝对截止时间裁决，并把这个绝对时刻交给房间去 arm 一次性 timer（D-111）；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
@@ -146,11 +146,28 @@ final class SessionEngine {
         return min(startedAt + duration, lastActivityAt + Double(silenceLimit.rawValue))
     }
 
+    /// The warning's instant: five seconds of silence into an eight-second limit, or three short of whatever limit is
+    /// set (D-112). Nil once the warning is showing, because then the end is the next transition.
+    var warningAt: TimeInterval? {
+        guard phase == .writing, let lastActivityAt else { return nil }
+        return lastActivityAt + Double(silenceLimit.rawValue - 3)
+    }
+
+    /// The next instant the room must wake for: the warning while the writer is still inside it, otherwise the end.
+    var nextWake: TimeInterval? {
+        switch (warningAt, nextDeadline) {
+        case let (warning?, deadline?): return min(warning, deadline)
+        case let (warning?, nil): return warning
+        case let (nil, deadline?): return deadline
+        case (nil, nil): return nil
+        }
+    }
+
     /// How long the room may sleep before the session changes by itself, in this engine's own clock. Nil when
-    /// nothing is running, so a one-shot timer armed with it wakes exactly on the deadline (D-111).
+    /// nothing is running, so a one-shot timer armed with it wakes exactly on the transition (D-111, D-112).
     var secondsUntilNextDeadline: TimeInterval? {
-        guard let deadline = nextDeadline else { return nil }
-        return max(deadline - now(), 0)
+        guard let wake = nextWake else { return nil }
+        return max(wake - now(), 0)
     }
 
     @discardableResult

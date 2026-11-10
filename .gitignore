@@ -31,3 +31,4 @@ tmp/font-candidates/
 # Dependencies
 node_modules/
 test-results/
+scripts/core-tasks/out/

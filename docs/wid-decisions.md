@@ -2404,7 +2404,7 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   other fails the gate rather than shipping a dead Buy. `buy.js` runs its checkout half on `/buy` and its
   key-delivery half on `mac.html`, each gated on the DOM it finds, so there is still one checkout implementation and
   no second `session_id` reader. `mac.html`'s card kept the browser-trial route and `Download free trial`, so a
-  buyer who wants the manual before paying still reaches it from the purchase page's header (`Mac page`).
+  buyer who wants the manual before paying still reaches it from the purchase page's header (`Details`).
 - Tests: `qa/shell.spec.mjs` holds the purchase page's own contract - the landing shell, an exact reading of the
   page, no footer, nothing under the actions that implies a refund or a guarantee, one screen at 320/390/1440 with
   the price as the largest text, and the three licence lines equal to `mac.html`'s sentence; it also joins the

@@ -1128,7 +1128,7 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
   await expect(macCheckout).toContainText(stripeSentence);
   await expect(page.locator('main')).not.toContainText('payment provider');
   // The outside-request list names the apps that exist, not only the Mac page.
-  await expect(page.locator('main')).toContainText('The only outside requests are the cookieless analytics beacon and, on the Mac page and in the Mac app, the license service.');
+  await expect(page.locator('main')).toContainText('The only outside requests are the cookieless analytics beacon and, on the Mac page, the buy page and in the Mac app, the license service.');
 
   await page.goto('terms.html');
   const terms = page.locator('#mac + p');

@@ -352,7 +352,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
 .dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
-.dl-page .dlhead h1 .nw{white-space:nowrap}
+.dl-page .dlhead h1 .nw,.dl-page #requirements .nw{white-space:nowrap}
 .dl-page .dlhead .sub{max-width:60ch}
 .dlbox{--pad:32px;max-width:760px;margin:36px auto 0;padding:var(--pad);gap:20px}
 .dlbox .actions{display:flex;flex-wrap:wrap;gap:var(--s3)}

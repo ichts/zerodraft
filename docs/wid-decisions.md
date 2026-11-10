@@ -2415,3 +2415,5 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   `mac.html`.
 - Evidence: `data/wid-buy-page-c/` - core-task T3 before/after (`core-before/`, `core-after/`), the journey run
   (`journey-full/`), and captures at 390 and 1440 in both themes.
+  The Emil review (ui-review, typography, ui-polish, touch-and-accessibility; 320/390/1440, both modes) is the
+  Chinese table `data/wid-buy-page-c/emil-review.md`, kept outside the repository.

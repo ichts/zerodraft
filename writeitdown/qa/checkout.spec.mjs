@@ -452,29 +452,38 @@ test('the stacked buy row keeps one width and stays secondary', async ({ page })
   expect(ghostWide, 'side by side the ghost keeps its natural width').toBeLessThan(buyWide);
 });
 
-// A hyphen is a break opportunity, so `14-` / `day refund.` split the number from its unit and the
-// refund window reads as `14-` until the next line. The non-breaking hyphen keeps them together at
-// every width, including the 480 px band where the current note wraps onto a second line.
+// A hyphen is a break opportunity, so `14-` / `day refund` split the number from its unit and the
+// refund window reads as `14-` until the next line. The one compact label that prints the window
+// (the `/download/` requirement card) is 200 px wide and never wraps at a page width, so a width
+// check alone could never fail. The gate therefore puts a copy of the real label, with the page's own
+// cascade, into a container swept from 40 px to 300 px: wherever the label is forced to wrap, the
+// number and its unit must still share one line.
 test('the refund window keeps its number and unit on one line', async ({ page }) => {
-  // The compact label that still prints the window: the Mac card's note stopped carrying the refund
-  // when the sale moved to buy.html, and rule 30 keeps it off that page, so the requirement card is
-  // the one place a buyer reads `14-day refund` as one unit of a broken-out label.
   await page.goto('download/');
   for (const width of [1440, 480, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    const rects = await page.evaluate(() => {
-      const note = [...document.querySelectorAll('#requirements b')].find(label => /14.day/.test(label.textContent));
-      const walker = document.createTreeWalker(note, NodeFilter.SHOW_TEXT);
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        const at = node.nodeValue.search(/14[-\u2011]day/);
-        if (at < 0) continue;
-        const range = document.createRange();
-        range.setStart(node, at);
-        range.setEnd(node, at + 6);
-        return [...range.getClientRects()].filter(rect => rect.width > 0).length;
+    const splits = await page.evaluate(() => {
+      const item = [...document.querySelectorAll('#requirements li')].find(li => /14.day/.test(li.textContent));
+      const probe = item.cloneNode(true);
+      probe.style.cssText = 'position:absolute;visibility:hidden;left:0;top:0;margin:0;box-sizing:border-box';
+      item.parentNode.appendChild(probe);
+      const label = probe.querySelector('b');
+      const hits = [];
+      for (let box = 40; box <= 300; box += 1) {
+        probe.style.width = `${box}px`;
+        const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const at = node.nodeValue.search(/14[-\u2011]day/);
+          if (at < 0) continue;
+          const range = document.createRange();
+          range.setStart(node, at);
+          range.setEnd(node, at + 6);
+          if ([...range.getClientRects()].filter(rect => rect.width > 0).length > 1) hits.push(box);
+        }
       }
-      return 0;
+      probe.remove();
+      return hits;
     });
-    expect(rects, `the refund window splits at ${width}px`).toBe(1);
+    expect(splits, `the refund window splits in a label box of these widths at ${width}px`).toEqual([]);
   }
 });

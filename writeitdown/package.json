@@ -2,8 +2,8 @@
   "name": "writeitdown-browser-qa",
   "private": true,
   "scripts": {
-    "test": "node --test qa/design-guard.test.mjs qa/tokens-json.test.mjs qa/kit-not-shipped.test.mjs && node qa/design-guard.mjs && playwright test",
-    "design-guard": "node --test qa/design-guard.test.mjs qa/tokens-json.test.mjs qa/kit-not-shipped.test.mjs && node qa/design-guard.mjs",
+    "test": "node --test qa/design-guard.test.mjs qa/tokens-json.test.mjs qa/kit-not-shipped.test.mjs qa/boards.test.mjs && node qa/design-guard.mjs && playwright test",
+    "design-guard": "node --test qa/design-guard.test.mjs qa/tokens-json.test.mjs qa/kit-not-shipped.test.mjs qa/boards.test.mjs && node qa/design-guard.mjs",
     "release-check": "node release-check.mjs",
     "cache-headers": "sh qa/cache-headers.sh",
     "journey": "node journey/journey.mjs",

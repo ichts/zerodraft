@@ -69,7 +69,9 @@ const recorder = () => {
     let lastHidden = room.hidden, lastPhase = room.dataset.phase;
     new MutationObserver(() => {
       if (lastHidden !== room.hidden) { lastHidden = room.hidden; m.mark(room.hidden ? 'room-hidden' : 'room-visible'); }
-      if (lastPhase !== room.dataset.phase) { lastPhase = room.dataset.phase; afterPaint(`phase-painted:${room.dataset.phase}`); }
+      // Two marks per phase: the synchronous flip (the room decided) and the frame that shows it. The gap between
+      // them is the room's own render cost, and the gap from the deadline to the flip is detection (D-111).
+      if (lastPhase !== room.dataset.phase) { lastPhase = room.dataset.phase; m.mark(`phase:${room.dataset.phase}`); afterPaint(`phase-painted:${room.dataset.phase}`); }
     }).observe(room, { attributes: true, attributeFilter: ['hidden', 'data-phase'] });
     editor?.addEventListener('focus', () => m.mark('editor-focus'));
     editor?.addEventListener('input', () => { m.mark('input'); afterPaint('input-painted'); });
@@ -161,8 +163,10 @@ async function taskTwo(browser, vpName, base) {
     // counts once it is painted, so this is the late-arriving milliseconds a writer actually waits.
     const sessionStart = marks.find(x => x.name === 'input')?.at;
     const firstPainted = marks.find(x => x.name === 'input-painted')?.at;
+    const flip = marks.find(x => x.name === 'phase:kept')?.at;
     const kept = marks.find(x => x.name === 'phase-painted:kept')?.at;
-    return { overrun: since(sessionStart + 60_000, kept), firstChar: firstPainted, kept };
+    return { overrun: since(sessionStart + 60_000, kept), firstChar: firstPainted, kept,
+      detection: since(sessionStart + 60_000, flip), paint: since(flip, kept) };
   })();
   const focusAtKept = await page.evaluate(() => document.activeElement?.id ?? null);
   const keptText = await page.locator('#kept-text').innerText();
@@ -182,7 +186,9 @@ async function taskTwo(browser, vpName, base) {
       first_char_to_kept_painted: since(deadlineOverrun.firstChar, deadlineOverrun.kept),
       kept_painted_to_copy_pointer: since(deadlineOverrun.kept, pointerAt),
       copy_pointer_to_copied_label: since(pointerAt, copiedAt),
-      deadline_overrun_vs_60000: deadlineOverrun.overrun
+      deadline_overrun_vs_60000: deadlineOverrun.overrun,
+      deadline_detection_ms: deadlineOverrun.detection,
+      kept_paint_ms: deadlineOverrun.paint
     },
     steps: { typingKeystrokes: typedText.length, nonTypingActions: 1, nonTypingActionsNote: 'one click on Copy text (focus is already on it)' },
     focusAtKept,

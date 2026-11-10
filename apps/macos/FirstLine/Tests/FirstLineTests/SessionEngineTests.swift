@@ -313,6 +313,76 @@ struct SessionEngineTests {
         #expect(engine.wipedText == "draft")
     }
 
+    // MARK: - The instant the room must wake for (D-111)
+
+    // The room's ticker runs at 0.1 s, so a deadline can only be noticed by a sample and a loaded app can run that
+    // sample late. The engine names the instant instead, so the room can arm one timer for it: the earlier of the
+    // finish and the silence wipe, or nil when nothing is running.
+    @Test
+    func nextDeadlineIsTheEarlierOfFinishAndWipe() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+
+        #expect(engine.nextDeadline == nil, "idle has nothing to wake for")
+
+        engine.start(duration: 60)
+        #expect(engine.nextDeadline == nil, "a started session without text has no deadline")
+
+        engine.registerCommittedText("draft")
+        #expect(engine.nextDeadline == 8, "one keystroke then silence: the wipe comes first")
+
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        #expect(engine.nextDeadline == 60, "still typing: the finish comes first")
+
+        uptime = 52
+        engine.registerMarkedTextActivity()
+        #expect(engine.nextDeadline == 60, "a tie resolves to the one instant")
+    }
+
+    @Test
+    func theArmedInstantIsExactlyWhereThePhaseChanges() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+
+        engine.start(duration: 60)
+        engine.registerCommittedText("draft")
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        guard let deadline = engine.nextDeadline else {
+            Issue.record("a running session must name its deadline")
+            return
+        }
+        // A millisecond early is still writing; at the instant itself the session has ended.
+        uptime = deadline - 0.001
+        engine.tick()
+        #expect(engine.phase == .writing || engine.phase == .danger)
+        // The room arms a one-shot timer with this many seconds and no other clock reading.
+        #expect(engine.secondsUntilNextDeadline == deadline - (deadline - 0.001))
+        uptime = deadline
+        engine.tick()
+        #expect(engine.phase == .success)
+        #expect(engine.nextDeadline == nil, "a finished session wakes for nothing")
+    }
+
+    @Test
+    func aWipedSessionNamesNoDeadline() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+
+        engine.start(duration: 60)
+        engine.registerCommittedText("draft")
+        uptime = 9.0
+        engine.tick()
+
+        #expect(engine.phase == .failure)
+        #expect(engine.nextDeadline == nil)
+    }
+
     // MARK: - Empty session never succeeds (Fix 4)
 
     @Test

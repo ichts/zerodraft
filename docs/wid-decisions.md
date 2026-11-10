@@ -2314,3 +2314,30 @@ is `docs/wid-world-table.md`.
   390 and 1440, plus the purchase page each one reaches); `data/wid-night-loop/evidence/buy-entry-options/` for the
   rejected header pill; `writeitdown/qa/mac.spec.mjs` "landing: Paper in light" and "the buy entry is no further down
   the landing than it is today".
+
+## D-111: The deadline decides the transition, not the next tick
+
+- Status: in force on both surfaces.
+- Date: 2026-11-10
+- Decision: the instant a session changes by itself - the earlier of the finish and the silence wipe - is a named
+  number, computed once (`nextDeadline` in `writeitdown/session.mjs`, `SessionEngine.nextDeadline` on the Mac). The
+  room arms one timer for it after every tick, re-armed from the clock rather than from the previous timer, so drift
+  never accumulates. The 50 ms web interval and the 0.1 s AppKit ticker keep drawing the clock, the numeral and the
+  bar; they no longer decide the transition.
+- Reason: both surfaces sampled the deadline. A 50 ms sample can land 50 ms late, a 0.1 s sample 100 ms late, and a
+  host that runs the callback late pushes it further, so `Finish to text` reported the deadline landing 119 to 130 ms
+  late on the web and 245 to 287 ms late on the Mac. The 60 seconds are published in the FAQ and the structured data,
+  so the transition is a promise, not a taste call.
+- What was measured, and what was not: the web meter now splits the overshoot into detection (deadline to the room's
+  decision) and paint (decision to the frame that shows it). At load 4 to 18 detection was 59 ms median before and
+  48 ms after (n=3 each) and paint was 21 to 155 ms. The paint term is the measuring harness, not the product: the
+  same page runs at 80 to 150 ms per frame in headless Chrome with no long tasks on the main thread. So the claim is
+  the **bound** - one timer wake-up instead of one sample, unbounded when callbacks are slow - and the end-to-end
+  overshoot on that host could not be shown smaller. The Mac numbers are equally unproven end-to-end: `swift test`
+  covers the engine's armed instant, and a real-window measurement on a quiet host is still owed.
+- Tests: `writeitdown/session.test.mjs` asserts the number (earlier of finish and wipe, null when nothing runs) and
+  that `advance` changes phase exactly at the armed instant, not a millisecond before it;
+  `Tests/FirstLineTests/SessionEngineTests.swift` asserts the same three properties for the engine, including
+  `secondsUntilNextDeadline`, the value the room arms its timer with.
+- Evidence: `data/wid-night-loop/out-deadline-{before,after}-{loaded,split}/` (raw runs and metrics), and the harness
+  frame-budget check recorded in `data/wid-night-loop/log.md`.

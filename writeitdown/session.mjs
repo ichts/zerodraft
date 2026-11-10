@@ -11,6 +11,14 @@ export function nextDeadline(state) {
   return Math.min(state.started + 60000, state.lastInput + 8000);
 }
 
+// The next automatic transition, which is not always the end: while the writer is still inside the fifth second the
+// warning comes first (D-112). The room arms its timer with this, so the numeral lands on its instant like the wipe.
+export function nextTransition(state) {
+  const deadline = nextDeadline(state);
+  if (deadline === null) return null;
+  return state.phase === 'typing' ? Math.min(deadline, state.lastInput + 5000) : deadline;
+}
+
 export function advance(state, now) {
   const deadline = nextDeadline(state);
   if (deadline === null) return state;

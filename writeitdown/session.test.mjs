@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fresh, advance, append, clock, wordCount, countLabel, historyLines, nextDeadline, GONE } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, countLabel, historyLines, nextDeadline, nextTransition, GONE } from './session.mjs';
 import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
 test('rest has no running deadline', () => {
@@ -51,6 +51,27 @@ test('the next automatic transition is the earlier of the finish and the wipe', 
   assert.equal(nextDeadline(tie), 60000, 'a tie resolves to the one instant, and the wipe wins it');
   assert.equal(nextDeadline(advance(writing, 60000)), null, 'a finished session arms nothing');
   assert.equal(nextDeadline(advance(tie, 60000)), null, 'a wiped session arms nothing');
+});
+
+// The warning is a transition too, and the room must wake for it: measured on this host the numeral could arrive
+// 49 to 131 ms after the fifth second of silence, while the wipe arrived on its own instant, so the writer's
+// reaction window was 2.90 to 3.05 s instead of 3.00 s.
+test('the room wakes for the warning, not only for the end', () => {
+  assert.equal(nextTransition(fresh()), null, 'rest has nothing to wake for');
+  const once = append(fresh(), 'Hello', 1000);
+  assert.equal(nextTransition(once), 6000, 'while typing, the warning is the next transition');
+  const warned = { ...once, phase: 'warn' };
+  assert.equal(nextTransition(warned), 9000, 'in the warning, the wipe is next');
+  const writing = { ...once, lastInput: 55000 };
+  assert.equal(nextTransition(writing), 60000, 'a finish earlier than the warning wins');
+  assert.equal(nextTransition(writing) >= nextTransition(once) - 5000, true, 'the wake is never past the end');
+});
+
+test('the warning instant is where the phase becomes the warning, and not a frame earlier', () => {
+  const state = append(fresh(), 'Hello', 1000);
+  const wake = nextTransition(state);
+  assert.equal(advance(state, wake - 0.5).phase, 'typing', 'still writing a millisecond before');
+  assert.equal(advance(state, wake).phase, 'warn', 'the warning at its instant');
 });
 
 test('the armed instant is exactly where advance changes phase, never one tick early or late', () => {

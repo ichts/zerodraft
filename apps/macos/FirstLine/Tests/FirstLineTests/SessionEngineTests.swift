@@ -370,6 +370,41 @@ struct SessionEngineTests {
     }
 
     @Test
+    func theRoomAlsoWakesForTheWarning() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+
+        engine.start(duration: 60)
+        engine.registerCommittedText("draft")
+        // Five seconds of silence is the warning, and it comes long before the wipe at eight.
+        #expect(engine.warningAt == 5)
+        #expect(engine.nextWake == 5, "the warning is the next thing the room wakes for")
+        uptime = 5
+        engine.tick()
+        #expect(engine.phase == .danger, "the warning lands on its instant")
+        #expect(engine.warningAt == nil, "the warning does not repeat")
+        #expect(engine.nextWake == 8, "then the wipe is next")
+    }
+
+    @Test
+    func theWarningWakesBeforeAnEarlierFinish() {
+        var uptime = 0.0
+        let engine = SessionEngine(now: { uptime })
+
+        engine.start(duration: 60)
+        engine.registerCommittedText("draft")
+        for second in stride(from: 6.0, through: 54.0, by: 6.0) {
+            uptime = second
+            engine.registerMarkedTextActivity()
+        }
+        uptime = 56
+        engine.registerCommittedText(" more")
+        // The finish at 60 comes before the warning at 61, and neither may be skipped.
+        #expect(engine.warningAt == 61)
+        #expect(engine.nextWake == 60)
+    }
+
+    @Test
     func aWipedSessionNamesNoDeadline() {
         var uptime = 0.0
         let engine = SessionEngine(now: { uptime })

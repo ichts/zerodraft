@@ -1,0 +1,360 @@
+{
+  "rule": "A board is out of date whenever it disagrees with the system: a region whose token no longer resolves to what the real screen draws, a string the screen no longer shows, a token missing from docs/design-system/tokens.json, or a board missing from this list. Fix the board, never the check. Boards are generated from this file (node scripts/build-boards.mjs); edit this file, not the HTML.",
+  "tokens": "docs/design-system/tokens.json",
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "boards": [
+    {
+      "file": "Landing-Rest",
+      "screen": "Landing",
+      "state": "Rest",
+      "url": "index.html",
+      "drive": "landing",
+      "regions": [
+        {
+          "name": "canvas",
+          "selector": "body",
+          "property": "backgroundColor",
+          "token": "--page"
+        },
+        {
+          "name": "headline",
+          "selector": "h1",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "door",
+          "selector": "#landing .cta a[href=\"#trial\"]",
+          "property": "backgroundColor",
+          "token": "--ink"
+        },
+        {
+          "name": "door label",
+          "selector": "#landing .cta a[href=\"#trial\"]",
+          "property": "color",
+          "token": "--on-ink"
+        },
+        {
+          "name": "demo paper",
+          "selector": "#paper",
+          "property": "backgroundColor",
+          "token": "--paper-tone"
+        }
+      ],
+      "strings": [
+        "We force you to write it down",
+        "Give it 60 seconds"
+      ]
+    },
+    {
+      "file": "Room-Fresh",
+      "screen": "Room",
+      "state": "Fresh",
+      "url": "index.html",
+      "drive": "room-fresh",
+      "regions": [
+        {
+          "name": "paper",
+          "selector": "#room .room-paper",
+          "property": "backgroundColor",
+          "token": "--paper-tone"
+        },
+        {
+          "name": "clock",
+          "selector": "#room-clock",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "count",
+          "selector": "#room-count",
+          "property": "color",
+          "token": "--paper-quiet"
+        },
+        {
+          "name": "caret",
+          "selector": "#editor",
+          "property": "caretColor",
+          "token": "--ink"
+        }
+      ],
+      "strings": [
+        "Type to begin",
+        "1:00"
+      ]
+    },
+    {
+      "file": "Room-Typing",
+      "screen": "Room",
+      "state": "Typing",
+      "url": "index.html",
+      "drive": "room-typing",
+      "regions": [
+        {
+          "name": "paper",
+          "selector": "#room .room-paper",
+          "property": "backgroundColor",
+          "token": "--paper-tone"
+        },
+        {
+          "name": "clock",
+          "selector": "#room-clock",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "count",
+          "selector": "#room-count",
+          "property": "color",
+          "token": "--paper-quiet"
+        },
+        {
+          "name": "live line",
+          "selector": "#editor-ink",
+          "property": "color",
+          "token": "--ink"
+        }
+      ],
+      "strings": [
+        "words"
+      ]
+    },
+    {
+      "file": "Room-Warning",
+      "screen": "Room",
+      "state": "Warning",
+      "url": "index.html",
+      "drive": "room-warn",
+      "regions": [
+        {
+          "name": "wash",
+          "selector": "#room .room-paper-wash",
+          "property": "backgroundColor",
+          "token": "--paper-wash"
+        },
+        {
+          "name": "numeral",
+          "selector": "#room-numeral",
+          "property": "color",
+          "token": "--paper-danger"
+        },
+        {
+          "name": "caption",
+          "selector": "#room-warning",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "clock",
+          "selector": "#room-clock",
+          "property": "color",
+          "token": "--ink"
+        }
+      ],
+      "strings": []
+    },
+    {
+      "file": "Room-Wiped",
+      "screen": "Room",
+      "state": "Wiped",
+      "url": "index.html",
+      "drive": "room-wiped",
+      "regions": [
+        {
+          "name": "paper",
+          "selector": "#room .room-paper",
+          "property": "backgroundColor",
+          "token": "--paper-tone"
+        },
+        {
+          "name": "consequence",
+          "selector": "#failure-note",
+          "property": "color",
+          "token": "--paper-quiet"
+        },
+        {
+          "name": "begin again",
+          "selector": "#begin-again",
+          "property": "backgroundColor",
+          "token": "--sheet"
+        },
+        {
+          "name": "begin again label",
+          "selector": "#begin-again",
+          "property": "color",
+          "token": "--ink"
+        }
+      ],
+      "strings": [
+        "You stopped.",
+        "Draft deleted.",
+        "Begin again"
+      ]
+    },
+    {
+      "file": "Room-Kept",
+      "screen": "Room",
+      "state": "Kept",
+      "url": "index.html",
+      "drive": "room-kept",
+      "regions": [
+        {
+          "name": "paper",
+          "selector": "#room .room-paper",
+          "property": "backgroundColor",
+          "token": "--paper-tone"
+        },
+        {
+          "name": "receipt",
+          "selector": "#receipt",
+          "property": "color",
+          "token": "--paper-quiet"
+        },
+        {
+          "name": "copy",
+          "selector": "#copy",
+          "property": "backgroundColor",
+          "token": "--ink"
+        },
+        {
+          "name": "copy label",
+          "selector": "#copy",
+          "property": "color",
+          "token": "--on-ink"
+        },
+        {
+          "name": "begin again",
+          "selector": "#restart",
+          "property": "backgroundColor",
+          "token": "--sheet"
+        }
+      ],
+      "strings": [
+        "You wrote it down.",
+        "Copy text",
+        "Begin again"
+      ]
+    },
+    {
+      "file": "Buy-Rest",
+      "screen": "Buy",
+      "state": "Rest",
+      "url": "buy.html",
+      "drive": "settled",
+      "regions": [
+        {
+          "name": "canvas",
+          "selector": "body",
+          "property": "backgroundColor",
+          "token": "--page"
+        },
+        {
+          "name": "price",
+          "selector": "h1.buy-price",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "buy",
+          "selector": "#buy-form button",
+          "property": "backgroundColor",
+          "token": "--ink"
+        },
+        {
+          "name": "buy label",
+          "selector": "#buy-form button",
+          "property": "color",
+          "token": "--on-ink"
+        }
+      ],
+      "strings": [
+        "$4.99 once",
+        "Buy for $4.99 once",
+        "Download free trial"
+      ]
+    },
+    {
+      "file": "Buy-Error",
+      "screen": "Buy",
+      "state": "Error",
+      "url": "buy.html",
+      "drive": "buy-error",
+      "regions": [
+        {
+          "name": "status",
+          "selector": "#checkout-status",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "buy",
+          "selector": "#buy-form button",
+          "property": "backgroundColor",
+          "token": "--ink"
+        }
+      ],
+      "strings": [
+        "Checkout is unavailable. Please try again in a moment."
+      ]
+    },
+    {
+      "file": "Mac-Rest",
+      "screen": "Mac",
+      "state": "Rest",
+      "url": "mac.html",
+      "drive": "settled",
+      "regions": [
+        {
+          "name": "canvas",
+          "selector": "body",
+          "property": "backgroundColor",
+          "token": "--page"
+        },
+        {
+          "name": "price",
+          "selector": "#price",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "buy",
+          "selector": "#buy-heading ~ .doc-actions .btn-primary",
+          "property": "backgroundColor",
+          "token": "--ink"
+        }
+      ],
+      "strings": [
+        "$4.99 once",
+        "Download free trial"
+      ]
+    },
+    {
+      "file": "Mac-LicenseError",
+      "screen": "Mac",
+      "state": "LicenseError",
+      "url": "mac.html?session_id=cs_board",
+      "drive": "license-error",
+      "regions": [
+        {
+          "name": "status",
+          "selector": "#license-status",
+          "property": "color",
+          "token": "--ink"
+        },
+        {
+          "name": "check again",
+          "selector": "#retry-license",
+          "property": "backgroundColor",
+          "token": "--sheet"
+        }
+      ],
+      "strings": [
+        "Your license is not ready yet.",
+        "Check again"
+      ]
+    }
+  ]
+}

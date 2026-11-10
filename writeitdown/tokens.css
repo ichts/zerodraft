@@ -96,3 +96,20 @@
    a shorter sheet instead of being pushed onto it (D-068, Q-02). */
 @media (max-height:700px){.home .paper{--t-numeral:min(15vh,140px)}}
 @media (max-width:767px){.home{--t-write:21px}}
+
+/* The room palette: the colour roles of the writing room's own shell (.stage, .paper, the trial wall),
+   which sit on :root rather than .home. Dark is the default, light follows data-theme. These are the
+   names site.css reads; the values were site.css literals until the design guard (qa/design-guard.mjs)
+   made tokens.css the only place a colour is written. */
+:root{
+  color-scheme:dark;
+  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--hand:#e4604a;
+  --wash-paper:#3a1c15;--deep-paper:#4a2318;
+  --lift:0 1px 0 rgba(0,0,0,.25),0 24px 48px -32px rgba(0,0,0,.65);
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--hand:#9a2a1f;
+  --wash-paper:#ebdfce;--deep-paper:#decab3;
+  --lift:0 1px 0 rgba(26,24,19,.10),0 24px 48px -32px rgba(26,24,19,.35);
+}

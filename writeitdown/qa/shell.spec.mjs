@@ -189,6 +189,9 @@ test('the licence sentence is written once and copied verbatim to the Mac page',
   await page.goto(purchasePage);
   const facts = await page.locator('.buy-facts li').allInnerTexts();
   expect(facts.join(' '), 'the purchase page states the same facts, word for word').toBe(sentence);
+  // Safari drops list semantics from a `ul` whose markers are hidden unless the role is restated, and
+  // the phone that reads this page is WebKit. The three facts stay three list items to a screen reader.
+  await expect(page.locator('.buy-facts'), 'the facts stay a list in WebKit').toHaveAttribute('role', 'list');
   // The refund is a legal term, not a line beside a Buy button (rule 30): it stays in the page and on
   // /terms.html that own it.
   await page.goto('mac.html');

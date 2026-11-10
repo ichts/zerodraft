@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const TOKENS = 'tokens.css';
 const GENERATED_CSS = /^fonts.*\.css$/;
-const SKIP_DIRS = new Set(['node_modules', 'test-results', 'qa', 'journey', 'fonts', 'kit']);
+const SKIP_DIRS = new Set(['node_modules', 'test-results', 'qa', 'journey', 'fonts']);
 
 const COLOUR_FN = /\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\(/i;
 const HEX = /(?<![\w&#-])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![\w-])/g;

@@ -1,0 +1,14 @@
+/* The component gallery: every shared component in every state, in the theme the header toggle sets.
+   A developer tool, not a page of the product: it is not installed (install.sh lists files one by one) and
+   qa/kit.spec.mjs fails if it ever is. Open it at /writeitdown/kit/ on the preview server. Layout only; the
+   components themselves come from ../site.css and ../tokens.css. */
+.home .kit{padding-bottom:var(--s9)}
+.home .kit h1{margin:var(--s7) 0 0;text-align:left;font:500 var(--t-h3)/1.2 var(--serif)}
+.home .kit-part{margin-top:var(--s7);padding-top:var(--s5);border-top:1px solid var(--hair)}
+.home .kit-part h2{margin:0 0 var(--s5);text-align:left;font:500 var(--t-ui)/1.6 var(--sans);letter-spacing:.04em;color:var(--mute)}
+.home .kit-states{display:grid;align-items:start;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:var(--s6) var(--s5)}
+.home .kit-wide{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+.home .kit-state{margin:0}
+.home .kit-state figcaption{margin:0 0 var(--s3);font:400 var(--t-small)/1.6 var(--sans);color:var(--mute)}
+.home .kit-state p{margin:0}
+.home .kit-state .empty{padding:var(--s6) var(--s4);border:1px solid var(--hair);border-radius:var(--r-sheet)}

@@ -1,7 +1,7 @@
 /*
  * [INPUT]: 单调时间源、NaturalLanguage 分词与编辑器提交、IME 活动
- * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-077）
- * [POS]: 首次输入启动时钟与绝对截止时间裁决；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
+ * [OUTPUT]: SessionEngine / SessionPhase、五档时长与静默时限裁决、词数和失败时 unusedSeconds / deletionElapsedSeconds、每会话一次的首次删除提示时刻 refusalNoticeAt（D-077）、下一次自动状态变化的绝对时刻 nextDeadline / secondsUntilNextDeadline（D-111）
+ * [POS]: 首次输入启动时钟与绝对截止时间裁决，并把这个绝对时刻交给房间去 arm 一次性 timer（D-111）；正文变化时更新词数，重启由 AppState 授权，草稿只在内存
  * [PROTOCOL]: 变更时检查最近 AGENTS.md
  */
 import Foundation
@@ -138,15 +138,30 @@ final class SessionEngine {
         tick()
     }
 
+    /// The instant this session changes by itself: the earlier of the finish and the silence wipe, or nil when
+    /// nothing is running (D-111). The room arms one timer for it, so the transition lands on the deadline instead of
+    /// on the next 0.1 s sample, and `adjudicateDeadlines` compares against the same number.
+    var nextDeadline: TimeInterval? {
+        guard let startedAt, let lastActivityAt, phase == .writing || phase == .danger else { return nil }
+        return min(startedAt + duration, lastActivityAt + Double(silenceLimit.rawValue))
+    }
+
+    /// How long the room may sleep before the session changes by itself, in this engine's own clock. Nil when
+    /// nothing is running, so a one-shot timer armed with it wakes exactly on the deadline (D-111).
+    var secondsUntilNextDeadline: TimeInterval? {
+        guard let deadline = nextDeadline else { return nil }
+        return max(deadline - now(), 0)
+    }
+
     @discardableResult
     private func adjudicateDeadlines() -> Bool {
-        guard let startedAt, let lastActivityAt, phase == .writing || phase == .danger else { return false }
+        guard let startedAt, let lastActivityAt, let deadline = nextDeadline else { return false }
         let current = now()
         let finish = startedAt + duration
         let wipe = lastActivityAt + Double(silenceLimit.rawValue)
         let wipePassed = current >= wipe
         let finishPassed = current >= finish
-        guard wipePassed || finishPassed else { return false }
+        guard current >= deadline else { return false }
         if wipePassed && (!finishPassed || wipe <= finish) ||
             finishPassed && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             unusedSeconds = max(0, Int(ceil(finish - wipe)))

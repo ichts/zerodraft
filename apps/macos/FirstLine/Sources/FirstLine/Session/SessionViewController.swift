@@ -1,7 +1,7 @@
 /*
  * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
  * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
- * [POS]: Clear window ground (D-102): the traffic lights step out once the first character lands and return on a title-strip hover or when the room stops. Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
+ * [POS]: Clear window ground (D-102), 以及截止时刻的一次性 timer 与 0.1 s ticker 并存（D-111）: the traffic lights step out once the first character lands and return on a title-strip hover or when the room stops. Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
 import AppKit
@@ -254,6 +254,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var keyMonitor: Any?
     private var keyObserver: NSObjectProtocol?
     private var ticker: Timer?
+    /// One-shot wake at `engine.nextDeadline`: the 0.1 s ticker draws the numeral and the bar, but a deadline can
+    /// only be noticed by a sample and a loaded app runs that sample late (D-111).
+    private var deadlineTimer: Timer?
     private var focusAttempts = 0
     private var lastDenyAt: TimeInterval?
     private var deny = DenyFeedbackState()
@@ -334,6 +337,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         syncTrafficLights(restore: true)
         ticker?.invalidate()
         ticker = nil
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor); self.keyMonitor = nil }
         if let keyObserver { NotificationCenter.default.removeObserver(keyObserver); self.keyObserver = nil }
         endCutAnimation()
@@ -879,6 +884,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         appState.handleTick()
         applyVisualSettings()
         applyPhase()
+        armDeadline()
         if let deniedAt = engine.lastDenyAt, deniedAt != lastDenyAt {
             lastDenyAt = deniedAt
             let noticeAt = engine.refusalNoticeAt
@@ -887,6 +893,18 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             showDeny(announcing: !earnsNotice)
             if earnsNotice { showRefusalNotice() }
         }
+    }
+
+    /// Re-armed after every tick from the engine's own clock, so a late wake never accumulates into a later one.
+    private func armDeadline() {
+        deadlineTimer?.invalidate()
+        deadlineTimer = nil
+        guard let delay = engine.secondsUntilNextDeadline else { return }
+        let timer = Timer(timeInterval: max(delay, 0.001), repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.tick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        deadlineTimer = timer
     }
 
     private func applyPhase() {

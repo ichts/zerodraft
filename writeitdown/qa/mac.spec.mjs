@@ -237,18 +237,26 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a.btn-primary[href="#trial"]'), 'one door on the page, not two').toHaveCount(1);
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
+  // One evaluate, measured from the top of the document: every rect here is in document space, so a test that
+  // scrolls, or a scroll that animates, cannot make a gap read smaller than the layout's.
   const layout = await page.evaluate(() => {
     const pin = document.createElement('style');
     pin.textContent = '.home{--sans:Arial, sans-serif}';
     document.head.append(pin);
-    const r = s => document.querySelector(s).getBoundingClientRect();
+    const doc = s => {
+      const r = document.querySelector(s).getBoundingClientRect();
+      const top = r.top + window.scrollY;
+      return { top, bottom: top + r.height, height: r.height, left: r.left, width: r.width };
+    };
     const home = document.querySelector('#landing');
     const token = n => parseFloat(getComputedStyle(home).getPropertyValue(n));
+    const card = doc('#paper'), door = doc('#landing .cta .btn'), buy = doc('#landing .cta .cta-buy');
     const out = {
-      card: r('#paper'), sub: r('.hero-sub'), door: r('#landing .cta .btn'), vh: innerHeight,
+      card, sub: doc('.hero-sub'), door, vh: innerHeight,
+      buyAbove: buy.top - door.bottom, buyBelow: card.top - buy.bottom,
       ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing .cta')).paddingTop),
       stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
-      tokens: { s1: token('--s1'), s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
+      tokens: { s1: token('--s1'), s2: token('--s2'), s3: token('--s3'), s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
     };
     pin.remove();
     return out;
@@ -261,10 +269,12 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
   expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred over the sheet').toBeLessThan(1);
   expect(layout.ctaTop, 'the headline group closes on the spacing scale').toBe(phone ? layout.tokens.s4 : layout.tokens.s5);
-  // The door group now ends on the buy line, so on a phone the sheet returns to the smallest gap: the buy line
-  // took the space the sheet used to own rather than adding a band above it (D-110).
-  expect(layout.stageTop, 'the sheet keeps the scale gap under the door group').toBe(phone ? layout.tokens.s1 : layout.tokens.s7);
-  expect(layout.door.bottom, 'the buy line sits under the door').toBeLessThanOrEqual(await cta.locator('a.cta-buy').evaluate(e => e.getBoundingClientRect().top) + 0.5);
+  // The buy line is a quiet route of its own, not a footnote to the door (D-110 as amended): it starts at least one
+  // scale step below the door's box - so a thumb aimed at the door cannot land on it - and the sheet starts at least
+  // one step below it, which keeps the price off the paper.
+  expect(layout.stageTop, 'the sheet keeps the scale gap under the door group').toBe(phone ? layout.tokens.s2 : layout.tokens.s7);
+  expect(layout.buyAbove, 'the buy line owns at least 12 px of air under the door').toBeGreaterThanOrEqual(11.5);
+  expect(layout.buyBelow, 'the sheet owns at least 8 px of air under the buy line').toBeGreaterThanOrEqual(7.5);
 
   await expect(page.locator('#facts, .points, .callback'), 'the facts table, the points band and the closing block are gone').toHaveCount(0);
   await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');

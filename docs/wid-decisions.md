@@ -2315,6 +2315,23 @@ is `docs/wid-world-table.md`.
   rejected header pill; `writeitdown/qa/mac.spec.mjs` "landing: Paper in light" and "the buy entry is no further down
   the landing than it is today".
 
+### D-110 amendment, 2026-11-10 (spacing only, same decision)
+
+The line shipped 10 px under the door's pill and 4 px above the paper, which read as a price caveat hanging off the
+free button rather than a second route a buyer can take - the reading rule 30 exists to prevent. The string, the
+first-screen position, the ink, the underline and the absence of a pill all stay; only the air changed.
+
+- `.home .cta-buy` now starts 12 px below the door's box on every width (was 6 px, and 0 on a phone), and a phone's
+  sheet keeps `--s2` (8 px) instead of `--s1` (4 px) under it. Measured on the built page: door to buy 12 px, buy to
+  sheet 8 px (was 10 px visible / 4 px box), thumb-safe because a finger aimed at the door has to miss by 12 px before
+  it can land on the price.
+- Cost, measured: the first screen grows 16 px on a phone (320x700 66 -> 82 px over the viewport, 375x667 95 -> 111,
+  390x844 4 -> 20) and 6 px at 1440x900; the paper stays at exactly 61% of the viewport at all four widths, and the buy
+  line stays inside the first screen (bottom 353/304/503 px above it).
+- Contract in a test: `qa/mac.spec.mjs` now asserts the buy box clears the door by at least 12 px and the sheet clears
+  the buy box by at least 8 px, on the phone and desktop projects. The old spacing fails both assertions.
+- Revert: `git revert <this commit>` restores the previous spacing; the assertions revert with it.
+
 ## D-111: The deadline decides the transition, not the next tick
 
 - Status: in force on both surfaces.

@@ -237,7 +237,10 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a.btn-primary[href="#trial"]'), 'one door on the page, not two').toHaveCount(1);
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
+  // Measured from the top of the document: a test that scrolled the page would otherwise read a smaller gap than
+  // the layout has, which says nothing about the spacing the visitor sees.
   const layout = await page.evaluate(() => {
+    window.scrollTo(0, 0);
     const pin = document.createElement('style');
     pin.textContent = '.home{--sans:Arial, sans-serif}';
     document.head.append(pin);

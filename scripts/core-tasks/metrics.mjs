@@ -58,7 +58,12 @@ export function runsToMetrics(runs, meta) {
         steps: 2,
         steps_detail: `1 uninterrupted write + 1 click (Copy text); typing keystrokes ${pick(t2, r => r.t2.steps.typingKeystrokes)}`,
         ms: sum(segments),
-        segments_ms: { ...segments, deadline_overrun_vs_60000: pick(t2, r => r.t2.ms.deadline_overrun_vs_60000) },
+        segments_ms: {
+          ...segments,
+          deadline_overrun_vs_60000: pick(t2, r => r.t2.ms.deadline_overrun_vs_60000),
+          deadline_detection_ms: pick(t2, r => r.t2.ms.deadline_detection_ms),
+          kept_paint_ms: pick(t2, r => r.t2.ms.kept_paint_ms)
+        },
         n: t2.length,
         checks: { kept_matches_typed: t2.every(r => r.t2.keptTextMatchesTyped), clipboard_matches_kept: t2.every(r => r.t2.clipboardMatchesKept) }
       };
@@ -119,7 +124,7 @@ export function formatTable(metrics) {
       const t = m[task];
       if (!t) continue;
       const note = [];
-      if (task === 'T2' && t.segments_ms) note.push(`deadline +${t.segments_ms.deadline_overrun_vs_60000} ms`);
+      if (task === 'T2' && t.segments_ms) note.push(`deadline +${t.segments_ms.deadline_overrun_vs_60000} ms (detection ${t.segments_ms.deadline_detection_ms}, paint ${t.segments_ms.kept_paint_ms})`);
       if (task === 'T3' && t.reach_screens_down != null) note.push(`${t.reach_screens_down} screens down; first screen: ${t.in_first_screen ? 'yes' : 'no'}`);
       if (t.checks) note.push(...Object.entries(t.checks).map(([k, v]) => `${k}: ${v ? 'yes' : 'NO'}`));
       const steps = t.steps_detail ? `${t.steps} (${t.steps_detail})` : String(t.steps);

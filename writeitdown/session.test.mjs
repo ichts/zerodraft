@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fresh, advance, append, clock, wordCount, countLabel, historyLines, GONE } from './session.mjs';
+import { fresh, advance, append, clock, wordCount, countLabel, historyLines, nextDeadline, GONE } from './session.mjs';
 import { LINES, TIMELINE, buildTimeline } from './demo-timeline.mjs';
 
 test('rest has no running deadline', () => {
@@ -34,6 +34,39 @@ test('real deadline keeps only after sixty seconds', () => {
   state = advance(state, 60000);
   assert.equal(state.phase, 'kept');
   assert.equal(append(state, ' no', 60001).text, state.text);
+});
+
+// The room arms a timer for the instant the session changes by itself, so that instant is a number here and is
+// computed once: the earlier of the 60-second finish and the 8-second silence wipe. A sample can arrive up to a
+// couple of ticks late; the timer cannot, which is why the number has to exist outside the sampler (D-111).
+test('the next automatic transition is the earlier of the finish and the wipe', () => {
+  assert.equal(nextDeadline(fresh()), null, 'rest has nothing to arm');
+  const once = append(fresh(), 'Hello', 0);
+  assert.equal(nextDeadline(once), 8000, 'one keystroke then silence: the wipe comes first');
+  const writing = { ...once, lastInput: 54000 };
+  assert.equal(nextDeadline(writing), 60000, 'still typing: the finish comes first');
+  const warned = { ...once, phase: 'warn', lastInput: 2000 };
+  assert.equal(nextDeadline(warned), 10000, 'the warning still ends at the wipe');
+  const tie = { ...once, lastInput: 52000 };
+  assert.equal(nextDeadline(tie), 60000, 'a tie resolves to the one instant, and the wipe wins it');
+  assert.equal(nextDeadline(advance(writing, 60000)), null, 'a finished session arms nothing');
+  assert.equal(nextDeadline(advance(tie, 60000)), null, 'a wiped session arms nothing');
+});
+
+test('the armed instant is exactly where advance changes phase, never one tick early or late', () => {
+  const states = [
+    append(fresh(), 'Hello', 1000),
+    { ...append(fresh(), 'Hello', 1000), lastInput: 53000 },
+    { ...append(fresh(), 'Hello', 1000), phase: 'warn', lastInput: 3000 },
+    { ...append(fresh(), ' ', 1000) },
+    { ...append(fresh(), 'Hi', 0), phase: 'warn', lastInput: 52000 }
+  ];
+  const running = ['typing', 'warn'];
+  for (const state of states) {
+    const at = nextDeadline(state);
+    assert.ok(running.includes(advance(state, at - 0.5).phase), `${at}: still running a millisecond before`);
+    assert.ok(!running.includes(advance(state, at).phase), `${at}: the session ends at the instant itself`);
+  }
 });
 
 test('delayed ticks honor earlier absolute deadline and wipe wins a tie', () => {

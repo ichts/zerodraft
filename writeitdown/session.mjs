@@ -2,11 +2,21 @@ export function fresh() {
   return { phase: 'rest', text: '', started: null, lastInput: null, ended: null, unused: 60 };
 }
 
+/* The instant the session changes by itself: the 60-second finish or the 8-second silence wipe, whichever comes
+   first, or null when nothing is running. It lives here once because two callers need it for two reasons: `advance`
+   compares the clock against it, and the room arms a timer for it so the transition lands on the deadline instead of
+   on the next sample of a 50 ms ticker (D-111). */
+export function nextDeadline(state) {
+  if (state.started === null || !['typing', 'warn'].includes(state.phase)) return null;
+  return Math.min(state.started + 60000, state.lastInput + 8000);
+}
+
 export function advance(state, now) {
-  if (state.started === null || !['typing', 'warn'].includes(state.phase)) return state;
+  const deadline = nextDeadline(state);
+  if (deadline === null) return state;
   const finish = state.started + 60000;
   const wipe = state.lastInput + 8000;
-  if (now >= Math.min(finish, wipe)) {
+  if (now >= deadline) {
     if (wipe <= finish || !state.text.trim()) {
       return { ...fresh(), phase: 'wipe', ended: Math.min(finish, wipe), unused: Math.max(0, Math.ceil((finish - wipe) / 1000)) };
     }

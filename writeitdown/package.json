@@ -2,7 +2,8 @@
   "name": "writeitdown-browser-qa",
   "private": true,
   "scripts": {
-    "test": "playwright test",
+    "test": "node --test qa/design-guard.test.mjs && node qa/design-guard.mjs && playwright test",
+    "design-guard": "node --test qa/design-guard.test.mjs && node qa/design-guard.mjs",
     "release-check": "node release-check.mjs",
     "cache-headers": "sh qa/cache-headers.sh",
     "journey": "node journey/journey.mjs",

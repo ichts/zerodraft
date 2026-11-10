@@ -14,19 +14,6 @@ a:hover{color:var(--ink)}
 :focus-visible{outline:1px solid var(--ink);outline-offset:3px}
 [hidden]{display:none!important}
 button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
-:root{
-  color-scheme:dark;
-  --wall:#15140f;--paper:#211f18;--ink:#ece7d9;--mute:#8f897a;--faint:#5c574c;--hand:#e4604a;
-  --wash-paper:#3a1c15;--deep-paper:#4a2318;
-  --lift:0 1px 0 rgba(0,0,0,.25),0 24px 48px -32px rgba(0,0,0,.65);
-}
-:root[data-theme="light"]{
-  color-scheme:light;
-  --wall:#d8d2c3;--paper:#f7f4ea;--ink:#1a1813;--mute:#6f6a5d;--faint:#b3ada0;--hand:#9a2a1f;
-  --wash-paper:#ebdfce;--deep-paper:#decab3;
-  --lift:0 1px 0 rgba(26,24,19,.10),0 24px 48px -32px rgba(26,24,19,.35);
-}
-
 .stage{
   --deck:24px;--script:26px;--lh:41.6px;
   --gut:32px;--doorh:52px;
@@ -86,7 +73,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    line therefore share one opacity. The aperture is a hard clip at the pitch: a partial line is cut at
    its edge, never given an alpha of its own. Both layers share one box, one font and one wrap, so the ink sits under the
    caret. */
-.editor-stack{position:relative;width:100%;max-width:62ch;height:calc(5 * var(--lh));mask-image:linear-gradient(to bottom,#000 calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
+.editor-stack{position:relative;width:100%;max-width:62ch;height:calc(5 * var(--lh));mask-image:linear-gradient(to bottom,rgb(0 0 0) calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
 #editor,.editor-ink{box-sizing:border-box;display:block;width:100%;height:100%;margin:0;border:0;border-radius:0;padding:calc(2 * var(--lh)) 0;overflow:hidden;text-align:center;font:400 var(--script)/var(--lh) var(--serif);letter-spacing:normal;word-spacing:normal;text-indent:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal}
 #editor{resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:var(--ink);scrollbar-width:none}
 .editor-ink{position:absolute;inset:0;color:var(--ink);pointer-events:none}

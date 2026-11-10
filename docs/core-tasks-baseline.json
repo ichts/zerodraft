@@ -1,0 +1,131 @@
+{
+ "_doc": "Core-task baseline for the writeitdown web surface. Recorded by scripts/core-tasks/measure-web.mjs; see scripts/core-tasks/README.md. Mac is not covered here.",
+ "meta": {
+  "repo": "/Users/ichts/.treehouse/zerodraft-14838c/2/zerodraft",
+  "runs": 6,
+  "tasks": [
+   1,
+   2,
+   3
+  ],
+  "viewports": [
+   "desktop",
+   "mobile"
+  ],
+  "at": "2026-11-10T00:42:24.678Z",
+  "browser": "157.0.8103.40",
+  "loadavgStart": [
+   8.2,
+   8.2,
+   15.7
+  ],
+  "loadavgEnd": [
+   10.8,
+   8.5,
+   12.9
+  ],
+  "head": "89b4870"
+ },
+ "web-desktop": {
+  "T1": {
+   "steps": 2,
+   "steps_detail": "1 click (Give it 60 seconds) + 1 key",
+   "ms": 255.6,
+   "segments_ms": {
+    "nav_to_fonts_ready": 131.4,
+    "click_to_editor_focus": 18.6,
+    "key_to_glyph_painted": 105.6
+   },
+   "n": 3
+  },
+  "T2": {
+   "steps": 2,
+   "steps_detail": "1 uninterrupted write + 1 click (Copy text); typing keystrokes 329",
+   "ms": 60205.9,
+   "segments_ms": {
+    "first_char_to_kept_painted": 60035.5,
+    "copy_pointer_to_copied_label": 170.4,
+    "deadline_overrun_vs_60000": 118.8
+   },
+   "n": 3,
+   "checks": {
+    "kept_matches_typed": true,
+    "clipboard_matches_kept": true
+   }
+  },
+  "T3": {
+   "steps": 2,
+   "steps_detail": "2 clicks + 2.64 screens of scrolling to find the landing Buy link",
+   "ms": 269.1,
+   "segments_ms": {
+    "landing_click_to_purchase_page_loaded": 216.1,
+    "buy_click_to_stripe_handoff": 53
+   },
+   "n": 3,
+   "reach_screens_down": 2.64,
+   "in_first_screen": false
+  },
+  "T3b": {
+   "steps": 3,
+   "steps_detail": "3 clicks, no scrolling (header Download for Mac -> Buy for $4.99 once -> Buy)",
+   "ms": 521,
+   "n": 3
+  },
+  "load_avg_runs": [
+   8,
+   9,
+   6
+  ]
+ },
+ "web-mobile": {
+  "T1": {
+   "steps": 2,
+   "steps_detail": "1 click (Give it 60 seconds) + 1 key",
+   "ms": 354.9,
+   "segments_ms": {
+    "nav_to_fonts_ready": 276.4,
+    "click_to_editor_focus": 26.4,
+    "key_to_glyph_painted": 52.1
+   },
+   "n": 3
+  },
+  "T2": {
+   "steps": 2,
+   "steps_detail": "1 uninterrupted write + 1 click (Copy text); typing keystrokes 329",
+   "ms": 60390.1,
+   "segments_ms": {
+    "first_char_to_kept_painted": 60093.9,
+    "copy_pointer_to_copied_label": 296.2,
+    "deadline_overrun_vs_60000": 130.1
+   },
+   "n": 3,
+   "checks": {
+    "kept_matches_typed": true,
+    "clipboard_matches_kept": true
+   }
+  },
+  "T3": {
+   "steps": 2,
+   "steps_detail": "2 clicks + 3.92 screens of scrolling to find the landing Buy link",
+   "ms": 353,
+   "segments_ms": {
+    "landing_click_to_purchase_page_loaded": 252,
+    "buy_click_to_stripe_handoff": 101
+   },
+   "n": 3,
+   "reach_screens_down": 3.92,
+   "in_first_screen": false
+  },
+  "T3b": {
+   "steps": 3,
+   "steps_detail": "3 clicks, no scrolling (header Download for Mac -> Buy for $4.99 once -> Buy)",
+   "ms": 614,
+   "n": 3
+  },
+  "load_avg_runs": [
+   8,
+   7,
+   9
+  ]
+ }
+}

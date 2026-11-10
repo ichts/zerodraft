@@ -2380,3 +2380,38 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   half-millisecond before. `SessionEngineTests` asserts the same three properties on the Mac.
 - Evidence: `data/wid-night-loop/log.md` for both scratch runs (`warn-grid.mjs`: +5043 before, +5000 after) and the
   frame-window run (`warn-window.mjs`).
+
+## D-113: The buy line opens a purchase page, not the manual
+
+- Status: in force on the web surface.
+- Date: 2026-11-10
+- Decision: `writeitdown.app/buy` (`writeitdown/buy.html`) is the sale. It is one screen at every width and holds,
+  in this order and nothing else: the price `$4.99 once` as the page's largest text, the licence in three short
+  lines - `One license for 2 computers.`, `No subscription.`, `Free updates included.` - the primary
+  `Buy for $4.99 once` checkout form, and `Download free trial`. No footer, no second section, no refund,
+  guarantee, trust badge, payment-processor or reassurance line beside the button (rule 30). The landing's buy line
+  and every footer `Buy for Mac` now point here. `mac.html` stays the manual and becomes the checkout's return page:
+  its `#buy` card carries the same price and the same three licence lines word for word, and links to `/buy`
+  instead of running a second form. The refund leaves that card, because the card sits beside a Buy control; it
+  stays in `#refund` on the same page, `/terms.html` and the Stripe checkout. `/buy` stays out of `sitemap.xml`
+  until LIVE sales pass the real TEST loop, exactly as `mac.html` does.
+- Reason: the buy line used to land a buyer who had already decided on the ninth section of a document, beside
+  requirements, install steps and a refund policy. The pricing study (`wid-pricing-research/report.md`, option C)
+  measured that detour and recommended a single-screen price page instead of a `/pricing` section: one price, what
+  it buys, the action. The captain chose the page and the door vocabulary rather than a second template.
+- What it costs, stated plainly: the sale is now two artefacts instead of one, and the gateway reads the checkout
+  slot from `buy.html` (`release-check.mjs`), so a release that edits the form's action in one place and not the
+  other fails the gate rather than shipping a dead Buy. `buy.js` runs its checkout half on `/buy` and its
+  key-delivery half on `mac.html`, each gated on the DOM it finds, so there is still one checkout implementation and
+  no second `session_id` reader. `mac.html`'s card kept the browser-trial route and `Download free trial`, so a
+  buyer who wants the manual before paying still reaches it from the purchase page's header (`Mac page`).
+- Tests: `qa/shell.spec.mjs` holds the purchase page's own contract - the landing shell, an exact reading of the
+  page, no footer, nothing under the actions that implies a refund or a guarantee, one screen at 320/390/1440 with
+  the price as the largest text, and the three licence lines equal to `mac.html`'s sentence; it also joins the
+  one-price guard. `qa/mac.spec.mjs` asserts the manual links the sale and no longer runs it, and the release-gate
+  fixture cases drive the checkout slot from `buy.html` (missing slot, GET, wrong action, wrong price on either
+  page). `qa/checkout.spec.mjs` drives every checkout and delivery path from the page that owns it. The journey
+  block `buy-page` walks landing -> buy line -> `/buy` -> hosted checkout and fails if the walk ever passes through
+  `mac.html`.
+- Evidence: `data/wid-buy-page-c/` - core-task T3 before/after (`core-before/`, `core-after/`), the journey run
+  (`journey-full/`), and captures at 390 and 1440 in both themes.

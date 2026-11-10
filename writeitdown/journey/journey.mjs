@@ -19,8 +19,8 @@ if (!/^https?:\/\//.test(base)) { console.error('usage: npm run journey -- --bas
 const out = path.resolve(arg('out', `journey-results/${Date.now()}`));
 const expectSha = arg('expect-sha', null);
 const scenarios = arg('scenarios', null)?.split(',');
-if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe', 'mac-purchase'].includes(name))) {
-  console.error('--scenarios accepts full-session,silence-wipe,mac-purchase'); process.exit(2);
+if (scenarios && scenarios.some(name => !['full-session', 'silence-wipe', 'buy-page', 'mac-purchase'].includes(name))) {
+  console.error('--scenarios accepts full-session,silence-wipe,buy-page,mac-purchase'); process.exit(2);
 }
 const DMG_URL = 'https://writeitdown.app/download/Write-It-Down-1.1.dmg';
 const sizes = [{ name: 'phone', width: 390, height: 844, engine: 'webkit' }, { name: 'desktop', width: 1440, height: 900, engine: 'chromium' }];
@@ -150,8 +150,9 @@ async function run(size, browser) {
       ok(await cta.count() === 1, `${await cta.count()} entrance bands`);
       const c = await cta.boundingBox(), d = await demo.boundingBox();
       ok(c.y + c.height <= d.y + 2, 'the entrance band is not above the demo');
-      ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
-      ok(await cta.locator('> *').count() === 1, `${await cta.locator('> *').count()} elements in the entrance band`);
+      ok(await cta.locator('a').count() === 2, `${await cta.locator('a').count()} links in the entrance band`);
+      ok(await cta.locator('> *').count() === 2, `${await cta.locator('> *').count()} elements in the entrance band`);
+      ok(await cta.locator('a.cta-buy').count() === 1, 'the entrance band lost its one buy line');
       ok(await page.locator('#landing a.btn-primary[href="#trial"]').count() === 1, 'more than one 60-second door on the page');
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
@@ -235,8 +236,8 @@ async function run(size, browser) {
       const heading = (h1?.[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       ok(r.status() === 200 && heading === 'Write It Down for Mac', `download page h1 is "${heading}"`);
     });
-    await step('Buy link points at mac.html#buy', async () => {
-      ok(await page.locator('#mac a[href="mac.html#buy"]').count() === 1, 'Buy link missing');
+    await step('Buy link points at the purchase page', async () => {
+      ok(await page.locator('#mac a[href="buy.html"]').count() === 1, 'Buy link missing');
     });
   });
   await block('landing/faq', async () => {
@@ -259,7 +260,7 @@ async function run(size, browser) {
     await step('Trefoil Studio, Product/Help/Legal links all resolve', async () => {
       await show('footer'); const t = await page.locator('footer').innerText(); ok(/Trefoil Studio/.test(t), 'Trefoil Studio missing');
       const hrefs = await page.locator('footer a').evaluateAll(els => els.map(e => e.getAttribute('href')));
-      for (const n of ['support.html', 'privacy.html', 'terms.html', 'impressum.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'mac.html#buy']) ok(hrefs.includes(n), `footer link ${n} missing`);
+      for (const n of ['support.html', 'privacy.html', 'terms.html', 'impressum.html', 'download/', 'mailto:contact@trefoilstudio.com', '#trial', 'buy.html']) ok(hrefs.includes(n), `footer link ${n} missing`);
       for (const h of hrefs.filter(h => !/^(mailto:|#)/.test(h))) { const r = await ctx.request.get(url('/' + h.split('#')[0])); ok(r.status() === 200, `${h} -> ${r.status()}`); }
     });
   });
@@ -436,6 +437,52 @@ async function run(size, browser) {
       const h = (await h1.innerText()).trim(); ok(h.toLowerCase() === p, `H1 is "${h}"`);
     });
   });
+  // The buyer's shortest path. A person who clicks the one buy line on the landing must reach the price
+  // and a working checkout without meeting the manual: two clicks, one screen, no scrolling, and no stop
+  // on mac.html. This is the behaviour the change protects, so it is asserted end to end on both engines
+  // rather than inferred from the link's href.
+  if (!scenarios || scenarios.includes('buy-page')) {
+    await block('buy-page', async () => {
+      const service = LICENSE_SERVICE;
+      const hosted = 'https://checkout.stripe.com/c/pay/cs_test_buy_page_fixture';
+      const visited = [];
+      page.on('framenavigated', frame => { if (frame === page.mainFrame()) visited.push(frame.url()); });
+      await ctx.route('https://licenses.writeitdown.app/**', route => route.abort());
+      await ctx.route('https://checkout.stripe.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Hosted checkout fixture</h1>' }));
+      let posts = 0;
+      await ctx.route(`${service}/checkout`, route => {
+        ok(route.request().method() === 'POST', 'checkout must POST');
+        posts++;
+        return route.fulfill({ json: { url: hosted } });
+      });
+      await step('the landing buy line opens the price, not the documentation', async () => {
+        await page.goto(url('/'));
+        await page.locator('#landing .cta a.cta-buy').click();
+        await page.waitForURL(/\/buy(\.html)?$/);
+        const heading = (await page.locator('main h1').innerText()).trim();
+        ok(heading === '$4.99 once', `the purchase page leads with "${heading}"`);
+        ok(await page.locator('#buy-form').count() === 1, 'the purchase page carries no checkout control');
+        ok(!visited.some(u => /\/mac\.html/.test(u)), `the walk passed through ${visited.join(' -> ')}`);
+      });
+      await step('the purchase page fits one screen at this size', async () => {
+        const box = await page.evaluate(() => ({
+          scroll: document.documentElement.scrollHeight, view: innerHeight,
+          buy: document.querySelector('#buy-form button').getBoundingClientRect(),
+          price: document.querySelector('.buy-price').getBoundingClientRect(),
+          ghost: document.querySelector('#buy .doc-actions > .btn-ghost').getBoundingClientRect(),
+        }));
+        ok(box.scroll <= box.view, `the page needs ${box.scroll - box.view}px of scrolling at ${size.width}px`);
+        for (const [name, rect] of [['the price', box.price], ['Buy', box.buy], ['Download free trial', box.ghost]])
+          ok(rect.top >= 0 && rect.bottom <= box.view, `${name} is not fully on the first screen at ${size.width}px`);
+      });
+      await step('one more click hands the buyer to the hosted checkout, never the docs page', async () => {
+        await page.getByRole('button', { name: 'Buy for $4.99 once', exact: true }).click();
+        await page.waitForURL(hosted);
+        ok(posts === 1, `expected one checkout POST, saw ${posts}`);
+        ok(!visited.some(u => /\/mac\.html/.test(u)), `the walk passed through ${visited.join(' -> ')}`);
+      });
+    });
+  }
   await block('mac-purchase', async () => {
     const service = LICENSE_SERVICE;
     const hosted = 'https://checkout.stripe.com/c/pay/cs_test_journey_fixture';
@@ -449,7 +496,7 @@ async function run(size, browser) {
       return route.fulfill({ json: { url: hosted } });
     });
     await step('Buy follows harness checkout and Back permits another checkout', async () => {
-      await page.goto(url('/mac.html#buy'));
+      await page.goto(url('/buy.html'));
       const buy = page.getByRole('button', { name: 'Buy for $4.99 once', exact: true });
       await buy.click();
       await page.waitForURL(hosted);

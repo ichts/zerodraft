@@ -1,18 +1,22 @@
-// Checkout and key delivery for mac.html. The session credential is read once into page memory;
-// the address bar and history keep it only until the license response arrives, then drop it on
-// success and failure alike. Keys stay in page memory only.
+// Checkout and key delivery for the purchase path, in one file because both pages share it: buy.html
+// carries the checkout form, and mac.html - the checkout's fixed return URL - carries the delivery card.
+// Each half runs only on the page that has its DOM. The session credential is read once into page memory;
+// the address bar and history keep it only until the license response arrives, then drop it on success
+// and failure alike. Keys stay in page memory only.
 (() => {
   const form = document.getElementById('buy-form');
-  const buy = form.querySelector('button');
-  const checkoutStatus = document.getElementById('checkout-status');
-  const service = new URL(form.action).origin;
+  // The licence service, named once: the checkout form on buy.html posts to it, and the key is fetched
+  // from it on the return page. qa/checkout.spec.mjs intercepts this origin, so a typo here fails there.
+  const SERVICE = 'https://licenses.writeitdown.app';
   const options = { credentials: 'omit', cache: 'no-store', referrerPolicy: 'no-referrer', redirect: 'error' };
 
   // One source per label: the probe measures the strings the state machine writes, so a copy edit
   // cannot drift between the reserved width and the label that lands in it.
+  const buy = form?.querySelector('button');
+  const copy = document.getElementById('copy-license');
   const LABELS = {
-    buy: { idle: buy.textContent, busy: 'Opening checkout...', retry: 'Try again' },
-    copy: { idle: document.getElementById('copy-license').textContent, done: 'Copied' },
+    buy: buy && { idle: buy.textContent, busy: 'Opening checkout...', retry: 'Try again' },
+    copy: copy && { idle: copy.textContent, done: 'Copied' },
   };
 
   // Both controls swap their label with the state machine, and a control that resizes under the
@@ -20,13 +24,14 @@
   // the device actually renders, the measured floor room.js gives the kept pill's copy control (D-059):
   // a width tuned on one machine's sans moves the control again on the next.
   const WIDTH_PROBES = {
-    '#buy-form button': Object.values(LABELS.buy),
-    '#copy-license': Object.values(LABELS.copy),
+    '#buy-form button': LABELS.buy ? Object.values(LABELS.buy) : [],
+    '#copy-license': LABELS.copy ? Object.values(LABELS.copy) : [],
   };
 
   function sizeLabelFloors() {
     const floors = {};
     for (const [selector, labels] of Object.entries(WIDTH_PROBES)) {
+      if (!labels.length) continue;
       const control = document.querySelector(selector);
       if (!control || !control.offsetParent) continue;
       const probe = control.cloneNode(false);
@@ -52,47 +57,64 @@
   sizeLabelFloors();
   document.fonts.ready.then(sizeLabelFloors);
 
-  window.addEventListener('pageshow', () => {
-    buy.disabled = false;
-    buy.textContent = LABELS.buy.idle;
-    buy.removeAttribute('aria-busy');
-    checkoutStatus.textContent = '';
-    checkoutStatus.setAttribute('role', 'status');
-  });
+  if (form) {
+    const checkoutStatus = document.getElementById('checkout-status');
 
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (buy.disabled) return;
-    buy.disabled = true;
-    buy.textContent = LABELS.buy.busy;
-    buy.setAttribute('aria-busy', 'true');
-    checkoutStatus.setAttribute('role', 'status');
-    checkoutStatus.textContent = LABELS.buy.busy;
-    try {
-      const response = await fetch(form.action, { ...options, method: 'POST', headers: { Accept: 'application/json' } });
-      if (!response.ok) throw new Error('Checkout unavailable');
-      const { url } = await response.json();
-      const hosted = new URL(url);
-      if (hosted.origin !== 'https://checkout.stripe.com' || hosted.username || hosted.password)
-        throw new Error('Invalid checkout destination');
-      location.assign(hosted.href);
-    } catch {
-      checkoutStatus.textContent = 'Checkout is unavailable. Please try again in a moment.';
-      checkoutStatus.setAttribute('role', 'alert');
+    window.addEventListener('pageshow', () => {
       buy.disabled = false;
-      buy.textContent = LABELS.buy.retry;
+      buy.textContent = LABELS.buy.idle;
       buy.removeAttribute('aria-busy');
-    }
-  });
+      checkoutStatus.textContent = '';
+      checkoutStatus.setAttribute('role', 'status');
+    });
+
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (buy.disabled) return;
+      buy.disabled = true;
+      buy.textContent = LABELS.buy.busy;
+      buy.setAttribute('aria-busy', 'true');
+      checkoutStatus.setAttribute('role', 'status');
+      checkoutStatus.textContent = LABELS.buy.busy;
+      try {
+        const response = await fetch(form.action, { ...options, method: 'POST', headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('Checkout unavailable');
+        const { url } = await response.json();
+        const hosted = new URL(url);
+        if (hosted.origin !== 'https://checkout.stripe.com' || hosted.username || hosted.password)
+          throw new Error('Invalid checkout destination');
+        location.assign(hosted.href);
+      } catch {
+        checkoutStatus.textContent = 'Checkout is unavailable. Please try again in a moment.';
+        checkoutStatus.setAttribute('role', 'alert');
+        buy.disabled = false;
+        buy.textContent = LABELS.buy.retry;
+        buy.removeAttribute('aria-busy');
+      }
+    });
+  }
 
   const session = new URLSearchParams(location.search).get('session_id');
   if (!session) return;
 
+  // The credential is the only bearer protection for a buyer's key, so no page keeps it in the address
+  // bar, in history or in a bookmarked URL. Only the checkout's fixed return page can render a key; any
+  // other page drops the credential at once instead of carrying it.
+  function clearCredential() {
+    const clean = new URL(location.href);
+    clean.searchParams.delete('session_id');
+    history.replaceState(history.state, '', clean.href);
+  }
+
   const card = document.getElementById('license-delivery');
+  if (!card) {
+    clearCredential();
+    return;
+  }
+
   const status = document.getElementById('license-status');
   const key = document.getElementById('license-key');
   const result = document.getElementById('license-result');
-  const copy = document.getElementById('copy-license');
   const retryRow = document.getElementById('license-retry-row');
   const retry = document.getElementById('retry-license');
   let deliveredKey = '';
@@ -107,19 +129,13 @@
     retryRow.hidden = true;
   }
 
-  function clearCredential() {
-    const clean = new URL(location.href);
-    clean.searchParams.delete('session_id');
-    history.replaceState(history.state, '', clean.href);
-  }
-
   async function loadLicense() {
     const request = ++latestRequest;
     checking();
     retry.disabled = true;
     retry.setAttribute('aria-busy', 'true');
     try {
-      const url = new URL('/api/v1/license', service);
+      const url = new URL('/api/v1/license', SERVICE);
       url.searchParams.set('session_id', session);
       const response = await fetch(url, { ...options, headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('License unavailable');

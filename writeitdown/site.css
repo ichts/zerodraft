@@ -395,6 +395,28 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* A phone head: the whole head is left-aligned on the page edge, so the headline and the 34ch deck
    start on one edge instead of stacking centred lines with different left edges (D-060). */
 @media (max-width:420px){.dl-page .dlhead{text-align:left}.dl-page .dlhead .sub{max-width:34ch;margin-left:0;text-align:left}}
+/* ---------- Buy (/buy): the price is the page ----------
+   One screen at every width, and nothing below the two actions: the number, the licence it buys in
+   three lines, Buy, Download free trial. Same product, not a second template (rule 5): the serif price
+   the Mac card already sets, the sans the tool speaks in, the v2 pills and page background A. The
+   landing's buy line points here instead of into a nine-section document, so the buyer lands on the
+   price, not on the manual. The three lines are the licence sentence mac.html prints beside its own
+   price, word for word (rule 2); the refund stays on the checkout, the terms and mac.html#refund,
+   never beside this button (rule 30). No footer: a second band below the actions is the document this
+   page exists to replace. */
+.home main.buy{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:calc(100vh - var(--nav-h));min-height:calc(100svh - var(--nav-h));
+  padding:var(--s7) var(--gut) var(--s8);text-align:center}
+.home .buy-price{margin:0;font:500 clamp(52px,12.8vw,116px)/1 var(--serif);letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.home .buy-facts{list-style:none;margin:var(--s5) 0 0;padding:0;display:grid;gap:var(--s1);
+  font:400 var(--t-body)/1.5 var(--sans);color:var(--mute)}
+.home .buy .doc-actions{justify-content:center;margin-top:var(--s6)}
+/* A checkout failure is the only thing this page ever adds under its actions, and an empty status
+   line is not a line: it holds no height until it says something. */
+.home .buy-status{margin:0;font:400 var(--t-small)/1.6 var(--sans);color:var(--mute)}
+.home .buy-status:not(:empty){margin-top:var(--s4)}
+.home .buy-status[role="alert"]{color:var(--ink)}
 /* ---------- Trial room (#room): the landing design system ----------
    The room carries .home, so it reads the same tokens as the landing: page background A, the white sheet with
    the only shadow, Newsreader for the writing, the system UI stack for the tool, red for the stakes. The wash

@@ -14,6 +14,7 @@ See the Mac page for current purchase details and license delivery. The price an
 
 - [Write It Down](https://writeitdown.app/): the product, the sixty-second web room, the rules, and the Mac app.
 - [Write It Down for Mac](https://writeitdown.app/mac.html): the native Mac app, the 3 free sessions, and current purchase and activation details.
+- [Buy Write It Down for Mac](https://writeitdown.app/buy): the price, what a license covers, the checkout, and the free trial download.
 - [Download the Mac free trial](https://writeitdown.app/download/): the disk image, its SHA-256, install steps, and refund terms.
 - [Support](https://writeitdown.app/support.html): start a session, find a draft, copy text, and contact.
 - [Privacy](https://writeitdown.app/privacy.html): what the browser and the Mac app keep and send.

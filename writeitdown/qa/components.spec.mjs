@@ -6,23 +6,11 @@
 //   Skeleton: a held place never moves (the wall stays blank), in either motion preference.
 //   Kbd: the landing's key caps are real <kbd> elements and keep their illustration size.
 //   Empty: one centred sentence with its actions, inside the reading measure.
-// The markup is injected into a shipped page so the components are measured against the real stylesheet.
+// The markup is the gallery's own (kit/index.html), so the page a developer looks at is the page that is measured.
 import { test, expect } from '@playwright/test';
 
-const FIXTURE = `
-<div id="fx">
-  <div class="field" id="f1"><label class="field-label" for="f1-in">Label</label><input class="field-input" id="f1-in" placeholder="Hint" aria-describedby="f1-note"><p class="field-note" id="f1-note">Note</p></div>
-  <div class="field" id="f2" data-state="error"><label class="field-label" for="f2-in">Label</label><input class="field-input" id="f2-in" aria-invalid="true" aria-describedby="f2-note"><p class="field-note" id="f2-note">Note</p></div>
-  <div class="field" id="f3"><label class="field-label" for="s1">Label</label><span class="select"><select class="field-input" id="s1"><option>One</option><option>Two</option></select></span></div>
-  <p><span class="status"><i class="status-dot" data-state="idle"></i>Idle</span> <span class="status"><i class="status-dot" data-state="live"></i>Live</span> <span class="status"><i class="status-dot" data-state="error"></i>Error</span></p>
-  <div aria-busy="true"><span class="skeleton" id="sk1" aria-hidden="true"></span><span class="skeleton" id="sk2" data-size="short" aria-hidden="true"></span></div>
-  <p>Press <kbd class="kbd" id="kb">Esc</kbd> to leave.</p>
-  <div class="empty" id="em"><p class="empty-title">Page not found</p><div class="empty-actions"><a class="btn btn-ghost" href="/">Go to the home page</a></div></div>
-</div>`;
-
 test.beforeEach(async ({ page }) => {
-  await page.goto('support.html');
-  await page.evaluate(html => document.querySelector('main').insertAdjacentHTML('beforeend', html), FIXTURE);
+  await page.goto('kit/index.html');
 });
 
 const style = (page, selector, props) => page.evaluate(([sel, list]) => {
@@ -40,23 +28,23 @@ const token = (page, name) => page.evaluate(n => {
 }, name);
 
 test('a field is reached through its label, is a 44 px target at 16 px, and an invalid one is told apart', async ({ page }) => {
-  await page.locator('label[for="f1-in"]').click();
-  await expect(page.locator('#f1-in')).toBeFocused();
-  const ok = await style(page, '#f1-in', ['height', 'fontSize', 'borderTopColor', 'borderTopLeftRadius']);
+  await page.locator('label[for="kit-f-rest"]').click();
+  await expect(page.locator('#kit-f-rest')).toBeFocused();
+  const ok = await style(page, '#kit-f-rest', ['height', 'fontSize', 'borderTopColor', 'borderTopLeftRadius']);
   expect(ok.height).toBe('44px');
   expect(ok.fontSize).toBe('16px');
   expect(ok.borderTopLeftRadius).toBe('8px');
-  const bad = await style(page, '#f2-in', ['borderTopColor']);
+  const bad = await style(page, '#kit-f-bad', ['borderTopColor']);
   expect(bad.borderTopColor).toBe(await token(page, '--red-text'));
   expect(bad.borderTopColor).not.toBe(ok.borderTopColor);
-  expect((await style(page, '#f2 .field-note', ['color'])).color).toBe(await token(page, '--red-text'));
-  expect(await page.locator('#f2-in').getAttribute('aria-describedby')).toBe(await page.locator('#f2 .field-note').getAttribute('id'));
+  expect((await style(page, '#kit-f-bad-note', ['color'])).color).toBe(await token(page, '--red-text'));
+  expect(await page.locator('#kit-f-bad').getAttribute('aria-describedby')).toBe(await page.locator('#kit-f-bad-note').getAttribute('id'));
 });
 
 test('a select is the native control with the same 44 px target, drawn without the platform chrome and with a chevron', async ({ page }) => {
-  await page.locator('label[for="s1"]').click();
-  await expect(page.locator('#s1')).toBeFocused();
-  const s = await style(page, '#s1', ['height', 'appearance']);
+  await page.locator('label[for="kit-s-rest"]').click();
+  await expect(page.locator('#kit-s-rest')).toBeFocused();
+  const s = await style(page, '#kit-s-rest', ['height', 'appearance']);
   expect(s.height).toBe('44px');
   expect(s.appearance).toBe('none');
   const chevron = await page.evaluate(() => { const c = getComputedStyle(document.querySelector('.select'), '::after'); return { content: c.content, width: c.width }; });
@@ -78,18 +66,18 @@ test('a status dot differs by fill and not only by colour', async ({ page }) => 
 for (const reducedMotion of ['no-preference', 'reduce']) {
   test(`a skeleton never animates (${reducedMotion})`, async ({ page }) => {
     await page.emulateMedia({ reducedMotion });
-    for (const id of ['#sk1', '#sk2']) {
+    for (const id of ['.skeleton:not([data-size])', '.skeleton[data-size="short"]']) {
       const s = await style(page, id, ['animationName', 'transitionDuration']);
       expect(s.animationName).toBe('none');
       expect(s.transitionDuration).toBe('0s');
     }
-    const [full, short] = await page.evaluate(() => ['#sk1', '#sk2'].map(i => document.querySelector(i).getBoundingClientRect().width));
+    const [full, short] = await page.evaluate(() => ['.skeleton:not([data-size])', '.skeleton[data-size="short"]'].map(i => document.querySelector(i).getBoundingClientRect().width));
     expect(short).toBeCloseTo(full * 0.4, 0);
   });
 }
 
 test('a named key is a kbd element with its own small cap', async ({ page }) => {
-  const k = await style(page, '#kb', ['display', 'height', 'fontSize', 'fontFamily']);
+  const k = await style(page, '.kbd:not(.key)', ['display', 'height', 'fontSize', 'fontFamily']);
   expect(k.display).toBe('inline-flex');
   expect(k.fontSize).toBe('13px');
   expect(parseFloat(k.height)).toBeCloseTo(13 * 1.8, 1);
@@ -107,13 +95,14 @@ test('the landing key caps are kbd elements at the illustration size', async ({ 
 });
 
 test('an empty state is one centred sentence with its action inside the reading measure', async ({ page }) => {
-  const e = await style(page, '#em', ['textAlign', 'display', 'maxWidth']);
+  const e = await style(page, '.empty', ['textAlign', 'display', 'maxWidth']);
   expect(e).toEqual({ textAlign: 'center', display: 'flex', maxWidth: '720px' });
   const title = await style(page, '.empty-title', ['fontFamily', 'fontSize']);
   expect(title.fontFamily).toMatch(/Newsreader/);
   const centred = await page.evaluate(() => {
-    const box = document.querySelector('#em .btn').getBoundingClientRect();
-    return Math.abs(box.left + box.width / 2 - innerWidth / 2);
+    const box = document.querySelector('.empty .btn').getBoundingClientRect();
+    const empty = document.querySelector('.empty').getBoundingClientRect();
+    return Math.abs(box.left + box.width / 2 - (empty.left + empty.width / 2));
   });
   expect(centred).toBeLessThan(2);
 });

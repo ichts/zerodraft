@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kit - Write It Down</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<script src="../theme.js"></script>
+<link rel="stylesheet" href="../site.css">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../fonts.css">
+<link rel="stylesheet" href="kit.css">
+</head>
+<body class="home page-a">
+<nav class="wrap home-nav" aria-label="Main"><a class="brand" href="../index.html" aria-label="Write It Down"></a><div class="nav-end"><button class="theme-btn" type="button" data-theme-toggle aria-label="Switch to dark theme"><svg class="i-moon" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M16.5 12.4A7 7 0 0 1 7.6 3.5a7 7 0 1 0 8.9 8.9z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><svg class="i-sun" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="3.6" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 1.8v2.1M10 16.1v2.1M1.8 10h2.1M16.1 10h2.1M4.2 4.2l1.5 1.5M14.3 14.3l1.5 1.5M4.2 15.8l1.5-1.5M14.3 5.7l1.5-1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div></nav>
+<main class="wrap kit">
+<h1>Kit</h1>
+
+<section class="kit-part" aria-labelledby="kit-kbd">
+<h2 id="kit-kbd">Kbd</h2>
+<div class="kit-states">
+<figure class="kit-state"><figcaption>inline</figcaption><p>Press <kbd class="kbd">Esc</kbd> to leave.</p></figure>
+<figure class="kit-state"><figcaption>key cap</figcaption><div class="keys"><kbd class="kbd key">&#8984;V</kbd></div></figure>
+<figure class="kit-state"><figcaption>key cap, refused</figcaption><div class="keys"><kbd class="kbd key no">&#9003;</kbd></div></figure>
+</div>
+</section>
+
+<section class="kit-part" aria-labelledby="kit-status">
+<h2 id="kit-status">StatusDot</h2>
+<div class="kit-states">
+<figure class="kit-state"><figcaption>idle</figcaption><span class="status"><i class="status-dot" data-state="idle"></i>Idle</span></figure>
+<figure class="kit-state"><figcaption>live</figcaption><span class="status"><i class="status-dot" data-state="live"></i>Live</span></figure>
+<figure class="kit-state"><figcaption>error</figcaption><span class="status"><i class="status-dot" data-state="error"></i>Error</span></figure>
+</div>
+</section>
+
+<section class="kit-part" aria-labelledby="kit-skeleton">
+<h2 id="kit-skeleton">Skeleton</h2>
+<div class="kit-states">
+<figure class="kit-state"><figcaption>full</figcaption><div aria-busy="true"><span class="skeleton" aria-hidden="true"></span></div></figure>
+<figure class="kit-state"><figcaption>short</figcaption><div aria-busy="true"><span class="skeleton" data-size="short" aria-hidden="true"></span></div></figure>
+</div>
+</section>
+
+<section class="kit-part" aria-labelledby="kit-field">
+<h2 id="kit-field">Field</h2>
+<div class="kit-states">
+<figure class="kit-state"><figcaption>rest</figcaption><div class="field"><label class="field-label" for="kit-f-rest">Label</label><input class="field-input" id="kit-f-rest" placeholder="Hint" aria-describedby="kit-f-rest-note"><p class="field-note" id="kit-f-rest-note">Note</p></div></figure>
+<figure class="kit-state"><figcaption>filled</figcaption><div class="field"><label class="field-label" for="kit-f-filled">Label</label><input class="field-input" id="kit-f-filled" value="Value" aria-describedby="kit-f-filled-note"><p class="field-note" id="kit-f-filled-note">Note</p></div></figure>
+<figure class="kit-state"><figcaption>invalid</figcaption><div class="field" data-state="error"><label class="field-label" for="kit-f-bad">Label</label><input class="field-input" id="kit-f-bad" value="Value" aria-invalid="true" aria-describedby="kit-f-bad-note"><p class="field-note" id="kit-f-bad-note">Note</p></div></figure>
+<figure class="kit-state"><figcaption>disabled</figcaption><div class="field"><label class="field-label" for="kit-f-off">Label</label><input class="field-input" id="kit-f-off" value="Value" disabled aria-describedby="kit-f-off-note"><p class="field-note" id="kit-f-off-note">Note</p></div></figure>
+</div>
+</section>
+
+<section class="kit-part" aria-labelledby="kit-select">
+<h2 id="kit-select">Select</h2>
+<div class="kit-states">
+<figure class="kit-state"><figcaption>rest</figcaption><div class="field"><label class="field-label" for="kit-s-rest">Label</label><span class="select"><select class="field-input" id="kit-s-rest"><option>One</option><option>Two</option></select></span></div></figure>
+<figure class="kit-state"><figcaption>invalid</figcaption><div class="field" data-state="error"><label class="field-label" for="kit-s-bad">Label</label><span class="select"><select class="field-input" id="kit-s-bad" aria-invalid="true" aria-describedby="kit-s-bad-note"><option>One</option><option>Two</option></select></span><p class="field-note" id="kit-s-bad-note">Note</p></div></figure>
+<figure class="kit-state"><figcaption>disabled</figcaption><div class="field"><label class="field-label" for="kit-s-off">Label</label><span class="select"><select class="field-input" id="kit-s-off" disabled><option>One</option><option>Two</option></select></span></div></figure>
+</div>
+</section>
+
+<section class="kit-part" aria-labelledby="kit-empty">
+<h2 id="kit-empty">Empty</h2>
+<div class="kit-states kit-wide">
+<figure class="kit-state"><figcaption>one action</figcaption><div class="empty"><p class="empty-title">Page not found</p><div class="empty-actions"><a class="btn btn-ghost" href="../index.html">Go to the home page</a></div></div></figure>
+<figure class="kit-state"><figcaption>two actions</figcaption><div class="empty"><p class="empty-title">Page not found</p><div class="empty-actions"><a class="btn btn-primary" href="../index.html">Go to the home page</a><a class="btn btn-ghost" href="../support.html">Support</a></div></div></figure>
+</div>
+</section>
+</main>
+</body>
+</html>

@@ -418,7 +418,7 @@ test('mobile dynamic viewport keeps EXIT and word count visible with expanded to
     await capture(page, info, `trial-toolbar-${state}`);
     await page.locator('#exit').click();
     await page.locator('#exit').click();
-    await expect(page.locator('#landing .cta a')).toBeFocused();
+    await expect(page.locator('#landing .cta a[href="#trial"]')).toBeFocused();
     await expect(page.locator('#room')).toBeHidden();
   }
 });

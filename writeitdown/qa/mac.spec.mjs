@@ -202,7 +202,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
   expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
-  for (const selector of ['#landing .home-nav .btn', '.cta .btn', '#clock', '#count'])
+  for (const selector of ['#landing .home-nav .btn', '.cta .btn', '.cta .cta-buy', '#clock', '#count'])
     await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
   const nav = page.locator('#landing .home-nav a.btn-quiet');
@@ -216,8 +216,22 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('#landing .cta');
-  await expect(cta.locator('> *'), 'the entrance band holds the door and nothing else').toHaveCount(1);
-  await expect(cta.locator('> a'), 'the only entrance is the 60-second door').toHaveCount(1);
+  // The entrance band holds the door and the one quiet route to the purchase (D-110): the door stays the only way
+  // into the room, and the buy line is the only way to pay without leaving the first screen. It reuses the
+  // published price string, wears the site's underlined-link treatment instead of a second pill, and keeps a
+  // 40 px touch target.
+  await expect(cta.locator('> *'), 'the entrance band holds the door and its quiet buy line, nothing else').toHaveCount(2);
+  await expect(cta.locator('> a'), 'the entrance band holds two links and no other control').toHaveCount(2);
+  const buyLine = cta.locator('a.cta-buy');
+  await expect(buyLine, 'the buy line reuses the published price string').toHaveText('Buy for $4.99 once');
+  await expect(buyLine, 'the buy line goes to the purchase card').toHaveAttribute('href', 'mac.html#buy');
+  const buyLineInk = await buyLine.evaluate(e => {
+    const s = getComputedStyle(e);
+    return { decoration: s.textDecorationLine, colour: s.color, height: e.getBoundingClientRect().height,
+      ink: getComputedStyle(e.closest('.home')).getPropertyValue('--ink').trim() };
+  });
+  expect(buyLineInk.decoration, 'the buy line wears the underline, not a second pill').toBe('underline');
+  expect(buyLineInk.height, 'the buy line keeps a 40 px touch target on a phone').toBeGreaterThanOrEqual(39.5);
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
@@ -234,7 +248,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
       card: r('#paper'), sub: r('.hero-sub'), door: r('#landing .cta .btn'), vh: innerHeight,
       ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing .cta')).paddingTop),
       stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
-      tokens: { s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
+      tokens: { s1: token('--s1'), s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
     };
     pin.remove();
     return out;
@@ -247,7 +261,10 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
   expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred over the sheet').toBeLessThan(1);
   expect(layout.ctaTop, 'the headline group closes on the spacing scale').toBe(phone ? layout.tokens.s4 : layout.tokens.s5);
-  expect(layout.stageTop, 'the sheet gets the larger gap under the door').toBe(phone ? layout.tokens.s5 : layout.tokens.s7);
+  // The door group now ends on the buy line, so on a phone the sheet returns to the smallest gap: the buy line
+  // took the space the sheet used to own rather than adding a band above it (D-110).
+  expect(layout.stageTop, 'the sheet keeps the scale gap under the door group').toBe(phone ? layout.tokens.s1 : layout.tokens.s7);
+  expect(layout.door.bottom, 'the buy line sits under the door').toBeLessThanOrEqual(await cta.locator('a.cta-buy').evaluate(e => e.getBoundingClientRect().top) + 0.5);
 
   await expect(page.locator('#facts, .points, .callback'), 'the facts table, the points band and the closing block are gone').toHaveCount(0);
   await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');

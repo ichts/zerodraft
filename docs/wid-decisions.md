@@ -2281,3 +2281,36 @@ is `docs/wid-world-table.md`.
   arrangement and pass after. Live-site before/after in a macOS 26.6 VM with real Pinyin input, plus
   the per-character table of slice status, load time and repaint frames, are in
   `data/wid-ime-font-swap/`.
+
+## D-110: The first screen sells the app, in the room's own type
+
+- Status: in force. Captain rule 53 sets the target: the buy entry is visible on the first screen on a computer and
+  on a phone. This entry records how the landing meets it.
+- Date: 2026-11-10
+- Decision: the landing's entrance band holds the door and one quiet buy link under it, `Buy for $4.99 once`, going
+  to `mac.html#buy`. It reuses the published price string, wears the same underlined 13 px quiet-route treatment as
+  the kept screen's `Mac app` link (Q-21's underlined-link treatment), in ink rather than the quiet role because the
+  wall takes ink to 11.76:1 and the quiet role only to 3.57:1. It is a 40 px touch target on a phone and 44 px on a
+  computer, and it adds no chrome: no pill, no second button, no new sentence. The sheet's gap under the door group
+  gives back on a phone (`.stagewrap` margin-top `--s5` to `--s1`) so the door group grows by one link instead of by
+  a band, and the sheet keeps its 61% floor.
+- Reason: `Buy to checkout` cost reach before it cost anything: the landing's only purchase link sat 2.64 screens
+  down at 1440 and 3.92 at 390, or three clicks away through the header's `Download for Mac`. Measured on
+  `89b4870` with `scripts/core-tasks/measure-web.mjs`; the meter now lives in the repository and reports the same
+  task before and after. A second header pill was measured first and rejected: on a 390 px phone it pushes the nav's
+  scroll width to 481 px, so the whole page zooms out, and at 320 px both pills collapse to zero width.
+- Effect, measured on the built page (390x844, 375x667, 320x700, 1440x900, plus dark at both widths): the buy line
+  sits at 0.34 / 0.47 / 0.42 / 0.32 screens, inside the viewport everywhere, no horizontal overflow at any width
+  (`scrollWidth` equals the viewport), the sheet stays at exactly 61% on every size, and two clicks reach the
+  purchase card with its buy button in view.
+- Reversible: it is one anchor in `writeitdown/index.html` and one rule (plus its phone line) in `site.css`; removing
+  them restores the single-child entrance band and the `--s5` gap. `qa/mac.spec.mjs` asserts the new band (two links,
+  the door's href, the buy line's string, href, underline and touch target) and `qa/phase4.spec.mjs`'s fold sweep
+  still holds the 61% floor at every width from 320 to 430.
+- Supersedes: D-047's clause that "the door is the page's only entrance" as far as the *purchase* is concerned. The
+  door stays the only way into the room; the first screen now also carries the only way to pay. It does not touch
+  Q-20's copy rule: the link states the price and nothing else.
+- Evidence: `data/wid-night-loop/evidence/buy-entry-b/` (captures at 320x700, 375x667, 390x844, 1440x900, dark at
+  390 and 1440, plus the purchase page each one reaches); `data/wid-night-loop/evidence/buy-entry-options/` for the
+  rejected header pill; `writeitdown/qa/mac.spec.mjs` "landing: Paper in light" and "the buy entry is no further down
+  the landing than it is today".

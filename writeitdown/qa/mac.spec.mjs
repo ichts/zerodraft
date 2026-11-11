@@ -220,12 +220,33 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
   expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
-  for (const selector of ['#landing .home-nav .btn', '.cta .btn', '.cta .cta-buy', '#clock', '#count'])
+  for (const selector of ['#landing .home-nav .nav-buy', '#landing .home-nav a.btn-quiet:not(.nav-buy)', '.cta .btn', '#clock', '#count'])
     await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
-  const nav = page.locator('#landing .home-nav a.btn-quiet');
+  const nav = page.locator('#landing .home-nav a.btn-quiet:not(.nav-buy)');
   await expect(nav).toHaveText('Download for Mac');
   await expect(nav).toHaveAttribute('href', 'download/');
+  // D-115: the way to pay is the header's Buy, a lighter quiet pill immediately left of Download for Mac.
+  const headerBuy = page.locator('#landing .home-nav a.nav-buy');
+  await expect(headerBuy, 'the header carries one Buy, the single word').toHaveText('Buy');
+  await expect(headerBuy, 'the header Buy goes to the purchase page').toHaveAttribute('href', 'buy.html');
+  const headerPair = await page.locator('#landing .home-nav .nav-end').evaluate(end => {
+    const buy = end.querySelector('.nav-buy'), dl = end.querySelector('a.btn-quiet:not(.nav-buy)');
+    const b = buy.getBoundingClientRect(), d = dl.getBoundingClientRect(), s = getComputedStyle(buy), t = getComputedStyle(dl);
+    return { order: buy.compareDocumentPosition(dl) & Node.DOCUMENT_POSITION_FOLLOWING ? 'buy-first' : 'download-first',
+      gap: d.left - b.right, sameRow: Math.abs(b.top - d.top) < 0.5, hitTop: document.elementFromPoint(b.left + b.width / 2, b.top - 3.5) === buy, hitBottom: document.elementFromPoint(b.left + b.width / 2, b.bottom + 3.5) === buy,
+      buyFill: s.backgroundColor, dlFill: t.backgroundColor, buyEdge: s.borderTopColor, dlEdge: t.borderTopColor };
+  });
+  expect(headerPair.order, 'Buy sits immediately left of Download for Mac').toBe('buy-first');
+  expect(headerPair.hitTop && headerPair.hitBottom, 'Buy keeps a 44 px tall hit area around its 36 px pill').toBe(true);
+  // Below 460 px Download for Mac steps aside and Buy stays alone (D-115); the pair is a computer's header.
+  if (page.viewportSize().width >= 460) {
+    expect(headerPair.sameRow, 'Buy and Download share one row').toBe(true);
+    expect(headerPair.gap, 'the two pills do not touch').toBeGreaterThanOrEqual(4);
+    expect(headerPair.buyFill, 'Buy has no fill, so Download for Mac stays the heavier pill').toBe('rgba(0, 0, 0, 0)');
+    expect(headerPair.dlFill, 'Download for Mac keeps its sheet fill').not.toBe('rgba(0, 0, 0, 0)');
+    expect(headerPair.buyEdge, 'Buy wears the lighter hairline, not the stronger one').not.toBe(headerPair.dlEdge);
+  }
   const card = page.locator('#paper');
   await expect(card.locator('#clock')).toBeVisible();
   await expect(card.locator('#count')).toHaveText(/^((\d+ words?)?)$/);
@@ -234,23 +255,11 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('#landing .cta');
-  // The entrance band holds the door and the one quiet route to the purchase (D-110): the door stays the only way
-  // into the room, and the buy line is the only way to pay without leaving the first screen. It reuses the
-  // published price string, wears the site's underlined-link treatment instead of a second pill, and keeps a
-  // 40 px touch target.
-  await expect(cta.locator('> *'), 'the entrance band holds the door and its quiet buy line, nothing else').toHaveCount(2);
-  await expect(cta.locator('> a'), 'the entrance band holds two links and no other control').toHaveCount(2);
-  const buyLine = cta.locator('a.cta-buy');
-  await expect(buyLine, 'the buy line is the single word Buy; the price lives on the purchase page (D-114)').toHaveText('Buy');
-  await expect(buyLine, 'the buy line goes to the purchase page').toHaveAttribute('href', 'buy.html');
-  const buyLineInk = await buyLine.evaluate(e => {
-    const s = getComputedStyle(e);
-    return { decoration: s.textDecorationLine, colour: s.color, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width,
-      ink: getComputedStyle(e.closest('.home')).getPropertyValue('--ink').trim() };
-  });
-  expect(buyLineInk.decoration, 'the buy line wears the underline, not a second pill').toBe('underline');
-  expect(buyLineInk.height, 'the buy line keeps a 40 px touch target on a phone').toBeGreaterThanOrEqual(39.5);
-  expect(buyLineInk.width, 'the one-word buy line still has a 44 px wide hit area').toBeGreaterThanOrEqual(43.5);
+  // The hero keeps one action (D-115): the door. The way to pay moved to the header's Buy, so the entrance band
+  // holds the door and nothing else, and no second buy line hangs under it.
+  await expect(cta.locator('> *'), 'the entrance band holds the door, nothing else').toHaveCount(1);
+  await expect(cta.locator('a'), 'the entrance band holds one link').toHaveCount(1);
+  await expect(page.locator('.cta-buy'), 'the hero buy line is gone').toHaveCount(0);
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
@@ -269,10 +278,10 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
     };
     const home = document.querySelector('#landing');
     const token = n => parseFloat(getComputedStyle(home).getPropertyValue(n));
-    const card = doc('#paper'), door = doc('#landing .cta .btn'), buy = doc('#landing .cta .cta-buy');
+    const card = doc('#paper'), door = doc('#landing .cta .btn');
     const out = {
       card, sub: doc('.hero-sub'), door, vh: innerHeight,
-      buyAbove: buy.top - door.bottom, buyBelow: card.top - buy.bottom,
+      doorBelow: card.top - door.bottom,
       ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing .cta')).paddingTop),
       stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
       tokens: { s1: token('--s1'), s2: token('--s2'), s3: token('--s3'), s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
@@ -288,12 +297,9 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
   expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred over the sheet').toBeLessThan(1);
   expect(layout.ctaTop, 'the headline group closes on the spacing scale').toBe(phone ? layout.tokens.s4 : layout.tokens.s5);
-  // The buy line is a quiet route of its own, not a footnote to the door (D-110 as amended): it starts at least one
-  // scale step below the door's box - so a thumb aimed at the door cannot land on it - and the sheet starts at least
-  // one step below it, which keeps the price off the paper.
-  expect(layout.stageTop, 'the sheet keeps the scale gap under the door group').toBe(phone ? layout.tokens.s2 : layout.tokens.s7);
-  expect(layout.buyAbove, 'the buy line owns at least 12 px of air under the door').toBeGreaterThanOrEqual(11.5);
-  expect(layout.buyBelow, 'the sheet owns at least 8 px of air under the buy line').toBeGreaterThanOrEqual(7.5);
+  // With the buy line gone the sheet starts one scale step under the door: 24 px on a phone, 48 px on a computer.
+  expect(layout.stageTop, 'the sheet keeps the scale gap under the door').toBe(phone ? layout.tokens.s5 : layout.tokens.s7);
+  expect(layout.doorBelow, 'the sheet starts one scale step under the door').toBeCloseTo(phone ? layout.tokens.s5 : layout.tokens.s7, 0);
 
   await expect(page.locator('#facts, .points, .callback'), 'the facts table, the points band and the closing block are gone').toHaveCount(0);
   await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');
@@ -315,7 +321,13 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('landing.png'), fullPage: true });
 
-  await nav.click();
+  // The header's Buy is a real click on every width and lands on the price (D-115).
+  await headerBuy.click();
+  await expect(page).toHaveURL(/\/buy(\.html)?$/);
+  await expect(page.locator('h1')).toHaveText('$4.99 once');
+  await page.goBack();
+  // Download for Mac is in the header from 460 px up; below that the Mac card's own link is the way in.
+  await (page.viewportSize().width >= 460 ? nav : mac.locator('a[href="download/"]')).click();
   await expect(page).toHaveURL(/\/download\/$/);
   await expect(page.locator('h1')).toHaveText('Write It Down for Mac');
   await page.goBack();
@@ -596,7 +608,7 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
     for (const path of shellPages) {
       await page.goto(path);
       // Linux system fonts make the download action wider than macOS does. Exercise that layout on either OS.
-      if (actionWidth) await page.addStyleTag({ content: `nav .btn-quiet { min-width: ${actionWidth}px }` });
+      if (actionWidth) await page.addStyleTag({ content: `nav .btn-quiet:not(.nav-buy) { min-width: ${actionWidth}px }` });
       const nav = page.locator('nav[aria-label="Main"]:visible').first();
       const header = await nav.evaluate(nav => {
         const brand = nav.querySelector('.brand');
@@ -631,24 +643,25 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
 test('the header holds its gutter at every width from 320 to 1440 px', async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto('download/');
-  await page.addStyleTag({ content: 'nav .btn-quiet { min-width: 164px }' });
+  await page.addStyleTag({ content: 'nav .btn-quiet:not(.nav-buy) { min-width: 164px }' });
   const widths = [];
-  for (let width = 320; width <= 420; width += 1) widths.push(width);
-  for (let width = 428; width <= 1440; width += 8) widths.push(width);
+  for (let width = 320; width <= 480; width += 1) widths.push(width);
+  for (let width = 488; width <= 1440; width += 8) widths.push(width);
   const failures = [];
   for (const width of widths) {
     await page.setViewportSize({ width, height: 844 });
     const state = await page.evaluate(() => {
       const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(nav => nav.getClientRects().length);
-      const button = nav.querySelector('.theme-btn'), action = nav.querySelector('.btn-quiet');
+      const button = nav.querySelector('.theme-btn'), action = nav.querySelector('.btn-quiet:not(.nav-buy)'), buy = nav.querySelector('.nav-buy');
       const box = button.getBoundingClientRect();
       return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         gutter: innerWidth - box.right, button: Math.min(box.width, box.height),
-        action: !!action && action.getClientRects().length > 0 };
+        action: !!action && action.getClientRects().length > 0, buy: !!buy && buy.getClientRects().length > 0 };
     });
-    const wantsAction = width >= 380;
-    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || state.action !== wantsAction)
-      failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}`);
+    // D-115: Buy is in the header at every width; the page action steps aside below 460 px, where both no longer fit.
+    const wantsAction = width >= 460;
+    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || state.action !== wantsAction || !state.buy)
+      failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}, buy ${state.buy}`);
   }
   expect(failures, failures.slice(0, 16).join('; ')).toEqual([]);
 });
@@ -1227,10 +1240,10 @@ test('the buy entry is no further down the landing than it is today, and the no-
   expect(detour.inFirstScreen, 'the download page sells without scrolling').toBe(true);
 });
 
-// The buy line shipped after 320/375/390/1440 were measured. This sweeps the tablet band - the sizes between the
-// phone sweep and the desktop target - and holds the same three promises there: the line is on the first screen,
-// nothing overflows sideways, and the sheet keeps its 61% floor (D-110, D-068).
-test('the buy line holds through the tablet band', async ({ page }, info) => {
+// The header's Buy (D-115) is measured at the widths a phone and a computer use. This sweeps the tablet band - the
+// sizes between the phone sweep and the desktop target - and holds three promises there: Buy is in the header on the
+// first screen, nothing overflows sideways, and the sheet keeps its 61% floor (D-110, D-068).
+test('the header Buy holds through the tablet band', async ({ page }, info) => {
   test.skip(!['1440-light-no-preference', '390-light-no-preference'].includes(info.project.name), 'One project sweeps the band');
   for (const size of [{ width: 600, height: 800 }, { width: 768, height: 1024 }, { width: 834, height: 1112 }, { width: 1024, height: 768 }, { width: 1180, height: 820 }]) {
     await page.setViewportSize(size);
@@ -1239,16 +1252,18 @@ test('the buy line holds through the tablet band', async ({ page }, info) => {
     const read = await page.evaluate(() => {
       const box = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height }; };
       const door = box('#landing .cta .btn');
-      const buy = box('#landing .cta .cta-buy');
+      const buy = box('#landing .home-nav .nav-buy');
+      const download = box('#landing .home-nav a.btn-quiet:not(.nav-buy)');
       const sheet = box('#paper');
       return { viewport: innerHeight, viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth,
-        door, buy, sheet, first: box('.first-screen') };
+        door, buy, download, sheet, first: box('.first-screen') };
     });
     const label = `${size.width}x${size.height}`;
-    expect(await page.locator('#landing .cta a[href="buy.html"]').count(), `${label}: one quiet buy line in the door band`).toBe(1);
-    expect(read.buy.top, `${label}: the buy line is on the first screen`).toBeLessThan(read.viewport);
-    expect(read.buy.top, `${label}: the buy line sits under the door`).toBeGreaterThanOrEqual(read.door.bottom - 0.5);
-    expect(Math.abs(read.buy.left + (read.buy.right - read.buy.left) / 2 - (read.door.left + read.door.right) / 2), `${label}: the line is centred on the door`).toBeLessThan(1);
+    expect(await page.locator('#landing .cta a[href="buy.html"]').count(), `${label}: no buy line in the door band`).toBe(0);
+    expect(await page.locator('#landing .home-nav a[href="buy.html"]').count(), `${label}: one Buy in the header`).toBe(1);
+    expect(read.buy.top, `${label}: Buy is on the first screen`).toBeLessThan(read.viewport);
+    expect(read.buy.bottom, `${label}: Buy sits above the door`).toBeLessThanOrEqual(read.door.top);
+    expect(read.buy.right, `${label}: Buy sits left of Download for Mac`).toBeLessThanOrEqual(read.download.left);
     expect(read.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(read.viewportWidth);
     expect(read.sheet.height / read.viewport, `${label}: the sheet keeps its 61% floor`).toBeGreaterThanOrEqual(0.61 - 1 / read.viewport);
     expect(Math.abs(read.sheet.bottom - read.first.bottom), `${label}: the sheet still owns the first screen's remainder`).toBeLessThanOrEqual(1);

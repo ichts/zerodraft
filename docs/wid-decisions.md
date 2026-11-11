@@ -2429,3 +2429,25 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   D-113. Their placement, href, underline and touch-target rules stand.
 - Tests: `qa/mac.spec.mjs` asserts the landing line reads `Buy`, and a sweep over the landing, `mac.html`, the
   download page, the footers and 404 asserts every non-prose link to the purchase page reads `Buy`.
+
+## D-115: Buy lives in the header's top-right corner, not under the door
+- Date: 2026-11-11. Captain: move Buy to the top-right corner of the site header; the decision is yes.
+- Decision: every page with the `nav-end` header block carries a `Buy` pill (the one word, to the page's own buy href)
+  immediately left of the page's other pill (`Download for Mac`, `Details` on `/buy`, `Try it in your browser` on
+  the download page). It is the quiet pill with its fill and its stronger edge taken off (`.nav-buy`: transparent,
+  `--hair`), so `Download for Mac` stays the heavier of the two; its 36 px pill carries a 44 px hit area. On `/buy`
+  it is `aria-current="page"`: no edge, underlined, still a link. The hero keeps one action: the small `Buy` link under
+  `Give it 60 seconds` and its CSS are gone, and the phone gap between the door and the sheet is `--s5` again (the
+  buy line had taken it down to `--s2`). The room's header carries the same pill beside Download, and on a phone the
+  room keeps only the mark and the theme icon, as Q-01 says.
+- Reason: a buyer looks for Buy where the header's actions are, on every page; the hero should offer one thing.
+- Cost, stated plainly: Buy and the page action together need 452 px at the widest system-font action, and the
+  theme button must stay on the page gutter (Q-19). So the page action now steps aside below 460 px (was below 380),
+  and Buy stays there. A phone at 390 or 430 px shows `Buy` and the theme icon; `Download for Mac` is one tap away in
+  the Mac card and the footer, which is where D-110 already measured the second pill failing at 390.
+- Supersedes: D-110 and D-114's placement clause (the buy line under the door; the label wording of D-114 stands), and
+  Q-19's 380 px step.
+- Tests: `qa/shell.spec.mjs` `the header carries Buy on every page...` (every page type, left of the page action,
+  visible at 390 where the action is hidden, 44 px hit area, `aria-current` only on `/buy`, one hero action, no
+  `.cta-buy`); `qa/mac.spec.mjs` asserts the pair's order, weights and the header sweep (Buy at every width, the
+  page action from 460 px); the `buy-page` journey block clicks the header Buy.

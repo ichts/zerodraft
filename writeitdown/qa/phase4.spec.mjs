@@ -1648,7 +1648,9 @@ test('focus is a ring, never a re-cut of the control it lands on', async ({ page
       outline: `${style.outlineWidth} ${style.outlineStyle}`, width: box.width, height: box.height };
   });
   const door = await (async () => {
-    for (let step = 0; step < 4; step += 1) await page.keyboard.press('Tab');
+    // Brand, every header pill that shows (Buy, and the page action where it fits), the theme button, then the door.
+    const stops = await page.evaluate(() => [...document.querySelectorAll('#landing .home-nav a, #landing .home-nav button')].filter(e => e.getClientRects().length).length);
+    for (let step = 0; step < stops + 1; step += 1) await page.keyboard.press('Tab');
     return page.evaluate(() => {
       const element = document.activeElement;
       const style = getComputedStyle(element);

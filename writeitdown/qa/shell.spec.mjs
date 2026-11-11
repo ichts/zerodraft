@@ -86,6 +86,56 @@ test('thirteen shipped pages share one header, plate, canvas and body family', a
   }
 });
 
+// D-115: a visitor on any page finds Buy in the top-right corner, immediately left of the page's other pill, and on a
+// phone, where that pill steps aside, Buy stays. The hero keeps one action. Protects "I can pay from where I am".
+test('the header carries Buy on every page, left of the page action, and the hero keeps one action', async ({ page }, info) => {
+  test.setTimeout(sweepTimeout(pages.length + 3));
+  const width = info.project.use.viewport.width;
+  for (const path of [...pages, purchasePage]) {
+    await openPage(page, path);
+    const read = await page.evaluate(() => {
+      const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(n => n.getClientRects().length);
+      const shown = el => !!el && el.getClientRects().length > 0;
+      const buys = [...nav.querySelectorAll('a.nav-buy')];
+      const buy = buys[0];
+      const other = nav.querySelector('a.btn-quiet:not(.nav-buy)');
+      const box = buy?.getBoundingClientRect() ?? { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
+      const theme = nav.querySelector('.theme-btn').getBoundingClientRect();
+      return { count: buys.length, text: buy?.textContent, path: buy && new URL(buy.href).pathname, current: buy?.getAttribute('aria-current'),
+        visible: shown(buy), otherVisible: shown(other),
+        leftOfOther: shown(other) ? box.right <= other.getBoundingClientRect().left : null,
+        leftOfTheme: box.right <= theme.left, height: box.height,
+        hitTop: document.elementFromPoint(box.left + box.width / 2, box.top - 3.5) === buy,
+        hitBottom: document.elementFromPoint(box.left + box.width / 2, box.bottom + 3.5) === buy,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+    });
+    const at = `${path} at ${width}px:`;
+    expect(read.count, `${at} one header Buy`).toBe(1);
+    expect(read.text, `${at} the header link is the single word Buy`).toBe('Buy');
+    expect(read.path, `${at} the header Buy goes to the purchase page`).toMatch(/^\/(writeitdown\/)?buy(\.html)?$/);
+    expect(read.visible, `${at} Buy is visible in the header`).toBe(true);
+    expect(read.leftOfTheme, `${at} Buy is left of the theme button`).toBe(true);
+    expect(read.hitTop && read.hitBottom, `${at} Buy keeps a 44 px tall hit area`).toBe(true);
+    expect(read.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
+    if (read.otherVisible) expect(read.leftOfOther, `${at} Buy is immediately left of the page action`).toBe(true);
+    if (width === 390) expect(read.otherVisible, `${at} the page action steps aside on a phone and Buy stays`).toBe(false);
+    if (width === 1440) expect(read.otherVisible, `${at} the page action is beside Buy on a computer`).toBe(true);
+    expect(read.current, `${at} only the purchase page marks its own Buy as current`).toBe(path === purchasePage ? 'page' : null);
+  }
+  // The not-found page links its stylesheet by root path, which the local server cannot serve from /writeitdown/, so its
+  // header is read as markup: one Buy to /buy, ahead of Download for Mac.
+  await openPage(page, '404.html');
+  const missing = await page.evaluate(() => {
+    const end = document.querySelector('nav[aria-label="Main"] .nav-end');
+    return [...end.querySelectorAll('a')].map(a => `${a.textContent}>${a.getAttribute('href')}`);
+  });
+  expect(missing, '404.html: Buy leads Download for Mac in the header').toEqual(['Buy>/buy', 'Download for Mac>/download/']);
+  await openPage(page, 'index.html');
+  await expect(page.locator('#landing .cta a'), 'the hero keeps one action: the door').toHaveCount(1);
+  await expect(page.locator('#landing .cta a.btn-primary')).toHaveText('Give it 60 seconds');
+  await expect(page.locator('.cta-buy'), 'no second buy line under the door').toHaveCount(0);
+});
+
 test('the document pages keep 17 px sans copy at the documented measure', async ({ page }) => {
   for (const path of documentPages) {
     await page.goto(path);
@@ -422,7 +472,7 @@ test('the phone room nav keeps only the theme icon, and the Mac link moves into 
   await expect(nav).toHaveCount(1);
   await expect(nav.locator('.brand')).toBeVisible();
   await expect(nav.locator('.theme-btn')).toBeVisible();
-  await expect(nav.locator('.btn-quiet')).toBeHidden();
+  for (const action of await nav.locator('.btn-quiet').all()) await expect(action, 'the phone room header keeps no pill, Buy included (Q-01)').toBeHidden();
   const mac = page.locator('.room .paper-foot .room-mac');
   await expect(mac).toBeVisible();
   await expect(mac).toHaveText('Download for Mac');

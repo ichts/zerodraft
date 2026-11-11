@@ -6,6 +6,14 @@ Current user-visible behavior is documented in [README.md](README.md); shared wr
 
 Real OS IME, iOS Safari/virtual keyboard and human audio evaluation remain unverified. Chrome viewport checks do not replace those checks.
 
+# 2026-11-11: Buy moves to the header's top-right corner (D-115)
+
+The landing's `Buy` link under the door is gone; every header carries a lighter quiet `Buy` pill left of the page
+action, and below 460 px it is the only header pill. Proof: `qa/shell.spec.mjs` `the header carries Buy on every
+page...`, the 320-480 px header sweep in `qa/mac.spec.mjs`, the `buy-page` journey block on WebKit iPhone 14 and
+Chromium 1440x900 (header Buy to `/buy` to hosted checkout), and before/after captures of the landing at 1440 and 390 in
+both themes, `/buy` and `mac.html` in `data/wid-buy-top-right/`.
+
 # 2026-11-10: The buy line opens a purchase page, not the manual
 
 `writeitdown.app/buy` is the sale (D-113). One screen at every width, holding the price `$4.99 once`

@@ -56,10 +56,16 @@ The agent runs an installed copy of the runner. Copy the script again whenever i
 
 `WID_NIGHTLY_TEST_ARGS="--filter nomatch" bash scripts/nightly-swift-tests.sh` must exit 1 with `the run reported no test result at all` in `record.json`. A job that stays green on that input is broken.
 
+## The silent exit it found, and the one known issue
+
+The first full run ended `swift test` with exit 0 after 24 of 376 started tests and no summary line; the gate refused it. The cause is in the test process: the Swift runner waits in `CFRunLoopRun` on the main thread, and a `CFRunLoopStop` that AppKit queued for its own loop (a window-ordering animation, or the nested event loop inside `NSButtonCell.performClick:`) later landed on the runner's loop. `Tests/TestProcessHardening/TestProcessHardening.m` turns window animations off and replaces that click with its non-nested equivalent for the test process only. If a run ever shows `the run ended without its own summary line` again, a new stray stop exists: find it with an `DYLD_INSERT_LIBRARIES` interposer on `CFRunLoopStop` and `exit` run against `swiftpm-testing-helper`.
+
+One test records a known issue by design: `RoomTests.firstPinyinKeyAfterAWipeThroughTheInputContext` needs an active key window, and a headless or backgrounded test process has none. The record counts it in `known_issues`; the run still passes. It is not a failure and it is not skipped, but that test proves less here than on a machine with an active session.
+
 ## Windows on the Mac mini's screen
 
 The suite is `swift test`, not a GUI journey, but some tests create real `NSWindow`s and call `makeKeyAndOrderFront` (`RoomTests`, `EditingCommandTests`), and the Pinyin test uses the real input context. They run in the xctest process, not in a built app. The nightly agent runs in the user's login session, so those windows can appear on the Mac mini's screen for the length of the test. Real-window acceptance, the shipped DMG and the recorded journeys still run only in the Tart VM (`scripts/vm-journey.sh`).
 
 ## What the nightly does not cover
 
-Anything that needs a signed or notarised build, the real DMG, Sparkle updates against the live appcast, the packaged `.app`, a real license or Stripe checkout, a real GUI session with real HID input, a physical Mac other than this one, or macOS versions other than the Mac mini's. It tests the `main` commit as it stands at the start time; it does not test a branch unless `WID_NIGHTLY_REF` says so.
+Anything that needs a signed or notarised build, the real DMG, Sparkle updates against the live appcast, the packaged `.app`, a real license or Stripe checkout, a real GUI session with real HID input, a physical Mac other than this one, or macOS versions other than the Mac mini's. It tests the `main` commit as it stands at the start time; it does not test a branch unless `WID_NIGHTLY_REF` says so. It does not run `swift test` a second time to hunt flakes: one run in about twenty (before the eviction fix in `BeginLatencyTests` was proven, 1 of 4 parallel runs) failed two tests that could not be reproduced in 18 further runs; if the record shows a failed test name, run that suite again before calling it a regression.

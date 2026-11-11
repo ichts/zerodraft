@@ -2417,3 +2417,15 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   (`journey-full/`), and captures at 390 and 1440 in both themes.
   The Emil review (ui-review, typography, ui-polish, touch-and-accessibility; 320/390/1440, both modes) is the
   Chinese table `data/wid-buy-page-c/emil-review.md`, kept outside the repository.
+
+## D-114: Every link to the purchase page is the single word Buy
+- Date: 2026-11-11. Captain, on seeing the home buy line `Buy for $4.99 once`: "ugly as hell".
+- Decision: the landing's quiet buy link, the `#mac` card link, the download page's ghost button and every footer link
+  that points at `/buy` read `Buy`. No price, no "once", no platform. The landing link keeps its underlined-link
+  treatment and its place under the door, with a 44 px wide hit area (it was as wide as its old label), 44 px tall on
+  desktop and 40 px on a phone. The price lives on `/buy`, where `$4.99 once` is the page's largest text; the submit
+  button on `/buy` is not part of this and still reads `Buy for $4.99 once` beside that heading.
+- Supersedes: the label wording of D-110 (`Buy for $4.99 once` on the landing) and the footer label `Buy for Mac` in
+  D-113. Their placement, href, underline and touch-target rules stand.
+- Tests: `qa/mac.spec.mjs` asserts the landing line reads `Buy`, and a sweep over the landing, `mac.html`, the
+  download page, the footers and 404 asserts every non-prose link to the purchase page reads `Buy`.

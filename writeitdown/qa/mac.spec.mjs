@@ -32,7 +32,7 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   // One purchase path, and it is not here: the card hands the sale to the purchase page, which owns the
   // checkout. This page stays because it is the checkout's fixed return URL and the key is delivered here.
   await expect(page.locator('[data-launch="checkout"]'), 'the docs page links to the sale, it does not run it').toHaveCount(0);
-  await expect(page.locator('#buy').getByRole('link', { name: 'Buy for $4.99 once', exact: true }), 'the card links to the purchase page').toHaveAttribute('href', 'buy.html');
+  await expect(page.locator('#buy').getByRole('link', { name: 'Buy', exact: true }), 'the card links to the purchase page').toHaveAttribute('href', 'buy.html');
   await expect(page.locator('[data-launch="license"]')).toContainText("paste it into the app's activation field");
   await expect(page.locator('#waitlist-form')).toHaveCount(0);
   await expect(page.locator('#buy').getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
@@ -89,10 +89,22 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
   }
 });
 
+// D-114: every link that sends a visitor to the purchase page is the single word Buy. The price is the purchase
+// page's largest text and is not repeated on the way there. Protects a visitor from reading a price-and-platform
+// line (the old `Buy for $4.99 once` / `Buy for Mac`) on pages that only point at /buy.
+test('every link to the purchase page is the single word Buy', async ({ page }) => {
+  for (const file of ['index.html', 'mac.html', 'download/', 'support.html', 'privacy.html', 'terms.html', '404.html', 'write-it-down-price.html']) {
+    await page.goto(file);
+    const labels = await page.locator('a[href$="buy.html"]:not(p a), a[href$="/buy"]:not(p a)').evaluateAll(links => links.map(a => a.textContent.trim()));
+    expect(labels.length, `${file}: links to the purchase page`).toBeGreaterThan(0);
+    for (const label of labels) expect(label, `${file}: a purchase link reads Buy`).toBe('Buy');
+  }
+});
+
 test('the footer buy line on the help pages opens the purchase page', async ({ page }) => {
   for (const file of ['support.html', 'privacy.html', 'terms.html']) {
     await page.goto(file);
-    await page.locator('.home-foot a', { hasText: 'Buy for Mac' }).click();
+    await page.locator('.home-foot').getByRole('link', { name: 'Buy', exact: true }).click();
     await expect(page).toHaveURL(/\/buy\.html$/);
     await expect(page.locator('.buy-price'), `${file}: the price is the page`).toHaveText(`${appPrice} once`);
   }
@@ -229,15 +241,16 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(cta.locator('> *'), 'the entrance band holds the door and its quiet buy line, nothing else').toHaveCount(2);
   await expect(cta.locator('> a'), 'the entrance band holds two links and no other control').toHaveCount(2);
   const buyLine = cta.locator('a.cta-buy');
-  await expect(buyLine, 'the buy line reuses the published price string').toHaveText('Buy for $4.99 once');
+  await expect(buyLine, 'the buy line is the single word Buy; the price lives on the purchase page (D-114)').toHaveText('Buy');
   await expect(buyLine, 'the buy line goes to the purchase page').toHaveAttribute('href', 'buy.html');
   const buyLineInk = await buyLine.evaluate(e => {
     const s = getComputedStyle(e);
-    return { decoration: s.textDecorationLine, colour: s.color, height: e.getBoundingClientRect().height,
+    return { decoration: s.textDecorationLine, colour: s.color, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width,
       ink: getComputedStyle(e.closest('.home')).getPropertyValue('--ink').trim() };
   });
   expect(buyLineInk.decoration, 'the buy line wears the underline, not a second pill').toBe('underline');
   expect(buyLineInk.height, 'the buy line keeps a 40 px touch target on a phone').toBeGreaterThanOrEqual(39.5);
+  expect(buyLineInk.width, 'the one-word buy line still has a 44 px wide hit area').toBeGreaterThanOrEqual(43.5);
   const door = cta.locator('a.btn-primary');
   await expect(door).toHaveText('Give it 60 seconds');
   await expect(door).toHaveAttribute('href', '#trial');
@@ -295,7 +308,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(mac.locator('.facts')).toContainText('2 computers');
   await expect(mac.locator('.facts')).toContainText('14 days');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
-  await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy for $4.99 once');
+  await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
   for (const label of ['Support', 'Privacy', 'Terms']) await expect(page.locator('.home-foot nav a', { hasText: label })).toBeVisible();
@@ -756,7 +769,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
     expect(schemaProperties(graph)).not.toContain(property);
 
   await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
-  await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy for $4.99 once');
+  await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy');
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'buy.html'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);
@@ -1194,7 +1207,7 @@ test('installer acceptance rejects an installer missing its logo-directory guard
 test('the buy entry is no further down the landing than it is today, and the no-scroll detour still exists', async ({ page }) => {
   await page.goto('index.html');
   const reach = await page.evaluate(() => {
-    const a = [...document.querySelectorAll('#landing a')].find(x => /Buy for \$4\.99/.test(x.textContent));
+    const a = [...document.querySelectorAll('#landing a')].find(x => x.getAttribute('href') === 'buy.html');
     if (!a) return null;
     const r = a.getBoundingClientRect();
     return { screens: Math.round(((r.top + scrollY) / innerHeight) * 100) / 100, inFirstScreen: r.top < innerHeight };
@@ -1205,7 +1218,7 @@ test('the buy entry is no further down the landing than it is today, and the no-
   expect(reach.screens, `the landing buy entry is ${reach.screens} screens down, and its measured reach on 89b4870 was 2.64 at 1440 and 3.92 at 390`).toBeLessThanOrEqual(cap);
   await page.goto('download/');
   const detour = await page.evaluate(() => {
-    const a = [...document.querySelectorAll('a')].find(x => /Buy for \$4\.99/.test(x.textContent));
+    const a = [...document.querySelectorAll('a')].find(x => x.getAttribute('href') === '../buy.html');
     if (!a) return null;
     const r = a.getBoundingClientRect();
     return { top: Math.round(r.top), inFirstScreen: r.top < innerHeight && r.bottom > 0 };

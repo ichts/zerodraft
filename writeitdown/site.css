@@ -242,7 +242,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The door, and the one quiet way to buy the app without leaving the first screen: the same quiet route the
    kept screen carries to the app (D-110). Ink, not the quiet role, because the wall takes it to 4.5:1. */
 .cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s5) var(--gut) 0;text-align:center}
-.home .cta-buy{display:inline-flex;align-items:center;min-height:44px;margin-top:var(--s3);font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.home .cta-buy{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-top:var(--s3);font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 /* sections */
 .sect{max-width:var(--maxw);margin:0 auto;padding:var(--section) var(--gut) 0}
 .home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ichts.wid-swift-nightly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>@RUNNER@</string>
+    </array>
+
+    <!-- 04:30 local time every day. Fill in @HOUR@ and @MINUTE@; see docs/NIGHTLY_TESTS.md. -->
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>@HOUR@</integer>
+        <key>Minute</key>
+        <integer>@MINUTE@</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>WID_NIGHTLY_OUT</key>
+        <string>@OUT@</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>@OUT@/launchd.out</string>
+    <key>StandardErrorPath</key>
+    <string>@OUT@/launchd.err</string>
+
+    <!-- A Mac that is asleep at the start time runs the missed job once on wake. -->
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

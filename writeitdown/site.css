@@ -184,6 +184,12 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .btn-primary{background:var(--ink);color:var(--on-ink)}
 .home .btn-ghost{height:44px;background:var(--sheet);border-color:var(--hair-2);color:var(--ink)}
 .home .btn-quiet{height:36px;padding:0 var(--s4);font-size:14px;background:var(--sheet);border-color:var(--hair-2)}
+/* The header's Buy (D-115): the same 36 px quiet pill with the fill and the stronger edge taken off, so Download
+   for Mac stays the heavier of the two. The hit area grows to 44 px with a pseudo-element, the way the theme button's does. */
+.home .nav-buy{position:relative;background:transparent;border-color:var(--hair)}
+.home .nav-buy::after{content:"";position:absolute;inset:-5px 0}
+/* On its own page Buy is where the reader already is: the pill drops its edge and underlines, still a link. */
+.home .nav-buy[aria-current="page"]{border-color:transparent;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 /* A control that is working looks like it is working: the pressed-looking state is reserved for the press. */
 .home .btn:disabled{opacity:.6;cursor:progress}
 .home .btn:disabled:hover{transform:none}
@@ -239,10 +245,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .prev-line:nth-child(n+3){opacity:0}
 /* Reveal the rounded top border, never scale its corners with the remaining time. */
 .bar{position:absolute;left:0;top:0;box-sizing:border-box;height:calc(2 * var(--r-sheet));width:100%;border-top:2px solid var(--ink);border-radius:var(--r-sheet) var(--r-sheet) 0 0;clip-path:inset(0 0 0 0);pointer-events:none;z-index:2}
-/* The door, and the one quiet way to buy the app without leaving the first screen: the same quiet route the
-   kept screen carries to the app (D-110). Ink, not the quiet role, because the wall takes it to 4.5:1. */
+/* The door: the hero's one action. The way to pay is the header's Buy (D-115). */
 .cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s5) var(--gut) 0;text-align:center}
-.home .cta-buy{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;margin-top:var(--s3);font:500 var(--t-small)/1.6 var(--sans);letter-spacing:.04em;color:var(--ink);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
 /* sections */
 .sect{max-width:var(--maxw);margin:0 auto;padding:var(--section) var(--gut) 0}
 .home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
@@ -320,10 +324,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
      host font cannot decide whether the sheet still fills 60% of the first screen. */
   .hero-sub{margin-top:var(--s1)}
   .cta{padding-top:var(--s4)}
-  /* The buy line takes the gap the sheet used to own, so the door group grows by one link instead of by a
-     section: the sheet keeps its 61% floor on a short phone (D-110). */
-  .home .cta-buy{margin-top:var(--s3);min-height:40px}
-  .stagewrap{margin-top:var(--s2)}
+  .stagewrap{margin-top:var(--s5)}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
   .faqwrap{grid-template-columns:1fr;gap:20px}
@@ -334,9 +335,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .brand{font-size:16px}
   .home-nav{gap:var(--s2)}
 }
-/* Below 380 px the header keeps the brand and the theme button; every page carries its action in the body. */
-@media (max-width:379px){
-  nav[aria-label="Main"] .btn-quiet{display:none}
+/* Below 460 px the header keeps the brand, Buy and the theme button: Buy and the page action together need 452 px at the
+   widest system-font action, and the theme button must stay on the page gutter. Every page carries its other action in the body. */
+@media (max-width:459px){
+  nav[aria-label="Main"] .btn-quiet:not(.nav-buy){display:none}
 }
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}

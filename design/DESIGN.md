@@ -277,9 +277,9 @@ notch.
   its hit area without enlarging the lockup.
 - Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and the theme
   button keeps at least 6 px of right gutter, with the 36 px theme button unscaled and the page action present
-  at 380 px and above and hidden below 380 px. The room drops it sooner on phones; see the mobile rule
+  at 460 px and above and hidden below 460 px, where the header's `Buy` pill (D-115) stays. The room drops it sooner on phones; see the mobile rule
   below. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at every width from 320 to 1440 px"
-  sweeps the widest header (`/download/`) in 1 px steps from 320 to 420 and 8 px steps from 420 to 1440
+  sweeps the widest header (`/download/`) in 1 px steps from 320 to 480 and 8 px steps from 488 to 1440
   under the wider-font action model, so a breakpoint that leaves an uncovered band fails; keep the range
   sweep instead of sampled widths. The landing's header also keeps the page container's left edge and width:
   `writeitdown/qa/mac.spec.mjs` "the landing header spans the page container at every width" pins the nav's
@@ -288,8 +288,8 @@ notch.
   (D-055, D-068).
 - Site header, mobile: from 391 to 820 px the 19 px lockup takes 141.9 px of the row, with 12 px between the
   brand and the page action and 6 px inside the action group; at 380-390 px the 16 px lockup takes 119.5 px,
-  the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 380 px the nav page action is
-  hidden on every page, leaving the brand lockup and the 36 px theme button; each page keeps its call to action
+  the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 460 px the nav page action is
+  hidden on every page, leaving the brand lockup, the `Buy` pill and the 36 px theme button; each page keeps its call to action
   in the body, so the mark never shrinks below 16 px and the header stays one 56 px row. The action is dropped
   rather than stacked into a second header row, so the room's header height and its dynamic-viewport paper
   sizing stay unchanged. One rule for every page that uses `.brand` - these sizes and the single
@@ -338,8 +338,8 @@ notch.
   390 px and requires no horizontal overflow, at least 6 px of right gutter and one lockup step across every
   shipped page and the room; at 360 px it also requires a chip of at least 16 px with the split still
   reading. "the header holds its gutter at every width from 320 to 1440 px" sweeps `/download/`
-  in 1 px steps from 320 to 420 and 8 px steps from 420 to 1440 under the wider-font action model and requires
-  no horizontal overflow, at least 6 px of right gutter, the page action at 380 px and above and absent below,
+  in 1 px steps from 320 to 480 and 8 px steps from 488 to 1440 under the wider-font action model and requires
+  no horizontal overflow, at least 6 px of right gutter, the page action at 460 px and above and absent below,
   and the 36 px theme button at every width, so a breakpoint that leaves a band uncovered fails. Verify the
   sizes in 11.3 in light and dark, with no clipping and no shift in the nav.
 

@@ -150,9 +150,10 @@ async function run(size, browser) {
       ok(await cta.count() === 1, `${await cta.count()} entrance bands`);
       const c = await cta.boundingBox(), d = await demo.boundingBox();
       ok(c.y + c.height <= d.y + 2, 'the entrance band is not above the demo');
-      ok(await cta.locator('a').count() === 2, `${await cta.locator('a').count()} links in the entrance band`);
-      ok(await cta.locator('> *').count() === 2, `${await cta.locator('> *').count()} elements in the entrance band`);
-      ok(await cta.locator('a.cta-buy').count() === 1, 'the entrance band lost its one buy line');
+      ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
+      ok(await cta.locator('> *').count() === 1, `${await cta.locator('> *').count()} elements in the entrance band`);
+      ok(await page.locator('.cta-buy').count() === 0, 'a buy line came back under the door');
+      ok(await landingNav.locator('a.nav-buy', { hasText: /^buy$/i }).count() === 1, 'the header lost its one Buy');
       ok(await page.locator('#landing a.btn-primary[href="#trial"]').count() === 1, 'more than one 60-second door on the page');
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
@@ -265,9 +266,9 @@ async function run(size, browser) {
     });
   });
   await block('download', async () => {
-    await step('top-bar pill goes to /download/', async () => {
+    await step('top-bar pill goes to /download/ (a phone shows only Buy there, so it takes the Mac card link)', async () => {
       await page.goto(url('/'));
-      await landingNav.locator('a', { hasText: /^download for mac$/i }).click();
+      await (size.width >= 460 ? landingNav.locator('a', { hasText: /^download for mac$/i }) : page.locator('#mac a[href="download/"]')).click();
       await page.waitForURL(/\/download\/?$/);
       const h1 = page.locator('main h1');
       ok(await h1.count() === 1, `${await h1.count()} h1 elements on the download page`);
@@ -437,7 +438,7 @@ async function run(size, browser) {
       const h = (await h1.innerText()).trim(); ok(h.toLowerCase() === p, `H1 is "${h}"`);
     });
   });
-  // The buyer's shortest path. A person who clicks the one buy line on the landing must reach the price
+  // The buyer's shortest path. A person who clicks the header's Buy on the landing must reach the price
   // and a working checkout without meeting the manual: two clicks, one screen, no scrolling, and no stop
   // on mac.html. This is the behaviour the change protects, so it is asserted end to end on both engines
   // rather than inferred from the link's href.
@@ -455,9 +456,9 @@ async function run(size, browser) {
         posts++;
         return route.fulfill({ json: { url: hosted } });
       });
-      await step('the landing buy line opens the price, not the documentation', async () => {
+      await step('the header Buy opens the price, not the documentation', async () => {
         await page.goto(url('/'));
-        await page.locator('#landing .cta a.cta-buy').click();
+        await page.locator('#landing .home-nav a.nav-buy').click();
         await page.waitForURL(/\/buy(\.html)?$/);
         const heading = (await page.locator('main h1').innerText()).trim();
         ok(heading === '$4.99 once', `the purchase page leads with "${heading}"`);

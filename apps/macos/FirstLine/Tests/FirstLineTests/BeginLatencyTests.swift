@@ -55,7 +55,14 @@ struct BeginLatencyTests {
         let scale = window.backingScaleFactor
         let dark = home.view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let (w, h) = (Int((area.width * scale).rounded()), Int((area.height * scale).rounded()))
-        await spin(until: { PaperSheetCache.shared.holds(width: w, height: h, scale: scale, dark: dark) }, limit: .seconds(600))
+        // Parallel suites build sheets of their own on the main actor, and the cache keeps only three: a sheet the
+        // picker warmed can be evicted before this poll runs, and nothing would ever warm it again. Ask the picker
+        // again each turn; a picker that does not warm the room's paper still fails the `holds` check below.
+        await spin(until: {
+            if PaperSheetCache.shared.holds(width: w, height: h, scale: scale, dark: dark) { return true }
+            home.prewarmRoomPaper()
+            return false
+        }, limit: .seconds(600))
         #expect(PaperSheetCache.shared.holds(width: w, height: h, scale: scale, dark: dark), "the picker never warmed the room's paper")
         let builtBefore = PaperSheetCache.shared.synchronousBuilds(width: w, height: h, scale: scale, dark: dark)
         let begin = try #require(descendants(home.view, NSButton.self).first { $0.title == "Begin" })

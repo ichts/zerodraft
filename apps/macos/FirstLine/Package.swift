@@ -37,9 +37,14 @@ let package = Package(
                 .unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
             ]
         ),
+        // Test-process hardening only (not shipped): see the header of Tests/TestProcessHardening/TestProcessHardening.m.
+        .target(
+            name: "TestProcessHardening",
+            path: "Tests/TestProcessHardening"
+        ),
         .testTarget(
             name: "WriteItDownTests",
-            dependencies: ["WriteItDown"],
+            dependencies: ["WriteItDown", "TestProcessHardening"],
             path: "Tests/FirstLineTests"
         )
     ]

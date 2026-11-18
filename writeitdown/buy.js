@@ -95,7 +95,7 @@
 
   const fragment = new URLSearchParams(location.hash.slice(1));
   const session = fragment.get('session_id') || new URLSearchParams(location.search).get('session_id');
-  const hasActivation = fragment.has('activate');
+  const hasActivation = /(^|&)activate=/.test(location.hash.slice(1));
   const activation = fragment.get('activate');
   if (!session && !hasActivation) return;
 

@@ -115,6 +115,14 @@ for (const fragment of ['activate=javascript:alert(1)', 'activate=', 'activate=c
   });
 }
 
+test('bare #activate anchor stays a plain in-page anchor', async () => {
+  const page = await deliver(null, { url: `${cleanURL}#activate` });
+  assert.equal(page.element('license-result').hidden, true);
+  assert.equal(page.element('license-status').textContent, '');
+  assert.deepEqual(page.fetches, []);
+  assert.deepEqual(page.replacements, []);
+});
+
 test('Stripe fragment return fetches the credential once and offers the app handoff', async () => {
   const page = await deliver('cs_live_fixture', { url: `${cleanURL}#session_id=cs_live_fixture` });
   assert.equal(page.element('activate-license').href, 'writeitdown://activate#key=cs_live_fixture');

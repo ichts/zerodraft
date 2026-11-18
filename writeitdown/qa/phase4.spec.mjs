@@ -1659,7 +1659,7 @@ test('focus is a ring, never a re-cut of the control it lands on', async ({ page
         width: element.getBoundingClientRect().width, height: element.getBoundingClientRect().height };
     });
   })();
-  expect(door.text, 'the keyboard reaches the door last').toBe('Give it 60 seconds');
+  expect(door.text, 'the keyboard reaches the door last').toBe('Start a free 60-second session');
   expect(door.ring).toBe(true);
   expect(door.radius, 'the door keeps its pill under focus').toBe('999px');
   expect(door.outline).toBe('2px solid');
@@ -1872,8 +1872,8 @@ test('the landing states the warning lead-in and never labels a moment with anot
     stopped: [...document.querySelectorAll('#core .mo.m3 .t, #core .mo.m3 .r')].map(e => e.textContent.trim()),
     marker: [...document.querySelectorAll('#how .line8 .lab span, #how .line8 .lab b')].map(e => e.textContent.trim()),
     card: document.querySelectorAll('#how .card .txt')[1].textContent.replace(/\s+/g, ' ').trim(),
-    faq: document.querySelector('#faq details p').textContent.replace(/\s+/g, ' ').trim(),
-    schema: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'][1].mainEntity[0].acceptedAnswer.text,
+    faq: document.querySelectorAll('#faq details p')[1].textContent.replace(/\s+/g, ' ').trim(),
+    schema: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'][1].mainEntity[1].acceptedAnswer.text,
   }));
   expect(copy.moments[0]).toMatch(/^0:47\b/);
   expect(copy.moments[2]).toMatch(/^8 s\b/);
@@ -1887,8 +1887,8 @@ test('the landing states the warning lead-in and never labels a moment with anot
   // One form for a silence mark everywhere.
   expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
   // The card says the one rule (D-101) and the marker above it shows the warning; the lead-in is stated in the answer the schema repeats word for word.
-  expect(copy.card).toBe('8 seconds of silence deletes the draft.');
-  expect(copy.faq).toMatch(/warning always starts three seconds before/i);
+  expect(copy.card).toMatch(/warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds/);
+  expect(copy.faq).toMatch(/counts 3, 2, 1 before deleting your draft at 8 seconds/i);
   expect(copy.faq).toBe(copy.schema);
 });
 

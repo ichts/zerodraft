@@ -199,11 +199,11 @@ test('release gate rejects missing or invalid purchase and download configuratio
 test('landing: Paper in light - headline, demo card, one room button, sections, honest Mac block', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
-  await expect(hero.locator('h1')).toHaveText('We force you to write it down');
-  await expect(hero.locator('h1 .hand')).toHaveText('write it down');
+  await expect(hero.locator('h1')).toHaveText('Keep typing or lose every word.');
+  await expect(hero.locator('h1 .hand')).toHaveText('lose every word.');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
   await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Newsreader/);
-  await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Forward only. Pause and the draft disappears. Keep going and you get to keep it.');
+  await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Write It Down is a forward-only writing timer for people who get stuck rewriting their first sentence.');
   const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
   expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
   expect(families.every(f => ['Newsreader', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
@@ -261,10 +261,10 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(cta.locator('a'), 'the entrance band holds one link').toHaveCount(1);
   await expect(page.locator('.cta-buy'), 'the hero buy line is gone').toHaveCount(0);
   const door = cta.locator('a.btn-primary');
-  await expect(door).toHaveText('Give it 60 seconds');
+  await expect(door).toHaveText('Start a free 60-second session');
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a.btn-primary[href="#trial"]'), 'one door on the page, not two').toHaveCount(1);
-  await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Give it 60 seconds');
+  await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Start a free 60-second session');
   // One evaluate, measured from the top of the document: every rect here is in document space, so a test that
   // scrolls, or a scroll that animates, cannot make a gap read smaller than the layout's.
   const layout = await page.evaluate(() => {
@@ -305,15 +305,15 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');
   await expect(page.locator('#landing')).not.toContainText(/Real rules, real numbers|Straight answers|A native writing room/);
 
-  await expect(page.locator('#how')).toContainText('Sixty seconds. Forward only.');
-  await expect(page.locator('#how .card .txt')).toHaveText(['Forward only, no deleting.', '8 seconds of silence deletes the draft.', 'Write to 0:00 and the text is yours.']);
+  await expect(page.locator('#how')).toContainText('How it works');
+  await expect(page.locator('#how .card .txt')).toHaveText(['Start a free 60-second session in your browser, or pick a 1, 5, 10, 20, or 30-minute timer in the Mac app.', 'Type the next word without stopping to delete, paste, cut, or undo, because a warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds.', 'Keep going until the timer reaches zero, and the finished text is yours to copy.']);
   await expect(page.locator('#how .card h3'), 'each card carries one line and no title').toHaveCount(0);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
-  await expect(mac.locator('.facts')).toContainText('$4.99 once');
-  await expect(mac.locator('.facts')).toContainText('2 computers');
-  await expect(mac.locator('.facts')).toContainText('14 days');
-  await expect(mac.locator('a[href="download/"]')).toHaveText('Download free trial');
+  await expect(mac.locator('.facts')).toContainText('then pay $4.99 once');
+  await expect(mac.locator('.facts')).toContainText('2 Macs');
+  await expect(mac.locator('.facts')).toContainText('14-day refund');
+  await expect(mac.locator('a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');
   await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
@@ -756,11 +756,11 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   await page.goto('index.html');
   await expect(page.locator('#landing h1')).toHaveCount(1);
   await expect(page.locator('#landing h2')).toHaveText([
-    /What it feels like when you stop/, /Sixty seconds\. Forward only\. Nothing kept\./,
-    'Write It Down for Mac', 'Questions, answered']);
+    /What it feels like when you stop/, 'How it works', 'Why it works',
+    'Pricing', 'Questions, answered']);
   await expect(page.locator('#core > p.sub, #how > p.sub')).toHaveCount(0);
   const questions = page.locator('#faq details');
-  await expect(questions).toHaveCount(8);
+  await expect(questions).toHaveCount(6);
   await expect(questions.first()).toHaveAttribute('open', '');
   const second = questions.nth(1);
   await expect(second.locator('p')).toBeHidden();
@@ -781,7 +781,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   for (const property of ['publisher', 'aggregateRating', 'review'])
     expect(schemaProperties(graph)).not.toContain(property);
 
-  await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download free trial');
+  await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');
   await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy');
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'buy.html'])

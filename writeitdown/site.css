@@ -205,7 +205,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .h1{margin:0;display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font:500 var(--t-display)/1.05 var(--serif);letter-spacing:-.02em}
 .home .h1 .l1{white-space:nowrap}
 .home .hand{font-family:var(--hand);font-weight:400;color:var(--red-text);letter-spacing:0;white-space:nowrap}
-.home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 4.6));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
+.home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 5.8));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
 @keyframes wid-write{to{clip-path:inset(-10% -4% -20% 0)}}
 /* sheet (the paper): the demo.js preview */
 .stagewrap{width:100%;max-width:var(--maxw);margin:var(--s7) auto 0;padding:0 var(--gut)}
@@ -284,9 +284,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
 .facts{list-style:none;margin:0;padding:0;display:grid}
-.facts li{display:flex;align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
+.facts li{display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .facts li:last-child{border-bottom:0}
-.facts b{font:500 28px/1.1 var(--serif);min-width:120px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.facts b{font:500 22px/1.15 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 /* footer */
 .home-foot{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut);font:400 14px/1.5 var(--sans);color:var(--mute)}
 .foot-grid{padding:var(--s8) 0 var(--s6);border-top:1px solid var(--hair);display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:var(--s6)}
@@ -318,7 +318,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .home .btn-quiet{font-size:13px;padding:0 12px}
   .home .hero{padding-top:var(--s1)}
   .home .h1{flex-direction:column;align-items:center;font-size:clamp(34px,10.5vw,44px)}
-  .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 4.6));margin-top:.02em}
+  .home .h1 .hand{font-size:min(1.9em,calc((100vw - 2 * var(--gut)) / 5.8));margin-top:.02em}
   /* The hero, the door and the 61% sheet are one stack: the door closes the headline group,
      the sheet gets the larger gap. The gate measures this stack with the sans face pinned, so a
      host font cannot decide whether the sheet still fills 60% of the first screen. */
@@ -327,6 +327,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .stagewrap{margin-top:var(--s5)}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
+  .facts li{grid-template-columns:1fr;gap:4px}
   .faqwrap{grid-template-columns:1fr;gap:20px}
   .foot-grid{grid-template-columns:1fr 1fr}
 }

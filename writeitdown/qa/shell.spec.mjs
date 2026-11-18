@@ -132,7 +132,7 @@ test('the header carries Buy on every page, left of the page action, and the her
   expect(missing, '404.html: Buy leads Download for Mac in the header').toEqual(['Buy>/buy', 'Download for Mac>/download/']);
   await openPage(page, 'index.html');
   await expect(page.locator('#landing .cta a'), 'the hero keeps one action: the door').toHaveCount(1);
-  await expect(page.locator('#landing .cta a.btn-primary')).toHaveText('Give it 60 seconds');
+  await expect(page.locator('#landing .cta a.btn-primary')).toHaveText('Start a free 60-second session');
   await expect(page.locator('.cta-buy'), 'no second buy line under the door').toHaveCount(0);
 });
 

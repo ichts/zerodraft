@@ -111,11 +111,11 @@ async function run(size, browser) {
 
   await block('landing/hero', async () => {
     await step('page loads', async () => { const r = await page.goto(url('/')); ok(r.ok(), `status ${r.status()}`); });
-    await step('H1 "We force you to" + "write it down", no final period', async () => {
+    await step('H1 "Keep typing or" + "lose every word."', async () => {
       const h1 = page.locator('h1.h1');
       ok(await h1.count() === 1, `${await h1.count()} h1 elements`);
       const t = (await h1.innerText()).replace(/\s+/g, ' ').trim();
-      ok(t.toLowerCase() === 'we force you to write it down', `H1 is "${t}"`);
+      ok(t === 'Keep typing or lose every word.', `H1 is "${t}"`);
     });
     await step('second line is the red handwritten one', async () => {
       const h = page.locator('h1.h1 .hand');
@@ -128,7 +128,7 @@ async function run(size, browser) {
       const sub = page.locator('#landing header.hero p.sub');
       ok(await sub.count() === 1, `${await sub.count()} subheadlines in the hero`);
       const t = (await sub.innerText()).replace(/\s+/g, ' ').trim();
-      ok(t === 'Forward only. Pause and the draft disappears. Keep going and you get to keep it.', `subheadline is "${t}"`);
+      ok(t === 'Write It Down is a forward-only writing timer for people who get stuck rewriting their first sentence.', `subheadline is "${t}"`);
     });
     await step('top bar: one Download for Mac pill routed to /download/', async () => {
       const pill = landingNav.locator('a', { hasText: /^download for mac$/i });
@@ -208,12 +208,12 @@ async function run(size, browser) {
       ok(/PreOrder$/.test(a.offers.availability), `availability ${a.offers.availability}`);
       ok(/macOS 14/.test(a.operatingSystem), `os ${a.operatingSystem}`);
     });
-    await step('heading tree: one h1, h2 order per SEO.md, no h3 under how, 8 h3 under FAQ', async () => {
+    await step('heading tree: one h1, h2 order per SEO.md, no h3 under how, 6 h3 under FAQ', async () => {
       const tree = (await page.locator('#landing h1, #landing h2, #landing h3').evaluateAll(els => els.map(e => e.tagName.toLowerCase() + ' ' + e.textContent.replace(/\s+/g, ' ').trim()))).join('\n');
       const h = tree.split('\n'); ok(h.filter(x => x.startsWith('h1 ')).length === 1, 'need exactly one h1 in the landing');
-      const order = [/^h1 We force you to write it down$/, /^h2 What it feels like when you stop/, /^h2 Sixty seconds\. Forward only\. Nothing kept\./, /^h2 Write It Down for Mac/, /^h2 Questions, answered/];
+      const order = [/^h1 Keep typing or lose every word\.$/, /^h2 What it feels like when you stop/, /^h2 How it works/, /^h2 Why it works/, /^h2 Pricing/, /^h2 Questions, answered/];
       order.forEach((re, i) => ok(re.test(h[i] || ''), `heading ${i}: "${h[i]}" does not match ${re}`));
-      ok(h.slice(5, 13).every(x => x.startsWith('h3 ')) && h.length === 13, `FAQ headings: ${JSON.stringify(h.slice(5))}`);
+      ok(h.slice(6, 12).every(x => x.startsWith('h3 ')) && h.length === 12, `FAQ headings: ${JSON.stringify(h.slice(6))}`);
     });
   });
   await block('landing/core-rule', async () => {
@@ -225,13 +225,13 @@ async function run(size, browser) {
     await step('3 cards: one approved line each, no titles', async () => {
       await show('#how');
       const t = await page.locator('#how .cards .card .txt').allInnerTexts();
-      ok(JSON.stringify(t.map(x => x.trim())) === JSON.stringify(['Forward only, no deleting.', '8 seconds of silence deletes the draft.', 'Write to 0:00 and the text is yours.']), `cards ${JSON.stringify(t)}`);
+      ok(JSON.stringify(t.map(x => x.trim())) === JSON.stringify(['Start a free 60-second session in your browser, or pick a 1, 5, 10, 20, or 30-minute timer in the Mac app.', 'Type the next word without stopping to delete, paste, cut, or undo, because a warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds.', 'Keep going until the timer reaches zero, and the finished text is yours to copy.']), `cards ${JSON.stringify(t)}`);
       const h3 = await page.locator('#how .cards .card h3').count(); ok(h3 === 0, `cards carry ${h3} h3 titles, expected none`);
     });
   });
   await block('landing/mac-block', async () => {
     await step('Download free trial link reaches /download/ (200, real page)', async () => {
-      const h = await page.locator('#mac a', { hasText: /^download free trial$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
+      const h = await page.locator('#mac a', { hasText: /^download for mac \(3 free sessions\)$/i }).getAttribute('href'); ok(h === 'download/', `href ${h}`);
       const r = await ctx.request.get(url('/download/'));
       const h1 = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(await r.text());
       const heading = (h1?.[1] || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
@@ -242,8 +242,8 @@ async function run(size, browser) {
     });
   });
   await block('landing/faq', async () => {
-    await step('FAQ: 8 details, first open; open/close toggles by click and keyboard', async () => {
-      await show('#faq'); const d = page.locator('#faq details'); ok(await d.count() === 8, `${await d.count()} items`);
+    await step('FAQ: 6 details, first open; open/close toggles by click and keyboard', async () => {
+      await show('#faq'); const d = page.locator('#faq details'); ok(await d.count() === 6, `${await d.count()} items`);
       ok(await d.nth(0).evaluate(e => e.open), 'first item should start open');
       const sum = d.nth(1).locator('summary'); await sum.click(); ok(await d.nth(1).evaluate(e => e.open), 'did not open on click');
       ok(await d.nth(1).locator('p').isVisible(), 'answer not visible when open');
@@ -251,8 +251,8 @@ async function run(size, browser) {
       await sum.focus(); await page.keyboard.press('Enter'); ok(await d.nth(1).evaluate(e => e.open), 'did not open on Enter');
       await page.keyboard.press('Enter'); ok(!(await d.nth(1).evaluate(e => e.open)), 'did not close on Enter');
     });
-    await step('FAQ text equals the FAQPage JSON-LD (same 8 questions and answers)', async () => {
-      const q = (await ldGraph()).find(x => x['@type'] === 'FAQPage'); ok(q && q.mainEntity.length === 8, 'FAQPage needs 8 questions');
+    await step('FAQ text equals the FAQPage JSON-LD (same 6 questions and answers)', async () => {
+      const q = (await ldGraph()).find(x => x['@type'] === 'FAQPage'); ok(q && q.mainEntity.length === 6, 'FAQPage needs 6 questions');
       const vis = await page.locator('#faq details').evaluateAll(els => els.map(e => [e.querySelector('summary h3').textContent.replace(/\s+/g, ' ').trim(), e.querySelector('p').textContent.replace(/\s+/g, ' ').trim()]));
       q.mainEntity.forEach((m, i) => { ok(vis[i][0] === m.name, `Q${i + 1} "${vis[i][0]}" != JSON-LD "${m.name}"`); ok(vis[i][1] === m.acceptedAnswer.text.replace(/\s+/g, ' ').trim(), `A${i + 1} differs from JSON-LD`); });
     });

@@ -123,7 +123,16 @@ func environmentConfig(dbPath string) (Config, error) {
 		if cfg.ProductID == "" {
 			cfg.ProductID = os.Getenv("STRIPE_PRODUCT_ID")
 		}
-		err = configureStripe(&cfg)
+		if err = configureStripe(&cfg); err != nil {
+			return cfg, err
+		}
+		switch os.Getenv("LICENSE_MAIL_PROVIDER") {
+		case "":
+		case "resend":
+			cfg.Mailer, err = newResendMailer(os.Getenv("RESEND_API_KEY"), os.Getenv("RESEND_API_BASE"))
+		default:
+			err = errors.New("LICENSE_MAIL_PROVIDER must be resend or unset")
+		}
 		return cfg, err
 	}
 	cfg.TestPublicKey, err = readKey(os.Getenv("WAFFO_TEST_PUBLIC_KEY_FILE"), false)

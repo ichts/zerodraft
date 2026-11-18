@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder、Update/UpdateController
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证；main() 在任何窗口绘制前先调用 TextSmoothing.matchWeb()（关闭 CoreText 字体平滑，D-098）
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…
+ * [POS]: 接收 writeitdown://activate 链接并交给 AppState（写作中不抢前台）；建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -54,6 +54,12 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
 
         NSApp.activate(ignoringOtherApps: true)
         Task { await appState.validateLicenseIfNeeded() }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        guard let url = urls.first(where: { ActivationLink.key(from: $0) != nil }) else { return }
+        appState.receiveActivationLink(url)
+        if !appState.isWritingSessionActive { NSApp.activate(ignoringOtherApps: true) }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

@@ -37,6 +37,7 @@ type Config struct {
 	Provider                             string
 	StripeWebhookSecret, StripeSecretKey string
 	StripePriceID, StripeAPIBase         string
+	Mailer                               MailProvider
 }
 type Server struct {
 	db                          *sql.DB
@@ -109,6 +110,10 @@ func Open(cfg Config, now func() time.Time) (*Server, error) {
 	}
 	if cfg.Provider == "stripe" {
 		if err := migrateStripe(db); err != nil {
+			db.Close()
+			return nil, err
+		}
+		if err := migrateMail(db); err != nil {
 			db.Close()
 			return nil, err
 		}

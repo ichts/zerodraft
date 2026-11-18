@@ -2451,3 +2451,24 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   visible at 390 where the action is hidden, 44 px hit area, `aria-current` only on `/buy`, one hero action, no
   `.cta-buy`); `qa/mac.spec.mjs` asserts the pair's order, weights and the header sweep (Buy at every width, the
   page action from 460 px); the `buy-page` journey block clicks the header Buy.
+
+## D-116: The license key is emailed, and the email and mac.html open the app with the key pre-filled
+- Date: 2026-11-18. Captain: "2 wid 做" on three license-delivery fixes. Firstmate answers 2026-11-18 (Resend Free,
+  sending only, tracking off, DNS at Spaceship, privacy sentence, `contact@trefoilstudio.com` as the TEST inbox).
+- Decision: after a completed paid Stripe checkout the license service emails the buyer from
+  `Write It Down <contact@trefoilstudio.com>` through Resend: the key and one `Activate in the app` link, plain text
+  plus a minimal HTML twin. Sending is idempotent per Stripe event id through the `license_mail` table; the buyer
+  address is never stored. The link is `mac.html#activate=<key>` (an email client strips a custom scheme, and a
+  fragment never reaches a server or a referrer); `mac.html` shows an `Activate in the app` button that opens
+  `writeitdown://activate#key=<key>`, and the Mac app pre-fills its activation card. The app never activates by
+  itself and never interrupts a live session. Stripe's success URL also moved from `?session_id=` to `#session_id=`
+  (the old query form still works on the page). The old line "this page will not show it again" is gone: the service
+  never made the key one-shot, so the line was false.
+- Supersedes: the mac.html copy of the old "Save this key; this page will not show it again." and the query-string
+  success URL. The copy-key path stays as the fallback for an app without the handler.
+- Finding (not a defect): the 2026-11-05 live purchase did activate, on macOS about six minutes after payment;
+  firstmate read the license database. The "0 activations" worry was wrong.
+- Release: the Mac handler needs the next captain-signed build (Info.plist `CFBundleURLTypes` plus
+  `application(_:open:)`); nothing in this change signs, notarises, edits the appcast or deploys.
+- Tests: `services/license/mail_test.go`, `writeitdown/buy.test.mjs`, `writeitdown/qa/checkout.spec.mjs`,
+  `ActivationLinkTests.swift`.

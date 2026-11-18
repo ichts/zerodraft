@@ -10,6 +10,18 @@
     <string>1.1</string>
     <key>CFBundleVersion</key>
     <string>2</string>
+    <!-- writeitdown://activate#key=... pre-fills the activation card; see Licensing/ActivationLink.swift. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>app.writeitdown.mac.activate</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>writeitdown</string>
+            </array>
+        </dict>
+    </array>
     <key>WIDDisplayPrice</key>
     <string>$4.99</string>
     <key>WIDCheckoutURL</key>

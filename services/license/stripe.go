@@ -21,7 +21,7 @@ import (
 )
 
 const stripeReturnURL = "https://writeitdown.app/mac.html"
-const stripeSuccessURL = stripeReturnURL + "?session_id={CHECKOUT_SESSION_ID}"
+const stripeSuccessURL = stripeReturnURL + "#session_id={CHECKOUT_SESSION_ID}"
 
 // stripeKeyMode derives the key's mode from an accepted prefix: standard and
 // restricted keys, each bound to the mode encoded in its prefix. A bare prefix
@@ -142,17 +142,20 @@ type stripeLines struct {
 }
 
 type stripeObject struct {
-	ID             string       `json:"id"`
-	Livemode       *bool        `json:"livemode"`
-	PaymentIntent  string       `json:"payment_intent"`
-	AmountTotal    *int         `json:"amount_total"`
-	Amount         *int         `json:"amount"`
-	AmountRefunded int          `json:"amount_refunded"`
-	Currency       string       `json:"currency"`
-	Mode           string       `json:"mode"`
-	Status         string       `json:"status"`
-	PaymentStatus  string       `json:"payment_status"`
-	LineItems      *stripeLines `json:"line_items"`
+	ID              string       `json:"id"`
+	Livemode        *bool        `json:"livemode"`
+	PaymentIntent   string       `json:"payment_intent"`
+	AmountTotal     *int         `json:"amount_total"`
+	Amount          *int         `json:"amount"`
+	AmountRefunded  int          `json:"amount_refunded"`
+	Currency        string       `json:"currency"`
+	Mode            string       `json:"mode"`
+	Status          string       `json:"status"`
+	PaymentStatus   string       `json:"payment_status"`
+	LineItems       *stripeLines `json:"line_items"`
+	CustomerDetails struct {
+		Email string `json:"email"`
+	} `json:"customer_details"`
 }
 
 type stripeEvent struct {
@@ -211,6 +214,9 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	status := s.applyStripeEvent(e, body)
+	if status == 200 {
+		status = s.deliverLicense(r.Context(), e, body)
+	}
 	if status != 200 {
 		http.Error(w, "event not accepted", status)
 		return
@@ -270,6 +276,10 @@ func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {
 	hash := sha256.Sum256(body)
 	payloadHash := hex.EncodeToString(hash[:])
 	_, err = tx.Exec("INSERT INTO stripe_events(event_id,event_type,payload_hash,received_at) VALUES(?,?,?,?)", e.ID, e.Type, payloadHash, s.now().Unix())
+	if err == nil && e.Type == "checkout.session.completed" && s.cfg.Mailer != nil {
+		_, err = tx.Exec(`INSERT OR IGNORE INTO license_mail(event_id,license_id,template_version,state)
+ SELECT ?,license_id,1,'pending' FROM stripe_purchases WHERE session_id=?`, e.ID, o.ID)
+	}
 	if err == nil {
 		err = tx.Commit()
 	}

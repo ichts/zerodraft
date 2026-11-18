@@ -26,6 +26,7 @@ docs/WRITEITDOWN_PLAN.md: 本应用改造为 writeitdown macOS app 的现行计�
 docs/RELEASE_CHECKLIST.md: 直接分发签名/公证/DMG 发布清单，含 Updates（Sparkle）一节：build number 递增、signed-feed 策略、ZIP 载荷、密钥对与 feed/签名校验、先载荷后 feed、feed 200 与缺失文件 404、下载页发布说明版本、universal 与真实窗口证据。
 docs/RELEASE_KEY.md: 船长在发布 Mac 上创建、备份更新签名私钥的完整步骤（generate_keys、公钥进 Info.plist、导出后存 1Password 再删除、绝不入库），以及签名 feed 后该密钥即为永久信任锚、不存在“换钥恢复”路径的契约。
 docs/LAUNCH_PLAN.md: 历史 Zero Draft 发布规划；writeitdown 当前分发与视觉方向见 `docs/WRITEITDOWN_PLAN.md` 和 `writeitdown/AGENTS.md`。
+Sources/FirstLine/Licensing/ActivationLink.swift: `writeitdown://activate#key=` 的唯一校验器；AppState.receiveActivationLink 只预填激活卡、不自动激活、不打断进行中的写作，契约见 LICENSE_PAYMENT_SPEC 的 Activation link。
 docs/LICENSE_PAYMENT_SPEC.md: 签名许可服务、Mac 激活及真实订单发布门槛；支付适配器契约见 `services/license/README.md`。
 docs/LAUNCH_TODO.md、docs/POLAR_PRODUCT_CHECKLIST.md、docs/POLAR_OWNER_STEPS.md: 历史 Dodo/Polar 发布材料，不适用于当前签名许可服务。
 docs/MANUAL_QA.md: 历史检查清单与按批次记录的窗口 QA 结果；行为验收以 `../../../docs/wid-mac-behavior.md` 为准，视觉验收以 `docs/WRITEITDOWN_PLAN.md` 第 6 节为准。

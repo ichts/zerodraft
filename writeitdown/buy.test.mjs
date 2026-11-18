@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 const script = new vm.Script(await readFile(new URL('./buy.js', import.meta.url), 'utf8'));
 const cleanURL = 'https://writeitdown.app/mac.html';
 
-async function deliver(licenseKey, { succeed = true, failures = 0 } = {}) {
+async function deliver(licenseKey, { succeed = true, failures = 0, url = 'https://writeitdown.app/mac.html?session_id=cs_test_fixture' } = {}) {
   const nodes = new Map();
   const copies = [];
   const replacements = [];
@@ -35,10 +35,7 @@ async function deliver(licenseKey, { succeed = true, failures = 0 } = {}) {
     // finds nothing here and these tests stay about the credential and key paths.
     document: { getElementById: element, querySelector: () => null, fonts: { ready: Promise.resolve() } },
     window: { addEventListener() {} },
-    location: {
-      search: '?session_id=cs_test_fixture',
-      href: 'https://writeitdown.app/mac.html?session_id=cs_test_fixture',
-    },
+    location: new URL(url),
     history: { state: null, replaceState: (...args) => replacements.push(args[2]) },
     navigator: { clipboard: { writeText: async text => copies.push(text) } },
     fetch,
@@ -94,5 +91,41 @@ test('a failed delivery keeps the credential so Check again retries from memory'
   assert.equal(page.element('license-retry-row').hidden, true);
   assert.equal(page.fetches.length, 2);
   for (const url of page.fetches) assert.match(url, /session_id=cs_test_fixture/);
-  assert.deepEqual(page.replacements, [cleanURL, cleanURL]);
+  assert.deepEqual(page.replacements, [cleanURL]);
+});
+
+test('email activation consumes the fragment without fetching or persisting the key', async () => {
+  const page = await deliver(null, { url: `${cleanURL}#activate=cs_test_email_fixture` });
+  assert.equal(page.element('license-key').textContent, 'cs_test_email_fixture');
+  assert.equal(page.element('activate-license').href, 'writeitdown://activate#key=cs_test_email_fixture');
+  assert.equal(page.element('activate-license').hidden, false);
+  assert.deepEqual(page.fetches, []);
+  assert.deepEqual(page.replacements, [cleanURL]);
+  await page.element('copy-license').listeners.click();
+  assert.deepEqual(page.copies, ['cs_test_email_fixture']);
+});
+
+for (const fragment of ['activate=javascript:alert(1)', 'activate=', 'activate=cs_test_one&activate=cs_test_two', 'activate=cs_test_one&session_id=cs_test_two']) {
+  test(`invalid or ambiguous email fragment stays inert: ${fragment}`, async () => {
+    const page = await deliver(null, { url: `${cleanURL}#${fragment}` });
+    assert.equal(page.element('license-result').hidden, true);
+    assert.equal(page.element('activate-license').hidden, true);
+    assert.deepEqual(page.fetches, []);
+    assert.deepEqual(page.replacements, [cleanURL]);
+  });
+}
+
+test('bare #activate anchor stays a plain in-page anchor', async () => {
+  const page = await deliver(null, { url: `${cleanURL}#activate` });
+  assert.equal(page.element('license-result').hidden, true);
+  assert.equal(page.element('license-status').textContent, '');
+  assert.deepEqual(page.fetches, []);
+  assert.deepEqual(page.replacements, []);
+});
+
+test('Stripe fragment return fetches the credential once and offers the app handoff', async () => {
+  const page = await deliver('cs_live_fixture', { url: `${cleanURL}#session_id=cs_live_fixture` });
+  assert.equal(page.element('activate-license').href, 'writeitdown://activate#key=cs_live_fixture');
+  assert.equal(page.fetches.length, 1);
+  assert.deepEqual(page.replacements, [cleanURL]);
 });

@@ -40,7 +40,7 @@
 <script src="buy.js"></script>
 <script>
 // The purchase page never receives the checkout return, so it never carries a buyer credential: only
-// mac.html?session_id=... suppresses the beacon. Count this page's visit like every other page.
+// a mac.html purchase return (#session_id=..., #activate=...) suppresses the beacon. Count this page's visit like every other page.
 const beacon = document.createElement('script');
 beacon.type = 'module';
 beacon.src = 'https://static.cloudflareinsights.com/beacon.min.js';

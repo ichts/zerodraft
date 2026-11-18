@@ -36,6 +36,10 @@ Successful renewal replaces the persisted token only after checking signature, p
 
 The Buy action does not open `WIDCheckoutURL` directly. `HostedCheckoutClient` POSTs to `{WIDLicenseServiceURL}/api/v1/checkout` with `Accept: application/json`, no request body, no cookie jar and no buyer credential, and refuses HTTP redirects. A 200 response is accepted only when it contains a string `url` on `https://checkout.stripe.com` with no user or password; the app opens that URL in the system browser. Any transport error, non-200 status, malformed body or invalid destination opens `WIDCheckoutURL` (the public `mac.html`) instead. The hosted URL and buyer session identifier are never logged. Tests use URLProtocol fixtures and never create a real charge. Checkout success is not purchase evidence; the genuine TEST gate remains below.
 
+## Activation link
+
+The app registers the `writeitdown` URL scheme (`CFBundleURLTypes`). `writeitdown://activate#key=<key>` is the only accepted shape (`Licensing/ActivationLink.swift`): host `activate`, no path, query, user or port, and exactly one `key` fragment item shaped like a Checkout session id (`cs_test_` or `cs_live_`, at most 100 characters). The key lives in the fragment, never in a query, a log or an error. A valid link only pre-fills the license field of the activation card; the writer still presses Activate, and the key is held in memory only. A live writing session is never interrupted: the app neither navigates nor comes to front, and the key waits for the next activation card. A Mac that is already licensed ignores the link. The link ships with the next captain-signed release; earlier builds ignore it and the `mac.html` copy-key path still works.
+
 ## Service wire contract
 
 `WaffoLicenseClient` uses `URLSession`, POST and JSON, without an Authorization header. Redirects are refused so order numbers and tokens cannot be forwarded to another origin.

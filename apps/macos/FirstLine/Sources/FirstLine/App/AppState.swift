@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
- * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用（`trialBudgetSpent` 让停止屏说出真实的重启阻断原因）、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
+ * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用（`trialBudgetSpent` 让停止屏说出真实的重启阻断原因）、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、writeitdown://activate 链接只预填激活卡（receiveActivationLink，写作中保留到下一张卡）、Waffo 签名 token 持久化
  * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
@@ -124,6 +124,7 @@ final class AppState {
     var licenseActivationError: LicenseActivationError?
     var licenseActivationJustSucceeded = false
     private(set) var checkoutInFlight = false
+    private(set) var pendingActivationKey: String?
 
     init(
         sessionEngine: SessionEngine = SessionEngine(),
@@ -327,6 +328,21 @@ final class AppState {
 
     func openWebTrial() {
         openExternalURL(Self.webTrialURL)
+    }
+
+    /// A key delivered by the `writeitdown://activate` link. It only pre-fills the activation card; the
+    /// writer still presses Activate. A live session is never interrupted: the key waits for the next
+    /// card, and a Mac that is already licensed ignores the link.
+    func receiveActivationLink(_ url: URL) {
+        guard let key = ActivationLink.key(from: url), !hasFullAccess else { return }
+        pendingActivationKey = key
+        guard !isWritingSessionActive else { return }
+        selectedSurface = .upgrade
+    }
+
+    func takePendingActivationKey() -> String? {
+        defer { pendingActivationKey = nil }
+        return pendingActivationKey
     }
 
     func openLicenseHelp() {

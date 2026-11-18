@@ -1,8 +1,7 @@
 // Checkout and key delivery for the purchase path, in one file because both pages share it: buy.html
 // carries the checkout form, and mac.html - the checkout's fixed return URL - carries the delivery card.
-// Each half runs only on the page that has its DOM. The session credential is read once into page memory;
-// the address bar and history keep it only until the license response arrives, then drop it on success
-// and failure alike. Keys stay in page memory only.
+// Return credentials and email activation fragments are consumed into page memory and removed from
+// the address bar immediately. No credential is persisted or sent as a referrer.
 (() => {
   const form = document.getElementById('buy-form');
   // The licence service, named once: the checkout form on buy.html posts to it, and the key is fetched
@@ -94,29 +93,27 @@
     });
   }
 
-  const session = new URLSearchParams(location.search).get('session_id');
-  if (!session) return;
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const session = fragment.get('session_id') || new URLSearchParams(location.search).get('session_id');
+  const hasActivation = /(^|&)activate=/.test(location.hash.slice(1));
+  const activation = fragment.get('activate');
+  if (!session && !hasActivation) return;
 
-  // The credential is the only bearer protection for a buyer's key, so no page keeps it in the address
-  // bar, in history or in a bookmarked URL. Only the checkout's fixed return page can render a key; any
-  // other page drops the credential at once instead of carrying it.
-  function clearCredential() {
-    const clean = new URL(location.href);
-    clean.searchParams.delete('session_id');
-    history.replaceState(history.state, '', clean.href);
-  }
+  const clean = new URL(location.href);
+  clean.searchParams.delete('session_id');
+  if (hasActivation || fragment.has('session_id')) clean.hash = '';
+  history.replaceState(history.state, '', clean.href);
 
   const card = document.getElementById('license-delivery');
-  if (!card) {
-    clearCredential();
-    return;
-  }
+  if (!card) return;
 
   const status = document.getElementById('license-status');
   const key = document.getElementById('license-key');
   const result = document.getElementById('license-result');
   const retryRow = document.getElementById('license-retry-row');
   const retry = document.getElementById('retry-license');
+  const activate = document.getElementById('activate-license');
+  const appKey = value => /^cs_(test_|live_)[A-Za-z0-9_]+$/.test(value) && value.length <= 100;
   let deliveredKey = '';
   let latestRequest = 0;
 
@@ -127,6 +124,16 @@
     status.textContent = 'Checking your license...';
     result.hidden = true;
     retryRow.hidden = true;
+  }
+
+  function showKey(value) {
+    deliveredKey = value;
+    key.textContent = value;
+    status.textContent = 'Your license key is ready.';
+    activate.hidden = !appKey(value);
+    if (!activate.hidden) activate.href = `writeitdown://activate#key=${encodeURIComponent(value)}`;
+    result.hidden = false;
+    sizeLabelFloors();
   }
 
   async function loadLicense() {
@@ -143,11 +150,7 @@
       const candidate = typeof licenseKey === 'string' ? licenseKey.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '') : '';
       if (!candidate) throw new Error('License unavailable');
       if (request !== latestRequest) return;
-      deliveredKey = candidate;
-      key.textContent = deliveredKey;
-      status.textContent = 'Your license key is ready.';
-      result.hidden = false;
-      sizeLabelFloors();
+      showKey(candidate);
     } catch {
       if (request !== latestRequest) return;
       status.textContent = 'Your license is not ready yet.';
@@ -156,7 +159,6 @@
       if (request === latestRequest) {
         retry.disabled = false;
         retry.removeAttribute('aria-busy');
-        clearCredential();
       }
     }
   }
@@ -172,5 +174,8 @@
   });
 
   retry.addEventListener('click', loadLicense);
-  loadLicense();
+  if (hasActivation) {
+    if (!session && fragment.getAll('activate').length === 1 && appKey(activation)) showKey(activation);
+    else status.textContent = 'Your license is not ready yet.';
+  } else loadLicense();
 })();

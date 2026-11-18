@@ -1,7 +1,7 @@
 /**
  * [INPUT]: AppKit, AppState, license activation state, checkout state and DesignSystem tokens.
  * [OUTPUT]: Activation/paywall white card with key field, Activate, Buy (absent when checkout is unavailable, disabled while a check runs), price line, the checkout/Stripe note next to Buy, the 48 pt `Try the free web room` route, the 560 pt resting (not fixed) card width and live states.
- * [POS]: writeitdown AppKit license gate; POST checkout via AppState with mac.html fallback.
+ * [POS]: writeitdown AppKit license gate; takes a key pending from the activation link into the field (never activates by itself); POST checkout via AppState with mac.html fallback.
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  */
 
@@ -162,6 +162,7 @@ final class UpgradeViewController: NSViewController {
     }
 
     private func refreshLicense() {
+        if let key = appState.takePendingActivationKey() { licenseField.stringValue = key }
         let active = appState.hasFullAccess
         titleLabel.stringValue = active ? "Write It Down" : "Activate Write It Down"
         subtitleLabel.stringValue = active
@@ -222,6 +223,7 @@ final class UpgradeViewController: NSViewController {
             _ = self.appState.licenseActivationError
             _ = self.appState.settings
             _ = self.appState.trialAccessError
+            _ = self.appState.pendingActivationKey
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }

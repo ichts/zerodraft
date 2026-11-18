@@ -33,7 +33,7 @@ test('Mac page offers the free trial and real Buy without dead or fake CTAs', as
   // checkout. This page stays because it is the checkout's fixed return URL and the key is delivered here.
   await expect(page.locator('[data-launch="checkout"]'), 'the docs page links to the sale, it does not run it').toHaveCount(0);
   await expect(page.locator('#buy').getByRole('link', { name: 'Buy', exact: true }), 'the card links to the purchase page').toHaveAttribute('href', 'buy.html');
-  await expect(page.locator('[data-launch="license"]')).toContainText("paste it into the app's activation field");
+  await expect(page.locator('[data-launch="license"]')).toContainText("paste the key into the app's activation field");
   await expect(page.locator('#waitlist-form')).toHaveCount(0);
   await expect(page.locator('#buy').getByRole('link', { name: 'Download free trial', exact: true })).toHaveAttribute('href', 'download/');
   await expect(page.locator('#buy-heading')).toHaveText('Buy Write It Down');

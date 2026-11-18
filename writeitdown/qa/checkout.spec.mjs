@@ -82,7 +82,7 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   expect(await page.evaluate(() => [...document.scripts].some(script => script.src.includes('cloudflareinsights')))).toBe(false);
   expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['writeitdown-theme']);
   await expect(page.locator('#license-result')).toContainText("Paste this key into the app's activation field.");
-  await expect(page.locator('#license-result')).toContainText('Save this key; this page will not show it again.');
+  await expect(page.locator('#license-result')).not.toContainText('will not show it again');
   await expect(page.locator('#license-retry-row')).toBeHidden();
   await credentialCleared(page);
   const copy = page.getByRole('button', { name: 'Copy license key', exact: true });
@@ -94,6 +94,28 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   await page.screenshot({ path: info.outputPath('paid-license.png'), fullPage: true });
   await page.goBack();
   await expect(page).toHaveURL(/\/index\.html$/);
+});
+
+test('the emailed activation link shows the key and the app button without any request', async ({ page }) => {
+  const appKey = 'cs_test_emailed_fixture';
+  const requests = [];
+  page.on('request', request => requests.push(request.url()));
+  await page.goto(`mac.html#activate=${appKey}`);
+  await expect(page.locator('#license-key')).toHaveText(appKey);
+  const activate = page.getByRole('link', { name: 'Activate in the app', exact: true });
+  await expect(activate).toBeVisible();
+  await expect(activate).toHaveAttribute('href', `writeitdown://activate#key=${appKey}`);
+  expect(await activate.getAttribute('rel')).toContain('noreferrer');
+  expect(new URL(page.url()).hash, 'key left in the address bar').toBe('');
+  expect(requests.filter(url => url.includes('licenses.writeitdown.app') || url.includes(appKey)), 'key sent over the network').toEqual([]);
+  await expect(page.getByRole('button', { name: 'Copy license key', exact: true })).toBeVisible();
+});
+
+test('a malformed activation fragment shows no key and no app button', async ({ page }) => {
+  await page.goto('mac.html#activate=javascript:alert(1)');
+  await expect(page.locator('#license-status')).toContainText(neutral);
+  await expect(page.getByRole('link', { name: 'Activate in the app', exact: true })).toBeHidden();
+  await noKey(page);
 });
 
 test('a key padded by the service is displayed and copied without the padding', async ({ page, context }) => {

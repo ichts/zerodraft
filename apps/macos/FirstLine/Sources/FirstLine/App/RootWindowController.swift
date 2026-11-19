@@ -19,6 +19,7 @@ final class RootWindowController: NSWindowController {
     let appState: AppState
     let container: RootContainerViewController
     var programmaticFullScreenExitPending = false
+    private var lightPlacementPending = false
     func copyKeptText() { container.copyKeptText() }
     func refreshRoom() { container.refreshRoom() }
 
@@ -53,6 +54,7 @@ final class RootWindowController: NSWindowController {
         window.setFrame(NSRect(x: 0, y: 0, width: 1040, height: 720), display: false)
         window.center()
         Self.placeTrafficLights(window)
+        followTrafficLights(of: window)
         applyTheme()
         container.show(appState.selectedSurface)
         armSurfaceObservation()
@@ -89,21 +91,52 @@ final class RootWindowController: NSWindowController {
     /// The system puts the lights 6-8 pt from the window corner, which on a clear window leaves them floating
     /// over the wallpaper, straddling the paper's left edge, with a gutter above the paper twice as deep as the
     /// other three. They are moved into the paper's top gutter instead: vertically centred in its 32 pt, the red
-    /// light's left edge on the paper's left edge, the system's own spacing between the three kept. Idempotent:
-    /// the spacing is read from the current frames, so a re-run after the system re-lays the title bar (resize,
-    /// key changes) lands on the same place.
+    /// light's left edge on the paper's left edge, the system's own spacing between the three kept. The system
+    /// puts them back whenever it re-lays the title bar (resize, key changes, and on macOS 26 once typing
+    /// starts), so this runs again on every frame change of a light; it writes absolute positions, so a run is
+    /// safe at any point of the system's own pass.
     static func placeTrafficLights(_ window: NSWindow) {
-        guard !window.styleMask.contains(.fullScreen),
+        guard !placingTrafficLights, !window.styleMask.contains(.fullScreen),
               let close = window.standardWindowButton(.closeButton),
               let mini = window.standardWindowButton(.miniaturizeButton),
               let zoom = window.standardWindowButton(.zoomButton),
               let frameView = window.contentView?.superview, let host = close.superview else { return }
+        placingTrafficLights = true
+        defer { placingTrafficLights = false }
+        if systemLightStep == nil { systemLightStep = mini.frame.minX - close.frame.minX }
         let gutter = SessionViewController.sheetMargin
-        let step = mini.frame.minX - close.frame.minX
         let centre = host.convert(NSPoint(x: gutter, y: frameView.bounds.maxY - gutter / 2), from: frameView)
         for (index, button) in [close, mini, zoom].enumerated() {
-            let origin = NSPoint(x: centre.x + CGFloat(index) * step, y: centre.y - button.frame.height / 2)
+            let origin = NSPoint(x: centre.x + CGFloat(index) * (systemLightStep ?? 0), y: centre.y - button.frame.height / 2)
             if button.frame.origin != origin { button.setFrameOrigin(origin) }
+        }
+    }
+
+    private static var placingTrafficLights = false
+    /// The system's spacing between the lights, read once from its own layout before the first move.
+    private static var systemLightStep: CGFloat?
+
+    private func followTrafficLights(of window: NSWindow) {
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let button = window.standardWindowButton(kind) else { continue }
+            button.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(lightMoved(_:)),
+                                                   name: NSView.frameDidChangeNotification, object: button)
+        }
+    }
+
+    /// A light moved while the system was still laying the title bar out, so the other two may be about to move
+    /// too; placing now would be overwritten (macOS 26 left the green light under the yellow one). The placement
+    /// waits for the end of the system's pass, still in the same run-loop turn, before anything is drawn.
+    @objc private func lightMoved(_ notification: Notification) {
+        guard !lightPlacementPending, !Self.placingTrafficLights else { return }
+        lightPlacementPending = true
+        RunLoop.main.perform(inModes: [.common]) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lightPlacementPending = false
+                if let window = self.window { Self.placeTrafficLights(window) }
+            }
         }
     }
 

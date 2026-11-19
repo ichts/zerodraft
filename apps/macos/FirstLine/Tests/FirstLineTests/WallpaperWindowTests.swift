@@ -106,11 +106,24 @@ struct WallpaperWindowTests {
         }
         #expect(abs(frames[0].minX - paperFrame.minX) < 0.5, "red light on the paper's left edge")
         #expect(frames[0].maxX < frames[1].minX && frames[1].maxX < frames[2].minX, "system order and spacing kept")
+        // The system puts the lights back at its own spots whenever it re-lays the title bar (seen on macOS 26
+        // the moment typing starts); they follow it to the gutter again without being asked.
+        for kind in kinds {
+            let button = try #require(window.standardWindowButton(kind))
+            button.setFrameOrigin(NSPoint(x: button.frame.minX - 24, y: button.frame.minY + 4))
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))  // the end of the system's pass, same turn on screen
+        let red = try #require(window.standardWindowButton(.closeButton))
+        let reset = try kinds.map { kind -> NSRect in
+            let button = try #require(window.standardWindowButton(kind))
+            return button.convert(button.bounds, to: nil)
+        }
+        #expect(abs(reset[0].minX - 32) < 0.5, "back in the gutter after a system reset")
+        #expect(abs(reset[1].minX - frames[1].minX) < 0.5 && abs(reset[2].minX - frames[2].minX) < 0.5,
+                "the three keep the system's spacing, none lands under another")
         // A resize re-lays the title bar; the lights land back in the same place.
         window.setFrame(NSRect(x: 0, y: 0, width: 1200, height: 800), display: true)
         window.contentView?.layoutSubtreeIfNeeded()
-        RootWindowController.placeTrafficLights(window)
-        let red = try #require(window.standardWindowButton(.closeButton))
         let after = red.convert(red.bounds, to: nil)
         #expect(abs(after.minX - 32) < 0.5)
         #expect(abs((window.frame.height - after.midY) - 16) < 0.5)

@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、App/AppState、App/RootWindowController、App/MainMenuBuilder、Update/UpdateController
  * [OUTPUT]: 纯 AppKit 入口、AppDelegate 菜单动作与验证；main() 在任何窗口绘制前先调用 TextSmoothing.matchWeb()（关闭 CoreText 字体平滑，D-098）
- * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…
+ * [POS]: 建立 NSApplication、菜单与主窗口；生产应用注入 Waffo-backed client 并启动缓存许可校验；无试用余额且未激活时禁用写作/Home/Settings 菜单，新篇命令同步清理房间、路由复制与设置；真实 .app 内启动 Sparkle 更新器，Session 房间显示时禁用 Check for Updates…；applicationShouldTerminate 与 Begin/Home 菜单在有未保留草稿时先走房间的两步退出确认（D-118）
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
  * 重写决策：删去 SwiftUI `@main struct FirstLineApp: App`。纯 AppKit 启动由
@@ -60,19 +60,32 @@ final class FirstLineAppDelegate: NSObject, NSApplicationDelegate {
         true
     }
 
+    /// Quit (Cmd+Q, the Dock, a quit from another app) is the same loss as closing the window: an unkept draft
+    /// asks first, in the room. The app comes forward so the question is seen.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if rootWindowController?.mayAbandonDraft() ?? true { return .terminateNow }
+        rootWindowController?.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        return .terminateCancel
+    }
+
     // MARK: - Menu actions (target-action bridge to AppState)
 
     @objc func newPiece(_ sender: Any?) {
+        guard rootWindowController?.mayAbandonDraft() ?? true else { return }
         appState.newPiece()
         rootWindowController?.refreshRoom()
     }
     @objc func copyKept(_ sender: Any?) { rootWindowController?.copyKeptText() }
-    @objc func closeWindow(_ sender: Any?) { rootWindowController?.window?.performClose(sender) }
+    @objc func closeWindow(_ sender: Any?) { rootWindowController?.closeWindow() }
     @objc func openWriting(_ sender: Any?) {
         appState.openWritingMode()
         rootWindowController?.refreshRoom()
     }
-    @objc func goHome(_ sender: Any?) { appState.goHome() }
+    @objc func goHome(_ sender: Any?) {
+        guard rootWindowController?.mayAbandonDraft() ?? true else { return }
+        appState.goHome()
+    }
     @objc func openSettings(_ sender: Any?) { appState.openSettings() }
     @objc func terminateApp(_ sender: Any?) { NSApp.terminate(nil) }
     @objc func checkForUpdates(_ sender: Any?) { updateController?.checkForUpdates() }

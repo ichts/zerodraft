@@ -25,6 +25,8 @@ final class RootContainerViewController: NSViewController {
 
     func copyKeptText() { (current as? SessionViewController)?.copyKeptText() }
     func refreshRoom() { (current as? SessionViewController)?.refreshRoom() }
+    /// Only the room can ask; any other surface has nothing to confirm on.
+    func confirmDeparture() -> Bool { (current as? SessionViewController)?.confirmDeparture() ?? true }
 
     init(appState: AppState, updateSettings: (any UpdateSettings)? = nil) {
         self.appState = appState

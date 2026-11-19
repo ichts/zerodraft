@@ -2475,7 +2475,6 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   `WallpaperWindowTests.trafficLightsSitInThePapersTopGutterAlignedToItsLeftEdge`; Tart macOS 15.7.7 and 26.6.2
   before/after captures in the PR (`data/wid-mac-traffic-light/`).
 
-
 ## D-117: The landing demo can be heard, in the Nib set, off until the visitor turns it on
 
 - Date: 2026-11-19. Captain: picked the Nib (steel pen) set after auditioning three sets (Nib, Pencil, Wood) and off.
@@ -2497,3 +2496,25 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 - Tests: `writeitdown/sound-cues.test.mjs` (the cues of one whole loop, the silent refusal, the resumed tab),
   `qa/sound.spec.mjs` (off at load, gesture first, gain and slider law, keyboard, Reduce Motion, silent room, no other
   script loads it), `qa/test-install.py` (the sound files ship). Sources and licences: `writeitdown/sound/SOURCES.md`.
+
+## D-118: Closing, quitting, Begin and Home over an unkept draft ask first, in the room's own two acts
+
+- Date: 2026-11-19
+- Decision: while a session is running and the writer has typed (the first input has landed), Cmd+W and the red
+  light, Cmd+Q (and a quit from the Dock), Cmd+N (Begin) and Cmd+0 (Home) no longer delete the draft in one act.
+  Each shows the room's existing confirmation, `Press Esc again to leave and delete the draft.`, and does
+  nothing else; the same act again inside the same two seconds is the writer confirming and goes through. Esc,
+  `Esc to exit` and these four share one `ExitConfirmation`, so Esc followed by Cmd+W confirms too, and typing
+  cancels it. Nothing asks when there is nothing to lose: before the first input, in the stopped room (the draft
+  is already deleted) and in the kept room (the text is the writer's to copy). A session left running behind
+  Settings is brought back to the room first, because that is where the question lives. Cmd+W now reaches the
+  window in a live room (it did nothing there while the lights were hidden). A confirmed close deletes the draft
+  before the window goes, so the quit that follows has nothing left to ask. No new copy: the phrase is the shipped
+  one (D-062, the web room's Q-29).
+- Reason: the 1.1 Mac build quit and discarded the draft on Cmd+Q, on the red light and on Cmd+W from Settings,
+  and Cmd+N and Cmd+0 restarted or left the room, with no question. The web room already refuses any
+  one-act departure (Q-29), so the Mac was the surface that lost a writer's words by a slip of the left hand.
+- Supersedes: nothing. It extends the two-act exit (D-062) from Esc and click to every other act that ends a live
+  session.
+- Evidence: `QuitGuardTests` (10 cases); Tart macOS 15.7.7 and 26.6.2 real-HID before/after captures in the PR
+  (`data/wid-mac-quit-guard/`).

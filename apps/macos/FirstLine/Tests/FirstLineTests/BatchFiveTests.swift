@@ -380,6 +380,11 @@ struct KeyboardFlowTests {
         let delegate = FirstLineAppDelegate(appState: state, windowController: windowController)
         let menu = MainMenuBuilder.buildMenu(appState: state, validationOwner: delegate)
         let command = try #require(menu.items.last?.submenu?.items.first { $0.keyEquivalent == "n" })
+        if !fromKept {
+            // A live draft asks first (QuitGuardTests); the repeat inside the window is the confirmation.
+            #expect(NSApplication.shared.sendAction(command.action!, to: command.target, from: command))
+            #expect(engine.text == "private old draft")
+        }
         #expect(NSApplication.shared.sendAction(command.action!, to: command.target, from: command))
         #expect(engine.text.isEmpty)
         #expect(engine.wordCount == 0)

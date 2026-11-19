@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
  * [OUTPUT]: 主窗口（无自身底色：透明窗口、透明标题栏（无分隔线、隐藏系统顶边高光）、桌面壁纸透出，D-102；红黄绿灯移入纸张顶部 32 pt 留白、红灯左缘对齐纸张左缘，D-116）、surface 路由、theme/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
- * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
+ * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface；NSWindowDelegate.windowShouldClose 与 mayAbandonDraft：关窗、退出、Begin、Home 在有未保留草稿时先要房间的两步确认（D-118）
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
@@ -23,6 +23,19 @@ final class RootWindowController: NSWindowController {
     func copyKeptText() { container.copyKeptText() }
     func refreshRoom() { container.refreshRoom() }
 
+    /// Whether the writer's unkept draft may be thrown away right now. With nothing unkept the answer is always
+    /// yes. Otherwise the room asks with its own two-act exit confirmation (the shipped wording) and answers no
+    /// until the writer repeats the act. A session left running behind Settings is brought back to the room
+    /// first, because the confirmation lives there.
+    func mayAbandonDraft() -> Bool {
+        guard appState.hasUnkeptDraft else { return true }
+        if appState.selectedSurface != .session {
+            appState.openWritingMode()
+            swapToSurface(appState.selectedSurface)
+        }
+        return container.confirmDeparture()
+    }
+
     init(appState: AppState, updateSettings: (any UpdateSettings)? = nil) {
         self.appState = appState
         self.container = RootContainerViewController(appState: appState, updateSettings: updateSettings)
@@ -38,6 +51,7 @@ final class RootWindowController: NSWindowController {
         Self.letWallpaperShow(window)
 
         super.init(window: window)
+        window.delegate = self
         NotificationCenter.default.addObserver(self, selector: #selector(didExitFullScreen(_:)),
                                                name: NSWindow.didExitFullScreenNotification, object: window)
         NotificationCenter.default.addObserver(self, selector: #selector(willEnterFullScreen(_:)),
@@ -282,5 +296,24 @@ extension RootWindowController: NSMenuItemValidation {
         case #selector(redo(_:)): return firstResponderUndoManager?.canRedo ?? false
         default: return true
         }
+    }
+}
+
+// MARK: - Closing the window
+
+extension RootWindowController: NSWindowDelegate {
+    /// Cmd+W. `performClose` is a no-op while the room hides the traffic lights, which left the key dead in a live
+    /// room; asking the delegate directly makes the key work everywhere and keeps the draft question in one place.
+    func closeWindow() {
+        guard let window, windowShouldClose(window) else { return }
+        window.close()
+    }
+
+    /// Closing the last window quits the app, so it is the same loss as quitting: an unkept draft asks first.
+    /// A confirmed close deletes the draft here, so the quit that follows has nothing left to ask about.
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        guard mayAbandonDraft() else { return false }
+        if appState.hasUnkeptDraft { appState.abandonSession() }
+        return true
     }
 }

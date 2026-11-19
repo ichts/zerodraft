@@ -1,7 +1,7 @@
 /**
  * [INPUT]: 依赖 SessionEngine、SettingsStore、LicenseClient、CheckoutClient 管理应用状态
  * [OUTPUT]: 提供 Surface 与 AppState，三次会话试用（`trialBudgetSpent` 让停止屏说出真实的重启阻断原因）、耗尽后的激活入口、in-app hosted checkout 与公开 Mac 页回退、Waffo 签名 token 持久化
- * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface
+ * [POS]: 试用首个非空输入前持久扣次，失败后仅非空输入重启，空组字清理不重启；耗尽后拒绝启动先清空会话再进激活页且 canUseApp 为 false；已有许可记录不可回退试用；本地许可门槛不等待后台重验，完整契约见 docs/LICENSE_PAYMENT_SPEC.md 的 Entitlement and persisted state；Home/Exit 清空草稿，锁定会话选择，Settings 返回原 surface；hasUnkeptDraft：首个输入后仍在走的会话，关窗/退出/Begin/Home 的确认条件（D-118）
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
@@ -264,6 +264,12 @@ final class AppState {
 
     var sessionIsRunning: Bool {
         sessionEngine.phase == .writing || sessionEngine.phase == .danger
+    }
+
+    /// 写作者已经开始、还没有任何东西被保留的草稿：首个输入之后仍在走的会话（含离开房间去 Settings 的）。
+    /// 失败后草稿已被擦除、成稿后草稿已被保留，两者都不算；关窗、退出、新篇、回首页只在它为真时要确认。
+    var hasUnkeptDraft: Bool {
+        sessionIsRunning && sessionEngine.hasStarted
     }
 
     /// 更新界面绝不能在写作可能仍在进行时出现：整个 Session 房间（空、写作、警告、失败、成稿），

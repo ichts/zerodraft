@@ -12,7 +12,7 @@ source = Path(__file__).resolve().parents[1]
 files = {
     'download/index.html', 'index.html', 'buy.html', 'mac.html', 'privacy.html',
     'terms.html', 'impressum.html', 'support.html', 'site.css', 'tokens.css',
-'theme.js', 'paper-render.js', 'paper.js', 'demo.js',
+'theme.js', 'paper-render.js', 'paper.js', 'demo.js', 'sound.js', 'sound-cues.mjs',
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
     'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html',
     'write-it-down-free-trial.html', 'write-it-down-price.html',
@@ -27,6 +27,7 @@ fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/reenie-beanie.woff2',
          'fonts/OFL-Newsreader.txt', 'fonts/OFL-ZhuqueFangsong.txt', 'fonts/OFL-ReenieBeanie.txt'}
 fonts |= {'fonts/zhuque-fangsong-gb2312.woff2'}
 files |= fonts
+files |= {'sound/SOURCES.md', *(f'sound/nib-key-{i}.wav' for i in range(1, 9)), *(f'sound/nib-warn-{i}.wav' for i in range(1, 4)), 'sound/nib-wipe-1.wav'}
 # Host files a page may link that no deploy bundle contains: the archived 1.0 disk image lives in
 # download/releases/ on the host, outside the installed set (README, "The 1.0 archive").
 host_artifacts = {'download/releases/Write-It-Down-1.0.dmg'}

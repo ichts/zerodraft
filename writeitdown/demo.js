@@ -2,6 +2,8 @@ import { LINES, TIMELINE } from './demo-timeline.mjs';
 import { wordCount } from './session.mjs';
 import { denyFeedback, LINE_SHIFT_MS, lineShiftProgress } from './feedback.js';
 import { statusSlot } from './status-slot.js';
+import { cuesBetween } from './sound-cues.mjs';
+import { landingSound } from './sound.js';
 
 (function () {
   "use strict";
@@ -145,9 +147,17 @@ import { statusSlot } from './status-slot.js';
     lastT = t;
   }
 
+  // The sound follows the same absolute clock as the picture: a cue is owed once, when t crosses its moment.
+  var soundT = null;
+  function renderSound(t) {
+    if (soundT !== null && t >= soundT) landingSound.cue(cuesBetween(soundT, t, EVENTS, SILENT_END, WARN_END));
+    soundT = t;
+  }
+
   function render(t) {
     if (t < lastT) lastT = -1;
     renderDeny(t);
+    renderSound(t);
     if (t < WARN_END) startBar();
     else {
       if (barAnimation) barAnimation.cancel();
@@ -220,12 +230,13 @@ import { statusSlot } from './status-slot.js';
     if (document.hidden || document.getElementById('landing').hidden) {
       visible = false;
       barDeadline = null;
+      soundT = null;
       return;
     }
     resuming = !visible;
     visible = true;
     if (resuming) slot.invalidate();
-    if (reducedMq.matches) { renderReduced(); return; }
+    if (reducedMq.matches) { soundT = null; renderReduced(); return; }
     render((Date.now() - t0) % LOOP);
   }
 

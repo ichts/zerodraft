@@ -68,12 +68,12 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
         liveResizeObserver = nil
     }
 
-    /// The room's paper is the content area inset 32 pt on every side (SessionViewController.buildRoom). The
+    /// The room's paper is the window inset 32 pt on every side (SessionViewController.buildRoom). The
     /// picker renders that sheet in the background while the writer chooses, so Begin shows the finished
     /// paper on its first frame instead of building the texture on the click (D-096).
     func prewarmRoomPaper() {
         guard let window = view.window else { return }
-        let area = view.safeAreaRect.insetBy(dx: 32, dy: 32)
+        let area = view.bounds.insetBy(dx: 32, dy: 32)
         let scale = window.backingScaleFactor
         let dark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         PaperSheetCache.shared.prewarm(width: Int((area.width * scale).rounded()),

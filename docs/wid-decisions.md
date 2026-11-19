@@ -2451,3 +2451,27 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   visible at 390 where the action is hidden, 44 px hit area, `aria-current` only on `/buy`, one hero action, no
   `.cta-buy`); `qa/mac.spec.mjs` asserts the pair's order, weights and the header sweep (Buy at every width, the
   page action from 460 px); the `buy-page` journey block clicks the header Buy.
+
+## D-116: The Mac traffic lights sit in the paper's top gutter, and the gutter is 32 pt on all four sides
+
+- Date: 2026-11-19
+- Decision: on the clear window (D-102) the red, yellow and green lights no longer float 6 pt (macOS 15) or 8 pt
+  (macOS 26) from the invisible window corner. They move into the paper's top gutter: vertically centred in its
+  32 pt, the red light's left edge on the paper's left edge, the system's own spacing between the three kept. The
+  title bar adds no gutter of its own any more: the room's paper is 32 pt from the window's top edge like it is
+  from the other three, instead of 60 pt (28 pt title bar plus 32 pt) on macOS 15 and 65 pt on macOS 26. The
+  minimum content height is 680 pt again (paper minimum 916 x 616 pt, unchanged); the default 1040 x 720 window
+  gives a paper about one title bar (28 to 33 pt) taller. The pointer zone that brings the lights back is the
+  same 32 pt strip the lights live in. Picker, rules, settings and activation cards stay centred as they were.
+  Typing still hides the lights and the title strip, an empty, stopped or kept room, or leaving the room brings
+  them back (D-102).
+- Reason: the audit (1118) measured the lights floating in the wallpaper, 41 to 49 pt above the paper and
+  straddling its left edge (lights x 208 to 270 against paper x 232 on macOS 26), with a top margin twice the other
+  three. Nothing aligned with anything. Putting them in the gutter makes one margin and one alignment line.
+- Supersedes: D-102's clause that the paper keeps its 32 pt margin from the title bar's bottom edge and that the
+  minimum content height grows by the title bar's height. The clear window, hidden title, no rule, no lit top
+  edge, step-out on first character and return on hover or stop all stand.
+- Evidence: `WallpaperWindowTests.paperSitsTheSameGutterFromAllFourWindowEdges`,
+  `WallpaperWindowTests.trafficLightsSitInThePapersTopGutterAlignedToItsLeftEdge`; Tart macOS 15.7.7 and 26.6.2
+  before/after captures in the PR (`data/wid-mac-traffic-light/`).
+

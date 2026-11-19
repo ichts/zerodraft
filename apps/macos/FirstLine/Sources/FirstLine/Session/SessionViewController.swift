@@ -538,7 +538,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paperShadow.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             paper.leadingAnchor.constraint(equalTo: safe.leadingAnchor, constant: Self.sheetMargin),
             paper.trailingAnchor.constraint(equalTo: safe.trailingAnchor, constant: -Self.sheetMargin),
-            paper.topAnchor.constraint(equalTo: safe.topAnchor, constant: Self.sheetMargin),
+            paper.topAnchor.constraint(equalTo: view.topAnchor, constant: Self.sheetMargin),
             paper.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: -Self.sheetMargin),
             progressBar.leadingAnchor.constraint(equalTo: paper.leadingAnchor),
             progressBar.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
@@ -1110,7 +1110,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     override func mouseMoved(with event: NSEvent) {
         let position = paper.convert(event.locationInWindow, from: nil)
         chromeHover = position.y > paper.bounds.height - 90 || position.y < 90
-        titleBarHover = view.window.map { event.locationInWindow.y > $0.contentLayoutRect.maxY } ?? false
+        titleBarHover = view.window.map { event.locationInWindow.y > $0.frame.height - Self.sheetMargin } ?? false
         applyVisualSettings()
         syncTrafficLights()
     }

@@ -3,8 +3,8 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
-/// D-102: the window has no ground of its own; the paper keeps today's size and place and the writer's desktop
-/// shows around it. Numbers decide; the real-window captures only show what the numbers describe.
+/// D-102: the window has no ground of its own and the writer's desktop shows around the paper; D-116: the lights
+/// live in the paper's top gutter. Numbers decide; the real-window captures only show what the numbers describe.
 @MainActor
 struct WallpaperWindowTests {
     private func controller(surface: Surface) -> (RootWindowController, URL) {
@@ -71,20 +71,62 @@ struct WallpaperWindowTests {
         #expect(decorations(frame).allSatisfy { $0.isHidden }, "AppKit re-shows it on resize and focus changes; the room hides it again")
     }
 
-    @Test func paperKeepsTodaysSizeAndPlaceUnderTheClearTitleBar() throws {
+    @Test func paperSitsTheSameGutterFromAllFourWindowEdges() throws {
         let (controller, root) = controller(surface: .session)
         defer { try? FileManager.default.removeItem(at: root) }
         let window = try #require(controller.window)
         let content = try #require(window.contentView)
         let paper = try #require(descendants(content, PaperSheetView.self).first)
         let frame = paper.convert(paper.bounds, to: nil)
-        let titleBar = window.frame.height - window.contentLayoutRect.height
-        // Today: a 28 pt title bar above, then the 32 pt page gutter on every side of the paper.
+        // The clear title bar adds no gutter of its own: the paper is 32 pt from the top edge like the other three.
         #expect(abs(frame.minX - 32) < 0.5)
         #expect(abs((window.frame.width - frame.maxX) - 32) < 0.5)
         #expect(abs(frame.minY - 32) < 0.5)
-        #expect(abs((window.frame.height - frame.maxY) - (titleBar + 32)) < 0.5)
-        #expect(window.contentMinSize.height - 680 == titleBar)
+        #expect(abs((window.frame.height - frame.maxY) - 32) < 0.5)
+        #expect(window.contentMinSize == NSSize(width: 980, height: 680), "the paper's minimum stays 916 x 616")
+    }
+
+    /// The writer's view: the three lights sit in the paper's top gutter, centred in its 32 pt, the red one on
+    /// the paper's left edge, instead of floating 6-8 pt from the corner over the wallpaper.
+    @Test func trafficLightsSitInThePapersTopGutterAlignedToItsLeftEdge() throws {
+        let (controller, root) = controller(surface: .session)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let window = try #require(controller.window)
+        let content = try #require(window.contentView)
+        let paper = try #require(descendants(content, PaperSheetView.self).first)
+        let paperFrame = paper.convert(paper.bounds, to: nil)
+        let kinds: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+        let frames = try kinds.map { kind -> NSRect in
+            let button = try #require(window.standardWindowButton(kind))
+            return button.convert(button.bounds, to: nil)
+        }
+        for frame in frames {
+            #expect(abs((window.frame.height - frame.midY) - 16) < 0.5, "centred in the 32 pt gutter above the paper")
+            #expect(frame.maxY <= window.frame.height && window.frame.height - frame.minY <= 32 + 0.5, "inside the gutter")
+        }
+        #expect(abs(frames[0].minX - paperFrame.minX) < 0.5, "red light on the paper's left edge")
+        #expect(frames[0].maxX < frames[1].minX && frames[1].maxX < frames[2].minX, "system order and spacing kept")
+        // The system puts the lights back at its own spots whenever it re-lays the title bar (seen on macOS 26
+        // the moment typing starts); they follow it to the gutter again without being asked.
+        for kind in kinds {
+            let button = try #require(window.standardWindowButton(kind))
+            button.setFrameOrigin(NSPoint(x: button.frame.minX - 24, y: button.frame.minY + 4))
+        }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05))  // the end of the system's pass, same turn on screen
+        let red = try #require(window.standardWindowButton(.closeButton))
+        let reset = try kinds.map { kind -> NSRect in
+            let button = try #require(window.standardWindowButton(kind))
+            return button.convert(button.bounds, to: nil)
+        }
+        #expect(abs(reset[0].minX - 32) < 0.5, "back in the gutter after a system reset")
+        #expect(abs(reset[1].minX - frames[1].minX) < 0.5 && abs(reset[2].minX - frames[2].minX) < 0.5,
+                "the three keep the system's spacing, none lands under another")
+        // A resize re-lays the title bar; the lights land back in the same place.
+        window.setFrame(NSRect(x: 0, y: 0, width: 1200, height: 800), display: true)
+        window.contentView?.layoutSubtreeIfNeeded()
+        let after = red.convert(red.bounds, to: nil)
+        #expect(abs(after.minX - 32) < 0.5)
+        #expect(abs((window.frame.height - after.midY) - 16) < 0.5)
     }
 
     @Test func everySurfaceGroundIsClearInAWindowAndPageColourInFullScreen() throws {
@@ -130,7 +172,7 @@ struct WallpaperWindowTests {
         engine.registerCommittedText("I")
         room.refreshRoom()
         #expect(lights() == [0, 0, 0], "typing hides them")
-        let top = NSPoint(x: 400, y: window.frame.height - 6)
+        let top = NSPoint(x: 400, y: window.frame.height - 6)  // inside the 32 pt gutter the lights live in
         room.mouseMoved(with: NSEvent.mouseEvent(with: .mouseMoved, location: top, modifierFlags: [], timestamp: 0,
                                                  windowNumber: window.windowNumber, context: nil, eventNumber: 0,
                                                  clickCount: 0, pressure: 0)!)

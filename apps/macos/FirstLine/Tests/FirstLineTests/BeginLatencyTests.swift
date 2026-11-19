@@ -51,7 +51,7 @@ struct BeginLatencyTests {
         let home = try #require(window.contentViewController?.children.first as? HomeViewController)
         home.view.layoutSubtreeIfNeeded()
         home.viewDidAppear()
-        let area = home.view.safeAreaRect.insetBy(dx: 32, dy: 32)
+        let area = home.view.bounds.insetBy(dx: 32, dy: 32)  // the paper is 32 pt from every window edge (D-116)
         let scale = window.backingScaleFactor
         let dark = home.view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let (w, h) = (Int((area.width * scale).rounded()), Int((area.height * scale).rounded()))

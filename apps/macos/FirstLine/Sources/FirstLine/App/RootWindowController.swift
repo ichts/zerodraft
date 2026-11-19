@@ -1,6 +1,6 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
- * [OUTPUT]: 主窗口（无自身底色：透明窗口、透明标题栏（无分隔线、隐藏系统顶边高光）、桌面壁纸透出，D-102）、surface 路由、theme/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
+ * [OUTPUT]: 主窗口（无自身底色：透明窗口、透明标题栏（无分隔线、隐藏系统顶边高光）、桌面壁纸透出，D-102；红黄绿灯移入纸张顶部 32 pt 留白、红灯左缘对齐纸张左缘，D-116）、surface 路由、theme/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
  * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface
  *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
@@ -19,6 +19,7 @@ final class RootWindowController: NSWindowController {
     let appState: AppState
     let container: RootContainerViewController
     var programmaticFullScreenExitPending = false
+    private var lightPlacementPending = false
     func copyKeptText() { container.copyKeptText() }
     func refreshRoom() { container.refreshRoom() }
 
@@ -52,6 +53,8 @@ final class RootWindowController: NSWindowController {
         Self.hideTitlebarDecoration(window)
         window.setFrame(NSRect(x: 0, y: 0, width: 1040, height: 720), display: false)
         window.center()
+        Self.placeTrafficLights(window)
+        followTrafficLights(of: window)
         applyTheme()
         container.show(appState.selectedSurface)
         armSurfaceObservation()
@@ -78,10 +81,63 @@ final class RootWindowController: NSWindowController {
         window.backgroundColor = NSColor(white: 0, alpha: 1.0 / 255.0)
         window.hasShadow = false
         window.isMovableByWindowBackground = true
-        // contentMinSize counts the clear title bar now; add it back so the paper's minimum stays 980 x 680.
-        let titleBar = max(0, window.frame.height - window.contentLayoutRect.height)
-        window.contentMinSize = NSSize(width: 980, height: 680 + titleBar)
+        // The paper sits 32 pt from the window's top edge like it does from the other three (the lights live in
+        // that gutter), so the content height is the paper's 616 pt minimum plus the two gutters.
+        window.contentMinSize = NSSize(width: 980, height: 680)
         hideTitlebarDecoration(window)
+        placeTrafficLights(window)
+    }
+
+    /// The system puts the lights 6-8 pt from the window corner, which on a clear window leaves them floating
+    /// over the wallpaper, straddling the paper's left edge, with a gutter above the paper twice as deep as the
+    /// other three. They are moved into the paper's top gutter instead: vertically centred in its 32 pt, the red
+    /// light's left edge on the paper's left edge, the system's own spacing between the three kept. The system
+    /// puts them back whenever it re-lays the title bar (resize, key changes, and on macOS 26 once typing
+    /// starts), so this runs again on every frame change of a light; it writes absolute positions, so a run is
+    /// safe at any point of the system's own pass.
+    static func placeTrafficLights(_ window: NSWindow) {
+        guard !placingTrafficLights, !window.styleMask.contains(.fullScreen),
+              let close = window.standardWindowButton(.closeButton),
+              let mini = window.standardWindowButton(.miniaturizeButton),
+              let zoom = window.standardWindowButton(.zoomButton),
+              let frameView = window.contentView?.superview, let host = close.superview else { return }
+        placingTrafficLights = true
+        defer { placingTrafficLights = false }
+        if systemLightStep == nil { systemLightStep = mini.frame.minX - close.frame.minX }
+        let gutter = SessionViewController.sheetMargin
+        let centre = host.convert(NSPoint(x: gutter, y: frameView.bounds.maxY - gutter / 2), from: frameView)
+        for (index, button) in [close, mini, zoom].enumerated() {
+            let origin = NSPoint(x: centre.x + CGFloat(index) * (systemLightStep ?? 0), y: centre.y - button.frame.height / 2)
+            if button.frame.origin != origin { button.setFrameOrigin(origin) }
+        }
+    }
+
+    private static var placingTrafficLights = false
+    /// The system's spacing between the lights, read once from its own layout before the first move.
+    private static var systemLightStep: CGFloat?
+
+    private func followTrafficLights(of window: NSWindow) {
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let button = window.standardWindowButton(kind) else { continue }
+            button.postsFrameChangedNotifications = true
+            NotificationCenter.default.addObserver(self, selector: #selector(lightMoved(_:)),
+                                                   name: NSView.frameDidChangeNotification, object: button)
+        }
+    }
+
+    /// A light moved while the system was still laying the title bar out, so the other two may be about to move
+    /// too; placing now would be overwritten (macOS 26 left the green light under the yellow one). The placement
+    /// waits for the end of the system's pass, still in the same run-loop turn, before anything is drawn.
+    @objc private func lightMoved(_ notification: Notification) {
+        guard !lightPlacementPending, !Self.placingTrafficLights else { return }
+        lightPlacementPending = true
+        RunLoop.main.perform(inModes: [.common]) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.lightPlacementPending = false
+                if let window = self.window { Self.placeTrafficLights(window) }
+            }
+        }
     }
 
     /// The system lights a 1 px edge along the top of a titled window through its title bar decoration view. Over
@@ -101,7 +157,9 @@ final class RootWindowController: NSWindowController {
     }
 
     @objc private func windowChromeChanged(_ notification: Notification) {
-        if let window { Self.hideTitlebarDecoration(window) }
+        guard let window else { return }
+        Self.hideTitlebarDecoration(window)
+        Self.placeTrafficLights(window)
     }
 
     @objc private func willEnterFullScreen(_ notification: Notification) { container.setFullScreenGround(true) }
@@ -176,7 +234,10 @@ final class RootWindowController: NSWindowController {
     }
 
     @objc private func didExitFullScreen(_ notification: Notification) {
-        if let window { Self.hideTitlebarDecoration(window) }
+        if let window {
+            Self.hideTitlebarDecoration(window)
+            Self.placeTrafficLights(window)
+        }
         container.setFullScreenGround(false)
         if programmaticFullScreenExitPending {
             programmaticFullScreenExitPending = false

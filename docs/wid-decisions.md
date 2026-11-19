@@ -2475,3 +2475,25 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   `WallpaperWindowTests.trafficLightsSitInThePapersTopGutterAlignedToItsLeftEdge`; Tart macOS 15.7.7 and 26.6.2
   before/after captures in the PR (`data/wid-mac-traffic-light/`).
 
+
+## D-117: The landing demo can be heard, in the Nib set, off until the visitor turns it on
+
+- Date: 2026-11-19. Captain: picked the Nib (steel pen) set after auditioning three sets (Nib, Pencil, Wood) and off.
+- Decision: the landing's scripted demo carries sound, and only the demo does. A speaker button in the header, left of
+  the theme button, turns it on; it is off at every load, nothing is stored, and no audio is created or fetched before
+  that click. While it is on, a volume slider hangs under the button (default 40, gain 0.16, -15.9 dB; the law is the
+  square of the slider). The demo plays what it shows: one of eight pen strikes per typed key, the three count ticks on
+  3, 2, 1, and one paper slide on the wipe. The blocked Backspace stays silent. Under Reduce Motion the demo is a still
+  frame and plays nothing, even with sound on. A tab that was hidden owes no burst on return. The room, the kept
+  screen and the Mac app stay silent.
+- Reason: the demo is the one place a visitor watches the rule work; the pen, the count and the slide let a reader who
+  looks away hear "stop and it deletes". The set is real CC0 recordings, band-limited so Nib, the brightest of the
+  three, never turns harsh: keys 5.5 kHz, count 3.6 kHz, wipe 6 kHz.
+- Cost, stated plainly: the 12 slices add 240 KB to the deploy bundle, fetched only after the click. Key-to-sound in the
+  page is under 1 ms from the cue to the audio thread; the device adds its own output latency (about 8 ms in Safari,
+  about 21 ms in desktop Chrome), which a page cannot remove.
+- Supersedes: nothing in D-046; the refusal is still visual only. The earlier standing line that the web has no sound
+  is superseded for the landing demo only.
+- Tests: `writeitdown/sound-cues.test.mjs` (the cues of one whole loop, the silent refusal, the resumed tab),
+  `qa/sound.spec.mjs` (off at load, gesture first, gain and slider law, keyboard, Reduce Motion, silent room, no other
+  script loads it), `qa/test-install.py` (the sound files ship). Sources and licences: `writeitdown/sound/SOURCES.md`.

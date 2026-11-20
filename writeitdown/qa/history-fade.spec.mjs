@@ -197,7 +197,15 @@ const frames = page => page.evaluate(() => Object.fromEntries(['#exit', '#room-c
   .map(selector => { const r = document.querySelector(selector).getBoundingClientRect(); return [selector, [r.x, r.y, r.width, r.height].map(v => Math.round(v * 100) / 100)]; })));
 const noteShown = page => page.locator('#refusal-note').getAttribute('data-shown');
 // The paper's shake and its red hairline are both animations under the paper; Reduce Motion keeps the hairline alone.
-const shakes = page => page.evaluate(() => document.querySelector('.room-paper').getAnimations({ subtree: true }).length);
+// The shake lasts 200 ms and the test's own awaits (the note's text, the screenshot) can outlast it on a busy host, so
+// the page counts the paper's animations on every frame from the key press, and `shakes` reports the most it saw.
+const watchShakes = page => page.evaluate(() => {
+  const live = () => document.querySelector('.room-paper').getAnimations({ subtree: true }).length;
+  window.__shakeMax = 0;
+  const sample = () => { window.__shakeMax = Math.max(window.__shakeMax, live()); if (window.__shakeMax === 0) requestAnimationFrame(sample); };
+  sample();
+});
+const shakes = page => page.evaluate(() => Math.max(window.__shakeMax || 0, document.querySelector('.room-paper').getAnimations({ subtree: true }).length));
 // Where the note sits against the writing: its box, the live line's box bottom and the footer's top, all in page pixels.
 const geometry = page => page.evaluate(() => {
   const box = selector => document.querySelector(selector).getBoundingClientRect();
@@ -221,6 +229,7 @@ test('the first refused delete says the rule once, centred under the line being 
     new MutationObserver(() => window.__noteFlips.push([note.dataset.shown, performance.now()])).observe(note, { attributes: true, attributeFilter: ['data-shown'] });
   });
 
+  await watchShakes(page);
   await page.keyboard.press('Backspace');
   await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
   await expect(page.locator('#refusal-note')).toHaveText(REFUSAL);
@@ -262,17 +271,22 @@ test('the first refused delete says the rule once, centred under the line being 
   expect(await frames(page), 'nothing moved after it went').toEqual(before);
 
   // Later refusals in the same session shake only and show nothing.
+  await watchShakes(page);
   await page.keyboard.press('Backspace');
   expect(await shakes(page), 'a later refusal still shakes').toBeGreaterThan(0);
   expect(await noteShown(page), 'a later refusal shows no text').toBe('false');
   expect(await page.locator('#status').textContent()).toBe('Blocked. Forward only.');
   await page.keyboard.insertText(' more');
 
-  // A session that ends starts the next one clean: stop typing until the draft is wiped, then refuse again.
-  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe', { timeout: 9000 });
+  // A session that ends starts the next one clean: stop typing until the draft is wiped, then refuse again. The wipe
+  // lands 8 s after the last key (phase4 and the deadline checker prove that to the millisecond on a fake clock); this
+  // real-clock wait only has to outlast it, and a host running other work stretches the page's timers, so a 1 s margin
+  // over the 8 s failed once in ten runs.
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe', { timeout: 30_000 });
   await page.keyboard.press('Backspace');
   expect(await noteShown(page), 'the stopped screen owns the space: the note waits').toBe('false');
   await page.keyboard.insertText('Fresh');
+  await watchShakes(page);
   await page.keyboard.press('Backspace');
   await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
 });
@@ -281,6 +295,7 @@ test('the note fades out in 200 ms, and under Reduce Motion it only steps', asyn
   await enter(page);
   const reduce = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
   await page.keyboard.insertText('Words');
+  await watchShakes(page);
   await page.keyboard.press('Backspace');
   await expect(page.locator('#refusal-note')).toHaveAttribute('data-shown', 'true');
   const timing = await page.locator('#refusal-note').evaluate(e => getComputedStyle(e).transitionDuration);

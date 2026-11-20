@@ -1,7 +1,10 @@
 /**
- * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权与 SessionEngine 活动回调
+ * [INPUT]: 依赖 NSTextView 输入事件、AppState 输入授权、SessionEngine 活动回调、BundledFonts 与纸张角色（FirstLineColors.paper*）
  * [OUTPUT]: 提供 AppendOnlyTextView 自定义编辑器
- * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版（光标所在行每次布局后落在锚点，短稿长稿同位）与受控 wipe；TextKit 位置用 UTF-16
+ * [POS]: AppKit editor core，负责 append-only、IME 候选内删除、居中 zen 排版（光标所在行每次布局后落在锚点，短稿长稿同位）与受控 wipe；TextKit 位置用 UTF-16。
+ *        字形与 web 一致（D-120）：拉丁为 Allo，首个中文字符时注册 Resource Han Rounded 并只在中文 run 上替换字体；
+ *        不再有标点轻量化、跨文字间距或 0.35 pt 墨迹外扩（D-090：字形只上色，不描边不位移）；每行基线按 web 规则
+ *        落在「行顶 + 半行距 + ascent」（1.6 行高），中文行与拉丁行同一节距；字色与历史阶梯取当前纸的角色。
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 

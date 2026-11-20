@@ -15,7 +15,7 @@
 import AppKit
 
 /// The web room sets `-webkit-font-smoothing: antialiased`, which draws plain grey-scale glyphs. CoreText on the
-/// Mac thickens every stem unless the process turns smoothing off, so the same Newsreader line carried 31% to 52%
+/// Mac thickens every stem unless the process turns smoothing off, so the same writing line (Newsreader when measured) carried 31% to 52%
 /// more ink on the Mac (measured, D-098). `AppleFontSmoothing = 0` in the app's own preference domain is the
 /// long-standing user default for it (Apple does not document it as API, so the ink-unit table in D-098 is the
 /// proof, not the key); it must be written before the first window draws text.

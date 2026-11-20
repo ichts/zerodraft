@@ -2612,3 +2612,61 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 - Tests: `qa/shell.spec.mjs` "the first frame carries the Lamp mark and the lockup, before any script runs",
   `qa/phase4.spec.mjs` "the demo starts when its sheet first enters view", `qa/mac.spec.mjs` lockup focus test
   (the mark mask is inline), `qa/logo-inline.test.mjs`.
+
+## D-120: The Mac room follows D-119: three papers, one face, the sentence caption, and the web's switch
+
+- Date: 2026-11-20. Firstmate, task `wid-mac-v2-converge`: the Mac matches the web V2 look (cf427c3, D-119),
+  closing the divergences D-119 listed for the Mac lane.
+- Decision: the Mac app draws the same room as `writeitdown/#trial` in each of the three papers. One engine, one
+  timing and one ink model serve every paper; a paper changes material and colour only.
+  - **Papers.** Lamp (default), Paper and Slate, each with every page and sheet role of `writeitdown/tokens.css` v3,
+    read from that file by `DesignTokenTests` so a drift fails with both values. The window wears aqua in Paper and
+    darkAqua in Lamp and Slate; Lamp and Slate share darkAqua, so the colours resolve the stored paper and
+    `PaperModeRepaint` is the one place a paper is applied (it repaints the whole tree, since AppKit sends no change
+    between two papers on the same appearance).
+  - **Material.** The sheet is the CSS recipe, rendered natively: the tone, the 240 px grain tile from the sheet's
+    top-left, the 1600x1100 cloud covering the sheet from its centre, then the lamp's light multiplied over both. The
+    noise is a port of SVG `feTurbulence` with the web's seeds, so the sheet lands within 2 levels of the web room's
+    own pixels at the same size; Paper is its plain tone. The lamp never moves. Slate's grain is even by the web's
+    round-006b measure (row-mean against column-mean spread, at most 3x). Each paper takes its own
+    `--paper-shadow`, with the ring as its first layer. The sheet radius is `--r-sheet`, 4 pt.
+  - **Wash.** The warn wash and the deeper cut are the paper's own `--paper-wash` and `--paper-wash-deep`, faded in
+    by the web's opacity ramp over seconds 5 to 8 and out on the 120 ms snap; a tick never repaints the paper.
+  - **Words on the sheet** take the sheet's roles in every paper, as the web rebinds `--ink` inside `[data-paper]`:
+    ink, quiet, danger, and the sheet's own tone inside an ink pill. The cards (picker, Settings, activation) keep
+    the page roles.
+  - **Switch.** The room carries the web room's switch with its labels verbatim, `Lamp / Paper / Slate`, one radio
+    group named `Paper`: 13 pt labels at least 44x44, 2 pt apart, the chosen one in ink with a 1 pt underline 5 pt
+    under the baseline. The web room puts it in its header beside the mark; the Mac room has no header (the traffic
+    lights own the top gutter, D-116), so it sits on the sheet's top-left across the clock row, its first word on
+    the room's 22 pt inset. A choice is not input: the draft, phase, session and silence clock carry on, a click
+    never takes focus, the keyboard returns to the writing (except on the kept sheet), and the switch fades with
+    the chrome in Focus Mode. Settings' appearance row becomes the same choice, named by the web's legend, `Paper`.
+  - **Storage.** The paper is stored locally as `paperMode`. The retired `theme` setting is read once (light to
+    Paper; dark, system or missing to Lamp, as the web maps its old values) and never written back.
+  - **One face.** Allo (the web's Latin subset `allo-latin.woff2`, byte for byte, OFL-1.1) for the writing (410),
+    the headings (540), the warning numeral (360, tabular) and every label; Resource Han Rounded (the web's GB2312
+    subset, OFL-1.1) for Chinese, registered only when the first Chinese character arrives, so Latin, accents and
+    Greek never load it. Both licences ship in the app's resources. The writing baseline is the web's: the line's
+    top, plus the half-leading of the 1.6 line, plus the ascent. The stopped headline sits on the web's fixed 1.1
+    line box the same way.
+  - **Dropped with Newsreader:** the Mac-only light punctuation (0.84 scale), the script-boundary kerning between
+    Chinese and Latin runs, and the 0.35 pt ink spread (D-056's transferable half, stepped by D-073). D-090 already
+    holds that glyphs are coloured, never stroked or moved; the web never had these, and they were tuned to
+    Newsreader's metrics.
+  - **Warning caption.** The web's sentence, `Keep typing or the draft is deleted.`, 13 pt weight 500, no tracking,
+    ink; 7:1 or better on every paper at the deepest wash.
+  - No new prose: every string is shipped web or Mac copy.
+- Reason: D-119 made the three papers and one face the product's look and named the Mac as the lane that follows;
+  the Mac still drew Newsreader on one paper, with a caps warning line and no switch.
+- Supersedes: for the Mac, the light/dark appearance pair and its `Theme` setting, D-093's flat charcoal dark sheet,
+  D-057's faces, D-056's ink spread (and D-073's stepping of it), the Mac's light punctuation and script-boundary
+  kerning, D-102's 16 pt sheet radius (the rest of D-102 stands), and `design/DESIGN.md` section 5 point 2 for the
+  Mac app. It closes D-119's "Mac divergences until the Mac lane follows": `qa/shared-type-baseline.json` now holds
+  the Allo and Resource Han Rounded advances and `qa/typography.spec.mjs` checks them again.
+- Tests: `DesignTokenTests`, `PaperContrastTests` (each paper's tones and ladder, 7:1 on the rendered sheet, wash and
+  deep wash, the sheet against the web's pixels, Slate's even grain), `PaperModeTests` (the switch, a choice is not
+  input, arrows, Focus Mode, Lamp to Slate repaint, every word on the sheet in a sheet role), `TypographyParityTests`
+  with `writeitdown/qa/typography.spec.mjs` on the same baseline file, `EditorFocusTests` (the lazy Chinese face, no
+  added kerning or spread), `SettingsStoreTests.legacyThemeMigratesOnceAndIsNeverWrittenBack`, `SnapshotTests` in
+  every paper; behaviour cases 20, 22, 48, 62, 84, 86, 87 and 88.

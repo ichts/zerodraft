@@ -11,12 +11,13 @@ export default defineConfig({
     channel: 'chrome',
     trace: 'retain-on-failure',
   },
-  projects: [1440, 390].flatMap(width => ['dark', 'light'].flatMap(colorScheme =>
+  // Every test runs in each paper mode (D-119): one engine, one timing, three materials. Lamp is the default and its
+  // projects store nothing; Paper and Slate choose the mode the way a visitor does, through the stored switch.
+  projects: [1440, 390].flatMap(width => ['lamp', 'paper', 'slate'].flatMap(mode =>
     ['no-preference', 'reduce'].map(reducedMotion => ({
-      name: `${width}-${colorScheme}-${reducedMotion}`,
-      // Light is the site default; dark projects choose dark the way a visitor does, via the stored toggle.
-      use: { viewport: { width, height: width === 1440 ? 900 : 844 }, colorScheme, reducedMotion,
-        storageState: { cookies: [], origins: [{ origin: 'http://127.0.0.1:8015', localStorage: [{ name: 'writeitdown-theme', value: colorScheme }] }] } },
+      name: `${width}-${mode}-${reducedMotion}`,
+      use: { viewport: { width, height: width === 1440 ? 900 : 844 }, colorScheme: mode === 'paper' ? 'light' : 'dark', reducedMotion,
+        storageState: { cookies: [], origins: mode === 'lamp' ? [] : [{ origin: 'http://127.0.0.1:8015', localStorage: [{ name: 'writeitdown-theme', value: mode }] }] } },
     })))),
   webServer: {
     command: 'python3 -m http.server 8015 --bind 127.0.0.1 --directory ..',

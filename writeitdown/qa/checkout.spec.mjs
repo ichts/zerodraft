@@ -80,7 +80,8 @@ test('paid session shows only the fetched key and copies it', async ({ page, con
   await expect(page.locator('#license-key')).toHaveText(key);
   await expect(page.locator('#license-key')).toBeInViewport();
   expect(await page.evaluate(() => [...document.scripts].some(script => script.src.includes('cloudflareinsights')))).toBe(false);
-  expect(await page.evaluate(() => Object.keys(localStorage))).toEqual(['writeitdown-theme']);
+  // The only key the site ever writes is the chosen mode, and Lamp (the default) writes none (D-119).
+  expect((await page.evaluate(() => Object.keys(localStorage))).filter(name => name !== 'writeitdown-theme')).toEqual([]);
   await expect(page.locator('#license-result')).toContainText("Paste this key into the app's activation field.");
   await expect(page.locator('#license-result')).toContainText('Save this key; this page will not show it again.');
   await expect(page.locator('#license-retry-row')).toBeHidden();
@@ -379,7 +380,7 @@ test('both controls keep their one width on a wider default sans', async ({ page
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.route('**/tokens.css', async route => {
     const response = await route.fetch();
-    const body = (await response.text()).replace(/--sans:[^;]+;/, '--sans:Verdana,"DejaVu Sans",sans-serif;');
+    const body = (await response.text()).replace(/--face-ui:[^;]+;/, '--face-ui:Verdana,"DejaVu Sans",sans-serif;');
     await route.fulfill({ response, body });
   });
   await page.route(`${service}/license?session_id=cs_test_wider_width`, route => route.fulfill({ json: { licenseKey: key } }));

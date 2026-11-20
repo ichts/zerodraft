@@ -55,15 +55,15 @@ for (const url of pages) {
 
 test('continuous corners: boxes are superellipse, pills round, the header chip keeps its drawn squircle', async ({ page }) => {
   await page.goto('download/');
+  // The theme button these once shared is gone with the Lamp / Paper / Slate switch, which draws no box (D-119).
   const supported = await page.evaluate(() => CSS.supports('corner-shape', 'superellipse(1.25)'));
   test.skip(!supported, 'no continuous corners in this browser');
   const shapes = await page.evaluate(() => {
     const shape = (selector, pseudo = null) => getComputedStyle(document.querySelector(selector), pseudo).cornerShape;
-    return { card: shape('.dlbox'), pill: shape('.btn'), theme: shape('.theme-btn'), chip: shape('.brand', '::before') };
+    return { card: shape('.dlbox'), pill: shape('.btn'), chip: shape('.brand', '::before') };
   });
   expect(shapes.card).toBe('superellipse(1.25)');
   expect(shapes.pill).toBe(ROUND);
-  expect(shapes.theme).toBe(ROUND);
   expect(shapes.chip).toBe(ROUND);
 });
 
@@ -71,11 +71,12 @@ test('the two writing sheets share one radius, the cards share another', async (
   await page.goto('./');
   const radii = await page.evaluate(() => {
     const radius = selector => getComputedStyle(document.querySelector(selector)).borderTopLeftRadius;
-    return { demo: radius('#paper'), room: radius('.room-paper'), card: radius('.cards .card'), mac: radius('.mac-card'), moment: radius('.mo') };
+    return { demo: radius('#paper'), room: radius('.room-paper'), how: radius('.vis-sheet'), mac: radius('.mac-card'), moment: radius('.mo') };
   });
   expect(radii.demo, 'the demo sheet and the room sheet are one object').toBe(radii.room);
-  expect(radii.demo).toBe('16px');
-  expect([radii.card, radii.mac, radii.moment], 'cards and moments share the card radius').toEqual(['24px', '24px', '24px']);
+  // World A (D-119): paper is cut, not moulded; a sheet takes the 4 px floor and every card on the desk shares it.
+  expect(radii.demo).toBe('4px');
+  expect([radii.how, radii.mac, radii.moment], 'cards and moments share the card radius').toEqual(['4px', '4px', '4px']);
 });
 
 // A panel padded p inside a card of radius R takes max(4, R - p), so both corners share one centre.
@@ -153,14 +154,14 @@ test('numbers that update or sit in a column keep their width', async ({ page })
       clock: digits.map(text => probe(clock, text)),
       fact: digits.map(text => probe(fact, text)),
       factVariant: getComputedStyle(fact).fontVariantNumeric,
-      // Negative control: the bundled Newsreader face is proportional until tabular-nums is asked for.
+      // Negative control: the bundled Allo face is proportional until tabular-nums is asked for.
       proportional: digits.map(text => probe(fact, text, 'proportional-nums')),
     };
   });
   expect(new Set(widths.clock).size, 'the clock digits share one width').toBe(1);
   expect(new Set(widths.fact).size, 'the price facts share one digit width').toBe(1);
   expect(widths.factVariant).toBe('tabular-nums');
-  expect(new Set(widths.proportional).size, 'negative control: proportional Newsreader digits differ').toBeGreaterThan(1);
+  expect(new Set(widths.proportional).size, 'negative control: proportional Allo digits differ').toBeGreaterThan(1);
 });
 
 test('the mac page price keeps tabular figures', async ({ page }) => {

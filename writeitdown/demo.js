@@ -88,9 +88,9 @@ import { landingSound } from './sound.js';
   }
   function setWash(k) {
     var pap;
-    if (k === "deep") pap = "var(--deep-paper)";
+    if (k === "deep") pap = "var(--paper-wash-deep)";
     else if (k == null) pap = "none";
-    else pap = "color-mix(in oklab, var(--wash-paper) " + Math.round(k * 100) + "%, transparent)";
+    else pap = "color-mix(in oklab, var(--paper-wash) " + Math.round(k * 100) + "%, transparent)";
     if (seen.wp !== pap) { seen.wp = pap; washPaper.style.background = pap; }
   }
   // The draining minute: one continuous linear animation per loop, never a stepped tick.
@@ -178,7 +178,7 @@ import { landingSound } from './sound.js';
       setPhase("warn");
       setWash((t - SILENT_END) / WARN_MS);
       numeralEl.textContent = String(3 - Math.floor((t - SILENT_END) / 1000));
-      captionEl.textContent = "KEEP TYPING OR THE DRAFT IS DELETED.";
+      captionEl.textContent = "Keep typing or the draft is deleted.";
       warnEl.hidden = false;
       stoppedEl.hidden = true;
       renderDraft(full());

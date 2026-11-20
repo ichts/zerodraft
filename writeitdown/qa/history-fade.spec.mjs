@@ -268,8 +268,11 @@ test('the first refused delete says the rule once, centred under the line being 
   expect(await page.locator('#status').textContent()).toBe('Blocked. Forward only.');
   await page.keyboard.insertText(' more');
 
-  // A session that ends starts the next one clean: stop typing until the draft is wiped, then refuse again.
-  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe', { timeout: 9000 });
+  // A session that ends starts the next one clean: stop typing until the draft is wiped, then refuse again. The wipe
+  // lands 8 s after the last key (phase4 and the deadline checker prove that to the millisecond on a fake clock); this
+  // real-clock wait only has to outlast it, and a host running other work stretches the page's timers, so a 1 s margin
+  // over the 8 s failed once in ten runs.
+  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'wipe', { timeout: 30_000 });
   await page.keyboard.press('Backspace');
   expect(await noteShown(page), 'the stopped screen owns the space: the note waits').toBe('false');
   await page.keyboard.insertText('Fresh');

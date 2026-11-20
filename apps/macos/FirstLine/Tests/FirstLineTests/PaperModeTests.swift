@@ -60,6 +60,7 @@ struct PaperModeTests {
     func theSwitchIsTheWebsRadioGroup(mode: PaperMode) throws {
         try withPaperMode(mode) { _ in
             let fixture = try room(mode: mode)
+            defer { try? FileManager.default.removeItem(at: fixture.root) }
             let modes = try #require(fixture.room.modeSwitch)
             #expect(modes.accessibilityRole() == .radioGroup)
             #expect(modes.accessibilityLabel() == "Paper")

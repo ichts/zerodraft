@@ -2670,3 +2670,7 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   with `writeitdown/qa/typography.spec.mjs` on the same baseline file, `EditorFocusTests` (the lazy Chinese face, no
   added kerning or spread), `SettingsStoreTests.legacyThemeMigratesOnceAndIsNeverWrittenBack`, `SnapshotTests` in
   every paper; behaviour cases 20, 22, 48, 62, 84, 86, 87 and 88.
+- Found by the D-120 Tart smoke, not caused by it (base cf427c3 shows it too): a resize on the stopped sheet let
+  AppKit's automatic insets zero the writing scroll view's top inset, so the line after Begin again sat about 130 pt
+  above the anchor. The room's scroll view now takes no automatic insets; behaviour case 89 and
+  `DesignReviewFixesTests.restartAfterAResizeOnTheStoppedSheetPutsTheLineOnTheAnchor`.

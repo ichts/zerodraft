@@ -348,6 +348,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = false
+        // The editor owns the top inset that puts the line on the anchor. AppKit's automatic insets reset it to zero
+        // when a live resize ends, and the next line then sat above the anchor (Tart 15.7.7 and 26.6.2).
+        scrollView.automaticallyAdjustsContentInsets = false
         scrollView.wantsLayer = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         paper.addSubview(scrollView)

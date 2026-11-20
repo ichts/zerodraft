@@ -1,13 +1,13 @@
 /**
  * [INPUT]: 依赖 AppKit、Observation、App/AppState、AppKit surfaces、DesignSystem/Colors
- * [OUTPUT]: 主窗口（无自身底色：透明窗口、透明标题栏（无分隔线、隐藏系统顶边高光）、桌面壁纸透出，D-102；红黄绿灯移入纸张顶部 32 pt 留白、红灯左缘对齐纸张左缘，D-116）、surface 路由、theme/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
+ * [OUTPUT]: 主窗口（无自身底色：透明窗口、透明标题栏（无分隔线、隐藏系统顶边高光）、桌面壁纸透出，D-102；红黄绿灯移入纸张顶部 32 pt 留白、红灯左缘对齐纸张左缘，D-116）、surface 路由、纸张模式（PaperMode）/focus 响应、成稿复制与新篇同步刷新菜单桥接，以及 Edit 菜单 Undo/Redo 到文本框 undo manager 的转发
  * [POS]: writeitdown AppKit 窗口壳与路由真相源；退役 SwiftUI RootView，把 AppState.selectedSurface；NSWindowDelegate.windowShouldClose 与 mayAbandonDraft：关窗、退出、Begin、Home 在有未保留草稿时先要房间的两步确认（D-118）
- *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用 theme 与最小尺寸契约。
+ *        经常驻 RootContainerViewController 映射到各 surface 子 VC，并应用纸张模式与最小尺寸契约。
  * [PROTOCOL]: 变更时更新此头部，然后检查 FirstLine/AGENTS.md
  *
- * 路由：本控制器观察 selectedSurface 和 theme：
+ * 路由：本控制器观察 selectedSurface 和 paperMode：
  *   1) selectedSurface -> 换常驻容器内的子控制器；
- *   2) theme -> 更新窗口外观；focusMode -> 全屏切换；
+ *   2) paperMode -> PaperModeRepaint（Paper=aqua，Lamp/Slate=darkAqua，Lamp<->Slate 显式重绘，D-120）；focusMode -> 全屏切换；
  * Observation 的 withObservationTracking 只触发一次回调，因此在回调里重新 arm 观察实现持续跟踪。
  */
 
@@ -69,10 +69,10 @@ final class RootWindowController: NSWindowController {
         window.center()
         Self.placeTrafficLights(window)
         followTrafficLights(of: window)
-        applyTheme()
+        PaperModeRepaint.apply(appState.settings.paperMode, to: window)
         container.show(appState.selectedSurface)
         armSurfaceObservation()
-        armThemeObservation()
+        armPaperModeObservation()
         armFocusObservation()
     }
 
@@ -215,14 +215,14 @@ final class RootWindowController: NSWindowController {
         }
     }
 
-    private func armThemeObservation() {
+    private func armPaperModeObservation() {
         withObservationTracking { [weak self] in
-            _ = self?.appState.settings.theme
+            _ = self?.appState.settings.paperMode
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.applyTheme()
-                self.armThemeObservation()
+                PaperModeRepaint.apply(self.appState.settings.paperMode, to: self.window)
+                self.armPaperModeObservation()
             }
         }
     }
@@ -262,16 +262,6 @@ final class RootWindowController: NSWindowController {
         appState.updateFocusMode(false)
     }
 
-    private func applyTheme() {
-        switch appState.settings.theme {
-        case .system:
-            window?.appearance = nil
-        case .light:
-            window?.appearance = NSAppearance(named: .aqua)
-        case .dark:
-            window?.appearance = NSAppearance(named: .darkAqua)
-        }
-    }
 }
 
 /// surface -> NSViewController 工厂。Phase 1 全部返回占位 VC；Phase 2+ 逐个分支替换为真实实现。

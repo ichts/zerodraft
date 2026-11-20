@@ -35,9 +35,9 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// True while the lines above are still dissolving to their step.
     var isDissolvingHistory: Bool { dissolve != nil }
     /// One uniform ink step per line ended by Return, closest line first, older lines gone (D-088 unit, D-092 values:
-    /// 1, .22, .07 light; 1, .16, .05 dark) for the effective appearance.
+    /// 1, .22, .07 in Lamp and Paper; 1, .16, .05 in Slate) for the current mode.
     var historyLineOpacities: [CGFloat] {
-        FirstLineColors.paperHistoryOpacities(dark: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+        FirstLineColors.paperHistoryOpacities(for: effectiveAppearance)
     }
     /// Guards replaceCharacters during a live insertText so the append path never
     /// trips a false deny. TextKit location/length values are UTF-16 offsets.
@@ -467,8 +467,8 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         defaultParagraphStyle = paragraph
         typingAttributes = attributes
-        insertionPointColor = FirstLineColors.inkNSColor
-        textColor = FirstLineColors.inkNSColor
+        insertionPointColor = FirstLineColors.paperInkNSColor
+        textColor = FirstLineColors.paperInkNSColor
         font = sessionFont
         alignment = .center
         layoutManager?.delegate = self
@@ -567,7 +567,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             guard clipped.length > 0 else { continue }
             let alpha = shown[index]
             textStorage.addAttribute(.foregroundColor,
-                                      value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
+                                      value: FirstLineColors.paperInkNSColor.withAlphaComponent(alpha),
                                       range: clipped)
         }
         shownLineAlphas = shown
@@ -742,7 +742,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private func activeTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: sessionFont,
-            .foregroundColor: FirstLineColors.inkNSColor,
+            .foregroundColor: FirstLineColors.paperInkNSColor,
             .paragraphStyle: paragraph,
         ]
     }

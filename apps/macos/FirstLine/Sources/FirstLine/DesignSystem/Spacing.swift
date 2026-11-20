@@ -27,7 +27,8 @@ enum FirstLineSpacing {
 
 enum FirstLineRadius {
     static let control: CGFloat = 8
-    static let sheet: CGFloat = 16
+    /// The writing sheet, `--r-sheet` (D-120, superseding D-102's 16 pt): the sheet's corner and its bar's.
+    static let sheet: CGFloat = 4
     static let card: CGFloat = 22
     static let stage: CGFloat = 28
 }

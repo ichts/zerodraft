@@ -56,7 +56,7 @@ final class SettingsViewController: NSViewController {
         content.addArrangedSubview(headerRow)
         headerRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         let appearance = section("Appearance", rows: [
-            settingRow("Theme", control: themePopup()),
+            settingRow("Paper", control: paperModePopup()),
             settingRow("Reduced Motion", control: motionPopup()),
             settingRow("Focus Mode", control: focusSwitch()),
             settingRow("Alignment", control: alignmentPopup()),
@@ -280,13 +280,14 @@ final class SettingsViewController: NSViewController {
         }
     }
 
-    private func themePopup() -> NSPopUpButton {
+    /// The web's mode switch, its legend and labels verbatim (`Paper`: Lamp, Paper, Slate).
+    private func paperModePopup() -> NSPopUpButton {
         let popup = FirstLineInkPopUpButton(frame: .zero, pullsDown: false)
         popup.font = FirstLineTypography.smallNSFont
-        popup.addItems(withTitles: AppTheme.allCases.map(\.label))
-        popup.selectItem(at: AppTheme.allCases.firstIndex(of: appState.settings.theme) ?? 0)
+        popup.addItems(withTitles: PaperMode.allCases.map(\.label))
+        popup.selectItem(at: PaperMode.allCases.firstIndex(of: appState.settings.paperMode) ?? 0)
         popup.target = self
-        popup.action = #selector(themeChanged(_:))
+        popup.action = #selector(paperModeChanged(_:))
         return popup
     }
 
@@ -403,9 +404,9 @@ final class SettingsViewController: NSViewController {
         return formatter.string(from: date)
     }
 
-    @objc private func themeChanged(_ sender: NSPopUpButton) {
-        guard AppTheme.allCases.indices.contains(sender.indexOfSelectedItem) else { return }
-        appState.updateTheme(AppTheme.allCases[sender.indexOfSelectedItem])
+    @objc private func paperModeChanged(_ sender: NSPopUpButton) {
+        guard PaperMode.allCases.indices.contains(sender.indexOfSelectedItem) else { return }
+        appState.updatePaperMode(PaperMode.allCases[sender.indexOfSelectedItem])
     }
 
     @objc private func motionChanged(_ sender: NSPopUpButton) {

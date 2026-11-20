@@ -1,11 +1,17 @@
 name: writeitdown
 
-# The writeitdown acceptance suite is 1048 Playwright tests (8 projects x 2 workers), about 15 minutes serial.
-# It runs as parallel shards (the matrix below sets how many); the job named `test` at the bottom is the single required check.
+# The writeitdown acceptance suite runs in two shapes (writeitdown/playwright.config.mjs):
+#   - a pull request runs the default pair of projects (desktop and phone width, Lamp, no motion preference), 3 shards;
+#   - the nightly schedule and a manual run (`workflow_dispatch`) run the full matrix, `WID_MATRIX=full`: every spec in
+#     Lamp, Paper and Slate at both widths with and without Reduce Motion, 12 shards. Run it by hand before a release.
+# It runs as parallel shards; the job named `test` at the bottom is the single required check.
 # It always reports: success when every shard passed or when the web suite was legitimately skipped
 # (a changes-detection job, not `on.paths`, so a required check never stays pending).
 on:
   pull_request:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
 
 # A newer push to the same PR ref supersedes the older run. Runs on main are never cancelled.
 concurrency:
@@ -30,7 +36,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           web=true
-          if files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)') && [ -n "$files" ]; then
+          if [ "${{ github.event_name }}" = pull_request ] && files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)') && [ -n "$files" ]; then
             web=false
             while IFS= read -r f; do
               case "$f" in
@@ -52,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        shard: ${{ fromJSON(github.event_name == 'pull_request' && '[1, 2, 3]' || '[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]') }}
     defaults:
       run:
         working-directory: writeitdown
@@ -67,6 +73,7 @@ jobs:
       - run: npx playwright install --with-deps chrome
       - name: Playwright shard ${{ matrix.shard }}/${{ strategy.job-total }}
         env:
+          WID_MATRIX: ${{ github.event_name == 'pull_request' && 'default' || 'full' }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/shard-${{ matrix.shard }}.json
         run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }} --reporter=list,json
       - uses: actions/upload-artifact@v4
@@ -122,6 +129,8 @@ jobs:
       - name: Sharded test count equals the listed test count
         if: needs.changes.outputs.web == 'true'
         working-directory: writeitdown
+        env:
+          WID_MATRIX: ${{ github.event_name == 'pull_request' && 'default' || 'full' }}
         run: |
           npm ci
           count='[.. | objects | select(has("tests")) | .tests[]] | length'

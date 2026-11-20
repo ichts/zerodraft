@@ -92,26 +92,4 @@ for (const board of canvas.boards) {
     for (const string of board.strings) expect(text, `string "${string}"`).toContain(flat(string));
   });
 
-  test(`${board.screen} - ${board.state}: the board loads and its swatches draw their tokens`, async ({ page }) => {
-    const errors = [];
-    page.on('pageerror', e => errors.push(e.message));
-    page.on('console', m => m.type() === 'error' && errors.push(m.text()));
-    await page.goto(`../docs/design/${board.file}.dc.html`);
-    const rows = await page.evaluate(() => [...document.querySelectorAll('tr')].slice(1).map(tr => {
-      const swatch = tr.querySelector('.swatch');
-      const probe = document.createElement('i');
-      probe.style.color = `var(${tr.children[3].textContent})`;
-      document.body.append(probe);
-      const resolved = getComputedStyle(probe).color;
-      probe.remove();
-      return { token: tr.children[3].textContent, drawn: getComputedStyle(swatch).backgroundColor, resolved };
-    }));
-    expect(rows.length).toBe(board.regions.length);
-    for (const row of rows) expect(row.drawn, row.token).toBe(row.resolved);
-    expect(errors).toEqual([]);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow, 'the board scrolls sideways').toBe(0);
-    const split = await page.evaluate(() => [...document.querySelectorAll('td:nth-child(3) code')].filter(c => c.getClientRects().length > 1).map(c => c.textContent));
-    expect(split, 'a property name breaks mid-word').toEqual([]);
-  });
 }

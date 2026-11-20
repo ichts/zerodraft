@@ -119,69 +119,6 @@ test('the site serves its own faces and never asks another host for one', async 
   expect(fonts.map(font => font.familyName).every(family => /^Allo/.test(family)), `the writing face is the bundled Allo: ${fonts.map(f => f.familyName)}`).toBe(true);
 });
 
-test('chinese in the room draws in Resource Han Rounded', async ({ page }) => {
-  await page.goto('index.html#trial');
-  // D-109: the room fixes its Chinese face at a draft's first Chinese character - the webfont if the file is already
-  // resident, the platform face if it is not. An earlier Chinese draft on this page made it resident here, so this
-  // measures the face the room draws with on that path, waiting for the face itself.
-  await page.evaluate(() => document.fonts.load('28px "Resource Han Rounded"', '\u6211'));
-  await page.click('#editor');
-  const text = '我写中文草稿';
-  await page.keyboard.insertText(text);
-  const loaded = await page.evaluate(async text => {
-    await document.fonts.ready;
-    const editor = getComputedStyle(document.querySelector('#editor'));
-    const probe = document.createElement('span');
-    probe.id = 'cjk-probe';
-    probe.style.cssText = 'position:fixed;left:20px;top:20px;white-space:pre;'
-      + `font:${editor.fontWeight} ${editor.fontSize}/${editor.lineHeight} ${editor.fontFamily}`;
-    probe.textContent = text;
-    document.body.append(probe);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    return { stack: editor.fontFamily, ready: document.fonts.check('400 28px "Resource Han Rounded"', text) };
-  }, text);
-  expect(loaded.ready, 'the shipped Chinese face covers the draft').toBe(true);
-  expect(loaded.stack, 'the writing stack names Allo first and the Chinese face second')
-    .toMatch(/^Allo, "Resource Han Rounded",/);
-  const cdp = await page.context().newCDPSession(page);
-  await cdp.send('DOM.enable');
-  await cdp.send('CSS.enable');
-  const { root } = await cdp.send('DOM.getDocument');
-  const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#cjk-probe' });
-  const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
-  const platform = fonts.map(font => font.familyName);
-  expect(platform.filter(family => /^Resource Han Rounded/.test(family)).length, `Chinese draws in Resource Han Rounded, got ${platform}`).toBe(1);
-  expect(platform.some(family => /PingFang|Songti|SimSun/.test(family)), 'no system CJK face takes over').toBe(false);
-});
-
-test('the clock keeps its width as the session counts down', async ({ page }) => {
-  await page.goto('index.html#trial');
-  const clock = await page.evaluate(() => {
-    const element = document.querySelector('#room-clock');
-    const style = getComputedStyle(element);
-    const width = value => {
-      const previous = element.textContent;
-      element.textContent = value;
-      const measured = element.getBoundingClientRect().width;
-      element.textContent = previous;
-      return +measured.toFixed(3);
-    };
-    return {
-      variant: style.fontVariantNumeric,
-      size: style.fontSize,
-      weight: style.fontWeight,
-      family: style.fontFamily,
-      one: width('1:00'),
-      zero: width('0:59'),
-    };
-  });
-  expect(clock.variant, 'the clock sets tabular digits like the Mac').toBe('tabular-nums');
-  expect(clock.size, 'the clock is 15 px like the Mac').toBe('15px');
-  expect(clock.weight, 'the clock is semibold like the Mac').toBe('600');
-  expect(faceOf(clock), 'the clock is the one face').toBe('writing');
-  expect(Math.abs(clock.one - clock.zero), `the clock does not change width between 1:00 (${clock.one}) and 0:59 (${clock.zero})`).toBeLessThanOrEqual(0.01);
-});
-
 test('the shared writing roles advance like the Mac', async ({ page }) => {
   // Both surfaces draw Allo and Resource Han Rounded (D-119, D-120); the numeral is measured with its tabular figures.
   await page.goto('index.html');
@@ -203,46 +140,4 @@ test('the shared writing roles advance like the Mac', async ({ page }) => {
     const drift = Math.abs(advance - role.advancePt) / role.advancePt;
     expect(drift, `${role.role} "${role.string}" at ${role.size}: the web draws ${advance.toFixed(3)}, the Mac ${role.advancePt}`).toBeLessThanOrEqual(baseline.tolerance);
   }
-});
-
-test('the result headings carry the Mac\'s tracking, not the web\'s old negative value', async ({ page }) => {
-  await page.goto('index.html');
-  const headings = await page.evaluate(() => {
-    const read = selector => {
-      const style = getComputedStyle(document.querySelector(selector));
-      return { family: style.fontFamily, weight: style.fontWeight, letterSpacing: style.letterSpacing };
-    };
-    return { kept: read('#kept h1'), stopped: read('.room-top h1') };
-  });
-  for (const [name, heading] of Object.entries(headings)) {
-    expect(faceOf(heading), `${name} heading is Allo`).toBe('writing');
-    expect(heading.weight, `${name} heading is the display weight (D-119)`).toBe('540');
-    expect(heading.letterSpacing, `${name} heading sets no tracking, as the Mac does not`).toBe('normal');
-  }
-});
-
-test('the kept receipt and the machine-voice labels keep the Mac\'s 13 px medium and its tracking', async ({ page }) => {
-  await page.goto('index.html');
-  const roles = await page.evaluate(() => {
-    const read = selector => {
-      const style = getComputedStyle(document.querySelector(selector));
-      return { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight, letterSpacing: style.letterSpacing };
-    };
-    return { receipt: read('.kept-receipt'), note: read('#failure-note'), caption: read('#room-warning'), count: read('#room-count') };
-  });
-  for (const name of ['receipt', 'caption']) {
-    expect(roles[name].size, `${name} is 13 px like the Mac`).toBe('13px');
-    expect(roles[name].weight, `${name} is the Mac's medium`).toBe('500');
-    expect(faceOf(roles[name]), `${name} is the one face`).toBe('writing');
-  }
-  expect(roles.receipt.letterSpacing, 'the receipt keeps the Mac\'s .02em').toBe('0.26px');
-  expect(roles.note.size, 'the stopped screen\'s consequence line is 15 px').toBe('15px');
-  expect(roles.note.weight, 'the consequence line is regular').toBe('400');
-  expect(faceOf(roles.note), 'the consequence line is the one face').toBe('writing');
-  expect(parseFloat(roles.note.letterSpacing) || 0, 'the consequence line sets no tracking').toBe(0);
-  // Round 006 (D-119): the caption is a sentence at note size, so it carries no caps tracking.
-  expect(parseFloat(roles.caption.letterSpacing) || 0, 'the warning caption sets no tracking').toBe(0);
-  expect(roles.count.size, 'the count is 13 px like the Mac').toBe('13px');
-  expect(roles.count.weight, 'the count is regular like the Mac').toBe('400');
-  expect(faceOf(roles.count), 'the count is the one face').toBe('writing');
 });

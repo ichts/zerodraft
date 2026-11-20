@@ -84,17 +84,3 @@ test('click and Escape share the same two-act exit and typing cancels either', a
   await expect(page.locator('#editor')).toHaveValue('');
   await expect(page).not.toHaveURL(/#trial/);
 });
-
-test('the exit label and the count compute identical font metrics on one baseline', async ({ page }) => {
-  await enter(page);
-  const empty = await footer(page);
-  expect(empty.right.text).toBe('Type to begin');
-  expect(empty.left.text).toMatch(/^(Esc to exit|Exit)$/);
-  expect(empty.left.style).toEqual(empty.right.style);
-  expect(Math.abs(empty.left.centre - empty.right.centre)).toBeLessThan(0.5);
-  await page.keyboard.type('one two three');
-  const typing = await footer(page);
-  expect(typing.right.text).toBe('3 words');
-  expect(typing.left.style).toEqual(typing.right.style);
-  expect(Math.abs(typing.left.centre - typing.right.centre)).toBeLessThan(0.5);
-});

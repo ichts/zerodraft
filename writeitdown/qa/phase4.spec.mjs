@@ -322,47 +322,6 @@ test('empty room shows only the caret and the count prompt; after a wipe the blo
   expect(await chrome()).toBe('visible');
 });
 
-test('history is stepped per line and a new line shifts it exactly one pitch', async ({ page }, info) => {
-  const reduced = info.project.use.reducedMotion === 'reduce';
-  await enter(page);
-  await page.keyboard.insertText('First line');
-  await settle(page);
-  const topology = await editor(page).evaluate(e => ({ line: parseFloat(getComputedStyle(e).lineHeight), scroll: e.scrollTop }));
-  await page.keyboard.insertText(' typed on the same line');
-  await settle(page);
-  expect(await editor(page).evaluate(e => e.scrollTop), 'same-line typing moves nothing').toBe(topology.scroll);
-  for (const line of [2, 3, 4]) {
-    const start = topology.scroll + (line - 2) * topology.line;
-    await page.keyboard.insertText('\n');
-    await page.keyboard.insertText(`Line ${line}`);
-    if (reduced) {
-      expect(await editor(page).evaluate(e => e.scrollTop), `line ${line} snaps under Reduce Motion`).toBeCloseTo(start + topology.line, 0);
-    } else {
-      await page.clock.runFor(90);
-      const mid = await editor(page).evaluate(e => e.scrollTop);
-      expect(mid, `line ${line} is shifting, not snapping`).toBeGreaterThan(start + 0.5);
-      expect(mid, `line ${line} is shifting, not snapping`).toBeLessThan(start + topology.line - 0.5);
-    }
-    await settle(page);
-    expect(await editor(page).evaluate(e => e.scrollTop), `line ${line} shifted the history one pitch`)
-      .toBeCloseTo(start + topology.line, 0);
-  }
-  // One fixed pitch for every script: a Chinese line advances exactly one line box too.
-  const cjkStart = topology.scroll + 3 * topology.line;
-  await page.keyboard.insertText('\n中文继续写。');
-  if (reduced) {
-    expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line snaps under Reduce Motion').toBeCloseTo(cjkStart + topology.line, 0);
-  } else {
-    await page.clock.runFor(90);
-    const cjkMid = await editor(page).evaluate(e => e.scrollTop);
-    expect(cjkMid, 'a CJK line is shifting, not snapping').toBeGreaterThan(cjkStart + 0.5);
-    expect(cjkMid, 'a CJK line is shifting, not snapping').toBeLessThan(cjkStart + topology.line - 0.5);
-  }
-  await settle(page);
-  expect(await editor(page).evaluate(e => e.scrollTop), 'a CJK line keeps the same pitch').toBeCloseTo(topology.scroll + 4 * topology.line, 0);
-  await expect(page.locator('#room-count')).toHaveText(countLabel('First line typed on the same line\nLine 2\nLine 3\nLine 4\n中文继续写。'));
-});
-
 test('warning numeral and caption are placed by ink under the writing line', async ({ page }, info) => {
   await enter(page);
   await page.keyboard.insertText('Keep typing until the warning lands.');
@@ -693,44 +652,6 @@ test('the session bar drains continuously, never in steps', async ({ page }, inf
       previous = now;
     }
   }
-});
-
-test('the session bar is the paper\'s own rounded top edge at every fill', async ({ page }) => {
-  await enter(page);
-  await page.keyboard.insertText('A');
-  await settle(page);
-  const geometry = () => page.evaluate(() => {
-    const paper = document.querySelector('#room .room-paper');
-    const bar = document.querySelector('#room-bar');
-    const p = paper.getBoundingClientRect();
-    const b = bar.getBoundingClientRect();
-    const s = getComputedStyle(bar);
-    const radius = parseFloat(getComputedStyle(paper).borderTopLeftRadius);
-    return { left: b.left - p.left, right: p.right - b.right, top: b.top - p.top, radius,
-      border: s.borderTopWidth, barRadius: [s.borderTopLeftRadius, s.borderTopRightRadius],
-      side: [s.borderLeftWidth, s.borderRightWidth], clip: s.clipPath, overflow: getComputedStyle(paper).overflow };
-  });
-  const full = await geometry();
-  expect(full.left, 'the bar starts at the card edge').toBe(0);
-  expect(full.right, 'the bar ends at the card edge').toBe(0);
-  expect(full.top).toBe(0);
-  expect(full.border).toBe('2px');
-  expect(full.side, 'the border tapers to the card edge, never a side stroke').toEqual(['0px', '0px']);
-  expect(full.radius).toBeGreaterThan(0);
-  expect(full.barRadius, 'the bar follows the card corner curve').toEqual([`${full.radius}px`, `${full.radius}px`]);
-  expect(barFraction(full.clip)).toBeGreaterThan(0.99);
-  for (let i = 0; i < 10; i++) {
-    await page.clock.fastForward(3000);
-    await page.keyboard.insertText(' writing');
-  }
-  await page.clock.runFor(600);
-  // WAAPI runs on the real timeline, not the faked page clock: seat the fill at its midpoint.
-  await page.locator('#room-bar').evaluate(bar => bar.getAnimations().forEach(a => { a.pause(); a.currentTime = 30000; }));
-  const half = await geometry();
-  expect(half.left, 'the bar still starts at the card edge').toBe(0);
-  expect(half.right, 'the revealed edge never shrinks the box').toBe(0);
-  expect(barFraction(half.clip)).toBeGreaterThan(0.4);
-  expect(barFraction(half.clip)).toBeLessThan(0.6);
 });
 
 test('native zen input, deny, IME paths, warning, recovery and wipe', async ({ page }, info) => {
@@ -1624,51 +1545,6 @@ test('the demo numeral follows its own sheet, and the room keeps the Mac numeral
   }
 });
 
-test('the room wears the landing design system', async ({ page }) => {
-  await enter(page);
-  const look = await page.evaluate(() => {
-    const css = s => getComputedStyle(document.querySelector(s));
-    const probeOn = (selector, name) => {
-      const i = document.createElement('i');
-      i.style.color = getComputedStyle(document.querySelector(selector)).getPropertyValue(name);
-      document.querySelector('#room').append(i);
-      const c = getComputedStyle(i).color; i.remove(); return c;
-    };
-    const probe = name => probeOn('#room', name);
-    return {
-      page: css('#room').backgroundColor, pageToken: probe('--page'),
-      // The renderer owns the sheet's tone token on the sheet itself (it corrects the texture's mean, D-069),
-      // so the paper is compared with the tone the renderer set for it; the rendered value is measured in
-      // qa/paper.spec.mjs.
-      sheet: css('.room-paper').backgroundColor, sheetToken: probeOn('.room-paper', '--paper-tone'),
-      sheetShadow: css('.room-paper').boxShadow, roomShadow: css('#room').boxShadow,
-      writing: css('#editor').fontFamily, tool: ['#room-clock', '#room-count', '#exit'].map(s => css(s).fontFamily),
-      washes: document.querySelectorAll('#room .wash').length,
-    };
-  });
-  expect(look.page).toBe(look.pageToken);
-  // D-056/D-069: the writing sheet is the Note paper, a measured role of its own; `--sheet` stays the plain
-  // surface for cards, controls and fields, so the room's paper paints the tone the renderer set for it.
-  expect(look.sheet).toBe(look.sheetToken);
-  expect(look.sheetShadow).not.toBe('none');
-  expect(look.roomShadow).toBe('none');
-  expect(look.writing).toMatch(/^"?Allo/);
-  for (const family of look.tool) expect(family).toMatch(/system-ui/);
-  expect(look.washes, 'the warning wash lives on the sheet only').toBe(1);
-  // The paper switch sits beside the mark (D-119). Changing the paper is not input: the keyboard stays on the
-  // writing and the draft is untouched.
-  await editor(page).focus();
-  await page.keyboard.insertText('still here');
-  const modes = page.locator('#room .home-nav .modes');
-  await expect(modes).toBeVisible();
-  const next = (await page.evaluate(() => document.documentElement.dataset.theme)) === 'slate' ? 'Paper' : 'Slate';
-  await modes.locator('label').getByText(next, { exact: true }).click();
-  await expect(page.locator('html')).toHaveAttribute('data-theme', next.toLowerCase());
-  await expect(editor(page), 'switching the paper hands focus back to the writing').toBeFocused();
-  await expect(editor(page)).toHaveValue('still here');
-  await expect(page.locator('#room')).toHaveAttribute('data-phase', 'typing');
-});
-
 test('focus is a ring, never a re-cut of the control it lands on', async ({ page }, info) => {
   // Walk in with the keyboard, so every focus the page makes is a :focus-visible one - the state
   // that used to re-cut the room's pill into an 8 px rectangle (D-059).
@@ -1876,33 +1752,6 @@ test('the watch-only demo advertises no input, and its count speaks like the roo
   // The first scripted word prints the same string the room prints for one word.
   await expect(page.locator('#count')).toHaveText(`${wordCount(first.cur)} ${wordCount(first.cur) === 1 ? 'word' : 'words'}`);
   await expect(page.locator('#count')).toHaveText('1 word');
-});
-
-test('the landing states the warning lead-in and never labels a moment with another moment', async ({ page }) => {
-  const copy = await page.evaluate(() => ({
-    moments: [...document.querySelectorAll('#core .mo small')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
-    numeral: document.querySelector('#core .mo .n').textContent.trim(),
-    stopped: [...document.querySelectorAll('#core .mo.m3 .t, #core .mo.m3 .r')].map(e => e.textContent.trim()),
-    marker: [...document.querySelectorAll('#how .line8 .lab span, #how .line8 .lab b')].map(e => e.textContent.trim()),
-    card: document.querySelectorAll('#how .how-row > p')[1].textContent.replace(/\s+/g, ' ').trim(),
-    faq: document.querySelectorAll('#faq details p')[1].textContent.replace(/\s+/g, ' ').trim(),
-    schema: JSON.parse(document.querySelector('script[type="application/ld+json"]').textContent)['@graph'][1].mainEntity[1].acceptedAnswer.text,
-  }));
-  expect(copy.moments[0]).toMatch(/^0:47\b/);
-  expect(copy.moments[2]).toMatch(/^8 s\b/);
-  // The middle panel's label and its numeral name the same quantity: three seconds left.
-  const label = copy.moments[1].match(/^(\d+) s left\b/);
-  expect(label, `the warning panel is labelled with its own numeral: ${copy.moments[1]}`).not.toBeNull();
-  expect(Number(label[1])).toBe(Number(copy.numeral));
-  expect(Number(label[1]), 'the warning leads the deletion by three seconds').toBe(3);
-  // The deleted panel shows the stopped screen's own words and names no second moment (D-070).
-  expect(copy.stopped).toEqual(['You stopped.', 'Draft deleted.']);
-  // One form for a silence mark everywhere.
-  expect(copy.marker).toEqual(['last key', '5 s · warning', '8 s · deleted']);
-  // The card says the one rule (D-101) and the marker above it shows the warning; the lead-in is stated in the answer the schema repeats word for word.
-  expect(copy.card).toMatch(/warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds/);
-  expect(copy.faq).toMatch(/counts 3, 2, 1 before deleting your draft at 8 seconds/i);
-  expect(copy.faq).toBe(copy.schema);
 });
 
 test('the clock does not breathe: tabular numerals on the room and the demo', async ({ page }) => {

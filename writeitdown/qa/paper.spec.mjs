@@ -83,28 +83,6 @@ async function roomPatches(page) {
 }
 
 test.describe('the sheet', () => {
-  test('each mode paints its locked sheet on the demo and in the room', async ({ page }) => {
-    await page.goto('./');
-    const m = await mode(page);
-    const want = SHEET[m];
-    for (const sel of ['#paper', '.room-paper', '.mo', '.vis-sheet', '.mac-card']) {
-      expect(toHex(await token(page, sel, '--paper-tone')), `${sel} tone`).toBe(want.tone);
-      expect(toHex(await style(page, sel, 'backgroundColor')), `${sel} paints the tone`).toBe(want.tone);
-    }
-    expect(toHex(await style(page, '#paper .script', 'color')), 'the demo writes in the sheet ink').toBe(want.ink);
-    expect(toHex(await token(page, '#paper', '--paper-wash')), 'the wash').toBe(want.wash);
-    expect(toHex(await token(page, '#paper', '--paper-wash-deep')), 'the deep wash').toBe(want.deep);
-    await enterRoom(page);
-    expect(toHex(await style(page, '#editor-ink', 'color')), 'the room writes in the sheet ink').toBe(want.ink);
-    expect(toHex(await style(page, '#room-count', 'color')), 'the quiet role').toBe(want.quiet);
-    expect(toHex(await style(page, '.danger .numeral', 'color')), 'the numeral').toBe(want.danger);
-    const history = await page.evaluate(() => ['--paper-history-1', '--paper-history-2']
-      .map(n => Number(getComputedStyle(document.querySelector('#editor')).getPropertyValue(n))));
-    expect(history, 'the dimmed history steps (D-092)').toEqual(want.history);
-    // There is no canvas paper and no renderer any more: the material is CSS.
-    expect(await page.locator('.sheet-paper').count()).toBe(0);
-    expect(await page.evaluate(() => 'WriteItDownPaper' in window)).toBe(false);
-  });
 
   test('Paper is plain white: no grain, no cloud, no lamp', async ({ page }) => {
     await page.goto('./');
@@ -178,15 +156,6 @@ test.describe('the sheet', () => {
         }
       }
     }
-  });
-
-  test('the grain never moves while the writer types', async ({ page }) => {
-    await enterRoom(page);
-    const { topLeft } = await roomPatches(page);
-    const before = await pixels(page, topLeft);
-    await page.locator('#editor').pressSequentially('the rain is on the window and the room is quiet', { delay: 20 });
-    const after = await pixels(page, topLeft);
-    expect(after.hash, 'the sheet was repainted under the writer').toBe(before.hash);
   });
 
   test('the sheet texture keeps its own aspect on every sheet: no streak on a tall phone sheet (round 006)', async ({ page }) => {

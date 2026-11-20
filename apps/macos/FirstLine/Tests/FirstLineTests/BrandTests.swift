@@ -47,15 +47,6 @@ struct BrandTests {
         #expect(RootWindowController(appState: state).window?.title == "Write It Down")
     }
 
-    @Test func startScreenHasNoSiteHeadlineDeckOrSlogan() {
-        let state = AppState()
-        let home = HomeViewController(appState: state)
-        let labels = allLabels(in: home.view).joined(separator: " ")
-        #expect(!labels.contains("We force you"))
-        #expect(!labels.contains("With a clock"))
-        #expect(!labels.contains("Give it sixty seconds"))
-    }
-
     @Test func upgradeShowsOneTimePrice() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

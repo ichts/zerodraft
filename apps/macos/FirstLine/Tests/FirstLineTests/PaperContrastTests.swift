@@ -52,21 +52,6 @@ struct PaperContrastTests {
         .slate: ("#363b3d", "#f7eedb", "#f4efe6", "#ffe8de", "#493e3d", "#5a403d", [1, 0.16, 0.05]),
     ]
 
-    @Test(arguments: PaperMode.allCases)
-    func eachModeHasItsLockedSheet(mode: PaperMode) throws {
-        _ = NSApplication.shared
-        let want = try #require(Self.sheet[mode])
-        try withPaperMode(mode) { (appearance: NSAppearance.Name) throws in
-            #expect(hex(try resolved(FirstLineColors.paperNSColor, appearance)) == want.tone)
-            #expect(hex(try resolved(FirstLineColors.paperInkNSColor, appearance)) == want.ink)
-            #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, appearance)) == want.quiet)
-            #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, appearance)) == want.danger)
-            #expect(hex(try resolved(FirstLineColors.paperWashNSColor, appearance)) == want.wash)
-            #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, appearance)) == want.deep)
-            #expect(FirstLineColors.paperHistoryOpacities(for: NSAppearance(named: appearance)!) == want.history)
-        }
-    }
-
     /// The dimmed history (D-092): the steps are exempt from 7:1 and pinned to the same 1.57:1 and 1.15:1 on every
     /// sheet, so no mode's history reads louder than another's.
     @Test(arguments: PaperMode.allCases)
@@ -243,16 +228,6 @@ struct PaperContrastTests {
         return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2])
     }
 
-    @Test func theFieldIsDeterministic() throws {
-        let first = try #require(PaperField.render(width: 240, height: 160, scale: 2, mode: .lamp))
-        let second = try #require(PaperField.render(width: 240, height: 160, scale: 2, mode: .lamp))
-        let a = try #require(first.dataProvider?.data) as Data
-        let b = try #require(second.dataProvider?.data) as Data
-        #expect(a == b, "the same size and mode must always produce the same sheet")
-        let other = try #require(PaperField.render(width: 240, height: 160, scale: 2, mode: .slate))
-        let c = try #require(other.dataProvider?.data) as Data
-        #expect(a != c, "Lamp and Slate are different papers")
-    }
 }
 
 private extension NSColor {

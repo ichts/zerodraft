@@ -46,6 +46,8 @@ final class PaperSheetView: NSView {
 
     private var paperImage: CGImage?
     private var imageKey = ""
+    /// How many times the sheet has been drawn; typing and warn ticks must leave it unchanged.
+    private(set) var paints = 0
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -106,6 +108,7 @@ final class PaperSheetView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        paints += 1
         let rect = bounds
         ctx.saveGState()
         if cornerRadius > 0 {

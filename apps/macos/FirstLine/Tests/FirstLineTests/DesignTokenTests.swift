@@ -1,54 +1,92 @@
 import AppKit
+import Foundation
 import Testing
 @testable import WriteItDown
 
+/// The Mac palette is tokens.css v3, read from the file itself: a token changed on the web without the Mac, or the
+/// other way round, fails here with the role and both values (D-119, D-120).
 @MainActor
 struct DesignTokenTests {
-    @Test func lightTokensResolveToBackgroundA() {
-        assertPalette(.aqua, expected: [
-            (FirstLineColors.pageNSColor, 0xF7F7F5), (FirstLineColors.sheetNSColor, 0xFFFFFF),
-            (FirstLineColors.inkNSColor, 0x1C1917), (FirstLineColors.muteNSColor, 0x6B655C),
-            (FirstLineColors.chromeNSColor, 0x5C564D), (FirstLineColors.tagBackgroundNSColor, 0xF2F2F0),
-            (FirstLineColors.redNSColor, 0xB02A1E), (FirstLineColors.paperWashNSColor, 0xE8CFBB),
-            (FirstLineColors.paperWashDeepNSColor, 0xE6BCA7), (FirstLineColors.onInkNSColor, 0xFFFFFF),
-        ])
+    private static let tokens: String = {
+        let file = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()  // FirstLine
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()  // repo root
+            .appendingPathComponent("writeitdown/tokens.css")
+        return (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+    }()
+
+    /// The declarations of one mode's block: Lamp is `:root`, the others `:root[data-theme="…"]`, each inheriting
+    /// what it leaves out from Lamp, as the cascade does.
+    private static func declarations(_ mode: PaperMode) -> [String: String] {
+        func block(_ selector: String) -> [String: String] {
+            guard let start = tokens.range(of: selector + "{"),
+                  let end = tokens.range(of: "\n}", range: start.upperBound..<tokens.endIndex) else { return [:] }
+            var values: [String: String] = [:]
+            let body = tokens[start.upperBound..<end.lowerBound]
+            let pattern = try! NSRegularExpression(pattern: #"(--[a-z0-9-]+)\s*:\s*([^;]+);"#)
+            let text = String(body)
+            for match in pattern.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
+                let name = String(text[Range(match.range(at: 1), in: text)!])
+                let value = String(text[Range(match.range(at: 2), in: text)!]).trimmingCharacters(in: .whitespaces)
+                values[name] = value
+            }
+            return values
+        }
+        let lamp = block(":root")
+        guard mode != .lamp else { return lamp }
+        return lamp.merging(block(":root[data-theme=\"\(mode.rawValue)\"]")) { $1 }
     }
 
-    @Test func darkTokensResolveToLandingDarkTheme() {
-        assertPalette(.darkAqua, expected: [
-            (FirstLineColors.pageNSColor, 0x15140F), (FirstLineColors.sheetNSColor, 0x26231C),
-            (FirstLineColors.inkNSColor, 0xECE7D9), (FirstLineColors.muteNSColor, 0xA39D8E),
-            (FirstLineColors.chromeNSColor, 0xA39D8E), (FirstLineColors.tagBackgroundNSColor, 0x2E2A22),
-            (FirstLineColors.redNSColor, 0xE4604A), (FirstLineColors.paperWashNSColor, 0x453226),
-            (FirstLineColors.paperWashDeepNSColor, 0x573428), (FirstLineColors.onInkNSColor, 0x15140F),
-        ])
+    private static func hex(_ value: String?) -> UInt32? {
+        guard let value, value.hasPrefix("#"), value.count == 7 else { return nil }
+        return UInt32(value.dropFirst(), radix: 16)
     }
 
-    @Test func uiIsSystemSansAndWritingIsNewsreader() throws {
-        let system = NSFont.systemFont(ofSize: 15)
-        #expect(FirstLineTypography.uiNSFont.familyName == system.familyName)
-        #expect(FirstLineTypography.displayNSFont().familyName == system.familyName)
-        let writing = try #require(FirstLineTypography.writingNSFont(size: 28))
-        #expect(writing.fontName.localizedCaseInsensitiveContains("Newsreader"))
+    @Test(arguments: PaperMode.allCases)
+    func everyRoleIsTheWebsToken(mode: PaperMode) throws {
+        let css = Self.declarations(mode)
+        try #require(css["--paper-tone"] != nil, "tokens.css has no \(mode) block")
+        let palette = FirstLineColors.Palette.of(mode)
+        let colours: [(String, UInt32)] = [
+            ("--page", palette.page), ("--sheet", palette.sheet), ("--tag-bg", palette.tagBackground),
+            ("--ink", palette.ink), ("--mute", palette.mute), ("--chrome", palette.mute), ("--on-ink", palette.onInk),
+            ("--red", palette.red), ("--red-text-small", palette.redText),
+            ("--paper-tone", palette.paper), ("--paper-ink", palette.paperInk), ("--paper-quiet", palette.paperQuiet),
+            ("--paper-danger", palette.paperDanger), ("--paper-wash", palette.paperWash),
+            ("--paper-wash-deep", palette.paperWashDeep),
+        ]
+        for (token, mac) in colours {
+            let web = try #require(Self.hex(css[token]), "\(mode) \(token) is \(css[token] ?? "missing")")
+            #expect(web == mac, "\(mode) \(token): web \(String(web, radix: 16)), Mac \(String(mac, radix: 16))")
+        }
+        #expect(css["--paper-history-1"].flatMap(Double.init) == Double(palette.history[1]))
+        #expect(css["--paper-history-2"].flatMap(Double.init) == Double(palette.history[2]))
     }
 
-    @Test func redIsThePenInBothAppearances() {
-        assertPalette(.aqua, expected: [(FirstLineColors.redNSColor, 0xB02A1E)])
-        assertPalette(.darkAqua, expected: [(FirstLineColors.redNSColor, 0xE4604A)])
+    /// Each role resolves to its mode through the window's appearance and the stored mode, so one window shows one
+    /// mode at a time.
+    @Test(arguments: PaperMode.allCases)
+    func rolesResolveToTheShowingMode(mode: PaperMode) {
+        withPaperMode(mode) { appearance in
+            let palette = FirstLineColors.Palette.of(mode)
+            assertPalette(appearance, expected: [
+                (FirstLineColors.pageNSColor, palette.page), (FirstLineColors.inkNSColor, palette.ink),
+                (FirstLineColors.paperNSColor, palette.paper), (FirstLineColors.paperInkNSColor, palette.paperInk),
+                (FirstLineColors.paperQuietNSColor, palette.paperQuiet),
+                (FirstLineColors.paperDangerNSColor, palette.paperDanger),
+                (FirstLineColors.paperWashNSColor, palette.paperWash),
+            ])
+            #expect(FirstLineColors.mode(for: NSAppearance(named: appearance)!) == mode)
+        }
     }
 
-    @Test func redTextIsBrighterInDarkOnly() {
-        assertPalette(.aqua, expected: [(FirstLineColors.redTextNSColor, 0xB02A1E)])
-        assertPalette(.darkAqua, expected: [(FirstLineColors.redTextNSColor, 0xFF9B88)])
-    }
-
-    private func assertPalette(_ appearance: NSAppearance.Name, expected: [(NSColor, Int)]) {
+    private func assertPalette(_ appearance: NSAppearance.Name, expected: [(NSColor, UInt32)]) {
         for (token, hex) in expected {
-            var actual: [Int] = []
+            var actual: [UInt32] = []
             NSAppearance(named: appearance)!.performAsCurrentDrawingAppearance {
-                let resolved = token.usingColorSpace(.deviceRGB)!
+                let resolved = token.usingColorSpace(.sRGB)!
                 actual = [resolved.redComponent, resolved.greenComponent, resolved.blueComponent]
-                    .map { Int(($0 * 255).rounded()) }
+                    .map { UInt32(($0 * 255).rounded()) }
             }
             #expect(actual == [(hex >> 16) & 255, (hex >> 8) & 255, hex & 255])
         }

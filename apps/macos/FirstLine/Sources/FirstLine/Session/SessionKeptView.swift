@@ -75,6 +75,7 @@ final class SessionKeptView: NSView {
 
         heading.translatesAutoresizingMaskIntoConstraints = false
         heading.alignment = .center
+        heading.textColor = FirstLineColors.paperInkNSColor
         heading.maximumNumberOfLines = 2
         heading.lineBreakMode = .byWordWrapping
         body.translatesAutoresizingMaskIntoConstraints = true

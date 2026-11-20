@@ -192,7 +192,7 @@ struct LicenseFlowTests {
     }
 
     @Test func cachedCredentialDoesNotAliasUnicodeEquivalentInput() async throws {
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "\u{e9}-test-order", licenseStatus: .active,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
         let (state, client, _, fm, root) = try makeAppState(initialSettings: cached)
@@ -208,7 +208,7 @@ struct LicenseFlowTests {
     @Test(arguments: [LicenseStatus.unknown, .revoked])
     func cachedSameKeyRevalidatesWithoutConsumingAnotherSlot(status: LicenseStatus) async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY", licenseStatus: status,
                                  licenseActivatedAt: now, licenseLastValidatedAt: now,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -226,7 +226,7 @@ struct LicenseFlowTests {
     @Test
     func inactiveSameKeyInstanceActivatesAgain() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .revoked, licenseActivatedAt: now,
                                  licenseLastValidatedAt: now, licenseInstanceID: "lki_inactive",
@@ -244,7 +244,7 @@ struct LicenseFlowTests {
     @Test
     func sameKeyValidationNetworkFailureDoesNotActivate() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY", licenseStatus: .revoked,
                                  licenseActivatedAt: now, licenseLastValidatedAt: now,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -328,7 +328,7 @@ struct LicenseFlowTests {
         defer { try? fm.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        try store.save(AppSettings(defaultDuration: 60, reducedMotion: .system,
                                    licenseKey: "KEY",
                                    licenseStatus: .active, licenseActivatedAt: now,
                                    licenseLastValidatedAt: now, licenseInstanceID: "instance",
@@ -350,7 +350,7 @@ struct LicenseFlowTests {
     @Test(arguments: [LicenseStatus.active, .unknown, .revoked])
     func cachedKeyWithoutInstanceCannotValidateOrUnlockButCanActivateSameKey(status: LicenseStatus) async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: status, licenseActivatedAt: now,
                                  licenseLastValidatedAt: now, licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -381,7 +381,7 @@ struct LicenseFlowTests {
 
     @Test
     func cachedKeyOpensBeforeRevalidationButRequiresMatchingProduct() async throws {
-        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let active = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -416,7 +416,7 @@ struct LicenseFlowTests {
     func expiredOfflineLicenseRecoversAfterOnlineValidation() async throws {
         let then = Date(timeIntervalSince1970: 1_700_000_000)
         let now = then.addingTimeInterval(8 * 86_400)
-        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let active = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: then,
                                  licenseLastValidatedAt: then, licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -452,7 +452,7 @@ struct LicenseFlowTests {
 
     @Test(arguments: [true, false])
     func olderSameKeyValidationCannotOverrideNewerResult(newerValid: Bool) async throws {
-        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let active = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseInstanceID: "lki_existing",
                                  licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -484,7 +484,7 @@ struct LicenseFlowTests {
 
     @Test(arguments: [false, true])
     func rejectedProductCleansOnlyNewInstanceAndReportsFailure(cleanupFails: Bool) async throws {
-        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let old = AppSettings(defaultDuration: 60, reducedMotion: .system,
                               licenseKey: "OLD", licenseStatus: .active,
                               licenseActivatedAt: Date(timeIntervalSince1970: 1_700_000_000),
                               licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -501,7 +501,7 @@ struct LicenseFlowTests {
 
     @Test
     func rejectedActivationNeverDeactivatesPreviouslyAcceptedInstance() async throws {
-        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let old = AppSettings(defaultDuration: 60, reducedMotion: .system,
                               licenseKey: "KEY", licenseStatus: .active,
                               licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
         let fm = FileManager.default
@@ -542,7 +542,7 @@ struct LicenseFlowTests {
     func offlineGraceExpiresWhileAppRemainsOpenAndOnlineValidationRestoresAccess() async throws {
         let last = Date(timeIntervalSince1970: 1_700_000_000)
         var now = last.addingTimeInterval(86_400)
-        let active = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let active = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: last,
                                  licenseLastValidatedAt: last, licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -573,7 +573,7 @@ struct LicenseFlowTests {
     func offlineGraceRejectsClockRollbackAndSevenDayBoundary(age: Int) async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let last = now.addingTimeInterval(TimeInterval(-age))
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: last,
                                  licenseLastValidatedAt: last, licenseInstanceID: "lki_existing",
@@ -591,7 +591,7 @@ struct LicenseFlowTests {
     func clockRollbackBeyondToleranceRevokesOfflineGraceWhileAppOpen() async throws {
         let last = Date(timeIntervalSince1970: 1_700_000_000)
         var now = last.addingTimeInterval(86_400)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: last,
                                  licenseLastValidatedAt: last, licenseInstanceID: "lki_existing",
@@ -613,7 +613,7 @@ struct LicenseFlowTests {
 
     @Test
     func activeFlagWithoutKeyCannotSkipOfflineGrace() throws {
-        let old = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let old = AppSettings(defaultDuration: 60, reducedMotion: .system,
                               trialSessionsUsed: 3, licenseStatus: .active)
         let (state, _, _, fm, root) = try makeAppState(initialSettings: old,
             clockNow: Date(timeIntervalSince1970: 2_000_000_000))
@@ -626,7 +626,7 @@ struct LicenseFlowTests {
     @Test(arguments: [true, false])
     func visibleLicenseSurfacesRefreshAfterValidation(valid: Bool) async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY",
                                  licenseStatus: .active, licenseActivatedAt: now,
                                  licenseLastValidatedAt: now, licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -674,7 +674,7 @@ struct LicenseFlowTests {
     @Test
     func validCachedLicenseOutranksEarlierActivationErrorInSettings() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY", licenseStatus: .active,
                                  licenseActivatedAt: now, licenseLastValidatedAt: now,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -707,7 +707,7 @@ struct LicenseFlowTests {
     @Test
     func cleanupFailureRemainsVisibleAlongsideRecoveredCachedLicense() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "OLD", licenseStatus: .active,
                                  licenseActivatedAt: now, licenseLastValidatedAt: now,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -751,7 +751,7 @@ struct LicenseFlowTests {
     @Test
     func validationRefreshDoesNotInterruptWriting() async throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
-        let cached = AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        let cached = AppSettings(defaultDuration: 60, reducedMotion: .system,
                                  licenseKey: "KEY", licenseStatus: .active,
                                  licenseActivatedAt: now, licenseLastValidatedAt: now,
                                  licenseInstanceID: "lki_existing", licenseProductID: "prod_mock", licenseToken: "mock-token")
@@ -770,7 +770,6 @@ struct LicenseFlowTests {
     @Test
     func activatedLicenseAllowsWriting() async throws {
         let exhausted = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system
         )
@@ -788,7 +787,6 @@ struct LicenseFlowTests {
     @Test
     func revokedLicenseCannotStartWriting() throws {
         let revoked = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
             licenseStatus: .revoked
@@ -805,7 +803,6 @@ struct LicenseFlowTests {
     @Test
     func validateLicenseRefreshesLastValidatedAtWhenValid() async throws {
         let active = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
             licenseKey: "PRO-VALID",
@@ -833,7 +830,6 @@ struct LicenseFlowTests {
     @Test
     func validateLicenseRevokesWhenServiceReturnsInvalid() async throws {
         let active = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
             licenseKey: "PRO-REFUNDED",
@@ -858,7 +854,6 @@ struct LicenseFlowTests {
         let recentlyValidated = Date(timeIntervalSince1970: 1_700_000_000)
         let oneDayLater = Date(timeIntervalSince1970: 1_700_000_000 + 86_400)
         let active = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
             licenseKey: "PRO-OFFLINE",
@@ -884,7 +879,6 @@ struct LicenseFlowTests {
         let lastValidated = Date(timeIntervalSince1970: 1_700_000_000)
         let eightDaysLater = Date(timeIntervalSince1970: 1_700_000_000 + 8 * 86_400)
         let active = AppSettings(
-            theme: .system,
             defaultDuration: 300,
             reducedMotion: .system,
             licenseKey: "PRO-EXPIRED",

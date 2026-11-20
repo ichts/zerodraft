@@ -279,14 +279,14 @@ struct RoomTests {
                                               context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
                 exit.mouseEntered(with: event)
                 let color = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-                #expect(sameColor(color, FirstLineColors.inkNSColor, appearance: name))
+                #expect(sameColor(color, FirstLineColors.paperInkNSColor, appearance: name))
                 exit.mouseExited(with: event)
                 let quiet = exit.attributedTitle.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
                 #expect(sameColor(quiet, FirstLineColors.paperQuietNSColor, appearance: name))
                 window.makeFirstResponder(exit)
                 let ring = exit as? FirstLineInkFocusRinging
                 #expect(ring?.showsInkFocusRing == true)
-                #expect(sameColor(ring?.inkFocusRingColor, FirstLineColors.inkNSColor, appearance: name))
+                #expect(sameColor(ring?.inkFocusRingColor, FirstLineColors.paperInkNSColor, appearance: name))
             }
             #expect(exit.frame == frame)
         }
@@ -333,7 +333,7 @@ struct RoomTests {
         advance(fixture, to: .danger)
         fixture.room.view.layoutSubtreeIfNeeded()
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        let caption = try #require(fields.first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
+        let caption = try #require(fields.first { $0.stringValue == "Keep typing or the draft is deleted." })
         #expect(!caption.isHiddenOrHasHiddenAncestor)
         let numeral = try #require(fields.first { $0.stringValue == "3" })
         #expect(!numeral.isHiddenOrHasHiddenAncestor)
@@ -379,7 +379,7 @@ struct RoomTests {
         let clock = try #require(fields.first { $0.stringValue == "0:55" })
         #expect(clock.alphaValue == 0, "Focus Mode hides the clock while the pointer rests mid-window")
         let numeral = try #require(fields.first { $0.stringValue == "3" })
-        let caption = try #require(fields.first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
+        let caption = try #require(fields.first { $0.stringValue == "Keep typing or the draft is deleted." })
         for warning in [numeral, caption] {
             #expect(!warning.isHiddenOrHasHiddenAncestor)
             #expect(warning.alphaValue == 1)
@@ -465,7 +465,8 @@ struct RoomTests {
         let copyFrame = fixture.room.view.convert(copy.bounds, from: copy)
         let receiptFrame = fixture.room.view.convert(receipt.bounds, from: receipt)
         #expect(captionFrame.maxY <= copyFrame.minY, "the caption sits under the action row")
-        #expect(abs(captionFrame.midX - receiptFrame.midX) < 0.5, "the caption shares the kept block's centre")
+        // Each line is centred on whole points, so two odd widths can sit half a point apart: one 2x pixel.
+        #expect(abs(captionFrame.midX - receiptFrame.midX) <= 0.5, "the caption shares the kept block's centre")
         #expect(abs((caption.font?.pointSize ?? 0) - FirstLineTypography.smallMediumNSFont.pointSize) < 0.01,
                 "the caption uses the room's small caption face")
         let captionInk = caption.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
@@ -566,8 +567,8 @@ struct RoomTests {
         #expect(kept.draft.isEmpty)
     }
 
-    /// The ramp moves the sheet's colour, not the view's alpha, so the paper keeps one grain layer under
-    /// the alarm; the recovery still leaves on the 120 ms fade (D-056).
+    /// The ramp is the wash's opacity, the warning's strength, as the web sets `.room-paper-wash`'s opacity; the
+    /// recovery leaves on the 120 ms linear fade from wherever it stood (D-120).
     @Test func washRecoveryFadesOnceAndWarningInterruptsImmediately() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
@@ -575,12 +576,12 @@ struct RoomTests {
         fixture.room.tick()
         let wash = try #require(descendants(fixture.room.view, of: PaperWashView.self)
             .first { $0.fraction == 0.5 })
-        #expect(wash.alphaValue == 1)
+        #expect(wash.alphaValue == 0.5)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.editor.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
         let fade = try #require(wash.layer?.animation(forKey: "opacity") as? CABasicAnimation)
         #expect(fade.duration == 0.12)
-        #expect((fade.fromValue as? Float) == 1)
+        #expect((fade.fromValue as? Float) == 0.5)
         #expect((fade.toValue as? Float) == 0)
         #expect(wash.fraction == 0.5, "the wash leaves on the fade still carrying its warmth, not cut to plain paper")
         var control: [Float] = [0, 0]
@@ -592,7 +593,7 @@ struct RoomTests {
         fixture.clock.now = 13
         fixture.room.tick()
         #expect(wash.fraction == 0.5)
-        #expect(wash.alphaValue == 1)
+        #expect(wash.alphaValue == 0.5)
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         fixture.state.settings.reducedMotion = .always
         fixture.editor.insertText("y", replacementRange: NSRange(location: NSNotFound, length: 0))
@@ -600,9 +601,9 @@ struct RoomTests {
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
     }
 
-    /// A warn tick moves only the wash's colour: the texture layer is drawn once per field and never again
-    /// while the alarm ramps, and it lands on the sheet's own grain, so nothing on the paper moves or flickers.
-    @Test func warnTicksNeverRepaintThePaperTexture() throws {
+    /// A warn tick moves only the wash's opacity: the wash is painted once per size, mode and step and never again
+    /// while the alarm ramps, and the sheet under it is never rebuilt, so nothing on the paper moves or flickers.
+    @Test func warnTicksNeverRepaintThePaperOrTheWash() throws {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         let view = fixture.room.view
@@ -629,24 +630,23 @@ struct RoomTests {
             return pixels
         }
         let plain = try render()
-        fixture.clock.now = 5.2
+        fixture.clock.now = 5.6
         fixture.room.tick()
-        #expect(wash.alphaValue == 1 && wash.fraction > 0)
+        #expect(abs(wash.alphaValue - 0.2) < 0.001 && abs(wash.fraction - 0.2) < 0.001)
         let washed = try render()
-
-        let count = Double(plain.count)
-        let offset = zip(washed, plain).reduce(0.0) { $0 + ($1.0.1 - $1.1.1) } / count
-        let residual = (zip(washed, plain).reduce(0.0) { $0 + pow($1.0.1 - $1.1.1 - offset, 2) } / count).squareRoot()
-        #expect(residual < 0.01, "the washed grain does not sit on the sheet's grain: residual \(residual)")
+        let green = { (pixels: [(Double, Double, Double)]) in pixels.reduce(0.0) { $0 + $1.1 } / Double(pixels.count) }
+        #expect(green(washed) < green(plain), "the wash did not reach the frame")
 
         settle()
-        let paints = wash.texturePaints
-        #expect(paints > 0, "the texture layer was never painted")
+        let paints = wash.paints
+        let builds = paper.paints
+        #expect(paints > 0, "the wash was never painted")
         for now in [5.5, 6.0, 6.5, 7.0, 7.5] {
             fixture.clock.now = now
             fixture.room.tick()
             settle()
-            #expect(wash.texturePaints == paints, "a warn tick at \(now) s repainted the paper texture")
+            #expect(wash.paints == paints, "a warn tick at \(now) s repainted the wash")
+            #expect(paper.paints == builds, "a warn tick at \(now) s repainted the sheet")
         }
     }
 
@@ -659,6 +659,7 @@ struct RoomTests {
             .first { $0.alphaValue == 1 })
         #expect(wash.layer?.animation(forKey: "opacity") == nil)
         #expect(wash.deep)
+        #expect(wash.fraction == 1, "the cut lays the deep step at full strength")
         fixture.room.endCutAnimation()
         #expect(wash.alphaValue == 0)
         #expect(wash.layer?.animation(forKey: "opacity")?.duration == 0.12)
@@ -672,10 +673,12 @@ struct RoomTests {
         fixture.room.tick()
         #expect(fixture.engine.phase == .danger)
         let fields = descendants(fixture.room.view, of: NSTextField.self)
-        let caption = try #require(fields.first { $0.stringValue == "KEEP TYPING OR THE DRAFT IS DELETED." })
+        let caption = try #require(fields.first { $0.stringValue == "Keep typing or the draft is deleted." })
         let kern = caption.attributedStringValue.attribute(.kern, at: 0, effectiveRange: nil) as? CGFloat
-        #expect(abs((kern ?? 0) - 0.52) < 0.01)
+        // Sentence case at the note's size, untracked, medium (round 006b, D-119).
+        #expect((kern ?? 0) == 0)
         #expect(caption.font?.pointSize == 13)
+        #expect(caption.font == FirstLineTypography.smallMediumNSFont)
         let numeral = try #require(fields.first { $0.stringValue == "3" })
         #expect(abs((numeral.font?.pointSize ?? 0) - min(fixture.room.view.bounds.height * 0.18, 170)) < 1)
     }
@@ -725,7 +728,8 @@ struct RoomTests {
         #expect(outline.path?.boundingBox == CGRect(origin: .zero, size: outline.bounds.size))
         let stroke = try #require(outline.strokeColor)
         let ring = try #require(NSColor(cgColor: stroke))
-        #expect(sameColor(ring, FirstLineColors.onInkNSColor, appearance: appearance))
+        // On the sheet the pill's ring is the sheet's own tone (`--on-ink` rebinds to `--paper-tone`, D-120).
+        #expect(sameColor(ring, FirstLineColors.paperNSColor, appearance: appearance))
         window.makeFirstResponder(nil)
         #expect(outline.isHidden)
         window.orderOut(nil)

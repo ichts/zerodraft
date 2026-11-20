@@ -354,8 +354,8 @@ struct ReviewRoundTests {
         #expect(engine.phase == .danger)
         let washed = try sample()
 
-        // The tint itself is exact and deterministic: at 6.5 s the sheet is half way from the Wheat tone to
-        // the locked wash colour, and the view is fully covering the paper so the grain is painted once.
+        // The wash itself is exact and deterministic: at 6.5 s the mode's wash colour lies over the sheet at half
+        // strength, `.room-paper-wash` at opacity .5 (D-120).
         let wash = try #require(descendants(of: room.view, of: PaperWashView.self).first)
         #expect(abs(wash.fraction - 0.5) < 0.001)
         let tint = try #require(wash.tint.usingColorSpace(.sRGB))
@@ -367,8 +367,10 @@ struct ReviewRoundTests {
         }
         let base = try #require(noteTone)
         let washColour = try #require(target)
-        #expect(abs(Double(tint.redComponent) - Double((base.redComponent + washColour.redComponent) / 2)) < 0.002)
-        #expect(abs(Double(tint.greenComponent) - Double((base.greenComponent + washColour.greenComponent) / 2)) < 0.002)
+        #expect(abs(wash.alphaValue - 0.5) < 0.001)
+        #expect(abs(Double(tint.redComponent - washColour.redComponent)) < 0.002)
+        #expect(abs(Double(tint.greenComponent - washColour.greenComponent)) < 0.002)
+        #expect(base != washColour)
 
         // And it reaches the frame: the rendered sheet is warmer and loses green against the same patch
         // before the alarm. The sheet's grain lifts both frames equally, so the shift is what is measured.

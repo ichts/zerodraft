@@ -33,7 +33,6 @@ enum PaperModeRepaint {
     static func repaint(_ view: NSView) {
         view.viewDidChangeEffectiveAppearance()
         view.needsDisplay = true
-        if view.wantsUpdateLayer { view.needsDisplay = true }
         view.subviews.forEach(repaint)
     }
 }

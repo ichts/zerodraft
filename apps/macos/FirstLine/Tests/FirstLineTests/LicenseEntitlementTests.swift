@@ -123,7 +123,7 @@ struct LicenseEntitlementTests {
         try JSONSerialization.data(withJSONObject: fixture).write(to: root.appendingPathComponent("settings.json"))
         for _ in 0..<2 {
             let state = makeState(at: root)
-            #expect(state.settings.theme == .dark)
+            #expect(state.settings.paperMode == .lamp)
             #expect(state.settings.defaultDuration == 300)
             #expect(state.settings.reducedMotion == .always)
             #expect(state.settings.licenseStatus == .inactive)
@@ -142,7 +142,7 @@ struct LicenseEntitlementTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
-        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        try store.save(AppSettings(defaultDuration: 60, reducedMotion: .system,
                                    licenseKey: key, licenseStatus: .active, licenseLastValidatedAt: now,
                                    licenseInstanceID: "instance", licenseProductID: "prod_mock", licenseToken: "mock-token"))
         let client = MockLicenseClient()

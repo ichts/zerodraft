@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 @testable import WriteItDown
 
 /// Editor/navigation tests use an explicit test-only entitlement. Licensing tests use AppState directly.
@@ -29,4 +29,14 @@ func licensedTestState(
     state.settings.licenseStatus = .active
     state.selectedSurface = .home
     return state
+}
+
+/// Runs `body` with `mode` showing: it receives the appearance to give the window (aqua for Paper, darkAqua for
+/// Lamp and Slate), and every colour resolved inside `body` reads `mode`. The mode is task-local, so suites running
+/// beside this one keep their own.
+@MainActor
+func withPaperMode<T>(_ mode: PaperMode, _ body: (NSAppearance.Name) throws -> T) rethrows -> T {
+    try FirstLineColors.$taskDarkMode.withValue(mode == .paper ? nil : mode) {
+        try body(PaperModeRepaint.appearanceName(for: mode))
+    }
 }

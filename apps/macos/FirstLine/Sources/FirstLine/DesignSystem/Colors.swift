@@ -80,10 +80,14 @@ enum FirstLineColors {
         set { storedMode.withLock { $0 = newValue } }
     }
 
+    /// The dark mode for work running inside one task, ahead of the stored one. Tests draw Slate this way, so a
+    /// suite running beside them never sees another suite's mode; the app itself never sets it.
+    @TaskLocal static var taskDarkMode: PaperMode?
+
     /// The mode an appearance shows: Paper on aqua, the stored dark mode (Lamp or Slate) on darkAqua.
     static func mode(for appearance: NSAppearance) -> PaperMode {
         guard appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua else { return .paper }
-        return paperMode == .slate ? .slate : .lamp
+        return (taskDarkMode ?? paperMode) == .slate ? .slate : .lamp
     }
 
     static func palette(for appearance: NSAppearance) -> Palette {

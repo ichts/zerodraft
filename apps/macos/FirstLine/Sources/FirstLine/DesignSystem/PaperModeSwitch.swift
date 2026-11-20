@@ -86,6 +86,9 @@ final class PaperModeOption: FirstLineInkFocusButton {
     private weak var owner: PaperModeSwitch?
     private var hover = false
     private var tracking: NSTrackingArea?
+    /// The chosen label's underline. The button draws through its layer (`wantsUpdateLayer`), so `draw(_:)` never
+    /// runs; the line is its own sublayer, placed in `layout()` and coloured in `updateLayer()`.
+    private let underline = CALayer()
 
     var isChosen: Bool { owner?.mode == choice }
 
@@ -113,6 +116,10 @@ final class PaperModeOption: FirstLineInkFocusButton {
         setAccessibilityRole(.radioButton)
         setContentHuggingPriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .horizontal)
+        wantsLayer = true
+        underline.actions = ["frame": NSNull(), "position": NSNull(), "bounds": NSNull(), "backgroundColor": NSNull(),
+                             "hidden": NSNull()]
+        layer?.addSublayer(underline)
         refresh()
     }
 
@@ -133,7 +140,22 @@ final class PaperModeOption: FirstLineInkFocusButton {
             .font: FirstLineTypography.smallNSFont, .foregroundColor: color,
         ])
         setAccessibilityValue(isChosen)
+        needsLayout = true
         needsDisplay = true
+    }
+
+    override func layout() {
+        super.layout()
+        if underline.superlayer == nil { layer?.addSublayer(underline) }
+        underline.isHidden = underlineRect == nil
+        underline.frame = underlineRect ?? .zero
+    }
+
+    override func updateLayer() {
+        super.updateLayer()
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            underline.backgroundColor = labelColor.cgColor
+        }
     }
 
     override func updateTrackingAreas() {
@@ -181,12 +203,4 @@ final class PaperModeOption: FirstLineInkFocusButton {
         return NSRect(x: x, y: y.rounded(), width: width, height: 1)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        guard let underlineRect else { return }
-        effectiveAppearance.performAsCurrentDrawingAppearance {
-            labelColor.setFill()
-            underlineRect.fill()
-        }
-    }
 }

@@ -44,39 +44,59 @@ struct TypographyParityTests {
         return CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
     }
 
-    /// The writing stack the room and the kept sheet share: Newsreader over the bundled CJK cascade.
+    /// The writing stack the room and the kept sheet share: Allo over Resource Han Rounded, as the room has it once
+    /// Chinese has asked for the Chinese face.
     private func writingFont(size: CGFloat) throws -> NSFont {
-        try #require(WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size))
+        BundledFonts.ensureCJKRegistered()
+        return try #require(FirstLineTypography.writingNSFont(size: size))
+    }
+
+    /// The axes a variable font is drawn at, by four-letter tag.
+    private func axes(_ font: NSFont) -> [String: Double] {
+        let variation = CTFontCopyVariation(font) as? [Int: Double] ?? [:]
+        return Dictionary(uniqueKeysWithValues: variation.map { tag, value in
+            let bytes = [24, 16, 8, 0].map { UInt8((tag >> $0) & 255) }
+            return (String(decoding: bytes, as: UTF8.self), value)
+        })
     }
 
     private func descendants<T: NSView>(_ view: NSView, of type: T.Type) -> [T] {
         ((view as? T).map { [$0] } ?? []) + view.subviews.flatMap { descendants($0, of: type) }
     }
 
+    /// One face for every role (D-119, D-120): Allo at the web's weights, Resource Han Rounded for Chinese, and no
+    /// system or mono face anywhere.
     @Test func everyTypeRoleResolvesToTheSharedSet() throws {
-        #expect(try #require(FirstLineTypography.writingNSFont(size: 28)).fontName == "Newsreader16pt-Regular")
-        #expect(try #require(FirstLineTypography.writingItalicNSFont(size: 162)).fontName == "Newsreader16pt-Italic")
-        #expect(try #require(FirstLineTypography.writingMediumNSFont(size: 48)).fontName == "NewsreaderRoman-Medium")
-        #expect(try #require(ChineseFontCandidate.zhuqueFangsong.font(size: 28)).fontName == "ZhuqueFangsong-Regular")
-
-        let system = NSFont.systemFont(ofSize: 15).familyName
-        for (name, font) in [("ui", FirstLineTypography.uiNSFont),
-                             ("uiSemibold", FirstLineTypography.uiSemiboldNSFont),
-                             ("small", FirstLineTypography.smallNSFont),
-                             ("smallMedium", FirstLineTypography.smallMediumNSFont),
-                             ("smallSemibold", FirstLineTypography.smallSemiboldNSFont),
-                             ("field", FirstLineTypography.fieldNSFont),
-                             ("clock", FirstLineTypography.clockNSFont),
-                             ("display", FirstLineTypography.displayNSFont()),
-                             ("subtitle", FirstLineTypography.subtitleNSFont())] {
-            #expect(font.familyName == system, "\(name) left the system sans")
-        }
-        // The mono chrome layer is retired on both surfaces: no role may resolve to a mono face.
-        for font in [FirstLineTypography.uiNSFont, FirstLineTypography.smallNSFont,
-                     FirstLineTypography.clockNSFont, FirstLineTypography.displayNSFont()] {
+        let roles: [(String, NSFont?, Double)] = [
+            ("writing", FirstLineTypography.writingNSFont(size: 28), 410),
+            ("numeral", FirstLineTypography.numeralNSFont(size: 162), 360),
+            ("heading", FirstLineTypography.writingMediumNSFont(size: 48), 540),
+            ("ui", FirstLineTypography.uiNSFont, 400),
+            ("uiSemibold", FirstLineTypography.uiSemiboldNSFont, 600),
+            ("small", FirstLineTypography.smallNSFont, 400),
+            ("smallMedium", FirstLineTypography.smallMediumNSFont, 500),
+            ("smallSemibold", FirstLineTypography.smallSemiboldNSFont, 600),
+            ("field", FirstLineTypography.fieldNSFont, 400),
+            ("clock", FirstLineTypography.clockNSFont, 600),
+            ("display", FirstLineTypography.displayNSFont(), 540),
+            ("subtitle", FirstLineTypography.subtitleNSFont(), 400),
+        ]
+        for (name, font, weight) in roles {
+            let font = try #require(font, "\(name) has no font")
+            #expect(font.fontName.hasPrefix(BundledFonts.alloPostScript), "\(name) is \(font.fontName), not Allo")
+            // A variable font reports only the axes moved off their defaults; Allo's wght default is 400.
+            let drawn = axes(font)["wght"] ?? 400
+            #expect(drawn == weight, "\(name) draws at \(drawn), not \(weight)")
             #expect(!font.fontName.localizedCaseInsensitiveContains("Mono"))
-            #expect(!(font.familyName ?? "").localizedCaseInsensitiveContains("Plex"))
         }
+        #expect(try #require(BundledFonts.cjk(size: 28)).fontName == BundledFonts.cjkPostScript)
+    }
+
+    /// Only Chinese asks for the 1.2 MB Chinese face; Latin writing, digits and punctuation never do (D-109).
+    @Test func theChineseFaceWaitsForChinese() {
+        #expect(!BundledFonts.asksForCJK("promotion. i want time 1:00"))
+        #expect(BundledFonts.asksForCJK("我"))
+        #expect(BundledFonts.asksForCJK("wo 们"))
     }
 
     @Test func theBundleCarriesOnlyTheSharedFaces() throws {
@@ -84,17 +104,16 @@ struct TypographyParityTests {
         // keep files a previous build copied, so it is not the source of truth.
         let resources = packageRoot.appendingPathComponent("Sources/FirstLine/Resources")
         let names = try FileManager.default.contentsOfDirectory(atPath: resources.path)
-        #expect(Set(names.filter { $0.hasSuffix(".ttf") })
-            == ["Newsreader-Variable.ttf", "Newsreader-Italic-Variable.ttf", "ZhuqueFangsong-Regular.ttf"])
-        #expect(Set(names.filter { $0.hasPrefix("OFL-") }) == ["OFL-Newsreader.txt", "OFL-ZhuqueFangsong.txt"])
+        #expect(Set(names.filter { [".ttf", ".otf", ".woff", ".woff2"].contains(where: $0.hasSuffix) })
+            == [BundledFonts.latinFile, BundledFonts.cjkFile])
+        #expect(Set(names.filter { $0.hasPrefix("OFL-") }) == ["OFL-Allo.txt", "OFL-ResourceHanRounded.txt"])
     }
 
-    @Test func chineseCascadesToTheMacRoomsFangsong() throws {
+    @Test func chineseCascadesToResourceHanRounded() throws {
         let font = try writingFont(size: 28)
         let cascade = CTFontCopyAttribute(font, kCTFontCascadeListAttribute) as? [CTFontDescriptor] ?? []
-        #expect(cascade.count == 1)
         let names = cascade.map { CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) as? String }
-        #expect(names == ["ZhuqueFangsong-Regular"], "the writing face's CJK cascade moved: \(names)")
+        #expect(names == [BundledFonts.cjkPostScript], "the writing face's CJK cascade moved: \(names)")
     }
 
     @Test func theClockUsesTabularDigitsAtTheMacsSize() {
@@ -116,7 +135,7 @@ struct TypographyParityTests {
 
         let heading = try #require(descendants(kept, of: NSTextField.self)
             .first { $0.stringValue == "You wrote it down." })
-        #expect(heading.font?.fontName == "NewsreaderRoman-Medium")
+        #expect(heading.font?.fontName.hasPrefix(BundledFonts.alloPostScript) == true)
         #expect(heading.attributedStringValue.attribute(.kern, at: 0, effectiveRange: nil) == nil,
                 "the kept heading must stay untracked: the web now matches this value")
         // The heading is clamp(32px, 5vw, 48px) against the window viewport, the web's --t-kept.
@@ -145,7 +164,7 @@ struct TypographyParityTests {
                 let cascade = CTFontCopyAttribute(font, kCTFontCascadeListAttribute) as? [CTFontDescriptor] ?? []
                 face = (cascade.first.flatMap { CTFontDescriptorCopyAttribute($0, kCTFontNameAttribute) } as? String) ?? ""
             case "warning-numeral":
-                font = try #require(FirstLineTypography.writingItalicNSFont(size: role.size))
+                font = FirstLineTypography.numeralNSFont(size: role.size)
                 face = font.fontName
             case "kept-heading":
                 font = try #require(FirstLineTypography.writingMediumNSFont(size: role.size))
@@ -154,7 +173,8 @@ struct TypographyParityTests {
                 font = try #require(FirstLineTypography.writingNSFont(size: role.size))
                 face = font.fontName
             }
-            #expect(face == role.face, "\(role.role) resolves to \(face), not \(role.face)")
+            // A variable instance is named after its base face plus the axes it moved (`…_opsz_wght…`).
+            #expect(face.hasPrefix(role.face), "\(role.role) resolves to \(face), not \(role.face)")
             let measured = advance(role.string, font: font)
             let drift = abs(measured - role.advancePt) / role.advancePt
             #expect(drift <= shared.tolerance,

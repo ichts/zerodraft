@@ -201,7 +201,7 @@ struct DesignReviewFixesTests {
             #expect(abs(edge - edges[0].1) <= 1,
                     "\(name) ends at \(edge), \(edges[0].0) ends at \(edges[0].1): one right edge only")
         }
-        let rowLabels = ["Theme", "Reduced Motion", "Focus Mode", "Alignment", "Font Size",
+        let rowLabels = ["Paper", "Reduced Motion", "Focus Mode", "Alignment", "Font Size",
                          "Check for updates automatically"]
         var leadingEdges: [CGFloat] = []
         for name in rowLabels {

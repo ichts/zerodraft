@@ -721,14 +721,20 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             failureBase = composition.base
             let headlineFont = FirstLineTypography.writingMediumNSFont(size: composition.base)
                 ?? FirstLineTypography.displayNSFont(size: composition.base)
+            // The web's 1.1 line box (`.room-top h1`): a fixed box, with the glyphs on the web's baseline (the box's
+            // top plus the half-leading plus the ascent). TextKit sets a clamped line's baseline one descent above its
+            // bottom, so the half-leading the box gives up moves the glyphs down to where the browser draws them.
+            let box = (headlineFont.pointSize * Self.failureHeadlineLineHeight).rounded()
+            let halfLeading = (box - headlineFont.ascender + headlineFont.descender) / 2
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
-            paragraph.lineHeightMultiple = Self.failureHeadlineLineHeight
+            paragraph.minimumLineHeight = box
+            paragraph.maximumLineHeight = box
             failureHeadlineLabel.font = headlineFont
             failureHeadlineLabel.attributedStringValue = NSAttributedString(
                 string: "You stopped.",
                 attributes: [.font: headlineFont, .foregroundColor: FirstLineColors.paperInkNSColor,
-                             .paragraphStyle: paragraph])
+                             .paragraphStyle: paragraph, .baselineOffset: min(0, halfLeading)])
             failureNoteLabel.font = composition.noteFont
             failureNoteLabel.attributedStringValue = FirstLineTypography.trackedText(
                 "Draft deleted.", font: composition.noteFont, color: FirstLineColors.paperQuietNSColor,

@@ -116,12 +116,16 @@ struct RoundThreeTests {
                     control.displayIfNeeded()
                     #expect(ringing.showsInkFocusRing, "\(name) control \(control.title) did not show the ink ring")
                     let ringColor = resolved(ringing.inkFocusRingColor, appearance)
-                    let ink = resolved(FirstLineColors.inkNSColor, appearance)
+                    // A control on the sheet takes the sheet's roles, as the web rebinds `--ink` and `--on-ink`
+                    // inside the paper (D-120); a control on a card takes the page's.
+                    let onPaper = (control as? FirstLineInkFocusButton)?.onPaper ?? false
+                    let ink = resolved(onPaper ? FirstLineColors.paperInkNSColor : FirstLineColors.inkNSColor, appearance)
+                    let onInk = resolved(onPaper ? FirstLineColors.paperNSColor : FirstLineColors.onInkNSColor, appearance)
                     // Ink-filled pills use the light inner ring (single outline); every
                     // other control uses the ink ring.
                     let fill = control.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }
                     let isInkPill = fill.map { resolved($0, appearance) == ink } ?? false
-                    let expected = isInkPill ? resolved(FirstLineColors.onInkNSColor, appearance) : ink
+                    let expected = isInkPill ? onInk : ink
                     #expect(ringColor == expected, "\(name) control \(control.title) ring is not the expected token")
                 }
                 window.orderOut(nil)
@@ -225,14 +229,18 @@ struct RoundThreeTests {
             #expect(abs(paper.frame.maxX - (bounds.maxX - insets.right - 32)) <= 1, "sheet trailing margin at \(size)")
             #expect(abs(paper.frame.minY - (insets.bottom + 32)) <= 1, "sheet bottom margin at \(size)")
             #expect(abs(paper.frame.maxY - (bounds.maxY - insets.top - 32)) <= 1, "sheet top margin at \(size)")
-            let font = FirstLineTypography.writingNSFont(size: state.settings.writingFontSize.points)
+            let font = try #require(FirstLineTypography.writingNSFont(size: state.settings.writingFontSize.points))
             let character = ("0" as NSString).size(withAttributes: [.font: font]).width
             let expected = min(CGFloat(state.settings.writingAlignment.measureCharacters) * character,
                                scroll.bounds.width - 16)
             let measured = try #require(editor.textContainer).containerSize.width
             #expect(abs(measured - expected) <= 6, "writing column is \(measured), expected \(expected)")
-            #expect(measured / character >= 55 && measured / character <= 70,
-                    "column must stay a readable 60-70 characters (the 62ch cap fits the sheet)")
+            // The web's `max-width:62ch`: Allo's figure is wider than Newsreader's, so a 1040 pt window holds about
+            // 56 of them and the column takes the sheet; a wide window reaches the 62ch cap and stops there.
+            #expect(measured / character <= 62.5, "the column passed the 62ch cap")
+            if size.width >= 1600 {
+                #expect(abs(measured / character - 62) <= 0.5, "a wide sheet's column is not the 62ch cap")
+            }
             window.orderOut(nil)
         }
     }
@@ -267,13 +275,16 @@ struct RoundThreeTests {
         #expect(abs(box.minX) <= 0.01 && abs(box.maxX - top.bounds.width) <= 0.01, "the stroke touches both card edges")
         #expect(abs(box.maxY - top.bounds.maxY) <= 0.01, "the stroke touches the card's top edge")
         #expect(outline.contains(CGPoint(x: top.bounds.width / 2, y: top.bounds.maxY - 1)), "2 pt thick on the straight run")
-        #expect(!outline.contains(CGPoint(x: 4, y: top.bounds.maxY - 1)), "outside the corner curve stays unpainted")
-        #expect(outline.contains(CGPoint(x: 4, y: top.bounds.maxY - FirstLineRadius.sheet + 10)), "the stroke runs down the corner arc to the side edge")
+        // The sheet's corner is the web's 4 pt (`--r-sheet`, D-120): outside the arc stays unpainted, and the
+        // stroke tapers down the arc to the side edge (outer arc at x 0.13, inner at x 0.54, 3 pt down).
+        #expect(FirstLineRadius.sheet == 4)
+        #expect(!outline.contains(CGPoint(x: 0.3, y: top.bounds.maxY - 0.3)), "outside the corner curve stays unpainted")
+        #expect(outline.contains(CGPoint(x: 0.3, y: top.bounds.maxY - 3)), "the stroke runs down the corner arc to the side edge")
         #expect(top.toolTip == nil)
         #expect(top.accessibilityLabel() == nil, "the bar is the only indicator: no label")
         #expect(abs(top.fraction - 1) <= 0.01, "the bar starts full")
         #expect(top.fractionAnimation == nil, "an idle bar has no animation")
-        #expect(resolved(top.fillColor, .aqua) == resolved(FirstLineColors.inkNSColor, .aqua))
+        #expect(resolved(top.fillColor, .aqua) == resolved(FirstLineColors.paperInkNSColor, .aqua))
 
         now.now = 4
         engine.registerCommittedText("a")

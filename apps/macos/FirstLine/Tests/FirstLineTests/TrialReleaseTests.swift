@@ -341,7 +341,7 @@ struct TrialReleaseTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try JSONEncoder().encode(InstallID(uuid: UUID(uuidString: fixture.install)!, createdAt: fixture.now))
             .write(to: root.appendingPathComponent("install-id.json"))
-        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        try store.save(AppSettings(defaultDuration: 60, reducedMotion: .system,
                                    licenseKey: "order", licenseStatus: .active, licenseActivatedAt: fixture.now,
                                    licenseLastValidatedAt: fixture.now, licenseInstanceID: "activation-test",
                                    licenseProductID: fixture.product, licenseToken: fixture.token()))
@@ -414,7 +414,7 @@ struct TrialReleaseTests {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         try SettingsStore(configDirectory: root).save(AppSettings(
-            theme: .system, defaultDuration: 60, reducedMotion: .system,
+            defaultDuration: 60, reducedMotion: .system,
             licenseActivatedAt: Date(), licenseProductID: "old-product"))
         let state = makeState(at: root)
         #expect(!state.canStartSession)
@@ -426,7 +426,7 @@ struct TrialReleaseTests {
         let root = tempRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
-        try store.save(AppSettings(theme: .system, defaultDuration: 60, reducedMotion: .system,
+        try store.save(AppSettings(defaultDuration: 60, reducedMotion: .system,
                                    licenseKey: "old-order", licenseStatus: status,
                                    licenseInstanceID: "instance", licenseProductID: "prod_mock", licenseToken: "bad-token"))
         let state = makeState(at: root)

@@ -9,14 +9,16 @@ import Testing
 struct SnapshotTests {
     private let size = NSSize(width: 1040, height: 720)
 
-    @Test func everySurfaceRendersInLightAndDark() throws {
+    @Test func everySurfaceRendersInEveryPaper() throws {
         _ = NSApplication.shared
         let output = ProcessInfo.processInfo.environment["WID_SNAPSHOT_DIR"]
             .map { URL(fileURLWithPath: $0, isDirectory: true) }
         if let output { try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true) }
 
-        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-            let suffix = appearance == .darkAqua ? "dark" : "light"
+        for mode in PaperMode.allCases { try withPaperMode(mode) { appearance in
+            let suffix = mode.rawValue
+            // Each surface's state carries the mode it is drawn in, so the Settings Paper row names it.
+            @MainActor func showing(_ state: AppState) -> AppState { state.updatePaperMode(mode); return state }
 
             let picker = try trialState(used: 2)
             try snapshot(HomeViewController(appState: picker), name: "picker-\(suffix)", appearance: appearance,
@@ -30,13 +32,13 @@ struct SnapshotTests {
             try snapshot(UpgradeViewController(appState: licensed), name: "activation-active-\(suffix)", appearance: appearance,
                          output: output, sheetPoint: NSPoint(x: 250, y: 360))
 
-            try snapshot(SettingsViewController(appState: licensedTestState()), name: "settings-\(suffix)",
+            try snapshot(SettingsViewController(appState: showing(licensedTestState())), name: "settings-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
-            try snapshot(SettingsViewController(appState: licensedTestState(), updateSettings: StubUpdateSettings()),
+            try snapshot(SettingsViewController(appState: showing(licensedTestState()), updateSettings: StubUpdateSettings()),
                          name: "settings-updates-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
             let exhaustedSettings = try trialState(used: 3)
-            try snapshot(SettingsViewController(appState: exhaustedSettings), name: "settings-entry-\(suffix)",
+            try snapshot(SettingsViewController(appState: showing(exhaustedSettings)), name: "settings-entry-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 200, y: 360))
             // The rules panel is a popover's content (D-097): it has no card and no fill of its own, the system
             // popover surface sits behind it, so the corners are clear.
@@ -69,36 +71,24 @@ struct SnapshotTests {
             exitHint.room.requestExit()
             try snapshot(exitHint.room, name: "room-exit-hint-\(suffix)", appearance: appearance,
                          output: output, paperPoint: NSPoint(x: 520, y: 660))
-        }
 
-        try snapshot(activationError(), name: "activation-error-light", appearance: .aqua,
-                     output: output, sheetPoint: NSPoint(x: 250, y: 360))
-        // The warn state is the one room state whose sheet is not the plain tone: it is measured against the
-        // wash tint at the fraction the tick produced (idle 5.6 s of the 8 s standard limit = 0.2).
-        try snapshot(warningState(reducesMotion: false).room, name: "room-warning-light", appearance: .aqua,
-                     output: output, washPoint: (NSPoint(x: 520, y: 120), 0.2))
-        try snapshot(warningState(reducesMotion: true).room, name: "room-warning-reduced-light", appearance: .aqua,
-                     output: output, washPoint: (NSPoint(x: 520, y: 120), 1))
-        try snapshot(warningState(reducesMotion: false, appearance: .darkAqua).room, name: "room-warning-dark",
-                     appearance: .darkAqua, output: output)
-        let deletedLight = deletedState(appearance: .aqua)
-        try snapshot(deletedLight, name: "room-deleted-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
-        let deletedDark = deletedState(appearance: .darkAqua)
-        try snapshot(deletedDark, name: "room-deleted-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
-        let keptLight = keptState(appearance: .aqua, copy: false)
-        try snapshot(keptLight, name: "room-kept-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
-        let copiedLight = keptState(appearance: .aqua, copy: true)
-        try snapshot(copiedLight, name: "room-copied-light", appearance: .aqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
-        let copiedDark = keptState(appearance: .darkAqua, copy: true)
-        try snapshot(copiedDark, name: "room-copied-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
-        let keptDark = keptState(appearance: .darkAqua, copy: false)
-        try snapshot(keptDark, name: "room-kept-dark", appearance: .darkAqua,
-                     output: output, paperPoint: NSPoint(x: 520, y: 660))
+            try snapshot(activationError(), name: "activation-error-\(suffix)", appearance: appearance,
+                         output: output, sheetPoint: NSPoint(x: 250, y: 360))
+            // The warn state is the one room state whose sheet is not the plain tone: on the plain Paper sheet it
+            // is measured against the wash at the strength the tick produced (idle 5.6 s of the 8 s limit = 0.2).
+            let wash = { (fraction: CGFloat) in mode == .paper ? (NSPoint(x: 520, y: 120), fraction) : nil }
+            try snapshot(warningState(reducesMotion: false, appearance: appearance).room,
+                         name: "room-warning-\(suffix)", appearance: appearance, output: output, washPoint: wash(0.2))
+            try snapshot(warningState(reducesMotion: true, appearance: appearance).room,
+                         name: "room-warning-reduced-\(suffix)", appearance: appearance, output: output,
+                         washPoint: wash(1))
+            for (state, room) in [("deleted", deletedState(appearance: appearance)),
+                                  ("kept", keptState(appearance: appearance, copy: false)),
+                                  ("copied", keptState(appearance: appearance, copy: true))] {
+                try snapshot(room, name: "room-\(state)-\(suffix)", appearance: appearance,
+                             output: output, paperPoint: NSPoint(x: 520, y: 660))
+            }
+        } }
     }
 
     /// The grain is texture on the sheet, not an image that reacts to the writer: typing changes the words
@@ -106,16 +96,16 @@ struct SnapshotTests {
     /// Typing never regenerates the field. The clock stays inside the reading window here on purpose: past five
     /// seconds of silence the wash is a *state* on the sheet, and that change is measured by
     /// `ReviewRoundTests.warningWashTintsTheRenderedPaper`, not conflated with the grain's stillness (D-073).
-    @Test func paperStaysStillWhileTyping() throws {
-        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-            let name = appearance == .aqua ? "light" : "dark"
+    @Test(arguments: PaperMode.allCases)
+    func paperStaysStillWhileTyping(mode: PaperMode) throws {
+        try withPaperMode(mode) { appearance in
             let fixture = roomState(appearance: appearance)
             let before = try paperPixels(fixture.room, appearance: appearance)
             typeDraft(fixture)
             fixture.clock.now = 3
             fixture.room.tick()
             let after = try paperPixels(fixture.room, appearance: appearance)
-            #expect(before == after, "\(name): the paper changed under the writer's keys")
+            #expect(before == after, "\(mode): the paper changed under the writer's keys")
         }
     }
 
@@ -148,19 +138,19 @@ struct SnapshotTests {
         return bytes
     }
 
-    @Test func keptCopyFocusRendersInLightAndDark() throws {
+    @Test func keptCopyFocusRendersInEveryPaper() throws {
         let output = ProcessInfo.processInfo.environment["WID_SNAPSHOT_DIR"]
             .map { URL(fileURLWithPath: $0, isDirectory: true) }
         if let output { try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true) }
-        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
-            let suffix = appearance == .aqua ? "light" : "dark"
+        for mode in PaperMode.allCases { try withPaperMode(mode) { appearance in
+            let suffix = mode.rawValue
             for copied in [false, true] {
                 let room = keptState(appearance: appearance, copy: copied)
                 let label = copied ? "copied" : "copy"
                 try snapshot(room, name: "room-\(label)-focus-\(suffix)", appearance: appearance,
                              output: output, paperPoint: NSPoint(x: 520, y: 660), focus: true)
             }
-        }
+        } }
     }
 
     // MARK: - States
@@ -230,7 +220,7 @@ struct SnapshotTests {
         let state = licensedTestState(sessionEngine: engine,
                                       settingsStore: SettingsStore(configDirectory: root),
                                       installIDStore: InstallIDStore(configDirectory: root))
-        if appearance == .darkAqua { state.updateTheme(.dark) }
+        state.updatePaperMode(FirstLineColors.mode(for: NSAppearance(named: appearance)!))
         state.startSession(duration: 60)
         let board = NSPasteboard(name: NSPasteboard.Name(UUID().uuidString))
         let room = SessionViewController(appState: state, pasteboard: board)
@@ -265,7 +255,7 @@ struct SnapshotTests {
         let state = licensedTestState(sessionEngine: engine,
                                       settingsStore: SettingsStore(configDirectory: root),
                                       installIDStore: InstallIDStore(configDirectory: root))
-        if appearance == .darkAqua { state.updateTheme(.dark) }
+        state.updatePaperMode(FirstLineColors.mode(for: NSAppearance(named: appearance)!))
         if reducesMotion { state.updateReducedMotion(.always) }
         state.startSession(duration: 60)
         let room = SessionViewController(appState: state)
@@ -370,7 +360,7 @@ struct SnapshotTests {
     }
 
     /// The paper is measured, not eyeballed: a text-free region must average the locked tone and must
-    /// carry grain (a real spread), on every room state the wash does not cover, in both appearances (D-056).
+    /// carry grain (a real spread) on Lamp and Slate and none on Paper, on every room state the wash does not cover.
     private func assertPaper(_ rep: NSBitmapImageRep, around point: NSPoint,
                              in appearance: NSAppearance.Name, name: String) throws {
         let resolved = try #require(appearanceColor(FirstLineColors.paperNSColor, appearance))
@@ -391,18 +381,25 @@ struct SnapshotTests {
         let count = Double(samples.count)
         try #require(count > 0)
         let mean = (sum.r / count, sum.g / count, sum.b / count)
-        // The exact two-level tone assertion runs on the field the view draws, in
-        // `PaperContrastTests.theRenderedFieldStaysOnTheLockedTone`, where the pixels are the ones the sheet is
-        // made of. This window bitmap is a 24 px patch of a mottled sheet, so it guards gross drift (a lamp light used to lift the dark sheet 25 levels) while the field
-        // assertion guards the value itself (D-073).
+        // This window bitmap is a 24 px patch of a textured sheet, so it guards gross drift; the field the view draws
+        // is pinned to the web's pixels in `PaperContrastTests.theRenderedSheetIsTheWebsSheet` (D-073, D-120).
         let lift = [mean.0 - Double(expected.redComponent),
                     mean.1 - Double(expected.greenComponent),
                     mean.2 - Double(expected.blueComponent)]
         let variance = samples.reduce(0.0) { $0 + pow($1.0 - mean.0, 2) } / count
         let spread = variance.squareRoot()
-        let outOfBand = lift.contains { abs($0) > 0.06 }
-        #expect(!outOfBand, "\(name): the paper's tone left the locked band, mean=\(mean) lift=\(lift)")
-        #expect(spread > 0.002, "\(name): the paper carries no grain, spread=\(spread)")
+        // Paper is its tone exactly. On Lamp and Slate the grain, cloud and light move the tone (Lamp's lamp darkens
+        // it, Slate's grain lifts it), so this band only catches a lost sheet; the field itself is pinned to the
+        // web's pixels in `PaperContrastTests.theRenderedSheetIsTheWebsSheet`.
+        let plain = FirstLineColors.mode(for: NSAppearance(named: appearance)!) == .paper
+        let outOfBand = plain ? lift.contains { abs($0) > 0.01 } : lift.contains { abs($0) > 0.3 }
+        #expect(!outOfBand, "\(name): the paper's tone left its band, mean=\(mean) lift=\(lift)")
+        // Paper is the plain white sheet; Lamp and Slate carry their grain.
+        if FirstLineColors.mode(for: NSAppearance(named: appearance)!) == .paper {
+            #expect(spread < 0.001, "\(name): the plain sheet carries a texture, spread=\(spread)")
+        } else {
+            #expect(spread > 0.002, "\(name): the paper carries no grain, spread=\(spread)")
+        }
     }
 
     /// The warning sheet is measured too: the rendered patch must be the paper tone mixed toward the locked

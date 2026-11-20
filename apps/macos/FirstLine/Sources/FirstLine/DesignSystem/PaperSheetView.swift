@@ -1,28 +1,27 @@
 /**
- * [INPUT]: the paper's laid-out size, the window's backing scale, the effective appearance (light/dark),
- *          and the locked paper constants (tone Wheat #e9e2ce / #342e24 per D-069, superseding D-056's Note
- *          tone; grain 70 of 100, size 1.00 per D-056).
- * [OUTPUT]: PaperSheetView - the writing sheet: the locked tone with, in light, two-scale mottle and grain and, in
- *           dark, one fine grain (D-093), rendered once into a cached CGImage per size and appearance, with the
- *           sheet ring and rounded clip the room needs;
+ * [INPUT]: the paper's laid-out size, the window's backing scale, the paper mode its appearance shows
+ *          (FirstLineColors.mode(for:)), and the web's paper tokens (tokens.css v3: `--paper-tone`, `--paper-grain`,
+ *          `--paper-cloud`, `--paper-light`, D-119).
+ * [OUTPUT]: PaperSheetView - the writing sheet: the mode's tone, its grain and cloud and the lamp's light, rendered
+ *           once into a cached CGImage per size and mode, with the sheet ring and rounded clip the room needs;
  *           PaperSheetCache - the small cache that lets the picker render the room's sheet off the main thread
- *           before Begin, so the room's first paint finds the finished paper instead of building it.
- * [POS]: The Mac half of the sheet the web renders in writeitdown/paper.js; the room, its failure screen and
- *        the kept sheet all sit on this one paper. Cards, fields and controls keep FirstLineColors.sheetNSColor.
- * [PROTOCOL]: Keep the generator in step with writeitdown/paper.js (same seeds, amplitudes and pigments);
- *             paint on size/appearance change only, never on typing. Then check FirstLine/AGENTS.md.
+ *           before Begin, so the room's first paint finds the finished paper instead of building it;
+ *           PaperField - the renderer and PaperField.drawLight, the light the wash multiplies by as well.
+ * [POS]: The Mac half of the sheet the web paints from tokens.css; the room, its failure screen and the kept sheet
+ *        all sit on this one paper. Cards, fields and controls keep FirstLineColors.sheetNSColor.
+ * [PROTOCOL]: Keep the renderer in step with tokens.css (same SVG filters, seeds, colours and gradient stops);
+ *             paint on size or mode change only, never on typing. Then check FirstLine/AGENTS.md.
  *
- * Why a cached image: the field is ~5 M device pixels at 2x. Drawing it in draw(_:) each frame would
- * re-generate it under every keystroke; one image per size costs about a tenth of a second once and is then
- * free. The image is built synchronously on first draw, so the window's first paint already carries the paper
- * instead of flashing a flat tone; a live window drag reuses the previous image stretched and rebuilds it when
- * the drag ends.
+ * What the web draws (`[data-paper]`): the tone; the grain, a 240 px stitched fractalNoise tile repeated from the
+ * top-left; the cloud, one 1600x1100 fractalNoise image covering the sheet from its centre; then the light, a radial
+ * gradient multiplied over the sheet. Lamp and Slate carry all three; Paper is its plain tone. The noise is the SVG
+ * reference generator (Turbulence), sampled where the browser samples it, and its linearRGB colours are converted
+ * to sRGB before compositing, as the browser does.
  *
- * Why the cache is warmed ahead: a texture built on the click's own turn put the room ~0.5 s behind Begin
- * (D-096). The picker already knows the room's paper size, so it renders that sheet in the background while
- * the writer chooses; the sheet is a pure function of size, scale and appearance, so a hit is identical to
- * what the room would have built, and a miss (a resize, a click before the render ends) still builds it
- * synchronously and never paints a flat tone.
+ * Why a cached image: the field is ~5 M device pixels at 2x. One image per size costs a fraction of a second once
+ * and is then free. The image is built synchronously on first draw, so the window's first paint already carries
+ * the paper instead of flashing a flat tone; a live window drag reuses the previous image stretched and rebuilds it
+ * when the drag ends. The picker warms the room's size ahead (D-096), so Begin finds it built.
  */
 
 import AppKit
@@ -30,7 +29,7 @@ import CoreGraphics
 
 @MainActor
 final class PaperSheetView: NSView {
-    /// The sheet's ring on the paper (ink 7% light / hair 10% dark, the same ring the plain sheet takes).
+    /// The sheet's ring on the paper.
     var borderColor: NSColor? {
         didSet { needsDisplay = true }
     }
@@ -45,12 +44,10 @@ final class PaperSheetView: NSView {
         didSet { updateLayerShape() }
     }
 
-    /// Hands the sheet's texture to the state wash each time the field is rebuilt, so the wash composites
-    /// the same mottle and grain over its tint and never forces a rebuild of its own (D-056).
-    var textureDidChange: ((PaperField.Texture) -> Void)?
-
     private var paperImage: CGImage?
     private var imageKey = ""
+    /// How many times the sheet has been drawn; typing and warn ticks must leave it unchanged.
+    private(set) var paints = 0
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -94,33 +91,30 @@ final class PaperSheetView: NSView {
         needsDisplay = true
     }
 
-    /// The texture for the current size and appearance, built on demand.
+    /// The sheet for the current size and mode, built on demand.
     private func currentPaper() -> CGImage? {
         let scale = window?.backingScaleFactor ?? 2
         let width = Int((bounds.width * scale).rounded())
         let height = Int((bounds.height * scale).rounded())
         guard width > 1, height > 1 else { return nil }
-        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let key = PaperSheetCache.key(width: width, height: height, scale: scale, dark: dark)
+        let mode = FirstLineColors.mode(for: effectiveAppearance)
+        let key = PaperSheetCache.key(width: width, height: height, scale: scale, mode: mode)
         if key == imageKey, let paperImage { return paperImage }
-        guard let sheet = PaperSheetCache.shared.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
+        guard let image = PaperSheetCache.shared.sheet(width: width, height: height, scale: scale, mode: mode) else { return nil }
         imageKey = key
-        paperImage = sheet.image
-        textureDidChange?(sheet.texture)
-        return sheet.image
+        paperImage = image
+        return image
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        paints += 1
         let rect = bounds
         ctx.saveGState()
         if cornerRadius > 0 {
             ctx.addPath(CGPath(roundedRect: rect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
             ctx.clip()
         }
-        // The field is generated bottom-left-up; flip once so the image and the sheet share one origin.
-        ctx.translateBy(x: 0, y: rect.height)
-        ctx.scaleBy(x: 1, y: -1)
         // A window drag reuses the last field stretched and rebuilds once when the drag ends, so the
         // ~5 M pixel field is never regenerated per drag frame.
         let image = inLiveResize ? paperImage : currentPaper()
@@ -128,7 +122,7 @@ final class PaperSheetView: NSView {
             ctx.interpolationQuality = inLiveResize ? .high : .none
             ctx.draw(image, in: CGRect(origin: .zero, size: rect.size))
         } else {
-            FirstLineColors.paperNSColor.setFill()
+            effectiveAppearance.performAsCurrentDrawingAppearance { FirstLineColors.paperNSColor.setFill() }
             ctx.fill(CGRect(origin: .zero, size: rect.size))
         }
         ctx.restoreGState()
@@ -145,126 +139,122 @@ final class PaperSheetView: NSView {
     }
 }
 
-/// One finished sheet kept for the next room. The sheet is immutable once rendered, so sharing it between the
+/// One finished sheet kept for the next room. The image is immutable once rendered, so sharing it between the
 /// render queue and the main thread is safe.
 private struct RenderedSheet: @unchecked Sendable {
-    let sheet: PaperField.Sheet
+    let image: CGImage
 }
 
-/// The most recent rendered sheets, keyed by pixel size, scale and appearance. Three entries cover the live
-/// window, one resize behind it and the other appearance; the oldest goes first.
+/// The most recent rendered sheets, keyed by pixel size, scale and mode. Three entries cover the live window, one
+/// resize behind it and the mode switched from; the oldest goes first.
 @MainActor
 final class PaperSheetCache {
     static let shared = PaperSheetCache()
     static let capacity = 3
 
-    private var entries: [(key: String, sheet: PaperField.Sheet)] = []
+    private var entries: [(key: String, image: CGImage)] = []
     private var warming: Set<String> = []
     private var builds: [String: Int] = [:]
 
-    nonisolated static func key(width: Int, height: Int, scale: CGFloat, dark: Bool) -> String {
-        "\(width)x\(height)@\(scale)-\(dark ? "dark" : "light")"
+    nonisolated static func key(width: Int, height: Int, scale: CGFloat, mode: PaperMode) -> String {
+        "\(width)x\(height)@\(scale)-\(mode.rawValue)"
     }
 
     /// How many times this size was built on the caller's turn because the cache missed; tests assert it stays
     /// unchanged across a picker-to-room transition.
-    func synchronousBuilds(width: Int, height: Int, scale: CGFloat, dark: Bool) -> Int {
-        builds[Self.key(width: width, height: height, scale: scale, dark: dark)] ?? 0
+    func synchronousBuilds(width: Int, height: Int, scale: CGFloat, mode: PaperMode) -> Int {
+        builds[Self.key(width: width, height: height, scale: scale, mode: mode)] ?? 0
     }
 
     /// True once the sheet for this size is cached.
-    func holds(width: Int, height: Int, scale: CGFloat, dark: Bool) -> Bool {
-        cached(Self.key(width: width, height: height, scale: scale, dark: dark)) != nil
+    func holds(width: Int, height: Int, scale: CGFloat, mode: PaperMode) -> Bool {
+        cached(Self.key(width: width, height: height, scale: scale, mode: mode)) != nil
     }
 
     /// The sheet for this size: the cached one when it matches, otherwise built now and remembered.
-    func sheet(width: Int, height: Int, scale: CGFloat, dark: Bool) -> PaperField.Sheet? {
-        let wanted = Self.key(width: width, height: height, scale: scale, dark: dark)
+    func sheet(width: Int, height: Int, scale: CGFloat, mode: PaperMode) -> CGImage? {
+        let wanted = Self.key(width: width, height: height, scale: scale, mode: mode)
         if let hit = cached(wanted) { return hit }
         builds[wanted, default: 0] += 1
-        guard let built = PaperField.sheet(width: width, height: height, scale: scale, dark: dark) else { return nil }
+        guard let built = PaperField.render(width: width, height: height, scale: scale, mode: mode) else { return nil }
         store(built, as: wanted)
         return built
     }
 
     /// Renders the sheet for this size off the main thread unless it is already cached or on its way.
-    func prewarm(width: Int, height: Int, scale: CGFloat, dark: Bool) {
+    func prewarm(width: Int, height: Int, scale: CGFloat, mode: PaperMode) {
         guard width > 1, height > 1 else { return }
-        let wanted = Self.key(width: width, height: height, scale: scale, dark: dark)
+        let wanted = Self.key(width: width, height: height, scale: scale, mode: mode)
         guard cached(wanted) == nil, warming.insert(wanted).inserted else { return }
         Task.detached(priority: .userInitiated) {
-            let built = PaperField.sheet(width: width, height: height, scale: scale, dark: dark).map(RenderedSheet.init)
+            let built = PaperField.render(width: width, height: height, scale: scale, mode: mode).map(RenderedSheet.init)
             await MainActor.run {
                 let cache = PaperSheetCache.shared
                 cache.warming.remove(wanted)
-                if let built, cache.cached(wanted) == nil { cache.store(built.sheet, as: wanted) }
+                if let built, cache.cached(wanted) == nil { cache.store(built.image, as: wanted) }
             }
         }
     }
 
-    private func cached(_ key: String) -> PaperField.Sheet? {
+    private func cached(_ key: String) -> CGImage? {
         guard let index = entries.firstIndex(where: { $0.key == key }) else { return nil }
         let entry = entries.remove(at: index)
         entries.append(entry)
-        return entry.sheet
+        return entry.image
     }
 
-    private func store(_ sheet: PaperField.Sheet, as key: String) {
-        entries.append((key, sheet))
+    private func store(_ image: CGImage, as key: String) {
+        entries.append((key, image))
         if entries.count > Self.capacity { entries.removeFirst() }
     }
 }
 
-/// The generator. Every constant here is the locked paper (D-056 / writeitdown/paper.js).
+/// The renderer: tokens.css's paper, layer by layer.
 enum PaperField {
-    static let lightTone = (r: 233.0, g: 226.0, b: 206.0)
-    static let darkTone = (r: 52.0, g: 46.0, b: 36.0)
-    static let grain = 0.70
-    static let size = 1.00
-    static let tooth = 44.0
-    static let pulp = 24.0
-    /// The dark sheet's whole texture (D-093): one very fine grain, peak +-3 levels, nothing else. No mottle,
-    /// pulp, fibres or flecks, so no pixel lifts far enough to cost a text role its 7:1.
-    static let darkGrain = 3.0
+    /// One fractalNoise layer: its feTurbulence and the colour matrix's constant colour (linearRGB) and alpha line.
+    struct Noise: Sendable {
+        let seed: Int
+        let frequency: Double
+        let colour: (r: Double, g: Double, b: Double)
+        let gain: Double
+        let offset: Double
+    }
 
-    /// mulberry32, the web renderer's generator; the same seed yields the same field.
-    struct Random {
-        private var state: UInt32
-        init(seed: UInt32) { state = seed }
+    /// One mode's paper; `nil` layers are `none`.
+    struct Recipe: Sendable {
+        let tone: UInt32
+        let grain: Noise?
+        let cloud: Noise?
+        /// `--paper-light` stops, (position, sRGB hex).
+        let light: [(CGFloat, UInt32)]
+    }
 
-        mutating func next() -> Double {
-            state = state &+ 0x6d2b_79f5
-            var t = state
-            t = (t ^ (t >> 15)) &* (1 | state)
-            t = (t &+ ((t ^ (t >> 7)) &* (61 | t))) ^ t
-            return Double(t ^ (t >> 14)) / 4_294_967_296.0
+    static let grainTile: Double = 240
+    static let cloudSize = (width: 1600.0, height: 1100.0)
+    /// The light's ellipse, `ellipse 90% 85% at 50% 35%`.
+    static let lightRadii = (x: 0.90, y: 0.85)
+    static let lightCentre = (x: 0.50, y: 0.35)
+
+    static func recipe(_ mode: PaperMode) -> Recipe {
+        let tone = FirstLineColors.Palette.of(mode).paper
+        switch mode {
+        case .paper:
+            return Recipe(tone: tone, grain: nil, cloud: nil, light: [])
+        case .lamp:
+            return Recipe(tone: tone,
+                          grain: Noise(seed: 4, frequency: 0.85, colour: (0.30, 0.24, 0.16), gain: 1.1, offset: -0.36),
+                          cloud: Noise(seed: 11, frequency: 0.006, colour: (0.35, 0.28, 0.18), gain: 0.5, offset: -0.12),
+                          light: [(0, 0xFFFCF4), (0.45, 0xFBF3E2), (0.78, 0xF4E9D3), (1, 0xF1E3C8)])
+        case .slate:
+            return Recipe(tone: tone,
+                          grain: Noise(seed: 4, frequency: 0.85, colour: (0.10, 0.11, 0.12), gain: 1.1, offset: -0.36),
+                          cloud: Noise(seed: 11, frequency: 0.006, colour: (0.14, 0.16, 0.17), gain: 0.5, offset: -0.12),
+                          light: [(0, 0xFFFFFF), (0.50, 0xF8F6F2), (1, 0xEEEBE5)])
         }
     }
 
-    /// FNV-1a over the seed's bytes, matching the web renderer's seed derivation.
-    static func seed(_ text: String) -> UInt32 {
-        var hash: UInt32 = 2_166_136_261
-        for byte in text.utf8 {
-            hash = (hash ^ UInt32(byte)) &* 16_777_619
-        }
-        return hash
-    }
-
-    private static func tone(dark: Bool) -> (r: Double, g: Double, b: Double) {
-        dark ? darkTone : lightTone
-    }
-
-    private static func hex(_ tone: (r: Double, g: Double, b: Double)) -> String {
-        String(format: "#%02x%02x%02x", Int(tone.r), Int(tone.g), Int(tone.b))
-    }
-
-    /// A deviation becomes an alpha over black or white that shifts the sheet's own channel by exactly that
-    /// much, so pale and dark specks weigh the same in sRGB and the sheet's mean stays on the locked tone as
-    /// the grain is layered on (D-073).
-    private static func alpha(delta: Double, tone: (r: Double, g: Double, b: Double)) -> Double {
-        let average = (tone.r + tone.g + tone.b) / 3
-        let room = delta > 0 ? 255 - average : average
-        return min(1, abs(delta) / max(10, room))
+    private static func srgb(_ linear: Double) -> Double {
+        linear <= 0.0031308 ? 12.92 * linear : 1.055 * pow(linear, 1 / 2.4) - 0.055
     }
 
     private static func makeContext(width: Int, height: Int) -> CGContext? {
@@ -273,232 +263,103 @@ enum PaperField {
                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
     }
 
-    /// One noise layer drawn into its own image, so the caller can scale it with smoothing.
-    private static func noiseImage(width: Int, height: Int, amount: Double,
-                                   tone: (r: Double, g: Double, b: Double),
-                                   random: inout Random) -> CGImage? {
-        guard width > 1, height > 1, let context = makeContext(width: width, height: height),
+    /// A noise layer as an image whose first row is its top: pixel (i, j) carries the colour matrix's output at
+    /// the user-space point `sample(i, j)`, its alpha `clamp(gain * a + offset)`.
+    private static func noiseImage(_ noise: Noise, width: Int, height: Int,
+                                   tile: (x: Double, y: Double, width: Double, height: Double)?,
+                                   sample: (Int, Int) -> (Double, Double)) -> CGImage? {
+        guard width > 0, height > 0, let context = makeContext(width: width, height: height),
               let raw = context.data else { return nil }
         let pixels = raw.bindMemory(to: UInt8.self, capacity: width * height * 4)
-        for index in 0..<(width * height) {
-            let value = ((random.next() + random.next() + random.next()) - 1.5) / 1.5 * amount
-            let byte = UInt8((alpha(delta: value, tone: tone) * 255).rounded())
-            // Premultiplied: a deviation is full black or full white, so the colour scales with the alpha.
-            let colour: UInt8 = value < 0 ? 0 : byte
-            pixels[index * 4] = colour
-            pixels[index * 4 + 1] = colour
-            pixels[index * 4 + 2] = colour
-            pixels[index * 4 + 3] = byte
+        let turbulence = Turbulence(seed: noise.seed)
+        let colour = (srgb(noise.colour.r), srgb(noise.colour.g), srgb(noise.colour.b))
+        for j in 0..<height {
+            for i in 0..<width {
+                let (x, y) = sample(i, j)
+                let a = min(1, max(0, turbulence.fractal(3, x: x, y: y, baseX: noise.frequency, baseY: noise.frequency,
+                                                         octaves: 3, tile: tile)))
+                let alpha = min(1, max(0, noise.gain * a + noise.offset))
+                let index = (j * width + i) * 4
+                pixels[index] = UInt8((colour.0 * alpha * 255).rounded())
+                pixels[index + 1] = UInt8((colour.1 * alpha * 255).rounded())
+                pixels[index + 2] = UInt8((colour.2 * alpha * 255).rounded())
+                pixels[index + 3] = UInt8((alpha * 255).rounded())
+            }
         }
         return context.makeImage()
     }
 
-    /// Everything on the sheet except its base tone: both mottle scales and the grain at the locked strength,
-    /// plus the flat shift that puts the finished sheet's mean back on the token. Drawn over any base, it
-    /// reproduces the sheet's texture on that base.
-    struct Texture {
-        let image: CGImage
-        let shift: (r: Double, g: Double, b: Double)
+    /// Multiplies the mode's light over `rect` of `context` (unflipped, origin bottom-left), the web's
+    /// `[data-paper]::after`. The room's wash takes the same light, so a washed sheet is lit exactly like the sheet.
+    static func drawLight(_ mode: PaperMode, in context: CGContext, rect: CGRect) {
+        let stops = recipe(mode).light
+        guard stops.count > 1 else { return }
+        let colours = stops.map { stop -> CGColor in
+            let rgb = stop.1
+            return CGColor(srgbRed: CGFloat((rgb >> 16) & 255) / 255, green: CGFloat((rgb >> 8) & 255) / 255,
+                           blue: CGFloat(rgb & 255) / 255, alpha: 1)
+        }
+        guard let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB), colors: colours as CFArray,
+                                        locations: stops.map(\.0)) else { return }
+        context.saveGState()
+        context.clip(to: rect)
+        context.setBlendMode(.multiply)
+        context.translateBy(x: rect.minX + rect.width * lightCentre.x, y: rect.maxY - rect.height * lightCentre.y)
+        context.scaleBy(x: rect.width * lightRadii.x, y: rect.height * lightRadii.y)
+        context.drawRadialGradient(gradient, startCenter: .zero, startRadius: 0, endCenter: .zero, endRadius: 1,
+                                   options: [.drawsAfterEndLocation])
+        context.restoreGState()
     }
 
-    /// One rendered sheet: the paper itself and the texture layer composited into it.
-    struct Sheet {
-        let image: CGImage
-        let texture: Texture
-    }
-
-    static func render(width: Int, height: Int, scale: CGFloat, dark: Bool) -> CGImage? {
-        sheet(width: width, height: height, scale: scale, dark: dark)?.image
-    }
-
-    static func sheet(width: Int, height: Int, scale: CGFloat, dark: Bool) -> Sheet? {
-        let colour = tone(dark: dark)
+    /// The finished sheet at `width` x `height` device pixels.
+    static func render(width: Int, height: Int, scale: CGFloat, mode: PaperMode) -> CGImage? {
+        guard width > 1, height > 1, let context = makeContext(width: width, height: height) else { return nil }
+        let recipe = recipe(mode)
         let full = CGRect(x: 0, y: 0, width: width, height: height)
-        guard let paper = makeContext(width: width, height: height),
-              let texture = makeContext(width: width, height: height) else { return nil }
-        paper.setShouldAntialias(true)
-        paper.setFillColor(CGColor(srgbRed: colour.r / 255, green: colour.g / 255, blue: colour.b / 255, alpha: 1))
-        paper.fill(full)
+        let tone = recipe.tone
+        context.setFillColor(CGColor(srgbRed: CGFloat((tone >> 16) & 255) / 255, green: CGFloat((tone >> 8) & 255) / 255,
+                                     blue: CGFloat(tone & 255) / 255, alpha: 1))
+        context.fill(full)
+        let s = Double(scale)
 
-        if dark { return darkSheet(width: width, height: height, colour: colour, paper: paper, texture: texture) }
-
-        // Two scales of mottle, each generated small and upscaled with smoothing.
-        var coarse = Random(seed: seed("coarse" + hex(colour)))
-        var fine = Random(seed: seed("fine" + hex(colour)))
-        let mottle: [(cell: Int, amount: Double)] = [
-            (max(2, Int((34.0 * scale).rounded())), 9.0),
-            (max(2, Int((9.0 * scale).rounded())), 4.5),
-        ]
-        for (index, layer) in mottle.enumerated() {
-            let smallWidth = max(2, (width + layer.cell - 1) / layer.cell)
-            let smallHeight = max(2, (height + layer.cell - 1) / layer.cell)
-            let image = index == 0
-                ? noiseImage(width: smallWidth, height: smallHeight, amount: layer.amount, tone: colour, random: &coarse)
-                : noiseImage(width: smallWidth, height: smallHeight, amount: layer.amount, tone: colour, random: &fine)
-            guard let image else { continue }
-            for context in [paper, texture] {
-                context.interpolationQuality = .high
-                context.draw(image, in: full)
-            }
-        }
-
-        // The grain is one layer, composited at the locked strength so the tone stays the base layer's.
-        // The seed's size is serialised the way the web's `'tooth' + hex + SIZE` prints 1.00: "1".
-        guard let grainContext = makeContext(width: width, height: height) else { return nil }
-        var random = Random(seed: seed("tooth" + hex(colour) + "1"))
-
-        if let toothImage = noiseImage(width: width, height: height, amount: tooth,
-                                       tone: colour, random: &random) {
-            grainContext.interpolationQuality = .none
-            grainContext.draw(toothImage, in: full)
-        }
-        let pulpCell = max(2, Int((Double(scale) * 0.8).rounded()))
-        let pulpWidth = max(2, (width + pulpCell - 1) / pulpCell)
-        let pulpHeight = max(2, (height + pulpCell - 1) / pulpCell)
-        if let pulpImage = noiseImage(width: pulpWidth, height: pulpHeight, amount: pulp,
-                                      tone: colour, random: &random) {
-            grainContext.interpolationQuality = .high
-            grainContext.draw(pulpImage, in: full)
-        }
-        drawFibres(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random)
-        drawFlecks(into: grainContext, width: width, height: height, scale: scale,
-                   tone: colour, random: &random)
-
-        if let grainLayer = grainContext.makeImage() {
-            for context in [paper, texture] {
+        if let grain = recipe.grain {
+            // One 240 px tile at device resolution, stitched over the filter region (-10%, 120%), repeated from
+            // the sheet's top-left like `background-position: 0 0`.
+            let side = Int((grainTile * s).rounded())
+            let region = (x: -grainTile * 0.1, y: -grainTile * 0.1, width: grainTile * 1.2, height: grainTile * 1.2)
+            if let tile = noiseImage(grain, width: side, height: side, tile: region, sample: { i, j in
+                ((Double(i) + 0.5) / s + 0.5, (Double(j) + 0.5) / s + 0.5)
+            }) {
                 context.saveGState()
-                context.setAlpha(grain)
                 context.interpolationQuality = .none
-                context.draw(grainLayer, in: full)
+                context.draw(tile, in: CGRect(x: 0, y: CGFloat(height - side), width: CGFloat(side), height: CGFloat(side)),
+                             byTiling: true)
                 context.restoreGState()
             }
         }
-        guard let textureImage = texture.makeImage() else { return nil }
-        let shift = meanShift(of: paper, to: colour)
-        apply(shift: shift, to: paper, in: full)
-        guard let image = paper.makeImage() else { return nil }
-        return Sheet(image: image, texture: Texture(image: textureImage, shift: shift))
-    }
 
-    /// The dark sheet: the flat token and one fine grain at device-pixel size, drawn at full strength.
-    private static func darkSheet(width: Int, height: Int, colour: (r: Double, g: Double, b: Double),
-                                  paper: CGContext, texture: CGContext) -> Sheet? {
-        let full = CGRect(x: 0, y: 0, width: width, height: height)
-        var random = Random(seed: seed("tooth" + hex(colour) + "1"))
-        if let image = noiseImage(width: width, height: height, amount: darkGrain, tone: colour, random: &random) {
-            for context in [paper, texture] {
-                context.interpolationQuality = .none
-                context.draw(image, in: full)
+        if let cloud = recipe.cloud {
+            // The cloud covers the sheet from its centre (`background-size: cover`). It is a few-hundred-pixel
+            // field, so it is evaluated on an 8-pixel grid and drawn smoothed.
+            let cover = max(Double(width) / (cloudSize.width * s), Double(height) / (cloudSize.height * s))
+            let drawn = (width: cloudSize.width * cover * s, height: cloudSize.height * cover * s)
+            let step = 8.0
+            let grid = (width: Int((drawn.width / step).rounded(.up)), height: Int((drawn.height / step).rounded(.up)))
+            if let image = noiseImage(cloud, width: grid.width, height: grid.height, tile: nil, sample: { i, j in
+                ((Double(i) + 0.5) * step / s / cover + 0.5, (Double(j) + 0.5) * step / s / cover + 0.5)
+            }) {
+                let origin = (x: (Double(width) - drawn.width) / 2, y: (Double(height) - drawn.height) / 2)
+                context.saveGState()
+                context.interpolationQuality = .high
+                // The image's first row is its top: place that top `origin.y` under the sheet's top edge.
+                let size = (width: Double(grid.width) * step, height: Double(grid.height) * step)
+                context.draw(image, in: CGRect(x: origin.x, y: Double(height) - origin.y - size.height,
+                                               width: size.width, height: size.height))
+                context.restoreGState()
             }
         }
-        guard let textureImage = texture.makeImage() else { return nil }
-        let shift = meanShift(of: paper, to: colour)
-        apply(shift: shift, to: paper, in: full)
-        guard let image = paper.makeImage() else { return nil }
-        return Sheet(image: image, texture: Texture(image: textureImage, shift: shift))
-    }
 
-    /// The locked tone wins over the texture: the finished sheet is shifted by whatever the noise layers moved
-    /// its mean, so what reaches the screen measures the token itself and not a slightly warmer or greyer paper
-    /// (D-073). The shift is one additive and one subtractive flat fill, so the grain's own contrast is untouched.
-    private static func meanShift(of context: CGContext,
-                                  to tone: (r: Double, g: Double, b: Double)) -> (r: Double, g: Double, b: Double) {
-        let none = (r: 0.0, g: 0.0, b: 0.0)
-        guard let raw = context.data else { return none }
-        let width = context.width
-        let height = context.height
-        guard width > 1, height > 1 else { return none }
-        let pixels = raw.bindMemory(to: UInt8.self, capacity: width * height * 4)
-        var sums = (r: 0.0, g: 0.0, b: 0.0)
-        for index in 0..<(width * height) {
-            let alpha = Double(pixels[index * 4 + 3]) / 255
-            guard alpha > 0.5 else { continue }
-            sums.r += Double(pixels[index * 4])
-            sums.g += Double(pixels[index * 4 + 1])
-            sums.b += Double(pixels[index * 4 + 2])
-        }
-        let count = Double(width * height)
-        let delta = (r: tone.r - sums.r / count, g: tone.g - sums.g / count, b: tone.b - sums.b / count)
-        return abs(delta.r) + abs(delta.g) + abs(delta.b) > 0.05 ? delta : none
-    }
-
-    /// Moves every pixel of `rect` by `delta` (in 0...255 sRGB levels): the sheet's mean correction.
-    private static func apply(shift delta: (r: Double, g: Double, b: Double), to context: CGContext, in rect: CGRect) {
-        let up = (r: max(delta.r, 0) / 255, g: max(delta.g, 0) / 255, b: max(delta.b, 0) / 255)
-        if up.r + up.g + up.b > 0 {
-            context.saveGState()
-            context.setBlendMode(.plusLighter)
-            context.setFillColor(CGColor(srgbRed: up.r, green: up.g, blue: up.b, alpha: 1))
-            context.fill(rect)
-            context.restoreGState()
-        }
-        let down = (r: max(-delta.r, 0) / 255, g: max(-delta.g, 0) / 255, b: max(-delta.b, 0) / 255)
-        if down.r + down.g + down.b > 0 {
-            context.saveGState()
-            context.setBlendMode(.plusDarker)
-            context.setFillColor(CGColor(srgbRed: 1 - down.r, green: 1 - down.g, blue: 1 - down.b, alpha: 1))
-            context.fill(rect)
-            context.restoreGState()
-        }
-    }
-
-    /// Short pulp fibres: a dense, low-contrast hair mat rather than a few long scratches.
-    private static func drawFibres(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random) {
-        let dpr = Double(scale)
-        let count = Int((Double(width * height) / (dpr * dpr) * 0.0026).rounded())
-        ctx.setLineCap(.round)
-        for _ in 0..<count {
-            let pale = random.next() < 0.44
-            let spread = (12 + random.next() * 34) * (pale ? 0.7 : 1)
-            ctx.setAlpha(alpha(delta: (pale ? 1.0 : -1.0) * spread, tone: tone) * (0.55 + random.next() * 0.45))
-            ctx.setStrokeColor(CGColor(srgbRed: pale ? 1 : 0, green: pale ? 1 : 0, blue: pale ? 1 : 0, alpha: 1))
-            ctx.setLineWidth((0.5 + random.next() * 0.7) * dpr)
-            let x = random.next() * Double(width)
-            let y = random.next() * Double(height)
-            let length = (2 + random.next() * 7) * size * dpr
-            let angle = random.next() * .pi * 2
-            let bow = (random.next() - 0.5) * 2.2 * dpr
-            ctx.move(to: CGPoint(x: x, y: y))
-            ctx.addQuadCurve(to: CGPoint(x: x + cos(angle) * length, y: y + sin(angle) * length),
-                             control: CGPoint(x: x + cos(angle) * length * 0.5 - sin(angle) * bow,
-                                              y: y + sin(angle) * length * 0.5 + cos(angle) * bow))
-            ctx.strokePath()
-        }
-        ctx.setAlpha(1)
-    }
-
-    /// Flecks: pigment, not shading. Sparse, crisp, irregular, mostly dark, a few pale chalk ones.
-    private static func drawFlecks(into ctx: CGContext, width: Int, height: Int, scale: CGFloat,
-                                   tone: (r: Double, g: Double, b: Double), random: inout Random) {
-        let dpr = Double(scale)
-        let count = Int((Double(width * height) / (dpr * dpr) * 0.0030).rounded())
-        for _ in 0..<count {
-            let x = random.next() * Double(width)
-            let y = random.next() * Double(height)
-            let pale = random.next() < 0.14
-            let pigment: (r: Double, g: Double, b: Double) = pale
-                ? (255, 250, 240)
-                : (random.next() < 0.7 ? (36, 29, 21) : (91, 67, 39))
-            ctx.setFillColor(CGColor(srgbRed: pigment.r / 255, green: pigment.g / 255, blue: pigment.b / 255, alpha: 1))
-            ctx.setAlpha(pale ? 0.16 + random.next() * 0.24 : 0.26 + random.next() * 0.46)
-            let radius = (0.4 + random.next() * 1.0) * dpr * max(0.7, size * 0.85)
-            let lobes = random.next() < 0.7 ? 1 : 2
-            for _ in 0..<lobes {
-                let offsetX = (random.next() - 0.5) * radius * 1.6
-                let offsetY = (random.next() - 0.5) * radius * 1.6
-                let rx = radius * (0.45 + random.next() * 0.7)
-                let ry = radius * (0.28 + random.next() * 0.5)
-                let rotation = random.next() * .pi
-                ctx.saveGState()
-                ctx.translateBy(x: x + offsetX, y: y + offsetY)
-                ctx.rotate(by: rotation)
-                ctx.addEllipse(in: CGRect(x: -rx, y: -ry, width: rx * 2, height: ry * 2))
-                ctx.fillPath()
-                ctx.restoreGState()
-            }
-        }
-        ctx.setAlpha(1)
+        drawLight(mode, in: context, rect: full)
+        return context.makeImage()
     }
 }

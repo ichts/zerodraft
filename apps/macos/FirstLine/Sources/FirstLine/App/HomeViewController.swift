@@ -75,9 +75,9 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
         guard let window = view.window else { return }
         let area = view.bounds.insetBy(dx: 32, dy: 32)
         let scale = window.backingScaleFactor
-        let dark = view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         PaperSheetCache.shared.prewarm(width: Int((area.width * scale).rounded()),
-                                       height: Int((area.height * scale).rounded()), scale: scale, dark: dark)
+                                       height: Int((area.height * scale).rounded()), scale: scale,
+                                       mode: FirstLineColors.mode(for: view.effectiveAppearance))
     }
 
     private func buildInterface() {

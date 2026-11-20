@@ -312,7 +312,7 @@ final class FirstLineStatusView: NSView {
         self.tone = tone
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = .systemFont(ofSize: 13)
+        label.font = FirstLineTypography.smallNSFont
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         label.stringValue = text

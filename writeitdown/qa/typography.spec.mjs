@@ -183,23 +183,23 @@ test('the clock keeps its width as the session counts down', async ({ page }) =>
 });
 
 test('the shared writing roles advance like the Mac', async ({ page }) => {
-  // Held, not deleted: the baseline is the Mac's Newsreader, and the Mac lane follows D-119 with its own measured
-  // baseline. When that lands this test runs again against the Allo advances on both surfaces.
-  test.skip(!baseline.roles.some(role => role.cssFamily === 'Allo'), 'D-119: the Mac still draws Newsreader; the Mac lane re-measures the shared baseline in Allo');
+  // Both surfaces draw Allo and Resource Han Rounded (D-119, D-120); the numeral is measured with its tabular figures.
   await page.goto('index.html');
   for (const role of baseline.roles) {
-    const advance = await page.evaluate(async ({ family, size, weight, style, string }) => {
+    const advance = await page.evaluate(async ({ family, size, weight, style, numeric, string }) => {
       await document.fonts.load(`${style} ${weight} ${size}px "${family}"`, string);
       await document.fonts.ready;
       const probe = document.createElement('span');
       probe.style.cssText = 'position:fixed;left:0;top:0;white-space:pre;letter-spacing:normal;'
-        + `font-family:"${family}",serif;font-size:${size}px;font-weight:${weight};font-style:${style}`;
+        + `font-family:"${family}",serif;font-size:${size}px;font-weight:${weight};font-style:${style};`
+        + `font-variant-numeric:${numeric}`;
       probe.textContent = string;
       document.body.append(probe);
       const width = probe.getBoundingClientRect().width;
       probe.remove();
       return width;
-    }, { family: role.cssFamily, size: role.size, weight: role.cssWeight, style: role.cssStyle, string: role.string });
+    }, { family: role.cssFamily, size: role.size, weight: role.cssWeight, style: role.cssStyle,
+      numeric: role.cssNumeric ?? 'normal', string: role.string });
     const drift = Math.abs(advance - role.advancePt) / role.advancePt;
     expect(drift, `${role.role} "${role.string}" at ${role.size}: the web draws ${advance.toFixed(3)}, the Mac ${role.advancePt}`).toBeLessThanOrEqual(baseline.tolerance);
   }

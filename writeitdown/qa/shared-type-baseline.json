@@ -6,18 +6,18 @@
       "role": "writing-latin",
       "string": "promotion. i want time",
       "size": 28,
-      "face": "Newsreader16pt-Regular",
-      "cssFamily": "Newsreader",
-      "cssWeight": "400",
+      "face": "AlloVariable-Regular",
+      "cssFamily": "Allo",
+      "cssWeight": "410",
       "cssStyle": "normal",
-      "advancePt": 264.486
+      "advancePt": 265.329
     },
     {
       "role": "writing-cjk",
       "string": "我写中文草稿",
       "size": 28,
-      "face": "ZhuqueFangsong-Regular",
-      "cssFamily": "Zhuque Fangsong",
+      "face": "Resource-Han-Rounded-CN-Normal",
+      "cssFamily": "Resource Han Rounded",
       "cssWeight": "400",
       "cssStyle": "normal",
       "advancePt": 168
@@ -26,21 +26,22 @@
       "role": "kept-heading",
       "string": "You wrote it down.",
       "size": 48,
-      "face": "NewsreaderRoman-Medium",
-      "cssFamily": "Newsreader",
-      "cssWeight": "500",
+      "face": "AlloVariable-Regular",
+      "cssFamily": "Allo",
+      "cssWeight": "540",
       "cssStyle": "normal",
-      "advancePt": 395.869
+      "advancePt": 377.328
     },
     {
       "role": "warning-numeral",
       "string": "3",
       "size": 162,
-      "face": "Newsreader16pt-Italic",
-      "cssFamily": "Newsreader",
-      "cssWeight": "400",
-      "cssStyle": "italic",
-      "advancePt": 97.2
+      "face": "AlloVariable-Regular",
+      "cssFamily": "Allo",
+      "cssWeight": "360",
+      "cssStyle": "normal",
+      "cssNumeric": "tabular-nums",
+      "advancePt": 94.969
     }
   ]
 }

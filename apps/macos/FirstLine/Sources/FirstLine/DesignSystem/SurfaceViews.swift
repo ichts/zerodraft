@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing.
- * [OUTPUT]: FirstLineShadowView (ink ladder behind a surface) and FirstLineCardView (sheet + shadow + content insets).
+ * [OUTPUT]: FirstLineShadowView (the mode's `--paper-shadow` stack behind a surface, D-120) and FirstLineCardView (sheet + shadow + content insets).
  * [POS]: Shared page/sheet depth primitives; the only shadow in the app, matching the sheet-shadow token.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -17,23 +17,47 @@ final class FirstLineShadowView: NSView {
         didSet { updateLayers() }
     }
 
+    /// One CSS box-shadow layer: `0 offset blur spread colour`. CALayer blurs by `radius`, half the CSS blur, and the
+    /// spread grows or shrinks the shadow path.
     private struct Spec {
         let opacity: CGFloat
         let radius: CGFloat
         let offset: CGSize
+        let spread: CGFloat
         let inkTinted: Bool
+
+        init(_ opacity: CGFloat, blur: CGFloat, y: CGFloat, spread: CGFloat, inkTinted: Bool) {
+            self.opacity = opacity
+            radius = blur / 2
+            offset = CGSize(width: 0, height: -y)
+            self.spread = spread
+            self.inkTinted = inkTinted
+        }
+
+        init(opacity: CGFloat, radius: CGFloat, offset: CGSize, spread: CGFloat, inkTinted: Bool) {
+            self.opacity = opacity
+            self.radius = radius
+            self.offset = offset
+            self.spread = spread
+            self.inkTinted = inkTinted
+        }
     }
 
-    // Approved tokens.swift SheetShadow: black 5% contact, ink 12% and 20% layers.
-    private let lightSpecs = [
-        Spec(opacity: 0.05, radius: 0.5, offset: CGSize(width: 0, height: -1), inkTinted: false),
-        Spec(opacity: 0.12, radius: 12, offset: CGSize(width: 0, height: -12), inkTinted: true),
-        Spec(opacity: 0.20, radius: 36, offset: CGSize(width: 0, height: -36), inkTinted: true),
-    ]
-    private let darkSpecs = [
-        Spec(opacity: 0.25, radius: 0.5, offset: CGSize(width: 0, height: -1), inkTinted: false),
-        Spec(opacity: 0.60, radius: 28, offset: CGSize(width: 0, height: -28), inkTinted: false),
-    ]
+    /// `--paper-shadow` per mode (tokens.css v3): Lamp and Slate share the black lamp-lit stack, Paper an ink one.
+    private static func specs(for mode: PaperMode) -> [Spec] {
+        switch mode {
+        case .paper:
+            [Spec(0.07, blur: 0, y: 0, spread: 1, inkTinted: true),
+             Spec(0.05, blur: 4, y: 2, spread: 0, inkTinted: true),
+             Spec(0.12, blur: 24, y: 12, spread: -8, inkTinted: true),
+             Spec(0.20, blur: 72, y: 36, spread: -24, inkTinted: true)]
+        case .lamp, .slate:
+            [Spec(0.30, blur: 0, y: 0, spread: 1, inkTinted: false),
+             Spec(0.60, blur: 14, y: 6, spread: -4, inkTinted: false),
+             Spec(0.60, blur: 48, y: 24, spread: -16, inkTinted: false)]
+        }
+    }
+    private static let layerCount = 4
     private var shadowLayers: [CALayer] = []
 
     /// How far the shadow may reach past the sheet, in pt; nil leaves the approved spec untouched. A window with no
@@ -45,8 +69,8 @@ final class FirstLineShadowView: NSView {
 
     /// The farthest any layer of the current appearance's shadow reaches below the sheet.
     var effectiveReach: CGFloat {
-        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        return (dark ? darkSpecs : lightSpecs).map { fitted($0).radius + abs(fitted($0).offset.height) }.max() ?? 0
+        Self.specs(for: FirstLineColors.mode(for: effectiveAppearance))
+            .map { fitted($0).radius + abs(fitted($0).offset.height) + fitted($0).spread }.max() ?? 0
     }
 
     private func fitted(_ spec: Spec) -> Spec {
@@ -55,7 +79,7 @@ final class FirstLineShadowView: NSView {
         let scale = reach / natural
         return Spec(opacity: spec.opacity, radius: spec.radius * scale,
                     offset: CGSize(width: spec.offset.width * scale, height: spec.offset.height * scale),
-                    inkTinted: spec.inkTinted)
+                    spread: spec.spread, inkTinted: spec.inkTinted)
     }
 
     init(cornerRadius: CGFloat = FirstLineRadius.card, fillColor: NSColor = FirstLineColors.sheetNSColor) {
@@ -64,7 +88,7 @@ final class FirstLineShadowView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         layer?.masksToBounds = false
-        (lightSpecs + darkSpecs).forEach { _ in
+        (0..<Self.layerCount).forEach { _ in
             let sublayer = CALayer()
             sublayer.masksToBounds = false
             layer?.addSublayer(sublayer)
@@ -90,8 +114,7 @@ final class FirstLineShadowView: NSView {
 
     private func updateLayers() {
         guard bounds.width > 0, bounds.height > 0, let parentLayer = layer else { return }
-        let dark = effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let specs = dark ? darkSpecs : lightSpecs
+        let specs = Self.specs(for: FirstLineColors.mode(for: effectiveAppearance))
         let visible = Array(shadowLayers.prefix(specs.count))
         // Hidden spare layers stay out of the render tree when the mode uses fewer layers.
         for sublayer in shadowLayers where !visible.contains(sublayer) { sublayer.isHidden = true }
@@ -101,9 +124,10 @@ final class FirstLineShadowView: NSView {
             sublayer.frame = bounds
             sublayer.cornerRadius = cornerRadius
             sublayer.backgroundColor = resolved(fillColor)
-            sublayer.shadowPath = CGPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
-                                         cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-            sublayer.shadowColor = resolved(spec.inkTinted ? FirstLineColors.inkNSColor : .black)
+            let path = bounds.insetBy(dx: -spec.spread, dy: -spec.spread)
+            let corner = max(cornerRadius + spec.spread, 0)
+            sublayer.shadowPath = CGPath(roundedRect: path, cornerWidth: corner, cornerHeight: corner, transform: nil)
+            sublayer.shadowColor = resolved(spec.inkTinted ? FirstLineColors.paperInkNSColor : .black)
             sublayer.shadowOpacity = Float(spec.opacity)
             sublayer.shadowRadius = spec.radius
             sublayer.shadowOffset = spec.offset

@@ -1,6 +1,6 @@
 /*
- * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
- * [OUTPUT]: One AppKit room: page, the Wheat paper sheet (PaperSheetView) with the sheet shadow, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: a tint layer under the sheet's texture layer, leaving on the 120 ms fade) and numeral, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on a 1.1 line box, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens, PaperModeSwitch.
+ * [OUTPUT]: One AppKit room: page, the current paper (Lamp, Paper or Slate; PaperSheetView) with that paper's shadow, every word and control on it in the paper's roles, the paper switch on the sheet's top-left across the clock row (a choice is not input: the draft, phase and silence clock carry on and focus returns to the writing unless kept; it fades with the chrome, D-120), one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: the wash and deep sheets over the paper at the web's opacity ramp, never repainting the paper on a tick, leaving on the 120 ms fade), the numeral and the sentence-case warn caption, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on the web's fixed 1.1 line box and baseline, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
  * [POS]: Clear window ground (D-102), 以及截止时刻的一次性 timer 与 0.1 s ticker 并存（D-111）: the traffic lights step out once the first character lands and return on a title-strip hover or when the room stops. Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.；confirmDeparture：关窗、退出、Begin、Home 与 Esc 共用同一个两步退出确认（D-118）
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -49,96 +49,49 @@ class RoomWashView: NSView {
     }
 }
 
-/// The sheet's texture inside the wash: both mottle scales and the grain, drawn once into its own layer each
-/// time the sheet rebuilds its field, so a warn tick that only moves the tint never repaints it.
-final class PaperTextureView: NSView {
-    var image: CGImage? { didSet { needsDisplay = true } }
-    /// How many times the texture has been painted; a warn tick must leave it unchanged.
+/// The sheet's warn wash, the web's `.room-paper-wash`: the mode's wash colour (the deeper one during the cut) laid
+/// over the sheet at the warning's strength and lit by the sheet's own light, so a washed sheet is lit exactly
+/// like the bare one. The colour is painted once per size, mode and step; a tick only moves the view's opacity.
+final class PaperWashView: RoomWashView {
+    private var fadeToken = 0
+    /// How many times the wash has been painted; a warn tick must leave it unchanged.
     private(set) var paints = 0
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-        layerContentsRedrawPolicy = .onSetNeedsDisplay
-        autoresizingMask = [.width, .height]
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override var isOpaque: Bool { false }
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let image, let ctx = NSGraphicsContext.current?.cgContext else { return }
-        paints += 1
-        ctx.saveGState()
-        ctx.translateBy(x: 0, y: bounds.height)
-        ctx.scaleBy(x: 1, y: -1)
-        ctx.interpolationQuality = .none
-        ctx.draw(image, in: CGRect(origin: .zero, size: bounds.size))
-        ctx.restoreGState()
-    }
-}
-
-/// The sheet's warn wash. Its layer carries the paper tone mixed toward the locked wash colour, and the
-/// sheet's own texture sits above it in a layer of its own, so the alarm tints the same paper on both
-/// surfaces and each tick changes one layer colour instead of repainting the sheet (D-056). The sheet's
-/// mean shift rides on that colour, so the washed sheet keeps the sheet's corrected tone.
-final class PaperWashView: RoomWashView {
-    private let textureView = PaperTextureView()
-    private var shift = (r: 0.0, g: 0.0, b: 0.0)
-    private var fadeToken = 0
-
-    /// The sheet's texture; set once per rebuilt field, never per tick.
-    var texture: PaperField.Texture? {
-        didSet {
-            textureView.image = texture?.image
-            shift = texture?.shift ?? (0, 0, 0)
-            needsDisplay = true
-        }
-    }
-
-    /// How many times the texture layer has been painted, so a test can prove a tick never repaints it.
-    var texturePaints: Int { textureView.paints }
-
-    /// How far the sheet has warmed, 0...1: the ramp moves the colour, not the view's alpha.
-    var fraction: CGFloat = 0 { didSet { needsDisplay = true } }
-    var deep = false { didSet { needsDisplay = true } }
+    /// How strong the wash is, 0...1: the view's opacity.
+    private(set) var fraction: CGFloat = 0
+    var deep = false { didSet { if deep != oldValue { needsDisplay = true } } }
 
     override init(fillColor: NSColor) {
         super.init(fillColor: fillColor)
-        textureView.frame = bounds
-        addSubview(textureView)
+        layerContentsRedrawPolicy = .onSetNeedsDisplay
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    /// The paper's tone mixed toward the locked wash colour, resolved for this view's appearance every
-    /// time it is read, so neither a theme switch nor a drawing-appearance left behind by another view
-    /// can bake a stale tint into the wash.
+    override var wantsUpdateLayer: Bool { false }
+
+    /// The colour the wash lays down: `--paper-wash`, or `--paper-wash-deep` during the cut.
     var tint: NSColor {
         var resolved = NSColor.clear
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            let target = (deep ? FirstLineColors.paperWashDeepNSColor : FirstLineColors.paperWashNSColor)
-                .usingColorSpace(.sRGB)
-            guard let target, let base = FirstLineColors.paperNSColor.usingColorSpace(.sRGB) else { return }
-            let t = min(max(fraction, 0), 1)
-            resolved = NSColor(srgbRed: base.redComponent + (target.redComponent - base.redComponent) * t,
-                               green: base.greenComponent + (target.greenComponent - base.greenComponent) * t,
-                               blue: base.blueComponent + (target.blueComponent - base.blueComponent) * t,
-                               alpha: 1)
+            resolved = (deep ? FirstLineColors.paperWashDeepNSColor : FirstLineColors.paperWashNSColor)
+                .usingColorSpace(.sRGB) ?? .clear
         }
         return resolved
     }
 
-    override func updateLayer() {
-        super.updateLayer()
-        let colour = tint
-        layer?.backgroundColor = CGColor(srgbRed: colour.redComponent + shift.r / 255,
-                                         green: colour.greenComponent + shift.g / 255,
-                                         blue: colour.blueComponent + shift.b / 255, alpha: 1)
+    override func draw(_ dirtyRect: NSRect) {
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        paints += 1
+        ctx.setFillColor(tint.cgColor)
+        ctx.fill(bounds)
+        PaperField.drawLight(FirstLineColors.mode(for: effectiveAppearance), in: ctx, rect: bounds)
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        needsDisplay = true
     }
 
     /// Shows the wash at `fraction` warmth, or, at zero, leaves on the 120 ms fade still carrying its last
@@ -150,8 +103,8 @@ final class PaperWashView: RoomWashView {
         }
         fadeToken += 1
         if self.deep != deep { self.deep = deep }
-        self.fraction = fraction
-        setOpacity(1, reducesMotion: reducesMotion)
+        self.fraction = min(fraction, 1)
+        setOpacity(self.fraction, reducesMotion: reducesMotion)
     }
 
     private func fadeOut(reducesMotion: Bool) {
@@ -233,6 +186,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var outline: RoomWashView!
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
+    /// The paper switch across the clock row from the clock (D-120).
+    private(set) var modeSwitch: PaperModeSwitch!
     private var countLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!
@@ -348,7 +303,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private func label(_ text: String = "", font: NSFont? = FirstLineTypography.smallNSFont,
-                       color: NSColor = FirstLineColors.inkNSColor) -> NSTextField {
+                       color: NSColor = FirstLineColors.paperInkNSColor) -> NSTextField {
         let field = NSTextField(labelWithString: text)
         field.translatesAutoresizingMaskIntoConstraints = false
         field.font = font
@@ -363,13 +318,12 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperShadow.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(paperShadow)
 
-        // The paper is the Wheat sheet (D-069): tone and texture are rendered by the view itself.
+        // The paper is the mode's sheet (D-120): tone, grain, cloud and light are rendered by the view itself; its
+        // 1 pt ring is the first layer of the shadow behind it, as in the web's `--paper-shadow`.
         paper = PaperSheetView()
         paper.translatesAutoresizingMaskIntoConstraints = false
         paper.cornerRadius = FirstLineRadius.sheet
         paper.clipsContent = true
-        paper.borderColor = FirstLineColors.sheetRingNSColor
-        paper.borderWidth = 1
         view.addSubview(paper)
 
         textView = AppendOnlyTextView()
@@ -394,6 +348,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = false
+        // The editor owns the top inset that puts the line on the anchor. AppKit's automatic insets reset it to zero
+        // when a live resize ends, and the next line then sat above the anchor (Tart 15.7.7 and 26.6.2).
+        scrollView.automaticallyAdjustsContentInsets = false
         scrollView.wantsLayer = true
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         paper.addSubview(scrollView)
@@ -402,7 +359,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paperWash.translatesAutoresizingMaskIntoConstraints = false
         paperWash.cornerRadius = FirstLineRadius.sheet
         paperWash.alphaValue = 0
-        paper.textureDidChange = { [weak paperWash] texture in paperWash?.texture = texture }
         paper.addSubview(paperWash, positioned: .below, relativeTo: scrollView)
 
         outline = RoomWashView(fillColor: .clear)
@@ -414,10 +370,10 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         paper.addSubview(outline)
 
         progressBar = FirstLineFillBar(frame: .zero)
-        progressBar.fillColor = FirstLineColors.inkNSColor
+        progressBar.fillColor = FirstLineColors.paperInkNSColor
         paper.addSubview(progressBar)
 
-        timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.inkNSColor)
+        timerLabel = label(font: FirstLineTypography.clockNSFont, color: FirstLineColors.paperInkNSColor)
         timerLabel.alignment = .right
         timerLabel.setAccessibilityRole(.staticText)
         timerLabel.setAccessibilityElement(true)
@@ -429,9 +385,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
-        numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
+        numeralLabel = label(font: FirstLineTypography.numeralNSFont(size: 130),
                              color: FirstLineColors.paperDangerNSColor)
-        warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
+        warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperInkNSColor)
         warningHint.maximumNumberOfLines = 0
         numeralLabel.isHidden = true
         warningHint.isHidden = true
@@ -451,7 +407,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         refusalNoteLabel.setAccessibilityElement(false)
 
         failureHeadlineLabel = label(font: FirstLineTypography.writingMediumNSFont(size: 44),
-                                     color: FirstLineColors.inkNSColor)
+                                     color: FirstLineColors.paperInkNSColor)
         failureHeadlineLabel.maximumNumberOfLines = 2
         failureHeadlineLabel.lineBreakMode = .byWordWrapping
         failureHeadlineLabel.isHidden = true
@@ -471,7 +427,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         // keyboard focus. Its label rides a pass-through label on the pill's optical centre.
         failureRestartButton = FirstLineButtons.secondary(title: "Begin again", target: self,
                                                           action: #selector(restart),
-                                                          height: FailureComposition.reference)
+                                                          height: FailureComposition.reference, onPaper: true)
         failureRestartButton.keyEquivalent = "\r"
         failureRestartButton.setAccessibilityLabel("Begin again")
         failureRestartButton.setAccessibilityHelp(
@@ -491,7 +447,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         failureRestartLabel.lineBreakMode = .byClipping
         failureRestartLabel.setAccessibilityElement(false)
         failureRestartLabel.attributedStringValue = FirstLineTypography.trackedText(
-            "Begin again", font: FirstLineTypography.uiSemiboldNSFont, color: FirstLineColors.inkNSColor,
+            "Begin again", font: FirstLineTypography.uiSemiboldNSFont, color: FirstLineColors.paperInkNSColor,
             kernEm: 0.04, lineHeightMultiple: 1.6)
         failureRestartButton.addSubview(failureRestartLabel)
         failurePillHeight = failureRestartButton.constraints.first { $0.firstAttribute == .height }
@@ -511,7 +467,17 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paper.addSubview(element)
         }
         buildKeptView()
+        modeSwitch = PaperModeSwitch(mode: appState.settings.paperMode)
+        modeSwitch.onChoose = { [weak self] mode in self?.choosePaper(mode) }
+        paper.addSubview(modeSwitch)
         installConstraints()
+    }
+
+    /// A paper switch changes colour only: the draft, the phase and the silence clock carry on, and the keyboard
+    /// goes straight back to the writing unless the room is showing the kept draft (room.js roomModes).
+    private func choosePaper(_ mode: PaperMode) {
+        appState.updatePaperMode(mode)
+        if engine.phase != .success { focusForPhase() }
     }
 
     private func buildKeptView() {
@@ -553,6 +519,9 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             outline.leadingAnchor.constraint(equalTo: paper.leadingAnchor), outline.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             outline.topAnchor.constraint(equalTo: paper.topAnchor), outline.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             timerLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 18),
+            // The first label's word starts on the room inset, as the clock ends on it.
+            modeSwitch.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: Self.roomInset - PaperModeSwitch.padding),
+            modeSwitch.centerYAnchor.constraint(equalTo: timerLabel.centerYAnchor),
             timerLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -Self.roomInset),
             exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: Self.roomInset),
             exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
@@ -574,6 +543,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             captionTop,
             warningHint.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
             warningHint.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
+            warningHint.widthAnchor.constraint(lessThanOrEqualToConstant: Self.warningCaptionMaxWidth),
             failureHeadlineLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             failureTop,
             failureHeadlineLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 32),
@@ -659,7 +629,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private func updateTextMeasure() {
         let scrollWidth = scrollView.bounds.width
         guard scrollWidth > 1 else { return }
-        let font = FirstLineTypography.writingNSFont(size: appState.settings.writingFontSize.points)
+        let size = appState.settings.writingFontSize.points
+        let font = FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
         let character = ("0" as NSString).size(withAttributes: [.font: font]).width
         let cap = CGFloat(appState.settings.writingAlignment.measureCharacters) * character
         let measure = min(cap, max(scrollWidth - 16, 160))
@@ -669,47 +640,52 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    /// Ink height of the drawn glyphs, used to place the warning by its ink rather
-    /// than by a line-box frame.
-    private func glyphInkHeight(_ text: String, font: NSFont) -> CGFloat? {
-        let coreText = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var tallest: CGFloat = 0
-        for scalar in text.unicodeScalars {
-            guard scalar.value <= UInt16.max else { continue }
-            var codeUnit = UniChar(scalar.value)
-            var glyph = CGGlyph()
-            guard CTFontGetGlyphsForCharacters(coreText, &codeUnit, &glyph, 1), glyph != 0 else { continue }
-            var measured = glyph
-            var bounds = CGRect.zero
-            CTFontGetBoundingRectsForGlyphs(coreText, .horizontal, &measured, &bounds, 1)
-            tallest = max(tallest, bounds.height)
-        }
-        return tallest > 0 ? tallest : nil
+    /// The drawn ink of `text` around its baseline (maxY above, minY below), the web's `actualBoundingBox`.
+    private func inkBounds(_ text: String, font: NSFont) -> CGRect {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        return CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
     }
 
+    /// The warning caption, sentence case at the note size: `500 13px/1.45`, ink, no tracking (D-119).
+    static let warningText = "Keep typing or the draft is deleted."
+    static let warningCaptionLineHeight: CGFloat = 1.45
+    /// The caption's measure, the web's `max-width:17em` at 13 pt.
+    static let warningCaptionMaxWidth: CGFloat = 17 * 13
+
+    /// The warning group, placed by ink as `status-slot.js` places it: the numeral's ink top 44 pt under the
+    /// writing baseline and the caption's ink top 20 pt under the numeral's ink. A sheet too short for the group
+    /// between the line and the footer (8 pt clear of each) takes it above the line instead, never off the sheet.
     private func layoutWarning() {
         guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
-        // Place the warning by its ink, not by its label frames: the numeral's frame
-        // carries a large empty descent that used to read as a 65 pt gap to its line.
         let numeralSize = round(min(view.bounds.height * 0.18, 170))
         if numeralLabel.font?.pointSize != numeralSize {
-            numeralLabel.font = FirstLineTypography.writingItalicNSFont(size: numeralSize)
+            numeralLabel.font = FirstLineTypography.numeralNSFont(size: numeralSize)
         }
         let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
         let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
-        let numeralFont = numeralLabel.font ?? FirstLineTypography.smallNSFont
-        // The room's Newsreader digits are taller than cap height (old-style figures),
-        // so use the drawn glyph's ink height; cap height understated the ink by ~8 pt.
-        let numeralInkHeight = glyphInkHeight(numeralLabel.stringValue, font: numeralFont) ?? numeralFont.capHeight
-        let numeralBearing = numeralLabel.firstBaselineOffsetFromTop - numeralInkHeight
-        let numeralInkTop = baselineFromTop + 44
+        let numeralFont = numeralLabel.font ?? FirstLineTypography.numeralNSFont(size: numeralSize)
+        let numeralInk = inkBounds(numeralLabel.stringValue.isEmpty ? "3" : numeralLabel.stringValue, font: numeralFont)
+        let numeralBearing = numeralLabel.firstBaselineOffsetFromTop - numeralInk.maxY
+        let captionWidth = min(Self.warningCaptionMaxWidth, max(paper.bounds.width - 40, 0))
+        if warningHint.preferredMaxLayoutWidth != captionWidth { warningHint.preferredMaxLayoutWidth = captionWidth }
+        let captionFont = FirstLineTypography.smallMediumNSFont
+        let captionInk = inkBounds(Self.warningText, font: captionFont)
+        let captionBearing = warningHint.firstBaselineOffsetFromTop - captionInk.maxY
+
+        var numeralInkTop = baselineFromTop + 44
+        let groupHeight: (CGFloat) -> CGFloat = { inkTop in
+            let captionInkTop = inkTop + numeralInk.height + 20
+            return captionInkTop - captionBearing + self.warningHint.fittingSize.height - (inkTop - numeralBearing)
+        }
+        let height = groupHeight(numeralInkTop)
+        let footerTop = paper.bounds.height - 16 - Self.footerHeight
+        if numeralInkTop - numeralBearing + height > footerTop - 8 {
+            let lineTop = baselineFromTop - textView.lineBaselineOffset
+            numeralInkTop = max(0, lineTop - 8 - height) + numeralBearing
+        }
         let numeralTopConstant = round(numeralInkTop - numeralBearing)
         if abs(numeralTop.constant - numeralTopConstant) > 0.5 { numeralTop.constant = numeralTopConstant }
-
-        let captionFont = warningHint.font ?? FirstLineTypography.smallNSFont
-        let captionBearing = warningHint.firstBaselineOffsetFromTop - captionFont.capHeight
-        let captionInkTop = numeralInkTop + numeralInkHeight + 20
-        let captionTopConstant = round(captionInkTop - captionBearing)
+        let captionTopConstant = round(numeralInkTop + numeralInk.height + 20 - captionBearing)
         if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
     }
 
@@ -747,15 +723,21 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if failureBase != composition.base {
             failureBase = composition.base
             let headlineFont = FirstLineTypography.writingMediumNSFont(size: composition.base)
-                ?? .systemFont(ofSize: composition.base, weight: .medium)
+                ?? FirstLineTypography.displayNSFont(size: composition.base)
+            // The web's 1.1 line box (`.room-top h1`): a fixed box, with the glyphs on the web's baseline (the box's
+            // top plus the half-leading plus the ascent). TextKit sets a clamped line's baseline one descent above its
+            // bottom, so the half-leading the box gives up moves the glyphs down to where the browser draws them.
+            let box = (headlineFont.pointSize * Self.failureHeadlineLineHeight).rounded()
+            let halfLeading = (box - headlineFont.ascender + headlineFont.descender) / 2
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
-            paragraph.lineHeightMultiple = Self.failureHeadlineLineHeight
+            paragraph.minimumLineHeight = box
+            paragraph.maximumLineHeight = box
             failureHeadlineLabel.font = headlineFont
             failureHeadlineLabel.attributedStringValue = NSAttributedString(
                 string: "You stopped.",
-                attributes: [.font: headlineFont, .foregroundColor: FirstLineColors.inkNSColor,
-                             .paragraphStyle: paragraph])
+                attributes: [.font: headlineFont, .foregroundColor: FirstLineColors.paperInkNSColor,
+                             .paragraphStyle: paragraph, .baselineOffset: min(0, halfLeading)])
             failureNoteLabel.font = composition.noteFont
             failureNoteLabel.attributedStringValue = FirstLineTypography.trackedText(
                 "Draft deleted.", font: composition.noteFont, color: FirstLineColors.paperQuietNSColor,
@@ -766,7 +748,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
                 lineHeightMultiple: 1.6)
             failureRestartLabel.font = composition.pillLabelFont
             failureRestartLabel.attributedStringValue = FirstLineTypography.trackedText(
-                "Begin again", font: composition.pillLabelFont, color: FirstLineColors.inkNSColor,
+                "Begin again", font: composition.pillLabelFont, color: FirstLineColors.paperInkNSColor,
                 kernEm: 0.04, lineHeightMultiple: 1.6)
             failureNoteHeight.constant = (composition.noteFontSize * Self.failureNoteLineHeight).rounded()
             failurePillHeight.constant = composition.base
@@ -848,8 +830,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         let curtain = PaperSheetView()
         curtain.cornerRadius = FirstLineRadius.sheet
         curtain.clipsContent = true
-        curtain.borderColor = FirstLineColors.sheetRingNSColor
-        curtain.borderWidth = 1
         curtain.passesHitTests = true
         curtain.frame = paper.bounds
         paper.addSubview(curtain)
@@ -999,8 +979,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if warning {
             numeralLabel.stringValue = "\(engine.secondsUntilDeletion)"
             warningHint.attributedStringValue = FirstLineTypography.trackedText(
-                "KEEP TYPING OR THE DRAFT IS DELETED.", font: FirstLineTypography.smallMediumNSFont,
-                color: FirstLineColors.inkNSColor, kernEm: 0.04, lineHeightMultiple: 1.5)
+                Self.warningText, font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperInkNSColor,
+                kernEm: 0, lineHeightMultiple: Self.warningCaptionLineHeight, fixedLineHeight: true)
             // The digits are placed from the live caret line each time they show: the layout pass that last ran
             // (before any text, at width 0) left them below the paper on macOS 15, where none follows (D-089).
             layoutWarning()
@@ -1052,8 +1032,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func updateKeptContent() {
         let size = appState.settings.writingFontSize.points
-        let writingFont = WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size)
-            ?? FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
+        let writingFont = FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
         keptView.setContent(text: engine.text, wordCount: engine.wordCount,
                             duration: engine.duration, writingFont: writingFont)
     }
@@ -1103,6 +1082,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         updateKeptContent()
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
+        modeSwitch.alphaValue = showChrome ? 1 : 0
+        modeSwitch.mode = settings.paperMode
         countLabel.alphaValue = showChrome ? 1 : 0
         textView.animatesHistoryScroll = !reducesMotion
     }

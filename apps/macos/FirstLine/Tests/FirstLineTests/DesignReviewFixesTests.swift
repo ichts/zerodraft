@@ -201,7 +201,7 @@ struct DesignReviewFixesTests {
             #expect(abs(edge - edges[0].1) <= 1,
                     "\(name) ends at \(edge), \(edges[0].0) ends at \(edges[0].1): one right edge only")
         }
-        let rowLabels = ["Theme", "Reduced Motion", "Focus Mode", "Alignment", "Font Size",
+        let rowLabels = ["Paper", "Reduced Motion", "Focus Mode", "Alignment", "Font Size",
                          "Check for updates automatically"]
         var leadingEdges: [CGFloat] = []
         for name in rowLabels {
@@ -528,6 +528,52 @@ struct DesignReviewFixesTests {
             fresh.window.orderOut(nil)
             again.window.orderOut(nil)
         }
+    }
+
+    /// A window resized while the stopped sheet shows, then Begin again: the new line sits on the anchor. In a real
+    /// window the end of a live resize let AppKit's automatic insets zero the top inset the editor owns, and the
+    /// restarted line sat 120 pt above the anchor (Tart 15.7.7 and 26.6.2, D-120 smoke). A test window cannot run
+    /// a live resize, so the cause is pinned on the scroll view itself; the VM scenario measures the line.
+    @Test func restartAfterAResizeOnTheStoppedSheetPutsTheLineOnTheAnchor() throws {
+        let final = NSSize(width: 1240, height: 775)
+        let fresh = try room(size: final)
+        fresh.window.makeKeyAndOrderFront(nil)
+        fresh.room.viewDidAppear()
+        fresh.room.view.layoutSubtreeIfNeeded()
+        fresh.editor.insertText("a", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fresh.room.tick()
+        fresh.room.view.layoutSubtreeIfNeeded()
+        let freshCaret = caretInPaper(fresh.editor, paper: fresh.paper)
+
+        let again = try room(size: NSSize(width: 1040, height: 720))
+        again.window.makeKeyAndOrderFront(nil)
+        again.room.viewDidAppear()
+        let scroll = try #require(again.editor.enclosingScrollView)
+        #expect(!scroll.automaticallyAdjustsContentInsets, "the room's writing scroll view takes AppKit's automatic insets")
+        again.editor.insertText("I watched the rain.", replacementRange: NSRange(location: NSNotFound, length: 0))
+        again.clock.now = 1
+        again.engine.registerMarkedTextActivity()
+        again.room.tick()
+        again.clock.now = 20
+        again.room.tick()
+        again.room.endCutAnimation()
+        again.room.viewDidLayout()
+        #expect(again.engine.phase == .failure)
+        again.window.setContentSize(final)
+        again.room.view.layoutSubtreeIfNeeded()
+        again.room.viewDidLayout()
+        let ret = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: again.window.windowNumber,
+            context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36))
+        #expect(again.window.performKeyEquivalent(with: ret), "Return did not reach Begin again")
+        again.room.tick()
+        again.editor.insertText("a", replacementRange: NSRange(location: NSNotFound, length: 0))
+        again.room.tick()
+        again.room.view.layoutSubtreeIfNeeded()
+        let caret = caretInPaper(again.editor, paper: again.paper)
+        #expect(abs(caret.midY - freshCaret.midY) <= 1, "restart after resize: caret y \(caret.midY) vs \(freshCaret.midY)")
+        fresh.window.orderOut(nil)
+        again.window.orderOut(nil)
     }
 
     // MARK: - Fixtures

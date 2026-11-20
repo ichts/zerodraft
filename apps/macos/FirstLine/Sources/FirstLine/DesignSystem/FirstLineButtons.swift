@@ -15,14 +15,18 @@ enum FirstLineButtons {
 
     static func roomPrimary(title: String, target: AnyObject?, action: Selector,
                             reducesMotion: @escaping () -> Bool) -> NSButton {
-        styled(title: title, target: target, action: action, role: .primary, roomMotion: reducesMotion)
+        let button = styled(title: title, target: target, action: action, role: .primary, roomMotion: reducesMotion)
+        (button as? FirstLineInkFocusButton)?.onPaper = true
+        return button
     }
 
     /// `height` lets a secondary outline button sit in a row with a 48 pt primary
     /// without a 4 pt height mismatch; the pill radius follows the actual height.
     static func secondary(title: String, target: AnyObject?, action: Selector,
-                          height: CGFloat? = nil) -> NSButton {
-        styled(title: title, target: target, action: action, role: .secondary, height: height)
+                          height: CGFloat? = nil, onPaper: Bool = false) -> NSButton {
+        let button = styled(title: title, target: target, action: action, role: .secondary, height: height)
+        (button as? FirstLineInkFocusButton)?.onPaper = onPaper
+        return button
     }
 
     static func link(title: String, target: AnyObject?, action: Selector) -> NSButton {
@@ -31,6 +35,7 @@ enum FirstLineButtons {
 
     static func roomExit(title: String, target: AnyObject?, action: Selector) -> NSButton {
         let button = FirstLineRoomExitButton(title: title, target: target, action: action)
+        button.onPaper = true
         button.refreshTitle()
         return button
     }
@@ -82,7 +87,7 @@ private final class FirstLineLinkButton: FirstLineInkFocusButton {
         translatesAutoresizingMaskIntoConstraints = false
         isBordered = false
         bezelStyle = .inline
-        font = .systemFont(ofSize: 13, weight: .medium)
+        font = FirstLineTypography.smallMediumNSFont
         contentTintColor = FirstLineColors.chromeNSColor
         inkFocusRingInset = 3
         inkFocusRingCornerRadius = 4
@@ -129,7 +134,7 @@ private final class FirstLineRoomExitButton: FirstLineInkFocusButton {
     }
 
     func refreshTitle() {
-        let color = hover ? FirstLineColors.inkNSColor : FirstLineColors.paperQuietNSColor
+        let color = hover ? FirstLineColors.paperInkNSColor : FirstLineColors.paperQuietNSColor
         contentTintColor = color
         attributedTitle = FirstLineTypography.trackedText(title, font: FirstLineTypography.smallNSFont,
                                                           color: color, kernEm: 0)
@@ -179,8 +184,18 @@ private final class FirstLineButton: FirstLineInkFocusButton {
     }
 
     override var inkFocusRingColor: NSColor {
-        role == .primary ? FirstLineColors.onInkNSColor : FirstLineColors.inkNSColor
+        role == .primary ? onInk : ink
     }
+
+    override var onPaper: Bool { didSet { refreshAppearance() } }
+
+    // The roles this pill draws with: the page's, or the sheet's when it sits on the writing sheet.
+    private var ink: NSColor { onPaper ? FirstLineColors.paperInkNSColor : FirstLineColors.inkNSColor }
+    private var onInk: NSColor { onPaper ? FirstLineColors.paperNSColor : FirstLineColors.onInkNSColor }
+    private var surface: NSColor { onPaper ? FirstLineColors.paperNSColor : FirstLineColors.sheetNSColor }
+    private var hair: NSColor { onPaper ? FirstLineColors.paperHairNSColor : FirstLineColors.hairNSColor }
+    private var hairStrong: NSColor { onPaper ? FirstLineColors.paperHairStrongNSColor : FirstLineColors.hairStrongNSColor }
+    private var mute: NSColor { onPaper ? FirstLineColors.paperQuietNSColor : FirstLineColors.muteNSColor }
 
     var roomMotion: (() -> Bool)?
     private var hover = false
@@ -259,9 +274,7 @@ private final class FirstLineButton: FirstLineInkFocusButton {
 
     private func refreshAppearance() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            contentTintColor = isEnabled
-                ? (role == .primary ? FirstLineColors.onInkNSColor : FirstLineColors.inkNSColor)
-                : FirstLineColors.muteNSColor
+            contentTintColor = isEnabled ? (role == .primary ? onInk : ink) : mute
         }
         needsDisplay = true
     }
@@ -285,11 +298,11 @@ private final class FirstLineButton: FirstLineInkFocusButton {
                 case .primary:
                     layer?.borderWidth = 0
                     layer?.borderColor = nil
-                    layer?.backgroundColor = FirstLineColors.inkNSColor.withAlphaComponent(0.06).cgColor
+                    layer?.backgroundColor = ink.withAlphaComponent(0.06).cgColor
                 case .secondary:
                     layer?.borderWidth = 1
-                    layer?.borderColor = FirstLineColors.hairNSColor.cgColor
-                    layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
+                    layer?.borderColor = hair.cgColor
+                    layer?.backgroundColor = surface.cgColor
                 }
                 return
             }
@@ -297,11 +310,11 @@ private final class FirstLineButton: FirstLineInkFocusButton {
             case .primary:
                 layer?.borderWidth = 0
                 layer?.borderColor = nil
-                layer?.backgroundColor = FirstLineColors.inkNSColor.cgColor
+                layer?.backgroundColor = ink.cgColor
             case .secondary:
                 layer?.borderWidth = 1
-                layer?.borderColor = FirstLineColors.hairStrongNSColor.cgColor
-                layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
+                layer?.borderColor = hairStrong.cgColor
+                layer?.backgroundColor = surface.cgColor
             }
         }
     }
@@ -326,7 +339,7 @@ final class FirstLineIconCircleButton: FirstLineInkFocusButton {
         translatesAutoresizingMaskIntoConstraints = false
         isBordered = false
         bezelStyle = .inline
-        font = .systemFont(ofSize: 14, weight: .semibold)
+        font = FirstLineTypography.allo(size: 14, weight: FirstLineTypography.Weight.semibold)
         contentTintColor = FirstLineColors.inkNSColor
         inkFocusRingInset = 3
         wantsLayer = true

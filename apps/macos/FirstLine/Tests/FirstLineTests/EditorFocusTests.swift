@@ -231,65 +231,40 @@ struct EditorFocusTests {
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
     }
 
-    /// The ladder is solved per appearance (D-069), so a theme switch re-steps every completed line: no
-    /// step from the other appearance stays baked into the storage.
-    @Test func historyLadderFollowsTheAppearance() throws {
+    /// The ladder is solved per mode (D-069, D-120): Lamp and Paper step 1, .22, .07 and Slate 1, .16, .05, and a
+    /// mode switch re-steps every completed line, so no step from the other mode stays baked into the storage.
+    @Test func historyLadderFollowsTheMode() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.appearance = NSAppearance(named: .aqua)
         textView.configureSessionTypography()
         textView.loadRestoredText("one\ntwo\nthree")
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.22) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.07) < 0.001)
-        textView.appearance = NSAppearance(named: .darkAqua)
-        textView.viewDidChangeEffectiveAppearance()
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - 0.16) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - 0.05) < 0.001)
-        #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001)
+        for (mode, ladder) in [(PaperMode.paper, [0.07, 0.22]), (.lamp, [0.07, 0.22]), (.slate, [0.05, 0.16]),
+                               (.lamp, [0.07, 0.22])] {
+            try withPaperMode(mode) { (appearance: NSAppearance.Name) throws in
+                textView.appearance = NSAppearance(named: appearance)
+                textView.viewDidChangeEffectiveAppearance()
+                #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - ladder[0]) < 0.001, "\(mode)")
+                #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - ladder[1]) < 0.001, "\(mode)")
+                #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001, "\(mode)")
+            }
+        }
     }
 
-    /// The ink's imperfection steps with the line: the live line, one back and two back each carry their own
-    /// fixed spread, so a faded line cannot keep the live line's ink and the same text always renders
-    /// identically (D-073).
-    @Test func inkSpreadIsQuantisedToTheLineStep() throws {
+    /// D-090: the ink is the colour and nothing else. No line, live or fading, carries a shadow or a stroke.
+    @Test func historyCarriesNoInkSpread() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.loadRestoredText("one\ntwo\nthree")
-
-        func spread(_ index: Int) throws -> (alpha: CGFloat, blur: CGFloat) {
-            let storage = try #require(textView.textStorage)
-            let layout = try #require(textView.layoutManager)
-            let container = try #require(textView.textContainer)
-            layout.ensureLayout(for: container)
-            var lines: [NSRange] = []
-            layout.enumerateLineFragments(forGlyphRange: NSRange(location: 0, length: storage.length)) { _, _, _, glyphRange, _ in
-                lines.append(layout.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil))
+        textView.insertText("four", replacementRange: NSRange(location: NSNotFound, length: 0))
+        let storage = try #require(textView.textStorage)
+        var decorated: [String] = []
+        storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, range, _ in
+            for key in [NSAttributedString.Key.shadow, .strokeWidth, .strokeColor, .obliqueness, .expansion]
+            where attributes[key] != nil {
+                decorated.append("\(key.rawValue) at \(range)")
             }
-            let line = try #require(lines.indices.contains(index) ? lines[index] : nil)
-            let shadow = try #require(storage.attribute(.shadow, at: line.location, effectiveRange: nil) as? NSShadow)
-            let colour = try #require(shadow.shadowColor?.usingColorSpace(.sRGB))
-            return (colour.alphaComponent, shadow.shadowBlurRadius)
         }
-
-        let live = try spread(2)
-        let oneBack = try spread(1)
-        let twoBack = try spread(0)
-        // Exactly the ladder, quantised: one fixed value per step, and never the live line's spread.
-        #expect(abs(live.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep) < 0.001)
-        let ladder = textView.historyLineOpacities
-        #expect(abs(oneBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[1]) < 0.001)
-        #expect(abs(twoBack.alpha - AppendOnlyTextView.inkSpreadAlphaAtFullStep * ladder[2]) < 0.001)
-        #expect(oneBack.alpha < live.alpha && twoBack.alpha < oneBack.alpha)
-        // The blur belongs to the sheet, not to the fade: the step moves the ink's weight only.
-        #expect(abs(live.blur - oneBack.blur) < 0.001)
-
-        // Deterministic: the same text rendered again carries the same attributes.
-        let again = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        again.configureSessionTypography()
-        again.loadRestoredText("one\ntwo\nthree")
-        let replayed = try #require(again.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
-        let original = try #require(textView.textStorage?.attribute(.shadow, at: 0, effectiveRange: nil) as? NSShadow)
-        #expect(replayed.shadowBlurRadius == original.shadowBlurRadius)
-        #expect(replayed.shadowColor?.alphaComponent == original.shadowColor?.alphaComponent)
+        #expect(decorated.isEmpty, "\(decorated)")
+        #expect(textView.typingAttributes[.shadow] == nil)
     }
 
     @Test
@@ -587,63 +562,46 @@ struct EditorFocusTests {
         return paper.convert(NSPoint(x: textView.textContainerOrigin.x + line.midX, y: 0), from: textView).x
     }
 
+    /// Punctuation is set in the writing face at the writing size, as on the web (D-120 retires the Mac-only light
+    /// punctuation).
     @Test
-    func punctuationCharactersUsePitchLightAtSmallerSize() throws {
-        guard WritingFontCandidate.pitchLight.isAvailable else {
-            return
-        }
-
+    func punctuationKeepsTheWritingFace() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "hello, world."))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
+        textView.insertText("hello, world.", replacementRange: NSRange(location: NSNotFound, length: 0))
         textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
         let wordFont = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
         let commaFont = try #require(storage.attribute(.font, at: 5, effectiveRange: nil) as? NSFont)
         let periodFont = try #require(storage.attribute(.font, at: 12, effectiveRange: nil) as? NSFont)
-        let wordColor = try #require(storage.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
-        let commaColor = try #require(storage.attribute(.foregroundColor, at: 5, effectiveRange: nil) as? NSColor)
-
-        #expect(commaFont.fontName == wordFont.fontName)
-        #expect(commaFont.fontName == periodFont.fontName)
-        #expect(commaFont.fontName.localizedCaseInsensitiveContains("Newsreader"))
-        #expect(commaFont.pointSize < wordFont.pointSize)
-        #expect(commaColor.alphaComponent == wordColor.alphaComponent)
+        #expect(wordFont.fontName.hasPrefix(BundledFonts.alloPostScript))
+        #expect(commaFont == wordFont && periodFont == wordFont)
     }
 
+    /// The first Chinese character registers Resource Han Rounded and the writing face cascades to it, so the
+    /// character is drawn in the bundled face from its first frame (D-109, D-120).
     @Test
-    func zhuqueFontIsAppliedAsCJKFallback() throws {
-        guard ChineseFontCandidate.zhuqueFangsong.isAvailable else {
-            return
-        }
-
+    func firstChineseCharacterBringsResourceHanRounded() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "我们 write."))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
+        textView.insertText("我们 write.", replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(BundledFonts.isCJKRegistered)
 
-        textView.applySessionTypography()
-
+        // The typing face is Allo cascading to Resource Han Rounded; the storage holds the face each run is drawn in.
+        let typing = try #require(textView.typingAttributes[.font] as? NSFont)
+        #expect(typing.fontName.hasPrefix(BundledFonts.alloPostScript))
+        let cascade = try #require(typing.fontDescriptor.object(forKey: .cascadeList) as? [NSFontDescriptor])
+        #expect(cascade.first?.postscriptName == BundledFonts.cjkPostScript)
         let storage = try #require(textView.textStorage)
-        let font = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
-        if font.fontName == "ZhuqueFangsong-Regular" {
-            return
-        }
-
-        let cascadeList = try #require(font.fontDescriptor.object(forKey: .cascadeList) as? [NSFontDescriptor])
-        let firstFallback = try #require(cascadeList.first)
-        #expect(firstFallback.postscriptName == "ZhuqueFangsong-Regular")
+        let chinese = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+        let latin = try #require(storage.attribute(.font, at: 3, effectiveRange: nil) as? NSFont)
+        #expect(chinese.fontName == BundledFonts.cjkPostScript)
+        #expect(latin.fontName.hasPrefix(BundledFonts.alloPostScript))
     }
 
     @Test
     func markedPinyinCaretAlignsToLatinGlyphBounds() throws {
-        guard WritingFontCandidate.pitchLight.isAvailable else {
-            return
-        }
-
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "我们是共产"))
@@ -683,10 +641,6 @@ struct EditorFocusTests {
 
     @Test
     func markedPinyinCaretStaysOnCurrentLineAfterNewline() throws {
-        guard WritingFontCandidate.pitchLight.isAvailable else {
-            return
-        }
-
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "第一行\n第二行"))
@@ -725,10 +679,6 @@ struct EditorFocusTests {
 
     @Test
     func committedLatinCaretAfterChineseKeepsReadableHeight() throws {
-        guard WritingFontCandidate.pitchLight.isAvailable else {
-            return
-        }
-
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民xianyan"))
@@ -743,10 +693,6 @@ struct EditorFocusTests {
 
     @Test
     func committedSpaceCaretAfterChineseKeepsReadableHeight() throws {
-        guard WritingFontCandidate.pitchLight.isAvailable else {
-            return
-        }
-
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民 "))
@@ -791,38 +737,22 @@ struct EditorFocusTests {
         #expect(adjusted.height <= 30)
     }
 
-    @Test
-    func mixedChineseLatinBoundaryUsesKerningWithoutInsertedSpace() throws {
+    /// Chinese next to Latin is spaced by the faces alone, as on the web: no kerning is added at the boundary or on
+    /// a typed space (D-120 retires the Mac-only script-boundary kerning).
+    @Test(arguments: ["爱人民xianyan", "飘扬在qianxiong 不怕"])
+    func mixedChineseLatinCarriesNoAddedKerning(text: String) throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "爱人民xianyan"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
+        textView.insertText(text, replacementRange: NSRange(location: NSNotFound, length: 0))
         textView.applySessionTypography()
 
         let storage = try #require(textView.textStorage)
-        let boundaryKern = storage.attribute(.kern, at: 2, effectiveRange: nil) as? CGFloat
-
-        #expect(textView.string == "爱人民xianyan")
-        if let boundaryKern {
-            #expect(boundaryKern > -2)
+        #expect(textView.string == text)
+        var kerned: [Int] = []
+        storage.enumerateAttribute(.kern, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            if let value = value as? CGFloat, value != 0 { kerned.append(range.location) }
         }
-    }
-
-    @Test
-    func explicitSpaceBetweenLatinAndChineseIsVisuallyCompressed() throws {
-        let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
-        textView.configureSessionTypography()
-        textView.textStorage?.setAttributedString(NSAttributedString(string: "飘扬在qianxiong 不怕"))
-        textView.setSelectedRange(NSRange(location: textView.string.count, length: 0))
-
-        textView.applySessionTypography()
-
-        let storage = try #require(textView.textStorage)
-        let boundaryKern = try #require(storage.attribute(.kern, at: 11, effectiveRange: nil) as? CGFloat)
-
-        #expect(textView.string == "飘扬在qianxiong 不怕")
-        #expect(boundaryKern < 0)
+        #expect(kerned.isEmpty, "kerning added at \(kerned)")
     }
 
     @Test

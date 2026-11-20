@@ -86,9 +86,11 @@ class FirstLineInkFocusButton: NSButton, FirstLineInkFocusRinging {
     private var inkRing: InkFocusRing!
     var inkFocusRingInset: CGFloat = 4 { didSet { needsDisplay = true } }
     var inkFocusRingCornerRadius: CGFloat? { didSet { needsDisplay = true } }
+    /// A control on the writing sheet takes the sheet's roles, as the web rebinds `--ink` inside `[data-paper]`.
+    var onPaper = false { didSet { needsDisplay = true } }
 
     var showsInkFocusRing: Bool { visibleOutline }
-    var inkFocusRingColor: NSColor { FirstLineColors.inkNSColor }
+    var inkFocusRingColor: NSColor { onPaper ? FirstLineColors.paperInkNSColor : FirstLineColors.inkNSColor }
 
     private var visibleOutline: Bool {
         window?.firstResponder === self

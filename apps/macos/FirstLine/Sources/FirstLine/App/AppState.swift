@@ -257,8 +257,10 @@ final class AppState {
         sessionEngine.tick()
     }
 
-    func updateTheme(_ theme: AppTheme) {
-        settings.theme = theme
+    /// Colour only: the session, its clock and its draft are untouched (D-120).
+    func updatePaperMode(_ mode: PaperMode) {
+        guard settings.paperMode != mode else { return }
+        settings.paperMode = mode
         persistSettings()
     }
 

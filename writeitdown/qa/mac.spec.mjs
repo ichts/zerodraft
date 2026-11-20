@@ -419,7 +419,7 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
   const raster = async (pseudo) => {
     const style = getComputedStyle(el, pseudo);
     const image = new Image();
-    image.src = (style.maskImage || style.webkitMaskImage).match(/url\("?([^"\)]+)"?\)/)[1];
+    image.src = (style.maskImage || style.webkitMaskImage).match(/^url\("(.*)"\)$/)[1];
     await image.decode();
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
@@ -681,7 +681,7 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       expect(state.outlineWidth, `${path} brand ${index}: focus outline width`).toBe('2px');
       expect(state.color, `${path} brand ${index}: brand ink`).toBe(state.ink);
       expect(state.maskImage, `${path} brand ${index}: outline-clipping mask`).toBe('none');
-      expect(state.markImage, `${path} brand ${index}: lockup mask`).toContain('write-it-down-lockup.svg');
+      expect(state.markImage, `${path} brand ${index}: lockup mask, inlined so it paints with the first frame`).toMatch(/^url\("data:image\/svg\+xml,/);
     }
   }
 });

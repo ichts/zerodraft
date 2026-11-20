@@ -559,3 +559,29 @@ test('every page puts its content on the header grid at 1440, 1024 and 390', asy
     }
   }
 });
+
+// Round 007: nothing in the header or the mode switch pops in after load. The current mode is marked and the mark is
+// drawn by the HTML and CSS alone, so the first frame already has them; this proves it with scripts switched off.
+test('the first frame carries the Lamp mark and the lockup, before any script runs', async ({ browser }, info) => {
+  const context = await browser.newContext({ javaScriptEnabled: false, viewport: info.project.use.viewport });
+  const page = await context.newPage();
+  const requests = [];
+  page.on('request', request => requests.push(request.url()));
+  await page.goto(new URL('index.html', info.project.use.baseURL).href);
+  const state = await page.evaluate(() => {
+    const lamp = document.querySelector('#landing .modes label:has(input[value=lamp])');
+    const paper = document.querySelector('#landing .modes label:has(input[value=paper])');
+    const brand = document.querySelector('.brand');
+    const mask = pseudo => { const s = getComputedStyle(brand, pseudo); return s.maskImage || s.webkitMaskImage; };
+    return { theme: document.documentElement.dataset.theme ?? null, lamp: getComputedStyle(lamp).textDecorationColor,
+      lampInk: getComputedStyle(lamp).color, paper: getComputedStyle(paper).textDecorationColor,
+      checked: document.querySelector('#landing .modes input[value=lamp]').checked, plate: mask('::before'), mark: mask('::after') };
+  });
+  await context.close();
+  expect(state.theme, 'no script ran').toBeNull();
+  expect(state.checked, 'Lamp is checked in the markup').toBe(true);
+  expect(state.lamp, 'Lamp is underlined in ink').toBe(state.lampInk);
+  expect(state.paper, 'the other modes carry no underline').toBe('rgba(0, 0, 0, 0)');
+  for (const image of [state.plate, state.mark]) expect(image, 'the lockup masks are inline').toMatch(/^url\("data:image\/svg\+xml,/);
+  expect(requests.filter(url => url.includes('/logo/')), 'the header asks for no logo file').toEqual([]);
+});

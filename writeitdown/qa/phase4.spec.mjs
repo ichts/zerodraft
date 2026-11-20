@@ -1927,3 +1927,22 @@ test('the clock does not breathe: tabular numerals on the room and the demo', as
   // The count on the same row was already tabular: one tool face, one numeral metric.
   expect(room.countNumeric).toBe('tabular-nums');
 });
+
+// A phone that shows the sheet below the door must see the demo from its first key, not mid-loop or in its blank
+// report: the loop's clock starts when the sheet first enters view (round 007).
+test('the demo starts when its sheet first enters view', async ({ page }, info) => {
+  test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo does not loop');
+  await page.setViewportSize({ width: 390, height: 360 });
+  await page.reload();
+  await expect.poll(() => page.locator('#paper').evaluate(e => e.getBoundingClientRect().top - innerHeight)).toBeGreaterThan(0);
+  await page.clock.runFor(15000);
+  await expect(page.locator('#cur'), 'nothing types while the sheet is out of view').toHaveText('');
+  await expect(page.locator('#clock')).toHaveText('1:00');
+  await page.locator('#paper').scrollIntoViewIfNeeded();
+  // Observers are notified in creation order in one rendering step, so once this fresh one fires the demo's has too.
+  await page.evaluate(() => new Promise(resolve => new IntersectionObserver((entries, observer) => {
+    if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); resolve(); }
+  }).observe(document.getElementById('paper'))));
+  await page.clock.runFor(TIMELINE.events[0].t + 100);
+  await expect(page.locator('#cur'), 'the first key lands as the loop begins').toHaveText(TIMELINE.events[0].cur);
+});

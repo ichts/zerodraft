@@ -98,7 +98,7 @@ test('an empty state is one centred sentence with its action inside the reading 
   const e = await style(page, '.empty', ['textAlign', 'display', 'maxWidth']);
   expect(e).toEqual({ textAlign: 'center', display: 'flex', maxWidth: '720px' });
   const title = await style(page, '.empty-title', ['fontFamily', 'fontSize']);
-  expect(title.fontFamily).toMatch(/Newsreader/);
+  expect(title.fontFamily).toMatch(/^"?Allo/);
   const centred = await page.evaluate(() => {
     const box = document.querySelector('.empty .btn').getBoundingClientRect();
     const empty = document.querySelector('.empty').getBoundingClientRect();

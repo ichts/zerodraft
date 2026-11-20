@@ -4,7 +4,7 @@ import { createServer } from 'node:net';
 import { openPage, sweepTimeout } from './page-sweep.mjs';
 
 // The thirteen shipped pages. Every one of them carries the landing page's design system: the A mark
-// lockup on its paper plate, the theme button, the shared footer, and the v2 type and colour roles.
+// lockup on its plate, the Lamp / Paper / Slate switch (D-119), the shared footer, and the type and colour roles.
 // The support and answer pages are not a reading mode; the purchase page is not a third system.
 const pages = ['index.html', 'download/', 'mac.html', 'support.html', 'privacy.html', 'terms.html', 'impressum.html',
   'what-is-write-it-down.html', 'is-my-writing-saved.html', 'delete-a-draft.html',
@@ -33,15 +33,15 @@ const readShell = page => page.evaluate(async () => {
   const home = [...document.querySelectorAll('.home')].find(element => element.getClientRects().length);
   const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(element => element.getClientRects().length);
   const brand = nav.querySelector('.brand');
-  const toggle = nav.querySelector('.theme-btn');
+  const modes = [...document.querySelectorAll('fieldset.modes')].filter(element => element.getClientRects().length);
   const brandBox = brand.getBoundingClientRect();
   return {
     theme: document.documentElement.dataset.theme,
     brandTop: +brandBox.top.toFixed(2),
     brandHeight: +brandBox.height.toFixed(2),
-    plate: css(toggle).backgroundColor,
-    plateToken: token(home, '--sheet'),
-    plateEdge: css(toggle).borderTopWidth,
+    plate: css(brand, '::before').backgroundColor,
+    plateToken: token(home, '--brand-plate'),
+    modes: modes.map(set => [...set.querySelectorAll('input')].map(input => `${input.value}${input.checked ? '*' : ''}`).join(' ')),
     brandInk: css(brand).color,
     inkToken: token(home, '--ink'),
     family: css(home).fontFamily,
@@ -67,16 +67,19 @@ test('thirteen shipped pages share one header, plate, canvas and body family', a
   const summary = shells.map(s => `${s.path}: top ${s.brandTop}, plate ${s.plate}, family ${s.family.slice(0, 20)}, canvas ${s.canvas}`).join(' | ');
   expect(new Set(shells.map(s => s.brandTop)).size, `brand y: ${summary}`).toBe(1);
   expect(new Set(shells.map(s => s.brandHeight)).size, `brand height: ${summary}`).toBe(1);
-  expect(new Set(shells.map(s => s.plate)).size, `theme plate: ${summary}`).toBe(1);
+  expect(new Set(shells.map(s => s.plate)).size, `brand plate: ${summary}`).toBe(1);
   expect(new Set(shells.map(s => s.family)).size, `body family: ${summary}`).toBe(1);
   expect(new Set(shells.map(s => s.canvas)).size, `canvas: ${summary}`).toBe(1);
   for (const shell of shells) {
     const at = `${shell.path}:`;
     expect(shell.brandTop, `${at} the mark sits at the same y as the landing`).toBeGreaterThan(0);
     expect(shell.brandTop, `${at} the mark is inside the header's top third`).toBeLessThan(30);
-    expect(shell.plate, `${at} the theme button paints the paper plate, not transparency`).toBe(shell.plateToken);
+    expect(shell.plate, `${at} the lockup's plate paints its token, not transparency`).toBe(shell.plateToken);
     expect(shell.plate, `${at} the plate is opaque`).toMatch(/^rgb\(/);
-    expect(shell.plateEdge, `${at} the plate keeps its hairline edge`).toBe('1px');
+    // One visible switch per page, the three modes in order, the current one checked (D-119).
+    expect(shell.modes, `${at} one Lamp / Paper / Slate switch`).toHaveLength(1);
+    expect(shell.modes[0].replace('*', ''), `${at} the three modes in order`).toBe('lamp paper slate');
+    expect(shell.modes[0], `${at} the switch shows the current mode`).toContain(`${shell.theme || 'lamp'}*`);
     expect(shell.brandInk, `${at} the lockup wears the ink token`).toBe(shell.inkToken);
     expect(shell.canvas, `${at} the page canvas is background A`).toBe(shell.pageToken);
     expect(shell.footer, `${at} the shared footer is present`).toBe(true);
@@ -100,11 +103,11 @@ test('the header carries Buy on every page, left of the page action, and the her
       const buy = buys[0];
       const other = nav.querySelector('a.btn-quiet:not(.nav-buy)');
       const box = buy?.getBoundingClientRect() ?? { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
-      const theme = nav.querySelector('.theme-btn').getBoundingClientRect();
+      const end = nav.querySelector('.nav-end').getBoundingClientRect();
       return { count: buys.length, text: buy?.textContent, path: buy && new URL(buy.href).pathname, current: buy?.getAttribute('aria-current'),
         visible: shown(buy), otherVisible: shown(other),
         leftOfOther: shown(other) ? box.right <= other.getBoundingClientRect().left : null,
-        leftOfTheme: box.right <= theme.left, height: box.height,
+        inEnd: box.left >= end.left - 0.5 && box.right <= end.right + 0.5, height: box.height,
         hitTop: document.elementFromPoint(box.left + box.width / 2, box.top - 3.5) === buy,
         hitBottom: document.elementFromPoint(box.left + box.width / 2, box.bottom + 3.5) === buy,
         overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth };
@@ -114,7 +117,7 @@ test('the header carries Buy on every page, left of the page action, and the her
     expect(read.text, `${at} the header link is the single word Buy`).toBe('Buy');
     expect(read.path, `${at} the header Buy goes to the purchase page`).toMatch(/^\/(writeitdown\/)?buy(\.html)?$/);
     expect(read.visible, `${at} Buy is visible in the header`).toBe(true);
-    expect(read.leftOfTheme, `${at} Buy is left of the theme button`).toBe(true);
+    expect(read.inEnd, `${at} Buy sits in the header's right group`).toBe(true);
     expect(read.hitTop && read.hitBottom, `${at} Buy keeps a 44 px tall hit area`).toBe(true);
     expect(read.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
     if (read.otherVisible) expect(read.leftOfOther, `${at} Buy is immediately left of the page action`).toBe(true);
@@ -152,11 +155,11 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
         h1: css('main.doc h1').fontFamily,
       };
     });
-    expect(read.font, `${path}: body copy is the system tool face`).toMatch(/system-ui/);
+    expect(read.font, `${path}: body copy is the one face (D-119)`).toMatch(/^Allo\b/);
     expect(read.size, `${path}: body copy is 17 px`).toBe('17px');
     expect(read.width, `${path}: the measure stays near 62ch`).toBeLessThanOrEqual(62 * 17 * 0.66);
     expect(read.width, `${path}: the measure fills the available column`).toBeGreaterThan(300);
-    expect(read.h1, `${path}: headings keep the serif`).toMatch(/Newsreader/);
+    expect(read.h1, `${path}: headings are the one face`).toMatch(/^Allo\b/);
     expect(read.legacy, `${path}: no retired shell class survives`).toBe(0);
   }
 });
@@ -168,7 +171,7 @@ test('the purchase page wears the same shell and stops at its actions', async ({
   const shell = await readShell(page);
   expect(shell.brandTop, 'the mark sits at the landing y').toBe(landing.brandTop);
   expect(shell.brandHeight, 'the mark is the landing size').toBe(landing.brandHeight);
-  expect(shell.plate, 'the theme button paints the same plate').toBe(landing.plate);
+  expect(shell.plate, 'the lockup paints the same plate').toBe(landing.plate);
   expect(shell.brandInk, 'the lockup wears the ink token').toBe(shell.inkToken);
   expect(shell.canvas, 'the page canvas is background A').toBe(shell.pageToken);
   expect(shell.family, 'the same body family as every other page').toBe(landing.family);
@@ -188,7 +191,7 @@ test('the purchase page wears the same shell and stops at its actions', async ({
 });
 
 test('the purchase page is one screen at 320, 390 and 1440, with the price as its largest text', async ({ page }, info) => {
-  test.skip(info.project.name !== '1440-light-no-preference', 'one project drives its own three widths');  for (const [width, height] of [[320, 700], [390, 844], [1440, 900]]) {
+  test.skip(info.project.name !== '1440-lamp-no-preference', 'one project drives its own three widths');  for (const [width, height] of [[320, 700], [390, 844], [1440, 900]]) {
     await page.setViewportSize({ width, height });
     await openPage(page, purchasePage);
     await page.evaluate(() => document.fonts.ready);
@@ -379,14 +382,14 @@ test('the ghost pill keeps one text treatment on the buy path and the landing', 
   expect(purchase).toBe(landing);
 });
 
-test('the landing hand keeps its write-on reveal and drops it under reduced motion', async ({ page }, info) => {
+test('the landing headline is one face, with no hand accent left (D-119)', async ({ page }) => {
   await page.goto('index.html');
-  const name = await page.locator('.home .h1 .hand').evaluate(element => getComputedStyle(element).animationName);
-  expect(name, 'the reveal keeps its named animation').toBe(info.project.use.reducedMotion === 'reduce' ? 'none' : 'wid-write');
+  await expect(page.locator('.home .h1 .hand')).toHaveCount(0);
+  await expect(page.locator('.home .h1')).toHaveCSS('font-family', /^Allo\b/);
 });
 
 test('the release route server answers a missing page with 404', async ({ request }, info) => {
-  test.skip(info.project.name !== '1440-light-no-preference', 'one server run per suite');
+  test.skip(info.project.name !== '1440-lamp-no-preference', 'one server run per suite');
   const port = await new Promise((resolve, reject) => {
     const probe = createServer();
     probe.on('error', reject);
@@ -465,13 +468,13 @@ test('support keeps each answer once and lists the six answer links without sepa
   }
 });
 
-test('the phone room nav keeps only the theme icon, and the Mac link moves into the exit row', async ({ page }, info) => {
+test('the phone room nav keeps only the mode switch, and the Mac link moves into the exit row', async ({ page }, info) => {
   test.skip(info.project.use.viewport.width !== 390, 'phone layout');
   await page.goto('index.html#trial');
   const nav = page.locator('nav[aria-label="Main"]:visible');
   await expect(nav).toHaveCount(1);
   await expect(nav.locator('.brand')).toBeVisible();
-  await expect(nav.locator('.theme-btn')).toBeVisible();
+  await expect(nav.locator('fieldset.modes')).toBeVisible();
   for (const action of await nav.locator('.btn-quiet').all()) await expect(action, 'the phone room header keeps no pill, Buy included (Q-01)').toBeHidden();
   const mac = page.locator('.room .paper-foot .room-mac');
   await expect(mac).toBeVisible();
@@ -509,7 +512,7 @@ test('every document page still uses the landing measure, not a second reading m
 // at every width. A 62ch column left-flush under a full-width header is the defect this pins: the captain
 // read mac.html#buy as a narrow block stuck to the logo with an empty band on the right (D-055).
 test('every page puts its content on the header grid at 1440, 1024 and 390', async ({ page }, info) => {
-  test.skip(info.project.name !== '1440-light-no-preference', 'the test drives its own three widths');
+  test.skip(info.project.name !== '1440-lamp-no-preference', 'the test drives its own three widths');
   // Thirteen pages at three widths in one body: thirty-nine navigations, budgeted by the walk.
   test.setTimeout(sweepTimeout(3 * pages.length));
   const read = () => page.evaluate(() => {

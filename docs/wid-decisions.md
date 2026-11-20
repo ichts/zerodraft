@@ -2518,3 +2518,79 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   session.
 - Evidence: `QuitGuardTests` (10 cases); Tart macOS 15.7.7 and 26.6.2 real-HID before/after captures in the PR
   (`data/wid-mac-quit-guard/`).
+
+## D-119: writeitdown.app is the desk under the lamp, in three paper modes, with copy left and the lit sheet right
+
+- Date: 2026-11-19. Captain, on the worldview board (round 3): "用 A 但是很多细节还需要打磨 而且 我觉得需要像 platen
+  一样 有多种模式 / 我觉得有些人就肯定想要白色的那种 像 iA writer ulysses 那种一样的 要多弄几种". Captain, on the
+  homepage variants board: picked V2 (copy on the left, the lit sheet on the right), and the door stays
+  `Start a free 60-second session`. Firstmate's round-006 ruling set the Slate grain and the warning caption below.
+- Decision: the landing and the `#trial` room are world A, the desk under the lamp, and the writer picks one of three
+  paper modes. One engine, one timing and one ink model serve every mode; a mode changes material and colour only.
+  - **Lamp** (default): night. The Wheat paper (D-069) lies in one fixed lamp's pool that falls off into the dark on
+    the paper itself; the lamp never follows the caret. The sheet's word roles darken to hold 7:1 under the pool's
+    edge: ink `#1f1812`, quiet `#221a14`, danger `#380904`, the pool ending on `#f1e3c8`.
+  - **Paper**: a clean white page in daylight, `#fdfdfb` on a `#f4f3ef` wall, no lamp and no grain; ink `#1c1917`,
+    quiet `#3f3b36`, danger `#63140b`.
+  - **Slate**: night, dark slate `#363b3d` under a low light, ink `#f7eedb`, quiet `#f4efe6`, danger `#ffe8de`.
+  - The control is one radio group, `Lamp / Paper / Slate` (screen-reader legend `Paper`): on the landing under the
+    demo sheet, beside the sound control; in the room's top-left beside the mark; in the footer row of every other
+    page except `buy.html`, which keeps D-113's one screen with nothing past its two actions and simply wears the
+    stored mode. A switch mid-session keeps the draft, the phase, the focus and the silence clock: it is not input and
+    cannot hold off the wipe. The chosen mode replaces light/dark in the one existing key, `writeitdown-theme`; the
+    retired `light` reads as Paper and `dark` as Lamp, so no visitor's stored choice breaks.
+  - The material is CSS, not a canvas: a fine grain tile and a slow cloud on the mode's tone, and the lamp's pool
+    multiplied over both. The grain keeps its own 240 px square and the cloud covers the sheet, so a tall phone
+    sheet never stretches either into streaks (round 006). The small sheets (the moment cards, the how-it-works
+    sheet, the Mac card) carry the grain only: at card size the cloud reads as stains. `paper.js`,
+    `paper-render.js` and the hidden-room warm-up (D-103, D-104) are retired with the canvas; the door still opens
+    on its first frame, now because nothing is generated at all.
+  - V2 first screen: the headline, its sentence and the door on the left, the desk with the lit demo sheet on the
+    right, both on one screen at laptop width. On a phone they stack: the headline, the sentence and the door on
+    the first screen, then a square desk. The demo writes inside the pool: its text column is inset 18% so every
+    word stands where it clears 7:1, and the falling edge carries no text. The demo's clock and count stand on the
+    desk beside the sheet.
+  - The demo's warning numeral is a fifth of its own sheet's height, `clamp(32px, 20cqh, 76px)`, so the warning
+    group fits under the writing line on every phone; the room keeps the Mac's `min(18vh, 170px)`. This replaces
+    the landing-only max-height query of D-068.
+  - The warning caption is a sentence at note size, `Keep typing or the draft is deleted.` (13 px, weight 500,
+    no tracking), measured at 7:1 or better in every mode (round 006).
+  - One face: Allo (OFL-1.1, allo-font 1.0.3, pinned at ROND 30, `wght` 300-700, Latin subset, 200,588 B) for what
+    the writer writes, every heading and everything the tool says; Resource Han Rounded (OFL-1.1, RHR-CN Normal,
+    GB2312 subset, one 1,173,524 B file) for the same roles in Chinese. Writing is weight 410, the display 540,
+    the warning numeral 360. The room writes at 28/1.6 (21/34 on a phone, about 40 characters a row) and the demo
+    at 15/25 in the same face and weight. Newsreader, Zhuque Fangsong and the Reenie Beanie hand accent are
+    retired from the site. Both licences ship in `fonts/` beside the files.
+  - The Chinese face is never on the first paint: `room.js` asks for it when Chinese input begins (a committed
+    Chinese character, or an IME composition whose marked text shows one), never for the door, a hover, Latin,
+    Greek or pinyin. Measured on the landing: 0 B of Chinese face at first paint, first contentful paint 152 ms
+    locally and 732 ms at 10 Mbps / 40 ms with only Allo fetched; after the first Chinese character the face is
+    resident 141 ms later locally and 1,311 ms later at 10 Mbps, and the character is painted at once in the
+    platform face meanwhile. D-109's freeze is unchanged: a draft keeps the face it started with.
+  - The Mac card's door, the longest label on the page, keeps one line on a phone: the card's two actions stack at
+    the card's width and the label eases from 15 px to 14 px under 341 px, so a 320 px page never scrolls sideways.
+  - Sheets and cards take the 4 px radius floor in every mode: paper is cut, not moulded.
+  - D-117's sound control moves from the header to the demo controls under the sheet, unchanged: off at every
+    load, slider at 40, the low-pass on 3-2-1 and on the wipe, the room silent.
+  - The same rules in every mode: forward-only input, the warning with 3-2-1 after five seconds of silence, the
+    deletion at eight, the 60-second deadline, copy at the end, nothing saved. Red stays spent on the warning and
+    the wipe; focus rings and actions are ink. The history ladder is .22 / .07, and .16 / .05 in Slate (D-092).
+  - The Platen never-list binds every mode: no rail, carriage or capsule on the writing line, no typewriter-struck
+    letters, no monospace writing face, no lamp that follows the cursor, and no Platen textures, colours, layout,
+    sounds or copy.
+- Reason: the captain picked A, then V2 for its first screen, and asked for several modes, including a white page
+  in the spirit of iA Writer and Ulysses for writers who do not want a night scene.
+- Supersedes: the writeitdown light/dark appearance pair and its `[data-theme-toggle]` icon (with D-093's flat
+  charcoal dark sheet), the white-only sheet of D-056 as the only paper, `design/DESIGN.md` section 5 point 2
+  ("Dark mode is forbidden") for writeitdown.app only, D-057's faces (the rule that the site serves its own faces
+  stands), D-068's landing max-height numeral query and its "door and sheet share one first screen" fold, D-103 and
+  D-104's canvas warm-up, and D-109's prefetch on intent. The root Zero Draft landing keeps its bone-only rule.
+- Mac divergences until the Mac lane follows: the Mac still draws Newsreader, so `qa/shared-type-baseline.json`
+  stays the Mac's and the web's advance check is held (skipped with this reason) rather than deleted; the Mac's
+  warning caption is still the caps line (`SessionViewController.swift`); the Mac has one paper and no mode
+  control. Tokens, copy and timing above are the contract the Mac lane implements.
+- Tests: `qa/paper.spec.mjs` (rendered contrast per mode at the deepest warning second, the sheet geometry that
+  prevents streaks), `qa/phase4.spec.mjs` (the V2 fold on six phones and three laptops, the 320-430 px sweep, the
+  demo and room numerals, the demo's face), `qa/mac.spec.mjs` (Lamp default, legacy values, the switch on every
+  page), `qa/shell.spec.mjs`, `qa/typography.spec.mjs`, `qa/chinese-face.spec.mjs` (the face is asked for only by
+  Chinese input), `qa/history-fade.spec.mjs`, `qa/door-instant.spec.mjs`, `qa/sound.spec.mjs`.

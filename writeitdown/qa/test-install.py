@@ -12,7 +12,7 @@ source = Path(__file__).resolve().parents[1]
 files = {
     'download/index.html', 'index.html', 'buy.html', 'mac.html', 'privacy.html',
     'terms.html', 'impressum.html', 'support.html', 'site.css', 'tokens.css',
-'theme.js', 'paper-render.js', 'paper.js', 'demo.js', 'sound.js', 'sound-cues.mjs',
+'theme.js', 'demo.js', 'sound.js', 'sound-cues.mjs',
     'demo-timeline.mjs', 'feedback.js', 'status-slot.js', 'session.mjs', 'room.js', 'buy.js',
     'what-is-write-it-down.html', 'write-it-down-mac-vs-web.html',
     'write-it-down-free-trial.html', 'write-it-down-price.html',
@@ -22,10 +22,8 @@ files = {
     'logo/write-it-down-lockup.svg', 'logo/write-it-down-lockup-plate.svg', 'favicon.svg', 'favicon-16.png', 'favicon-32.png',
     'favicon-dark.svg', 'favicon-dark-16.png', 'favicon-dark-32.png', 'apple-touch-icon.png',
 }
-fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/reenie-beanie.woff2',
-         'fonts/newsreader-latin.woff2', 'fonts/newsreader-latin-italic.woff2',
-         'fonts/OFL-Newsreader.txt', 'fonts/OFL-ZhuqueFangsong.txt', 'fonts/OFL-ReenieBeanie.txt'}
-fonts |= {'fonts/zhuque-fangsong-gb2312.woff2'}
+fonts = {'fonts.css', 'fonts-cjk.css', 'fonts/allo-latin.woff2', 'fonts/resource-han-rounded-gb2312.woff2',
+         'fonts/OFL-Allo.txt', 'fonts/OFL-ResourceHanRounded.txt'}
 files |= fonts
 files |= {'sound/SOURCES.md', *(f'sound/nib-key-{i}.wav' for i in range(1, 9)), *(f'sound/nib-warn-{i}.wav' for i in range(1, 4)), 'sound/nib-wipe-1.wav'}
 # Host files a page may link that no deploy bundle contains: the archived 1.0 disk image lives in

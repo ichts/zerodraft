@@ -117,12 +117,10 @@ async function run(size, browser) {
       const t = (await h1.innerText()).replace(/\s+/g, ' ').trim();
       ok(t === 'Keep typing or lose every word.', `H1 is "${t}"`);
     });
-    await step('second line is the red handwritten one', async () => {
-      const h = page.locator('h1.h1 .hand');
-      const [f, c] = await h.evaluate(e => [getComputedStyle(e).fontFamily, getComputedStyle(e).color]);
-      ok(/reenie/i.test(f), `font ${f}`);
-      const [r, g, b] = c.match(/\d+/g).map(Number);
-      ok(r > 150 && g < 100 && b < 100, `colour ${c} is not red`);
+    await step('the headline is one face, Allo, with no hand accent (D-119)', async () => {
+      ok(await page.locator('h1.h1 .hand').count() === 0, 'a hand accent came back in the headline');
+      const f = await page.locator('h1.h1').evaluate(e => getComputedStyle(e).fontFamily);
+      ok(/^"?Allo\b/.test(f), `font ${f}`);
     });
     await step('subheadline states the rule under the H1', async () => {
       const sub = page.locator('#landing header.hero p.sub');
@@ -137,38 +135,38 @@ async function run(size, browser) {
     });
   });
   await block('landing/demo', async () => {
-    await step('demo sheet fills >=60% of the first viewport', async () => {
-      const b = await page.locator('#demo .paper').boundingBox();
-      const r = Math.min(b.height, size.height) / size.height; ok(r >= 0.6, `demo sheet covers ${(r * 100).toFixed(0)}% of the viewport`); return `${(r * 100).toFixed(0)}%`;
+    await step('V2: the lit desk stands beside the copy on a computer and follows the door on a phone (D-119)', async () => {
+      const desk = await page.locator('.desk').boundingBox(), door = await landingDoor.boundingBox();
+      if (size.width > 860) {
+        ok(desk.x >= door.x + door.width, 'the desk is not right of the copy');
+        ok(desk.y + desk.height <= size.height + 1, `the desk ends at ${Math.round(desk.y + desk.height)} px, past the first screen`);
+      } else {
+        ok(desk.y >= door.y + door.height, 'the desk does not follow the door');
+        ok(Math.abs(desk.width - desk.height) <= 1, `the phone desk is ${Math.round(desk.width)}x${Math.round(desk.height)}, not square`);
+      }
+      return `desk ${Math.round(desk.width)}x${Math.round(desk.height)}`;
+    });
+    await step('the mode switch offers Lamp, Paper and Slate, Lamp first by default', async () => {
+      const labels = (await page.locator('#landing .demo-controls .modes label').allInnerTexts()).map(t => t.trim());
+      ok(labels.join(' ') === 'Lamp Paper Slate', `modes ${labels.join(' ')}`);
+      ok(await page.locator('html').getAttribute('data-theme') === 'lamp', 'a fresh visitor is not on Lamp');
     });
     await step('demo is the scripted preview with a 60-second clock', async () => {
       ok(/^\d:\d\d$/.test((await page.locator('#clock').innerText()).trim()), 'clock');
       ok(await page.locator('#demo .paper').isVisible(), 'sheet hidden');
     });
-    await step('the door is the only entrance, and it sits above the demo', async () => {
-      const cta = page.locator('#landing .cta'), demo = page.locator('#demo');
+    await step('the door is the only entrance, on the first screen', async () => {
+      const cta = page.locator('#landing .cta');
       ok(await cta.count() === 1, `${await cta.count()} entrance bands`);
-      const c = await cta.boundingBox(), d = await demo.boundingBox();
-      ok(c.y + c.height <= d.y + 2, 'the entrance band is not above the demo');
       ok(await cta.locator('a').count() === 1, `${await cta.locator('a').count()} links in the entrance band`);
       ok(await cta.locator('> *').count() === 1, `${await cta.locator('> *').count()} elements in the entrance band`);
       ok(await page.locator('.cta-buy').count() === 0, 'a buy line came back under the door');
       ok(await landingNav.locator('a.nav-buy', { hasText: /^buy$/i }).count() === 1, 'the header lost its one Buy');
       ok(await page.locator('#landing a.btn-primary[href="#trial"]').count() === 1, 'more than one 60-second door on the page');
-      ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
+      ok((await landingDoor.innerText()).trim() === 'Start a free 60-second session', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');
-      const screen = await page.evaluate(() => {
-        const pin = document.createElement('style');
-        pin.textContent = '.home{--sans:Arial, sans-serif}';
-        document.head.append(pin);
-        const r = s => document.querySelector(s).getBoundingClientRect();
-        const door = r('#landing .cta a[href="#trial"]'), paper = r('#demo .paper');
-        pin.remove();
-        return { doorBottom: door.bottom, paperTop: paper.top, paperHeight: paper.height };
-      });
-      ok(screen.doorBottom <= size.height, `the door ends at ${Math.round(screen.doorBottom)} px, past the ${size.height} px first screen`);
-      ok(screen.doorBottom <= screen.paperTop, 'the door is not above the demo sheet');
-      ok(Math.min(screen.paperHeight, size.height) / size.height >= 0.6, `the sheet keeps ${Math.round(Math.min(screen.paperHeight, size.height) / size.height * 100)}% of the first viewport`);
+      const doorBottom = await landingDoor.evaluate(e => e.getBoundingClientRect().bottom);
+      ok(doorBottom <= size.height, `the door ends at ${Math.round(doorBottom)} px, past the ${size.height} px first screen`);
       ok(/8 seconds/.test(await page.locator('#landing').innerText()), 'the page no longer states the eight-second rule');
     });
     await step('the trimmed blocks are gone: no reassurance line, no points band, no facts table, no closing block', async () => {

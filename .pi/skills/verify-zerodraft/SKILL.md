@@ -81,7 +81,7 @@ for p in download checkout-success help privacy refund terms release-notes; do
 done
 ```
 
-writeitdown surface: `cd writeitdown && npm test` runs `qa/phase4.spec.mjs` across 8 projects - 32 tests (1440/390 widths x dark/light x reduced-motion on/off) against `http://127.0.0.1:8015/writeitdown/`. Drive a single project while iterating: `npx playwright test --project=1440-light-no-preference`.
+writeitdown surface: `cd writeitdown && npm test` runs the whole `qa/` Playwright suite across 12 projects (1440/390 widths x Lamp/Paper/Slate modes x reduced-motion on/off, D-119) against `http://127.0.0.1:8015/writeitdown/`. Drive a single project while iterating: `npx playwright test --project=1440-lamp-no-preference`.
 
 ## Evidence
 

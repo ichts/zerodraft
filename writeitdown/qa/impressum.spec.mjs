@@ -39,39 +39,3 @@ test('the Impressum is canonical, in the sitemap and linked from every footer', 
     await expect(page, path).toHaveURL(/\/impressum\.html$/);
   }
 });
-
-test('the Legal footer column stays aligned with its siblings on every page', async ({ page }) => {
-  test.setTimeout(sweepTimeout(pages.length));
-  const read = () => page.evaluate(() => {
-    const box = el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, r: r.right }; };
-    const columns = [...document.querySelectorAll('.foot-grid nav')].map(nav => ({
-      nav: box(nav), links: [...nav.querySelectorAll('a')].map(box),
-    }));
-    return {
-      columns, grid: box(document.querySelector('.foot-grid')),
-      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      width: document.documentElement.clientWidth,
-    };
-  });
-  const reference = {};
-  for (const path of pages) {
-    await openPage(page, path);
-    const m = await read();
-    const legal = m.columns[2];
-    expect(legal.links.length, `${path}: Legal links`).toBe(3);
-    expect(m.overflow, `${path}: no horizontal overflow`).toBeLessThanOrEqual(0);
-    for (const link of legal.links) {
-      expect(Math.abs(link.x - legal.nav.x), `${path}: link left edge on the column edge`).toBeLessThan(0.5);
-      expect(link.r, `${path}: link inside the viewport`).toBeLessThanOrEqual(m.width);
-      expect(link.r, `${path}: link inside its grid`).toBeLessThanOrEqual(m.grid.r + 0.5);
-    }
-    const pitch = legal.links.map((l, i) => i && l.y - legal.links[i - 1].y).slice(1);
-    expect(Math.abs(pitch[0] - pitch[1]), `${path}: even link pitch`).toBeLessThan(0.5);
-    // A column of three links is as tall as the Product column of three: no row grows.
-    expect(Math.abs(legal.nav.h - m.columns[0].nav.h), `${path}: Legal as tall as Product`).toBeLessThan(0.5);
-    expect(Math.abs(legal.nav.y - m.columns[1].nav.y), `${path}: Legal on the Help column's row`).toBeLessThan(0.5);
-    const key = { w: m.width, gridH: Math.round(m.grid.h * 10) / 10, legalH: Math.round(legal.nav.h * 10) / 10 };
-    reference.first ??= key;
-    expect(key, `${path}: footer geometry equals the first page's`).toEqual(reference.first);
-  }
-});

@@ -58,24 +58,36 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     private var isRestoringProgrammatically = false
     private var sessionFontSize: CGFloat = 28
     private var typographyConfigured = false
-    private let punctuationFontScale: CGFloat = 0.84
-    private let lightPunctuationCharacters = CharacterSet(charactersIn: ".,:;!?，。：；！？")
-    private let writingFont: WritingFontCandidate = .pitchLight
-    private let chineseFont: ChineseFontCandidate = .zhuqueFangsong
     private var sessionFont: NSFont {
-        writingFont.fontWithCJKFallback(size: sessionFontSize)
+        FirstLineTypography.writingNSFont(size: sessionFontSize)
             ?? NSFont.systemFont(ofSize: sessionFontSize, weight: .regular)
     }
+    /// The web's first-baseline rule (`status-slot.js`): the line's top, plus the half-leading the 1.6 line box
+    /// leaves around the writing face, plus its ascent. Every line, Latin or Chinese, takes the same offset, so a
+    /// Chinese line keeps the Latin pitch and the first character lands on the empty room's line.
     private var stableLineBaselineOffset: CGFloat {
-        guard let cjk = chineseFont.font(size: sessionFontSize) else { return sessionFontSize }
-
-        return ceil(cjk.ascender - cjk.descender + cjk.leading + abs(cjk.descender))
+        let lineHeight = sessionFontSize * 1.6
+        guard let face = BundledFonts.allo(size: sessionFontSize, weight: BundledFonts.Weight.writing) else {
+            return sessionFontSize
+        }
+        let ascent = face.ascender, descent = abs(face.descender)
+        return (lineHeight - (ascent + descent)) / 2 + ascent
     }
+    /// The baseline's distance under its line's top, the same for every line (the room places by it).
+    var lineBaselineOffset: CGFloat { stableLineBaselineOffset }
     private var caretHeight: CGFloat {
         ceil(sessionFontSize)
     }
-    private var targetScriptBoundaryGap: CGFloat {
-        sessionFontSize * 0.1
+
+    /// The first Chinese character registers the Chinese face before it is laid out (D-120), so it is drawn in
+    /// Resource Han Rounded from its first frame; Latin, accents and Greek never load it.
+    private func adoptCJKFace(for text: String) {
+        guard !BundledFonts.isCJKRegistered, BundledFonts.asksForCJK(text) else { return }
+        BundledFonts.ensureCJKRegistered()
+        let paragraph = sessionParagraphStyle()
+        font = sessionFont
+        typingAttributes = activeTextAttributes(paragraph: paragraph)
+        markedTextAttributes = activeTextAttributes(paragraph: paragraph)
     }
 
     override var frame: NSRect {
@@ -102,6 +114,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
         let hadMarkedText = hasMarkedText()
         let isActivity = !plainString(from: string).isEmpty
+        adoptCJKFace(for: plainString(from: string))
         guard isRestoringProgrammatically || (onPrepareInput?(isActivity) ?? true) else { return }
         let viewport = preservedCompositionViewport()
         if !isRestoringProgrammatically && isActivity {
@@ -140,6 +153,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
     override func insertText(_ string: Any, replacementRange: NSRange) {
         let inserted = plainString(from: string)
+        adoptCJKFace(for: inserted)
         let previousEnd = NSRange(location: utf16Length, length: 0)
         let isDefaultRange = replacementRange.location == NSNotFound
         let isMarkedCommit = hasMarkedText()
@@ -440,23 +454,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         }
     }
 
-    private func isWideCJKGlyph(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x2E80...0x2EFF,   // CJK Radicals Supplement
-             0x3000...0x303F,   // CJK Symbols and Punctuation
-             0x3040...0x30FF,   // Hiragana and Katakana
-             0x31F0...0x31FF,   // Katakana Phonetic Extensions
-             0x3400...0x4DBF,   // CJK Unified Ideographs Extension A
-             0x4E00...0x9FFF,   // CJK Unified Ideographs
-             0xAC00...0xD7AF,   // Hangul Syllables
-             0xF900...0xFAFF,   // CJK Compatibility Ideographs
-             0xFF00...0xFFEF:   // Halfwidth and Fullwidth Forms
-            return true
-        default:
-            return false
-        }
-    }
-
     override var rangeForUserCompletion: NSRange {
         NSRange(location: NSNotFound, length: 0)
     }
@@ -513,10 +510,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
 
         let range = NSRange(location: 0, length: textStorage.length)
         textStorage.beginEditing()
-        textStorage.removeAttribute(.shadow, range: range)
         textStorage.addAttributes(activeTextAttributes(paragraph: paragraph), range: range)
-        applyLightPunctuationTypography(in: range, textStorage: textStorage)
-        applyScriptBoundaryKerning(in: range, textStorage: textStorage)
         textStorage.endEditing()
         // Opacities are a function of the text alone, so they are applied once the edit block has ended.
         applyLineOpacity(in: range, textStorage: textStorage)
@@ -575,7 +569,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
             textStorage.addAttribute(.foregroundColor,
                                       value: FirstLineColors.inkNSColor.withAlphaComponent(alpha),
                                       range: clipped)
-            textStorage.addAttribute(.shadow, value: Self.inkSpread(step: alpha), range: clipped)
         }
         shownLineAlphas = shown
     }
@@ -732,120 +725,6 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return value
     }
 
-    private func applyLightPunctuationTypography(in range: NSRange, textStorage: NSTextStorage) {
-        let punctuationSize = sessionFontSize * punctuationFontScale
-        guard let punctuationFont = writingFont.punctuationFont(size: punctuationSize) else { return }
-
-        let value = textStorage.string as NSString
-        value.enumerateSubstrings(in: range, options: [.byComposedCharacterSequences]) { substring, substringRange, _, _ in
-            guard let scalar = substring?.unicodeScalars.first else { return }
-            guard self.lightPunctuationCharacters.contains(scalar) else { return }
-            guard self.font(punctuationFont, supports: scalar) else { return }
-            textStorage.addAttribute(.font, value: punctuationFont, range: substringRange)
-        }
-    }
-
-    private func font(_ font: NSFont, supports scalar: Unicode.Scalar) -> Bool {
-        guard scalar.value <= UInt16.max else { return false }
-
-        let coreTextFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var codeUnit = UniChar(scalar.value)
-        var glyph = CGGlyph()
-        return CTFontGetGlyphsForCharacters(coreTextFont, &codeUnit, &glyph, 1) && glyph != 0
-    }
-
-    private func applyScriptBoundaryKerning(in range: NSRange, textStorage: NSTextStorage) {
-        let value = textStorage.string as NSString
-        var scalars: [(scalar: Unicode.Scalar, range: NSRange)] = []
-
-        value.enumerateSubstrings(in: range, options: [.byComposedCharacterSequences]) { substring, substringRange, _, _ in
-            guard let scalar = substring?.unicodeScalars.first else { return }
-            scalars.append((scalar, substringRange))
-        }
-
-        for index in scalars.indices {
-            if index > scalars.startIndex,
-               index < scalars.index(before: scalars.endIndex),
-               scalars[index].scalar == " ",
-               shouldTightenBoundary(left: scalars[scalars.index(before: index)].scalar, right: scalars[scalars.index(after: index)].scalar) {
-                let adjustment = explicitSpaceBoundaryKerning(
-                    left: scalars[scalars.index(before: index)].scalar,
-                    right: scalars[scalars.index(after: index)].scalar
-                )
-                if adjustment < 0 {
-                    textStorage.addAttribute(.kern, value: adjustment, range: scalars[scalars.index(before: index)].range)
-                }
-                continue
-            }
-
-            guard index < scalars.index(before: scalars.endIndex) else { continue }
-            let current = scalars[index]
-            let next = scalars[scalars.index(after: index)]
-            guard shouldTightenBoundary(left: current.scalar, right: next.scalar) else { continue }
-            let adjustment = scriptBoundaryKerning(left: current.scalar, right: next.scalar)
-            guard adjustment < 0 else { continue }
-
-            textStorage.addAttribute(.kern, value: adjustment, range: current.range)
-        }
-    }
-
-    private func shouldTightenBoundary(left: Unicode.Scalar, right: Unicode.Scalar) -> Bool {
-        let leftIsCJK = isWideCJKGlyph(left)
-        let rightIsCJK = isWideCJKGlyph(right)
-        guard leftIsCJK != rightIsCJK else { return false }
-
-        let other = leftIsCJK ? right : left
-        return CharacterSet.alphanumerics.contains(other)
-    }
-
-    private func scriptBoundaryKerning(left: Unicode.Scalar, right: Unicode.Scalar) -> CGFloat {
-        let fallback = -ceil(sessionFontSize * 0.04)
-        guard let leftFont = font(for: left), let rightFont = font(for: right) else { return fallback }
-        guard let leftMetrics = glyphMetrics(for: left, font: leftFont),
-              let rightMetrics = glyphMetrics(for: right, font: rightFont) else { return fallback }
-
-        let leftSide = max(leftMetrics.advance - leftMetrics.bounds.maxX, 0)
-        let rightSide = max(rightMetrics.bounds.minX, 0)
-        return min(targetScriptBoundaryGap - leftSide - rightSide, 0)
-    }
-
-    private func explicitSpaceBoundaryKerning(left: Unicode.Scalar, right: Unicode.Scalar) -> CGFloat {
-        let fallback = -ceil(sessionFontSize * 0.55)
-        guard let leftFont = font(for: left),
-              let rightFont = font(for: right),
-              let spaceFont = writingFont.font(size: sessionFontSize) else { return fallback }
-        guard let leftMetrics = glyphMetrics(for: left, font: leftFont),
-              let rightMetrics = glyphMetrics(for: right, font: rightFont),
-              let spaceMetrics = glyphMetrics(for: " ", font: spaceFont) else { return fallback }
-
-        let naturalGap = max(leftMetrics.advance - leftMetrics.bounds.maxX, 0)
-            + spaceMetrics.advance
-            + max(rightMetrics.bounds.minX, 0)
-        return min(targetScriptBoundaryGap - naturalGap, 0)
-    }
-
-    private func font(for scalar: Unicode.Scalar) -> NSFont? {
-        isWideCJKGlyph(scalar)
-            ? chineseFont.font(size: sessionFontSize)
-            : writingFont.font(size: sessionFontSize)
-    }
-
-    private func glyphMetrics(for scalar: Unicode.Scalar, font: NSFont) -> (advance: CGFloat, bounds: NSRect)? {
-        guard scalar.value <= UInt16.max else { return nil }
-
-        let coreTextFont = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var codeUnit = UniChar(scalar.value)
-        var glyph = CGGlyph()
-        guard CTFontGetGlyphsForCharacters(coreTextFont, &codeUnit, &glyph, 1), glyph != 0 else { return nil }
-
-        var measuredGlyph = glyph
-        var advance = CGSize.zero
-        var bounds = CGRect.zero
-        CTFontGetAdvancesForGlyphs(coreTextFont, .horizontal, &measuredGlyph, &advance, 1)
-        CTFontGetBoundingRectsForGlyphs(coreTextFont, .horizontal, &measuredGlyph, &bounds, 1)
-        return (advance.width, bounds)
-    }
-
     private func sessionParagraphStyle() -> NSMutableParagraphStyle {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
@@ -860,32 +739,11 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
         return paragraph
     }
 
-    /// The ink's imperfection (D-073). The web displaces glyph outlines by 2 px and adds a 0.14 px stroke;
-    /// a live NSTextView cannot be re-rasterised per keystroke without moving the caret with it, so the Mac
-    /// keeps the transferable half - a hair of ink spread, so the strokes are thicker than a print engine's -
-    /// and leaves the hand to its own writing face.
-    ///
-    /// The spread is quantised to the line's own ladder step, never interpolated: fading a line fades its whole
-    /// rendered layer, exactly as the web fades the element that carries the displacement, so a completed line
-    /// cannot keep the live line's ink and the same text always renders identically.
-    static let inkSpreadAlphaAtFullStep: CGFloat = 0.55
-    private static let inkSpreadBlurRadius: CGFloat = 0.35
-
-    /// One of exactly four fixed spreads: the live step, the two history steps, and none.
-    static func inkSpread(step: CGFloat) -> NSShadow {
-        let spread = NSShadow()
-        spread.shadowColor = FirstLineColors.inkNSColor.withAlphaComponent(inkSpreadAlphaAtFullStep * step)
-        spread.shadowBlurRadius = inkSpreadBlurRadius
-        spread.shadowOffset = .zero
-        return spread
-    }
-
     private func activeTextAttributes(paragraph: NSParagraphStyle) -> [NSAttributedString.Key: Any] {
         [
             .font: sessionFont,
             .foregroundColor: FirstLineColors.inkNSColor,
             .paragraphStyle: paragraph,
-            .shadow: Self.inkSpread(step: 1),
         ]
     }
 

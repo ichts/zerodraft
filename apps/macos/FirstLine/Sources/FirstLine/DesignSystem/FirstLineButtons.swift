@@ -82,7 +82,7 @@ private final class FirstLineLinkButton: FirstLineInkFocusButton {
         translatesAutoresizingMaskIntoConstraints = false
         isBordered = false
         bezelStyle = .inline
-        font = .systemFont(ofSize: 13, weight: .medium)
+        font = FirstLineTypography.smallMediumNSFont
         contentTintColor = FirstLineColors.chromeNSColor
         inkFocusRingInset = 3
         inkFocusRingCornerRadius = 4
@@ -326,7 +326,7 @@ final class FirstLineIconCircleButton: FirstLineInkFocusButton {
         translatesAutoresizingMaskIntoConstraints = false
         isBordered = false
         bezelStyle = .inline
-        font = .systemFont(ofSize: 14, weight: .semibold)
+        font = FirstLineTypography.allo(size: 14, weight: FirstLineTypography.Weight.semibold)
         contentTintColor = FirstLineColors.inkNSColor
         inkFocusRingInset = 3
         wantsLayer = true

@@ -429,7 +429,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         countLabel.setAccessibilityRole(.staticText)
         countLabel.setAccessibilityElement(true)
         countLabel.setAccessibilityHidden(false)
-        numeralLabel = label(font: FirstLineTypography.writingItalicNSFont(size: 130),
+        numeralLabel = label(font: FirstLineTypography.numeralNSFont(size: 130),
                              color: FirstLineColors.paperDangerNSColor)
         warningHint = label(font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor)
         warningHint.maximumNumberOfLines = 0
@@ -574,6 +574,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             captionTop,
             warningHint.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 20),
             warningHint.trailingAnchor.constraint(lessThanOrEqualTo: paper.trailingAnchor, constant: -20),
+            warningHint.widthAnchor.constraint(lessThanOrEqualToConstant: Self.warningCaptionMaxWidth),
             failureHeadlineLabel.centerXAnchor.constraint(equalTo: paper.centerXAnchor),
             failureTop,
             failureHeadlineLabel.leadingAnchor.constraint(greaterThanOrEqualTo: paper.leadingAnchor, constant: 32),
@@ -669,47 +670,52 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         }
     }
 
-    /// Ink height of the drawn glyphs, used to place the warning by its ink rather
-    /// than by a line-box frame.
-    private func glyphInkHeight(_ text: String, font: NSFont) -> CGFloat? {
-        let coreText = CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
-        var tallest: CGFloat = 0
-        for scalar in text.unicodeScalars {
-            guard scalar.value <= UInt16.max else { continue }
-            var codeUnit = UniChar(scalar.value)
-            var glyph = CGGlyph()
-            guard CTFontGetGlyphsForCharacters(coreText, &codeUnit, &glyph, 1), glyph != 0 else { continue }
-            var measured = glyph
-            var bounds = CGRect.zero
-            CTFontGetBoundingRectsForGlyphs(coreText, .horizontal, &measured, &bounds, 1)
-            tallest = max(tallest, bounds.height)
-        }
-        return tallest > 0 ? tallest : nil
+    /// The drawn ink of `text` around its baseline (maxY above, minY below), the web's `actualBoundingBox`.
+    private func inkBounds(_ text: String, font: NSFont) -> CGRect {
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [.font: font]))
+        return CTLineGetBoundsWithOptions(line, .useGlyphPathBounds)
     }
 
+    /// The warning caption, sentence case at the note size: `500 13px/1.45`, ink, no tracking (D-119).
+    static let warningText = "Keep typing or the draft is deleted."
+    static let warningCaptionLineHeight: CGFloat = 1.45
+    /// The caption's measure, the web's `max-width:17em` at 13 pt.
+    static let warningCaptionMaxWidth: CGFloat = 17 * 13
+
+    /// The warning group, placed by ink as `status-slot.js` places it: the numeral's ink top 44 pt under the
+    /// writing baseline and the caption's ink top 20 pt under the numeral's ink. A sheet too short for the group
+    /// between the line and the footer (8 pt clear of each) takes it above the line instead, never off the sheet.
     private func layoutWarning() {
         guard paper.bounds.height > 0, let baseline = textView.currentInsertionBaseline() else { return }
-        // Place the warning by its ink, not by its label frames: the numeral's frame
-        // carries a large empty descent that used to read as a 65 pt gap to its line.
         let numeralSize = round(min(view.bounds.height * 0.18, 170))
         if numeralLabel.font?.pointSize != numeralSize {
-            numeralLabel.font = FirstLineTypography.writingItalicNSFont(size: numeralSize)
+            numeralLabel.font = FirstLineTypography.numeralNSFont(size: numeralSize)
         }
         let baselineInPaper = paper.convert(NSPoint(x: 0, y: baseline), from: textView)
         let baselineFromTop = paper.bounds.maxY - baselineInPaper.y
-        let numeralFont = numeralLabel.font ?? FirstLineTypography.smallNSFont
-        // The room's Newsreader digits are taller than cap height (old-style figures),
-        // so use the drawn glyph's ink height; cap height understated the ink by ~8 pt.
-        let numeralInkHeight = glyphInkHeight(numeralLabel.stringValue, font: numeralFont) ?? numeralFont.capHeight
-        let numeralBearing = numeralLabel.firstBaselineOffsetFromTop - numeralInkHeight
-        let numeralInkTop = baselineFromTop + 44
+        let numeralFont = numeralLabel.font ?? FirstLineTypography.numeralNSFont(size: numeralSize)
+        let numeralInk = inkBounds(numeralLabel.stringValue.isEmpty ? "3" : numeralLabel.stringValue, font: numeralFont)
+        let numeralBearing = numeralLabel.firstBaselineOffsetFromTop - numeralInk.maxY
+        let captionWidth = min(Self.warningCaptionMaxWidth, max(paper.bounds.width - 40, 0))
+        if warningHint.preferredMaxLayoutWidth != captionWidth { warningHint.preferredMaxLayoutWidth = captionWidth }
+        let captionFont = FirstLineTypography.smallMediumNSFont
+        let captionInk = inkBounds(Self.warningText, font: captionFont)
+        let captionBearing = warningHint.firstBaselineOffsetFromTop - captionInk.maxY
+
+        var numeralInkTop = baselineFromTop + 44
+        let groupHeight: (CGFloat) -> CGFloat = { inkTop in
+            let captionInkTop = inkTop + numeralInk.height + 20
+            return captionInkTop - captionBearing + self.warningHint.fittingSize.height - (inkTop - numeralBearing)
+        }
+        let height = groupHeight(numeralInkTop)
+        let footerTop = paper.bounds.height - 16 - Self.footerHeight
+        if numeralInkTop - numeralBearing + height > footerTop - 8 {
+            let lineTop = baselineFromTop - textView.lineBaselineOffset
+            numeralInkTop = max(0, lineTop - 8 - height) + numeralBearing
+        }
         let numeralTopConstant = round(numeralInkTop - numeralBearing)
         if abs(numeralTop.constant - numeralTopConstant) > 0.5 { numeralTop.constant = numeralTopConstant }
-
-        let captionFont = warningHint.font ?? FirstLineTypography.smallNSFont
-        let captionBearing = warningHint.firstBaselineOffsetFromTop - captionFont.capHeight
-        let captionInkTop = numeralInkTop + numeralInkHeight + 20
-        let captionTopConstant = round(captionInkTop - captionBearing)
+        let captionTopConstant = round(numeralInkTop + numeralInk.height + 20 - captionBearing)
         if abs(captionTop.constant - captionTopConstant) > 0.5 { captionTop.constant = captionTopConstant }
     }
 
@@ -747,7 +753,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if failureBase != composition.base {
             failureBase = composition.base
             let headlineFont = FirstLineTypography.writingMediumNSFont(size: composition.base)
-                ?? .systemFont(ofSize: composition.base, weight: .medium)
+                ?? FirstLineTypography.displayNSFont(size: composition.base)
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
             paragraph.lineHeightMultiple = Self.failureHeadlineLineHeight
@@ -999,8 +1005,8 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         if warning {
             numeralLabel.stringValue = "\(engine.secondsUntilDeletion)"
             warningHint.attributedStringValue = FirstLineTypography.trackedText(
-                "KEEP TYPING OR THE DRAFT IS DELETED.", font: FirstLineTypography.smallMediumNSFont,
-                color: FirstLineColors.inkNSColor, kernEm: 0.04, lineHeightMultiple: 1.5)
+                Self.warningText, font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.inkNSColor,
+                kernEm: 0, lineHeightMultiple: Self.warningCaptionLineHeight, fixedLineHeight: true)
             // The digits are placed from the live caret line each time they show: the layout pass that last ran
             // (before any text, at width 0) left them below the paper on macOS 15, where none follows (D-089).
             layoutWarning()
@@ -1052,8 +1058,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
 
     private func updateKeptContent() {
         let size = appState.settings.writingFontSize.points
-        let writingFont = WritingFontCandidate.pitchLight.fontWithCJKFallback(size: size)
-            ?? FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
+        let writingFont = FirstLineTypography.writingNSFont(size: size) ?? .systemFont(ofSize: size)
         keptView.setContent(text: engine.text, wordCount: engine.wordCount,
                             duration: engine.duration, writingFont: writingFont)
     }

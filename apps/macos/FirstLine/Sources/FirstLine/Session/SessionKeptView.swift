@@ -48,7 +48,7 @@ final class SessionKeptView: NSView {
          reducesMotion: @escaping () -> Bool) {
         copyButton = FirstLineButtons.roomPrimary(title: "Copy text", target: copyTarget, action: copyAction,
                                                   reducesMotion: reducesMotion)
-        copyButton.font = .systemFont(ofSize: 15, weight: .medium)
+        copyButton.font = FirstLineTypography.uiSemiboldNSFont
         restartButton = FirstLineButtons.secondary(title: "Begin again", target: restartTarget,
                                                    action: restartAction, height: 48)
         self.reducesMotion = reducesMotion
@@ -192,7 +192,7 @@ final class SessionKeptView: NSView {
     /// the row never shifts under the pointer.
     func setCopyTitle(_ title: String) {
         copyButton.title = title
-        let font = NSFont.systemFont(ofSize: 15, weight: .medium)
+        let font = FirstLineTypography.uiSemiboldNSFont
         copyButton.attributedTitle = transparentTitle(title, font: font, kernEm: 0.04)
         copyTitleLabel.attributedStringValue = FirstLineTypography.trackedText(
             title, font: font, color: FirstLineColors.onInkNSColor, kernEm: 0.04,
@@ -243,7 +243,7 @@ final class SessionKeptView: NSView {
     }
 
     private func styleRestart() {
-        let font = NSFont.systemFont(ofSize: 15, weight: .medium)
+        let font = FirstLineTypography.uiSemiboldNSFont
         restartButton.title = "Begin again"
         restartButton.font = font
         restartButton.attributedTitle = transparentTitle("Begin again", font: font, kernEm: 0.04)

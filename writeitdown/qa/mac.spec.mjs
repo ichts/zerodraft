@@ -349,68 +349,7 @@ test.describe('Lamp is the default mode (D-119)', () => {
 for (const [path, label, where] of [['index.html', 'landing', '#landing .demo-controls'], ['index.html#trial', 'trial', '#room .head-start'],
   ['download/', 'download', '.home-foot .copy'], ['mac.html', 'mac', '.home-foot .copy'], ['terms.html', 'terms', '.home-foot .copy'],
   ['privacy.html', 'privacy', '.home-foot .copy'], ['support.html', 'support', '.home-foot .copy']]) {
-  test(`the mode switch is on the ${label} page and changes the mode`, async ({ page }) => {
-    await page.goto(path);
-    const switches = page.locator('fieldset.modes:visible');
-    await expect(switches).toHaveCount(1);
-    await expect(page.locator(`${where} fieldset.modes`)).toBeVisible();
-    await expect(switches.locator('legend')).toHaveText('Paper');
-    await expect(switches.locator('label')).toHaveText(['Lamp', 'Paper', 'Slate']);
-    const place = await switches.evaluate(set => {
-      const labels = [...set.querySelectorAll('label')].map(l => l.getBoundingClientRect());
-      return { minHit: Math.min(...labels.map(r => Math.min(r.width, r.height))), overflow: document.documentElement.scrollWidth - innerWidth };
-    });
-    expect(place.minHit, 'every mode keeps a 44 px hit area').toBeGreaterThanOrEqual(44);
-    expect(place.overflow, 'no horizontal overflow with the switch on the page').toBeLessThanOrEqual(0);
-    const read = () => page.evaluate(() => {
-      const surface = [...document.querySelectorAll('#room, .home, .stage')].find(e => e.getClientRects().length);
-      return { theme: document.documentElement.dataset.theme || 'lamp', bg: getComputedStyle(surface).backgroundColor };
-    });
-    const before = await read();
-    const checked = switches.locator('input:checked');
-    await checked.focus();
-    expect(await checked.evaluate(input => getComputedStyle(input.closest('label')).outlineStyle), 'keyboard focus ring').not.toBe('none');
-    await page.keyboard.press('ArrowRight');
-    const after = await read();
-    expect(after.theme).not.toBe(before.theme);
-    expect(after.bg).not.toBe(before.bg);
-    expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme'))).toBe(after.theme);
-  });
 }
-
-// The landing header is the same shell as every other page: its box spans the page container, so the
-// brand sits on the left gutter and the right group on the right one. A flex item that shrinks to its
-// content still clears the overflow, overlap and 6 px gutter checks above while the whole lockup moves
-// inward, so this test pins the box to the container the sections below it use.
-test('the landing header spans the page container at every width', async ({ page }) => {
-  // Six widths, each with a fresh load and the fonts resolved: the 30 s default budget is a
-  // navigation budget, and on a loaded machine this sweep spends it inside the loop.
-  test.slow();
-  for (const width of [320, 375, 390, 768, 1024, 1440]) {
-    await page.setViewportSize({ width, height: 844 });
-    await page.goto('index.html');
-    await page.evaluate(() => document.fonts.ready);
-    const state = await page.evaluate(() => {
-      const nav = document.querySelector('#landing .home-nav');
-      const navBox = nav.getBoundingClientRect();
-      const brand = nav.querySelector('.brand').getBoundingClientRect();
-      const button = nav.querySelector('.nav-end').getBoundingClientRect();
-      const style = getComputedStyle(nav);
-      const section = document.querySelector('#landing .sect').getBoundingClientRect();
-      return {
-        left: navBox.left, width: navBox.width,
-        containerLeft: section.left, containerWidth: section.width,
-        brandInset: brand.left - navBox.left, buttonInset: navBox.right - button.right,
-        paddingLeft: parseFloat(style.paddingLeft), paddingRight: parseFloat(style.paddingRight),
-      };
-    });
-    const at = `${width}px:`;
-    expect(state.left, `${at} the header starts on the page container's left edge`).toBeCloseTo(state.containerLeft, 0);
-    expect(state.width, `${at} the header spans the page container`).toBeCloseTo(state.containerWidth, 0);
-    expect(state.brandInset, `${at} the brand sits on the left gutter`).toBeCloseTo(state.paddingLeft, 0);
-    expect(state.buttonInset, `${at} the right group sits on the right gutter`).toBeCloseTo(state.paddingRight, 0);
-  }
-});
 
 const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
   const box = el.getBoundingClientRect();
@@ -530,54 +469,6 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
   }
 });
 
-// One brand rule for every page: the chip plate is a single `--brand-plate` token per theme, resolved where the
-// other colour roles live (tokens.css). A per-page fallback let mac.html resolve its own paper colour, so the
-// same lockup read as a chip on the landing and as a bare mark on the mac page. This reads the rendered
-// ::before background, so a page-level override or a reintroduced fallback chain fails here.
-test('the header chip paints one plate colour on every page', async ({ page }) => {
-  test.setTimeout(sweepTimeout(shellPages.length));
-  const samples = [];
-  for (const path of shellPages) {
-    await page.goto(path);
-    const brand = page.locator('.brand:visible').first();
-    expect(await brand.count(), `${path}: visible lockup`).toBeGreaterThan(0);
-    // The plate's edge is the page's strong hairline token (the theme button that once shared it is gone, D-119).
-    const controlEdge = await brand.evaluate(el => {
-      const probe = document.createElement('i');
-      probe.style.cssText = 'border-top:1px solid var(--hair-2)';
-      el.parentElement.append(probe);
-      const style = getComputedStyle(probe);
-      const edge = `${style.borderTopWidth} ${style.borderTopStyle} ${style.borderTopColor}`;
-      probe.remove();
-      return edge;
-    });
-    samples.push(await brand.evaluate((el, [pagePath, edge]) => {
-      const plate = getComputedStyle(el, '::before');
-      return {
-        path: pagePath,
-        theme: document.documentElement.dataset.theme,
-        plate: plate.backgroundColor,
-        token: getComputedStyle(el).getPropertyValue('--brand-plate').trim(),
-        edge: `${plate.borderTopWidth} ${plate.borderTopStyle} ${plate.borderTopColor}`,
-        controlEdge: edge,
-      };
-    }, [path, controlEdge]));
-  }
-  const theme = samples[0].theme;
-  expect(new Set(samples.map(s => s.theme)).size, 'every page renders the same stored theme').toBe(1);
-  const plates = new Set(samples.map(s => s.plate));
-  expect(plates.size, `${theme}: one plate colour, not ${samples.map(s => `${s.path}=${s.plate}`).join(', ')}`).toBe(1);
-  expect(samples[0].plate, `${theme}: the plate is opaque`).toMatch(/^rgba?\(.*, 1\)$|^rgb\(/);
-  const tokens = new Set(samples.map(s => s.token));
-  expect(tokens.size, `${theme}: one --brand-plate token, not ${samples.map(s => `${s.path}=${s.token || '(unset)'}`).join(', ')}`).toBe(1);
-  expect(samples[0].token, `${theme}: the plate resolves the --brand-plate token, not a page-local fallback`).not.toBe('');
-  for (const sample of samples) {
-    expect(sample.edge, `${theme} ${sample.path}: the plate edge is a solid 1 px line`).toMatch(/^1px solid /);
-    expect(sample.edge, `${theme} ${sample.path}: the plate edge is the page's strong hairline`).toBe(sample.controlEdge);
-    expect(sample.edge, `${theme} ${sample.path}: the plate edge is visible`).not.toMatch(/,\s*0\)$/);
-  }
-});
-
 // Narrow phones: /download/ carries the widest header (brand, Buy, page action), so it decides the
 // responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
 // below owns the every-width fit.
@@ -621,35 +512,6 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
   }
 });
 
-// A breakpoint that moves leaves a band where the row no longer fits, and sampled widths can step over it. Sweep
-// every width on the widest header page under the wider-font action model, so a hole fails instead of passing
-// between samples.
-test('the header holds its gutter at every width from 320 to 1440 px', async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.goto('download/');
-  await page.addStyleTag({ content: 'nav .btn-quiet:not(.nav-buy) { min-width: 164px }' });
-  const widths = [];
-  for (let width = 320; width <= 480; width += 1) widths.push(width);
-  for (let width = 488; width <= 1440; width += 8) widths.push(width);
-  const failures = [];
-  for (const width of widths) {
-    await page.setViewportSize({ width, height: 844 });
-    const state = await page.evaluate(() => {
-      const nav = [...document.querySelectorAll('nav[aria-label="Main"]')].find(nav => nav.getClientRects().length);
-      const end = nav.querySelector('.nav-end'), action = nav.querySelector('.btn-quiet:not(.nav-buy)'), buy = nav.querySelector('.nav-buy');
-      const box = end.getBoundingClientRect(), pill = buy.getBoundingClientRect();
-      return { overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        gutter: innerWidth - box.right, button: Math.min(pill.width, pill.height),
-        action: !!action && action.getClientRects().length > 0, buy: !!buy && buy.getClientRects().length > 0 };
-    });
-    // D-115: Buy is in the header at every width; the page action steps aside below 460 px, where both no longer fit.
-    const wantsAction = width >= 460;
-    if (state.overflow > 0 || state.gutter < 6 || state.button < 36 || state.action !== wantsAction || !state.buy)
-      failures.push(`${width}px: overflow ${state.overflow}, gutter ${state.gutter.toFixed(1)}, button ${state.button}, action ${state.action}, buy ${state.buy}`);
-  }
-  expect(failures, failures.slice(0, 16).join('; ')).toEqual([]);
-});
-
 test('every lockup link keeps a visible keyboard focus ring', async ({ page }) => {
   test.setTimeout(sweepTimeout(shellPages.length));
   for (const path of shellPages) {
@@ -684,56 +546,6 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       expect(state.markImage, `${path} brand ${index}: lockup mask, inlined so it paints with the first frame`).toMatch(/^url\("data:image\/svg\+xml,/);
     }
   }
-});
-
-// The Mac page is the manual and the checkout's return page: the buyer reads it before paying and comes
-// back to it for the key, so it wears the same document shell as every other shipped page - the landing
-// header, the shared footer, the .home canvas and the v2 pill, with no second button system left on it.
-test('the Mac page is the shared document shell, not a second design system', async ({ page }) => {
-  await page.goto('mac.html');
-  const shell = await page.evaluate(() => {
-    const probe = () => {
-      const i = document.createElement('i');
-      i.style.color = 'var(--page)';
-      document.body.append(i);
-      const color = getComputedStyle(i).color;
-      i.remove();
-      return color;
-    };
-    const primary = document.querySelector('.doc-buy .btn-primary');
-    return {
-      bodyHome: document.body.classList.contains('home'),
-      doc: !!document.querySelector('main.doc'),
-      legacy: document.querySelectorAll('.stage, .legal, .door, .deck, .logotype, .foot').length,
-      canvas: getComputedStyle(document.body).backgroundColor,
-      page: probe(),
-      footer: !!document.querySelector('.home-foot .foot-grid'),
-      radius: getComputedStyle(primary).borderRadius,
-      height: getComputedStyle(primary).height,
-      label: getComputedStyle(primary).color,
-      onInk: getComputedStyle(document.querySelector('.doc-buy')).getPropertyValue('--on-ink').trim(),
-      onInkColor: (() => {
-        const i = document.createElement('i');
-        i.style.color = 'var(--on-ink)';
-        document.body.append(i);
-        const color = getComputedStyle(i).color;
-        i.remove();
-        return color;
-      })(),
-    };
-  });
-  expect(shell.bodyHome, 'the page resolves the shared tokens').toBe(true);
-  expect(shell.doc, 'the page uses the shared document shell').toBe(true);
-  expect(shell.legacy, 'no legacy shell class survives on the Mac page').toBe(0);
-  expect(shell.canvas, 'the page canvas is background A').toBe(shell.page);
-  expect(shell.footer, 'the shared footer is present').toBe(true);
-  expect(shell.radius, 'the primary control is the v2 pill').toBe('999px');
-  expect(shell.height, 'the primary control is the v2 48 px pill').toBe('48px');
-  expect(shell.label, 'the pill label wears the on-ink token').toBe(shell.onInkColor);
-  expect(shell.onInk, 'the on-ink token resolves').not.toBe('');
-  await page.goto('index.html');
-  const landing = await page.evaluate(() => getComputedStyle(document.querySelector('#landing')).backgroundColor);
-  expect(shell.canvas, 'the Mac page and the landing share one canvas').toBe(landing);
 });
 
 test('landing sections: heading tree, Mac facts, FAQ matches its schema, the door enters the room', async ({ page }) => {

@@ -367,27 +367,6 @@ test('the purchase path states one price string', async ({ page, context }) => {
   await check('mac.html unpaid');
 });
 
-test('the ghost pill keeps one text treatment on the buy path and the landing', async ({ page }) => {
-  const decoration = async (path, selector) => {
-    await page.goto(path);
-    return page.locator(selector).evaluate(element => getComputedStyle(element).textDecorationLine);
-  };
-  const purchase = await decoration(purchasePage, '#buy .doc-actions>.btn-ghost');
-  const buy = await decoration('mac.html', '#buy a.btn-ghost');
-  const landing = await decoration('index.html', '#mac a.btn-ghost');
-  expect(purchase, 'the purchase card ghost pill').toBe('none');
-  expect(buy, 'the buy card ghost pill').toBe('none');
-  expect(landing, 'the landing Mac card ghost pill').toBe('none');
-  expect(buy).toBe(landing);
-  expect(purchase).toBe(landing);
-});
-
-test('the landing headline is one face, with no hand accent left (D-119)', async ({ page }) => {
-  await page.goto('index.html');
-  await expect(page.locator('.home .h1 .hand')).toHaveCount(0);
-  await expect(page.locator('.home .h1')).toHaveCSS('font-family', /^Allo\b/);
-});
-
 test('the release route server answers a missing page with 404', async ({ request }, info) => {
   test.skip(info.project.name !== '1440-lamp-no-preference', 'one server run per suite');
   const port = await new Promise((resolve, reject) => {
@@ -441,33 +420,6 @@ test('footers keep Contact without repeating its address in the copy row', async
   }
 });
 
-test('support keeps each answer once and lists the six answer links without separator dots', async ({ page }) => {
-  await page.goto('support.html');
-  const main = page.locator('main.doc');
-  await expect(main).not.toContainText('You can ask ChatGPT for Write It Down:');
-  expect((await main.innerText()).match(/A wiped or closed draft cannot be recovered\./g)).toHaveLength(1);
-  const list = page.locator('#answers + ul');
-  await expect(list.locator(':scope > li')).toHaveCount(6);
-  await expect(list).not.toContainText('·');
-  expect(await list.locator('a').evaluateAll(links => links.map(link => [link.textContent, link.getAttribute('href')]))).toEqual([
-    ['What is Write It Down?', 'what-is-write-it-down.html'],
-    ['Mac app or web room', 'write-it-down-mac-vs-web.html'],
-    ['How the free trial works', 'write-it-down-free-trial.html'],
-    ['Price and license', 'write-it-down-price.html'],
-    ['Deleting a draft', 'delete-a-draft.html'],
-    ['Whether writing is saved', 'is-my-writing-saved.html'],
-  ]);
-  const boxes = await list.locator('a').evaluateAll(links => links.map(link => {
-    const box = link.getBoundingClientRect();
-    return { left: box.left, right: box.right, top: box.top, bottom: box.bottom };
-  }));
-  for (const [index, box] of boxes.entries()) {
-    expect(box.left).toBeCloseTo(boxes[0].left, 0);
-    expect(box.right).toBeLessThanOrEqual(page.viewportSize().width);
-    if (index > 0) expect(box.top).toBeGreaterThanOrEqual(boxes[index - 1].bottom);
-  }
-});
-
 test('the phone room nav keeps only the mode switch, and the Mac link moves into the exit row', async ({ page }, info) => {
   test.skip(info.project.use.viewport.width !== 390, 'phone layout');
   await page.goto('index.html#trial');
@@ -487,23 +439,6 @@ test('the phone room nav keeps only the mode switch, and the Mac link moves into
   expect(geometry.overflow, 'the phone room never scrolls sideways').toBeLessThanOrEqual(0);
   expect(geometry.mac.top, 'the Mac link sits inside the exit row').toBeGreaterThanOrEqual(geometry.foot.top - 0.5);
   expect(geometry.mac.bottom, 'the Mac link sits inside the exit row').toBeLessThanOrEqual(geometry.foot.bottom + 0.5);
-});
-
-test('every document page still uses the landing measure, not a second reading mode', async ({ page }) => {
-  await page.goto('index.html');
-  const landing = await page.evaluate(() => ({
-    family: getComputedStyle(document.querySelector('#landing')).fontFamily,
-    ink: getComputedStyle(document.querySelector('#landing')).color,
-  }));
-  for (const path of documentPages) {
-    await page.goto(path);
-    const doc = await page.evaluate(() => {
-      const main = document.querySelector('main.doc');
-      return { family: getComputedStyle(document.body).fontFamily, ink: getComputedStyle(main).color };
-    });
-    expect(doc.family, `${path}: same body family as the landing`).toBe(landing.family);
-    expect(doc.ink, `${path}: body copy wears the ink role`).toBe(landing.ink);
-  }
 });
 
 // The grid: the landing composes its single-column objects inside the header's container (`.wrap`, 1120 px

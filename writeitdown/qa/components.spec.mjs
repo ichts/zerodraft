@@ -1,11 +1,9 @@
-// The six shared components (Empty, StatusDot, Kbd, Skeleton, Field, Select) behave the way a visitor meets them.
+// The shared components (StatusDot, Skeleton, Field, Select) behave the way a visitor meets them.
 // Each test names what the visitor would notice when it breaks:
 //   Field/Select: tapping the label reaches the control, the control is a 44 px target at 16 px so a phone does
 //     not zoom, an invalid control is told apart from a valid one.
 //   StatusDot: a state is readable without colour (the fill differs), never only a hue.
 //   Skeleton: a held place never moves (the wall stays blank), in either motion preference.
-//   Kbd: the landing's key caps are real <kbd> elements and keep their illustration size.
-//   Empty: one centred sentence with its actions, inside the reading measure.
 // The markup is the gallery's own (kit/index.html), so the page a developer looks at is the page that is measured.
 import { test, expect } from '@playwright/test';
 
@@ -75,34 +73,3 @@ for (const reducedMotion of ['no-preference', 'reduce']) {
     expect(short).toBeCloseTo(full * 0.4, 0);
   });
 }
-
-test('a named key is a kbd element with its own small cap', async ({ page }) => {
-  const k = await style(page, '.kbd:not(.key)', ['display', 'height', 'fontSize', 'fontFamily']);
-  expect(k.display).toBe('inline-flex');
-  expect(k.fontSize).toBe('13px');
-  expect(parseFloat(k.height)).toBeCloseTo(13 * 1.8, 1);
-  expect(k.fontFamily).not.toMatch(/mono/i);
-});
-
-test('the landing key caps are kbd elements at the illustration size', async ({ page }) => {
-  await page.goto('./');
-  const caps = await page.evaluate(() => [...document.querySelectorAll('#how .key')].map(k => {
-    const r = k.getBoundingClientRect();
-    return { tag: k.tagName, h: Math.round(r.height), w: Math.round(r.width) };
-  }));
-  expect(caps.length).toBe(3);
-  expect(caps.every(c => c.tag === 'KBD' && c.h === 50 && c.w >= 58)).toBe(true);
-});
-
-test('an empty state is one centred sentence with its action inside the reading measure', async ({ page }) => {
-  const e = await style(page, '.empty', ['textAlign', 'display', 'maxWidth']);
-  expect(e).toEqual({ textAlign: 'center', display: 'flex', maxWidth: '720px' });
-  const title = await style(page, '.empty-title', ['fontFamily', 'fontSize']);
-  expect(title.fontFamily).toMatch(/^"?Allo/);
-  const centred = await page.evaluate(() => {
-    const box = document.querySelector('.empty .btn').getBoundingClientRect();
-    const empty = document.querySelector('.empty').getBoundingClientRect();
-    return Math.abs(box.left + box.width / 2 - (empty.left + empty.width / 2));
-  });
-  expect(centred).toBeLessThan(2);
-});

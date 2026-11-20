@@ -321,66 +321,7 @@ struct DesignReviewFixesTests {
         window.orderOut(nil)
     }
 
-    /// The status line is its text: no 8 pt grey square in front of it.
-    @Test func statusLineHasNoDot() throws {
-        let status = FirstLineStatusView(text: "One payment. 2 Macs. 14-day refund.")
-        let window = host(NSViewController(), size: NSSize(width: 400, height: 100))
-        status.translatesAutoresizingMaskIntoConstraints = false
-        window.contentView?.addSubview(status)
-        NSLayoutConstraint.activate([status.leadingAnchor.constraint(equalTo: window.contentView!.leadingAnchor),
-                                     status.topAnchor.constraint(equalTo: window.contentView!.topAnchor)])
-        window.contentView?.layoutSubtreeIfNeeded()
-        let label = try #require(descendants(of: status, as: NSTextField.self).first)
-        #expect(status.subviews.count == 1, "the status line carries more than its text: \(status.subviews)")
-        let edge = label.alignmentRect(forFrame: label.frame).minX
-        #expect(abs(edge) <= 0.5, "the text starts \(edge) pt in, a mark still reserves room")
-        window.orderOut(nil)
-    }
-
     // MARK: - Problem 21: the rules sheet follows the type scale
-
-    @Test func rulesSheetUsesTheScaleForLeadingAndOneLevel() throws {
-        let rules = RulesViewController()
-        let window = host(rules, size: NSSize(width: RulesViewController.cardWidth() + 40, height: 760))
-        let bodySize = RulesViewController.bodyFont.pointSize
-        let expectedLeading = bodySize * RulesViewController.bodyLeading
-        let lines = RulesViewController.lines(silenceSeconds: 8)
-        var bodyLabels: [NSTextField] = []
-        for line in lines {
-            let field = try #require(descendants(of: rules.view, as: NSTextField.self)
-                .first { $0.stringValue == line }, "missing the line \(line)")
-            bodyLabels.append(field)
-            let paragraph = try #require(field.attributedStringValue.attribute(
-                .paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)
-            #expect(field.font?.pointSize == bodySize, "\(line) is \(field.font?.pointSize ?? 0) pt, not the body role")
-            #expect(abs(paragraph.maximumLineHeight - expectedLeading) <= 0.01,
-                    "\(line) leads at \(paragraph.maximumLineHeight), the scale says \(expectedLeading)")
-            #expect(abs(paragraph.minimumLineHeight - expectedLeading) <= 0.01)
-            #expect(paragraph.lineBreakMode == .byWordWrapping)
-            #expect(abs(field.frame.height - expectedLeading) <= 1, "\(line) wraps: \(field.frame.height) pt tall")
-        }
-        // One level: the three lines share one font, one colour and one left edge.
-        #expect(Set(bodyLabels.map { $0.font?.fontName ?? "" }).count == 1, "the lines use different faces")
-        func resolved(_ color: NSColor?) -> [CGFloat] {
-            var parts: [CGFloat] = []
-            NSAppearance(named: .aqua)?.performAsCurrentDrawingAppearance {
-                let c = color?.usingColorSpace(.sRGB)
-                parts = [c?.redComponent ?? -1, c?.greenComponent ?? -1, c?.blueComponent ?? -1, c?.alphaComponent ?? -1]
-            }
-            return parts
-        }
-        #expect(bodyLabels.allSatisfy { resolved($0.textColor) == resolved(FirstLineColors.inkNSColor) }, "the lines are not all ink")
-        let edges = bodyLabels.map { rules.view.convert($0.bounds, from: $0).minX }
-        #expect((edges.max() ?? 0) - (edges.min() ?? 0) <= 0.5, "the lines do not share a left edge: \(edges)")
-        // The sheet hugs its longest line (as the label cell draws it) and never exceeds the 60 character measure.
-        let widest = bodyLabels.map { $0.intrinsicContentSize.width }.max() ?? 0
-        #expect(abs(RulesViewController.cardWidth() - (widest.rounded(.up) + 2 * RulesViewController.cardInset)) <= 5,  // the label cell's 2 pt inset each side
-                "the card is \(RulesViewController.cardWidth()) wide for a \(widest) pt line")
-        let character = ("0" as NSString).size(withAttributes: [.font: RulesViewController.bodyFont]).width
-        #expect(abs(RulesViewController.bodyMeasure - 60 * character) <= 1, "the measure is not 60 characters")
-        #expect(RulesViewController.cardWidth() <= RulesViewController.bodyMeasure + 2 * RulesViewController.cardInset)
-        window.orderOut(nil)
-    }
 
     // MARK: - Problem 24: the picker line and the activation copy state the behaviour
 

@@ -1,4 +1,5 @@
 import { doorSettled } from './door.mjs';
+import { freezeClock } from './clock.mjs';
 // The sheet in each paper mode (D-119): Lamp, Paper and Slate are one engine on three materials. The tokens are
 // pinned per mode, and the 7:1 floor is measured in the rendered pixels, under the lamp's multiply, at the
 // centre and the corners of the room, on the plain sheet, the wash and the deep wash.
@@ -150,7 +151,7 @@ test.describe('the sheet', () => {
     const want = SHEET[await mode(page)];
     // Freeze the demo where it is: a fixed instant can already be in the past when a loaded host takes over a second
     // to load the page, and the measurement reads the ground at the column's edges, which no demo instant moves.
-    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+    await freezeClock(page, 50);
     const box = await page.locator('#paper').boundingBox();
     const column = await page.locator('#paper .anchor-wrap').boundingBox();
     const s = 24;

@@ -5,43 +5,36 @@ import { test, expect } from '@playwright/test';
 // room's first letter never waits on a paint the click caused.
 //
 // Budget: the target is a room that takes the first letter within 100 ms of the click. The suite runs on shared,
-// loaded hosts, so the gates carry margin: the editor is focused within 250 ms of the click and no main-thread task
-// after the click runs longer than 150 ms (a key typed into a busy page waits for it). The canvas build froze the
-// main thread for about 1200 ms on a 2x screen.
+// loaded hosts where a wall clock counts the seconds the OS spent running someone else, so the gates count the
+// page's own main-thread CPU time (CDP `ThreadTime`): the editor is focused within 120 ms of CPU after the click
+// and the click through the first letter costs under 250 ms of CPU. The canvas build froze the main thread for
+// about 1200 ms on a 2x screen; the clean run costs about 70 ms.
 test.use({ deviceScaleFactor: 2 });
 
-const FOCUS_BUDGET_MS = 250;
-const LONG_TASK_BUDGET_MS = 150;
+const FOCUS_BUDGET_MS = 120;
+const FIRST_LETTER_BUDGET_MS = 250;
 
 test.beforeEach(async ({ page }) => {
   await page.route('https://static.cloudflareinsights.com/beacon.min.js', route => route.fulfill({ body: '' }));
-  await page.addInitScript(() => {
-    window.__long = [];
-    new PerformanceObserver(list => list.getEntries().forEach(e => window.__long.push({ start: e.startTime, duration: e.duration })))
-      .observe({ type: 'longtask', buffered: true });
-  });
   await page.goto('./');
   await page.evaluate(() => document.fonts.ready);
 });
 
 test('the room takes the first letter within the budget, and the click paints nothing', async ({ page }) => {
-  await page.evaluate(() => {
-    document.addEventListener('click', e => { window.__click = e.timeStamp; }, { capture: true, once: true });
-    const editor = document.getElementById('editor');
-    editor.addEventListener('focus', e => { window.__focus = e.timeStamp; }, { once: true });
-  });
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
+  const cpuMs = async () => 1000 * (await cdp.send('Performance.getMetrics')).metrics.find(m => m.name === 'ThreadTime').value;
+  const start = await cpuMs();
   await page.locator('#landing .cta a[href="#trial"]').click();
   await page.waitForFunction(() => document.activeElement?.id === 'editor');
+  const focused = await cpuMs();
   await page.keyboard.type('a');
   await page.waitForTimeout(1500);
+  const typed = await cpuMs();
 
-  const r = await page.evaluate(() => ({
-    click: window.__click, focus: window.__focus, value: document.getElementById('editor').value,
-    long: window.__long.filter(t => t.start + t.duration > window.__click).map(t => t.duration),
-  }));
-  expect(r.value, 'the letter reached the editor').toBe('a');
-  expect(r.focus - r.click, `click to editor focused (ms), budget ${FOCUS_BUDGET_MS}`).toBeLessThan(FOCUS_BUDGET_MS);
-  expect(Math.max(0, ...r.long), `longest main-thread task after the click (ms), budget ${LONG_TASK_BUDGET_MS}`).toBeLessThan(LONG_TASK_BUDGET_MS);
+  expect(await page.locator('#editor').inputValue(), 'the letter reached the editor').toBe('a');
+  expect(focused - start, `main-thread CPU from click to editor focused (ms), budget ${FOCUS_BUDGET_MS}`).toBeLessThan(FOCUS_BUDGET_MS);
+  expect(typed - start, `main-thread CPU from click to the first letter (ms), budget ${FIRST_LETTER_BUDGET_MS}`).toBeLessThan(FIRST_LETTER_BUDGET_MS);
 
   // The material is CSS: no canvas, no renderer, no texture generated for the click.
   expect(await page.locator('.sheet-paper').count()).toBe(0);

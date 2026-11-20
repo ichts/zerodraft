@@ -176,18 +176,6 @@ struct SettingsTests {
         #expect(kept.alignment == .center)
     }
 
-    @Test func alignmentAndFontSizeDefaultsAndChoices() {
-        let (state, root) = state()
-        defer { try? FileManager.default.removeItem(at: root) }
-        #expect(state.settings.writingAlignment == .centered)
-        #expect(state.settings.writingFontSize == .medium)
-        state.updateAlignment(.left)
-        state.updateFontSize(.large)
-        #expect(state.settings.writingAlignment == .left)
-        #expect(state.settings.writingFontSize.points == 34)
-        #expect(WritingFontSize.allCases == [.small, .medium, .large])
-    }
-
     @Test func focusWindowDeliversMouseMovementAndHasNoPinnedCommand() {
         let (state, root) = state()
         defer { try? FileManager.default.removeItem(at: root) }

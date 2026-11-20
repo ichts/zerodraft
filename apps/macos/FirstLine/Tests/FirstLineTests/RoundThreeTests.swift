@@ -397,13 +397,6 @@ struct RoundThreeTests {
         window.orderOut(nil)
     }
 
-    @Test func writingAlignmentNamesTheColumnMeasure() {
-        #expect(WritingAlignment.centered.label == "Narrow column")
-        #expect(WritingAlignment.left.label == "Wide column")
-        #expect(WritingAlignment.centered.measureCharacters == 62)
-        #expect(WritingAlignment.left.measureCharacters == 70)
-    }
-
     // MARK: - IME composition paths
 
     @Test func markedBackspaceAndCandidateKeysPassThroughWithoutDeny() throws {

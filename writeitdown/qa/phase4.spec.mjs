@@ -1565,6 +1565,16 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
   await expect(page.locator('#demo-stopped')).toBeHidden();
 });
 
+// The demo's loop starts when its sheet first enters view (round 007), and on a short screen the sheet sits below the
+// first screen: bring it into view and wait for the demo's own observer before the clock is moved.
+async function startDemoInView(page) {
+  await page.locator('#paper').scrollIntoViewIfNeeded();
+  // Observers are notified in creation order in one rendering step, so once this fresh one fires the demo's has too.
+  await page.evaluate(() => new Promise(resolve => new IntersectionObserver((entries, observer) => {
+    if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); resolve(); }
+  }).observe(document.getElementById('paper'))));
+}
+
 test('short demo sheets keep the status slot inside the paper', async ({ page }, info) => {
   test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo has no warning or report');
   // The screen can be short two ways: a wide landscape window, or a small phone whose sheet now
@@ -1573,6 +1583,7 @@ test('short demo sheets keep the status slot inside the paper', async ({ page },
     await page.setViewportSize(size);
     await page.reload();
     await page.evaluate(() => document.fonts.ready);
+    await startDemoInView(page);
     await page.clock.fastForward(SILENT_END + 150);
     await expect(page.locator('#warn')).toBeVisible();
     const warning = await page.evaluate(() => {

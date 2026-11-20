@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { freezeClock } from './clock.mjs';
 
 // D-109, with D-119's face: the room's Chinese has two hard requirements at once, and they constrain each other.
 //   1. A character the room draws is on the sheet at once. `font-display:block` held text invisible while the file
@@ -205,7 +206,7 @@ test('a character typed while the face is in flight is painted at once, and keep
   await page.locator('#editor').focus();
   await page.keyboard.insertText('我');
   await expect(page.locator('#editor')).toHaveValue('我');
-  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 100));
+  await freezeClock(page);
   // The request is still held, so the face cannot arrive. The character must be on the sheet anyway: no block
   // period, no wait for 2.5 MB.
   await page.waitForTimeout(250);

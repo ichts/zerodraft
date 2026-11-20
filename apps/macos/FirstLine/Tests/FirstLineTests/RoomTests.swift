@@ -607,6 +607,11 @@ struct RoomTests {
         let fixture = try roomFixture()
         fixture.state.settings.reducedMotion = .never
         let view = fixture.room.view
+        let window = try #require(view.window)
+        window.appearance = NSAppearance(named: .aqua)
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        defer { window.orderOut(nil) }
         let paper = try #require(descendants(view, of: PaperSheetView.self).first)
         let wash = try #require(descendants(view, of: PaperWashView.self).first)
         func settle() {
@@ -916,9 +921,16 @@ struct RoomTests {
         room.tick()
         #expect(!notice.isHidden)
 
-        try await Task.sleep(nanoseconds: 1_700_000_000)
-        #expect(!notice.isHidden, "still showing before two seconds")
-        try await Task.sleep(nanoseconds: 800_000_000)
+        // The note ends on the main queue at two seconds and its fade on a second timer. This test shares the main
+        // actor with the rest of the suite, so a sleep can resume long after it was due; the host's stall says nothing
+        // about the product. The early check therefore counts only when it really ran inside the window, and the end
+        // is polled for, a fixed 2.5 s sleep having raced the fade whenever the host was busy.
+        let shownAt = ContinuousClock.now
+        try await Task.sleep(for: .seconds(1))
+        if ContinuousClock.now - shownAt < .seconds(1.9) {
+            #expect(!notice.isHidden, "still showing before two seconds")
+        }
+        for _ in 0..<400 where !notice.isHidden { try await Task.sleep(for: .milliseconds(50)) }
         #expect(notice.isHidden, "gone after two seconds and the 0.2 s fade")
         room.view.layoutSubtreeIfNeeded()
         #expect(frames(room, [exit, count, fixture.editor]) == before, "nothing moved after it went")

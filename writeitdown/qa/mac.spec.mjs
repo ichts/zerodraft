@@ -1160,17 +1160,17 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
 });
 
 test('DMG release packaging refuses unconfigured builds', () => {
-  test.skip(test.info().project.name !== '1440-slate-no-preference', 'configuration gate, one project is enough');
+  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'configuration gate, one project is enough');
   expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete license and update configuration');
 });
 
 test('installer installs the complete purchase bundle and rejects symlinks', () => {
-  test.skip(test.info().project.name !== '1440-slate-no-preference', 'filesystem check, one project is enough');
+  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'filesystem check, one project is enough');
   expect(execFileSync('python3', ['qa/test-install.py'], { encoding: 'utf8' })).toContain('exact production files');
 });
 
 test('installer acceptance rejects an installer missing its symlink guard', () => {
-  test.skip(test.info().project.name !== '1440-slate-no-preference', 'negative control, one project is enough');
+  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'negative control, one project is enough');
   const root = mkdtempSync(join(tmpdir(), 'wid-broken-install-'));
   try {
     const broken = join(root, 'install.sh');
@@ -1183,7 +1183,7 @@ test('installer acceptance rejects an installer missing its symlink guard', () =
 });
 
 test('installer acceptance rejects an installer missing its logo-directory guard', () => {
-  test.skip(test.info().project.name !== '1440-slate-no-preference', 'negative control, one project is enough');
+  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'negative control, one project is enough');
   const root = mkdtempSync(join(tmpdir(), 'wid-broken-logo-install-'));
   try {
     const broken = join(root, 'install.sh');

@@ -35,7 +35,7 @@ import { landingSound } from './sound.js';
   var barEl = document.getElementById("bar");
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var t0 = Date.now();
+  var t0 = null;
   var seen = {};
   var lastT = -1;
   var barAnimation = null;
@@ -227,7 +227,7 @@ import { landingSound } from './sound.js';
   }
 
   function tick() {
-    if (document.hidden || document.getElementById('landing').hidden) {
+    if (document.hidden || document.getElementById('landing').hidden || (t0 === null && !reducedMq.matches)) {
       visible = false;
       barDeadline = null;
       soundT = null;
@@ -240,6 +240,16 @@ import { landingSound } from './sound.js';
     render((Date.now() - t0) % LOOP);
   }
 
+  // The loop starts when the sheet first enters view, so a phone that shows it below the door sees it from the first key.
+  // A sheet already on screen starts now; the observer only waits for one that is not.
+  var box = paper.getBoundingClientRect();
+  if (box.height > 0 && box.top < innerHeight && box.bottom > 0) t0 = Date.now();
+  else new IntersectionObserver(function (entries, observer) {
+    if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
+    observer.disconnect();
+    t0 = Date.now();
+    tick();
+  }).observe(paper);
   tick();
   setInterval(tick, 50);
   if (reducedMq.addEventListener) reducedMq.addEventListener("change", tick);

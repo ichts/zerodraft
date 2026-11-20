@@ -2594,3 +2594,21 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   demo and room numerals, the demo's face), `qa/mac.spec.mjs` (Lamp default, legacy values, the switch on every
   page), `qa/shell.spec.mjs`, `qa/typography.spec.mjs`, `qa/chinese-face.spec.mjs` (the face is asked for only by
   Chinese input), `qa/history-fade.spec.mjs`, `qa/door-instant.spec.mjs`, `qa/sound.spec.mjs`.
+
+### Correction to D-119: the first frame is whole, and the demo starts when it is seen
+
+- Date: 2026-11-20
+- Decision: Two fixes after the D-119 deploy, with no change to the look.
+  - The current mode is marked by CSS from `<html data-theme>`, which `theme.js` sets in `<head>`. Every switch's
+    Lamp radio is checked in the markup, so the Lamp underline is on the first frame even with scripts off.
+  - The header lockup's two masks are inlined in `site.css` byte for byte from `logo/`
+    (`qa/logo-inline.test.mjs`), so the mark paints with the first frame instead of after a second request.
+  - The demo loop's clock starts when its sheet first enters view (an `IntersectionObserver` in `demo.js`). A phone
+    that shows the sheet below the door sees the first key about half a second after the sheet appears, not a
+    loop already in its blank report.
+- Reason: On the deployed site the first paint showed no Lamp underline, the 1440 logo appeared late on one load,
+  and on a 390 phone the demo had not visibly started four seconds after the sheet came into view.
+- Supersedes: D-119's demo clock starting at script load only. Everything else in D-119 stands.
+- Tests: `qa/shell.spec.mjs` "the first frame carries the Lamp mark and the lockup, before any script runs",
+  `qa/phase4.spec.mjs` "the demo starts when its sheet first enters view", `qa/mac.spec.mjs` lockup focus test
+  (the mark mask is inline), `qa/logo-inline.test.mjs`.

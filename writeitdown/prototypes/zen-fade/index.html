@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Zen fade options - prototype</title>
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../fonts.css">
+<link rel="stylesheet" href="zen-fade.css">
+</head>
+<body class="home">
+<!-- Throwaway prototype (not part of install.sh, not shipped). One shared script feeds the same keystrokes to
+     every panel. State lives in the URL: ?only=old|a|b|c|now  ?text=en|zh  ?h1= ?h2= ?flat= ?ms= ?theme=dark -->
+<header class="bar">
+  <button id="replay" type="button">Replay</button>
+  <button id="live" type="button">Type yourself</button>
+  <label>1 up <input id="h1" type="range" min="0" max="1" step=".01"><output></output></label>
+  <label>2 up <input id="h2" type="range" min="0" max="1" step=".01"><output></output></label>
+  <label>flat <input id="flat" type="range" min="0" max="1" step=".01"><output></output></label>
+  <label>dissolve ms <input id="ms" type="range" min="0" max="900" step="10"><output></output></label>
+  <button id="copy" type="button">Copy values</button>
+</header>
+<main id="grid"></main>
+<script src="../../paper.js"></script>
+<script type="module" src="zen-fade.js"></script>
+</body>
+</html>

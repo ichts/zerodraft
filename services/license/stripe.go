@@ -248,14 +248,20 @@ const (
 )
 
 func (s *Server) stripeSessionDisposition(ctx context.Context, o stripeObject, completed bool) stripeSessionDisposition {
-	if !stripeID(o.ID, "cs_") || o.AmountTotal == nil || *o.AmountTotal < 0 || !stripeCurrency(o.Currency) || o.Mode != "payment" {
+	if !stripeID(o.ID, "cs_") {
 		return stripeSessionInvalid
 	}
-	if completed && (!stripeID(o.PaymentIntent, "pi_") || o.PaymentStatus != "paid" || o.Status != "complete") {
+	if o.Mode != "payment" {
+		return stripeSessionForeign
+	}
+	if o.AmountTotal == nil || *o.AmountTotal < 0 || !stripeCurrency(o.Currency) {
 		return stripeSessionInvalid
 	}
 	if *o.AmountTotal != 499 || o.Currency != "usd" {
 		return stripeSessionForeign
+	}
+	if completed && (!stripeID(o.PaymentIntent, "pi_") || o.PaymentStatus != "paid" || o.Status != "complete") {
+		return stripeSessionInvalid
 	}
 	lines := o.LineItems
 	if lines == nil {

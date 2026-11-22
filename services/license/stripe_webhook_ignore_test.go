@@ -90,6 +90,47 @@ func TestStripeHTTPIgnoresForeignCheckout(t *testing.T) {
 	}
 }
 
+func TestStripeHTTPIgnoresNonPaymentModeCheckout(t *testing.T) {
+	for _, typ := range []string{"checkout.session.completed", "checkout.session.expired"} {
+		for _, mode := range []string{"subscription", "setup"} {
+			t.Run(typ+"/"+mode, func(t *testing.T) {
+				s := stripeServer(t)
+				event := stripeFixture(typ)
+				o := stripeFixtureObject(event)
+				o["mode"], o["amount_total"], o["payment_intent"] = mode, nil, nil
+				if typ == "checkout.session.expired" {
+					o["status"], o["payment_status"] = "expired", "unpaid"
+				}
+				receiver := httptest.NewServer(s.Handler())
+				defer receiver.Close()
+				body := stripeJSON(t, event)
+				stripeHTTPDelivery(t, receiver, body, stripeHeader(stripeFixtureSecret, body, s.now()), 200)
+				assertStripeRowCounts(t, s, 0)
+			})
+		}
+	}
+}
+
+func TestStripeHTTPRejectsIncompleteWIDCandidate(t *testing.T) {
+	for _, name := range []string{"missing_payment_intent", "unpaid"} {
+		t.Run(name, func(t *testing.T) {
+			s := stripeServer(t)
+			event := stripeFixture("checkout.session.completed")
+			o := stripeFixtureObject(event)
+			if name == "unpaid" {
+				o["payment_status"] = "unpaid"
+			} else {
+				delete(o, "payment_intent")
+			}
+			receiver := httptest.NewServer(s.Handler())
+			defer receiver.Close()
+			body := stripeJSON(t, event)
+			stripeHTTPDelivery(t, receiver, body, stripeHeader(stripeFixtureSecret, body, s.now()), 400)
+			assertStripeRowCounts(t, s, 0)
+		})
+	}
+}
+
 func TestStripeHTTPIgnoresForeignRefundAndUnknownType(t *testing.T) {
 	for _, name := range []string{"refund_for_other_amount", "refund_for_other_currency", "unknown_event_type"} {
 		t.Run(name, func(t *testing.T) {

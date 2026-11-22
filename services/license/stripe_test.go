@@ -142,11 +142,17 @@ func TestStripeBusinessGates(t *testing.T) {
 		{"wrong currency", 200, func(e map[string]any) { stripeFixtureObject(e)["currency"] = "eur" }},
 		{"malformed currency", 400, func(e map[string]any) { stripeFixtureObject(e)["currency"] = "e1r" }},
 		{"negative amount", 400, func(e map[string]any) { stripeFixtureObject(e)["amount_total"] = -1 }},
-		{"wrong mode", 400, func(e map[string]any) { stripeFixtureObject(e)["mode"] = "subscription" }},
+		{"wrong mode", 200, func(e map[string]any) { stripeFixtureObject(e)["mode"] = "subscription" }},
 		{"livemode true", 401, func(e map[string]any) { e["livemode"] = true }},
 		{"missing livemode", 401, func(e map[string]any) { delete(e, "livemode") }},
 		{"object livemode true", 401, func(e map[string]any) { stripeFixtureObject(e)["livemode"] = true }},
 		{"unknown event type", 200, func(e map[string]any) { e["type"] = "payment_intent.succeeded" }},
+		{"setup mode", 200, func(e map[string]any) { stripeFixtureObject(e)["mode"] = "setup" }},
+		{"subscription mode without payment intent", 200, func(e map[string]any) {
+			o := stripeFixtureObject(e)
+			o["mode"], o["payment_intent"], o["amount_total"] = "subscription", nil, nil
+		}},
+		{"missing payment intent", 400, func(e map[string]any) { delete(stripeFixtureObject(e), "payment_intent") }},
 		{"unpaid", 400, func(e map[string]any) { stripeFixtureObject(e)["payment_status"] = "unpaid" }},
 		{"missing price without API", 400, func(e map[string]any) { delete(stripeFixtureObject(e), "line_items") }},
 	}

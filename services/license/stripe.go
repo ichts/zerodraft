@@ -190,24 +190,45 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid environment or event", 401)
 		return
 	}
-	if !stripeID(e.ID, "evt_") {
+	if !stripeID(e.ID, "evt_") || e.Type == "" {
 		http.Error(w, "unsupported event", 400)
 		return
 	}
+	ignored := false
 	switch e.Type {
 	case "checkout.session.completed", "checkout.session.expired":
-		if !s.stripeSessionAllowed(r.Context(), e.Data.Object, e.Type == "checkout.session.completed") {
+		switch s.stripeSessionDisposition(r.Context(), e.Data.Object, e.Type == "checkout.session.completed") {
+		case stripeSessionInvalid:
 			http.Error(w, "session not verified", 400)
 			return
+		case stripeSessionForeign:
+			ignored = true
 		}
 	case "charge.refunded":
 		o := e.Data.Object
-		if !stripeID(o.PaymentIntent, "pi_") || o.Amount == nil || *o.Amount != 499 || o.Currency != "usd" || o.AmountRefunded <= 0 || o.AmountRefunded > 499 {
+		if !stripeID(o.PaymentIntent, "pi_") || o.Amount == nil || !stripeCurrency(o.Currency) || o.AmountRefunded <= 0 || o.AmountRefunded > *o.Amount {
 			http.Error(w, "refund not verified", 400)
 			return
 		}
+		if *o.Amount != 499 || o.Currency != "usd" {
+			// A refund for a locally bound purchase must agree with the original charge.
+			var bound bool
+			err := s.db.QueryRowContext(r.Context(), `SELECT EXISTS(SELECT 1 FROM stripe_purchases WHERE payment_intent=?)`, o.PaymentIntent).Scan(&bound)
+			if err != nil {
+				http.Error(w, "event not accepted", 500)
+				return
+			}
+			if bound {
+				http.Error(w, "refund not verified", 400)
+				return
+			}
+			ignored = true
+		}
 	default:
-		http.Error(w, "unsupported event", 400)
+		ignored = true
+	}
+	if ignored {
+		respond(w, 200, map[string]string{"status": "ignored"})
 		return
 	}
 	status := s.applyStripeEvent(e, body)
@@ -218,21 +239,54 @@ func (s *Server) stripeWebhook(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]string{"status": "accepted"})
 }
 
-func (s *Server) stripeSessionAllowed(ctx context.Context, o stripeObject, completed bool) bool {
-	if !stripeID(o.ID, "cs_") || o.AmountTotal == nil || *o.AmountTotal != 499 || o.Currency != "usd" || o.Mode != "payment" {
-		return false
+type stripeSessionDisposition uint8
+
+const (
+	stripeSessionInvalid stripeSessionDisposition = iota
+	stripeSessionForeign
+	stripeSessionVerified
+)
+
+func (s *Server) stripeSessionDisposition(ctx context.Context, o stripeObject, completed bool) stripeSessionDisposition {
+	if !stripeID(o.ID, "cs_") || o.AmountTotal == nil || *o.AmountTotal < 0 || !stripeCurrency(o.Currency) || o.Mode != "payment" {
+		return stripeSessionInvalid
 	}
 	if completed && (!stripeID(o.PaymentIntent, "pi_") || o.PaymentStatus != "paid" || o.Status != "complete") {
-		return false
+		return stripeSessionInvalid
+	}
+	if *o.AmountTotal != 499 || o.Currency != "usd" {
+		return stripeSessionForeign
 	}
 	lines := o.LineItems
 	if lines == nil {
 		lines = new(stripeLines)
 		if s.stripeAPI(ctx, http.MethodGet, "/v1/checkout/sessions/"+url.PathEscape(o.ID)+"/line_items", nil, lines) != nil {
+			return stripeSessionInvalid
+		}
+	}
+	if lines.HasMore || len(lines.Data) != 1 || lines.Data[0].Quantity != 1 || !stripeID(lines.Data[0].Price.Product, "prod_") {
+		return stripeSessionInvalid
+	}
+	price := lines.Data[0].Price.ID
+	if price == s.cfg.StripePriceID {
+		return stripeSessionVerified
+	}
+	if stripeID(price, "price_") {
+		return stripeSessionForeign
+	}
+	return stripeSessionInvalid
+}
+
+func stripeCurrency(currency string) bool {
+	if len(currency) != 3 {
+		return false
+	}
+	for _, c := range currency {
+		if c < 'a' || c > 'z' {
 			return false
 		}
 	}
-	return !lines.HasMore && len(lines.Data) == 1 && lines.Data[0].Quantity == 1 && lines.Data[0].Price.ID == s.cfg.StripePriceID && stripeID(lines.Data[0].Price.Product, "prod_")
+	return true
 }
 
 func (s *Server) applyStripeEvent(e stripeEvent, body []byte) int {

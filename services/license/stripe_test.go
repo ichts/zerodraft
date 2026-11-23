@@ -119,47 +119,50 @@ func stripeRows(t *testing.T, s *Server, table string) int {
 func TestStripeBusinessGates(t *testing.T) {
 	cases := []struct {
 		name   string
+		want   int
 		change func(map[string]any)
 	}{
-		{"wrong price", func(e map[string]any) {
+		{"wrong price", 200, func(e map[string]any) {
 			stripeFixtureObject(e)["line_items"] = map[string]any{"data": []any{map[string]any{"quantity": 1, "price": map[string]string{"id": "price_wrong", "product": "prod_fixture"}}}}
 		}},
-		{"wrong amount", func(e map[string]any) { stripeFixtureObject(e)["amount_total"] = 500 }},
-		{"missing amount", func(e map[string]any) { delete(stripeFixtureObject(e), "amount_total") }},
-		{"missing billing product", func(e map[string]any) {
+		{"wrong amount", 200, func(e map[string]any) { stripeFixtureObject(e)["amount_total"] = 500 }},
+		{"missing amount", 400, func(e map[string]any) { delete(stripeFixtureObject(e), "amount_total") }},
+		{"missing billing product", 400, func(e map[string]any) {
 			stripeFixtureObject(e)["line_items"] = map[string]any{"data": []any{map[string]any{"quantity": 1, "price": map[string]string{"id": "price_fixture", "product": ""}}}}
 		}},
-		{"paginated items", func(e map[string]any) { stripeFixtureObject(e)["line_items"].(map[string]any)["has_more"] = true }},
-		{"multiple units", func(e map[string]any) {
+		{"paginated items", 400, func(e map[string]any) { stripeFixtureObject(e)["line_items"].(map[string]any)["has_more"] = true }},
+		{"multiple units", 400, func(e map[string]any) {
 			stripeFixtureObject(e)["line_items"].(map[string]any)["data"].([]any)[0].(map[string]any)["quantity"] = 2
 		}},
-		{"multiple items", func(e map[string]any) {
+		{"multiple items", 400, func(e map[string]any) {
 			items := stripeFixtureObject(e)["line_items"].(map[string]any)
 			data := items["data"].([]any)
 			items["data"] = append(data, data[0])
 		}},
-
-		{"wrong currency", func(e map[string]any) { stripeFixtureObject(e)["currency"] = "eur" }},
-		{"wrong mode", func(e map[string]any) { stripeFixtureObject(e)["mode"] = "subscription" }},
-		{"livemode true", func(e map[string]any) { e["livemode"] = true }},
-		{"missing livemode", func(e map[string]any) { delete(e, "livemode") }},
-		{"object livemode true", func(e map[string]any) { stripeFixtureObject(e)["livemode"] = true }},
-		{"unknown event type", func(e map[string]any) { e["type"] = "payment_intent.succeeded" }},
-		{"unpaid", func(e map[string]any) { stripeFixtureObject(e)["payment_status"] = "unpaid" }},
-		{"missing price without API", func(e map[string]any) { delete(stripeFixtureObject(e), "line_items") }},
+		{"wrong currency", 200, func(e map[string]any) { stripeFixtureObject(e)["currency"] = "eur" }},
+		{"malformed currency", 400, func(e map[string]any) { stripeFixtureObject(e)["currency"] = "e1r" }},
+		{"negative amount", 400, func(e map[string]any) { stripeFixtureObject(e)["amount_total"] = -1 }},
+		{"wrong mode", 200, func(e map[string]any) { stripeFixtureObject(e)["mode"] = "subscription" }},
+		{"livemode true", 401, func(e map[string]any) { e["livemode"] = true }},
+		{"missing livemode", 401, func(e map[string]any) { delete(e, "livemode") }},
+		{"object livemode true", 401, func(e map[string]any) { stripeFixtureObject(e)["livemode"] = true }},
+		{"unknown event type", 200, func(e map[string]any) { e["type"] = "payment_intent.succeeded" }},
+		{"setup mode", 200, func(e map[string]any) { stripeFixtureObject(e)["mode"] = "setup" }},
+		{"subscription mode without payment intent", 200, func(e map[string]any) {
+			o := stripeFixtureObject(e)
+			o["mode"], o["payment_intent"], o["amount_total"] = "subscription", nil, nil
+		}},
+		{"missing payment intent", 400, func(e map[string]any) { delete(stripeFixtureObject(e), "payment_intent") }},
+		{"unpaid", 400, func(e map[string]any) { stripeFixtureObject(e)["payment_status"] = "unpaid" }},
+		{"missing price without API", 400, func(e map[string]any) { delete(stripeFixtureObject(e), "line_items") }},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			s := stripeServer(t)
 			e := stripeFixture("checkout.session.completed")
 			c.change(e)
-			w := stripeRequest(s, e)
-			if w.Code < 400 {
-				t.Fatalf("accepted %s", c.name)
-			}
-			if stripeRows(t, s, "licenses") != 0 || stripeRows(t, s, "stripe_events") != 0 {
-				t.Fatal("rejected event mutated storage")
-			}
+			expect(t, stripeRequest(s, e), c.want)
+			assertStripeRowCounts(t, s, 0)
 		})
 	}
 }

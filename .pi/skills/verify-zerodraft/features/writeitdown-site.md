@@ -10,10 +10,10 @@
 
 ```bash
 cd writeitdown && npm install   # once per checkout
-npm test                        # the qa/ suite, 12 projects: {1440,390} x {lamp,paper,slate} x {no-preference,reduce}
-npx playwright test --project=1440-lamp-no-preference   # single project while iterating
+npm test                        # the qa/ suite, default pair: {1440,390} x light x no-preference (npm run test:full: all 8 with dark and reduce)
+npx playwright test --project=1440-light-no-preference   # single project while iterating
 ```
 
-The suite enters through `#landing a[href="#trial"]`, drives the editor (`#editor`), and asserts the zen geometry, forward-only denial, warn/wipe/recovery, the kept state with copy, ESC/EXIT, the paper modes, and reduced-motion behavior, capturing per-state screenshots into `writeitdown/test-results/`.
+The suite enters through `#landing a[href="#trial"]`, drives the editor (`#editor`), and asserts the zen geometry, forward-only denial, warn/wipe/recovery, the kept state with copy, ESC/EXIT, theme, and reduced-motion behavior, capturing per-state screenshots into `writeitdown/test-results/`.
 
-**Observable end state that proves it works:** `npm test` exits 0 across all 12 projects. Evidence (screenshots, traces on failure) lands under `writeitdown/test-results/` (override with `WID_QA_OUTPUT`).
+**Observable end state that proves it works:** `npm test` exits 0 across the default pair of projects. Evidence (screenshots, traces on failure) lands under `writeitdown/test-results/` (override with `WID_QA_OUTPUT`).

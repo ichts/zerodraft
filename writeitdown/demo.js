@@ -35,7 +35,7 @@ import { landingSound } from './sound.js';
   var barEl = document.getElementById("bar");
 
   var reducedMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var t0 = null;
+  var t0 = Date.now();
   var seen = {};
   var lastT = -1;
   var barAnimation = null;
@@ -88,9 +88,9 @@ import { landingSound } from './sound.js';
   }
   function setWash(k) {
     var pap;
-    if (k === "deep") pap = "var(--paper-wash-deep)";
+    if (k === "deep") pap = "var(--deep-paper)";
     else if (k == null) pap = "none";
-    else pap = "color-mix(in oklab, var(--paper-wash) " + Math.round(k * 100) + "%, transparent)";
+    else pap = "color-mix(in oklab, var(--wash-paper) " + Math.round(k * 100) + "%, transparent)";
     if (seen.wp !== pap) { seen.wp = pap; washPaper.style.background = pap; }
   }
   // The draining minute: one continuous linear animation per loop, never a stepped tick.
@@ -178,7 +178,7 @@ import { landingSound } from './sound.js';
       setPhase("warn");
       setWash((t - SILENT_END) / WARN_MS);
       numeralEl.textContent = String(3 - Math.floor((t - SILENT_END) / 1000));
-      captionEl.textContent = "Keep typing or the draft is deleted.";
+      captionEl.textContent = "KEEP TYPING OR THE DRAFT IS DELETED.";
       warnEl.hidden = false;
       stoppedEl.hidden = true;
       renderDraft(full());
@@ -227,7 +227,7 @@ import { landingSound } from './sound.js';
   }
 
   function tick() {
-    if (document.hidden || document.getElementById('landing').hidden || (t0 === null && !reducedMq.matches)) {
+    if (document.hidden || document.getElementById('landing').hidden) {
       visible = false;
       barDeadline = null;
       soundT = null;
@@ -240,16 +240,6 @@ import { landingSound } from './sound.js';
     render((Date.now() - t0) % LOOP);
   }
 
-  // The loop starts when the sheet first enters view, so a phone that shows it below the door sees it from the first key.
-  // A sheet already on screen starts now; the observer only waits for one that is not.
-  var box = paper.getBoundingClientRect();
-  if (box.height > 0 && box.top < innerHeight && box.bottom > 0) t0 = Date.now();
-  else new IntersectionObserver(function (entries, observer) {
-    if (!entries.some(function (entry) { return entry.isIntersecting; })) return;
-    observer.disconnect();
-    t0 = Date.now();
-    tick();
-  }).observe(paper);
   tick();
   setInterval(tick, 50);
   if (reducedMq.addEventListener) reducedMq.addEventListener("change", tick);

@@ -1,23 +1,23 @@
 {
-  "note": "The shared type set's measured advances (D-057). One committed value per role, asserted by writeitdown/qa/typography.spec.mjs in the browser and by apps/macos/FirstLine/Tests/FirstLineTests/TypographyParityTests.swift through CoreText. The Mac is the reference: its numbers are in points, and the web must agree within 0.05 %, which is far tighter than a face substitution moves an advance (1-9 %) and far looser than OS text-stack updates (measured agreement is 0.005 %).",
+  "note": "The shared type set's measured advances (D-057). One committed value per role, asserted by writeitdown/qa/typography.spec.mjs in the browser. The Mac keeps its own copy in apps/macos/FirstLine/design/type-baseline.json (D-121), asserted by TypographyParityTests through CoreText. These are the numbers the Mac had in Newsreader, in points, and the web must agree within 0.05 %, which is far tighter than a face substitution moves an advance (1-9 %) and far looser than OS text-stack updates (measured agreement is 0.005 %).",
   "tolerance": 0.0005,
   "roles": [
     {
       "role": "writing-latin",
       "string": "promotion. i want time",
       "size": 28,
-      "face": "AlloVariable-Regular",
-      "cssFamily": "Allo",
-      "cssWeight": "410",
+      "face": "Newsreader16pt-Regular",
+      "cssFamily": "Newsreader",
+      "cssWeight": "400",
       "cssStyle": "normal",
-      "advancePt": 265.329
+      "advancePt": 264.486
     },
     {
       "role": "writing-cjk",
       "string": "我写中文草稿",
       "size": 28,
-      "face": "Resource-Han-Rounded-CN-Normal",
-      "cssFamily": "Resource Han Rounded",
+      "face": "ZhuqueFangsong-Regular",
+      "cssFamily": "Zhuque Fangsong",
       "cssWeight": "400",
       "cssStyle": "normal",
       "advancePt": 168
@@ -26,22 +26,21 @@
       "role": "kept-heading",
       "string": "You wrote it down.",
       "size": 48,
-      "face": "AlloVariable-Regular",
-      "cssFamily": "Allo",
-      "cssWeight": "540",
+      "face": "NewsreaderRoman-Medium",
+      "cssFamily": "Newsreader",
+      "cssWeight": "500",
       "cssStyle": "normal",
-      "advancePt": 377.328
+      "advancePt": 395.869
     },
     {
       "role": "warning-numeral",
       "string": "3",
       "size": 162,
-      "face": "AlloVariable-Regular",
-      "cssFamily": "Allo",
-      "cssWeight": "360",
-      "cssStyle": "normal",
-      "cssNumeric": "tabular-nums",
-      "advancePt": 94.969
+      "face": "Newsreader16pt-Italic",
+      "cssFamily": "Newsreader",
+      "cssWeight": "400",
+      "cssStyle": "italic",
+      "advancePt": 97.2
     }
   ]
 }

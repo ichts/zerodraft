@@ -4,10 +4,9 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
-/// The Mac half of the shared type set (D-057). The web half is
-/// `writeitdown/qa/typography.spec.mjs`; both read `writeitdown/qa/shared-type-baseline.json`, so a
-/// face, size or tracking change on one surface fails the other surface's test with a readable
-/// number instead of a captain noticing that the two do not look alike.
+/// The Mac's type set (D-057, faces D-120): the measured advances in `design/type-baseline.json`, one committed
+/// value per role, so a face, size or tracking change fails here with a readable number. writeitdown.app went back to
+/// its earlier faces (D-121), so the web no longer reads this file.
 @MainActor
 struct TypographyParityTests {
     private struct Role: Decodable {
@@ -29,11 +28,7 @@ struct TypographyParityTests {
         .deletingLastPathComponent()  // FirstLine
 
     private func baseline() throws -> Baseline {
-        let fixture = packageRoot
-            .deletingLastPathComponent()  // macos
-            .deletingLastPathComponent()  // apps
-            .deletingLastPathComponent()  // repo root
-            .appendingPathComponent("writeitdown/qa/shared-type-baseline.json")
+        let fixture = packageRoot.appendingPathComponent("design/type-baseline.json")
         return try JSONDecoder().decode(Baseline.self, from: Data(contentsOf: fixture))
     }
 

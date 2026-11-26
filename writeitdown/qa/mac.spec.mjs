@@ -196,21 +196,32 @@ test('release gate rejects missing or invalid purchase and download configuratio
   }
 });
 
-test('landing: V2 in world A - headline, lit demo sheet, one room button, sections, honest Mac block', async ({ page }, info) => {
+test('landing: Paper in light - headline, demo card, one room button, sections, honest Mac block', async ({ page }, info) => {
   await page.goto('index.html');
   const hero = page.locator('header.hero');
   await expect(hero.locator('h1')).toHaveText('Keep typing or lose every word.');
-  // D-119: one face, no hand accent; the headline is Allo at the display weight.
-  await expect(hero.locator('h1 .hand')).toHaveCount(0);
-  await expect(hero.locator('h1')).toHaveCSS('font-family', /^"?Allo/);
+  await expect(hero.locator('h1 .hand')).toHaveText('lose every word.');
+  await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
+  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Newsreader/);
   await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Write It Down is a forward-only writing timer for people who get stuck rewriting their first sentence.');
   const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
-  expect(families, 'only the site face loads on the landing: the Chinese face waits for Chinese input').toEqual(['Allo']);
-  const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--paper-tone', '--face', '--face-ui'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
+  expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
+  expect(families.every(f => ['Newsreader', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
+  const ink = await hero.evaluate(h => {
+    const probe = document.createElement('i');
+    probe.style.color = getComputedStyle(h).getPropertyValue('--red-text');
+    h.append(probe);
+    const hand = getComputedStyle(probe).color;
+    probe.remove();
+    return { hand, actual: getComputedStyle(h.querySelector('h1 .hand')).color, line1: getComputedStyle(h.querySelector('h1 .l1')).color };
+  });
+  expect(ink.actual, 'the handwritten words wear the token red').toBe(ink.hand);
+  expect(ink.actual, 'the two headline parts differ in color').not.toBe(ink.line1);
+  const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
-  expect(tokens[6], 'the tool face is Allo, never a second family').toMatch(/^'?"?Allo/);
+  expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
   for (const selector of ['#landing .home-nav .nav-buy', '#landing .home-nav a.btn-quiet:not(.nav-buy)', '.cta .btn', '#clock', '#count'])
-    await expect(page.locator(selector)).toHaveCSS('font-family', /^"?Allo/);
+    await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
   const nav = page.locator('#landing .home-nav a.btn-quiet:not(.nav-buy)');
   await expect(nav).toHaveText('Download for Mac');
@@ -236,16 +247,16 @@ test('landing: V2 in world A - headline, lit demo sheet, one room button, sectio
     expect(headerPair.dlFill, 'Download for Mac keeps its sheet fill').not.toBe('rgba(0, 0, 0, 0)');
     expect(headerPair.buyEdge, 'Buy wears the lighter hairline, not the stronger one').not.toBe(headerPair.dlEdge);
   }
-  // V2: the demo's clock and count stand on the desk beside the sheet, in the desk's ink (D-119).
   const card = page.locator('#paper');
-  await expect(page.locator('#demo #clock')).toBeVisible();
-  await expect(page.locator('#demo #count')).toHaveText(/^((\d+ words?)?)$/);
-  // Journey: the sheet carries no tag and no saved label; beside it there is only the door.
+  await expect(card.locator('#clock')).toBeVisible();
+  await expect(card.locator('#count')).toHaveText(/^((\d+ words?)?)$/);
+  // Journey: the sheet carries no tag and no saved label; under it there is only the button.
   await expect(card.locator('.tag, .saved')).toHaveCount(0);
   await expect(page.locator('#demo')).not.toContainText(/60 seconds, forward only/i);
   await expect(card).not.toContainText(/nothing is saved/i);
   const cta = page.locator('#landing .cta');
-  // The hero keeps one action (D-115): the door.
+  // The hero keeps one action (D-115): the door. The way to pay moved to the header's Buy, so the entrance band
+  // holds the door and nothing else, and no second buy line hangs under it.
   await expect(cta.locator('> *'), 'the entrance band holds the door, nothing else').toHaveCount(1);
   await expect(cta.locator('a'), 'the entrance band holds one link').toHaveCount(1);
   await expect(page.locator('.cta-buy'), 'the hero buy line is gone').toHaveCount(0);
@@ -254,35 +265,49 @@ test('landing: V2 in world A - headline, lit demo sheet, one room button, sectio
   await expect(door).toHaveAttribute('href', '#trial');
   await expect(page.locator('#landing a.btn-primary[href="#trial"]'), 'one door on the page, not two').toHaveCount(1);
   await expect(page.locator('#landing a[href="#trial"]').first(), 'the hero button is the first way into the room').toHaveText('Start a free 60-second session');
-  // V2 geometry, in document space: copy on the left, the lit sheet on the right on a computer; stacked on a phone.
+  // One evaluate, measured from the top of the document: every rect here is in document space, so a test that
+  // scrolls, or a scroll that animates, cannot make a gap read smaller than the layout's.
   const layout = await page.evaluate(() => {
+    const pin = document.createElement('style');
+    pin.textContent = '.home{--sans:Arial, sans-serif}';
+    document.head.append(pin);
     const doc = s => {
       const r = document.querySelector(s).getBoundingClientRect();
       const top = r.top + window.scrollY;
-      return { top, bottom: top + r.height, height: r.height, left: r.left, right: r.right, width: r.width };
+      return { top, bottom: top + r.height, height: r.height, left: r.left, width: r.width };
     };
-    return { desk: doc('.desk'), card: doc('#paper'), sub: doc('.hero-sub'), h1: doc('header.hero h1'), door: doc('#landing .cta .btn'), vh: innerHeight };
+    const home = document.querySelector('#landing');
+    const token = n => parseFloat(getComputedStyle(home).getPropertyValue(n));
+    const card = doc('#paper'), door = doc('#landing .cta .btn');
+    const out = {
+      card, sub: doc('.hero-sub'), door, vh: innerHeight,
+      doorBelow: card.top - door.bottom,
+      ctaTop: parseFloat(getComputedStyle(document.querySelector('#landing .cta')).paddingTop),
+      stageTop: parseFloat(getComputedStyle(document.querySelector('#demo')).marginTop),
+      tokens: { s1: token('--s1'), s2: token('--s2'), s3: token('--s3'), s4: token('--s4'), s5: token('--s5'), s7: token('--s7') },
+    };
+    pin.remove();
+    return out;
   });
-  const phone = page.viewportSize().width <= 860;
+  const phone = page.viewportSize().width <= 820;
+  expect(layout.card.height / layout.vh, 'the demo paper is at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
+  expect(Math.min(layout.card.height, layout.vh) / layout.vh, 'the demo paper keeps at least 60% of the first viewport').toBeGreaterThanOrEqual(0.6);
   expect(layout.door.top, 'the door sits under the subheadline').toBeGreaterThan(layout.sub.bottom);
   expect(layout.door.bottom, 'the door is on the first screen').toBeLessThanOrEqual(layout.vh);
-  expect(Math.abs(layout.door.left - layout.h1.left), 'the door aligns with the headline\'s left edge').toBeLessThan(1);
-  if (phone) {
-    expect(layout.desk.top, 'on a phone the desk follows the door').toBeGreaterThan(layout.door.bottom);
-  } else {
-    expect(layout.desk.left, 'on a computer the desk stands right of the copy').toBeGreaterThan(layout.door.right);
-    expect(layout.desk.bottom, 'the whole desk is on the first screen').toBeLessThanOrEqual(layout.vh);
-    expect(layout.card.top + layout.card.height / 2, 'the sheet and the copy share one centre line')
-      .toBeCloseTo((layout.h1.top + layout.door.bottom) / 2, -2);
-  }
+  expect(layout.door.bottom, 'the door sits above the demo sheet').toBeLessThanOrEqual(layout.card.top);
+  expect(Math.abs(layout.door.left + layout.door.width / 2 - (layout.card.left + layout.card.width / 2)), 'the button is centred over the sheet').toBeLessThan(1);
+  expect(layout.ctaTop, 'the headline group closes on the spacing scale').toBe(phone ? layout.tokens.s4 : layout.tokens.s5);
+  // With the buy line gone the sheet starts one scale step under the door: 24 px on a phone, 48 px on a computer.
+  expect(layout.stageTop, 'the sheet keeps the scale gap under the door').toBe(phone ? layout.tokens.s5 : layout.tokens.s7);
+  expect(layout.doorBelow, 'the sheet starts one scale step under the door').toBeCloseTo(phone ? layout.tokens.s5 : layout.tokens.s7, 0);
 
   await expect(page.locator('#facts, .points, .callback'), 'the facts table, the points band and the closing block are gone').toHaveCount(0);
   await expect(page.locator('#landing')).not.toContainText('No account. Nothing is saved. Just the timer.');
   await expect(page.locator('#landing')).not.toContainText(/Real rules, real numbers|Straight answers|A native writing room/);
 
   await expect(page.locator('#how')).toContainText('How it works');
-  await expect(page.locator('#how .how-row > p')).toHaveText(['Start a free 60-second session in your browser, or pick a 1, 5, 10, 20, or 30-minute timer in the Mac app.', 'Type the next word without stopping to delete, paste, cut, or undo, because a warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds.', 'Keep going until the timer reaches zero, and the finished text is yours to copy.']);
-  await expect(page.locator('#how .how-row h3'), 'each row carries one line and no title').toHaveCount(0);
+  await expect(page.locator('#how .card .txt')).toHaveText(['Start a free 60-second session in your browser, or pick a 1, 5, 10, 20, or 30-minute timer in the Mac app.', 'Type the next word without stopping to delete, paste, cut, or undo, because a warning counts 3, 2, 1 after 5 seconds of silence and deletes your draft at 8 seconds.', 'Keep going until the timer reaches zero, and the finished text is yours to copy.']);
+  await expect(page.locator('#how .card h3'), 'each card carries one line and no title').toHaveCount(0);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
   await expect(mac.locator('.facts')).toContainText('then pay $4.99 once');
@@ -310,45 +335,70 @@ test('landing: V2 in world A - headline, lit demo sheet, one room button, sectio
   await expect(page.locator('#editor')).toBeFocused();
 });
 
-test.describe('Lamp is the default mode (D-119)', () => {
-  test.use({ colorScheme: 'light', storageState: { cookies: [], origins: [] } });
-  test('a fresh visitor gets Lamp whatever the system scheme, and a chosen mode is remembered', async ({ page }) => {
+test.describe('light is the default theme', () => {
+  test.use({ colorScheme: 'dark', storageState: { cookies: [], origins: [] } });
+  test('the toggle switches to dark and remembers it', async ({ page }) => {
     const loaded = await page.goto('index.html');
     expect(loaded, 'the suite serves the page through its own baseURL').not.toBeNull();
     expect(loaded.status(), 'the page loads from the suite origin').toBeLessThan(400);
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'lamp');
-    await expect(page.locator('#landing .modes input[value="lamp"]')).toBeChecked();
-    // A visitor who never chooses stores nothing; a chosen mode, Lamp included, is the one stored key.
-    expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme'))).toBeNull();
-    const ground = () => page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
-    expect(await ground()).toBe('rgb(18, 13, 10)');
-    await page.locator('#landing .modes label', { hasText: 'Slate' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'slate');
-    expect(await ground()).toBe('rgb(11, 12, 13)');
-    await page.locator('#landing .modes label', { hasText: 'Paper' }).click();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
-    expect(await ground()).toBe('rgb(244, 243, 239)');
+    expect(new URL(page.url()).protocol, 'the page has a real http(s) origin').toMatch(/^https?:$/);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
+    expect(bg).toBe('rgb(21, 20, 15)');
+    // D-103: red as words is brightened in dark (big Lc 45, small Lc 60); the fill red keeps its value.
+    const reds = () => page.evaluate(() => {
+      const color = (selector, prop = 'color') => getComputedStyle(document.querySelector(selector))[prop];
+      return { hand: color('#landing h1 .hand'), numeral: color('.mo .n'), label: color('.line8 .lab b'), track: color('.line8 .track i', 'backgroundColor') };
+    });
+    expect(await reds()).toEqual({ hand: 'rgb(246, 113, 90)', numeral: 'rgb(246, 113, 90)', label: 'rgb(255, 155, 136)', track: 'rgb(228, 96, 74)' });
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    expect(await reds(), 'light keeps the one pen red everywhere').toEqual({ hand: 'rgb(176, 42, 30)', numeral: 'rgb(176, 42, 30)', label: 'rgb(176, 42, 30)', track: 'rgb(176, 42, 30)' });
+    await page.locator('#landing .home-nav [data-theme-toggle]').click();
     await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'paper');
-    await expect(page.locator('#landing .modes input[value="paper"]')).toBeChecked();
-    await page.locator('#landing .modes label', { hasText: 'Lamp' }).click();
-    expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme')), 'a chosen Lamp is remembered too').toBe('lamp');
-  });
-  test('the retired light and dark values land on Paper and Lamp', async ({ page }) => {
-    for (const [stored, mode] of [['light', 'paper'], ['dark', 'lamp']]) {
-      await page.goto('index.html');
-      await page.evaluate(value => localStorage.setItem('writeitdown-theme', value), stored);
-      await page.reload();
-      await expect(page.locator('html'), `${stored} maps to ${mode}`).toHaveAttribute('data-theme', mode);
-    }
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 });
 
-// Journey: one Lamp / Paper / Slate switch on every page that carries one, reachable by keyboard; the choice holds
-// across pages. The landing keeps it by the demo, the room in its header, the other pages in the footer row.
-for (const [path, label, where] of [['index.html', 'landing', '#landing .demo-controls'], ['index.html#trial', 'trial', '#room .head-start'],
-  ['download/', 'download', '.home-foot .copy'], ['mac.html', 'mac', '.home-foot .copy'], ['terms.html', 'terms', '.home-foot .copy'],
-  ['privacy.html', 'privacy', '.home-foot .copy'], ['support.html', 'support', '.home-foot .copy']]) {
+// Journey: one theme icon button, top right in the header of every page with a header; none in the footer.
+for (const [path, label] of [['index.html', 'landing'], ['index.html#trial', 'trial'], ['download/', 'download'],
+  ['mac.html', 'mac'], ['terms.html', 'terms'], ['privacy.html', 'privacy'], ['support.html', 'support']]) {
+  test(`theme toggle is in the ${label} header and flips the theme`, async ({ page }) => {
+    await page.goto(path);
+    const header = page.locator('nav[aria-label="Main"]:visible');
+    await expect(header).toHaveCount(1);
+    const toggle = header.locator('button[data-theme-toggle]');
+    await expect(toggle).toHaveCount(1);
+    await expect(toggle).toBeVisible();
+    await expect(page.locator('[data-theme-toggle]:visible')).toHaveCount(1);
+    await expect(page.locator('footer [data-theme-toggle]')).toHaveCount(0);
+    const place = await toggle.evaluate(button => {
+      const r = button.getBoundingClientRect(), nav = button.closest('nav').getBoundingClientRect();
+      return { right: nav.right - r.right, top: r.top, width: r.width, height: r.height, overflow: document.documentElement.scrollWidth - innerWidth };
+    });
+    expect(place.right, 'the toggle ends the header row').toBeLessThan(40);
+    expect(place.top, 'the toggle is at the top of the page').toBeLessThan(40);
+    expect(Math.min(place.width, place.height)).toBeGreaterThanOrEqual(36);
+    expect(place.overflow, 'no horizontal overflow with the toggle in the header').toBeLessThanOrEqual(0);
+    const read = () => page.evaluate(() => {
+      const surface = [...document.querySelectorAll('#room, .home, .stage')].find(e => e.getClientRects().length);
+      return { theme: document.documentElement.dataset.theme, bg: getComputedStyle(surface).backgroundColor,
+        label: document.querySelector('nav[aria-label="Main"]:not([hidden] *) [data-theme-toggle]')?.getAttribute('aria-label') };
+    });
+    const before = await read();
+    expect(before.label).toBe(`Switch to ${before.theme === 'dark' ? 'light' : 'dark'} theme`);
+    await toggle.focus();
+    await expect(toggle).toBeFocused();
+    expect(await toggle.evaluate(b => getComputedStyle(b).outlineStyle), 'keyboard focus ring').not.toBe('none');
+    await page.keyboard.press('Enter');
+    const after = await read();
+    expect(after.theme).not.toBe(before.theme);
+    expect(after.bg).not.toBe(before.bg);
+    expect(after.label).toBe(`Switch to ${after.theme === 'dark' ? 'light' : 'dark'} theme`);
+    expect(await page.evaluate(() => localStorage.getItem('writeitdown-theme'))).toBe(after.theme);
+  });
 }
 
 const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
@@ -358,7 +408,7 @@ const measureHeaderMark = (brand) => brand.evaluate(async (el) => {
   const raster = async (pseudo) => {
     const style = getComputedStyle(el, pseudo);
     const image = new Image();
-    image.src = (style.maskImage || style.webkitMaskImage).match(/^url\("(.*)"\)$/)[1];
+    image.src = (style.maskImage || style.webkitMaskImage).match(/url\("?([^"\)]+)"?\)/)[1];
     await image.decode();
     const canvas = document.createElement('canvas');
     canvas.width = width; canvas.height = height;
@@ -452,8 +502,7 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
       expect(mark.chipHoleShare, `${at} the W leaves most of the plate visible`).toBeLessThan(0.4);
       for (let axis = 0; axis < 4; axis += 1)
         expect(Math.abs(mark.glyphBounds[axis] - mark.holeBounds[axis]), `${at} the W stays aligned with the plate`).toBeLessThanOrEqual(3);
-      // Paper is the one light mode (D-119): a light plate there, a dark plate under the Lamp and on the Slate.
-      const direction = info.project.name.includes('-paper-') ? 1 : -1;
+      const direction = info.project.use.colorScheme === 'light' ? 1 : -1;
       expect(mark.polarity * direction, `${at} light plate with dark glyphs, dark plate with light glyphs`).toBeGreaterThan(0.6);
       if (path === 'index.html' && index === 0) {
         await page.screenshot({ path: info.outputPath('header.png'), clip: { x: 0, y: 0, width: page.viewportSize().width, height: 110 } });
@@ -469,7 +518,7 @@ test('the header lockup shows the A mark chip beside the wordmark', async ({ pag
   }
 });
 
-// Narrow phones: /download/ carries the widest header (brand, Buy, page action), so it decides the
+// Narrow phones: /download/ carries the widest header (brand, page action, theme button), so it decides the
 // responsive step. These point samples keep the visual checks at the widths a phone actually uses; the sweep
 // below owns the every-width fit.
 for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and a legible chip at 360 px${actionWidth ? ' with wider system-font metrics' : ''}`, async ({ page }, info) => {
@@ -487,10 +536,10 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
       const nav = page.locator('nav[aria-label="Main"]:visible').first();
       const header = await nav.evaluate(nav => {
         const brand = nav.querySelector('.brand');
-        const end = nav.querySelector('.nav-end');
+        const button = nav.querySelector('.theme-btn');
         return {
           overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-          gutter: window.innerWidth - end.getBoundingClientRect().right,
+          gutter: window.innerWidth - button.getBoundingClientRect().right,
           lockup: parseFloat(getComputedStyle(brand).fontSize),
           gap: nav.querySelector('.nav-end').getBoundingClientRect().left - brand.getBoundingClientRect().right,
         };
@@ -499,7 +548,7 @@ for (const actionWidth of [0, 164]) test(`the header keeps its right gutter and 
       lockups.push(header.lockup);
       expect(header.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
       expect(header.gap, `${at} the brand and controls never overlap`).toBeGreaterThanOrEqual(0);
-      expect(header.gutter, `${at} the right group keeps the 6 px right gutter`).toBeGreaterThanOrEqual(6);
+      expect(header.gutter, `${at} the theme button keeps the 6 px right gutter`).toBeGreaterThanOrEqual(6);
       if (width !== 360) continue;
       await page.screenshot({ path: info.outputPath(`header-360-${path.replace(/[^a-z0-9]/gi, '-')}.png`), clip: { x: 0, y: 0, width, height: 110 } });
       const mark = await measureHeaderMark(nav.locator('.brand'));
@@ -543,7 +592,7 @@ test('every lockup link keeps a visible keyboard focus ring', async ({ page }) =
       expect(state.outlineWidth, `${path} brand ${index}: focus outline width`).toBe('2px');
       expect(state.color, `${path} brand ${index}: brand ink`).toBe(state.ink);
       expect(state.maskImage, `${path} brand ${index}: outline-clipping mask`).toBe('none');
-      expect(state.markImage, `${path} brand ${index}: lockup mask, inlined so it paints with the first frame`).toMatch(/^url\("data:image\/svg\+xml,/);
+      expect(state.markImage, `${path} brand ${index}: lockup mask`).toContain('write-it-down-lockup.svg');
     }
   }
 });
@@ -614,7 +663,7 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await expect(page.locator('#trial')).not.toContainText('$4.99');
   await expect(page.locator('#trial')).not.toContainText('14 days');
   await expect(page.locator('#trial a[href="../buy.html"]')).toHaveText('Buy a license');
-  await expect(page.locator('.dl-page .home-foot fieldset.modes')).toBeVisible();
+  await expect(page.locator('.dl-page [data-theme-toggle]')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(page.viewportSize().width);
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
@@ -972,17 +1021,17 @@ test('legal pages state the 3-session trial, the local counter and the opt-in up
 });
 
 test('DMG release packaging refuses unconfigured builds', () => {
-  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'configuration gate, one project is enough');
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'configuration gate, one project is enough');
   expect(execFileSync('python3', ['../apps/macos/FirstLine/scripts/test-release-config.py'], { encoding: 'utf8' })).toContain('release requires complete license and update configuration');
 });
 
 test('installer installs the complete purchase bundle and rejects symlinks', () => {
-  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'filesystem check, one project is enough');
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'filesystem check, one project is enough');
   expect(execFileSync('python3', ['qa/test-install.py'], { encoding: 'utf8' })).toContain('exact production files');
 });
 
 test('installer acceptance rejects an installer missing its symlink guard', () => {
-  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'negative control, one project is enough');
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'negative control, one project is enough');
   const root = mkdtempSync(join(tmpdir(), 'wid-broken-install-'));
   try {
     const broken = join(root, 'install.sh');
@@ -995,7 +1044,7 @@ test('installer acceptance rejects an installer missing its symlink guard', () =
 });
 
 test('installer acceptance rejects an installer missing its logo-directory guard', () => {
-  test.skip(test.info().project.name !== '1440-lamp-no-preference', 'negative control, one project is enough');
+  test.skip(test.info().project.name !== '1440-dark-no-preference', 'negative control, one project is enough');
   const root = mkdtempSync(join(tmpdir(), 'wid-broken-logo-install-'));
   try {
     const broken = join(root, 'install.sh');
@@ -1040,7 +1089,7 @@ test('the buy entry is no further down the landing than it is today, and the no-
 // sizes between the phone sweep and the desktop target - and holds three promises there: Buy is in the header on the
 // first screen, nothing overflows sideways, and the sheet keeps its 61% floor (D-110, D-068).
 test('the header Buy holds through the tablet band', async ({ page }, info) => {
-  test.skip(!['1440-lamp-no-preference', '390-lamp-no-preference'].includes(info.project.name), 'One project sweeps the band');
+  test.skip(!['1440-light-no-preference', '390-light-no-preference'].includes(info.project.name), 'One project sweeps the band');
   for (const size of [{ width: 600, height: 800 }, { width: 768, height: 1024 }, { width: 834, height: 1112 }, { width: 1024, height: 768 }, { width: 1180, height: 820 }]) {
     await page.setViewportSize(size);
     await page.goto('index.html');
@@ -1061,8 +1110,7 @@ test('the header Buy holds through the tablet band', async ({ page }, info) => {
     expect(read.buy.bottom, `${label}: Buy sits above the door`).toBeLessThanOrEqual(read.door.top);
     expect(read.buy.right, `${label}: Buy sits left of Download for Mac`).toBeLessThanOrEqual(read.download.left);
     expect(read.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(read.viewportWidth);
-    // V2 (D-119): the door stays on the first screen across the band, and the sheet lies inside the first screen's desk.
-    expect(read.door.bottom, `${label}: the door is on the first screen`).toBeLessThanOrEqual(read.viewport);
-    expect(read.sheet.bottom, `${label}: the sheet stays inside the first screen`).toBeLessThanOrEqual(read.first.bottom);
+    expect(read.sheet.height / read.viewport, `${label}: the sheet keeps its 61% floor`).toBeGreaterThanOrEqual(0.61 - 1 / read.viewport);
+    expect(Math.abs(read.sheet.bottom - read.first.bottom), `${label}: the sheet still owns the first screen's remainder`).toBeLessThanOrEqual(1);
   }
 });

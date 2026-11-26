@@ -193,9 +193,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .btn-primary{background:var(--ink);color:var(--on-ink)}
 .home .btn-ghost{height:44px;background:var(--sheet);border-color:var(--hair-2);color:var(--ink)}
 .home .btn-quiet{height:36px;padding:0 var(--s4);font-size:14px;background:var(--sheet);border-color:var(--hair-2)}
-/* The header's Buy (D-115): the same 36 px quiet pill with the fill and the stronger edge taken off, so Download
-   for Mac stays the heavier of the two. The hit area grows to 44 px with a pseudo-element, the way the theme button's does. */
-.home .nav-buy{position:relative;background:transparent;border-color:var(--hair)}
+/* The header's Buy (D-122): the 36 px pill in the primary button's ink fill and text colour, so it reads as the way to
+   pay and never as a disabled control beside the white Download for Mac outline pill. The hit area grows to 44 px with
+   a pseudo-element, the way the theme button's does. */
+.home .nav-buy{position:relative;background:var(--ink);color:var(--on-ink);border-color:transparent}
 .home .nav-buy::after{content:"";position:absolute;inset:-5px 0}
 /* On its own page Buy is where the reader already is: the pill drops its edge and underlines, still a link. */
 .home .nav-buy[aria-current="page"]{border-color:transparent;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
@@ -287,15 +288,21 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mo .n{font:italic 400 150px/1 var(--serif);color:var(--red-text)}
 .mo .r{font:400 var(--t-ui)/1.6 var(--sans);color:var(--ink)}
 .mo .cur{display:inline-block;width:2px;height:.9em;background:var(--ink);vertical-align:-.1em;margin-left:2px}
-/* Mac block: card + price facts. The heading and the two actions sit as one group beside the four
-   facts; the native-room paragraph that used to fill the left column is gone (D-047). */
-.home .mac-card{padding:clamp(28px,5vw,56px);display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center}
+/* Pricing block (D-122). The left block is the answer: the price large, one muted line under it, one row of two 48 px
+   pills. It starts on the same line as the first fact, and the facts' label column is only as wide as the longest
+   label, so the descriptions get the rest. */
+.home .mac-card{padding:28px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:28px;align-items:start}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
+.price-fig{margin:var(--s5) 0 0;display:grid;gap:var(--s1)}
+.price-amt{font:500 clamp(52px,12.8vw,96px)/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.price-note{font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
-.facts{list-style:none;margin:0;padding:0;display:grid}
-.facts li{display:grid;grid-template-columns:minmax(0,13rem) minmax(0,1fr);align-items:baseline;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
+.mac-card .actions .btn{height:48px}
+.facts{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:max-content minmax(0,1fr)}
+.facts li{display:grid;grid-template-columns:subgrid;grid-column:1/-1;align-items:baseline;column-gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
+.facts li:first-child{padding-top:0}
 .facts li:last-child{border-bottom:0}
-.facts b{font:500 22px/1.15 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.facts b{font:500 18px/1.15 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 /* footer */
 .home-foot{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut);font:400 14px/1.5 var(--sans);color:var(--mute)}
 .foot-grid{padding:var(--s8) 0 var(--s6);border-top:1px solid var(--hair);display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:var(--s6)}
@@ -336,7 +343,10 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
   .stagewrap{margin-top:var(--s5)}
   .home .chrome-row,.home .paper > .paper-foot{left:16px;right:16px}
   .cards,.moments,.home .mac-card{grid-template-columns:1fr}
-  .facts li{grid-template-columns:1fr;gap:4px}
+  .mac-card .actions{flex-direction:column}
+  .mac-card .actions .btn{width:100%}
+  .facts,.facts li{grid-template-columns:1fr}
+  .facts li{row-gap:4px}
   .faqwrap{grid-template-columns:1fr;gap:20px}
   .foot-grid{grid-template-columns:1fr 1fr}
 }

@@ -2698,3 +2698,15 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   and the web half of the wording in `docs/ui-quality.md` Q-09, Q-19, Q-21, Q-22, Q-23, Q-28, Q-30 and Q-39.
   D-120 stands for the Mac.
 
+
+## D-122: the header Buy is the solid ink pill
+
+- Date: 2026-11-26. Captain: "why is the buy button grey". The header Buy, a transparent pill with a hairline edge
+  (D-115), read as disabled beside the white Download for Mac pill.
+- Decision: `.nav-buy` wears the primary button's fill and text colour (`--ink`, `--on-ink`) with no visible edge, in
+  light and dark, on every page that shares the header (`/`, `/buy`, `/download/`, `/mac`, the document pages, 404).
+  Size, 44 px hit area, hover lift and the underline on `/buy` (`aria-current="page"`) are unchanged. Download for Mac
+  stays the white outline pill. CSS only, no new colour.
+- Tests: `qa/mac.spec.mjs` (header pair: Buy fill and text equal the door's, Download keeps its outline) and
+  `qa/shell.spec.mjs` (the same on every page and width).
+- Supersedes: the fill and edge part of D-115 (Buy as the lighter, fill-less pill). Its placement stands.

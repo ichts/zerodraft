@@ -14,19 +14,19 @@
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
   --sheet:#ffffff;
-  /* The writing sheet is the Wheat paper (D-069), the one object the writer writes on; the page, the
-     cards and the controls keep the white identity. Quiet, history and danger are measured roles:
-     every word on the paper clears 7:1 against the paper's own tone, except the dimmed history lines
-     (D-092: one back 1.57:1, two back 1.15:1), and the pen red is deepened until the numeral and the exit hint clear it too. */
-  --paper-tone:#e9e2ce;
+  /* The writing sheet is plain white in light (D-123, the sheet of the first white-and-ink identity: no grain, no
+     tint) and the warm charcoal paper in dark. Quiet, history and danger are measured roles: every word on the
+     paper clears 7:1 against the paper's own tone, except the dimmed history lines (D-092: one back about 1.6:1,
+     two back about 1.15:1), and the pen red is deepened until the numeral and the exit hint clear it too. */
+  --paper-tone:#ffffff;
   --paper-quiet:#48443E; /* the Mac's warm `paperQuiet` (D-084): one quiet grey on both surfaces */
   --paper-history-1:.22;
   --paper-history-2:.07;
   --paper-danger:#63140b;
-  /* The warn wash of the sheet: the root landing's `color-mix(in oklab, paper 88%, #C8392F)` and its
-     76% cut, resolved. A pale tint meant for a white sheet would only grey this paper (D-069). */
-  --paper-wash:#e8cfbb;
-  --paper-wash-deep:#e6bca7;
+  /* The warn wash of the white sheet is the soft red of the first identity (--red-soft, --red-deep); dark
+     keeps its own mix below. */
+  --paper-wash:var(--red-soft);
+  --paper-wash-deep:var(--red-deep);
   --ink:#1c1917;
   --mute:#6b655c;
   --chrome:#5c564d;

@@ -1,17 +1,17 @@
 import { doorSettled } from './door.mjs';
-// The Wheat paper on the writeitdown site (D-069, superseding D-056's Note tone): tone, grain and ink,
-// measured rather than eyeballed, on the landing demo sheet and in the room, light and dark.
+// The sheet on the writeitdown site (D-123): plain white with no grain in light, the grained charcoal paper in
+// dark, with their ink, measured rather than eyeballed, on the landing demo sheet and in the room.
 //
-// Fails on the Note sheet that shipped before the captain chose Wheat: the tone, the wash mixes, the dark
-// roles (quiet, history, pen) and the grain's rendered mean are all pinned to the Wheat values.
+// Fails on the Wheat sheet that shipped before the captain chose white: the light tone, the light wash mixes
+// and the absence of any light grain are pinned to the white sheet, and the dark roles stay pinned as they were.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#e9e2ce', dark: '#342e24' };
+const TONES = { light: '#ffffff', dark: '#342e24' };
 const INK = { light: '#1c1917', dark: '#ece7d9' };
 const QUIET = { light: '#48443e', dark: '#c2bfb7' };
 const DANGER = { light: '#63140b', dark: '#ffc2b4' };
-const WASH = { light: '#e8cfbb', dark: '#453226' };
-const WASH_DEEP = { light: '#e6bca7', dark: '#573428' };
+const WASH = { light: '#f6e2dc', dark: '#453226' };
+const WASH_DEEP = { light: '#ebc8bd', dark: '#573428' };
 
 const parseColour = value => {
   const match = String(value).match(/rgba?\(([^)]+)\)/);
@@ -51,6 +51,18 @@ const GRAIN_BAND = { light: 6, dark: 10 };
 const meanOffset = (mean, tone) => {
   const target = [1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16));
   return Math.max(...mean.map((value, i) => Math.abs(value - target[i])));
+};
+
+/** The light sheet is plain white (D-123): its canvas holds not one painted pixel. The dark sheet keeps its fine grain (D-093). */
+const expectGrain = (grain, mode, label) => {
+  if (mode === 'light') {
+    expect(grain.meanAlpha, `${label} is plain white: nothing is painted on it`).toBe(0);
+    expect(grain.spread, `${label} carries no grain`).toBe(0);
+    expect(grain.distinct, `${label} is one flat value`).toBe(1);
+  } else {
+    expect(grain.spread, `${label} carries the dark grain`).toBeGreaterThan(2);
+    expect(grain.distinct).toBeGreaterThan(8);
+  }
 };
 
 /** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
@@ -131,6 +143,8 @@ async function waitForPaper(page, selector) {
     const element = document.querySelector(sel);
     const info = element && window.WriteItDownPaper.paintInfo(element);
     if (!info || !(info.width > 2)) return false;
+    // The light sheet is plain white (D-123) and its canvas stays transparent; only the dark sheet has grain to wait for.
+    if (document.documentElement.dataset.theme !== 'dark') return true;
     const canvas = element.querySelector('.sheet-paper');
     const data = canvas.getContext('2d').getImageData(1, 1, 4, 4).data;
     return data.some(value => value !== 0);
@@ -172,10 +186,8 @@ test.describe('the sheet', () => {
 
     await waitForPaper(page, '#paper');
     const demoGrain = await patch(page, '#paper', 0.75);
-    expect(demoGrain.spread, 'the demo sheet carries grain').toBeGreaterThan(2);
-    // The dark grain is one fine layer (D-093), so it has fewer distinct values than the light sheet's mottle.
-    expect(demoGrain.distinct).toBeGreaterThan(mode === 'dark' ? 8 : 40);
-    expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
+    expectGrain(demoGrain, mode, 'the demo sheet');
+    expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[mode]);
 
     await enterRoom(page);
     expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
@@ -230,7 +242,7 @@ test.describe('the sheet', () => {
     expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });
 
-  test('the warn wash is the sheet own mix, not a pale tint meant for white', async ({ page }) => {
+  test('the warn wash tints the sheet: the soft red on the white sheet, its own mix on the dark one', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
     const wash = await style(page, '.room-paper-wash', 'backgroundColor');
@@ -248,9 +260,8 @@ test.describe('the sheet', () => {
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
     expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
-    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
-    // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
-    // renderer sets on the sheet (D-073).
+    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. It is measured
+    // against the locked tone, not the grain-corrected base the renderer sets on the sheet (D-073).
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
     expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
     expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));
@@ -270,7 +281,7 @@ test.describe('the sheet', () => {
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
     expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
     const grain = await patch(page, '.room-paper', 0.5);
-    expect(grain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
+    expectGrain(grain, await theme(page), 'the kept sheet');
     expect(meanOffset(grain.mean, TONES[await theme(page)]), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
     expect(contrast(parseColour(await style(page, '#kept-text', 'color')), paper),
       'the kept draft on the paper').toBeGreaterThanOrEqual(7);

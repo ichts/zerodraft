@@ -1,22 +1,22 @@
-/* Write It Down - the Wheat sheet.
+/* Write It Down - the sheet.
    [INPUT] every element marked data-paper, its laid-out size, devicePixelRatio, and the resolved
            theme on :root (light / dark); paper-render.js (loaded first) for the texture itself.
-   [OUTPUT] one static texture painted into a canvas child behind that element's content: the light Wheat
-            sheet's two-scale mottle and its grain (tooth, pulp, fibres, flecks); the dark sheet's one fine grain.
+   [OUTPUT] one static texture painted into a canvas child behind that element's content: the dark sheet's one
+            fine grain. The light sheet is plain white (D-123), so its canvas stays transparent.
             The tone itself stays in CSS so a state wash can still tint the sheet.
    [POS] the single place on the web surface that mounts what the paper looks like; the room, the
          failure sheet, the kept sheet and the landing demo sheet all mount it. The room's sheet is hidden
          until the door opens, so `warm` textures it ahead of time in a worker (D-103): the click never waits
          for a 4 MP texture.
    [PROTOCOL] paint once per size/theme/DPR and never again while writing; type always sits above
-              the canvas (z-index:-1 inside an isolated stacking context); values are D-069 (D-056's grain and ink).
+              the canvas (z-index:-1 inside an isolated stacking context); values are D-123 (light) and D-093 (dark).
 
    The field is deterministic: the same seed yields the same sheet, so the room, the demo and the
    Mac read as one paper. Nothing here animates, loops, or listens to typing. */
 (function () {
   'use strict';
 
-  const { TONES, GRAIN, SIZE, render } = window.WriteItDownPaperRender;
+  const { TONES, SIZE, render } = window.WriteItDownPaperRender;
   const workerUrl = document.currentScript ? new URL('paper-render.js', document.currentScript.src).href : 'paper-render.js';
 
   const currentTheme = () => (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
@@ -144,7 +144,6 @@
 
   const api = {
     TONES,
-    GRAIN,
     SIZE,
     render,
     mount,

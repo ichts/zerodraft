@@ -200,15 +200,14 @@ test.beforeEach(async ({ page }) => {
   });
   expect(fonts.status, 'the declared faces are loaded before a width is measured').toBe('loaded');
   expect(fonts.faces.filter(face => face.status !== 'loaded' && face.status !== 'unloaded'), JSON.stringify(fonts.faces)).toEqual([]);
-  for (const family of ['Allo']) {
+  for (const family of ['Newsreader', 'Reenie Beanie']) {
     expect(fonts.faces.some(face => face.family === family && face.status === 'loaded'), `${family} loaded`).toBe(true);
   }
   demoGeometry.set(page, await page.locator('.script').evaluate(e => {
     const rect = e.getBoundingClientRect();
     const paper = e.closest('.paper').getBoundingClientRect();
     const write = window.__run(e);
-    const style = getComputedStyle(e);
-    return { line: parseFloat(style.lineHeight), fontSize: style.fontSize, family: style.fontFamily, weight: style.fontWeight,
+    return { line: parseFloat(getComputedStyle(e).lineHeight), fontSize: getComputedStyle(e).fontSize,
       paperHeight: paper.height, baseline: write.baseline,
       ratio: (rect.top + rect.height / 2 - paper.top) / paper.height };
   }));
@@ -251,14 +250,8 @@ test('demo and trial active-line placement: 35% of the sheet on both surfaces', 
   // Journey: the demo's writing line sits where the room's does (within 1% of the sheet), at the same size.
   for (const state of Object.values(states)) expect(Math.abs(demo.ratio - state.ratio)).toBeLessThanOrEqual(0.01);
   expect(Math.abs(demo.ratio - 0.35)).toBeLessThan(0.005);
-  // V2 (D-119): the demo is the room seen from the desk, so it writes in the room's face and weight at the desk's
-  // own 15/25; the anchor, not the size, is what the two surfaces share.
-  const room = await editor(page).evaluate(e => ({ family: getComputedStyle(e).fontFamily, weight: getComputedStyle(e).fontWeight }));
-  // The room's stack also names the Chinese face once a draft has written Chinese (D-109); the Latin face is shared.
-  expect(demo.family.split(',')[0]).toBe(room.family.split(',')[0]);
-  expect(demo.weight).toBe(room.weight);
-  expect(demo.fontSize).toBe('15px');
-  expect(demo.line).toBe(25);
+  expect(demo.fontSize).toBe(await editor(page).evaluate(e => getComputedStyle(e).fontSize));
+  expect(demo.line).toBeCloseTo(states.empty.line, 1);
   await info.attach('placement', { body: JSON.stringify({ demo, states }), contentType: 'application/json' });
   console.log(info.project.name, JSON.stringify({ demo, ratios: Object.fromEntries(Object.entries(states).map(([k, v]) => [k, v.ratio])) }));
 });
@@ -336,7 +329,7 @@ test('warning numeral and caption are placed by ink under the writing line', asy
       captionText: document.querySelector('#room-warning').textContent };
   });
   expect(warning.numeralText).toMatch(/^[123]$/);
-  expect(warning.captionText).toBe('Keep typing or the draft is deleted.');
+  expect(warning.captionText).toBe('KEEP TYPING OR THE DRAFT IS DELETED.');
   expect(warning.numeral.inkTop - warning.baseline, 'numeral ink top under the writing baseline').toBeGreaterThan(40);
   expect(warning.numeral.inkTop - warning.baseline).toBeLessThan(48);
   expect(warning.caption.inkTop - (warning.numeral.inkTop + warning.numeral.inkHeight), 'caption under the numeral ink').toBeGreaterThan(16);
@@ -359,9 +352,8 @@ test('mobile dynamic viewport keeps EXIT and word count visible with expanded to
         viewport: innerHeight, ratio: (line.top + line.height / 2 - sheet.top) / sheet.height };
     });
     expect(demo.firstHeight, `${state}: the first screen fills the viewport`).toBeGreaterThanOrEqual(demo.viewport - 0.5);
-    // V2 (D-119): the phone desk is square, so the demo sheet is as tall as the desk lets it be, wherever the
-    // toolbars sit; the sheet's bottom no longer has to meet the first screen's.
-    expect(demo.height, `${state}: the phone sheet keeps its floor`).toBeGreaterThanOrEqual(220);
+    expect(demo.height, `${state}: the sheet keeps its 300 px floor`).toBeGreaterThanOrEqual(300 - 0.5);
+    expect(Math.abs(demo.bottom - demo.firstBottom), `${state}: the sheet owns the space the door leaves`).toBeLessThanOrEqual(1);
     await enter(page);
     await page.keyboard.insertText('Keep writing.');
     await settle(page);
@@ -415,7 +407,7 @@ test('the short trial sheet keeps its dynamic viewport minimum', async ({ page }
 // layout (status-slot.js) runs there, where the title, the receipt, two pills, the note and the draft all share 470 px
 // of paper. Nothing may leave the sheet, the page may not scroll, and every control has to stay on screen.
 test('the stopped screen holds on the smallest phone', async ({ page }, info) => {
-  test.skip(info.project.name !== '390-lamp-no-preference', 'One project owns the smallest-phone geometry');
+  test.skip(info.project.name !== '390-light-no-preference', 'One project owns the smallest-phone geometry');
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('./');
   await page.evaluate(() => document.fonts.ready);
@@ -493,7 +485,7 @@ test('short sheets keep the warning and result slots inside the paper', async ({
 });
 
 test('kept screens keep the controls and draft clear of the paper foot', async ({ page }, info) => {
-  test.skip(info.project.name !== '1440-lamp-no-preference', 'layout check, one project is enough');
+  test.skip(info.project.name !== '1440-light-no-preference', 'layout check, one project is enough');
   const sizes = [
     { width: 1440, height: 350 },
     { width: 844, height: 390 },
@@ -993,7 +985,7 @@ test('the kept screen draws the draft once', async ({ page }, info) => {
     await expect(page.locator('#editor'), `the ${size.width} kept screen hides the writing line`).toBeHidden();
     await expect(page.locator('#editor-ink'), `the ${size.width} kept screen hides the writing ink`).toBeHidden();
     expect(drawn, `the ${size.width} kept screen holds one copy of the draft`).toEqual(['DIV#kept-text']);
-    if (info.project.name === '1440-lamp-no-preference' || info.project.name === '390-lamp-no-preference') {
+    if (info.project.name === '1440-light-no-preference' || info.project.name === '390-light-no-preference') {
       await capture(page, info, `kept-once-${size.width}x${size.height}`);
     }
     // The next session paints its ink again: hiding the layer must not outlive the kept screen.
@@ -1176,9 +1168,9 @@ test('the stopped screen is one group anchored at 33% of the sheet', async ({ pa
   // The two gaps the captain set, measured box edge to box edge.
   expect(failure.gapHeadlineLine, 'headline to line').toBeCloseTo(GAP_HEADLINE_LINE, 0);
   expect(failure.gapLineButton, 'line to button').toBeCloseTo(GAP_LINE_BUTTON, 0);
-  // Type: the headline at the result role's size for this width, Allo at the display weight (D-119) at 1.1.
+  // Type: the headline at the result role's size for this width, Newsreader 500 at 1.1.
   expect(failure.headline.size).toBe(headlineSize(width));
-  expect(failure.headline.weight).toBe('540');
+  expect(failure.headline.weight).toBe('500');
   expect(failure.headline.lineHeight).toBeCloseTo(failure.headline.size * 1.1, 0);
   expect(failure.line.size).toBe(15);
   expect(failure.line.weight).toBe('400');
@@ -1372,7 +1364,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
     await seek(SILENT_END + offset);
     await expect(page.locator('#paper')).toHaveClass(/warn/);
     await expect(page.locator('#numeral')).toHaveText(numeral);
-    await expect(page.locator('#warn-caption')).toHaveText('Keep typing or the draft is deleted.');
+    await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
   }
   const warning = await page.evaluate(() => {
     const script = window.__run(document.querySelector('.script'));
@@ -1438,8 +1430,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   });
   expect(demoBlock.anchor, 'the demo block follows the room anchor').toBeCloseTo(FAILURE_ANCHOR, 2);
   expect(demoBlock.gap, 'headline to line in the demo').toBeCloseTo(GAP_HEADLINE_LINE, 0);
-  // The desk's scale (D-119): the demo's line is the room's at the small size.
-  expect(demoBlock.noteSize).toBe(13);
+  expect(demoBlock.noteSize).toBe(15);
   expect(demoBlock.clock, 'the demo takes its clock off the stopped sheet').toBe('hidden');
   expect(demoBlock.bar, 'the demo takes its bar off the stopped sheet').toBe('hidden');
   await expect(page.locator('#demo-stopped button')).toHaveCount(0);
@@ -1472,7 +1463,7 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
   test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo never loops');
   await page.clock.fastForward(SILENT_END + 150);
   await expect(page.locator('#warn')).toBeVisible();
-  await expect(page.locator('#warn-caption')).toHaveText('Keep typing or the draft is deleted.');
+  await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
   await page.locator('#landing .cta a[href="#trial"]').click();
   await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
@@ -1486,16 +1477,6 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
   await expect(page.locator('#demo-stopped')).toBeHidden();
 });
 
-// The demo's loop starts when its sheet first enters view (round 007), and on a short screen the sheet sits below the
-// first screen: bring it into view and wait for the demo's own observer before the clock is moved.
-async function startDemoInView(page) {
-  await page.locator('#paper').scrollIntoViewIfNeeded();
-  // Observers are notified in creation order in one rendering step, so once this fresh one fires the demo's has too.
-  await page.evaluate(() => new Promise(resolve => new IntersectionObserver((entries, observer) => {
-    if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); resolve(); }
-  }).observe(document.getElementById('paper'))));
-}
-
 test('short demo sheets keep the status slot inside the paper', async ({ page }, info) => {
   test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo has no warning or report');
   // The screen can be short two ways: a wide landscape window, or a small phone whose sheet now
@@ -1504,7 +1485,6 @@ test('short demo sheets keep the status slot inside the paper', async ({ page },
     await page.setViewportSize(size);
     await page.reload();
     await page.evaluate(() => document.fonts.ready);
-    await startDemoInView(page);
     await page.clock.fastForward(SILENT_END + 150);
     await expect(page.locator('#warn')).toBeVisible();
     const warning = await page.evaluate(() => {
@@ -1529,20 +1509,16 @@ test('short demo sheets keep the status slot inside the paper', async ({ page },
   }
 });
 
-test('the demo numeral follows its own sheet, and the room keeps the Mac numeral', async ({ page }) => {
-  // D-068 under V2 (D-119): the demo sheet is a fifth of the desk, so its numeral is a fifth of the sheet's own
-  // height (32-76 px) whatever the viewport's shape; the room keeps min(18vh, 170px).
-  for (const size of [{ width: 390, height: 664 }, { width: 320, height: 700 }, { width: 1440, height: 900 }, { width: 844, height: 390 }]) {
-    await page.setViewportSize(size);
-    const numeral = await page.evaluate(() => ({
-      demo: parseFloat(getComputedStyle(document.querySelector('#numeral')).fontSize),
-      demoSheet: Math.min(76, Math.max(32, document.querySelector('#paper').clientHeight * 0.2)),
-      room: parseFloat(getComputedStyle(document.querySelector('#room-numeral')).fontSize),
-      roomMac: Math.min(innerHeight * 0.18, 170),
-    }));
-    expect(numeral.demo, `${size.width}x${size.height}: the demo numeral is a fifth of its sheet`).toBeCloseTo(numeral.demoSheet, 0);
-    expect(numeral.room, `${size.width}x${size.height}: the room keeps the Mac numeral`).toBeCloseTo(numeral.roomMac, 1);
-  }
+test('the short-viewport numeral shrinks the landing sheet only', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 664 });
+  const numeral = await page.evaluate(() => ({
+    demo: parseFloat(getComputedStyle(document.querySelector('#numeral')).fontSize),
+    room: parseFloat(getComputedStyle(document.querySelector('#room-numeral')).fontSize),
+    demoShort: Math.min(innerHeight * 0.15, 140),
+    roomMac: Math.min(innerHeight * 0.18, 170),
+  }));
+  expect(numeral.demo, 'the short landing sheet keeps its smaller numeral').toBeCloseTo(numeral.demoShort, 1);
+  expect(numeral.room, 'the room keeps the Mac numeral on a short sheet').toBeCloseTo(numeral.roomMac, 1);
 });
 
 test('focus is a ring, never a re-cut of the control it lands on', async ({ page }, info) => {
@@ -1692,50 +1668,70 @@ test.describe('a wide fine pointer', () => {
   });
 });
 
-test('the first screen holds the headline and the door on every phone, and the desk beside them on a laptop', async ({ page }, info) => {
-  // V2 (D-119): copy on the left, the lit sheet on the right. Below 861 px the two stack: the headline, its note and
-  // the door stay on the first screen and the desk follows; at 1440x900 the whole desk stands beside the door.
+test('the door and the sheet it opens share one first screen on a short phone', async ({ page }, info) => {
   const read = () => page.evaluate(() => {
-    const box = selector => { const rect = document.querySelector(selector).getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, height: rect.height }; };
+    const box = selector => { const rect = document.querySelector(selector).getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, height: rect.height }; };
     return { viewport: innerHeight, viewportWidth: innerWidth, scrollWidth: document.documentElement.scrollWidth,
-      first: box('.first-screen'), door: box('#landing .cta .btn'), note: box('.hero-sub'), desk: box('.desk'), sheet: box('#paper') };
+      first: box('.first-screen'), door: box('#landing .cta .btn'), note: box('.hero-sub'), sheet: box('#paper') };
   });
-  const sizes = [{ width: 320, height: 568 }, { width: 375, height: 667 }, { width: 320, height: 700 }, { width: 375, height: 812 },
-    { width: 390, height: 844 }, { width: 430, height: 932 }];
-  for (const size of sizes) {
-    await page.setViewportSize(size);
-    await page.evaluate(() => window.scrollTo(0, 0));
-    const fold = await read();
-    const label = `${size.width}x${size.height}`;
-    expect(fold.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(fold.viewportWidth);
+  const expectFold = (fold, label) => {
     expect(fold.first.height, `${label}: the first screen fills the viewport`).toBeGreaterThanOrEqual(fold.viewport - 0.5);
+    expect(fold.sheet.height, `${label}: the sheet keeps its 300 px lower floor`).toBeGreaterThanOrEqual(300 - 0.5);
+    // The floor is `max(300px, 61vh)`, so the only shortfall a correct layout can show is the
+    // browser's own sub-pixel rounding of the vh unit: hold the ratio to one rendering pixel.
+    expect(fold.sheet.height, `${label}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(fold.viewport * 0.61 - 1);
+    expect(Math.abs(fold.sheet.bottom - fold.first.bottom), `${label}: the sheet owns the first screen's remaining space`).toBeLessThanOrEqual(1);
     expect(fold.note.top, `${label}: the note starts on the first screen`).toBeGreaterThanOrEqual(0);
     expect(fold.note.bottom, `${label}: the note is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+    expect(fold.door.top, `${label}: the door starts on the first screen`).toBeGreaterThanOrEqual(0);
     expect(fold.door.bottom, `${label}: the whole door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
-    expect(fold.desk.top, `${label}: the desk follows the door`).toBeGreaterThan(fold.door.bottom);
-    expect(Math.abs(fold.desk.right - fold.desk.left - (fold.desk.bottom - fold.desk.top)), `${label}: the phone desk is square`).toBeLessThanOrEqual(1);
-    await capture(page, info, `fold-${label}`);
-  }
-  for (const size of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 1024, height: 700 }]) {
+  };
+  // The hand word's write-on reveal is real time, not the fake clock: let it finish before the
+  // captures, so the evidence shows the resting headline.
+  await page.waitForTimeout(1500);
+  for (const size of [{ width: 375, height: 667 }, { width: 320, height: 700 }, { width: 375, height: 701 }]) {
     await page.setViewportSize(size);
     await page.evaluate(() => window.scrollTo(0, 0));
-    const fold = await read();
-    const label = `${size.width}x${size.height}`;
-    expect(fold.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(fold.viewportWidth);
-    expect(fold.desk.left, `${label}: the desk stands right of the copy`).toBeGreaterThan(fold.door.right);
-    expect(fold.desk.top, `${label}: the desk starts on the first screen`).toBeGreaterThanOrEqual(0);
-    expect(fold.desk.bottom, `${label}: the whole desk is on the first screen`).toBeLessThanOrEqual(fold.viewport);
-    expect(fold.door.bottom, `${label}: the whole door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+    expectFold(await read(), `${size.width}x${size.height}`);
+    await capture(page, info, `fold-${size.width}x${size.height}`);
   }
-  // Every phone width in the band, no seam on either axis.
-  if (info.project.name.startsWith('390-lamp-no-preference')) {
+  // The same container plus floor at a taller phone and at 320x568: the sheet keeps 61% and the
+  // first screen grows when the content and the floor need more than the viewport.
+  for (const size of [{ width: 375, height: 812 }, { width: 320, height: 568 }]) {
+    await page.setViewportSize(size);
+    await page.evaluate(() => window.scrollTo(0, 0));
+    expectFold(await read(), `${size.width}x${size.height}`);
+  }
+  // The two documented targets stay at or above the 61% the landing contract measured.
+  for (const size of [{ width: 390, height: 844 }, { width: 1440, height: 900 }]) {
+    await page.setViewportSize(size);
+    const fold = await read();
+    expect(fold.sheet.height, `${size.width}x${size.height}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(fold.viewport * 0.61 - 1);
+  }
+  // The first screen has no seam on either axis: sweep the phone band and assert the door, its
+  // note and the sheet never overflow their containers.
+  if (info.project.name === '390-light-no-preference') {
     for (let width = 320; width <= 430; width += 10) {
-      await page.setViewportSize({ width, height: 700 });
-      const fold = await read();
-      expect(fold.scrollWidth, `${width}: no horizontal overflow`).toBeLessThanOrEqual(fold.viewportWidth);
-      expect(fold.door.bottom, `${width}: the door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+      for (let height = 640; height <= 760; height += 20) {
+        await page.setViewportSize({ width, height });
+        await page.evaluate(() => window.scrollTo(0, 0));
+        const fold = await read();
+        const label = `${width}x${height}`;
+        expect(fold.scrollWidth, `${label}: no horizontal overflow`).toBeLessThanOrEqual(fold.viewportWidth);
+        expect(fold.sheet.height / fold.viewport, `${label}: the sheet stays at or above 61%`).toBeGreaterThanOrEqual(0.61 - 1 / fold.viewport);
+        expect(Math.abs(fold.sheet.bottom - fold.first.bottom), `${label}: the sheet stays inside the first screen`).toBeLessThanOrEqual(1);
+        expect(fold.note.top, `${label}: the note starts on the first screen`).toBeGreaterThanOrEqual(0);
+        expect(fold.note.bottom, `${label}: the note is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+        expect(fold.door.top, `${label}: the door starts on the first screen`).toBeGreaterThanOrEqual(0);
+        expect(fold.door.bottom, `${label}: the door is on the first screen`).toBeLessThanOrEqual(fold.viewport);
+      }
     }
   }
+  // 320x568 keeps the floor: the entrance is still reachable.
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const smallest = await read();
+  expect(smallest.door.bottom, '320x568 keeps the door on the first screen').toBeLessThanOrEqual(smallest.viewport);
 });
 test('the watch-only demo advertises no input, and its count speaks like the room', async ({ page }, info) => {
   // The theatre draws no insertion point and no typing prompt: neither exists in a preview that
@@ -1786,23 +1782,4 @@ test('the clock does not breathe: tabular numerals on the room and the demo', as
   expect(new Set(room.widths.map(width => width.toFixed(2))).size, `the room clock's width never changes: ${room.widths}`).toBe(1);
   // The count on the same row was already tabular: one tool face, one numeral metric.
   expect(room.countNumeric).toBe('tabular-nums');
-});
-
-// A phone that shows the sheet below the door must see the demo from its first key, not mid-loop or in its blank
-// report: the loop's clock starts when the sheet first enters view (round 007).
-test('the demo starts when its sheet first enters view', async ({ page }, info) => {
-  test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo does not loop');
-  await page.setViewportSize({ width: 390, height: 360 });
-  await page.reload();
-  await expect.poll(() => page.locator('#paper').evaluate(e => e.getBoundingClientRect().top - innerHeight)).toBeGreaterThan(0);
-  await page.clock.runFor(15000);
-  await expect(page.locator('#cur'), 'nothing types while the sheet is out of view').toHaveText('');
-  await expect(page.locator('#clock')).toHaveText('1:00');
-  await page.locator('#paper').scrollIntoViewIfNeeded();
-  // Observers are notified in creation order in one rendering step, so once this fresh one fires the demo's has too.
-  await page.evaluate(() => new Promise(resolve => new IntersectionObserver((entries, observer) => {
-    if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); resolve(); }
-  }).observe(document.getElementById('paper'))));
-  await page.clock.runFor(TIMELINE.events[0].t + 100);
-  await expect(page.locator('#cur'), 'the first key lands as the loop begins').toHaveText(TIMELINE.events[0].cur);
 });

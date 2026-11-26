@@ -1,5 +1,5 @@
 // The three landing moment cards (#core .mo: writing, warning, deleted) measured as rendered text.
-// Every text element on a card is checked against the card's own ground, in each mode, at 1440 and 390.
+// Every text element on a card is checked against the card's own ground, in light and dark, at 1440 and 390.
 // Floors follow WCAG 2.x: 4.5:1 for normal text, 3:1 for large text (24 px, or 18.66 px bold).
 // Fails on the shipped `.mo .r` line (`--mute` on `--red-deep`: 3.72:1 light) before it was repainted (D-071).
 import { test, expect } from '@playwright/test';
@@ -29,13 +29,9 @@ const contrast = (a, b) => {
 };
 
 const readCard = (page, name) => page.evaluate(cls => {
-  // The cards are named m1-m3 in reading order; only the two that differ carry a class of their own.
-  const card = document.querySelectorAll('#core .mo')[Number(cls.slice(1)) - 1];
+  const card = document.querySelector(`#core .mo.${cls}`);
   const style = getComputedStyle(card);
-  // A gradient ground is read stop by stop; a sheet's grain is a texture over its own colour, so that colour is the
-  // ground (qa/paper.spec.mjs measures the rendered grain against 7:1 on the writing sheets).
-  const stops = style.backgroundImage.match(/rgba?\([^)]*\)/g);
-  const grounds = stops ?? [style.backgroundColor];
+  const grounds = style.backgroundImage === 'none' ? [style.backgroundColor] : style.backgroundImage.match(/rgba?\([^)]*\)/g);
   const texts = [...card.querySelectorAll('*')]
     .filter(el => [...el.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim()))
     .map(el => {

@@ -275,9 +275,8 @@ notch.
   edge to the wordmark's first stroke is 0.36 em, and the lockup box is 7.467 x 1.046 em. The lockup's clear
   space is at least a quarter of the cap height on all sides (about 5 px at 21 px). The header link may extend
   its hit area without enlarging the lockup.
-- Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and its right
-  group keeps at least 6 px of right gutter (the paper-mode switch lives under the demo, in the room's top-left
-  and in the footer row, D-119), with the page action present
+- Site header invariant: at every width from 320 to 1440 px the header never scrolls sideways and the theme
+  button keeps at least 6 px of right gutter, with the 36 px theme button unscaled and the page action present
   at 460 px and above and hidden below 460 px, where the header's `Buy` pill (D-115) stays. The room drops it sooner on phones; see the mobile rule
   below. `writeitdown/qa/mac.spec.mjs` "the header holds its gutter at every width from 320 to 1440 px"
   sweeps the widest header (`/download/`) in 1 px steps from 320 to 480 and 8 px steps from 488 to 1440
@@ -290,7 +289,7 @@ notch.
 - Site header, mobile: from 391 to 820 px the 19 px lockup takes 141.9 px of the row, with 12 px between the
   brand and the page action and 6 px inside the action group; at 380-390 px the 16 px lockup takes 119.5 px,
   the brand-to-action gap is 8 px, and the action-group gap stays 6 px. Below 460 px the nav page action is
-  hidden on every page, leaving the brand lockup and the `Buy` pill; each page keeps its call to action
+  hidden on every page, leaving the brand lockup, the `Buy` pill and the 36 px theme button; each page keeps its call to action
   in the body, so the mark never shrinks below 16 px and the header stays one 56 px row. The action is dropped
   rather than stacked into a second header row, so the room's header height and its dynamic-viewport paper
   sizing stay unchanged. One rule for every page that uses `.brand` - these sizes and the single
@@ -334,15 +333,15 @@ notch.
   "the header chip paints one plate colour on every page" reads the rendered `::before` background on every
   shipped page and the room and requires one `--brand-plate` value per theme, so a page-local fallback cannot
   make the chip diverge again. The same test reads the plate's rendered border and requires the 1 px solid
-  `--hair-2` edge to equal the page's `--hair-2` hairline on every page, so a missing or per-page edge fails.
+  `--hair-2` edge to equal the theme button's boundary on every page, so a missing or per-page edge fails.
   "the header keeps its right gutter and a legible chip at 360 px" repeats the visual check at 360, 375 and
   390 px and requires no horizontal overflow, at least 6 px of right gutter and one lockup step across every
   shipped page and the room; at 360 px it also requires a chip of at least 16 px with the split still
   reading. "the header holds its gutter at every width from 320 to 1440 px" sweeps `/download/`
   in 1 px steps from 320 to 480 and 8 px steps from 488 to 1440 under the wider-font action model and requires
   no horizontal overflow, at least 6 px of right gutter, the page action at 460 px and above and absent below,
-  and `Buy` at every width, so a breakpoint that leaves a band uncovered fails. Verify the
-  sizes in 11.3 in every appearance, with no clipping and no shift in the nav.
+  and the 36 px theme button at every width, so a breakpoint that leaves a band uncovered fails. Verify the
+  sizes in 11.3 in light and dark, with no clipping and no shift in the nav.
 
 - Mac: the chip-and-wordmark lockup on the start screen in light and dark; `BrandTests.pickerLockupShowsTheChipTheWebHeaderUses`
   requires the chip to be square and open the lockup, the 1.046 em share, the 22.33% plate radius, the page/hair-2
@@ -384,14 +383,12 @@ The chip makes the mark an object using two aligned alpha-only mask files, not t
 - On narrow phones the lockup steps to 16 px type (DESIGN 11.3) instead of letting the header push the theme
   button past the page gutter; the chip's widened notch is what keeps the split readable at 16.7 px.
 
-## 12. Faces on writeitdown.app and the Mac app (D-057, D-119)
+## 12. Faces on writeitdown.app and the Mac app (D-057, D-121)
 
-D-119 gives writeitdown.app one face: Allo (bundled variable, ROND pinned at 30, `wght` 300-700) for what the
-writer writes, every heading and everything the tool says, with writing at 410, the display at 540 and the
-warning numeral at 360; Resource Han Rounded for the same roles in Chinese, fetched only when Chinese input
-begins; the system monospace on `code` only. The hand accent is retired. The table below is the Mac's set
-until the Mac lane follows D-119; `writeitdown/qa/typography.spec.mjs` owns the web census, and its shared
-advance check against `writeitdown/qa/shared-type-baseline.json` is held until the Mac re-measures in Allo.
+D-121 restores writeitdown.app to the faces below (Newsreader, Zhuque Fangsong, the system sans, the Reenie Beanie
+hand accent). The Mac app keeps the D-120 set (Allo, Resource Han Rounded) and its own advance baseline in
+`apps/macos/FirstLine/design/type-baseline.json`; the two surfaces no longer share one face set until the captain
+decides otherwise.
 
 Section 2 owns the root Zero Draft landing's type pairing. This section owns the faces of the product
 surfaces - every shipped writeitdown.app page and the native Mac app - which share one set, with the Mac

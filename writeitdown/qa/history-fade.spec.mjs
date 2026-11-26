@@ -10,8 +10,8 @@ import { doorSettled } from './door.mjs';
 // centred just under the line being written, for two seconds (D-100, moved out of the footer), and nothing else moves.
 import { test, expect } from '@playwright/test';
 
-const TONES = { lamp: '#e9e2ce', paper: '#fdfdfb', slate: '#363b3d' };
-const QUIET = { lamp: '#221a14', paper: '#3f3b36', slate: '#f4efe6' };
+const TONES = { light: '#e9e2ce', dark: '#342e24' };
+const QUIET = { light: '#48443e', dark: '#c2bfb7' };
 const REFUSAL = 'You can only add the next word.';
 
 const rgb = value => String(value).match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -34,7 +34,7 @@ const dissolved = page => page.evaluate(async () => {
   await Promise.all(document.getAnimations().filter(animation => animation instanceof CSSTransition).map(animation => animation.finished.catch(() => {})));
 });
 
-const theme = page => page.evaluate(() => document.documentElement.dataset.theme || 'lamp');
+const theme = page => page.evaluate(() => document.documentElement.dataset.theme || 'light');
 
 /** One span per logical line: its rung, its computed opacity and the rows it occupies, top to bottom. */
 const inkLines = page => page.evaluate(() => {
@@ -114,14 +114,14 @@ test('each Return line gets exactly its step, 1 / .22 / .07 per theme, and older
     const style = getComputedStyle(document.querySelector('#editor-ink'));
     return [1, 2].map(n => Number(style.getPropertyValue(`--paper-history-${n}`)));
   });
-  expect(tokens).toEqual(mode === 'slate' ? [0.16, 0.05] : [0.22, 0.07]);
+  expect(tokens).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
   const byRung = Object.fromEntries(lines.map(line => [line.rung, line.opacity]));
   expect(byRung).toEqual({ 0: 1, 1: tokens[0], 2: tokens[1], 3: 0 });
   expect(byRung['0']).toBe(1);
   const ink = rgb(await page.evaluate(() => getComputedStyle(document.querySelector('#editor-ink')).color));
   const paper = hex(TONES[mode]);
   expect(contrast(ink, paper), 'the live line keeps the full ink').toBeGreaterThanOrEqual(7);
-  // The captain's contrast exception: the same 1.57:1 and 1.15:1 in every mode, not 7:1 roles.
+  // The captain's contrast exception: the same 1.57:1 and 1.15:1 in both themes, not 7:1 roles.
   const ratios = tokens.map(alpha => contrast(over(ink, alpha, paper), paper));
   expect(ratios[0], `one back ${ratios[0].toFixed(2)}:1`).toBeGreaterThan(1.5);
   expect(ratios[0]).toBeLessThan(1.65);

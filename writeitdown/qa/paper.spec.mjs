@@ -1,187 +1,326 @@
 import { doorSettled } from './door.mjs';
-import { freezeClock } from './clock.mjs';
-// The sheet in each paper mode (D-119): Lamp, Paper and Slate are one engine on three materials. The tokens are
-// pinned per mode, and the 7:1 floor is measured in the rendered pixels, under the lamp's multiply, at the
-// centre and the corners of the room, on the plain sheet, the wash and the deep wash.
+// The Wheat paper on the writeitdown site (D-069, superseding D-056's Note tone): tone, grain and ink,
+// measured rather than eyeballed, on the landing demo sheet and in the room, light and dark.
 //
-// Fails on the canvas paper this replaced (D-069/D-093): there is no `.sheet-paper` canvas and no
-// `WriteItDownPaper` renderer any more; the material is CSS, painted once by the browser.
+// Fails on the Note sheet that shipped before the captain chose Wheat: the tone, the wash mixes, the dark
+// roles (quiet, history, pen) and the grain's rendered mean are all pinned to the Wheat values.
 import { test, expect } from '@playwright/test';
 
-const SHEET = {
-  lamp: { tone: '#e9e2ce', ink: '#1f1812', quiet: '#221a14', danger: '#380904', wash: '#e8cfbb', deep: '#e6bca7', history: [0.22, 0.07] },
-  paper: { tone: '#fdfdfb', ink: '#1c1917', quiet: '#3f3b36', danger: '#63140b', wash: '#fae7e2', deep: '#f6d0c9', history: [0.22, 0.07] },
-  slate: { tone: '#363b3d', ink: '#f7eedb', quiet: '#f4efe6', danger: '#ffe8de', wash: '#493e3d', deep: '#5a403d', history: [0.16, 0.05] },
+const TONES = { light: '#e9e2ce', dark: '#342e24' };
+const INK = { light: '#1c1917', dark: '#ece7d9' };
+const QUIET = { light: '#48443e', dark: '#c2bfb7' };
+const DANGER = { light: '#63140b', dark: '#ffc2b4' };
+const WASH = { light: '#e8cfbb', dark: '#453226' };
+const WASH_DEEP = { light: '#e6bca7', dark: '#573428' };
+
+const parseColour = value => {
+  const match = String(value).match(/rgba?\(([^)]+)\)/);
+  if (!match) return null;
+  const parts = match[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+  return { r: parts[0], g: parts[1], b: parts[2], a: parts.length > 3 ? parts[3] : 1 };
 };
 
-const rgb = value => {
-  const hex = String(value).match(/^#([0-9a-f]{6})$/i);
-  if (hex) return [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
-  return String(value).match(/[\d.]+/g).slice(0, 3).map(Number);
+const luminance = ({ r, g, b }) => {
+  const channel = value => {
+    const c = value / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 };
-const toHex = c => '#' + rgb(c).map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
-const lum = c => {
-  const ch = v => { const x = v / 255; return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4; };
-  const [r, g, b] = rgb(c);
-  return 0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b);
-};
-const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 
-const mode = page => page.evaluate(() => document.documentElement.dataset.theme);
+const contrast = (a, b) => {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+};
+
+const over = (colour, backdrop) => ({
+  r: colour.r * colour.a + backdrop.r * (1 - colour.a),
+  g: colour.g * colour.a + backdrop.g * (1 - colour.a),
+  b: colour.b * colour.a + backdrop.b * (1 - colour.a),
+  a: 1
+});
+
+const toHex = ({ r, g, b }) =>
+  '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+
+/** How far one patch's rendered mean may sit from the tone: the mottle moves a single patch more on the dark sheet. */
+const GRAIN_BAND = { light: 6, dark: 10 };
+
+/** The largest per-channel gap between a patch's rendered mean and a tone, read off the pixels. */
+const meanOffset = (mean, tone) => {
+  const target = [1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16));
+  return Math.max(...mean.map((value, i) => Math.abs(value - target[i])));
+};
+
+/** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
+ *  already warm. */
+const warmth = ({ r, g }) => (r - g) / 255;
+
+const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
+
+/** The sheet's tone, measured within the two levels the texture's correction is allowed to leave behind. */
+const expectTone = (measured, expected, label) => {
+  const a = measured.map(Math.round);
+  const b = channels(expected);
+  a.forEach((value, index) => {
+    expect(Math.abs(value - b[index]), `${label}: channel ${index} of ${a.join(',')} against ${expected}`)
+      .toBeLessThanOrEqual(2);
+  });
+};
+
+const theme = page => page.evaluate(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 const style = (page, selector, property) =>
-  page.evaluate(([s, p]) => getComputedStyle(document.querySelector(s))[p], [selector, property]);
-const token = (page, selector, name) =>
-  page.evaluate(([s, n]) => getComputedStyle(document.querySelector(s)).getPropertyValue(n).trim(), [selector, name]);
+  page.evaluate(([sel, prop]) => getComputedStyle(document.querySelector(sel))[prop], [selector, property]);
+
+/** A text-free patch of a sheet, read straight off its canvas: spread (grain), distinct values, and a hash. */
+async function patch(page, selector, where = 0.6) {
+  return page.evaluate(([sel, position]) => {
+    const canvas = document.querySelector(sel + ' .sheet-paper');
+    if (!canvas) return null;
+    const ctx = canvas.getContext('2d');
+    const width = Math.max(8, Math.min(200, Math.round(canvas.width * 0.18)));
+    const height = Math.max(8, Math.min(120, Math.round(canvas.height * 0.12)));
+    const x = Math.round((canvas.width - width) / 2);
+    const y = Math.round(canvas.height * position - height / 2);
+    const data = ctx.getImageData(x, y, width, height).data;
+    // The pixel the reader sees: the texture composited over the sheet's own tone.
+    const base = getComputedStyle(document.querySelector(sel)).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
+    let sum = 0;
+    let sumSquares = 0;
+    let count = 0;
+    let alpha = 0;
+    const channels = [0, 0, 0];
+    const values = [];
+    for (let i = 0; i < data.length; i += 4) {
+      alpha += data[i + 3];
+      const a = data[i + 3] / 255;
+      for (let c = 0; c < 3; c += 1) channels[c] += data[i + c] * a + base[c] * (1 - a);
+      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      sum += lum;
+      sumSquares += lum * lum;
+      count += 1;
+      values.push(data.slice(i, i + 4).join(','));
+    }
+    const mean = sum / count;
+    return {
+      spread: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)),
+      meanAlpha: alpha / count,
+      mean: channels.map(total => total / count),
+      distinct: new Set(values).size,
+      hash: values.reduce((acc, value) => {
+        for (let i = 0; i < value.length; i += 1) acc = (acc * 31 + value.charCodeAt(i)) | 0;
+        return acc;
+      }, 7)
+    };
+  }, [selector, where]);
+}
 
 async function enterRoom(page) {
-  await page.route('https://static.cloudflareinsights.com/beacon.min.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').click();
   await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
+  await waitForPaper(page, '.room-paper');
 }
 
-/** The rendered pixels of one patch: mean colour, the 2nd and 98th luminance percentiles, row and column means. */
-async function pixels(page, clip) {
-  const png = (await page.screenshot({ clip, animations: 'disabled', caret: 'hide' })).toString('base64');
-  return page.evaluate(async data => {
-    const bitmap = await createImageBitmap(await (await fetch('data:image/png;base64,' + data)).blob());
-    const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(bitmap, 0, 0);
-    const { data: px, width, height } = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
-    const l = [], mean = [0, 0, 0], rows = new Array(height).fill(0), cols = new Array(width).fill(0);
-    let hash = 7;
-    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
-      const i = (y * width + x) * 4;
-      const v = 0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2];
-      l.push([v, i]); rows[y] += v / width; cols[x] += v / height;
-      for (let c = 0; c < 3; c += 1) mean[c] += px[i + c] / (width * height);
-      hash = (hash * 31 + px[i] * 65536 + px[i + 1] * 256 + px[i + 2]) | 0;
+/** The sheet exists and carries its texture: the room is hidden at 0x0 until the reveal, and the
+ *  ResizeObserver textures it in the same rendering step that gives it its size. */
+async function waitForPaper(page, selector) {
+  await page.waitForFunction(sel => {
+    const element = document.querySelector(sel);
+    const info = element && window.WriteItDownPaper.paintInfo(element);
+    if (!info || !(info.width > 2)) return false;
+    const canvas = element.querySelector('.sheet-paper');
+    const data = canvas.getContext('2d').getImageData(1, 1, 4, 4).data;
+    return data.some(value => value !== 0);
+  }, selector);
+}
+
+/** What the screen shows where the sheet is empty: the sheet's own tone composited with the texture's mean,
+ *  which is the pixel value the captain locked, not the CSS constant behind it. */
+async function sheetTone(page, selector) {
+  return page.evaluate(sel => {
+    const element = document.querySelector(sel);
+    const value = getComputedStyle(element).backgroundColor;
+    const parts = value.match(/rgba?\(([^)]+)\)/)[1].split(/[,\s/]+/).filter(Boolean).map(Number);
+    const base = [parts[0], parts[1], parts[2]];
+    const canvas = element.querySelector('.sheet-paper');
+    if (!canvas || canvas.width < 2) return base;
+    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    const count = canvas.width * canvas.height;
+    const shift = [0, 0, 0];
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+      shift[0] += alpha * (data[i] - base[0]);
+      shift[1] += alpha * (data[i + 1] - base[1]);
+      shift[2] += alpha * (data[i + 2] - base[2]);
     }
-    l.sort((a, b) => a[0] - b[0]);
-    const at = q => { const i = l[Math.floor(q * (l.length - 1))][1]; return [px[i], px[i + 1], px[i + 2]]; };
-    const spread = a => { const m = a.reduce((s, v) => s + v, 0) / a.length; return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length); };
-    return { mean, dark: at(0.02), light: at(0.98), rowSpread: spread(rows), colSpread: spread(cols), hash };
-  }, png);
-}
-
-/** A text role as the reader sees it: its ink multiplied by the same light that shades the patch beneath it. */
-const lit = (ink, patch, tone) => rgb(ink).map((v, i) => v * Math.min(1, patch.mean[i] / rgb(tone)[i]));
-
-/** The text-free patches of the room: the centre under the writing line and the four corners inside the chrome. */
-async function roomPatches(page) {
-  const box = await page.locator('.room-paper').boundingBox();
-  const s = 40;
-  return {
-    centre: { x: box.x + box.width / 2 - s / 2, y: box.y + box.height * 0.62, width: s, height: s },
-    topLeft: { x: box.x + 8, y: box.y + 10, width: s, height: s },
-    topRight: { x: box.x + box.width - 8 - s, y: box.y + 50, width: s, height: s },
-    bottomLeft: { x: box.x + 8, y: box.y + box.height - 56 - s, width: s, height: s },
-    bottomRight: { x: box.x + box.width - 8 - s, y: box.y + box.height - 56 - s, width: s, height: s },
-  };
+    return base.map((channel, index) => channel + shift[index] / count);
+  }, selector);
 }
 
 test.describe('the sheet', () => {
-
-  test('Paper is plain white: no grain, no cloud, no lamp', async ({ page }) => {
+  test('the demo sheet and the room carry the locked tone, ink and grain', async ({ page }) => {
     await page.goto('./');
-    test.skip((await mode(page)) !== 'paper', 'the plain sheet is the Paper mode');
-    for (const sel of ['#paper', '.room-paper']) {
-      expect(await style(page, sel, 'backgroundImage')).toMatch(/^none(, none)*$/);
-      expect(await page.evaluate(s => getComputedStyle(document.querySelector(s), '::after').backgroundImage, sel)).toMatch(/^none(, none)*$/);
-    }
-  });
+    const mode = await theme(page);
+    const paper = parseColour(await style(page, '#paper', 'backgroundColor'));
+    expectTone(await sheetTone(page, '#paper'), TONES[mode], 'the demo sheet');
 
-  test('every word in the room clears 7:1 in the rendered pixels, under the lamp, on the sheet and both washes', async ({ page }) => {
+    // The words on the demo sheet are the locked ink.
+    expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
+
+    await waitForPaper(page, '#paper');
+    const demoGrain = await patch(page, '#paper', 0.75);
+    expect(demoGrain.spread, 'the demo sheet carries grain').toBeGreaterThan(2);
+    // The dark grain is one fine layer (D-093), so it has fewer distinct values than the light sheet's mottle.
+    expect(demoGrain.distinct).toBeGreaterThan(mode === 'dark' ? 8 : 40);
+    expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
+
     await enterRoom(page);
-    const want = SHEET[await mode(page)];
-    const roles = {
-      ink: await style(page, '#editor-ink', 'color'),
-      quiet: await style(page, '#room-count', 'color'),
-      danger: await style(page, '.danger .numeral', 'color'),
-    };
-    const fix = await page.addStyleTag({ content: '.room-paper-wash{opacity:1!important;transition:none!important}' });
-    for (const wash of ['sheet', 'wash', 'deep']) {
-      await page.evaluate(w => {
-        const room = document.querySelector('#room');
-        document.querySelector('.room-paper-wash').style.visibility = w === 'sheet' ? 'hidden' : 'visible';
-        if (w === 'deep') room.dataset.cut = 'true'; else delete room.dataset.cut;
-      }, wash);
-      for (const [where, clip] of Object.entries(await roomPatches(page))) {
-        const patch = await pixels(page, clip);
-        for (const [role, ink] of Object.entries(roles)) {
-          const seen = lit(ink, patch, want.tone);
-          // The worst pixel for this ink: the darkest grain under dark ink, the brightest under light ink.
-          const ground = lum(seen) < lum(patch.mean) ? patch.dark : patch.light;
-          const ratio = contrast(seen, ground);
-          expect.soft(ratio, `${role} on the ${wash} at the ${where}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
-        }
-      }
-    }
-    await fix.evaluate(node => node.remove());
+    expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
+    expect(toHex(parseColour(await style(page, '#editor-ink', 'color')))).toBe(INK[mode]);
+
+    // The texture is device-exact: one canvas pixel per device pixel, so it cannot shimmer.
+    const exact = await page.evaluate(() => {
+      const canvas = document.querySelector('.room-paper .sheet-paper');
+      const sheet = document.querySelector('.room-paper');
+      return { width: canvas.width, height: canvas.height,
+        css: [sheet.clientWidth, sheet.clientHeight], dpr: window.devicePixelRatio };
+    });
+    expect(exact.width).toBe(Math.round(exact.css[0] * exact.dpr));
+    expect(exact.height).toBe(Math.round(exact.css[1] * exact.dpr));
   });
 
-  test('the demo words clear 7:1 under the demo lamp, on the sheet and the deep wash', async ({ page }) => {
-    await page.route('https://static.cloudflareinsights.com/beacon.min.js', r => r.fulfill({ contentType: 'text/javascript', body: '' }));
-    await page.clock.install({ time: new Date('2026-09-16T12:00:00Z') });
-    await page.goto('./');
-    const want = SHEET[await mode(page)];
-    // Freeze the demo where it is: a fixed instant can already be in the past when a loaded host takes over a second
-    // to load the page, and the measurement reads the ground at the column's edges, which no demo instant moves.
-    await freezeClock(page, 50);
-    const box = await page.locator('#paper').boundingBox();
-    const column = await page.locator('#paper .anchor-wrap').boundingBox();
-    const s = 24;
-    // The ground at both ends of the text column, on the writing line and down where the numeral and its caption
-    // stand: the longest line reaches the column's edge, and the lamp is darkest away from its centre.
-    const clips = {};
-    for (const [name, fy] of [['line', 0.35], ['numeral', 0.6], ['caption', 0.85]]) {
-      clips[`${name}Left`] = { x: column.x, y: box.y + box.height * fy - s / 2, width: s, height: s };
-      clips[`${name}Right`] = { x: column.x + column.width - s, y: box.y + box.height * fy - s / 2, width: s, height: s };
-    }
-    const ink = await style(page, '#paper .script', 'color');
-    const quiet = await token(page, '#paper', '--paper-quiet');
-    const danger = await token(page, '#paper', '--paper-danger');
-    await page.addStyleTag({ content: '#paper > *:not(#wash-paper){visibility:hidden!important}' });
-    for (const wash of ['none', 'var(--paper-wash-deep)']) {
-      await page.evaluate(w => { document.querySelector('#wash-paper').style.setProperty('background', w, 'important'); }, wash);
-      for (const [where, clip] of Object.entries(clips)) {
-        const patch = await pixels(page, clip);
-        for (const [role, c] of Object.entries({ ink, quiet, danger })) {
-          const seen = lit(c, patch, want.tone);
-          const ground = lum(seen) < lum(patch.mean) ? patch.dark : patch.light;
-          const ratio = contrast(seen, ground);
-          expect.soft(ratio, `demo ${role} at ${where} on ${wash}: ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(7);
-        }
-      }
-    }
-  });
-
-  test('the sheet texture keeps its own aspect on every sheet: no streak on a tall phone sheet (round 006)', async ({ page }) => {
+  test('every word on the sheet clears 7:1, except the dimmed history lines (D-092)', async ({ page }) => {
     await enterRoom(page);
-    test.skip((await mode(page)) === 'paper', 'the Paper sheet has no texture');
-    // A streak is the cloud stretched along one axis. The grain tiles at its own 240 px, and the cloud scales by
-    // one factor in both axes (cover), so neither can stretch whatever shape the sheet takes. Measured in pixels
-    // the cloud is too slow to read, so the geometry is the assertion.
-    const sizes = await page.evaluate(() => ['.room-paper', '#paper'].map(s => getComputedStyle(document.querySelector(s)).backgroundSize));
-    expect(sizes[0]).toBe('240px 240px, cover');
-    expect(sizes[1].split(',')[0].trim()).toBe('240px 240px');
+    const mode = await theme(page);
+    // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
+    // background behind the canvas is the grain-corrected base, not the colour on screen (D-073).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
+    const ink = parseColour(await style(page, '#editor-ink', 'color'));
+
+    expect(toHex(ink)).toBe(INK[mode]);
+    expect(contrast(ink, paper), 'the writing ink').toBeGreaterThanOrEqual(7);
+
+    // The history (D-092): the alphas the ink layer's rungs apply, composited over the paper. The captain's contrast
+    // exception: one back 1.57:1 and two back 1.15:1 in both themes, so no 7:1 floor applies to them.
+    const alphas = await page.evaluate(() => {
+      const editor = document.querySelector('#editor');
+      const value = getComputedStyle(editor);
+      return [
+        Number(value.getPropertyValue('--paper-history-1')),
+        Number(value.getPropertyValue('--paper-history-2'))
+      ];
+    });
+    expect(alphas[0]).toBeGreaterThan(0);
+    expect(alphas[1]).toBeGreaterThan(0);
+    const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
+    expect(alphas).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
+    expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(1.5);
+    expect(ladder[0]).toBeLessThan(1.65);
+    expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThan(1.1);
+    expect(ladder[1]).toBeLessThan(1.2);
+
+    // The quiet chrome and the pen red on the sheet.
+    expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
+    expect(contrast(parseColour(await style(page, '#room-count', 'color')), paper)).toBeGreaterThanOrEqual(7);
+    expect(contrast(parseColour(await style(page, '#exit', 'color')), paper)).toBeGreaterThanOrEqual(7);
+    expect(toHex(parseColour(await style(page, '#failure-note', 'color')))).toBe(QUIET[mode]);
+    expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });
 
-  test('the kept screen stays on the same paper, and its words clear 7:1 on it', async ({ page }) => {
+  test('the warn wash is the sheet own mix, not a pale tint meant for white', async ({ page }) => {
+    await enterRoom(page);
+    const mode = await theme(page);
+    const wash = await style(page, '.room-paper-wash', 'backgroundColor');
+    expect(toHex(parseColour(wash)), 'the warn wash').toBe(WASH[mode]);
+
+    // The cut steps one step deeper, and the numeral sitting on it still clears 7:1. The attribute and
+    // the read happen in one evaluation: the room's own frame loop owns `data-cut`.
+    const cut = await page.evaluate(() => {
+      const room = document.querySelector('#room');
+      room.dataset.cut = 'true';
+      return getComputedStyle(document.querySelector('.room-paper-wash')).backgroundColor;
+    });
+    const deep = parseColour(cut);
+    expect(toHex(deep), 'the wash at the cut').toBe(WASH_DEEP[mode]);
+    const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
+    expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
+    expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
+    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. The wash is
+    // resolved from the locked tone, so it is measured against that tone, not the grain-corrected base the
+    // renderer sets on the sheet (D-073).
+    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
+    expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
+    expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));
+  });
+
+  test('the kept screen stays on the same paper', async ({ page }) => {
+    // The real kept path: type through the whole minute on the fake clock, then read the paper.
     await page.clock.install({ time: new Date('2026-10-26T12:00:00Z') });
     await enterRoom(page);
-    const want = SHEET[await mode(page)];
-    await page.locator('#editor').pressSequentially('kept words on the paper ', { delay: 20 });
+    await page.locator('#editor').type('kept words on the note paper ', { delay: 20 });
     for (let second = 0; second < 57; second += 3) {
       await page.clock.fastForward(3000);
-      await page.locator('#editor').pressSequentially('keep going ');
+      await page.locator('#editor').type('keep going ');
     }
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
-    expect(toHex(await style(page, '.room-paper', 'backgroundColor'))).toBe(want.tone);
-    for (const sel of ['#kept-text', '#receipt', '#kept-note'])
-      expect(contrast(await style(page, sel, 'color'), want.tone), `${sel} on the paper`).toBeGreaterThanOrEqual(7);
+    const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
+    expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
+    const grain = await patch(page, '.room-paper', 0.5);
+    expect(grain.spread, 'the kept sheet carries the grain').toBeGreaterThan(2);
+    expect(meanOffset(grain.mean, TONES[await theme(page)]), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
+    expect(contrast(parseColour(await style(page, '#kept-text', 'color')), paper),
+      'the kept draft on the paper').toBeGreaterThanOrEqual(7);
+    expect(contrast(parseColour(await style(page, '#receipt', 'color')), paper),
+      'the kept receipt on the paper').toBeGreaterThanOrEqual(7);
+    // The not-saved caption is a text role on the sheet, so it answers to the same floor (D-061).
+    expect(contrast(parseColour(await style(page, '#kept-note', 'color')), paper),
+      'the kept not-saved caption on the paper').toBeGreaterThanOrEqual(7);
+  });
+  test('the dark sheet is one fine grain: about +-3 levels, no blotch, every pixel clears 7:1 (D-093)', async ({ page }) => {
+    await page.goto('./');
+    test.skip((await theme(page)) !== 'dark', 'the dark sheet only exists in dark');
+    await page.waitForFunction(() => window.WriteItDownPaper);
+    const sheet = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      const info = window.WriteItDownPaper.render(canvas, 640, 384, 1, 'dark');
+      const out = document.createElement('canvas');
+      out.width = canvas.width;
+      out.height = canvas.height;
+      const ctx = out.getContext('2d');
+      ctx.fillStyle = info.base;
+      ctx.fillRect(0, 0, out.width, out.height);
+      ctx.drawImage(canvas, 0, 0);
+      const { data, width, height } = ctx.getImageData(0, 0, out.width, out.height);
+      const luma = i => 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+      let mean = 0;
+      let peak = 0;
+      let peakAt = 0;
+      const blocks = new Array(Math.floor(width / 32) * Math.floor(height / 32)).fill(0);
+      for (let y = 0; y < height; y += 1) {
+        for (let x = 0; x < width; x += 1) {
+          const i = (y * width + x) * 4;
+          const l = luma(i);
+          mean += l;
+          if (l > peak) { peak = l; peakAt = i; }
+          const bx = Math.floor(x / 32);
+          const by = Math.floor(y / 32);
+          if (bx < Math.floor(width / 32) && by < Math.floor(height / 32)) blocks[by * Math.floor(width / 32) + bx] += l / 1024;
+        }
+      }
+      mean /= width * height;
+      const blockMean = blocks.reduce((a, b) => a + b, 0) / blocks.length;
+      const blotch = Math.sqrt(blocks.reduce((a, b) => a + (b - blockMean) ** 2, 0) / blocks.length);
+      return { base: info.base, lift: peak - mean, blotch, brightest: [data[peakAt], data[peakAt + 1], data[peakAt + 2]] };
+    });
+    // +-3 levels per channel plus the 8-bit rounding of the alpha composite and luma weighting: Linux CI Chromium measures 3.54.
+    expect(sheet.lift, 'no pixel lifts more than the +-3 grain plus rounding').toBeLessThanOrEqual(4);
+    expect(sheet.blotch, 'no blotch at the 32 px scale').toBeLessThan(0.2);
+    const pixel = { r: sheet.brightest[0], g: sheet.brightest[1], b: sheet.brightest[2] };
+    expect(contrast(parseColour(`rgb(${channels(INK.dark).join(',')})`), pixel), 'ink on the brightest pixel').toBeGreaterThanOrEqual(7);
+    expect(contrast(parseColour(`rgb(${channels(QUIET.dark).join(',')})`), pixel), 'quiet text on the brightest pixel').toBeGreaterThanOrEqual(7);
   });
 });

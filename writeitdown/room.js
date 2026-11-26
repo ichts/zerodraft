@@ -23,7 +23,7 @@ const EXIT_HINT = {
   keyboard: 'Press Esc again to leave and delete the draft.',
   touch: 'Tap EXIT again to leave and delete the draft.'
 };
-const WARNING = 'Keep typing or the draft is deleted.';
+const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
 // The first refused delete of a session names the rule once, centred just under the line being written,
 // for two seconds (D-100 moves D-077's notice out of the footer); later refusals only shake.
 const REFUSAL = 'You can only add the next word.';
@@ -326,6 +326,8 @@ function restart() {
 
 let routed = false;
 let growing = [];
+// The moment the door's grow stops owning the main thread; the font engine waits for it (D-109).
+let growUntil = 0;
 
 // The door opens (D-097): the room's paper is the landing's demo paper grown, and the brand row slides to its
 // place, instead of the demo vanishing and a new paper appearing 160 px away. Only transforms and an opacity
@@ -349,7 +351,7 @@ function growInto(from) {
     { transformOrigin: '0 0', transform: 'none' }
   ], options));
   for (const el of paper.children) {
-    if (el.hidden || el.matches('.bar, .wash, .hairline')) continue;
+    if (el.hidden || el.matches('.sheet-paper, .bar, .wash, .hairline')) continue;
     const end = getComputedStyle(el).opacity;
     growing.push(el.animate([{ opacity: 0 }, { opacity: end }],
       { duration: GROW_MS * 0.7, delay: GROW_MS * 0.3, easing: 'ease-out', fill: 'backwards' }));
@@ -369,6 +371,7 @@ function route() {
   const active = location.hash === '#trial';
   growing.forEach(a => a.cancel());
   growing = [];
+  growUntil = 0;
   const from = active && !returning && routed ? boxes() : null;
   document.documentElement.classList.toggle('in-trial', active);
   $('landing').hidden = active;
@@ -379,14 +382,15 @@ function route() {
   if (active) {
     fitEditor();
     editor.focus({ preventScroll: true });
-    if (from) growInto(from);
+    if (from) { growInto(from); growUntil = performance.now() + GROW_MS; }
+    warmRoomFace();
   }
   else if (returning) document.querySelector('#landing a[href="#trial"]').focus({ preventScroll: true });
 }
 
 // Chinese is one GB2312 file and a draft draws it in exactly one face (D-109). Which face is decided at the draft's
-// first Chinese character and never revisited until the sheet is empty again: Resource Han Rounded if its bytes are
-// already resident, the platform face if they are not. That decision is what makes both promises true at once - the
+// first Chinese character and never revisited until the sheet is empty again: Zhuque if its bytes are already
+// resident, the platform serif if they are not. That decision is what makes both promises true at once - the
 // character is on the sheet at once, and no character ever changes face afterwards no matter when the file lands.
 // `font-display:swap` in `fonts-cjk.css` is the second guard under the same promise: a path that painted Chinese
 // without reaching this decision falls back to visible text, never to an invisible one.
@@ -394,24 +398,120 @@ function route() {
 // Chrome cannot be trusted with `font-display:optional` here: it abandons an optional face for the whole document at
 // the first paint that happens without it, and it then keeps the platform face even when the file has been resident
 // for seconds before the first Chinese character (measured, and held in `qa/chinese-face.spec.mjs`).
-const CJK_FAMILY = 'Resource Han Rounded';
-const CJK = /[\u3400-\u9fff\uf900-\ufaff]/;
 function adoptCjkFace(text) {
-  if (cjkFace || !CJK.test(text)) return;
-  const face = [...document.fonts].find(candidate => candidate.family.includes(CJK_FAMILY));
+  if (cjkFace || !/[\u3400-\u9fff\uf900-\ufaff]/.test(text)) return;
+  const face = [...document.fonts].find(candidate => candidate.family.includes('Zhuque Fangsong'));
   cjkFace = face?.status === 'loaded' ? 'webfont' : 'platform';
   room.dataset.cjkFace = cjkFace;
 }
 
-// The file is 1.17 MB that only a Chinese draft needs, so nothing asks for it before Chinese input appears: a
-// committed Chinese character, or an IME composition whose marked text already shows one (D-119). A Latin writer,
-// or one typing Greek or a dead-key accent, never fetches it. The first Chinese draft usually decides on the platform
-// face (D-109), and the next draft on an empty sheet finds the file resident.
+// The room asks the font engine for the face as its route opens, in the second a writer spends reading the empty
+// sheet; a trial link that has already shown intent has asked earlier (prefetchRoomFace), so the face is normally
+// resident before the first keystroke. Nothing on the landing asks for it, and the landing draws no Chinese
+// (D-057). The request waits out the door's own grow: decoding 2.5 MB of font is main-thread work and the grow owns
+// those 240 ms.
+let faceWarmed = false;
+let faceTimer = 0;
+function askForRoomFace() {
+  if (faceWarmed || !document.fonts?.load) return;
+  // Decoding 2.5 MB is main-thread work and the door's grow owns the 240 ms after the route opens, so the ask
+  // (however early the bytes arrived) lands after it. One rule, whichever path got here.
+  const wait = growUntil - performance.now();
+  if (wait > 0) {
+    clearTimeout(faceTimer);
+    faceTimer = setTimeout(askForRoomFace, Math.ceil(wait) + 20);
+    return;
+  }
+  faceWarmed = true;
+  document.fonts.load('28px "Zhuque Fangsong"', '我').catch(() => {});
+}
+
+function warmRoomFace() {
+  // A prefetch already in flight asks the font engine itself when its bytes land; asking here as well would send the
+  // same 2.5 MB twice on the link that can least afford it.
+  if (faceAsked) return;
+  askForRoomFace();
+}
+
+// The face is 2,589,548 B and it belongs to the room, not to the landing: a visitor who reads and leaves pays none
+// of it. Intent on a trial link - pointer, touch or focus - starts the fetch while they read, so on a slow link the
+// file is already arriving when the door opens instead of starting then (D-109). It runs after the frame that
+// painted the intent and on an idle main thread, so it can never delay first paint, LCP or the door's grow.
+// Two steps, because they have different priorities and only a preload can be told to be low: the bytes travel as a
+// low-priority preload (the only request on the wire, and `document.fonts.load()` here would be VeryHigh and would
+// compete with the landing's own paint), then the idle main thread hands those cached bytes to the font engine so
+// the first character finds a resident face instead of paying for the decode under the door.
 let faceAsked = false;
-function askForRoomFace(text) {
-  if (faceAsked || !text || !CJK.test(text) || !document.fonts?.load) return;
+
+// The face's file name lives in the generated `fonts-cjk.css`, so the preload reads it from there instead of
+// repeating a second copy that a rebuild could leave pointing at a file that no longer exists.
+function faceFile() {
+  for (const sheet of document.styleSheets) {
+    let rules;
+    try { rules = sheet.cssRules; } catch { continue; }
+    for (const rule of rules) {
+      if (rule.constructor.name !== 'CSSFontFaceRule' || !rule.style.fontFamily.includes('Zhuque Fangsong')) continue;
+      const url = rule.style.src.match(/url\(["']?([^"')]+)["']?\)/);
+      if (url) return url[1];
+    }
+  }
+  return null;
+}
+
+const whenIdle = run => (window.requestIdleCallback || (later => setTimeout(later, 0)))(run, { timeout: 2000 });
+
+function prefetchRoomFace() {
+  if (faceAsked || faceWarmed || !room.hidden) return;
+  const href = faceFile();
+  if (!href) return;
   faceAsked = true;
-  document.fonts.load(`28px "${CJK_FAMILY}"`, '\u6211').catch(() => {});
+  const link = document.createElement('link');
+  link.rel = 'preload';
+  link.as = 'font';
+  link.type = 'font/woff2';
+  // A font preload without crossOrigin is a different fetch from the font request and is made twice;
+  // fetchpriority is the only lever that keeps the 2.5 MB off the landing's critical path.
+  link.crossOrigin = 'anonymous';
+  link.setAttribute('fetchpriority', 'low');
+  link.addEventListener('load', () => whenIdle(askForRoomFace), { once: true });
+  link.href = href;
+  document.head.append(link);
+}
+
+function prefetchSoon() {
+  requestAnimationFrame(() => whenIdle(prefetchRoomFace));
+}
+
+for (const entry of document.querySelectorAll('#landing a[href="#trial"]')) {
+  for (const type of ['pointerenter', 'pointerdown', 'touchstart', 'focus']) {
+    entry.addEventListener(type, prefetchSoon, { once: true, passive: true });
+  }
+}
+
+// The room's sheet is hidden until the door opens, so its texture used to be painted on the page in the click's
+// own task - a 4 MP canvas, over a second on a 2x screen (D-103). Instead the room is measured while it is
+// hidden (shown and hidden again inside one task, so no frame sees it) and paper.js's worker textures the sheet
+// at exactly that size before anyone clicks. The click then finds the sheet painted.
+function warmPaper() {
+  if (!room.hidden || !window.WriteItDownPaper) return;
+  const root = document.documentElement;
+  const focused = document.activeElement;
+  const { scrollX, scrollY } = window;
+  root.classList.add('in-trial');
+  room.hidden = false;
+  const [width, height] = [paper.clientWidth, paper.clientHeight];
+  room.hidden = true;
+  root.classList.remove('in-trial');
+  // The in-trial page does not scroll, so the landing's offset would be lost with it.
+  if (window.scrollY !== scrollY) window.scrollTo({ left: scrollX, top: scrollY, behavior: 'instant' });
+  if (document.activeElement !== focused) focused?.focus?.({ preventScroll: true });
+  window.WriteItDownPaper.warm(paper, width, height);
+}
+
+let warmTimer = 0;
+function warmSoon(delay = 200) {
+  clearTimeout(warmTimer);
+  warmTimer = setTimeout(() => (window.requestIdleCallback || (f => f()))(warmPaper, { timeout: 500 }), delay);
 }
 
 function exit() {
@@ -445,7 +545,6 @@ editor.addEventListener('input', event => {
   }
   const addition = editor.value.slice(base.length);
   adoptCjkFace(addition);
-  askForRoomFace(addition);
   if (compositionBase !== null) {
     const active = append(state, addition || event.data || '', performance.now());
     state = { ...active, text: editor.value };
@@ -459,7 +558,6 @@ editor.addEventListener('compositionstart', () => {
   endCaret();
   compositionBase = state.text;
 });
-editor.addEventListener('compositionupdate', event => askForRoomFace(event.data));
 editor.addEventListener('compositionend', () => {
   compositionBase = null;
   endCaret();
@@ -485,11 +583,8 @@ paper.addEventListener('pointerdown', event => {
   event.preventDefault();
   editor.focus({ preventScroll: true });
 });
-// Switching the paper from the room header is not input: the draft, the phase and the silence clock carry on, and the
-// keyboard stays on the writing. The press never takes focus, and a keyboard change hands it straight back.
-const roomModes = room.querySelector('.modes');
-roomModes.addEventListener('pointerdown', event => { if (state.phase !== 'kept') event.preventDefault(); });
-roomModes.addEventListener('change', () => {
+// Switching theme from the room header hands the keyboard straight back to the writing.
+room.querySelector('[data-theme-toggle]').addEventListener('click', () => {
   if (state.phase !== 'kept') editor.focus({ preventScroll: true });
 });
 document.addEventListener('keydown', event => {
@@ -548,8 +643,8 @@ function sizeCopyFloor() {
   if (widest > 0) label.style.setProperty('--copy-floor', `${Math.ceil(widest)}px`);
 }
 
-window.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
-window.visualViewport?.addEventListener('resize', () => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+window.addEventListener('resize', () => { warmSoon(); syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
+window.visualViewport?.addEventListener('resize', () => { warmSoon(); syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
 document.fonts.ready.then(() => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
 touchInput.addEventListener('change', () => { syncExitCopy(); slot.invalidate(); placeStatus(); });
 reduced.addEventListener('change', tick);
@@ -558,6 +653,8 @@ window.addEventListener('pagehide', reset);
 window.addEventListener('pageshow', event => { if (event.persisted) route(); });
 document.addEventListener('visibilitychange', tick);
 setInterval(tick, 50);
+new MutationObserver(() => warmSoon()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 syncExitCopy();
 sizeCopyFloor();
 route();
+warmSoon(0);

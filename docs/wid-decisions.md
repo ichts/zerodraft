@@ -2674,3 +2674,27 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   AppKit's automatic insets zero the writing scroll view's top inset, so the line after Begin again sat about 130 pt
   above the anchor. The room's scroll view now takes no automatic insets; behaviour case 89 and
   `DesignReviewFixesTests.restartAfterAResizeOnTheStoppedSheetPutsTheLineOnTheAnchor`.
+
+## D-121: writeitdown.app goes back to the look it had before D-119
+
+- Date: 2026-11-26. Captain, to firstmate, task `wid-landing-restore`: restore the writeitdown.app homepage to its
+  version before PR 172 (commit 2f107d4): centred serif headline with the handwritten red `lose every word.`, the
+  dark pill door, the large rounded paper below, the rounded pill system. No minimal landing. This is the final WID
+  release.
+- Decision: the web site's files are the 2f107d4 files: `index.html`, `site.css`, `tokens.css`, `fonts.css`,
+  `fonts-cjk.css`, `fonts/` (Newsreader, Reenie Beanie, Zhuque Fangsong), `theme.js`, `demo.js`, `room.js`,
+  `paper.js`, `paper-render.js`, every page that loads `site.css`, `install.sh` and `journey/journey.mjs`. Light is
+  the default and dark is the stored choice again. Nothing after 2f107d4 that is not about the homepage look was
+  reverted: the Mac app (D-120), the licence service, the default two-project Playwright run and its full matrix
+  command, the test-stability fixes of #175 and #181, and the test pruning of #179 and #180.
+- Mac: the Mac room keeps D-120 (three papers, Allo and Resource Han Rounded). The Mac used to read the web's
+  `tokens.css` and `shared-type-baseline.json`; it now reads its own copies, `apps/macos/FirstLine/design/paper-tokens.css`
+  and `type-baseline.json`, byte for byte the files D-119 shipped, so the Mac tests keep proving what they proved.
+- Tests: the specs and baselines that pinned the V2 homepage are the 2f107d4 versions, minus the tests #179 and #180
+  already removed from main; `qa/door-instant.spec.mjs` keeps the CPU-time budget of #175. `docs/design/canvas.json`
+  keeps the `Keep typing or lose every word.` strings, which are also what the restored page shows.
+- Supersedes: D-119 and its correction for writeitdown.app (the three paper modes, Allo, the V2 first screen, the
+  `Lamp / Paper / Slate` switch, the demo clock starting on first view), the web half of D-120's parity table,
+  and the web half of the wording in `docs/ui-quality.md` Q-09, Q-19, Q-21, Q-22, Q-23, Q-28, Q-30 and Q-39.
+  D-120 stands for the Mac.
+

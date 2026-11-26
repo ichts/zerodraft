@@ -1,11 +1,11 @@
 /**
- * [INPUT]: writeitdown/tokens.css v3 (the three paper modes Lamp, Paper and Slate, same role names, D-119) and the
+ * [INPUT]: design/paper-tokens.css, the v3 set (the three paper modes Lamp, Paper and Slate, same role names, D-119) and the
  *          process-wide PaperMode the app applies.
  * [OUTPUT]: FirstLineColors - dynamic AppKit roles for the page (page, sheet, ink, mute, chrome, hairlines, sheet ring,
  *           red, on-ink) and for the writing sheet (paper tone, paper ink, quiet, danger, wash, deep wash, paper hairs,
  *           history steps), plus FirstLineColors.Palette, the one table every role reads.
  * [POS]: Shared native colour tokens for every surface and the room; no parallel palette.
- * [PROTOCOL]: Keep values aligned with writeitdown/tokens.css and check FirstLine/AGENTS.md.
+ * [PROTOCOL]: Keep values aligned with design/paper-tokens.css and check FirstLine/AGENTS.md.
  *
  * How a role finds its mode: the app gives the window the aqua appearance in Paper and darkAqua in Lamp and Slate
  * (D-120), so a role reads Paper on aqua and, on darkAqua, Lamp or Slate from the stored mode. Lamp and Slate share

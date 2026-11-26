@@ -3,15 +3,15 @@ import Foundation
 import Testing
 @testable import WriteItDown
 
-/// The Mac palette is tokens.css v3, read from the file itself: a token changed on the web without the Mac, or the
-/// other way round, fails here with the role and both values (D-119, D-120).
+/// The Mac palette is the three-paper token set kept in `design/paper-tokens.css`, read from the file itself: a role
+/// changed in the file without the Mac, or the other way round, fails here with the role and both values (D-120).
+/// The file is the v3 set writeitdown.app shipped under D-119; the web landing went back to its earlier look (D-121).
 @MainActor
 struct DesignTokenTests {
     private static let tokens: String = {
         let file = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()  // FirstLine
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()  // repo root
-            .appendingPathComponent("writeitdown/tokens.css")
+            .appendingPathComponent("design/paper-tokens.css")
         return (try? String(contentsOf: file, encoding: .utf8)) ?? ""
     }()
 
@@ -45,7 +45,7 @@ struct DesignTokenTests {
     @Test(arguments: PaperMode.allCases)
     func everyRoleIsTheWebsToken(mode: PaperMode) throws {
         let css = Self.declarations(mode)
-        try #require(css["--paper-tone"] != nil, "tokens.css has no \(mode) block")
+        try #require(css["--paper-tone"] != nil, "paper-tokens.css has no \(mode) block")
         let palette = FirstLineColors.Palette.of(mode)
         let colours: [(String, UInt32)] = [
             ("--page", palette.page), ("--sheet", palette.sheet), ("--tag-bg", palette.tagBackground),

@@ -154,6 +154,8 @@ async function run(size, browser) {
       ok(await cta.locator('> *').count() === 1, `${await cta.locator('> *').count()} elements in the entrance band`);
       ok(await page.locator('.cta-buy').count() === 0, 'a buy line came back under the door');
       ok(await landingNav.locator('a.nav-buy', { hasText: /^buy$/i }).count() === 1, 'the header lost its one Buy');
+      const fills = await page.evaluate(() => [getComputedStyle(document.querySelector('.home-nav a.nav-buy')).backgroundColor, getComputedStyle(document.querySelector('#landing a.btn-primary[href="#trial"]')).backgroundColor]);
+      ok(fills[0] === fills[1] && fills[0] !== 'rgba(0, 0, 0, 0)', `the header Buy is not the door's solid ink pill (${fills.join(' vs ')})`);
       ok(await page.locator('#landing a.btn-primary[href="#trial"]').count() === 1, 'more than one 60-second door on the page');
       ok((await landingDoor.innerText()).trim().toLowerCase() === 'give it 60 seconds', 'CTA missing');
       ok(await landingDoor.getAttribute('href') === '#trial', 'the door does not open the trial');

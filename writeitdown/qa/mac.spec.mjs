@@ -91,13 +91,66 @@ test('every shipped link resolves and every fragment exists', async ({ page, req
 
 // D-114: every link that sends a visitor to the purchase page is the single word Buy. The price is the purchase
 // page's largest text and is not repeated on the way there. Protects a visitor from reading a price-and-platform
-// line (the old `Buy for $4.99 once` / `Buy for Mac`) on pages that only point at /buy.
+// line (the old `Buy for $4.99 once` / `Buy for Mac`) on pages that only point at /buy. D-122: the one exception is
+// the homepage Pricing block, whose button reads `Buy for $4.99` because that block is where the price is answered.
 test('every link to the purchase page is the single word Buy', async ({ page }) => {
   for (const file of ['index.html', 'mac.html', 'download/', 'support.html', 'privacy.html', 'terms.html', '404.html', 'write-it-down-price.html']) {
     await page.goto(file);
     const labels = await page.locator('a[href$="buy.html"]:not(p a), a[href$="/buy"]:not(p a)').evaluateAll(links => links.map(a => a.textContent.trim()));
     expect(labels.length, `${file}: links to the purchase page`).toBeGreaterThan(0);
-    for (const label of labels) expect(label, `${file}: a purchase link reads Buy`).toBe('Buy');
+    const priced = file === 'index.html' ? await page.locator('#mac a[href="buy.html"]').textContent() : null;
+    const plain = priced ? labels.filter(label => label !== priced) : labels;
+    for (const label of plain) expect(label, `${file}: a purchase link reads Buy`).toBe('Buy');
+    if (priced) expect(priced.trim(), 'the Pricing block button names the price').toBe('Buy for $4.99');
+  }
+});
+
+// D-122: the Pricing block answers with the price, one row of two equal pills, a top-aligned left block and a
+// label column that fits its longest label. Protects the captain's "Pricing shows no price, buttons do not line up".
+test('the Pricing block shows the price, one 48 px button row and two-line facts', async ({ page }) => {
+  await page.goto('index.html');
+  await page.evaluate(() => document.fonts.ready);
+  const read = await page.locator('#mac').evaluate(mac => {
+    const box = el => el.getBoundingClientRect();
+    const [buy, download] = [...mac.querySelectorAll('.actions .btn')];
+    const li = mac.querySelector('.facts li'), label = li.querySelector('b');
+    const lines = [...mac.querySelectorAll('.facts li')].map(item => {
+      const range = document.createRange(); range.selectNodeContents([...item.childNodes].find(n => n.nodeType === 3));
+      return range.getClientRects().length;
+    });
+    const b = getComputedStyle(buy), d = getComputedStyle(download), probe = getComputedStyle(document.querySelector('.cta .btn-primary'));
+    const labels = [...mac.querySelectorAll('.facts b')];
+    return { amount: mac.querySelector('.price-amt').textContent, note: mac.querySelector('.price-note').textContent,
+      heights: [box(buy).height, box(download).height], bottoms: [box(buy).bottom, box(download).bottom],
+      radii: [b.borderTopLeftRadius, d.borderTopLeftRadius], buyFill: b.backgroundColor, doorFill: probe.backgroundColor, dlFill: d.backgroundColor,
+      buyText: buy.textContent, downloadText: download.textContent,
+      headingTop: box(mac.querySelector('h2')).top, firstRowTop: box(li).top,
+      labelCols: new Set(labels.map(el => Math.round(el.getBoundingClientRect().width))).size, labelWidth: box(label).width,
+      longest: Math.max(...labels.map(el => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; })),
+      lines, priceSize: parseFloat(getComputedStyle(mac.querySelector('.price-amt')).fontSize), headingSize: parseFloat(getComputedStyle(mac.querySelector('h2')).fontSize),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth, widths: [box(buy).width, box(download).width, box(mac.querySelector('.actions')).width],
+      stacked: box(mac.querySelector('.facts')).top >= box(download).bottom };
+  });
+  expect(read.amount, 'the price is the answer under Pricing').toBe('$4.99');
+  expect(read.note, 'the muted line under the price').toBe('once · no subscription');
+  expect(read.priceSize, 'the price is larger than the heading').toBeGreaterThan(read.headingSize);
+  expect(read.buyText).toBe('Buy for $4.99');
+  expect(read.downloadText).toBe('Download for Mac (3 free sessions)');
+  expect(read.heights, 'both buttons are 48 px').toEqual([48, 48]);
+  if (page.viewportSize().width >= 700) expect(read.bottoms[0], 'the buttons share a bottom edge').toBeCloseTo(read.bottoms[1], 1);
+  expect(read.radii[0], 'the buttons share a radius').toBe(read.radii[1]);
+  expect(read.buyFill, 'Buy is the solid ink pill of the door').toBe(read.doorFill);
+  expect(read.dlFill, 'Download for Mac is the outline pill, not the ink fill').not.toBe(read.buyFill);
+  expect(read.overflow).toBeLessThanOrEqual(0);
+  if (page.viewportSize().width >= 700) {
+    expect(read.headingTop, 'the left block starts on the first fact row').toBeCloseTo(read.firstRowTop, 0);
+    expect(read.labelCols, 'one label column').toBe(1);
+    expect(read.labelWidth - read.longest, 'the label column is only as wide as its longest label').toBeLessThanOrEqual(1);
+    if (page.viewportSize().width >= 1280) for (const n of read.lines) expect(n, 'a description takes at most two lines').toBeLessThanOrEqual(2);
+  } else {
+    expect(read.stacked, 'on a phone the list sits under the buttons').toBe(true);
+    expect(read.widths[0], 'on a phone Buy is full width').toBeCloseTo(read.widths[2], 0);
+    expect(read.widths[1], 'on a phone Download is full width').toBeCloseTo(read.widths[2], 0);
   }
 });
 
@@ -226,7 +279,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   const nav = page.locator('#landing .home-nav a.btn-quiet:not(.nav-buy)');
   await expect(nav).toHaveText('Download for Mac');
   await expect(nav).toHaveAttribute('href', 'download/');
-  // D-115: the way to pay is the header's Buy, a lighter quiet pill immediately left of Download for Mac.
+  // D-115, D-122: the way to pay is the header's Buy, the solid ink pill immediately left of Download for Mac.
   const headerBuy = page.locator('#landing .home-nav a.nav-buy');
   await expect(headerBuy, 'the header carries one Buy, the single word').toHaveText('Buy');
   await expect(headerBuy, 'the header Buy goes to the purchase page').toHaveAttribute('href', 'buy.html');
@@ -235,7 +288,8 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
     const b = buy.getBoundingClientRect(), d = dl.getBoundingClientRect(), s = getComputedStyle(buy), t = getComputedStyle(dl);
     return { order: buy.compareDocumentPosition(dl) & Node.DOCUMENT_POSITION_FOLLOWING ? 'buy-first' : 'download-first',
       gap: d.left - b.right, sameRow: Math.abs(b.top - d.top) < 0.5, hitTop: document.elementFromPoint(b.left + b.width / 2, b.top - 3.5) === buy, hitBottom: document.elementFromPoint(b.left + b.width / 2, b.bottom + 3.5) === buy,
-      buyFill: s.backgroundColor, dlFill: t.backgroundColor, buyEdge: s.borderTopColor, dlEdge: t.borderTopColor };
+      buyFill: s.backgroundColor, buyText: s.color, dlFill: t.backgroundColor, dlEdge: t.borderTopColor, dlText: t.color,
+      doorFill: getComputedStyle(document.querySelector('.cta .btn-primary')).backgroundColor, doorText: getComputedStyle(document.querySelector('.cta .btn-primary')).color };
   });
   expect(headerPair.order, 'Buy sits immediately left of Download for Mac').toBe('buy-first');
   expect(headerPair.hitTop && headerPair.hitBottom, 'Buy keeps a 44 px tall hit area around its 36 px pill').toBe(true);
@@ -243,9 +297,11 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   if (page.viewportSize().width >= 460) {
     expect(headerPair.sameRow, 'Buy and Download share one row').toBe(true);
     expect(headerPair.gap, 'the two pills do not touch').toBeGreaterThanOrEqual(4);
-    expect(headerPair.buyFill, 'Buy has no fill, so Download for Mac stays the heavier pill').toBe('rgba(0, 0, 0, 0)');
-    expect(headerPair.dlFill, 'Download for Mac keeps its sheet fill').not.toBe('rgba(0, 0, 0, 0)');
-    expect(headerPair.buyEdge, 'Buy wears the lighter hairline, not the stronger one').not.toBe(headerPair.dlEdge);
+    expect(headerPair.buyFill, 'Buy wears the same solid ink fill as the door, so it never reads as disabled').toBe(headerPair.doorFill);
+    expect(headerPair.buyText, 'Buy wears the door button text colour').toBe(headerPair.doorText);
+    expect(headerPair.buyFill, 'Buy is a real fill, not transparent').not.toBe('rgba(0, 0, 0, 0)');
+    expect(headerPair.dlFill, 'Download for Mac keeps its sheet fill, the outline pill').not.toBe(headerPair.buyFill);
+    expect(headerPair.dlEdge, 'Download for Mac keeps its visible outline').not.toBe('rgba(0, 0, 0, 0)');
   }
   const card = page.locator('#paper');
   await expect(card.locator('#clock')).toBeVisible();
@@ -314,7 +370,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(mac.locator('.facts')).toContainText('2 Macs');
   await expect(mac.locator('.facts')).toContainText('14-day refund');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');
-  await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy');
+  await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy for $4.99');
   await expect(page.locator('a[href*="checkout"], a[href$=".dmg"]')).toHaveCount(0);
   await expect(page.locator('.home-foot')).toContainText('Trefoil Studio');
   for (const label of ['Support', 'Privacy', 'Terms']) await expect(page.locator('.home-foot nav a', { hasText: label })).toBeVisible();
@@ -627,7 +683,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
     expect(schemaProperties(graph)).not.toContain(property);
 
   await expect(page.locator('#mac a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');
-  await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy');
+  await expect(page.locator('#mac a[href="buy.html"]')).toHaveText('Buy for $4.99');
   await expect(page.locator('.home-foot')).toContainText('2026 Trefoil Studio');
   for (const href of ['support.html', 'privacy.html', 'terms.html', 'download/', 'buy.html'])
     await expect(page.locator(`.home-foot a[href="${href}"]`)).toHaveCount(1);

@@ -10,7 +10,7 @@ import { doorSettled } from './door.mjs';
 // centred just under the line being written, for two seconds (D-100, moved out of the footer), and nothing else moves.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#e9e2ce', dark: '#342e24' };
+const TONES = { light: '#ffffff', dark: '#342e24' };
 const QUIET = { light: '#48443e', dark: '#c2bfb7' };
 const REFUSAL = 'You can only add the next word.';
 

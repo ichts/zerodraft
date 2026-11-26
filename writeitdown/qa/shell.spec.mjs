@@ -101,7 +101,12 @@ test('the header carries Buy on every page, left of the page action, and the her
       const other = nav.querySelector('a.btn-quiet:not(.nav-buy)');
       const box = buy?.getBoundingClientRect() ?? { left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0 };
       const theme = nav.querySelector('.theme-btn').getBoundingClientRect();
-      return { count: buys.length, text: buy?.textContent, path: buy && new URL(buy.href).pathname, current: buy?.getAttribute('aria-current'),
+      const probe = Object.assign(document.createElement('i'), { className: 'btn btn-primary' });
+      document.querySelector('.home').append(probe);
+      const door = getComputedStyle(probe), fill = buy && getComputedStyle(buy);
+      const solid = { fill: fill?.backgroundColor, text: fill?.color, doorFill: door.backgroundColor, doorText: door.color };
+      probe.remove();
+      return { solid, count: buys.length, text: buy?.textContent, path: buy && new URL(buy.href).pathname, current: buy?.getAttribute('aria-current'),
         visible: shown(buy), otherVisible: shown(other),
         leftOfOther: shown(other) ? box.right <= other.getBoundingClientRect().left : null,
         leftOfTheme: box.right <= theme.left, height: box.height,
@@ -114,6 +119,8 @@ test('the header carries Buy on every page, left of the page action, and the her
     expect(read.text, `${at} the header link is the single word Buy`).toBe('Buy');
     expect(read.path, `${at} the header Buy goes to the purchase page`).toMatch(/^\/(writeitdown\/)?buy(\.html)?$/);
     expect(read.visible, `${at} Buy is visible in the header`).toBe(true);
+    expect(read.solid.fill, `${at} Buy is the solid ink pill of the primary button`).toBe(read.solid.doorFill);
+    expect(read.solid.text, `${at} Buy wears the primary button's text colour`).toBe(read.solid.doorText);
     expect(read.leftOfTheme, `${at} Buy is left of the theme button`).toBe(true);
     expect(read.hitTop && read.hitBottom, `${at} Buy keeps a 44 px tall hit area`).toBe(true);
     expect(read.overflow, `${at} the page never scrolls sideways`).toBeLessThanOrEqual(0);
@@ -310,7 +317,9 @@ test('the purchase path states one price string', async ({ page, context }) => {
   await page.route('https://fonts.googleapis.com/**', route => route.abort());
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   const check = async label => {
-    const text = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+    let text = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
+    // D-122: the homepage Pricing block's one button reads `Buy for $4.99`, the single named exception to the string.
+    if (label === 'index.html') text = text.replace('Buy for $4.99', 'Buy');
     const mentions = [...text.matchAll(pricePattern)].map(match => match[0].trim());
     for (const mention of mentions)
       expect(mention, `${label}: price mention "${mention}"`).toBe('$4.99 once');

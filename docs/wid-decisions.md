@@ -2698,3 +2698,32 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   and the web half of the wording in `docs/ui-quality.md` Q-09, Q-19, Q-21, Q-22, Q-23, Q-28, Q-30 and Q-39.
   D-120 stands for the Mac.
 
+
+## D-122: the header Buy is the solid ink pill
+
+- Date: 2026-11-26. Captain: "why is the buy button grey". The header Buy, a transparent pill with a hairline edge
+  (D-115), read as disabled beside the white Download for Mac pill.
+- Decision: `.nav-buy` wears the primary button's fill and text colour (`--ink`, `--on-ink`) with no visible edge, in
+  light and dark, on every page that shares the header (`/`, `/buy`, `/download/`, `/mac`, the document pages, 404).
+  Size, 44 px hit area, hover lift and the underline on `/buy` (`aria-current="page"`) are unchanged. Download for Mac
+  stays the white outline pill. CSS only, no new colour.
+- Tests: `qa/mac.spec.mjs` (header pair: Buy fill and text equal the door's, Download keeps its outline) and
+  `qa/shell.spec.mjs` (the same on every page and width).
+- Supersedes: the fill and edge part of D-115 (Buy as the lighter, fill-less pill). Its placement stands.
+
+## D-123: the web sheet is plain white in light, the Mac keeps its paper until its next signed release
+
+- Date: 2026-11-26. Captain, about the textured beige paper in the homepage demo: "I no longer want this paper
+  colour, use white, we had a version of it long ago."
+- Decision: on writeitdown.app the light writing sheet is plain white `#ffffff`, the sheet of the first
+  white-and-ink identity (the `--sheet` token, `--sheet-shadow` edge and shadow of the commits before #71, which
+  `site.css` still uses). No grain, no mottle, no flecks: `paper-render.js` paints nothing in light and its tone is
+  `#ffffff`. The warn wash on that sheet is that identity's `--red-soft` / `--red-deep`. The rounded sheet, the
+  progress line, the timer, the word count, the fading history lines and the serif text are unchanged, and so are
+  ink, quiet and pen. It applies to the homepage demo and the web trial room, which share one sheet. Dark keeps its
+  current grained charcoal paper (D-093).
+- Mac: no release is cut for this. The Mac room keeps the Wheat paper of D-120 until its next signed release, so the
+  two surfaces differ on purpose.
+- Tests: `qa/paper.spec.mjs` pins the white tone, the white-sheet wash and the absence of any light grain (the dark
+  grain tests are unchanged); `qa/history-fade.spec.mjs` measures its contrast ladder against white.
+- Supersedes: D-069's Wheat tone and grain for the light web sheet only.

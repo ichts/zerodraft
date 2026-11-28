@@ -372,7 +372,7 @@ struct EditorFocusTests {
     }
 
     /// D-088 and D-092: a full stop fades nothing; Return starts the dissolve of the line just written, which lands on
-    /// its step (.22, then .07) after 320 ms; reached through the live editor path.
+    /// its step (.26, then .084 on white, D-130) after 320 ms; reached through the live editor path.
     @Test
     func returnStartsTheDissolveOfTheLineJustWrittenAndAFullStopDoesNot() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -414,7 +414,7 @@ struct EditorFocusTests {
         now += AppendOnlyTextView.historyDissolveDuration / 2
         editor.tickDissolve()
         #expect(editor.isDissolvingHistory == false)
-        #expect(abs(try firstLineAlpha() - ladder[1]) < 0.001, "the dissolve lands on one back: .22")
+        #expect(abs(try firstLineAlpha() - ladder[1]) < 0.001, "the dissolve lands on one back: \(ladder[1])")
 
         type("Second line. Third sentence.\n")
         #expect(editor.isDissolvingHistory)

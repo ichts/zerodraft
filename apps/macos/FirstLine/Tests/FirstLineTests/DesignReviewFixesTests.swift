@@ -201,7 +201,7 @@ struct DesignReviewFixesTests {
             #expect(abs(edge - edges[0].1) <= 1,
                     "\(name) ends at \(edge), \(edges[0].0) ends at \(edges[0].1): one right edge only")
         }
-        let rowLabels = ["Reduced Motion", "Focus Mode", "Alignment", "Font Size",
+        let rowLabels = ["Reduced motion", "Focus mode", "Alignment", "Font size",
                          "Check for updates automatically"]
         var leadingEdges: [CGFloat] = []
         for name in rowLabels {
@@ -226,7 +226,7 @@ struct DesignReviewFixesTests {
         let settings = SettingsViewController(appState: licensedTestState(), updateSettings: StubUpdateSettings())
         let window = host(settings, size: NSSize(width: 1040, height: 720))
         let strings = visibleStrings(in: settings.view)
-        #expect(strings.filter { $0 == "Focus Mode" }.count == 1, "the Focus Mode row is named twice: \(strings)")
+        #expect(strings.filter { $0 == "Focus mode" }.count == 1, "the Focus Mode row is named twice: \(strings)")
         #expect(!strings.contains("Fullscreen focus"), "the same control still carries a second label")
         #expect(strings.filter { $0 == "Check for updates automatically" }.count == 1,
                 "the updates row is named twice: \(strings)")

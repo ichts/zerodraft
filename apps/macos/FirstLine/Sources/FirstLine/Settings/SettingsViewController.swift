@@ -56,10 +56,10 @@ final class SettingsViewController: NSViewController {
         content.addArrangedSubview(headerRow)
         headerRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         let appearance = section("Appearance", rows: [
-            settingRow("Reduced Motion", control: motionPopup()),
-            settingRow("Focus Mode", control: focusSwitch()),
+            settingRow("Reduced motion", control: motionPopup()),
+            settingRow("Focus mode", control: focusSwitch()),
             settingRow("Alignment", control: alignmentPopup()),
-            settingRow("Font Size", control: sizePopup()),
+            settingRow("Font size", control: sizePopup()),
         ])
         content.addArrangedSubview(appearance)
         appearance.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -292,7 +292,7 @@ final class SettingsViewController: NSViewController {
         toggle.state = appState.settings.focusMode ? .on : .off
         // The row's leading label names the control; a second title on the switch
         // gave the same row two names (problem 10).
-        toggle.setAccessibilityLabel("Focus Mode")
+        toggle.setAccessibilityLabel("Focus mode")
         return toggle
     }
 

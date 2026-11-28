@@ -228,9 +228,12 @@ struct SettingsTests {
             ((view as? NSTextField).map { [$0.stringValue] } ?? []) + view.subviews.flatMap(labels)
         }
         let copy = labels(settings.view)
-        #expect(copy.contains("Focus Mode"))
+        // D-095: every Settings row label is sentence case, as the updates row and macOS System Settings are.
+        #expect(!copy.contains("Reduced Motion") && !copy.contains("Focus Mode") && !copy.contains("Font Size"))
+        #expect(copy.contains("Reduced motion"))
+        #expect(copy.contains("Focus mode"))
         #expect(copy.contains("Alignment"))
-        #expect(copy.contains("Font Size"))
+        #expect(copy.contains("Font size"))
         #expect(!copy.contains("Paper"), "the paper follows the system; Settings has no paper row (D-124)")
         #expect(!copy.contains("Session"))
         #expect(!copy.contains("Duration"))

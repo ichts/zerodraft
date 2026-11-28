@@ -183,7 +183,7 @@ struct SettingsUpdateTests {
         let settings = SettingsViewController(appState: licensedTestState(), updateSettings: StubUpdateSettings())
         _ = try #require(updateSwitch(settings.view), "the updates row has no switch")
         let label = try #require(textFields(settings.view).first { $0.stringValue == "Check for updates automatically" })
-        let focus = try #require(textFields(settings.view).first { $0.stringValue == "Focus Mode" })
+        let focus = try #require(textFields(settings.view).first { $0.stringValue == "Focus mode" })
         #expect(label.font == focus.font, "the updates row label is not the same role as the other rows")
         #expect(labels(settings.view).contains("Updates"))
         #expect(labels(settings.view).contains("Version \(AppState.displayVersion)"))

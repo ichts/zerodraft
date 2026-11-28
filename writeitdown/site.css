@@ -41,7 +41,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    baseline and the caption 20 px under the numeral's ink. The stopped screen is not a receipt in
    that slot: it is one group placed by its own midpoint (status-slot.js, D-070). */
 .danger{position:absolute;left:20px;right:20px;top:var(--danger-top,0);display:flex;flex-direction:column;align-items:center;pointer-events:none;text-align:center}
-.danger .numeral{font:italic 400 var(--t-numeral)/1 var(--serif);color:var(--red);font-variant-numeric:tabular-nums}
+.danger .numeral{font:var(--w-numeral) var(--t-numeral)/1 var(--serif);color:var(--red);font-variant-numeric:tabular-nums}
 .danger .caption{margin:var(--caption-gap,20px) 0 0;font:500 13px/1.5 var(--sans);letter-spacing:.04em;color:var(--ink)}
 
 .paper-foot{position:absolute;bottom:20px;left:20px;right:20px;display:flex;align-items:center;justify-content:space-between;gap:20px}
@@ -71,7 +71,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    its edge, never given an alpha of its own. Both layers share one box, one font and one wrap, so the ink sits under the
    caret. */
 .editor-stack{position:relative;width:100%;max-width:62ch;height:calc(5 * var(--lh));mask-image:linear-gradient(to bottom,rgb(0 0 0) calc(var(--lh) * 3),rgb(0 0 0 / 0) calc(var(--lh) * 3))}
-#editor,.editor-ink{box-sizing:border-box;display:block;width:100%;height:100%;margin:0;border:0;border-radius:0;padding:calc(2 * var(--lh)) 0;overflow:hidden;text-align:center;font:400 var(--script)/var(--lh) var(--serif);letter-spacing:normal;word-spacing:normal;text-indent:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal}
+#editor,.editor-ink{box-sizing:border-box;display:block;width:100%;height:100%;margin:0;border:0;border-radius:0;padding:calc(2 * var(--lh)) 0;overflow:hidden;text-align:center;font:var(--w-write) var(--script)/var(--lh) var(--serif);letter-spacing:normal;word-spacing:normal;text-indent:0;white-space:pre-wrap;overflow-wrap:break-word;word-break:normal}
 #editor{resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:var(--ink);scrollbar-width:none}
 .editor-ink{position:absolute;inset:0;color:var(--ink);pointer-events:none}
 .editor-ink [data-rung]{transition:opacity 320ms ease-out}
@@ -95,7 +95,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 /* The result screens: the fixed top block (headline, receipt, controls) and a draft that scrolls
    below it, so a long draft never hides the actions. */
 .room-top{position:absolute;z-index:2;left:32px;right:32px;top:var(--room-top,72px);display:flex;flex-direction:column;align-items:center;text-align:center;pointer-events:none}
-.room-top h1,.room-top .stopped{margin:0;font:500 var(--t-kept)/1.1 var(--serif);letter-spacing:normal;max-width:62ch}
+.room-top h1,.room-top .stopped{margin:0;font:var(--w-display) var(--t-kept)/1.1 var(--serif);letter-spacing:normal;max-width:62ch}
 .room-top .room-secondary{margin-top:24px;pointer-events:auto}
 /* The stopped screen is one composition, not a block under the top edge (D-070): the headline,
    the consequence line and the pill are one group whose midpoint sits at 33% of the sheet. The
@@ -105,7 +105,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room[data-phase="wipe"] .chrome-row,.room[data-phase="wipe"] .bar{visibility:hidden}
 #kept{position:absolute;top:var(--kept-top,72px);bottom:var(--kept-bottom,36px);left:36px;right:36px;display:flex;flex-direction:column;align-items:center}
 .kept-head{display:flex;flex-direction:column;align-items:center;width:100%;max-width:62ch;text-align:center}
-#kept h1{margin:0;font:500 var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:normal}
+#kept h1{margin:0;font:var(--w-display) var(--kept-title,var(--t-kept))/1.1 var(--serif);letter-spacing:normal}
 .kept-receipt{margin:var(--kept-receipt-gap,12px) 0 0;font:500 13px/1.6 var(--sans);letter-spacing:.02em;color:var(--paper-quiet)}
 .kept-actions{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;margin-top:var(--kept-actions-gap,20px)}
 /* The kept screen's one route to the app: the quiet role under the action row, on the footer
@@ -118,7 +118,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .room-paper[data-kept-app="false"] .kept-app{display:none}
 .kept-scroll{flex:1;min-height:0;width:100%;margin-top:var(--kept-scroll-gap,24px);overflow:auto;display:flex;flex-direction:column;align-items:center;scrollbar-width:none}
 .kept-scroll::-webkit-scrollbar{display:none}
-.kept-text{width:100%;max-width:62ch;margin:auto 0;text-align:center;font:400 var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
+.kept-text{width:100%;max-width:62ch;margin:auto 0;text-align:center;font:var(--w-write) var(--script)/var(--lh) var(--serif);white-space:pre-wrap;overflow-wrap:anywhere}
 /* Room controls: the live trial's 48 pt ink pill and 48 pt outlined secondary (the Mac's
    FirstLineButtons primary/secondary), one light inner ring on the pill edge (D-024). */
 .home .room-primary,.home .room-secondary{display:inline-flex;align-items:center;justify-content:center;height:48px;border-radius:var(--r-pill);font:600 15px/1.6 var(--sans);letter-spacing:.04em;transition:transform var(--d-feedback) var(--ease-out)}
@@ -209,7 +209,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .key.no::after{content:"";position:absolute;left:8px;right:8px;top:50%;height:2px;background:var(--red);transform:rotate(-14deg);border-radius:2px}
 /* headline */
 .home .hero{text-align:center;padding:var(--s4) var(--gut) 0}
-.home .h1{margin:0;display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font:500 var(--t-display)/1.05 var(--serif);letter-spacing:-.02em}
+.home .h1{margin:0;display:flex;justify-content:center;align-items:baseline;flex-wrap:wrap;column-gap:.28em;font:var(--w-display) var(--t-display)/1.05 var(--serif);letter-spacing:-.02em}
 .home .h1 .l1{white-space:nowrap}
 .home .hand{font-family:var(--hand);font-weight:400;color:var(--red);letter-spacing:0;white-space:nowrap}
 .home .h1 .hand{font-size:min(1.75em,calc((100vw - 2 * var(--gut)) / 5.8));line-height:.7;display:inline-block;padding:.04em .08em .1em;-webkit-text-stroke:.012em currentColor;clip-path:inset(-10% 100% -20% 0);animation:wid-write var(--d-write) var(--ease-out) .3s forwards}
@@ -238,11 +238,11 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .count{font:400 var(--t-small)/1.6 var(--sans);letter-spacing:0;font-variant-numeric:tabular-nums;color:var(--paper-quiet)}
 .home .prev-band{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);overflow:hidden;pointer-events:none}
 .home .prev-stack{position:absolute;left:0;right:0;bottom:var(--lh);display:flex;flex-direction:column-reverse;align-items:center}
-.home .prev-line{width:100%;max-width:62ch;font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
+.home .prev-line{width:100%;max-width:62ch;font:var(--w-write) var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
 .home .anchor-wrap{position:absolute;left:clamp(18px,5vw,56px);right:clamp(18px,5vw,56px);display:flex;justify-content:center}
 /* The demo line keeps one line box even before the first scripted word, so its own rect is the
    writing line the anchor measures (the caret span that used to hold it open is gone). */
-.home .script{margin:0;width:100%;max-width:62ch;min-height:var(--lh);font:400 var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
+.home .script{margin:0;width:100%;max-width:62ch;min-height:var(--lh);font:var(--w-write) var(--script)/var(--lh) var(--serif);color:var(--ink);text-align:center}
 /* The active line is centred at --write-anchor (35%) of the sheet, the same ratio as the trial room. */
 .home .anchor-wrap{top:calc(var(--write-anchor) - var(--lh) / 2)}
 .home .prev-band{bottom:calc(100% - var(--write-anchor) - var(--lh) / 2);height:calc(3 * var(--lh))}
@@ -256,7 +256,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .cta{display:flex;flex-direction:column;justify-content:center;align-items:center;padding:var(--s5) var(--gut) 0;text-align:center}
 /* sections */
 .sect{max-width:var(--maxw);margin:0 auto;padding:var(--section) var(--gut) 0}
-.home h2{margin:0;text-align:center;font:500 var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
+.home h2{margin:0;text-align:center;font:var(--w-display) var(--t-h2)/1.06 var(--serif);letter-spacing:-.02em}
 .home h2 .hand{font-size:1.5em;line-height:.8}
 .sub{margin:18px auto 0;max-width:46ch;text-align:center;font:400 var(--t-body)/1.55 var(--sans);color:var(--mute)}
 .hero-sub{max-width:var(--measure);margin-top:var(--s3)}
@@ -264,9 +264,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .card{--r-panel:max(var(--r-min),calc(var(--r-card) - var(--pad,0px)));background:var(--sheet);border-radius:var(--r-card);border:1px solid var(--hair);overflow:hidden;display:flex;flex-direction:column}
 .card .vis{height:190px;background:linear-gradient(180deg,var(--stage-a),var(--stage-b));display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--hair)}
 .card .txt{padding:22px var(--s5) 26px}
-.card h3{margin:0 0 var(--s2);font:500 var(--t-h3)/1.15 var(--serif);letter-spacing:-.01em}
+.card h3{margin:0 0 var(--s2);font:var(--w-display) var(--t-h3)/1.15 var(--serif);letter-spacing:-.01em}
 .card p{margin:0;color:var(--mute);font:400 var(--t-body)/1.55 var(--sans)}
-.card .txt p{color:var(--ink);font:500 var(--t-h3)/1.25 var(--serif);letter-spacing:-.01em}
+.card .txt p{color:var(--ink);font:var(--w-display) var(--t-h3)/1.25 var(--serif);letter-spacing:-.01em}
 .keys{display:flex;gap:var(--s3)}
 .line8{width:78%}
 .line8 .track{height:8px;border-radius:var(--r-pill);background:var(--hair-2);overflow:hidden}
@@ -279,8 +279,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .mo{background:var(--sheet);border-radius:var(--r-card);border:1px solid var(--hair);height:300px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:0 var(--s5)}
 .mo small{position:absolute;left:20px;top:18px;font:500 12px/1.4 var(--sans);color:var(--chrome)}
 .mo.m3{flex-direction:column;gap:var(--s2)}
-.mo .t{font:400 30px/1.3 var(--serif)}
-.mo .n{font:italic 400 150px/1 var(--serif);color:var(--red)}
+.mo .t{font:var(--w-write) 30px/1.3 var(--serif)}
+.mo .n{font:var(--w-numeral) 150px/1 var(--serif);color:var(--red)}
 .mo .r{font:400 var(--t-ui)/1.6 var(--sans);color:var(--ink)}
 .mo .cur{display:inline-block;width:2px;height:.9em;background:var(--ink);vertical-align:-.1em;margin-left:2px}
 /* Pricing block (D-122). The left block is the answer: the price large, one muted line under it, one row of two 48 px
@@ -289,7 +289,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .mac-card{padding:28px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:28px;align-items:start}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
 .price-fig{margin:var(--s5) 0 0;display:grid;gap:var(--s1)}
-.price-amt{font:500 clamp(52px,12.8vw,96px)/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.price-amt{font:var(--w-display) clamp(52px,12.8vw,96px)/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .price-note{font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}
 .mac-card .actions .btn{height:48px}
@@ -297,7 +297,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .facts li{display:grid;grid-template-columns:subgrid;grid-column:1/-1;align-items:baseline;column-gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .facts li:first-child{padding-top:0}
 .facts li:last-child{border-bottom:0}
-.facts b{font:500 18px/1.15 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.facts b{font:var(--w-display) 18px/1.15 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 /* footer */
 .home-foot{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut);font:400 14px/1.5 var(--sans);color:var(--mute)}
 .foot-grid{padding:var(--s8) 0 var(--s6);border-top:1px solid var(--hair);display:grid;grid-template-columns:1.4fr repeat(3,1fr);gap:var(--s6)}
@@ -316,7 +316,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .faq details{border-bottom:1px solid var(--hair)}
 .faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:var(--s5);align-items:center;padding:20px 0}
 .faq summary::-webkit-details-marker{display:none}
-.faq summary h3{margin:0;font:500 22px/1.3 var(--serif);letter-spacing:-.01em}
+.faq summary h3{margin:0;font:var(--w-display) 22px/1.3 var(--serif);letter-spacing:-.01em}
 .faq summary::after{content:"+";flex:none;font:400 24px/1 var(--sans);color:var(--mute);transition:transform var(--d-feedback) var(--ease-out)}
 .faq details[open] summary::after{transform:rotate(45deg)}
 .faq p{margin:0 0 20px;color:var(--mute);font-size:16.5px;line-height:1.6;max-width:62ch}
@@ -357,7 +357,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 }
 @media (prefers-reduced-motion: reduce){.home .h1 .hand{animation:none;clip-path:none}.home .btn,.home .room-primary,.home .room-secondary{transition:none}}
 .dl-page .dlhead{padding:clamp(40px,7vw,80px) 0 0;text-align:center}
-.dl-page .dlhead h1{margin:0;font:500 clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
+.dl-page .dlhead h1{margin:0;font:var(--w-display) clamp(38px,5vw,60px)/1.05 var(--serif);letter-spacing:-.02em}
 .dl-page .dlhead h1 .nw,.dl-page #requirements .nw{white-space:nowrap}
 .dl-page .dlhead .sub{max-width:60ch}
 .dlbox{--pad:32px;max-width:760px;margin:36px auto 0;padding:var(--pad);gap:20px}
@@ -392,7 +392,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .reqs b{display:block;color:var(--ink);font-weight:600}
 .steps3{max-width:760px;margin:20px auto 0;display:grid;grid-template-columns:repeat(2,1fr);align-items:start;gap:16px}
 .steps3 .card{--pad:20px;padding:var(--pad)}
-.steps3 h2{margin:0 0 6px;text-align:left;font:500 20px/1.2 var(--serif)}
+.steps3 h2{margin:0 0 6px;text-align:left;font:var(--w-display) 20px/1.2 var(--serif)}
 .steps3 p{margin:0 0 10px;color:var(--mute);font-size:15px;line-height:1.55}
 .steps3 a,.dl-alt a{text-decoration:underline;text-underline-offset:3px}
 .dl-alt{margin:28px auto 0;padding-bottom:var(--s8)}
@@ -413,7 +413,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home main.buy{display:flex;flex-direction:column;align-items:center;justify-content:center;
   min-height:calc(100vh - var(--nav-h));min-height:calc(100svh - var(--nav-h));
   padding:var(--s7) var(--gut) var(--s8);text-align:center}
-.home .buy-price{margin:0;font:500 clamp(52px,12.8vw,116px)/1 var(--serif);letter-spacing:-.03em;
+.home .buy-price{margin:0;font:var(--w-display) clamp(52px,12.8vw,116px)/1 var(--serif);letter-spacing:-.03em;
   font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
 .home .buy-facts{list-style:none;margin:var(--s5) 0 0;padding:0;display:grid;gap:var(--s1);
   font:400 var(--t-body)/1.5 var(--sans);color:var(--mute)}
@@ -457,9 +457,9 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    those edges are equidistant from the header's two edges. A left-flush column under a full-width header
    leaves one empty band and reads as a mistake (D-055); qa/shell.spec.mjs measures it at three widths. */
 .home main.doc{max-width:calc(62ch + 2 * var(--gut));margin:0 auto;padding:clamp(40px,6vw,72px) var(--gut) var(--s9)}
-.home .doc h1{margin:0;font:500 clamp(34px,4.3vw,58px)/1.06 var(--serif);letter-spacing:-.02em}
-.home .doc h2{margin:var(--s7) 0 var(--s3);text-align:left;font:500 var(--t-h3)/1.2 var(--serif);letter-spacing:-.01em}
-.home .doc h3{margin:var(--s5) 0 var(--s2);font:500 20px/1.3 var(--serif);letter-spacing:-.01em}
+.home .doc h1{margin:0;font:var(--w-display) clamp(34px,4.3vw,58px)/1.06 var(--serif);letter-spacing:-.02em}
+.home .doc h2{margin:var(--s7) 0 var(--s3);text-align:left;font:var(--w-display) var(--t-h3)/1.2 var(--serif);letter-spacing:-.01em}
+.home .doc h3{margin:var(--s5) 0 var(--s2);font:var(--w-display) 20px/1.3 var(--serif);letter-spacing:-.01em}
 .home .doc p,.home .doc li{margin:0 0 var(--s4);font:400 var(--t-body)/1.6 var(--sans);color:var(--ink)}
 .home .doc .doc-lede{margin-top:var(--s4);color:var(--mute)}
 .home .doc .doc-note{margin:0;font:400 var(--t-ui)/1.5 var(--sans);color:var(--mute)}
@@ -481,7 +481,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .doc-buy{padding:clamp(24px,4vw,40px);scroll-margin-top:var(--s4)}
 .home .doc-buy h2{margin:0}
 .home .price-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--s2) var(--s3);margin:var(--s4) 0 0}
-.home .price-row .doc-price{margin:0;font:500 32px/1.1 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
+.home .price-row .doc-price{margin:0;font:var(--w-display) 32px/1.1 var(--serif);letter-spacing:-.01em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .home .doc-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--s3);margin-top:var(--s5)}
 .home .doc-actions form{margin:0;display:flex}
 /* One width per control. Both labels change with the state machine - `Buy for $4.99 once` becomes

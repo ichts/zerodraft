@@ -255,11 +255,11 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(hero.locator('h1')).toHaveText('Keep typing or lose every word.');
   await expect(hero.locator('h1 .hand')).toHaveText('lose every word.');
   await expect(hero.locator('h1 .hand')).toHaveCSS('font-family', /Reenie Beanie/);
-  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Newsreader/);
+  await expect(hero.locator('h1 .l1')).toHaveCSS('font-family', /^"?Allo/);
   await expect(hero.locator('p.sub'), 'the subheadline carries the rule in the captain\'s words').toHaveText('Write It Down is a forward-only writing timer for people who get stuck rewriting their first sentence.');
   const families = await page.evaluate(() => [...new Set([...document.fonts].filter(f => f.status === 'loaded').map(f => f.family.replace(/"/g, '')))]);
-  expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Newsreader', 'Reenie Beanie']));
-  expect(families.every(f => ['Newsreader', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
+  expect(families.sort(), 'only the site faces load').toEqual(expect.arrayContaining(['Allo', 'Reenie Beanie']));
+  expect(families.every(f => ['Allo', 'Reenie Beanie'].includes(f)), families.join(', ')).toBe(true);
   const ink = await hero.evaluate(h => {
     const probe = document.createElement('i');
     probe.style.color = getComputedStyle(h).getPropertyValue('--red');
@@ -272,7 +272,7 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   expect(ink.actual, 'the two headline parts differ in color').not.toBe(ink.line1);
   const tokens = await page.locator('#landing').evaluate(e => ['--page', '--sheet', '--ink', '--red', '--r-stage', '--sans'].map(name => getComputedStyle(e).getPropertyValue(name).trim()));
   expect(tokens.every(Boolean), 'design-system tokens are in force on the landing').toBe(true);
-  expect(tokens[5], 'the tool face is the system UI stack, not a webfont').toMatch(/system-ui/);
+  expect(tokens[5], 'the tool face is Allo, with the system UI stack behind it').toMatch(/^'?"?Allo.*system-ui/);
   for (const selector of ['#landing .home-nav .nav-buy', '#landing .home-nav a.btn-quiet:not(.nav-buy)', '.cta .btn', '#clock', '#count'])
     await expect(page.locator(selector)).toHaveCSS('font-family', /system-ui/);
 
@@ -366,8 +366,11 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   await expect(page.locator('#how .card h3'), 'each card carries one line and no title').toHaveCount(0);
   await expect(page.locator('.mo small')).toHaveText([/writing/, /warning/, /deleted/]);
   const mac = page.locator('#mac');
-  await expect(mac.locator('.facts')).toContainText('then pay $4.99 once');
-  await expect(mac.locator('.facts')).toContainText('2 Macs');
+  // Each fact is said once (Artist audit, D-124 pass): the price and `once` live in the price figure, not in a fact row.
+  await expect(mac.locator('.price-fig')).toHaveText(/\$4\.99\s*once/);
+  await expect(mac.locator('.facts')).not.toContainText('$4.99');
+  await expect(mac.locator('.facts')).toContainText('3 free sessions');
+  await expect(mac.locator('.facts')).toContainText('2 computers');
   await expect(mac.locator('.facts')).toContainText('14-day refund');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');
   await expect(mac.locator('a[href="buy.html"]')).toHaveText('Buy for $4.99');
@@ -882,9 +885,8 @@ test('the download head breaks without an orphan and its checksum block reads', 
   const read = await readHead();
   const phone = page.viewportSize().width <= 420;
   if (phone) {
-    // No one-word last line: the headline breaks as `Write It Down` / `for Mac`.
-    expect(read.lines.length).toBeGreaterThan(1);
-    for (const line of read.lines) expect(line.split(' ').length, `the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
+    // No one-word line: the headline holds one line or breaks as `Write It Down` / `for Mac`.
+    if (read.lines.length > 1) for (const line of read.lines) expect(line.split(' ').length, `the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
     // The deck is a reading column on the headline's own left edge, not seven centred lines.
     expect(read.sub.align).toBe('left');
     expect(read.h1Align).toBe('left');
@@ -898,7 +900,7 @@ test('the download head breaks without an orphan and its checksum block reads', 
   }
   await page.screenshot({ path: info.outputPath('download-head.png'), fullPage: false });
   // The phone head is one left-aligned block at every phone width: the headline ink and the deck
-  // ink start on the same edge, and the H1 still breaks into two lines with no one-word line.
+  // ink start on the same edge, and the H1 never leaves a one-word line.
   for (const width of [390, 375, 320]) {
     await page.setViewportSize({ width, height: page.viewportSize().height });
     await page.evaluate(() => document.fonts.ready);
@@ -906,8 +908,7 @@ test('the download head breaks without an orphan and its checksum block reads', 
     expect(head.h1Align, `${width}: the phone head is left-aligned`).toBe('left');
     expect(head.sub.align, `${width}: the phone deck is left-aligned`).toBe('left');
     expect(head.h1InkLeft, `${width}: the headline ink and the deck ink share one edge`).toBeCloseTo(head.sub.inkLeft, 0);
-    expect(head.lines.length, `${width}: the phone headline breaks into two lines`).toBeGreaterThan(1);
-    for (const line of head.lines) expect(line.split(' ').length, `${width}: the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
+    if (head.lines.length > 1) for (const line of head.lines) expect(line.split(' ').length, `${width}: the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
     expect(head.sub.measure, `${width}: the deck stays within 34ch`).toBeLessThanOrEqual(head.sub.ch34 + 0.5);
   }
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);

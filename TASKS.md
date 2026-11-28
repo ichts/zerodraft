@@ -29,14 +29,13 @@
 - A10 决策记录拆三条：D-124 纸张与外观跟随，D-125 字体，D-126 焦点环。纸张的提交不依赖字体的提交。
 - A11 参考（哥睡前给）：Quiet.md（https://github.com/s1dashu/quiet-md）、MiaoYan（https://miaoyan.app/）。两者都是白 / 黑两种外观的安静写作工具，作为截图对照，不照搬。
 - A12 本仓库规则禁止新分支：每条直接在 main 上 commit 并 push。
-- A13 红色重做（哥在 Artideck 评论：「不太喜欢这个红色……包括 light 和 dark 的所有红色，都很奇怪」）。方案在画板第 2 轮：A 淡红 wash；B 灰 wash + 红色只留数字与手写（推荐）；C 无红。新红统一一个色相：浅色 `#b00c15`，深色 `#ff453a`，警告句用墨色。哥已在画板选定 B（red-b，2026-11-28）。B 的数字在最深一档上为 5.78:1（浅）/ 4.3:1（深），属大字（≥24px，WCAG 3:1），D-124 写明数字按大字门槛。
+- A13 红色重做（哥在 Artideck 评论：「不太喜欢这个红色……包括 light 和 dark 的所有红色，都很奇怪」）。方案在画板第 2 轮：A 淡红 wash；B 灰 wash + 红色只留数字与手写（推荐）；C 无红。新红统一一个色相：浅色 `#b00c15`，深色 `#ff453a`，警告句用墨色。哥已在画板选定 B（red-b，2026-11-28）。B 的数字在最深一档上为 5.78:1（浅）/ 4.44:1（深），属大字（≥24px，WCAG 3:1），D-124 写明数字按大字门槛。
 
-## 审查欠账
+## 审查
 
-Codex 2026-11-28 下午额度用尽（恢复约 15:05），哥指示先继续。以下已提交条目欠 Codex 复审，额度恢复后按提交逐条补审，打回就补修：
-- 第 1 条
-- 第 2 条（含第 7 条）
-- 第 3 条
+Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Codex）。
+- 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
+- 第 4、5 条：待审。
 
 ## 清单
 
@@ -54,8 +53,8 @@ Codex 2026-11-28 下午额度用尽（恢复约 15:05），哥指示先继续。
 
 - [x] 2. 网页浅色按 D-124：灰 wash `#f2f2f2`/`#e6e6e6`（`--paper-wash` 自有值）、quiet `#3f3b36`、一个红 `#b00c15`（数字、手写、标签、hairline），警告句与退出确认用墨色，退役 `--red-soft`/`--red-deep`/`--paper-danger`；`paper.spec`、`moments.spec` 等改断言。
 - [x] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
-- [ ] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
-- [ ] 5. Pricing 文案：价格、`no subscription`、`3 free sessions` 各说一次，按钮回 `Buy`（D-114），`2 Macs` 改 `2 computers`（A9）。
+- [x] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
+- [x] 5. Pricing 文案：价格、`no subscription`、`3 free sessions` 各说一次（事实行不再重复价格），`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
 - [ ] 6. Pricing 标题与价格间距为 0 的根因修复。
 - [x] 7. 三张状态卡统一中性底：并入第 2 条（退役 `--red-soft`/`--red-deep` 时必须一起改），断言在旧样式上已证明失败。
 - [ ] 8. 手机端 header 与 H1 间距补足。

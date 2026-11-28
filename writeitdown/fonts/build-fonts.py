@@ -1,81 +1,85 @@
 #!/usr/bin/env python3
 """Build the webfonts writeitdown.app serves from its own files.
 
-[INPUT] The Mac app's bundled faces (apps/macos/FirstLine/Sources/FirstLine/Resources): Newsreader
-        upright and italic variable, Zhuque Fangsong, and the committed
-        writeitdown/fonts/reenie-beanie.woff2 hand accent.
-[OUTPUT] writeitdown/fonts/*.woff2 plus the generated writeitdown/fonts.css (the faces every page
-        links) and writeitdown/fonts-cjk.css (the Chinese face, linked by index.html alone).
-[POS]   The one font build step for the static site; the committed woff2 files are its product.
-[PROTOCOL] Run `python3 fonts/build-fonts.py` after a face changes (needs fonttools + brotli); commit
-        both the files and the generated CSS. Never hand-edit fonts.css, fonts-cjk.css or a .woff2.
+[INPUT] Two upstream font releases, pinned by SHA-256 (see SOURCES): Allo 1.0.3's variable woff2 (npm
+        package `allo-font`, SIL OFL 1.1, no Reserved Font Name) and Resource Han Rounded CN Normal
+        (GitHub CyanoHao/Resource-Han-Rounded release RHR-CN.7z, SIL OFL 1.1). Neither source is
+        committed: pass their paths with --allo and --rhr.
+[OUTPUT] writeitdown/fonts/allo-latin.woff2 and writeitdown/fonts/resource-han-rounded-gb2312.woff2,
+        and the generated writeitdown/fonts.css (the faces every page links, with the committed
+        fonts/reenie-beanie.woff2 hand accent declared beside Allo) and
+        writeitdown/fonts-cjk.css (the Chinese face, linked by index.html alone).
+[POS]   The one font build step for the static site; the committed woff2 files are its product. The
+        licence texts the files ship under are committed beside them as upstream wrote them:
+        fonts/OFL-Allo.txt (allo-font 1.0.3's OFL.txt) and fonts/OFL-ResourceHanRounded.txt (the
+        release's LICENSE.md: the fonts under SIL OFL 1.1, Reserved Font Name 'Source').
+[PROTOCOL] Run `python3 fonts/build-fonts.py --allo PATH --rhr PATH` after a face changes (needs
+        fonttools + brotli); commit the files and the generated CSS together. Never hand-edit
+        fonts.css, fonts-cjk.css or a .woff2. `--list` prints the shipped files without sources.
 
 The site serves every face itself: a third-party font host that fails must not decide what a page
-renders (D-057). Latin is Newsreader subset to the Latin ranges the pages use, with its `wght` and
-`opsz` axes intact, so the web writes in the same variable font the Mac bundles. Chinese is Zhuque
-Fangsong, the Mac room's CJK face, subset to GB2312 as ONE file: the room takes any character, so a
-sliced set only moves the bytes it would have spent anyway into the middle of a draft, where every
-late slice repaints a character that is already on screen. `font-display:swap` is the visible-text
-guard: a Chinese character is never held invisible waiting for 2.5 MB. The guarantee that a drawn
-character never changes face lives in `room.js`, which fixes the face at a draft's first Chinese
-character - Zhuque if those bytes are already resident, the platform serif if they are not - and never
-revisits it until the sheet is empty again (D-109, after measuring that `font-display:optional` makes
-Chrome drop the face for the whole document). The landing's hand accent is one face with one glyph set and is declared here so
-every webfont face on the site has one owner.
+renders (D-057). Allo is the one face of every role (D-125): what the writer writes, the headings and
+everything the tool says; Reenie Beanie stays the landing's hand accent alone (D-057, D-121).
+Allo is subset to the Latin ranges a writer types (Latin-1, Extended-A/B,
+the Vietnamese block, combining marks, punctuation, currency, letterlike symbols, arrows) and pinned
+at ROND 30, the roundness world A uses everywhere, with `wght` cut to 300-700 (the weights the site
+sets: numeral 360, writing 410, headings 540, labels 400-600) and `opsz` kept. Chinese is Resource
+Han Rounded, the rounded CJK face that pairs with Allo, subset to GB2312 as ONE file: the room takes
+any character, so a sliced set only moves the bytes into the middle of a draft, where every late
+slice repaints a character already on screen. The file is never requested on first paint: room.js
+asks for it when Chinese input begins - an IME composition or a typed Chinese character (D-119), `font-display:swap` keeps text visible,
+and room.js fixes the face at a draft's first Chinese character so a drawn character never changes
+face (D-109).
 
-The subset must keep the source's vertical metrics: the room's 1.6 pitch is fixed in CSS, but where
-the glyph sits inside that pitch comes from hhea/OS-2. A 1px shift would break the writing anchor.
+The subset must keep the source's vertical metrics: the room's pitch is fixed in CSS, but where the
+glyph sits inside that pitch comes from hhea/OS-2. A 1px shift would break the writing anchor.
 """
 
 import argparse
-
+import hashlib
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from fontTools.ttLib import TTFont
+from fontTools.varLib import instancer
 
 SITE = Path(__file__).resolve().parents[1]
-MAC_RESOURCES = SITE.parent / 'apps' / 'macos' / 'FirstLine' / 'Sources' / 'FirstLine' / 'Resources'
 OUT = SITE / 'fonts'
 
-# The Latin ranges the pages use. This is the range Google served for the same face, so the rendered
-# advance stays identical to the live site; anything outside it is punctuation the pages do not set.
-LATIN_RANGES = (
-    'U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,'
-    'U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD'
-)
-
-# GB2312 is the common simplified set: 6763 hanzi plus the symbol rows, one file of about 2.5 MB.
-# A writer's draft can take any of them, so the room loads the whole set once when it opens instead
-# of one codepoint slice per new character.
-# Full-width punctuation and the CJK punctuation block belong to the same file.
-CJK_EXTRA_RANGES = 'U+00B7,U+2018-201D,U+2014,U+2026,U+3000-303F,U+FF01-FF60'
-
-CATALOG = {
-    'newsreader-latin': ('Newsreader-Variable.ttf', 'normal', 'Newsreader', LATIN_RANGES),
-    'newsreader-latin-italic': ('Newsreader-Italic-Variable.ttf', 'italic', 'Newsreader', LATIN_RANGES),
+SOURCES = {
+    'allo': ('AlloVariable.woff2 from allo-font@1.0.3 (fonts/webfonts/)',
+             '482bec1444dabaf1a493b34aa926bb7751ef5edc3e5a9f90a4111c7bb1e0c0ec'),
+    'rhr': ('ResourceHanRoundedCN-Normal.ttf from Resource-Han-Rounded RHR-CN.7z',
+            '33c26dd81ff65e9027a3628dc586fe59a2ed3c082c09e5b0836f1e1f389ee2f3'),
 }
+
+LATIN_RANGES = (
+    'U+0000-024F,U+0300-036F,U+1E00-1EFF,U+2000-206F,U+20A0-20CF,U+2100-214F,U+2190-21FF,'
+    'U+2212,U+2215,U+FEFF,U+FFFD'
+)
+ALLO_AXES = {'ROND': 30, 'wght': (300, 700)}
+
+# GB2312's Chinese: 6763 hanzi and the CJK symbol rows, one file, with the CJK punctuation block and the
+# full-width forms. The Latin, Greek and Cyrillic rows GB2312 also carries stay out: Allo draws Latin, and
+# a Greek letter must never pull 1.2 MB of Chinese onto the page.
+CJK_EXTRA_RANGES = 'U+3000-303F,U+FF01-FF60'
 
 
 def gb2312_charset():
-    """Every character GB2312 can decode: 682 symbols and 6763 hanzi, with their row byte."""
-    symbols, level1, level2 = [], [], []
+    """Every CJK character GB2312 can decode (codepoints from U+2E80 up)."""
+    characters = []
     for row in range(0xA1, 0xFF):
         for cell in range(0xA1, 0xFF):
             try:
                 character = bytes([row, cell]).decode('gb2312')
             except UnicodeDecodeError:
                 continue
-            if not 0x4E00 <= ord(character) <= 0x9FFF:
-                symbols.append(character)
-            elif row <= 0xD7:
-                level1.append(character)
-            else:
-                level2.append(character)
-    return symbols, level1, level2
-
+            if ord(character) >= 0x2E80:
+                characters.append(character)
+    return characters
 
 
 def unicode_range(characters):
@@ -100,10 +104,18 @@ def vertical_metrics(font):
             os2.sTypoAscender, os2.sTypoDescender, os2.usWinAscent, os2.usWinDescent)
 
 
-def subset(source, destination, unicodes):
+def pinned(name, path):
+    label, expected = SOURCES[name]
+    digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    if digest != expected:
+        raise SystemExit(f'--{name}: expected {label} ({expected}), got {digest}')
+    return Path(path)
+
+
+def subset(source, destination, unicodes, flavor='woff2'):
     subprocess.run([sys.executable, '-m', 'fontTools.subset', str(source),
-                    f'--output-file={destination}', '--flavor=woff2',
-                    '--layout-features=*', '--name-IDs=*', '--name-languages=*',
+                    f'--output-file={destination}', f'--flavor={flavor}' if flavor else '--no-hinting',
+                    '--layout-features=*', '--name-IDs=*', '--name-languages=*', '--notdef-outline',
                     f'--unicodes={unicodes}'], check=True)
     return destination
 
@@ -114,10 +126,9 @@ def check(destination, source, unicodes):
     if vertical_metrics(built) != vertical_metrics(original):
         raise SystemExit(f'{destination.name}: vertical metrics moved '
                          f'{vertical_metrics(original)} -> {vertical_metrics(built)}')
-    wanted = set(TTFont(str(source), lazy=True).getBestCmap())
     covered = set(built.getBestCmap())
-    missing = [f'U+{codepoint:04X}' for codepoint in sorted(wanted) if codepoint not in covered
-               and _in_ranges(codepoint, unicodes)]
+    missing = [f'U+{codepoint:04X}' for codepoint in sorted(original.getBestCmap())
+               if codepoint not in covered and _in_ranges(codepoint, unicodes)]
     if missing:
         raise SystemExit(f'{destination.name}: subset dropped {missing[:8]}')
     return destination.stat().st_size
@@ -132,71 +143,64 @@ def _in_ranges(codepoint, ranges):
     return False
 
 
-def faces(family, style, weight, file, ranges, display='swap'):
-    return (f"@font-face{{font-family:'{family}';font-style:{style};font-weight:{weight};"
-            f"font-display:{display};src:url(fonts/{file.name}) format('woff2');unicode-range:{ranges}}}\n")
+def face(family, weight, file, ranges):
+    return (f"@font-face{{font-family:'{family}';font-style:normal;font-weight:{weight};"
+            f"font-display:swap;src:url(fonts/{file.name}) format('woff2');unicode-range:{ranges}}}\n")
+
+
+def build_allo(source):
+    """Subset first (the variable tables still name every glyph), then pin ROND and cut wght."""
+    destination = OUT / 'allo-latin.woff2'
+    with tempfile.TemporaryDirectory() as scratch:
+        latin = subset(source, Path(scratch) / 'allo-latin.ttf', LATIN_RANGES, flavor=None)
+        # The source's head.modified is kept, so the same inputs always build the same bytes.
+        font = instancer.instantiateVariableFont(TTFont(latin, recalcTimestamp=False), ALLO_AXES)
+        font.flavor = 'woff2'
+        font.save(destination)
+    return destination, check(destination, source, LATIN_RANGES)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--list', action='store_true', help='print the shipped font files and sizes')
+    parser.add_argument('--allo', help=SOURCES['allo'][0])
+    parser.add_argument('--rhr', help=SOURCES['rhr'][0])
     arguments = parser.parse_args()
     if arguments.list:
         for path in sorted(OUT.glob('*.woff2')):
             print(f'{path.stat().st_size:>9} B  fonts/{path.name}')
         return
+    if not (arguments.allo and arguments.rhr):
+        parser.error('a rebuild needs both --allo and --rhr (see SOURCES for the pinned files)')
 
     OUT.mkdir(exist_ok=True)
-    base, cjk, report = [], [], []
-
-    # The hand accent is one static face, already subset and committed; it only needs its declaration,
-    # which keeps every webfont face on the site in one generated place.
-    hand = OUT / 'reenie-beanie.woff2'
-    if not hand.exists():
-        raise SystemExit(f'missing {hand.name}: the landing hand accent is a committed woff2')
-    base.append(f"@font-face{{font-family:'Reenie Beanie';font-style:normal;font-weight:400;"
-                f"font-display:swap;src:url(fonts/reenie-beanie.woff2) format('woff2')}}\n")
-    report.append((hand.name, hand.stat().st_size))
-
-    for slug, (source_name, style, family, ranges) in CATALOG.items():
-        destination = OUT / f'{slug}.woff2'
-        subset(MAC_RESOURCES / source_name, destination, ranges)
-        report.append((destination.name, check(destination, MAC_RESOURCES / source_name, ranges)))
-        # Both Newsreader files are variable on `wght` 200-800 and `opsz` 6-72; declaring the range is
-        # what lets one file serve the 400 writing text, the 500 headings and the italic numeral.
-        base.append(faces(family, style, '200 800', destination, ranges))
-
-    symbols, level1, level2 = gb2312_charset()
-    ranges = unicode_range(symbols + level1 + level2) + ',' + CJK_EXTRA_RANGES
-    destination = OUT / 'zhuque-fangsong-gb2312.woff2'
-    subset(MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', destination, ranges)
-    report.append((destination.name, check(destination, MAC_RESOURCES / 'ZhuqueFangsong-Regular.ttf', ranges)))
-    cjk.append(faces('Zhuque Fangsong', 'normal', '400', destination, ranges, display='swap'))
-
-    for licence in ('OFL-Newsreader.txt', 'OFL-ZhuqueFangsong.txt'):
-        shutil.copyfile(MAC_RESOURCES / licence, OUT / licence)
+    allo, allo_size = build_allo(pinned('allo', arguments.allo))
+    rhr_source = pinned('rhr', arguments.rhr)
+    cjk_ranges = unicode_range(gb2312_charset()) + ',' + CJK_EXTRA_RANGES
+    rhr = subset(rhr_source, OUT / 'resource-han-rounded-gb2312.woff2', cjk_ranges)
+    rhr_size = check(rhr, rhr_source, cjk_ranges)
 
     (SITE / 'fonts.css').write_text(
         '/* GENERATED by fonts/build-fonts.py - do not hand-edit.\n'
-        '   The faces writeitdown.app serves from its own files (D-057): Newsreader for what the writer writes\n'
-        '   and for headings, Reenie Beanie for the landing\'s hand accent only. Every page links this sheet.\n'
-        '   Licence texts sit beside the files in fonts/. Rebuild: python3 fonts/build-fonts.py */\n'
-        + ''.join(base))
+        '   The faces writeitdown.app serves from its own files (D-057, D-125): Allo, pinned at ROND 30, for\n'
+        '   every role on every page, and Reenie Beanie for the landing\'s hand accent only. Every page links\n'
+        '   this sheet. Licence texts sit beside the files in fonts/.\n'
+        '   Rebuild: python3 fonts/build-fonts.py --allo PATH --rhr PATH */\n'
+        + face('Allo', '300 700', allo, LATIN_RANGES)
+        + "@font-face{font-family:'Reenie Beanie';font-style:normal;font-weight:400;"
+          "font-display:swap;src:url(fonts/reenie-beanie.woff2) format('woff2')}\n")
     (SITE / 'fonts-cjk.css').write_text(
         '/* GENERATED by fonts/build-fonts.py - do not hand-edit.\n'
-        '   Zhuque Fangsong, the Mac room\'s Chinese face, GB2312-subset as one file and linked by\n'
-        '   index.html alone, the only page that can render Chinese. font-display:swap: text is never\n'
-        '   held invisible waiting for this file; room.js fixes the face at a draft\'s first Chinese\n'
-        '   character and keeps it until the sheet is empty again, so a drawn character never changes face\n'
-        '   (D-109). The room asks for the file when a\n'
-        '   trial link shows intent and again as it opens, so it is normally resident before the first\n'
-        '   keystroke. Rebuild: python3 fonts/build-fonts.py */\n'
-        + ''.join(cjk))
+        '   Resource Han Rounded, the Chinese face that pairs with Allo, GB2312-subset as one file and\n'
+        '   linked by index.html alone, the only page that can render Chinese. Nothing asks for the file\n'
+        '   on first paint: room.js requests it when the room opens or a trial link shows intent (D-109).\n'
+        '   font-display:swap keeps text visible; room.js fixes the face at a draft\'s first Chinese\n'
+        '   character and keeps it until the sheet is empty again, so a drawn character never changes\n'
+        '   face (D-109). Rebuild: python3 fonts/build-fonts.py --allo PATH --rhr PATH */\n'
+        + face('Resource Han Rounded', '400', rhr, cjk_ranges))
 
-    total = sum(size for _, size in report)
-    for name, size in report:
+    for name, size in ((allo.name, allo_size), (rhr.name, rhr_size)):
         print(f'{size:>9} B  fonts/{name}')
-    print(f'{total:>9} B  {len(report)} files')
 
 
 if __name__ == '__main__':

@@ -200,7 +200,7 @@ test.beforeEach(async ({ page }) => {
   });
   expect(fonts.status, 'the declared faces are loaded before a width is measured').toBe('loaded');
   expect(fonts.faces.filter(face => face.status !== 'loaded' && face.status !== 'unloaded'), JSON.stringify(fonts.faces)).toEqual([]);
-  for (const family of ['Newsreader', 'Reenie Beanie']) {
+  for (const family of ['Allo', 'Reenie Beanie']) {
     expect(fonts.faces.some(face => face.family === family && face.status === 'loaded'), `${family} loaded`).toBe(true);
   }
   demoGeometry.set(page, await page.locator('.script').evaluate(e => {
@@ -1168,9 +1168,9 @@ test('the stopped screen is one group anchored at 33% of the sheet', async ({ pa
   // The two gaps the captain set, measured box edge to box edge.
   expect(failure.gapHeadlineLine, 'headline to line').toBeCloseTo(GAP_HEADLINE_LINE, 0);
   expect(failure.gapLineButton, 'line to button').toBeCloseTo(GAP_LINE_BUTTON, 0);
-  // Type: the headline at the result role's size for this width, Newsreader 500 at 1.1.
+  // Type: the headline at the result role's size for this width, Allo 540 at 1.1.
   expect(failure.headline.size).toBe(headlineSize(width));
-  expect(failure.headline.weight).toBe('500');
+  expect(failure.headline.weight).toBe('540');
   expect(failure.headline.lineHeight).toBeCloseTo(failure.headline.size * 1.1, 0);
   expect(failure.line.size).toBe(15);
   expect(failure.line.weight).toBe('400');

@@ -5,14 +5,14 @@ import { test, expect } from '@playwright/test';
 //      was in flight (Chrome: up to 3 s), so on a slow link a writer who clicked and typed at once stared at an empty
 //      sheet. `font-display:swap` never holds text back.
 //   2. A character the room draws never changes face afterwards. Chinese used to arrive as 13 slices with `swap`,
-//      so the first character of every new slice was painted by the platform serif and repainted in Zhuque
+//      so the first character of every new slice was painted by the platform face and repainted in the webfont
 //      150-360 ms later, mid-draft, in front of the writer.
 // `font-display:optional` satisfies neither the product nor the browser: Chrome abandons an optional face for the
 // whole document at the first paint without it, and keeps the platform face even when the file has been resident for
 // seconds before the first Chinese character (measured here, and the reason the room decides instead). So the room
-// fixes the face at a draft's first Chinese character - Zhuque if those bytes are already resident, the platform serif
+// fixes the face at a draft's first Chinese character - Resource Han Rounded if those bytes are already resident, the platform face
 // if they are not - and never revisits it until the sheet is empty again. The tests below drive that decision from
-// either side, and from the draft after the one that had to accept the platform serif.
+// either side, and from the draft after the one that had to accept the platform face.
 //
 // A third requirement keeps the 2,589,548 B off the landing: a visitor who never touches a trial link fetches none of
 // it, and pointer, focus or touch on that link starts the fetch early, at low priority.
@@ -21,7 +21,7 @@ import { test, expect } from '@playwright/test';
 // the fallback and repainted it, block painted nothing at all. A held request makes the window as wide as the test
 // needs instead of racing a real network; a font request blocks the load event, so the page is opened to
 // DOMContentLoaded, which is already after room.js has routed and asked for the face.
-const FACE = '**/fonts/zhuque-fangsong*.woff2';
+const FACE = '**/fonts/resource-han-rounded*.woff2';
 
 const holdFace = async page => {
   const held = [];
@@ -52,7 +52,7 @@ test('one draft keeps one Chinese face from its first character to its last', as
   test.setTimeout(90_000);
   // The promise a writer can see, measured on what Chrome drew with rather than on the stylesheet. Chinese used
   // to arrive as 13 slices with `swap`, so a character whose slice was not resident was painted by the platform
-  // serif and repainted in Zhuque 150-360 ms later, while it sat on screen. The room decides the draft's face at
+  // face and repainted in the webfont 150-360 ms later, while it sat on screen. The room decides the draft's face at
   // its first Chinese character and keeps it until the sheet is empty, so the file landing - and a later
   // character typed while it is resident - must leave the draft on the face it started with.
   const { release } = await holdFace(page);
@@ -63,7 +63,7 @@ test('one draft keeps one Chinese face from its first character to its last', as
   await expect(page.locator('#editor')).toHaveValue('我');
   await page.waitForTimeout(250);
   const first = await platformFonts(page, '#editor-ink span');
-  expect(first.filter(family => /^Zhuque Fangsong/.test(family)), `the held draft drew in Zhuque: ${first}`)
+  expect(first.filter(family => /^Resource Han Rounded/.test(family)), `the held draft drew in Resource Han Rounded: ${first}`)
     .toHaveLength(0);
   // The file lands now, which is the window the slices repainted in, and a second character arrives while it is
   // resident. Neither may pull this draft onto the webfont.
@@ -76,11 +76,11 @@ test('one draft keeps one Chinese face from its first character to its last', as
     .toMatch(/^(typing|rest)$/);
   const both = await platformFonts(page, '#editor-ink span');
   expect(both, `the draft changed face when the file landed: ${first} then ${both}`).toEqual(first);
-  expect(both.filter(family => /^Zhuque Fangsong/.test(family)), `one draft drew in two faces: ${both}`).toHaveLength(0);
+  expect(both.filter(family => /^Resource Han Rounded/.test(family)), `one draft drew in two faces: ${both}`).toHaveLength(0);
   // The room's own record of the decision, read after the rendered evidence.
   expect(await page.locator('#room').getAttribute('data-cjk-face'), 'the draft did not freeze to the face it had')
     .toBe('platform');
-  expect(await writingStack(page), 'a frozen draft names the webfont it did not draw in').not.toMatch(/Zhuque/);
+  expect(await writingStack(page), 'a frozen draft names the webfont it did not draw in').not.toMatch(/Resource Han Rounded/);
 });
 
 test('composition text is drawn in the draft\'s own face and stays in it when committed', async ({ page }) => {
@@ -91,7 +91,7 @@ test('composition text is drawn in the draft\'s own face and stays in it when co
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').hover();
   await page.waitForFunction(() => [...document.fonts]
-    .some(face => face.family.includes('Zhuque') && face.status === 'loaded'), null, { timeout: 60_000 });
+    .some(face => face.family.includes('Resource Han Rounded') && face.status === 'loaded'), null, { timeout: 60_000 });
   await page.locator('#landing .cta a[href="#trial"]').click();
   await expect(page.locator('#room')).toBeVisible();
   await page.waitForFunction(() => document.activeElement?.id === 'editor');
@@ -107,14 +107,14 @@ test('composition text is drawn in the draft\'s own face and stays in it when co
         draft.letterSpacing][index]);
   });
   expect(own, 'the composing run carries a face or a size of its own').toEqual([true, true, true, true, true]);
-  const chinese = fonts => fonts.filter(family => /^Zhuque Fangsong/.test(family));
+  const chinese = fonts => fonts.filter(family => /^Resource Han Rounded/.test(family));
   const composingFonts = await platformFonts(page, '#editor-ink .composing');
   expect(chinese(composingFonts), `the composing run drew in ${composingFonts}`).toHaveLength(1);
   await session.send('Input.insertText', { text: '我' });
   await expect(page.locator('#editor')).toHaveValue('Before. 我');
   await expect(page.locator('#editor-ink .composing'), 'a commit leaves nothing underlined').toHaveCount(0);
   await page.waitForTimeout(120);
-  // The committed span also holds the Latin draft, which is Newsreader by design; the Chinese glyph's own face is
+  // The committed span also holds the Latin draft, which is Allo by design; the Chinese glyph's own face is
   // what must not change.
   const committedFonts = await platformFonts(page, '#editor-ink span');
   expect(chinese(committedFonts), `the character changed face when it was committed: ${committedFonts}`)
@@ -128,7 +128,7 @@ test('the room asks for the face when its door opens, before any character needs
   await expect(page.locator('#room')).toBeVisible();
   await expect.poll(() => held.length).toBe(1);
   const faces = await page.evaluate(() => [...document.fonts]
-    .filter(face => face.family.includes('Zhuque'))
+    .filter(face => face.family.includes('Resource Han Rounded'))
     .map(face => ({ status: face.status, range: face.unicodeRange })));
   expect(faces).toHaveLength(1);
   expect(['loading', 'loaded']).toContain(faces[0].status);
@@ -168,13 +168,13 @@ test('a character typed while the face is in flight is painted at once, and keep
   await page.keyboard.insertText('我');
   await expect(page.locator('#editor')).toHaveValue('我');
   // The request is still held, so the face cannot arrive. The character must be on the sheet anyway: no block
-  // period, no wait for 2.5 MB.
+  // period, no wait for 1.2 MB.
   await page.waitForTimeout(250);
   const painted = await shot();
   expect(painted, 'the typed character stays invisible while the face is in flight').not.toBe(empty);
-  // The room froze this page load to the platform serif, which is the only face it will draw Chinese in from here.
+  // The room froze this page load to the platform face, which is the only face it will draw Chinese in from here.
   expect(await page.locator('#room').getAttribute('data-cjk-face')).toBe('platform');
-  expect(await writingStack(page), 'the frozen draft still names the webfont').not.toMatch(/Zhuque/);
+  expect(await writingStack(page), 'the frozen draft still names the webfont').not.toMatch(/Resource Han Rounded/);
   // The face now lands. A character already on the sheet must not change face. The window is kept short because the
   // room starts its silence warning five seconds after the last key, and that wash would read as a repaint.
   release();
@@ -190,14 +190,14 @@ test('a character typed while the face is in flight is painted at once, and keep
   expect(new Set([painted, drawn, ...later]).size, 'the character changed face after it was drawn').toBe(1);
 });
 
-test('a room that finds the face resident draws Chinese in Zhuque and keeps it', async ({ page }) => {
+test('a room that finds the face resident draws Chinese in Resource Han Rounded and keeps it', async ({ page }) => {
   test.setTimeout(90_000);
   // The intended path: intent on a trial link prefetches the file while the visitor reads, so the face is resident
   // before the first Chinese character and the room freezes to it.
   await page.goto('./');
   await page.locator('#landing .cta a[href="#trial"]').hover();
   await page.waitForFunction(() => [...document.fonts]
-    .some(face => face.family.includes('Zhuque') && face.status === 'loaded'), null, { timeout: 60_000 });
+    .some(face => face.family.includes('Resource Han Rounded') && face.status === 'loaded'), null, { timeout: 60_000 });
   await page.locator('#landing .cta a[href="#trial"]').click();
   // The door opens on the click's own hash change, one task later; the room focuses the editor itself.
   await expect(page.locator('#room')).toBeVisible();
@@ -205,7 +205,7 @@ test('a room that finds the face resident draws Chinese in Zhuque and keeps it',
   await page.keyboard.insertText('我写中文');
   await expect(page.locator('#editor')).toHaveValue('我写中文');
   expect(await page.locator('#room').getAttribute('data-cjk-face')).toBe('webfont');
-  expect(await writingStack(page)).toMatch(/Zhuque Fangsong/);
+  expect(await writingStack(page)).toMatch(/Resource Han Rounded/);
   // The paint agrees with the stack: Chrome records the platform font with the frame.
   const client = await page.context().newCDPSession(page);
   await client.send('DOM.enable');
@@ -214,7 +214,7 @@ test('a room that finds the face resident draws Chinese in Zhuque and keeps it',
   const { nodeId } = await client.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#editor-ink span' });
   const { fonts } = await client.send('CSS.getPlatformFontsForNode', { nodeId });
   const platform = fonts.map(font => font.familyName);
-  expect(platform.filter(family => /^Zhuque Fangsong/.test(family)).length, `Chinese draw in Zhuque Fangsong, got ${platform}`).toBe(1);
+  expect(platform.filter(family => /^Resource Han Rounded/.test(family)).length, `Chinese draw in Resource Han Rounded, got ${platform}`).toBe(1);
 });
 
 test('the draft after a wipe draws the face that has landed by then', async ({ page }) => {
@@ -223,12 +223,12 @@ test('the draft after a wipe draws the face that has landed by then', async ({ p
   await page.goto('index.html#trial', { waitUntil: 'domcontentloaded' });
   await expect(page.locator('#room')).toBeVisible();
   await page.locator('#editor').focus();
-  // The first draft has to accept the platform serif: the file is still held.
+  // The first draft has to accept the platform face: the file is still held.
   await page.keyboard.insertText('我');
   expect(await page.locator('#room').getAttribute('data-cjk-face')).toBe('platform');
   release();
   await page.waitForFunction(() => [...document.fonts]
-    .some(face => face.family.includes('Zhuque') && face.status === 'loaded'), null, { timeout: 60_000 });
+    .some(face => face.family.includes('Resource Han Rounded') && face.status === 'loaded'), null, { timeout: 60_000 });
   // Now the silence deadline has to take that draft, which is what makes the next sheet empty.
   await page.waitForFunction(() => document.getElementById('room').dataset.phase === 'wipe', null, { timeout: 20_000 });
   expect(await page.locator('#room').getAttribute('data-cjk-face')).toBeNull();
@@ -237,7 +237,7 @@ test('the draft after a wipe draws the face that has landed by then', async ({ p
   await page.waitForTimeout(300);
   // Arriving early is only worth its bytes if a later draft uses what arrived.
   expect(await page.locator('#room').getAttribute('data-cjk-face')).toBe('webfont');
-  expect(await writingStack(page)).toMatch(/Zhuque Fangsong/);
+  expect(await writingStack(page)).toMatch(/Resource Han Rounded/);
 });
 
 test('a visitor who never touches the trial fetches no Chinese, and intent starts it early at low priority', async ({ page }) => {
@@ -246,9 +246,9 @@ test('a visitor who never touches the trial fetches no Chinese, and intent start
   await client.send('Network.enable');
   const requests = [];
   client.on('Network.requestWillBeSent', event => {
-    if (/fonts\/zhuque-fangsong[\w.-]*\.woff2/.test(event.request.url)) requests.push(event.request.initialPriority);
+    if (/fonts\/resource-han-rounded[\w.-]*\.woff2/.test(event.request.url)) requests.push(event.request.initialPriority);
   });
-  // The face is not requested on arrival: the landing draws no Chinese, and 2.5 MB is not a page weight to pay for
+  // The face is not requested on arrival: the landing draws no Chinese, and 1.2 MB is not a page weight to pay for
   // a bounce.
   await page.goto('./');
   await page.evaluate(() => document.fonts.ready);

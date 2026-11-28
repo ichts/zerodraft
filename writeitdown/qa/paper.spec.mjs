@@ -85,40 +85,42 @@ async function enterRoom(page) {
 }
 
 test.describe('the sheet', () => {
-  // The demo stands still under reduced motion, so its sheet is read without the scripted wash crossing it.
-  test.use({ reducedMotion: 'reduce' });
+  test.describe('on screen', () => {
+    // The demo stands still under reduced motion, so its sheet is read without the scripted wash crossing it.
+    test.use({ reducedMotion: 'reduce' });
 
-  test('the demo sheet and the room are one flat tone with the locked ink', async ({ page }) => {
-    await page.goto('./');
-    const mode = await theme(page);
-    expect(toHex(parseColour(await style(page, '#paper', 'backgroundColor')))).toBe(TONES[mode]);
-    expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
-    await expectFlat(page, '#paper', mode, 'the demo sheet');
+    test('the demo sheet and the room are one flat tone with the locked ink', async ({ page }) => {
+      await page.goto('./');
+      const mode = await theme(page);
+      expect(toHex(parseColour(await style(page, '#paper', 'backgroundColor')))).toBe(TONES[mode]);
+      expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
+      await expectFlat(page, '#paper', mode, 'the demo sheet');
 
-    await enterRoom(page);
-    expect(toHex(parseColour(await style(page, '.room-paper', 'backgroundColor')))).toBe(TONES[mode]);
-    expect(toHex(parseColour(await style(page, '#editor-ink', 'color')))).toBe(INK[mode]);
-    await expectFlat(page, '.room-paper', mode, 'the room sheet', 0.7);
-  });
+      await enterRoom(page);
+      expect(toHex(parseColour(await style(page, '.room-paper', 'backgroundColor')))).toBe(TONES[mode]);
+      expect(toHex(parseColour(await style(page, '#editor-ink', 'color')))).toBe(INK[mode]);
+      await expectFlat(page, '.room-paper', mode, 'the room sheet', 0.7);
+    });
 
-  test('the sheet follows the theme on screen: white, black, white, after a reload and a resize', async ({ page }) => {
-    await page.goto('./');
-    const start = await theme(page);
-    const other = start === 'light' ? 'dark' : 'light';
-    const toggle = page.locator('#landing .home-nav [data-theme-toggle]');
-    await expectFlat(page, '#paper', start, 'the demo sheet at load');
-    await toggle.click();
-    await expectFlat(page, '#paper', other, 'the demo sheet after one toggle');
-    await toggle.click();
-    await expectFlat(page, '#paper', start, 'the demo sheet after two toggles');
-    await toggle.click();
-    await page.reload();
-    expect(await theme(page)).toBe(other);
-    await expectFlat(page, '#paper', other, 'the demo sheet after a reload');
-    await page.setViewportSize({ width: 1180, height: 760 });
-    await expectFlat(page, '#paper', other, 'the demo sheet after a resize');
-    await enterRoom(page);
-    await expectFlat(page, '.room-paper', other, 'the room sheet after a resize', 0.7);
+    test('the sheet follows the theme on screen: white, black, white, after a reload and a resize', async ({ page }) => {
+      await page.goto('./');
+      const start = await theme(page);
+      const other = start === 'light' ? 'dark' : 'light';
+      const toggle = page.locator('#landing .home-nav [data-theme-toggle]');
+      await expectFlat(page, '#paper', start, 'the demo sheet at load');
+      await toggle.click();
+      await expectFlat(page, '#paper', other, 'the demo sheet after one toggle');
+      await toggle.click();
+      await expectFlat(page, '#paper', start, 'the demo sheet after two toggles');
+      await toggle.click();
+      await page.reload();
+      expect(await theme(page)).toBe(other);
+      await expectFlat(page, '#paper', other, 'the demo sheet after a reload');
+      await page.setViewportSize({ width: 1180, height: 760 });
+      await expectFlat(page, '#paper', other, 'the demo sheet after a resize');
+      await enterRoom(page);
+      await expectFlat(page, '.room-paper', other, 'the room sheet after a resize', 0.7);
+    });
   });
 
   test('every word on the sheet clears 7:1, except the dimmed history lines (D-092)', async ({ page }) => {
@@ -145,6 +147,9 @@ test.describe('the sheet', () => {
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
     expect(contrast(parseColour(await style(page, '#room-count', 'color')), paper)).toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#exit', 'color')), paper)).toBeGreaterThanOrEqual(7);
+    // The exit confirmation is ink, not red (D-124).
+    expect(toHex(parseColour(await style(page, '#exit-hint', 'color'))), 'the exit confirmation is ink').toBe(INK[mode]);
+    expect(contrast(parseColour(await style(page, '#exit-hint', 'color')), paper)).toBeGreaterThanOrEqual(7);
     expect(toHex(parseColour(await style(page, '#failure-note', 'color')))).toBe(QUIET[mode]);
     expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });

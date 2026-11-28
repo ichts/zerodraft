@@ -5,9 +5,9 @@
    sit on :root so any page that links this sheet can map the canvas, and every shipped page (landing, download, room,
    the help/legal/answer pages and mac.html) puts .home on <body> or its main surface to take the full role set. The
    header brand plate (--brand-plate) also sits on :root because every page that carries the lockup must resolve one
-   value. Faces (D-057): Newsreader is what the writer writes and what the site sets headings in, Zhuque Fangsong is
-   the same roles in Chinese, Reenie Beanie is the landing's hand accent alone, and everything the tool says - labels,
-   nav, buttons, clock, count, captions, receipts, quiet links - is the system sans. No monospace face carries text.
+   value. Faces (D-125): Allo, pinned at ROND 30, is every role - what the writer writes, the headings and everything
+   the tool says; Resource Han Rounded is the same roles in Chinese; Reenie Beanie is the landing's hand accent alone.
+   --serif and --sans keep their role names (written text and display, the tool) and both resolve to Allo.
    Every face is served from this site: fonts.css declares them (fonts/build-fonts.py generates it), fonts-cjk.css
    holds the Chinese face as one file and is linked by index.html alone. Dark keeps the same names. */
 :root{--page:#f7f7f5;--stage-a:var(--page);--stage-b:var(--page);--brand-plate:#ffffff}
@@ -30,16 +30,15 @@
   --red:#b00c15;
   --tag-bg:#f2f2f0;
   --on-ink:#ffffff;
-  /* type: serif = written text and display, cjk = the same roles in Chinese, hand = the landing's pen
-     accent (D-057), sans = the tool. --cjk is one family name so the guard can read it and so the
-     Chinese face is named in exactly one place. */
-  --cjk:'Zhuque Fangsong';
-  --serif:'Newsreader',var(--cjk),Georgia,'Times New Roman',serif;
-  /* the stack the room freezes to when its first Chinese character finds the Chinese face not yet resident (D-109):
-     `serif` sits before the Latin tail so Chinese resolves to the platform's serif, not to its sans */
-  --serif-platform:'Newsreader',serif,Georgia,'Times New Roman',serif;
+  /* type roles (D-125): serif = written text and display, sans = the tool, both Allo; cjk = the Chinese face, named
+     once; hand = the landing's pen accent (D-057). Weights follow the Mac: writing 410, display 540, numeral 360. */
+  --cjk:'Resource Han Rounded';
+  --serif:'Allo',var(--cjk),system-ui,sans-serif;
+  /* the stack the room freezes to when its first Chinese character finds the Chinese face not yet resident (D-109) */
+  --serif-platform:'Allo',system-ui,sans-serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
-  --sans:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',system-ui,sans-serif;
+  --sans:'Allo',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --w-write:410;--w-display:540;--w-numeral:360;
   /* writing size and placement for the web room: 28pt, active line at 35% of the sheet (the Mac's D-025
      anchor, brought to the web by D-043), one fixed pitch for every script (D-026), the warning numeral
      sized like the Mac's min(18vh, 170pt) */

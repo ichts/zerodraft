@@ -159,11 +159,11 @@ test('the document pages keep 17 px sans copy at the documented measure', async 
         h1: css('main.doc h1').fontFamily,
       };
     });
-    expect(read.font, `${path}: body copy is the system tool face`).toMatch(/system-ui/);
+    expect(read.font, `${path}: body copy is the Allo tool face`).toMatch(/^"?Allo/);
     expect(read.size, `${path}: body copy is 17 px`).toBe('17px');
     expect(read.width, `${path}: the measure stays near 62ch`).toBeLessThanOrEqual(62 * 17 * 0.66);
     expect(read.width, `${path}: the measure fills the available column`).toBeGreaterThan(300);
-    expect(read.h1, `${path}: headings keep the serif`).toMatch(/Newsreader/);
+    expect(read.h1, `${path}: headings are Allo`).toMatch(/^"?Allo/);
     expect(read.legacy, `${path}: no retired shell class survives`).toBe(0);
   }
 });

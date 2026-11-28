@@ -389,8 +389,8 @@ function route() {
 }
 
 // Chinese is one GB2312 file and a draft draws it in exactly one face (D-109). Which face is decided at the draft's
-// first Chinese character and never revisited until the sheet is empty again: Zhuque if its bytes are already
-// resident, the platform serif if they are not. That decision is what makes both promises true at once - the
+// first Chinese character and never revisited until the sheet is empty again: Resource Han Rounded if its bytes are
+// already resident, the platform face if they are not. That decision is what makes both promises true at once - the
 // character is on the sheet at once, and no character ever changes face afterwards no matter when the file lands.
 // `font-display:swap` in `fonts-cjk.css` is the second guard under the same promise: a path that painted Chinese
 // without reaching this decision falls back to visible text, never to an invisible one.
@@ -398,9 +398,10 @@ function route() {
 // Chrome cannot be trusted with `font-display:optional` here: it abandons an optional face for the whole document at
 // the first paint that happens without it, and it then keeps the platform face even when the file has been resident
 // for seconds before the first Chinese character (measured, and held in `qa/chinese-face.spec.mjs`).
+const CJK_FAMILY = 'Resource Han Rounded';
 function adoptCjkFace(text) {
   if (cjkFace || !/[\u3400-\u9fff\uf900-\ufaff]/.test(text)) return;
-  const face = [...document.fonts].find(candidate => candidate.family.includes('Zhuque Fangsong'));
+  const face = [...document.fonts].find(candidate => candidate.family.includes(CJK_FAMILY));
   cjkFace = face?.status === 'loaded' ? 'webfont' : 'platform';
   room.dataset.cjkFace = cjkFace;
 }
@@ -408,13 +409,13 @@ function adoptCjkFace(text) {
 // The room asks the font engine for the face as its route opens, in the second a writer spends reading the empty
 // sheet; a trial link that has already shown intent has asked earlier (prefetchRoomFace), so the face is normally
 // resident before the first keystroke. Nothing on the landing asks for it, and the landing draws no Chinese
-// (D-057). The request waits out the door's own grow: decoding 2.5 MB of font is main-thread work and the grow owns
+// (D-057). The request waits out the door's own grow: decoding 1.2 MB of font is main-thread work and the grow owns
 // those 240 ms.
 let faceWarmed = false;
 let faceTimer = 0;
 function askForRoomFace() {
   if (faceWarmed || !document.fonts?.load) return;
-  // Decoding 2.5 MB is main-thread work and the door's grow owns the 240 ms after the route opens, so the ask
+  // Decoding 1.2 MB is main-thread work and the door's grow owns the 240 ms after the route opens, so the ask
   // (however early the bytes arrived) lands after it. One rule, whichever path got here.
   const wait = growUntil - performance.now();
   if (wait > 0) {
@@ -423,17 +424,17 @@ function askForRoomFace() {
     return;
   }
   faceWarmed = true;
-  document.fonts.load('28px "Zhuque Fangsong"', '我').catch(() => {});
+  document.fonts.load(`28px "${CJK_FAMILY}"`, '我').catch(() => {});
 }
 
 function warmRoomFace() {
   // A prefetch already in flight asks the font engine itself when its bytes land; asking here as well would send the
-  // same 2.5 MB twice on the link that can least afford it.
+  // same 1.2 MB twice on the link that can least afford it.
   if (faceAsked) return;
   askForRoomFace();
 }
 
-// The face is 2,589,548 B and it belongs to the room, not to the landing: a visitor who reads and leaves pays none
+// The face is 1,173,524 B and it belongs to the room, not to the landing: a visitor who reads and leaves pays none
 // of it. Intent on a trial link - pointer, touch or focus - starts the fetch while they read, so on a slow link the
 // file is already arriving when the door opens instead of starting then (D-109). It runs after the frame that
 // painted the intent and on an idle main thread, so it can never delay first paint, LCP or the door's grow.
@@ -450,7 +451,7 @@ function faceFile() {
     let rules;
     try { rules = sheet.cssRules; } catch { continue; }
     for (const rule of rules) {
-      if (rule.constructor.name !== 'CSSFontFaceRule' || !rule.style.fontFamily.includes('Zhuque Fangsong')) continue;
+      if (rule.constructor.name !== 'CSSFontFaceRule' || !rule.style.fontFamily.includes(CJK_FAMILY)) continue;
       const url = rule.style.src.match(/url\(["']?([^"')]+)["']?\)/);
       if (url) return url[1];
     }
@@ -470,7 +471,7 @@ function prefetchRoomFace() {
   link.as = 'font';
   link.type = 'font/woff2';
   // A font preload without crossOrigin is a different fetch from the font request and is made twice;
-  // fetchpriority is the only lever that keeps the 2.5 MB off the landing's critical path.
+  // fetchpriority is the only lever that keeps the 1.2 MB off the landing's critical path.
   link.crossOrigin = 'anonymous';
   link.setAttribute('fetchpriority', 'low');
   link.addEventListener('load', () => whenIdle(askForRoomFace), { once: true });

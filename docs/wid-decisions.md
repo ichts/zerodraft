@@ -2755,7 +2755,7 @@ first-screen position, the ink, the underline and the absence of a pill all stay
     `--red-soft`, `--red-deep` and the paper's separate danger colour are retired.
   - Every text role on the paper clears 7:1 at the deepest wash, except the dimmed history lines (D-092) and the
     numeral, which is large text (at least 120 px or pt) and clears 3:1: `#b00c15` on `#e6e6e6` is 5.78:1,
-    `#ff453a` on `#262626` is 4.3:1.
+    `#ff453a` on `#262626` is 4.44:1.
   - The web keeps its theme button (light default, dark stored; D-121). The Mac and Windows apps follow the
     system appearance: light shows the white paper, dark the black one. The Mac's Lamp / Paper / Slate switch
     and its stored paper mode are removed; a stored mode migrates to following the system.
@@ -2766,6 +2766,29 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   (`writeitdown/qa/paper.spec.mjs`, `qa/history-fade.spec.mjs`, `FirstLineTests/PaperContrastTests`,
   `DesignTokenTests`, `SnapshotTests`, the Windows token drift gate). Until a lane lands, its surface still shows
   its previous paper.
-- Supersedes: D-069 and D-093 (Wheat tone and grain, the dark grained sheet), D-120's three papers, switch and
-  paper shadows, D-123's light wash and its "the Mac keeps its paper until its next signed release" clause, and
-  D-103's dark red values.
+- Supersedes: D-069 (the Wheat tone, and its 7:1 floor for the numeral, now a large-text 3:1 floor), D-073 (a
+  texture's rendered mean held at the tone: no sheet carries a texture), D-084 (the light quiet `#48443E`, now
+  `#3f3b36`), D-092's dark history alphas `.16` / `.05` (now `.17` / `.065`; its contrast targets stand), D-093 (the
+  dark grained sheet), D-103 as a whole (the separate red-as-words tokens `--red-text` / `--red-text-small` and both
+  modes' red values give way to one red per mode), D-104 (the worker that textured the hidden room before the click:
+  a flat sheet has nothing to paint), D-120's three papers, switch and paper shadows, and D-123's light wash and its
+  "the Mac keeps its paper until its next signed release" clause.
+
+## D-125: Allo is the one product face on every surface
+
+- Date: 2026-11-28. Captain: "maybe use this font: https://allo.joshpuckett.me/ - it can be tuned to what we need".
+  On the Artideck board `white-black-paper` the captain kept the landing's red hand accent (option A).
+- Decision: writeitdown.app, the Mac app and the Windows app set every product role in Allo (OFL-1.1, allo-font
+  1.0.3, ROND pinned at 30, `wght` 300-700, the same `allo-latin.woff2` the Mac bundles): what the writer writes
+  at 410, headings and result titles at 540, the warning numeral upright at 360, and everything the tool says at
+  400 / 500 / 600. Chinese is Resource Han Rounded (GB2312, one file). Newsreader and Zhuque Fangsong leave the web.
+  Reenie Beanie stays the landing's hand accent only (D-057, D-121); it never enters the room or the apps.
+- Web: `--serif` (written text and display) and `--sans` (the tool) keep their role names and both resolve to
+  Allo; `--w-write`, `--w-display`, `--w-numeral` carry the three weights. D-109's freeze is unchanged: a draft
+  keeps the Chinese face it started with, the platform face when Resource Han Rounded is not yet resident.
+- Why: one face across the three surfaces is what the captain asked for when unifying them; the Mac already
+  draws Allo (D-120), so the web and Windows follow it rather than the reverse.
+- Tests: `writeitdown/qa/typography.spec.mjs` and `qa/chinese-face.spec.mjs` name Allo and Resource Han Rounded;
+  `qa/shared-type-baseline.json` holds the web's Allo advances.
+- Supersedes: D-057's Newsreader, Zhuque Fangsong and system-sans roles, and D-121's restoration of them on the web.
+  D-057's hand-accent rule stands.

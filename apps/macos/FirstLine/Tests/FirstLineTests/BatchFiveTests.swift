@@ -231,7 +231,7 @@ struct SettingsTests {
         #expect(copy.contains("Focus Mode"))
         #expect(copy.contains("Alignment"))
         #expect(copy.contains("Font Size"))
-        #expect(copy.contains("Paper"))
+        #expect(!copy.contains("Paper"), "the paper follows the system; Settings has no paper row (D-124)")
         #expect(!copy.contains("Session"))
         #expect(!copy.contains("Duration"))
         #expect(!copy.contains("Delete after silence"))
@@ -252,8 +252,7 @@ struct SettingsTests {
         #expect(state.sessionEngine.text == "draft stays")
     }
 
-    @Test func paperDefaultsToLamp() {
-        #expect(AppSettings.defaultValue.paperMode == .lamp)
+    @Test func focusModeDefaultsOff() {
         #expect(AppSettings.defaultValue.focusMode == false)
     }
 
@@ -265,7 +264,6 @@ struct SettingsTests {
         let id = state.sessionEngine.sessionID
         state.updateAlignment(.left)
         state.updateFontSize(.small)
-        state.updatePaperMode(.slate)
         state.updateFocusMode(true)
         #expect(state.sessionEngine.text == "draft")
         #expect(state.sessionEngine.sessionID == id)

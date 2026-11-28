@@ -1,6 +1,6 @@
 /*
- * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens, PaperModeSwitch.
- * [OUTPUT]: One AppKit room: page, the current paper (Lamp, Paper or Slate; PaperSheetView) with that paper's shadow, every word and control on it in the paper's roles, the paper switch on the sheet's top-left across the clock row (a choice is not input: the draft, phase and silence clock carry on and focus returns to the writing unless kept; it fades with the chrome, D-120), one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: the wash and deep sheets over the paper at the web's opacity ramp, never repainting the paper on a tick, leaving on the 120 ms fade), the numeral and the sentence-case warn caption, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on the web's fixed 1.1 line box and baseline, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice in the exit confirmation's footer slot (D-077).
+ * [INPUT]: AppState preferences, SessionEngine, AppendOnlyTextView, RoomPresentation, PaperSheetView and the After tokens.
+ * [OUTPUT]: One AppKit room: page, the white or black paper the system appearance shows (PaperSheetView, D-124) with its shadow, every word and control on it in the paper's roles, one rounded top-edge session bar, clock/count, centered zen writing with stepped per-logical-line opacity (D-077), the paper's own wash (PaperWashView: the wash and deep sheets over the paper at the web's opacity ramp, never repainting the paper on a tick, leaving on the 120 ms fade), the numeral and the sentence-case warn caption, the stopped screen (one group whose midpoint sits on the room's one anchor: `You stopped.` on the web's fixed 1.1 line box and baseline, `Draft deleted.` on the web's 1.6 box, the `Begin again` pill one headline tall, chrome off, the writing layer transparent), kept heading/copy receipt with its unsaved caption and silent corner count, two-step exit via Esc or the quiet, keyboard-focusable footer button, the first refused delete's two-second notice centred under the live line (D-100).
  * [POS]: Clear window ground (D-102), 以及截止时刻的一次性 timer 与 0.1 s ticker 并存（D-111）: the traffic lights step out once the first character lands and return on a title-strip hover or when the room stops. Entering from Begin, the paper grows out of the picker card's rectangle (`growPaper(from:)`, D-097). Writing on the paper's one anchor above the vertical middle, Copy in the kept phase answering the Edit menu's copy: as Copy Kept Text, the warning numeral and its line just under the writing line, the empty room showing only the caret with the count slot reading `Type to begin`, editor focus, first-input trial reservation and signed-license gate, session-ID-bound reset, wipe or denied-restart clears the editor while the stopped sheet keeps the editor first responder with a transparent writing layer and makes the pill keyboard-reachable through Return and Tab, the stopped group placed by its own midpoint on that same anchor with the clock and bar off, restart returning to the same room's editor before the next tick, hover-only chrome, live typography, deadline visuals, confirmed escape/click exit and deny; no draft persistence and no room pill.；confirmDeparture：关窗、退出、Begin、Home 与 Esc 共用同一个两步退出确认（D-118）
  * [PROTOCOL]: Keep wash timing, strings and geometry aligned with writeitdown/room.js and the live trial; check nearest AGENTS.md.
  */
@@ -86,7 +86,6 @@ final class PaperWashView: RoomWashView {
         paints += 1
         ctx.setFillColor(tint.cgColor)
         ctx.fill(bounds)
-        PaperField.drawLight(FirstLineColors.mode(for: effectiveAppearance), in: ctx, rect: bounds)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -187,7 +186,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
     /// The paper switch across the clock row from the clock (D-120).
-    private(set) var modeSwitch: PaperModeSwitch!
     private var countLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!
@@ -393,7 +391,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         warningHint.isHidden = true
 
         exitButton = FirstLineButtons.roomExit(title: Self.exitLabel, target: self, action: #selector(exitTapped))
-        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperDangerNSColor)
+        exitHintLabel = label("", font: FirstLineTypography.smallMediumNSFont, color: FirstLineColors.paperInkNSColor)
         exitHintLabel.attributedStringValue = Self.exitHintString()
         exitHintLabel.maximumNumberOfLines = 1
         exitHintLabel.lineBreakMode = .byTruncatingTail
@@ -467,17 +465,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             paper.addSubview(element)
         }
         buildKeptView()
-        modeSwitch = PaperModeSwitch(mode: appState.settings.paperMode)
-        modeSwitch.onChoose = { [weak self] mode in self?.choosePaper(mode) }
-        paper.addSubview(modeSwitch)
         installConstraints()
-    }
-
-    /// A paper switch changes colour only: the draft, the phase and the silence clock carry on, and the keyboard
-    /// goes straight back to the writing unless the room is showing the kept draft (room.js roomModes).
-    private func choosePaper(_ mode: PaperMode) {
-        appState.updatePaperMode(mode)
-        if engine.phase != .success { focusForPhase() }
     }
 
     private func buildKeptView() {
@@ -519,9 +507,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
             outline.leadingAnchor.constraint(equalTo: paper.leadingAnchor), outline.trailingAnchor.constraint(equalTo: paper.trailingAnchor),
             outline.topAnchor.constraint(equalTo: paper.topAnchor), outline.bottomAnchor.constraint(equalTo: paper.bottomAnchor),
             timerLabel.topAnchor.constraint(equalTo: paper.topAnchor, constant: 18),
-            // The first label's word starts on the room inset, as the clock ends on it.
-            modeSwitch.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: Self.roomInset - PaperModeSwitch.padding),
-            modeSwitch.centerYAnchor.constraint(equalTo: timerLabel.centerYAnchor),
             timerLabel.trailingAnchor.constraint(equalTo: paper.trailingAnchor, constant: -Self.roomInset),
             exitButton.leadingAnchor.constraint(equalTo: paper.leadingAnchor, constant: Self.roomInset),
             exitButton.bottomAnchor.constraint(equalTo: paper.bottomAnchor, constant: -16),
@@ -1082,8 +1067,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
         updateKeptContent()
         let showChrome = !settings.focusMode || chromeHover
         timerLabel.alphaValue = showChrome ? 1 : 0
-        modeSwitch.alphaValue = showChrome ? 1 : 0
-        modeSwitch.mode = settings.paperMode
         countLabel.alphaValue = showChrome ? 1 : 0
         textView.animatesHistoryScroll = !reducesMotion
     }
@@ -1236,7 +1219,7 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     }
 
     private static func exitHintString() -> NSAttributedString {
-        quietRowText(exitHintText, color: FirstLineColors.paperDangerNSColor, truncates: true, kernEm: 0)
+        quietRowText(exitHintText, color: FirstLineColors.paperInkNSColor, truncates: true, kernEm: 0)
     }
 
     /// The note sits on the paper under the live line and moves nothing: it is placed by the caret line's baseline

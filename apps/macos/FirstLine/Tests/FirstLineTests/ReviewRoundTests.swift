@@ -321,16 +321,14 @@ struct ReviewRoundTests {
         editor.insertText("hello there", replacementRange: NSRange(location: NSNotFound, length: 0))
 
         // The same patch of the sheet, before the wash and under it: the wash is the difference between
-        // those two frames. An absolute redness would only be measuring the paper's own tone, which is
-        // now the warm Wheat paper, so the assertion is the warmth the alarm adds (D-056).
+        // those two frames, a grey step on the white paper (D-124).
         func sample() throws -> NSColor {
             room.view.layoutSubtreeIfNeeded()
             room.view.displayIfNeeded()
             let rep = try #require(room.view.bitmapImageRepForCachingDisplay(in: room.view.bounds))
             room.view.cacheDisplay(in: room.view.bounds, to: rep)
             let scale = CGFloat(rep.pixelsWide) / room.view.bounds.width
-            // Sample a patch of the empty upper middle of the paper, away from the clock and the text, and
-            // average it: the sheet is textured, so one pixel is a grain value, not the paper's tone.
+            // Sample a patch of the empty upper middle of the paper, away from the clock and the text.
             let x = Int(paper.frame.midX * scale)
             let y = Int((room.view.bounds.height - (paper.frame.maxY - 80)) * scale)
             var sums = (red: CGFloat(0), green: CGFloat(0), blue: CGFloat(0))
@@ -372,13 +370,11 @@ struct ReviewRoundTests {
         #expect(abs(Double(tint.greenComponent - washColour.greenComponent)) < 0.002)
         #expect(base != washColour)
 
-        // And it reaches the frame: the rendered sheet is warmer and loses green against the same patch
-        // before the alarm. The sheet's grain lifts both frames equally, so the shift is what is measured.
-        let warmth = Double(washed.redComponent - washed.greenComponent)
-            - Double(plain.redComponent - plain.greenComponent)
-        #expect(warmth > 0.015, "the warning paper is not warmed: \(washed) against \(plain)")
+        // And it reaches the frame: the rendered white sheet is darker, in grey, against the same patch before
+        // the alarm.
         #expect(Double(plain.greenComponent - washed.greenComponent) > 0.015,
-                "the warning paper is not tinted: \(washed) against \(plain)")
+                "the warning paper is not greyed: \(washed) against \(plain)")
+        #expect(abs(Double(washed.redComponent - washed.greenComponent)) < 0.01, "the wash is not grey: \(washed)")
         #expect(washed.greenComponent < 0.98)
         window.orderOut(nil)
     }

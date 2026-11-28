@@ -38,7 +38,7 @@ final class AppendOnlyTextView: NSTextView, @preconcurrency NSLayoutManagerDeleg
     /// True while the lines above are still dissolving to their step.
     var isDissolvingHistory: Bool { dissolve != nil }
     /// One uniform ink step per line ended by Return, closest line first, older lines gone (D-088 unit, D-092 values:
-    /// 1, .22, .07 in Lamp and Paper; 1, .16, .05 in Slate) for the current mode.
+    /// 1, .22, .07 on the white paper; 1, .17, .065 on the black, D-124) for the current appearance.
     var historyLineOpacities: [CGFloat] {
         FirstLineColors.paperHistoryOpacities(for: effectiveAppearance)
     }

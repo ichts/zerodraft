@@ -1,27 +1,11 @@
 /**
  * [INPUT]: 依赖 AppPaths.configDirectory 和 Codable 设置模型
- * [OUTPUT]: AppSettings、时长/静默限额及纸张模式（PaperMode：Lamp/Paper/Slate，与网页 writeitdown-theme 同名同值）/专注/排印选择、SettingsStore；含免费试用会话计数、许可产品身份和签名 token 缓存
- * [POS]: 配置层；旧 theme 键按网页的旧值映射迁移（light→Paper，dark/system→Lamp），只写回 paperMode（D-120）；合法时长校验、忽略旧解锁标记，保留无 key 的许可状态以阻止回退试用；损坏试用计数单独耗尽而不丢弃许可，旧 trial 许可状态不授予付费访问；写作偏好和 license 数据落盘，正文绝不落盘
+ * [OUTPUT]: AppSettings、时长/静默限额/专注/排印选择、SettingsStore；含免费试用会话计数、许可产品身份和签名 token 缓存
+ * [POS]: 配置层；纸张跟随系统外观不落盘（D-124），旧文件里的 paperMode / theme 键读入时忽略、下次保存时消失；合法时长校验、忽略旧解锁标记，保留无 key 的许可状态以阻止回退试用；损坏试用计数单独耗尽而不丢弃许可，旧 trial 许可状态不授予付费访问；写作偏好和 license 数据落盘，正文绝不落盘
  * [PROTOCOL]: 变更时更新此头部，然后检查 AGENTS.md
  */
 
 import Foundation
-
-/// The sheet's three modes, the web's `writeitdown-theme` values and labels verbatim (D-119, D-120). Lamp is the
-/// default on both surfaces; the mode changes colour only, never timing.
-enum PaperMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case lamp
-    case paper
-    case slate
-
-    var id: String { rawValue }
-    var label: String { rawValue.capitalized }
-
-    /// The retired light/dark/system theme, read once from an old settings file with the web's own legacy map.
-    static func migrating(legacyTheme: String?) -> PaperMode {
-        legacyTheme == "light" ? .paper : .lamp
-    }
-}
 
 enum ReducedMotionOverride: String, Codable, CaseIterable, Identifiable {
     case system
@@ -71,7 +55,6 @@ enum WritingFontSize: String, Codable, CaseIterable {
 
 struct AppSettings: Codable, Equatable {
     static let trialSessionLimit = 3
-    var paperMode: PaperMode
     var defaultDuration: TimeInterval
     var reducedMotion: ReducedMotionOverride
     var silenceLimit: SilenceLimit
@@ -99,7 +82,6 @@ struct AppSettings: Codable, Equatable {
     }
 
     init(
-        paperMode: PaperMode = .lamp,
         defaultDuration: TimeInterval,
         reducedMotion: ReducedMotionOverride,
         silenceLimit: SilenceLimit = .standard,
@@ -115,7 +97,6 @@ struct AppSettings: Codable, Equatable {
         licenseProductID: String? = nil,
         licenseToken: String? = nil
     ) {
-        self.paperMode = paperMode
         self.defaultDuration = SessionEngine.validDuration(defaultDuration)
         self.reducedMotion = reducedMotion
         self.silenceLimit = silenceLimit
@@ -134,9 +115,6 @@ struct AppSettings: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case paperMode
-        /// Read only, to migrate a settings file written before the paper modes (D-120).
-        case theme
         case defaultDuration
         case reducedMotion
         case silenceLimit, focusMode, writingAlignment, writingFontSize, trialSessionsUsed
@@ -150,8 +128,6 @@ struct AppSettings: Codable, Equatable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        paperMode = (try? container.decode(PaperMode.self, forKey: .paperMode))
-            ?? PaperMode.migrating(legacyTheme: try? container.decode(String.self, forKey: .theme))
         defaultDuration = SessionEngine.validDuration((try? container.decode(TimeInterval.self, forKey: .defaultDuration)) ?? SessionEngine.defaultDurationSeconds)
         reducedMotion = try container.decode(ReducedMotionOverride.self, forKey: .reducedMotion)
         silenceLimit = (try? container.decode(SilenceLimit.self, forKey: .silenceLimit)) ?? .standard
@@ -174,7 +150,6 @@ struct AppSettings: Codable, Equatable {
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(paperMode, forKey: .paperMode)
         try container.encode(SessionEngine.validDuration(defaultDuration), forKey: .defaultDuration)
         try container.encode(reducedMotion, forKey: .reducedMotion)
         try container.encode(silenceLimit, forKey: .silenceLimit)
@@ -192,7 +167,6 @@ struct AppSettings: Codable, Equatable {
     }
 
     static let defaultValue = AppSettings(
-        paperMode: .lamp,
         defaultDuration: SessionEngine.defaultDurationSeconds,
         reducedMotion: .system,
         licenseKey: nil,

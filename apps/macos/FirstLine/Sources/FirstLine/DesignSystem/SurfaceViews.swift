@@ -1,6 +1,6 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing.
- * [OUTPUT]: FirstLineShadowView (the mode's `--paper-shadow` stack behind a surface, D-120) and FirstLineCardView (sheet + shadow + content insets).
+ * [OUTPUT]: FirstLineShadowView (the paper's shadow stack behind a surface, D-124) and FirstLineCardView (sheet + shadow + content insets).
  * [POS]: Shared page/sheet depth primitives; the only shadow in the app, matching the sheet-shadow token.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -43,19 +43,16 @@ final class FirstLineShadowView: NSView {
         }
     }
 
-    /// `--paper-shadow` per mode (tokens.css v3): Lamp and Slate share the black lamp-lit stack, Paper an ink one.
-    private static func specs(for mode: PaperMode) -> [Spec] {
-        switch mode {
-        case .paper:
-            [Spec(0.07, blur: 0, y: 0, spread: 1, inkTinted: true),
-             Spec(0.05, blur: 4, y: 2, spread: 0, inkTinted: true),
-             Spec(0.12, blur: 24, y: 12, spread: -8, inkTinted: true),
-             Spec(0.20, blur: 72, y: 36, spread: -24, inkTinted: true)]
-        case .lamp, .slate:
-            [Spec(0.30, blur: 0, y: 0, spread: 1, inkTinted: false),
-             Spec(0.60, blur: 14, y: 6, spread: -4, inkTinted: false),
-             Spec(0.60, blur: 48, y: 24, spread: -16, inkTinted: false)]
-        }
+    /// The sheet's shadow per paper (D-124): the white sheet's ink-tinted stack (`--sheet-shadow`), a black one on black.
+    private static func specs(black: Bool) -> [Spec] {
+        black
+            ? [Spec(0.30, blur: 0, y: 0, spread: 1, inkTinted: false),
+               Spec(0.60, blur: 14, y: 6, spread: -4, inkTinted: false),
+               Spec(0.60, blur: 48, y: 24, spread: -16, inkTinted: false)]
+            : [Spec(0.07, blur: 0, y: 0, spread: 1, inkTinted: true),
+               Spec(0.05, blur: 4, y: 2, spread: 0, inkTinted: true),
+               Spec(0.12, blur: 24, y: 12, spread: -8, inkTinted: true),
+               Spec(0.20, blur: 72, y: 36, spread: -24, inkTinted: true)]
     }
     private static let layerCount = 4
     private var shadowLayers: [CALayer] = []
@@ -69,7 +66,7 @@ final class FirstLineShadowView: NSView {
 
     /// The farthest any layer of the current appearance's shadow reaches below the sheet.
     var effectiveReach: CGFloat {
-        Self.specs(for: FirstLineColors.mode(for: effectiveAppearance))
+        Self.specs(black: FirstLineColors.showsBlack(effectiveAppearance))
             .map { fitted($0).radius + abs(fitted($0).offset.height) + fitted($0).spread }.max() ?? 0
     }
 
@@ -114,9 +111,9 @@ final class FirstLineShadowView: NSView {
 
     private func updateLayers() {
         guard bounds.width > 0, bounds.height > 0, let parentLayer = layer else { return }
-        let specs = Self.specs(for: FirstLineColors.mode(for: effectiveAppearance))
+        let specs = Self.specs(black: FirstLineColors.showsBlack(effectiveAppearance))
         let visible = Array(shadowLayers.prefix(specs.count))
-        // Hidden spare layers stay out of the render tree when the mode uses fewer layers.
+        // Hidden spare layers stay out of the render tree when the paper uses fewer layers.
         for sublayer in shadowLayers where !visible.contains(sublayer) { sublayer.isHidden = true }
         for (sublayer, natural) in zip(visible, specs) {
             let spec = fitted(natural)

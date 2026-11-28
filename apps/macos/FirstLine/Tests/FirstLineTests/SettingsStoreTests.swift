@@ -26,7 +26,7 @@ struct SettingsStoreTests {
         defer { try? fm.removeItem(at: tempRoot) }
 
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
-        let settings = AppSettings(paperMode: .slate, defaultDuration: 600, reducedMotion: .always)
+        let settings = AppSettings(defaultDuration: 600, reducedMotion: .always)
 
         try store.save(settings)
         let loaded = try store.load()
@@ -71,22 +71,29 @@ struct SettingsStoreTests {
         let store = SettingsStore(fileManager: fm, configDirectory: configDirectory)
         let loaded = try store.load()
 
-        // The retired dark theme opens on Lamp, the mode that took its place (theme.js's own map).
-        #expect(loaded == AppSettings(paperMode: .lamp, defaultDuration: 600, reducedMotion: .always))
+        #expect(loaded == AppSettings(defaultDuration: 600, reducedMotion: .always))
     }
 
-    @Test(arguments: [("light", PaperMode.paper), ("dark", .lamp), ("system", .lamp), (nil, .lamp)] as [(String?, PaperMode)])
-    func legacyThemeMigratesOnceAndIsNeverWrittenBack(theme: String?, expected: PaperMode) throws {
-        let legacy = theme.map { #"{"theme":"\#($0)","defaultDuration":60,"reducedMotion":"system"}"# }
-            ?? #"{"defaultDuration":60,"reducedMotion":"system"}"#
-        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(legacy.utf8))
-        #expect(settings.paperMode == expected)
+    /// D-124: the paper follows the system, so a stored paper mode or a retired theme is read past and never written
+    /// back, and the trial count and the licence record beside it come through untouched.
+    @Test(arguments: [#""paperMode":"lamp","#, #""paperMode":"paper","#, #""paperMode":"slate","#,
+                      #""theme":"light","#, #""theme":"dark","#, #""theme":"system","#,
+                      #""theme":"light","paperMode":"slate","#, ""])
+    func aStoredPaperModeIsDroppedAndNothingElseMoves(stored: String) throws {
+        let json = #"{\#(stored)"defaultDuration":300,"reducedMotion":"always","trialSessionsUsed":2,"#
+            + #""licenseKey":"ORDER-1","licenseStatus":"active","licenseToken":"token","licenseInstanceID":"inst","#
+            + #""licenseProductID":"prod"}"#
+        let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+        #expect(settings.trialSessionsUsed == 2)
+        #expect(settings.licenseKey == "ORDER-1")
+        #expect(settings.licenseStatus == .active)
+        #expect(settings.licenseToken == "token")
+        #expect(settings.licenseInstanceID == "inst")
+        #expect(settings.licenseProductID == "prod")
+        #expect(settings.defaultDuration == 300)
         let written = try #require(String(data: JSONEncoder().encode(settings), encoding: .utf8))
-        #expect(written.contains("\"paperMode\":\"\(expected.rawValue)\""))
+        #expect(!written.contains("paperMode"), "a paper mode was written back")
         #expect(!written.contains("\"theme\""), "the retired theme key was written back")
-        // A stored mode wins over a leftover theme key.
-        let both = #"{"theme":"light","paperMode":"slate","defaultDuration":60,"reducedMotion":"system"}"#
-        #expect(try JSONDecoder().decode(AppSettings.self, from: Data(both.utf8)).paperMode == .slate)
     }
 
     @Test
@@ -117,7 +124,7 @@ struct SettingsStoreTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let store = SettingsStore(configDirectory: root)
-        let settings = AppSettings(paperMode: .slate, defaultDuration: 300, reducedMotion: .always,
+        let settings = AppSettings(defaultDuration: 300, reducedMotion: .always,
                                    licenseKey: key, licenseStatus: .active)
         #expect(settings.licenseStatus == .active)
         try store.save(settings)

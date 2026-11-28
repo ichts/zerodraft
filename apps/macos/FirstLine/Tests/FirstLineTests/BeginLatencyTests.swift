@@ -46,25 +46,10 @@ struct BeginLatencyTests {
         let (controller, state, root) = try makeWindow()
         defer { controller.window?.orderOut(nil); try? FileManager.default.removeItem(at: root) }
         let window = try #require(controller.window)
-        // A size no other suite uses, so the shared paper cache cannot be warmed or evicted by a neighbour. The wait for the background render is generous: parallel suites that build papers on the main thread can starve it for minutes; the measured time below is the main thread's own CPU, which a neighbour cannot inflate.
         window.setContentSize(NSSize(width: 1013, height: 727))
         let home = try #require(window.contentViewController?.children.first as? HomeViewController)
         home.view.layoutSubtreeIfNeeded()
         home.viewDidAppear()
-        let area = home.view.bounds.insetBy(dx: 32, dy: 32)  // the paper is 32 pt from every window edge (D-116)
-        let scale = window.backingScaleFactor
-        let mode = FirstLineColors.mode(for: home.view.effectiveAppearance)
-        let (w, h) = (Int((area.width * scale).rounded()), Int((area.height * scale).rounded()))
-        // Parallel suites build sheets of their own on the main actor, and the cache keeps only three: a sheet the
-        // picker warmed can be evicted before this poll runs, and nothing would ever warm it again. Ask the picker
-        // again each turn; a picker that does not warm the room's paper still fails the `holds` check below.
-        await spin(until: {
-            if PaperSheetCache.shared.holds(width: w, height: h, scale: scale, mode: mode) { return true }
-            home.prewarmRoomPaper()
-            return false
-        }, limit: .seconds(600))
-        #expect(PaperSheetCache.shared.holds(width: w, height: h, scale: scale, mode: mode), "the picker never warmed the room's paper")
-        let builtBefore = PaperSheetCache.shared.synchronousBuilds(width: w, height: h, scale: scale, mode: mode)
         let begin = try #require(descendants(home.view, NSButton.self).first { $0.title == "Begin" })
         let start = Self.mainThreadCPUms()
         begin.performClick(nil)
@@ -78,7 +63,6 @@ struct BeginLatencyTests {
         session.view.displayIfNeeded()
         window.displayIfNeeded()
         let elapsed = Self.mainThreadCPUms() - start
-        #expect(PaperSheetCache.shared.synchronousBuilds(width: w, height: h, scale: scale, mode: mode) == builtBefore, "the room rebuilt a paper the picker had warmed")
         #expect(state.selectedSurface == .session)
         let paper = try #require(descendants(session.view, PaperSheetView.self).first)
         #expect(paper.bounds.width > 100)

@@ -2,13 +2,14 @@ import AppKit
 import Testing
 @testable import WriteItDown
 
-/// The three sheets (D-119, D-120), measured: each mode's tone and roles, and the 7:1 floor of every word in the
-/// rendered pixels under the lamp, on the sheet and both washes. The Mac half of the web's paper.spec.mjs.
+/// The two sheets (D-124), measured: each paper's tone and roles, the 7:1 floor of every word on the sheet and on
+/// both washes, the numeral's large-text floor, and a rendered sheet that is one flat tone. The Mac half of the web's
+/// paper.spec.mjs.
 @MainActor
 struct PaperContrastTests {
-    private func resolved(_ color: NSColor, _ name: NSAppearance.Name) throws -> NSColor {
+    private func resolved(_ color: NSColor, _ paper: TestPaper) throws -> NSColor {
         var value: NSColor?
-        NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+        NSAppearance(named: paper.appearance)?.performAsCurrentDrawingAppearance {
             value = color.usingColorSpace(.sRGB)
         }
         return try #require(value)
@@ -45,194 +46,84 @@ struct PaperContrastTests {
                 alpha: 1)
     }
 
-    private static let sheet: [PaperMode: (tone: String, ink: String, quiet: String, danger: String, wash: String,
+    private static let sheet: [TestPaper: (tone: String, ink: String, quiet: String, red: String, wash: String,
                                            deep: String, history: [CGFloat])] = [
-        .lamp: ("#e9e2ce", "#1f1812", "#221a14", "#380904", "#e8cfbb", "#e6bca7", [1, 0.22, 0.07]),
-        .paper: ("#fdfdfb", "#1c1917", "#3f3b36", "#63140b", "#fae7e2", "#f6d0c9", [1, 0.22, 0.07]),
-        .slate: ("#363b3d", "#f7eedb", "#f4efe6", "#ffe8de", "#493e3d", "#5a403d", [1, 0.16, 0.05]),
+        .white: ("#ffffff", "#1c1917", "#3f3b36", "#b00c15", "#f2f2f2", "#e6e6e6", [1, 0.22, 0.07]),
+        .black: ("#111111", "#ededed", "#c2bfb7", "#ff453a", "#1b1b1b", "#262626", [1, 0.17, 0.065]),
     ]
 
-    /// The dimmed history (D-092): the steps are exempt from 7:1 and pinned to the same 1.57:1 and 1.15:1 on every
-    /// sheet, so no mode's history reads louder than another's.
-    @Test(arguments: PaperMode.allCases)
-    func historyStepsReadTheSameOnEverySheet(mode: PaperMode) throws {
-        let want = try #require(Self.sheet[mode])
-        let paper = try #require(color(want.tone)), ink = try #require(color(want.ink))
-        let faded = want.history.dropFirst().map { contrast(composited(ink, alpha: Double($0), over: paper), paper) }
-        #expect(abs(faded[0] - 1.57) < 0.06, "\(mode): history step one reads \(faded[0]):1")
-        #expect(abs(faded[1] - 1.15) < 0.03, "\(mode): history step two reads \(faded[1]):1")
-    }
-
-    /// One 40 pt patch of the rendered room sheet: its mean and its 2nd and 98th luminance percentile pixels.
-    private struct Patch { let mean: [Double], dark: [Double], light: [Double] }
-
-    private func patches(of image: CGImage, scale: Int) throws -> [String: Patch] {
-        let width = image.width, height = image.height
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-                                             bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let px = try #require(context.data).bindMemory(to: UInt8.self, capacity: width * height * 4)
-        let side = 40 * scale
-        let w = width / scale, h = height / scale
-        // paper.spec.mjs roomPatches: the centre under the writing line and the four corners inside the chrome.
-        let origins: [String: (Int, Int)] = [
-            "centre": (w / 2 - 20, Int(Double(h) * 0.62)), "topLeft": (8, 10), "topRight": (w - 48, 50),
-            "bottomLeft": (8, h - 96), "bottomRight": (w - 48, h - 96),
-        ]
-        return origins.mapValues { origin in
-            var values: [(Double, [Double])] = []
-            var mean = [0.0, 0.0, 0.0]
-            for y in origin.1 * scale..<origin.1 * scale + side {
-                for x in origin.0 * scale..<origin.0 * scale + side {
-                    let i = (y * width + x) * 4
-                    let rgb = [Double(px[i]), Double(px[i + 1]), Double(px[i + 2])]
-                    values.append((0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2], rgb))
-                    for c in 0..<3 { mean[c] += rgb[c] / Double(side * side) }
-                }
-            }
-            values.sort { $0.0 < $1.0 }
-            let at = { (q: Double) in values[Int(q * Double(values.count - 1))].1 }
-            return Patch(mean: mean, dark: at(0.02), light: at(0.98))
+    @Test(arguments: TestPaper.allCases)
+    func everyRoleIsThePapersToken(paper: TestPaper) throws {
+        let want = try #require(Self.sheet[paper])
+        #expect(hex(try resolved(FirstLineColors.paperNSColor, paper)) == want.tone)
+        #expect(hex(try resolved(FirstLineColors.paperInkNSColor, paper)) == want.ink)
+        #expect(hex(try resolved(FirstLineColors.paperQuietNSColor, paper)) == want.quiet)
+        #expect(hex(try resolved(FirstLineColors.paperDangerNSColor, paper)) == want.red)
+        #expect(hex(try resolved(FirstLineColors.paperWashNSColor, paper)) == want.wash)
+        #expect(hex(try resolved(FirstLineColors.paperWashDeepNSColor, paper)) == want.deep)
+        var history: [CGFloat] = []
+        NSAppearance(named: paper.appearance)?.performAsCurrentDrawingAppearance {
+            history = FirstLineColors.paperHistoryOpacities(for: NSAppearance.currentDrawing())
         }
+        #expect(history == want.history)
     }
 
-    /// The sheet as the room shows it: the rendered paper, and over it the wash at full strength under the light.
-    private func roomSheet(_ mode: PaperMode, wash: String?) throws -> CGImage {
-        let (width, height, scale) = (1376, 804, 1)
-        let sheet = try #require(PaperField.render(width: width, height: height, scale: CGFloat(scale), mode: mode))
-        guard let wash, let tint = color(wash) else { return sheet }
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-                                             bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        let rect = CGRect(x: 0, y: 0, width: width, height: height)
-        context.draw(sheet, in: rect)
-        context.setFillColor(tint.cgColor)
-        context.fill(rect)
-        PaperField.drawLight(mode, in: context, rect: rect)
-        return try #require(context.makeImage())
+    /// The dimmed history (D-092): the steps are exempt from 7:1 and pinned to the same 1.57:1 and 1.15:1 on both
+    /// papers, so neither paper's history reads louder than the other's.
+    @Test(arguments: TestPaper.allCases)
+    func historyStepsReadTheSameOnBothPapers(paper: TestPaper) throws {
+        let want = try #require(Self.sheet[paper])
+        let tone = try #require(color(want.tone)), ink = try #require(color(want.ink))
+        let faded = want.history.dropFirst().map { contrast(composited(ink, alpha: Double($0), over: tone), tone) }
+        #expect(abs(faded[0] - 1.57) < 0.06, "\(paper): history step one reads \(faded[0]):1")
+        #expect(abs(faded[1] - 1.15) < 0.03, "\(paper): history step two reads \(faded[1]):1")
     }
 
-    /// Every word in the room clears 7:1 on the pixels it sits on: each role is lit by the light that shades the
-    /// patch (paper.spec.mjs `lit`), and measured against the patch's worst grain pixel, on the plain sheet, the
-    /// wash and the deep wash, at the centre and the four corners.
-    @Test(arguments: PaperMode.allCases)
-    func everyWordClearsSevenToOneInTheRenderedPixels(mode: PaperMode) throws {
-        let want = try #require(Self.sheet[mode])
-        let tone = try #require(color(want.tone)).rgb255
-        for (ground, wash) in [("sheet", nil), ("wash", want.wash), ("deep", want.deep)] as [(String, String?)] {
-            for (place, patch) in try patches(of: roomSheet(mode, wash: wash), scale: 1) {
-                for (role, value) in [("ink", want.ink), ("quiet", want.quiet), ("danger", want.danger)] {
-                    let ink = try #require(color(value)).rgb255
-                    let seen = (0..<3).map { ink[$0] * min(1, patch.mean[$0] / tone[$0]) }
-                    let worst = luminance(seen) < luminance(patch.mean) ? patch.dark : patch.light
-                    let ratio = (max(luminance(seen), luminance(worst)) + 0.05) / (min(luminance(seen), luminance(worst)) + 0.05)
-                    #expect(ratio >= 7, "\(mode) \(role) on the \(ground) at the \(place): \(ratio):1")
-                }
+    /// Every word clears 7:1 on the sheet and on both washes; the numeral is large text and clears 3:1 on the
+    /// deepest wash (D-124). The wash is visible: one step off the sheet, the cut one step further.
+    @Test(arguments: TestPaper.allCases)
+    func everyWordClearsItsFloorAtTheDeepestWash(paper: TestPaper) throws {
+        let want = try #require(Self.sheet[paper])
+        let grounds = try [want.tone, want.wash, want.deep].map { try #require(color($0)) }
+        for ground in grounds {
+            for (role, value) in [("ink", want.ink), ("quiet", want.quiet)] {
+                let ratio = contrast(try #require(color(value)), ground)
+                #expect(ratio >= 7, "\(paper) \(role) on \(hex(ground)) reads \(ratio):1")
             }
         }
+        let numeral = contrast(try #require(color(want.red)), grounds[2])
+        #expect(numeral >= 3, "\(paper) numeral on the deepest wash reads \(numeral):1")
+        let step = contrast(grounds[1], grounds[0])
+        #expect(step > 1.05, "\(paper) wash is \(step):1 off the sheet")
+        #expect(contrast(grounds[2], grounds[0]) > step, "\(paper) cut is not past the ramp")
     }
 
-    /// The rendered sheet is the web's sheet: the same tone, grain, cloud and light. The reference is the web room's
-    /// bare sheet at the Mac window's default size (976 x 656, Chromium at 1x, cf427c3 `#trial`, its words hidden),
-    /// as 24 px patch means at nine points, within 2 levels. The Mac drew it within 0.5 when it was pinned.
-    @Test(arguments: [PaperMode.lamp, .slate, .paper])
-    func theRenderedSheetIsTheWebsSheet(mode: PaperMode) throws {
-        let web: [PaperMode: [[Double]]] = [
-            .lamp: [[211, 198, 168], [207, 195, 167], [209, 196, 165], [204, 188, 157], [209, 196, 165],
-                    [206, 190, 159], [206, 189, 155], [201, 184, 151], [199, 182, 148]],
-            .slate: [[62, 67, 68], [67, 72, 74], [63, 68, 70], [66, 71, 72], [63, 68, 70], [65, 69, 71],
-                     [60, 64, 65], [64, 69, 70], [65, 69, 70]],
-            .paper: Array(repeating: [253, 253, 251], count: 9),
-        ]
-        let (width, height) = (976, 656)
-        let image = try #require(PaperField.render(width: width, height: height, scale: 1, mode: mode))
-        let context = try #require(CGContext(data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
-                                             bytesPerRow: image.width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        let px = try #require(context.data).bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)
-        var index = 0
-        for fy in [0.3, 0.6, 0.9] {
-            for fx in [0.25, 0.5, 0.75] {
-                // The bitmap's first row is the sheet's top, as in a screenshot.
-                let (cx, cy) = (Int(fx * Double(width)), Int(fy * Double(height)))
-                var mean = [0.0, 0.0, 0.0]
-                for y in cy - 12..<cy + 12 {
-                    for x in cx - 12..<cx + 12 {
-                        let i = (y * image.width + x) * 4
-                        for c in 0..<3 { mean[c] += Double(px[i + c]) / 576 }
-                    }
-                }
-                let want = try #require(web[mode])[index]
-                let drift = zip(mean, want).map { abs($0 - $1) }.max() ?? 0
-                #expect(drift <= 2, "\(mode) at (\(fx), \(fy)): Mac \(mean.map { Int($0.rounded()) }), web \(want)")
-                index += 1
+    /// The sheet the room draws is one flat tone: no grain, cloud or lamp (D-124), in both papers.
+    @Test(arguments: TestPaper.allCases)
+    func theRenderedSheetIsOneFlatTone(paper: TestPaper) throws {
+        let want = try #require(Self.sheet[paper])
+        let sheet = PaperSheetView(frame: NSRect(x: 0, y: 0, width: 320, height: 200))
+        sheet.appearance = NSAppearance(named: paper.appearance)
+        let rep = try #require(sheet.bitmapImageRepForCachingDisplay(in: sheet.bounds))
+        sheet.cacheDisplay(in: sheet.bounds, to: rep)
+        var seen = Set<String>()
+        for y in stride(from: 40, to: 160, by: 7) {
+            for x in stride(from: 40, to: 280, by: 7) {
+                if let pixel = renderedPixel(rep, x: x, y: y) { seen.insert(hex(pixel)) }
             }
         }
-    }
-
-    /// Paper is plain: its tone, no grain, no cloud, no lamp. Lamp and Slate carry their grain and light.
-    @Test(arguments: PaperMode.allCases)
-    func onlyPaperIsPlain(mode: PaperMode) throws {
-        let image = try roomSheet(mode, wash: nil)
-        let all = try patches(of: image, scale: 1)
-        let spread = all.values.map { luminance($0.light) - luminance($0.dark) }.max() ?? 0
-        if mode == .paper {
-            #expect(spread == 0, "the plain sheet carries a texture")
-            #expect(all.values.allSatisfy { $0.mean.map { $0.rounded() } == [253, 253, 251] })
-        } else {
-            #expect(spread > 0.01, "\(mode) lost its grain")
+        #expect(seen.count == 1, "\(paper) sheet is not one flat tone: \(seen.sorted())")
+        // The cached bitmap round-trips through the display colour space, which may move a channel by one level.
+        let drawn = try #require(seen.first.flatMap { color($0) }), tone = try #require(color(want.tone))
+        for (a, b) in [(drawn.redComponent, tone.redComponent), (drawn.greenComponent, tone.greenComponent),
+                       (drawn.blueComponent, tone.blueComponent)] {
+            #expect(abs(a - b) * 255 <= 1.01, "\(paper) sheet paints \(hex(drawn)), not \(want.tone)")
         }
-    }
-
-    /// Slate's grain is even (round 006b): an isotropic grain, not the streaked stone it replaced, so the spread of
-    /// the row means and of the column means stay within 3x of each other on the bare sheet.
-    @Test func slateGrainIsEven() throws {
-        let image = try #require(PaperField.render(width: 1376, height: 804, scale: 1, mode: .slate))
-        let width = image.width, height = image.height
-        let context = try #require(CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
-                                             bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
-                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        let px = try #require(context.data).bindMemory(to: UInt8.self, capacity: width * height * 4)
-        let region = (x: 368, y: 252, width: 640, height: 300)
-        var rows = [Double](repeating: 0, count: region.height), columns = [Double](repeating: 0, count: region.width)
-        for y in 0..<region.height {
-            for x in 0..<region.width {
-                let i = ((region.y + y) * width + region.x + x) * 4
-                let luma = 0.2126 * Double(px[i]) + 0.7152 * Double(px[i + 1]) + 0.0722 * Double(px[i + 2])
-                rows[y] += luma / Double(region.width)
-                columns[x] += luma / Double(region.height)
-            }
-        }
-        func spread(_ values: [Double]) -> Double {
-            let mean = values.reduce(0, +) / Double(values.count)
-            return (values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)).squareRoot()
-        }
-        let ratio = max(spread(rows) / spread(columns), spread(columns) / spread(rows))
-        #expect(ratio <= 3, "Slate's grain runs one way: row/column spread ratio \(ratio)")
     }
 
     private func color(_ hex: String) -> NSColor? {
-        guard let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        guard hex.hasPrefix("#"), hex.count == 7, let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
         return NSColor(srgbRed: CGFloat((value >> 16) & 255) / 255, green: CGFloat((value >> 8) & 255) / 255,
                        blue: CGFloat(value & 255) / 255, alpha: 1)
-    }
-
-    private func luminance(_ rgb: [Double]) -> Double {
-        func channel(_ v: Double) -> Double {
-            let c = v / 255
-            return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2])
-    }
-
-}
-
-private extension NSColor {
-    var rgb255: [Double] {
-        let c = usingColorSpace(.sRGB) ?? self
-        return [Double(c.redComponent) * 255, Double(c.greenComponent) * 255, Double(c.blueComponent) * 255]
     }
 }

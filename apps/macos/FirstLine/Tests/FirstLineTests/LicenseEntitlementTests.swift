@@ -123,7 +123,6 @@ struct LicenseEntitlementTests {
         try JSONSerialization.data(withJSONObject: fixture).write(to: root.appendingPathComponent("settings.json"))
         for _ in 0..<2 {
             let state = makeState(at: root)
-            #expect(state.settings.paperMode == .lamp)
             #expect(state.settings.defaultDuration == 300)
             #expect(state.settings.reducedMotion == .always)
             #expect(state.settings.licenseStatus == .inactive)

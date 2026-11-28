@@ -231,21 +231,18 @@ struct EditorFocusTests {
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
     }
 
-    /// The ladder is solved per mode (D-069, D-120): Lamp and Paper step 1, .22, .07 and Slate 1, .16, .05, and a
-    /// mode switch re-steps every completed line, so no step from the other mode stays baked into the storage.
-    @Test func historyLadderFollowsTheMode() throws {
+    /// The ladder is solved per paper (D-124): white steps 1, .22, .07 and black 1, .17, .065, and an appearance
+    /// change re-steps every completed line, so no step from the other paper stays baked into the storage.
+    @Test func historyLadderFollowsThePaper() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.loadRestoredText("one\ntwo\nthree")
-        for (mode, ladder) in [(PaperMode.paper, [0.07, 0.22]), (.lamp, [0.07, 0.22]), (.slate, [0.05, 0.16]),
-                               (.lamp, [0.07, 0.22])] {
-            try withPaperMode(mode) { (appearance: NSAppearance.Name) throws in
-                textView.appearance = NSAppearance(named: appearance)
-                textView.viewDidChangeEffectiveAppearance()
-                #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - ladder[0]) < 0.001, "\(mode)")
-                #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - ladder[1]) < 0.001, "\(mode)")
-                #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001, "\(mode)")
-            }
+        for (paper, ladder) in [(TestPaper.white, [0.07, 0.22]), (.black, [0.065, 0.17]), (.white, [0.07, 0.22])] {
+            textView.appearance = NSAppearance(named: paper.appearance)
+            textView.viewDidChangeEffectiveAppearance()
+            #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - ladder[0]) < 0.001, "\(paper)")
+            #expect(abs(try lineAlpha(in: textView, lineIndex: 1) - ladder[1]) < 0.001, "\(paper)")
+            #expect(abs(try lineAlpha(in: textView, lineIndex: 2) - 1) < 0.001, "\(paper)")
         }
     }
 

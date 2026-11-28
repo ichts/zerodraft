@@ -22,7 +22,6 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
     private(set) var rulesPopover: NSPopover?
     /// The card's frame in the picker's own coordinates, the rect the room's paper grows out of (D-096).
     var cardFrame: NSRect { card.frame }
-    private var liveResizeObserver: NSObjectProtocol?
 
     init(appState: AppState) {
         self.appState = appState
@@ -42,12 +41,6 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
         super.viewDidAppear()
         view.window?.makeFirstResponder(beginButton)
         view.window?.defaultButtonCell = beginButton.cell as? NSButtonCell
-        prewarmRoomPaper()
-        liveResizeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didEndLiveResizeNotification, object: view.window, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.prewarmRoomPaper() }
-        }
     }
 
     /// Closing the rules hands focus back to the `?` that opened them, so a keyboard writer is not stranded.
@@ -55,29 +48,10 @@ final class HomeViewController: NSViewController, NSPopoverDelegate {
         view.window?.makeFirstResponder(rulesButton)
     }
 
-    override func viewDidLayout() {
-        super.viewDidLayout()
-        if !view.inLiveResize { prewarmRoomPaper() }
-    }
-
     override func viewWillDisappear() {
         super.viewWillDisappear()
         // The rules popover is not a sheet: it would stay over the room if the picker left under it.
         rulesPopover?.close()
-        if let liveResizeObserver { NotificationCenter.default.removeObserver(liveResizeObserver) }
-        liveResizeObserver = nil
-    }
-
-    /// The room's paper is the window inset 32 pt on every side (SessionViewController.buildRoom). The
-    /// picker renders that sheet in the background while the writer chooses, so Begin shows the finished
-    /// paper on its first frame instead of building the texture on the click (D-096).
-    func prewarmRoomPaper() {
-        guard let window = view.window else { return }
-        let area = view.bounds.insetBy(dx: 32, dy: 32)
-        let scale = window.backingScaleFactor
-        PaperSheetCache.shared.prewarm(width: Int((area.width * scale).rounded()),
-                                       height: Int((area.height * scale).rounded()), scale: scale,
-                                       mode: FirstLineColors.mode(for: view.effectiveAppearance))
     }
 
     private func buildInterface() {

@@ -74,7 +74,6 @@ func newRigWith(t *testing.T, vault *licence.MemoryVault, svc *fakeservice.Servi
 		Clock:   now, Version: "test",
 	})
 	g.a.env.RoomConfig.Clock = now
-	g.a.env.RoomConfig.SyncPaper = true
 	tt = ui.NewTester(g.a.View, 1040, 620)
 	g.tt = tt
 	tt.Frame()
@@ -478,3 +477,37 @@ func TestTheWindowCloseAsksOnlyForALiveDraft(t *testing.T) {
 		t.Fatal("the second close must go through and the first must not touch the draft")
 	}
 }
+
+// The activation card fits the smallest window the app allows: nothing on it is cut off at the minimum size
+// (Artist audit: the card was about 468 DIP tall in a 449 DIP content area that cannot scroll).
+func TestTheActivationCardFitsTheMinimumWindow(t *testing.T) {
+	g := newRig(t)
+	for i := 0; i < 3; i++ {
+		g.spend()
+		if i < 2 {
+			g.tt.Key(0, ui.KeyEscape)
+			g.tt.Key(0, ui.KeyEscape)
+		}
+	}
+	g.tt.Key(0, ui.KeyEnter)
+	if g.a.Surface() != Upgrade {
+		t.Fatalf("surface %d", g.a.Surface())
+	}
+	g.tt.SetSize(MinWindowWidth, MinWindowHeight-TitleBarHeight)
+	g.tt.Frame()
+	// the page box carries the title as its label, so the card's first line is read from the subtitle under the title
+	top, ok := g.tt.Find(tokens.UpgradeSubtitle)
+	bottom, ok2 := g.tt.Find(tokens.UpgradeWebTrial)
+	if !ok || !ok2 {
+		t.Fatalf("the card's first or last line is missing: %q", g.tt.Texts())
+	}
+	// the card's own insets sit around these lines, so the title keeps the card's top inset above it and the last
+	// control the bottom inset below it, inside the content area
+	if top.Y < upgradeInsetTop+upgradeTitleBox || bottom.Y+bottom.H > float32(MinWindowHeight-TitleBarHeight)-upgradeInsetBottom {
+		t.Fatalf("the card's lines run from %.1f to %.1f in a %d DIP content area", top.Y, bottom.Y+bottom.H, MinWindowHeight-TitleBarHeight)
+	}
+}
+
+// upgradeInsetTop and upgradeInsetBottom are the activation card's own vertical padding (upgradeView's card call), and
+// upgradeTitleBox the 34 pt title's line with the 6 DIP gap under it.
+const upgradeInsetTop, upgradeInsetBottom, upgradeTitleBox = 39, 39, 46

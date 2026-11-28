@@ -67,7 +67,7 @@ composition constants, the paper generator constants (`PaperSheetView.swift`) an
 | 29 | Reduced motion (system setting) | `Preferences().ReduceMotion` | done | wash steps at once, no shake, scroll snaps; not exercised on hardware |
 | 30 | VoiceOver announcements (danger, stopped, kept, blocked, exit hint, copied) | `Context.Announce` with the Mac strings | done | UIA/Narrator output not verified (pending) |
 | 31 | Settings, Home, rules screen, trial counter, licence, Buy, Sparkle updates | rows 34-62 below | see rows | split into one row per behaviour in this slice |
-| 32 | Window: min 980 wide, default 1040 x 720 | 1040 x 620 default, min 760 x 480 | different | vivobook-1's screen is 1280 x 720 DIP at 150%: the Mac default would not fit. `WID_WINDOW=1040x720` (evidence switch, not in the shortcut) sizes the page area to the Mac's for the side-by-side measurements |
+| 32 | Window: min 980 wide, default 1040 x 720 | 1040 x 620 default, min 760 x 560 (`app.MinWindowHeight`) | different | vivobook-1's screen is 1280 x 720 DIP at 150%: the Mac default would not fit; the minimum height leaves the activation card (about 468 DIP, 485 with a two-line error) its whole content area, since the card cannot scroll. `WID_WINDOW=1040x720` (evidence switch, not in the shortcut) sizes the page area to the Mac's for the side-by-side measurements |
 | 33 | Draft text stays in memory only | same | done | nothing is written to disk except the optional `WID_LOG` test log |
 
 ## The product around the room (slice 2)

@@ -222,6 +222,14 @@ func (a *App) obstacle() room.Obstacle {
 	return room.ObstacleLicenseNeeded
 }
 
+// The smallest window the app allows, outer size in DIPs, and the Windows 11 title bar it includes: the activation card
+// (the tallest screen, about 468 DIP and 485 with a two-line error on the test PC) fits the content area that leaves.
+const (
+	MinWindowWidth  = 760
+	MinWindowHeight = 560
+	TitleBarHeight  = 32
+)
+
 // MayClose answers the window's close: only a live draft in the room asks first (D-118).
 func (a *App) MayClose() bool {
 	if a.surface != Session || a.rm == nil {

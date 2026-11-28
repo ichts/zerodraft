@@ -84,7 +84,7 @@ func main() {
 	winW, winH, content := windowSize(os.Getenv("WID_WINDOW"))
 	mygo.App.WhenReady(func() {
 		win = mygo.NewWindow(mygo.WindowOptions{
-			Title: "Write It Down", Width: winW, Height: winH, UseContentSize: content, MinWidth: 760, MinHeight: 480,
+			Title: "Write It Down", Width: winW, Height: winH, UseContentSize: content, MinWidth: app.MinWindowWidth, MinHeight: app.MinWindowHeight,
 			Content: ui.View(a.View),
 		})
 		win.OnClose(func(e *mygo.CloseEvent) {

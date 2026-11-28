@@ -30,8 +30,6 @@ type Config struct {
 	// Copy puts the kept text on the clipboard and reports whether the clipboard now holds exactly it. Defaults to
 	// mygo.Clipboard with a read-back (a test replaces it: the headless backend has no clipboard to answer).
 	Copy func(string) bool
-	// SyncPaper renders the paper texture on the calling goroutine (first frame carries it, tests).
-	SyncPaper bool
 	// Writing font size in pt (28 is the Mac default).
 	FontSize float32
 	// Admit is the Mac prepareSessionInput gate for a session that has not started: it checks the licence or

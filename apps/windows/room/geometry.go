@@ -80,8 +80,8 @@ func WashFraction(idleSeconds, silenceSeconds float64, reduceMotion bool) float3
 	return float32(math.Min(math.Max((idleSeconds-warnAt)/tokens.WarnLeadSeconds, 0), 1))
 }
 
-// HistoryAlpha is the history's opacity by rung (D-092): the live line is 0, older lines step back to .26 and .084 (white; .172 and .061 black, D-130)
-// (light; .16 and .05 dark); lines beyond the steps are gone (-1).
+// HistoryAlpha is the history's opacity by rung (D-092): the live line is 0, older lines step back to .26 and .084
+// (white; .172 and .061 black, D-130); lines beyond the steps are gone (-1).
 func HistoryAlpha(rung int, dark bool) float32 {
 	l := tokens.HistoryOpacitiesLight
 	if dark {

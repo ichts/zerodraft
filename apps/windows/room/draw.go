@@ -494,7 +494,7 @@ func (r *Room) drawWarning(p *ui.Painter, pr ui.Rect, ink ui.Color, dark bool, a
 	size := round(min(r.winH()*0.18, 170))
 	above, below := DigitInk(rune('0'+n%10), size)
 	numTop := baseline + 44
-	l := r.shape(textSpec{s: fmt.Sprint(n), family: fonts.Numeral, size: size})
+	l := r.shape(textSpec{s: fmt.Sprint(n), family: fonts.Numeral, size: size, weight: 360})
 	w, _ := l.Size()
 	p.TextLayout(l, pr.X+(pr.W-w)/2, numTop+above-r.ascent(fonts.Numeral, size), rc(tokens.PaperDanger, dark))
 	capH := float32(13) * 0.70

@@ -29,9 +29,9 @@ Evidence names in the Reason column (`150-15-home-licensed.png`, `evidence/e2e15
 proved the row. Those captures were not committed; `scripts/e2e.sh`, `scripts/capture.sh` and `scripts/ime-suite.sh`
 regenerate them (see `README.md`).
 
-`gen_tokens.py` reads `Colors.swift` (every role, light and dark, alpha included), the history steps (D-092),
-`Spacing.swift`, the anchor/exit-window/session/silence/size/measure constants, the failure and kept
-composition constants, the paper generator constants (`PaperSheetView.swift`) and the verbatim room strings
+`gen_tokens.py` reads `Colors.swift` (the white and black palettes and every role over them, alpha included, and
+each paper's history steps, D-092 / D-124), `Spacing.swift`, the anchor/exit-window/session/silence/size/measure
+constants, the failure and kept composition constants and the verbatim room strings
 (`SessionViewController.swift`, `RoomPresentation.swift`, `SessionKeptView.swift`).
 
 | # | Mac source | Windows | Status | Reason / assertion |

@@ -100,6 +100,8 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 ### F. 终审补漏（Thinker 2026-11-28）
 
+Gemini 第 1 轮（第 1–28 条）：通过 1、2、3、4、6、8、9、10、11、12、12b、17、18、19、20、21、22、25、26、27、28；打回 5、13、14、15、16、23、24，修复在 `1c4e019`（5、13、14、16）、`9ccecbb`（15 的文档）、`2418be2`（24 的退出确认）和本节之后的 Windows 字体提交（23、24 的族名与可变轴、数字字重）。
+
 - [x] 31. 网页成稿屏 `Copy text` 焦点环：`.home .room-primary` 仍用 `--on-ink` 内环，白纸 / 黑纸上 1.00:1 看不见；改为与 D-126 同样的 3px 外偏移墨色环，`phase4.spec` 改断言（偏移 3px、颜色等于墨色；旧样式 -2px 失败）。
 - [x] 32. Windows 退出确认用墨色（D-124），不再用 `PaperDanger`；像素测试 `TestTheArmedExitConfirmationIsInk` 在旧代码上读到红色像素、失败。
 - [x] 33. Windows 同步 Mac 第 16、17 条：结账不可用时间距 20；Activate 预留最宽标签；入口卡反馈行预留一行。`TestTheActivationCardMovesNothingWhenItAnswers` 在旧代码上两处都失败（宽 106.7 < 120.2；web trial 435.8 → 451.5）；间距 20 是常量改动，无头测试量不出 pill 内文字的上边，未单独断言。SYNC 第 77 行。

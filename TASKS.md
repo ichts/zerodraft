@@ -36,7 +36,7 @@
 Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Codex）。
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
-- 第 6、8、9、11、12、12b 条：待审。
+- 第 6、8、9、11、12、12b、13 条：待审。
 
 ## 清单
 
@@ -64,7 +64,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 11. 警告句改为 Mac 的句子式 `Keep typing or the draft is deleted.`，去掉 .04em 字距（房间与演示同改）；phase4 断言 `text-transform:none`、`letter-spacing:normal`（旧样式 .04em、失败）；DESIGN.md §12 同步。
 - [x] 12. `/download/`：文件名续行去掉 0.5ch 内缩，与 `shasum` 同一左缘；Copy 控件与下一段留 12px；`COPY`/`COPIED` 改为句子式 `Copy`/`Copied`（与房间的 `Copy text`/`Copied` 一致）。mac.spec 新断言在旧样式上失败（偏 3.9px、间距 0）。
 - [x] 12b. 房间里浏览器「后退」：有字（或在 kept 屏）时，第一次后退把 `#trial` 推回历史并武装与 Esc 相同的确认，2 秒内第二次后退才离开；空房间照常直接离开。phase4 新用例在旧代码上失败（房间被隐藏）。
-- [ ] 13. 网页文档同步：`writeitdown/AGENTS.md`、`docs/design-system/tokens.json` 重导、`docs/design/canvas.json` 看板。
+- [x] 13. 网页文档同步：`writeitdown/AGENTS.md` 改正 Buy 样式（D-122 墨色、房间内 D-115）、入口文案 `Start a free 60-second session`、FAQ 数量（6）、Pricing 卡结构、状态卡；README 入口文案。`tokens.json` 与看板在第 2、3 条已重导并由 `tokens-json.test`、`boards.test` 守住。
 
 ### C. macOS
 

@@ -1,6 +1,6 @@
 # WRITE_IT_DOWN
 
-A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Give it 60 seconds on the landing. The landing nav's Download for Mac pill opens the Mac free-trial download page.
+A static browser writing room. Open `index.html#trial` over HTTP to enter directly, or choose Start a free 60-second session on the landing. The landing nav's Download for Mac pill opens the Mac free-trial download page.
 
 ```sh
 python3 -m http.server 8000

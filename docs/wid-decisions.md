@@ -2844,3 +2844,28 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 - Tests: `writeitdown/qa/typography.spec.mjs` "a license key is set in Paper Mono" (fails while the key inherits
   Allo) and the census, whose machine role is Paper Mono; `qa/test-install.py` ships the face and its licence.
 - Supersedes: D-057's system monospace for code strings.
+
+## D-130: the calm palette
+
+- Date: 2026-11-28. Captain: "our colour system is not calm enough", pointing at incipit.elm.fm, with Quiet.md and
+  MiaoYan as earlier references; on the Artideck board `white-black-paper` (round 3) the captain chose the
+  Incipit-like set.
+- Decision: the two papers of D-124 keep their shape (white in light, black in dark, the system appearance on the
+  Mac and Windows, the grey wash, one red per paper), and take calmer values on every surface: no pure white or
+  black, an ink one step lighter, a dusty red.
+
+  | Role | White | Black |
+  | --- | --- | --- |
+  | wall | `#f3f2ef` | `#141413` |
+  | paper and cards | `#fcfcfa` | `#1c1c1a` |
+  | ink | `#45433d` | `#dcdad3` |
+  | quiet (on the paper) | `#4b4943` | `#bdbbb3` |
+  | mute (off the paper) | `#6e6d68` | `#a3a29b` |
+  | warn wash / at the cut | `#f4f3f0` / `#eae9e5` | `#232321` / `#2a2a27` |
+  | history (D-092 targets 1.57:1, 1.15:1) | `.26` / `.084` | `.172` / `.061` |
+  | red | `#9a5255` | `#d08a8c` |
+
+  Ink clears 8.1:1 and quiet 7.4:1 at the deepest wash on both papers; the red is large text on the paper (4.66:1
+  white, 5.28:1 black at the deepest wash) and 5.5:1 / 6.3:1 as small text on a card.
+- Tests: the same paper, contrast and token tests as D-124, with these values.
+- Supersedes: D-124's colour values (its two papers, appearance rule, grey wash and single red stand).

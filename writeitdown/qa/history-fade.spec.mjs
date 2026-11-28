@@ -10,8 +10,8 @@ import { doorSettled } from './door.mjs';
 // centred just under the line being written, for two seconds (D-100, moved out of the footer), and nothing else moves.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#ffffff', dark: '#111111' };
-const QUIET = { light: '#3f3b36', dark: '#c2bfb7' };
+const TONES = { light: '#fcfcfa', dark: '#1c1c1a' };
+const QUIET = { light: '#4b4943', dark: '#bdbbb3' };
 const REFUSAL = 'You can only add the next word.';
 
 const rgb = value => String(value).match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -103,7 +103,7 @@ test('every row of one logical line carries one opacity, measured in the DOM and
   expect(liveDepth - depths[0], `live ${liveDepth.toFixed(1)} against history ${depths[0].toFixed(1)}`).toBeGreaterThan(10);
 });
 
-test('each Return line gets exactly its step, 1 / .22 / .07 per theme, and older lines are gone (D-092)', async ({ page }) => {
+test('each Return line gets exactly its step per paper (D-092 targets, D-130 values), and older lines are gone', async ({ page }) => {
   await enter(page);
   const mode = await theme(page);
   await page.keyboard.insertText('Oldest line.\nThree back.\nTwo back.\nOne back.\nLive');
@@ -114,7 +114,7 @@ test('each Return line gets exactly its step, 1 / .22 / .07 per theme, and older
     const style = getComputedStyle(document.querySelector('#editor-ink'));
     return [1, 2].map(n => Number(style.getPropertyValue(`--paper-history-${n}`)));
   });
-  expect(tokens).toEqual(mode === 'dark' ? [0.17, 0.065] : [0.22, 0.07]);
+  expect(tokens).toEqual(mode === 'dark' ? [0.172, 0.061] : [0.26, 0.084]);
   const byRung = Object.fromEntries(lines.map(line => [line.rung, line.opacity]));
   expect(byRung).toEqual({ 0: 1, 1: tokens[0], 2: tokens[1], 3: 0 });
   expect(byRung['0']).toBe(1);

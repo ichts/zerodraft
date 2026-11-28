@@ -10,26 +10,26 @@
    --serif and --sans keep their role names (written text and display, the tool) and both resolve to Allo.
    Every face is served from this site: fonts.css declares them (fonts/build-fonts.py generates it), fonts-cjk.css
    holds the Chinese face as one file and is linked by index.html alone. Dark keeps the same names. */
-:root{--page:#f7f7f5;--stage-a:var(--page);--stage-b:var(--page);--brand-plate:#ffffff}
+:root{--page:#f3f2ef;--stage-a:var(--page);--stage-b:var(--page);--brand-plate:#fcfcfa}
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
-  --sheet:#ffffff;
-  /* The sheet is white in light, black in dark (D-124); every word on it clears 7:1 except the history lines and the large numeral. */
-  --paper-tone:#ffffff;
-  --paper-quiet:#3f3b36;
-  --paper-history-1:.22;
-  --paper-history-2:.07;
+  --sheet:#fcfcfa;
+  /* The sheet is warm white in light, warm charcoal in dark (D-124, values D-130); every word on it clears 7:1 except the history lines and the large numeral. */
+  --paper-tone:#fcfcfa;
+  --paper-quiet:#4b4943;
+  --paper-history-1:.26;
+  --paper-history-2:.084;
   /* D-124: the warn wash greys the sheet (white darkens, black lightens); red is one hue per mode. */
-  --paper-wash:#f2f2f2;
-  --paper-wash-deep:#e6e6e6;
-  --ink:#1c1917;
-  --mute:#6b655c;
-  --chrome:#5c564d;
-  --hair:rgba(28,25,23,.10);
-  --hair-2:rgba(28,25,23,.16);
-  --red:#b00c15;
-  --tag-bg:#f2f2f0;
-  --on-ink:#ffffff;
+  --paper-wash:#f4f3f0;
+  --paper-wash-deep:#eae9e5;
+  --ink:#45433d;
+  --mute:#6e6d68;
+  --chrome:#6e6d68;
+  --hair:rgba(69,67,61,.12);
+  --hair-2:rgba(69,67,61,.20);
+  --red:#9a5255;
+  --tag-bg:#ededea;
+  --on-ink:#fcfcfa;
   /* type roles (D-125): serif = written text and display, sans = the tool, both Allo; cjk = the Chinese face, named
      once; hand = the landing's pen accent (D-057). Weights follow the Mac: writing 410, display 540, numeral 360. */
   --cjk:'Resource Han Rounded';
@@ -53,30 +53,30 @@
      never less than --r-min, so both corners share one centre (site.css derives --r-panel from --pad). */
   --r-ctl:8px;--r-sheet:16px;--r-card:24px;--r-stage:28px;--r-pill:999px;--r-min:4px;
   /* depth: hairline ring + 3 soft layers tinted with ink */
-  --lift:0 0 0 1px var(--hair),0 1px 1px rgba(28,25,23,.04),0 2px 4px rgba(28,25,23,.04),0 8px 16px -4px rgba(28,25,23,.06),0 24px 48px -16px rgba(28,25,23,.10);
-  --sheet-shadow:0 0 0 1px rgba(28,25,23,.07),0 2px 4px rgba(28,25,23,.05),0 12px 24px -8px rgba(28,25,23,.12),0 36px 72px -24px rgba(28,25,23,.20);
-  --press:inset 0 1px 0 rgba(255,255,255,.14),0 1px 1px rgba(0,0,0,.2),0 8px 16px -6px rgba(28,25,23,.35);
+  --lift:0 0 0 1px var(--hair),0 1px 1px rgba(69,67,61,.04),0 2px 4px rgba(69,67,61,.04),0 8px 16px -4px rgba(69,67,61,.06),0 24px 48px -16px rgba(69,67,61,.10);
+  --sheet-shadow:0 0 0 1px rgba(69,67,61,.07),0 2px 4px rgba(69,67,61,.05),0 12px 24px -8px rgba(69,67,61,.12),0 36px 72px -24px rgba(69,67,61,.20);
+  --press:inset 0 1px 0 rgba(255,255,255,.14),0 1px 1px rgba(0,0,0,.2),0 8px 16px -6px rgba(69,67,61,.35);
   /* motion: feedback fast, entrances slow, expo ease-out */
   --ease-out:cubic-bezier(.22,1,.36,1);
   --d-feedback:.16s;--d-enter:.6s;--d-write:.9s;
 }
-:root:not([data-theme="light"]){--page:#000000;--brand-plate:#111111}
+:root:not([data-theme="light"]){--page:#141413;--brand-plate:#1c1c1a}
 :root:not([data-theme="light"]) .home{
-  --sheet:#111111;
-  --paper-tone:#111111;
-  --paper-quiet:#c2bfb7;
-  --paper-history-1:.17;
-  --paper-history-2:.065;
-  --paper-wash:#1b1b1b;
-  --paper-wash-deep:#262626;
-  --ink:#ededed;
-  --mute:#a3a3a3;
-  --chrome:#a3a3a3;
-  --hair:rgba(237,237,237,.10);
-  --hair-2:rgba(237,237,237,.18);
-  --red:#ff453a;
-  --tag-bg:#1b1b1b;
-  --on-ink:#111111;
+  --sheet:#1c1c1a;
+  --paper-tone:#1c1c1a;
+  --paper-quiet:#bdbbb3;
+  --paper-history-1:.172;
+  --paper-history-2:.061;
+  --paper-wash:#232321;
+  --paper-wash-deep:#2a2a27;
+  --ink:#dcdad3;
+  --mute:#a3a29b;
+  --chrome:#a3a29b;
+  --hair:rgba(220,218,211,.10);
+  --hair-2:rgba(220,218,211,.18);
+  --red:#d08a8c;
+  --tag-bg:#232321;
+  --on-ink:#1c1c1a;
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.2),0 24px 48px -16px rgba(0,0,0,.5);
   --sheet-shadow:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.25),0 28px 56px -20px rgba(0,0,0,.6);
   --press:0 1px 1px rgba(0,0,0,.3),0 8px 16px -6px rgba(0,0,0,.5);

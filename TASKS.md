@@ -113,3 +113,11 @@ Gemini 第 1 轮（第 1–28 条）：通过 1、2、3、4、6、8、9、10、1
 - [x] 36. （Gemini 第 1 轮打回 4 处漏改，已在下一提交修：mac.html、免费试用答案页正文与 JSON-LD、Q-28、README 发布第 2 步）下载页删掉 SHA-256、`shasum` 命令与两个 Copy 控件（D-128）；`release-check.mjs`、`journey.mjs`、`dmg-journey.sh`、`llms.txt`、README、AGENTS 同步；mac.spec 断言页面不含 `SHA-256`/`shasum`/复制控件（旧页面失败）。
 - [x] 37. 等宽改用 Paper Mono（D-129，哥选定）：自托管 `fonts/paper-mono.woff2` 与 OFL，`--mono` token；`mac.html` 许可证 Key 与文档页 `code` 用它（原先 `.license-key code{font:inherit}` 让 Key 落在 Allo）；新测试在旧样式上失败；install 清单、test-install、DESIGN §12、Q-23、AGENTS 同步。写作与标题保持 Allo（哥选定）。
 
+### H. Calm 配色（D-130，哥在画板第 3 轮选了参考 Incipit 的一套）
+
+- [x] 38. D-130 决策记录：两种纸的结构不变，色值改为暖白 / 暖炭、降一档的墨、灰玫瑰红；纸上文字在最深 wash 上 ≥7:1，历史行按 D-092 目标重解。
+- [x] 39. 网页按 D-130 改 token 与测试。
+- [ ] 40. Mac 按 D-130 改 Palette 与测试。
+- [ ] 41. Windows 重新生成 token，测试同步。
+- [ ] 42. 红色在 Calm 底色下重选（Thinker：`#9a5255` 色相偏冷粉、浅色小字 5.05:1）。画板第 4 轮 A 暖朱砂 `#9a3326`/`#ec8878`、B 柔赤陶 `#924138`/`#dd8b81`、C 现值；等哥 Submit 后三端换值，新决策取代 D-130 的红。
+

@@ -1,18 +1,18 @@
 import { doorSettled } from './door.mjs';
-// The sheet on the writeitdown site (D-124): one flat white tone in light and one flat black tone in dark, with
+// The sheet on the writeitdown site (D-124, values D-130): one flat warm-white tone in light and one flat charcoal tone in dark, with
 // their ink, quiet chrome, grey wash and one red, measured on the rendered pixels as well as the computed styles.
 //
 // Fails on the grained charcoal sheet that dark shipped before D-124: the dark tone, the grey wash and the
 // flatness of the rendered pixels are pinned to the black sheet.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#ffffff', dark: '#111111' };
-const INK = { light: '#1c1917', dark: '#ededed' };
-const QUIET = { light: '#3f3b36', dark: '#c2bfb7' };
-const RED = { light: '#b00c15', dark: '#ff453a' };
-const WASH = { light: '#f2f2f2', dark: '#1b1b1b' };
-const WASH_DEEP = { light: '#e6e6e6', dark: '#262626' };
-const HISTORY = { light: [0.22, 0.07], dark: [0.17, 0.065] };
+const TONES = { light: '#fcfcfa', dark: '#1c1c1a' };
+const INK = { light: '#45433d', dark: '#dcdad3' };
+const QUIET = { light: '#4b4943', dark: '#bdbbb3' };
+const RED = { light: '#9a5255', dark: '#d08a8c' };
+const WASH = { light: '#f4f3f0', dark: '#232321' };
+const WASH_DEEP = { light: '#eae9e5', dark: '#2a2a27' };
+const HISTORY = { light: [0.26, 0.084], dark: [0.172, 0.061] };
 
 const parseColour = value => {
   const match = String(value).match(/rgba?\(([^)]+)\)/);

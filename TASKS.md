@@ -108,3 +108,8 @@ Gemini 第 1 轮（第 1–28 条）：通过 1、2、3、4、6、8、9、10、1
 - [x] 34. 决策与文档：D-125 改正 Windows 只换了书写/标题/数字三个角色；记录 Pricing 按钮 `Buy for $4.99` 的例外（D-127）；第 5 条措辞改正（卡内 `$4.99` 与 `3 free sessions` 仍各两次）；同步 `docs/ui-quality.md` Q-13/Q-22/Q-23/Q-34、`docs/wid-mac-behavior.md` 39/50、FirstLine AGENTS、writeitdown AGENTS、Windows SYNC 9/25/74/75。
 - [x] 35. `qa-window.sh` 的警告句断言改为句子式（4 处），`bash -n` 通过；PLAN 里对脚本断言的描述同步。脚本本身要等 cua-driver 授权后才能实跑。
 
+### G. 哥在字体画板上的决定（2026-11-28）
+
+- [x] 36. 下载页删掉 SHA-256、`shasum` 命令与两个 Copy 控件（D-128）；`release-check.mjs`、`journey.mjs`、`dmg-journey.sh`、`llms.txt`、README、AGENTS 同步；mac.spec 断言页面不含 `SHA-256`/`shasum`/复制控件（旧页面失败）。
+- [x] 37. 等宽改用 Paper Mono（D-129，哥选定）：自托管 `fonts/paper-mono.woff2` 与 OFL，`--mono` token；`mac.html` 许可证 Key 与文档页 `code` 用它（原先 `.license-key code{font:inherit}` 让 Key 落在 Allo）；新测试在旧样式上失败；install 清单、test-install、DESIGN §12、Q-23、AGENTS 同步。写作与标题保持 Allo（哥选定）。
+

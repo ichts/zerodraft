@@ -403,7 +403,7 @@ noticing that the two do not look alike.
 | the warning numeral | Allo, upright, tabular digits | `--w-numeral` 360 | Allo 360 |
 | everything the tool says, the clock | Allo | `--sans` at 400 / 500 / 600, the clock with tabular digits | Allo 400 / 500 / 600 |
 | the same roles in Chinese | Resource Han Rounded | `--cjk`, second in the writing stack, one GB2312 file in `fonts-cjk.css` | bundled cascade on the writing font |
-| literal machine strings | the system monospace | `ui-monospace` on `code` only (a shell command, a SHA-256) | none: the app has no code surface |
+| literal machine strings | Paper Mono (OFL-1.1, D-129) | `--mono` on `code` only (the license key on `mac.html`) | none: the app has no code surface |
 | the hand accent (exception) | Reenie Beanie | the landing's `lose every word.` and the `stop` heading word, nowhere else | never |
 
 Rules that follow from the table:

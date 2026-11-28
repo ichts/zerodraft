@@ -37,6 +37,7 @@
   /* the stack the room freezes to when its first Chinese character finds the Chinese face not yet resident (D-109) */
   --serif-platform:'Allo',system-ui,sans-serif;
   --hand:'Reenie Beanie','Segoe Print',cursive;
+  --mono:'Paper Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
   --sans:'Allo',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
   --w-write:410;--w-display:540;--w-numeral:360;
   /* writing size and placement for the web room: 28pt, active line at 35% of the sheet (the Mac's D-025

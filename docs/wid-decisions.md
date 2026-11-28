@@ -2820,3 +2820,27 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   facts" pins the label; `qa/shell.spec.mjs` keeps its one price string across the purchase path.
 - Supersedes: D-114 for this one button only.
 
+
+## D-128: the download page publishes no checksum
+
+- Date: 2026-11-28. Captain, on the Artideck board: "this download does not need a hash at all - which public app
+  download page gives one? delete it."
+- Decision: `/download/` shows no SHA-256, no `shasum` command and no copy control for either. The Install card says
+  how to install and who signed the app; Gatekeeper's Developer ID and notarization checks are the user's guarantee.
+  The release tooling keeps its own checksums out of sight: `release-dmg.sh` still writes the `.sha256` sidecar,
+  and the journey gate and `dmg-journey.sh` compare the served DMG with it when given `--expect-sha` /
+  `WID_EXPECT_SHA`.
+- Tests: `writeitdown/qa/mac.spec.mjs` asserts the page holds no `SHA-256`, no `shasum` and no copy control (fails on
+  the old page); `release-check.mjs --download` checks the DMG link, its versioned name and the release note.
+- Supersedes: D-060's published hash, Install command and their copy controls.
+
+## D-129: Paper Mono sets literal strings
+
+- Date: 2026-11-28. Captain, on the Artideck board `font-compare`: Allo stays the writing and heading face, and
+  Paper Mono (paper-design/paper-mono, OFL-1.1) is the monospace.
+- Decision: the one literal string left on the site after D-128, the license key on `mac.html`, is set in Paper
+  Mono, served from `writeitdown/fonts/paper-mono.woff2` through `--mono`; no page falls back to a system monospace
+  first. The apps set no literal strings in a monospace.
+- Tests: `writeitdown/qa/typography.spec.mjs` "a license key is set in Paper Mono" (fails while the key inherits
+  Allo) and the census, whose machine role is Paper Mono; `qa/test-install.py` ships the face and its licence.
+- Supersedes: D-057's system monospace for code strings.

@@ -106,7 +106,6 @@ async function run(size, browser) {
   // nav and entrance locators are anchored to the visible #landing stage.
   const landingNav = page.locator('#landing nav[aria-label=Main]');
   const landingDoor = page.locator('#landing .cta a[href="#trial"]');
-  let sha = null;
   const ldGraph = async () => (JSON.parse(await page.locator('script[type="application/ld+json"]').first().textContent()))['@graph'];
 
   await block('landing/hero', async () => {
@@ -286,14 +285,10 @@ async function run(size, browser) {
       ok(await link.count() === 1, `${await link.count()} DMG links on the download page`);
       const h = await link.getAttribute('href'); ok(h === DMG_URL, `href is ${h}`);
     });
-    await step('published SHA-256 present; terms, button, DMG link, sha all on screen', async () => {
+    await step('terms, button and DMG link on screen, and no checksum on the page (D-128)', async () => {
       await page.evaluate(() => { const t = document.querySelector('.dlbox').getBoundingClientRect(); window.scrollBy(0, t.top - 90); });
-      const checksum = page.locator('#sha256 code');
-      ok(await checksum.count() === 1, `${await checksum.count()} published checksums`);
-      sha = (await checksum.textContent({ timeout: 2000 })).trim().toLowerCase();
-      ok(/^[0-9a-f]{64}$/.test(sha), 'no published 64-hex SHA-256 (page still says pending)');
-      if (expectSha) ok(sha === expectSha.toLowerCase(), `published ${sha} != expected ${expectSha}`);
-      for (const sel of ['#requirements', 'main a[data-launch="dmg"]', '#sha256']) {
+      ok(!/SHA-256|shasum/.test(await page.locator('main').innerText()), 'the page shows a checksum or a Terminal command');
+      for (const sel of ['#requirements', 'main a[data-launch="dmg"]']) {
         ok(await page.locator(sel).count() === 1, `${sel} matches ${await page.locator(sel).count()} elements`);
         const bx = await page.locator(sel).boundingBox(); ok(bx && bx.y >= 0 && bx.y + bx.height <= size.height, `${sel} is not fully on screen`);
       }
@@ -306,15 +301,15 @@ async function run(size, browser) {
       const t = await page.locator('.steps3 .card > h2').allInnerTexts();
       ok(t.join('|') === 'Install|Activate', `sections ${JSON.stringify(t)}`);
     });
-    await step('DMG: 200, diskimage type, size >=1 MB, not HTML, sha equals published', async () => {
+    await step('DMG: 200, diskimage type, size >=1 MB, not HTML, and the expected build when --expect-sha is given', async () => {
       const r = await ctx.request.get(url(new URL(DMG_URL).pathname));
       ok(r.status() === 200, `status ${r.status()}`);
       const ct = r.headers()['content-type'] || ''; ok(ct.split(';')[0].trim() === 'application/x-apple-diskimage', `content-type ${ct}`);
       const body = await r.body(); ok(body.length >= 1_000_000, `size ${body.length} bytes is implausible for a DMG`);
       ok(!/^<!doctype html|^<html/i.test(body.subarray(0, 64).toString()), 'body is an HTML page');
-      ok(sha, 'no published sha to compare');
-      const got = crypto.createHash('sha256').update(body).digest('hex'); ok(got === sha, `sha256 of file ${got} != published ${sha}`);
-      return `${body.length} bytes, sha ok`;
+      if (!expectSha) return `${body.length} bytes`;
+      const got = crypto.createHash('sha256').update(body).digest('hex'); ok(got === expectSha.toLowerCase(), `sha256 of file ${got} != expected ${expectSha}`);
+      return `${body.length} bytes, the expected build`;
     });
     await step('missing DMG returns 404, never HTML', async () => {
       const r = await ctx.request.get(url(`/download/missing-${crypto.randomUUID()}.dmg`));

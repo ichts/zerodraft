@@ -35,13 +35,8 @@
 <a class="btn btn-primary" data-launch="dmg" href="https://writeitdown.app/download/Write-It-Down-1.1.dmg">Download free trial for Mac</a>
 <a class="btn btn-ghost" href="../buy.html">Buy</a>
 </div>
-<!-- Release gate: the next line is the published checksum of the DMG (one line). Publishing a version flips this line, the DMG link, the Install card's shasum filename and the release note's data-release-note together. Run `npm run release-check -- --download --live` before installing the site. -->
-<div class="dlrow">
-<p class="sha" id="sha256"><span class="sha-label">SHA-256: </span><code data-launch="sha256"><span>b5796ac123419f69ec758c3d671e3d90</span><span>fcd119ae8e932136adee0484616818a6</span></code></p>
-<button class="btn btn-quiet dlcopy" type="button" data-copy="sha256" aria-label="Copy the SHA-256">Copy</button>
-</div>
-<p class="sr-only" id="copy-sha256-status" role="status" aria-live="polite"></p>
-<p class="sha" id="release-notes" data-release-note="1.1"><b>Version 1.1.</b> A free update for the app you already own.</p>
+<!-- Release gate: publishing a version flips the DMG link and the release note's data-release-note together. Run `npm run release-check -- --download --live` before installing the site. -->
+<p class="dl-note" id="release-notes" data-release-note="1.1"><b>Version 1.1.</b> A free update for the app you already own.</p>
 <ul class="reqs" id="requirements">
 <li><b>macOS 14 Sonoma or later</b>One universal app for Apple silicon and Intel Macs.</li>
 <li><b>3 free sessions</b>A session counts once you type its first character.</li>
@@ -55,7 +50,7 @@
 <p class="dl-old" id="previous-version"><b>Previous version: 1.0.</b> A 1.0 installation cannot update itself. The archived <a href="releases/Write-It-Down-1.0.dmg">Write-It-Down-1.0.dmg</a> is a fresh install of 1.0 only.</p>
 </section>
 <section class="steps3" aria-label="Install, activate">
-<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image. To check the download, run this in Terminal and compare the result with the SHA-256 above:</p><div class="dlcmd"><code><span class="cmd-call">shasum -a 256 </span><span class="cmd-file">Write-It-Down-1.1.dmg</span></code><button class="btn btn-quiet dlcopy" type="button" data-copy="install" aria-label="Copy the install command">Copy</button></div><p class="sr-only" id="copy-install-status" role="status" aria-live="polite"></p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
+<div class="card" id="install"><h2>Install</h2><p>Open the disk image, drag Write It Down to Applications, then eject the disk image.</p><p>The app is signed with a Developer ID. When you open it the first time, macOS names the developer as Ziying WANG (Developer ID).</p></div>
 <div class="card" id="trial"><h2>Activate</h2><p><a href="../buy.html">Buy a license</a>, then paste the key from the Mac page into the app.</p></div>
 </section>
 <p class="sub dl-alt">No Mac at hand? <a href="../index.html#trial">Try it in your browser</a>: free, sixty seconds, nothing saved.</p>
@@ -71,39 +66,5 @@
 </footer>
 </div>
 <!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "df0c43279d154d5eb9ee4ef8a7d92fec"}'></script><!-- End Cloudflare Web Analytics -->
-<script>
-(function () {
-  var timers = new WeakMap();
-  var statusOf = function (name) { return document.getElementById('copy-' + name + '-status'); };
-  var valueOf = function (name) {
-    return name === 'sha256' ? document.querySelector('[data-launch="sha256"]').textContent : document.querySelector('#install code').textContent;
-  };
-  document.querySelectorAll('[data-copy]').forEach(function (button) {
-    button.addEventListener('click', async function () {
-      clearTimeout(timers.get(button));
-      timers.delete(button);
-      var name = button.getAttribute('data-copy');
-      var value = valueOf(name);
-      var status = statusOf(name);
-      try {
-        await navigator.clipboard.writeText(value);
-      } catch (error) {
-        var field = document.createElement('textarea');
-        field.value = value;
-        field.setAttribute('readonly', '');
-        field.style.cssText = 'position:fixed;top:0;left:-9999px';
-        document.body.append(field);
-        field.select();
-        var copied = document.execCommand('copy');
-        field.remove();
-        if (!copied) { button.textContent = 'Copy'; status.textContent = 'Copy failed. Select the text and copy it.'; return; }
-      }
-      status.textContent = 'Copied.';
-      button.textContent = 'Copied';
-      timers.set(button, setTimeout(function () { button.textContent = 'Copy'; status.textContent = ''; }, 2000));
-    });
-  });
-})();
-</script>
 </body>
 </html>

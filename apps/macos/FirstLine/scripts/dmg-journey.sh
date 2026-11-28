@@ -3,7 +3,7 @@
 # shellcheck disable=SC2015
 # [INPUT] Optional DMG path (default: download https://writeitdown.app/download/Write-It-Down-1.0.dmg)
 #         and output dir (default /tmp/wid-dmg-journey/<timestamp>). Env:
-#         WID_DMG_URL, WID_DMG_CLEAN_USER_EVIDENCE=<directory> (see MANUAL below).
+#         WID_DMG_URL, WID_EXPECT_SHA (the build the DMG must be), WID_DMG_CLEAN_USER_EVIDENCE=<directory> (see MANUAL below).
 # [OUTPUT] Per-step PASS/FAIL lines, AX snapshots + screenshots, required screen.mov,
 #          app.log, journey.log. Covers input, silence deletion, timed kept/copy,
 #          and exhausted-trial activation. Exit 0 only when every automated step
@@ -25,7 +25,6 @@
 set -uo pipefail
 
 DMG_URL="${WID_DMG_URL:-https://writeitdown.app/download/Write-It-Down-1.0.dmg}"
-PAGE_URL="${WID_DMG_PAGE_URL:-https://writeitdown.app/download/}"
 out="${2:-/tmp/wid-dmg-journey/$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$out"; out="$(cd "$out" && pwd -P)"
 work="$(mktemp -d "${TMPDIR:-/tmp}/wid-dmg.XXXXXX")"; work="$(cd "$work" && pwd -P)"
@@ -76,7 +75,7 @@ if ! kill -0 "$rec_pid" 2>/dev/null; then
   exit 1
 fi
 
-# 1. Obtain the DMG and compare with the published checksum.
+# 1. Obtain the DMG; with WID_EXPECT_SHA set, check it is that build (the page publishes no checksum, D-128).
 dmg="${1:-}"
 if [[ -z "$dmg" ]]; then
   dmg="$work/Write-It-Down-1.0.dmg"
@@ -85,9 +84,9 @@ fi
 size="$(stat -f %z "$dmg")"
 [[ "$size" -ge 1000000 ]] && pass "DMG size plausible ($size bytes)" || bad "DMG size implausible ($size bytes)"
 actual="$(shasum -a 256 "$dmg" | cut -d' ' -f1)"
-published="$(curl -fsSL "$PAGE_URL" | grep -o 'data-launch="sha256">[0-9a-f]\{64\}' | grep -o '[0-9a-f]\{64\}$' | head -1)"
-[[ -n "$published" && "$actual" == "$published" ]] && pass 'SHA-256 equals the published checksum' \
-  || bad "SHA-256 $actual != published '${published:-none}'"
+if [[ -n "${WID_EXPECT_SHA:-}" ]]; then
+  [[ "$actual" == "$WID_EXPECT_SHA" ]] && pass 'SHA-256 equals the expected build' || bad "SHA-256 $actual != expected $WID_EXPECT_SHA"
+fi
 
 # 2. DMG signature, notarization ticket, Gatekeeper.
 step 'codesign verifies the DMG' codesign --verify --verbose=2 "$dmg"

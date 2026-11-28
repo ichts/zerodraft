@@ -4,8 +4,7 @@ import { fontsSettled, openPage, sweepTimeout } from './page-sweep.mjs';
 
 // The shared type set (D-125). The Mac app and writeitdown.app draw text with the same faces: Allo for
 // every product role (what the writer writes, every heading, everything the tool says), Resource Han
-// Rounded for the same roles in Chinese, and the system monospace for literal machine strings (a shell
-// command, a hash). Reenie Beanie is the one declared exception: the landing's hand accent, marketing
+// Rounded for the same roles in Chinese, and Paper Mono for literal machine strings (a license key). Reenie Beanie is the one declared exception: the landing's hand accent, marketing
 // only, never in the room and never on the Mac (D-057).
 //
 // A role that leaves this set fails here rather than on a captain's screen. The Mac half of the same
@@ -15,7 +14,7 @@ import { fontsSettled, openPage, sweepTimeout } from './page-sweep.mjs';
 const SHARED = {
   product: /^"?Allo"?$/,
   chinese: /^"Resource Han Rounded"$/,
-  machine: /^(ui-monospace|SFMono-Regular|Menlo|monospace)$/,
+  machine: /^"Paper Mono"$/,
   accent: /^"Reenie Beanie"$/,
 };
 const baseline = JSON.parse(readFileSync(new URL('./shared-type-baseline.json', import.meta.url)));
@@ -78,7 +77,8 @@ test('every text role on every shipped page stays in the shared type set', async
     expect(machine.every(row => row.tag === 'code' || row.inCode), `${path}: monospace is reserved for code, found ${machine.map(r => `${r.tag}${r.inCode ? ' (in code)' : ''}`).join(',')}`).toBe(true);
   }
   // The census is only a guard if it actually sees the shared faces on the pages that carry them.
-  expect([...found.keys()].sort(), 'the shared faces are present and named').toEqual(['accent', 'machine', 'product']);
+  // The product face and the hand accent are on every census; no shipped page sets a literal code string today (D-128).
+  expect([...found.keys()].sort(), 'the shared faces are present and named').toEqual(['accent', 'product']);
   expect(found.get('accent').length, 'the hand accent exists on the landing only').toBeLessThanOrEqual(3);
   expect(found.get('accent').every(row => row.startsWith('index.html ')), 'the hand accent stays on the landing').toBe(true);
 });
@@ -185,3 +185,20 @@ test('the shared writing roles advance like the Mac', async ({ page }) => {
     expect(drift, `${role.role} "${role.string}" at ${role.size}: the web draws ${advance.toFixed(3)}, the Mac ${role.advancePt}`).toBeLessThanOrEqual(baseline.tolerance);
   }
 });
+
+// The captain's choice on the font board: a literal string (the license key on mac.html) is set in the site's own
+// Paper Mono, never a system monospace.
+test('a license key is set in Paper Mono', async ({ page }) => {
+  await page.goto('mac.html');
+  const read = await page.evaluate(async () => {
+    const key = document.querySelector('#license-key');
+    key.textContent = 'WID-7Q4M-K2XD-9PLA-3VNE';
+    key.closest('[hidden]')?.removeAttribute('hidden');
+    await document.fonts.load('400 13px "Paper Mono"', key.textContent);
+    await document.fonts.ready;
+    return { family: getComputedStyle(key).fontFamily, loaded: document.fonts.check('400 13px "Paper Mono"', key.textContent) };
+  });
+  expect(read.family, 'the key leads with Paper Mono').toMatch(/^"Paper Mono"/);
+  expect(read.loaded, 'the site serves Paper Mono').toBe(true);
+});
+

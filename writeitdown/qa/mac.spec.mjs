@@ -193,7 +193,6 @@ test('release gate rejects missing or invalid purchase and download configuratio
   const buy = readFileSync('buy.html', 'utf8');
   const support = readFileSync('support.html', 'utf8');
   const download = readFileSync('download/index.html', 'utf8');
-  const publishedHash = download.match(/<code data-launch="sha256">([\s\S]*?)<\/code>/)?.[1].replace(/<[^>]+>/g, '') ?? '';
   // The page ships its own release note, so the note controls rewrite that element in place and the
   // linked version comes from the DMG file name the page itself publishes.
   const linkedVersion = dmgFile.replace(/^Write-It-Down-|\.dmg$/g, '');
@@ -227,12 +226,6 @@ test('release gate rejects missing or invalid purchase and download configuratio
     [{ download: download.replace('data-launch="dmg"', 'data-launch-pending="dmg"') }, 'DMG URL: not confirmed'],
     [{ download: download.replace(dmgURL, 'https://example.com/app.dmg') }, 'DMG URL: not a real https .dmg destination'],
     [{ download: download.replaceAll(dmgFile, 'Write-It-Down.dmg') }, 'DMG URL: the file name does not carry the version'],
-    [{ download: download.replace('data-launch="sha256"', 'data-launch-pending="sha256"') }, 'SHA-256: not published'],
-    [{ download: download.replace(/(<code data-launch="sha256">)[\s\S]*?(<\/code>)/, '$1TBD$2') }, 'SHA-256: not 64 lowercase hex digits'],
-    [{ download: download.replace(/(<code data-launch="sha256">)[\s\S]*?(<\/code>)/, `$1<span>${publishedHash}</span>$2`) }, 'SHA-256: the code element must hold two 32-character spans'],
-    [{ download: download.replace(`<span class="cmd-file">${dmgFile}</span>`, '<span class="cmd-file">Write-It-Down-0.9.dmg</span>') }, 'Install command: hashes Write-It-Down-0.9.dmg'],
-    [{ download: download.replace(/(<code>)[\s\S]*?(<\/code>)/, `$1shasum -a 256 ${dmgFile}$2`) }, 'Install command: the code element must hold the call span and the filename span'],
-    [{ download: download.replace(/<code>[\s\S]*?<\/code>/, '<code>shasum -a 256</code>') }, 'Install command: the card does not name'],
     [{ download: withNote(`data-release-note="${aheadVersion}"`) }, `Release notes: the note declares ${aheadVersion} but the download is ${linkedVersion}`],
     [{ download: download.replaceAll(dmgFile, `Write-It-Down-${aheadVersion}.dmg`) }, `Release notes: the note declares ${linkedVersion} but the download is ${aheadVersion}`],
     [{ download: withNote(`data-release-note="${linkedVersion}" data-launch-pending="release-notes"`) }, 'Release notes: data-launch-pending is retired'],
@@ -697,7 +690,7 @@ test('landing sections: heading tree, Mac facts, FAQ matches its schema, the doo
   await expect(page.locator('#editor')).toBeFocused();
 });
 
-test('download page states the trial, the DMG, its checksum slot, requirements, and the signer', async ({ page }, info) => {
+test('download page states the trial, the DMG, requirements and the signer, and no checksum (D-128)', async ({ page }, info) => {
   await page.goto('download/');
   const main = page.locator('main');
   await expect(page.locator('#requirements')).toContainText('3 free sessions');
@@ -706,13 +699,13 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   const dmg = page.locator('[data-launch="dmg"]');
   await expect(dmg).toHaveText('Download free trial for Mac');
   await expect(dmg).toHaveAttribute('href', dmgURL);
-  const sha = page.locator('#sha256');
-  await expect(sha).toBeVisible();
-  await expect(sha).toHaveText(/^SHA-256: [0-9a-f]{64}$/);
+  // D-128: a public download page carries no checksum and no Terminal command.
+  await expect(main).not.toContainText('SHA-256');
+  await expect(main).not.toContainText('shasum');
+  await expect(page.locator('[data-copy]')).toHaveCount(0);
   await expect(page.locator('#requirements')).toContainText('macOS 14 Sonoma or later');
   await expect(page.locator('#requirements')).toContainText('One universal app for Apple silicon and Intel Macs.');
   await expect(main).toContainText('Ziying WANG (Developer ID)');
-  await expect(page.locator('#install')).toContainText(`shasum -a 256 ${dmgFile}`);
   await expect(main).toContainText('Free updates included.');
   await expect(page.locator('a[href*="checkout"]')).toHaveCount(0);
   await expect(page.locator('main a[href="../buy.html"]').first()).toBeVisible();
@@ -730,8 +723,8 @@ test('download page states the trial, the DMG, its checksum slot, requirements, 
   await page.screenshot({ path: info.outputPath('download.png'), fullPage: true });
 });
 
-// One version is current and the older one stays reachable: the download link, the Install command
-// and the release note name the same current version, the archive note links the previous one under
+// One version is current and the older one stays reachable: the download link and the release note
+// name the same current version, the archive note links the previous one under
 // releases/, and the archive note is a quiet line under the requirements, never a second download.
 test('the download page offers 1.1 as current and 1.0 as the archived previous version', async ({ page }, info) => {
   test.slow();
@@ -742,7 +735,6 @@ test('the download page offers 1.1 as current and 1.0 as the archived previous v
   const current = page.locator('[data-launch="dmg"]');
   await expect(current).toHaveCount(1);
   await expect(current).toHaveAttribute('href', dmgURL);
-  await expect(page.locator('#install .cmd-file')).toHaveText(dmgFile);
   await expect(page.locator('#release-notes')).toHaveAttribute('data-release-note', '1.1');
   // The page's whole DMG link set: the current download and one archived version, nothing else.
   const dmgLinks = page.locator('main a[href$=".dmg"]');
@@ -837,7 +829,7 @@ function contrast(left, right) {
   return (light + 0.05) / (dark + 0.05);
 }
 
-test('the download head breaks without an orphan and its checksum block reads', async ({ page }, info) => {
+test('the download head breaks without an orphan', async ({ page }, info) => {
   await page.goto('download/');
   await page.evaluate(() => document.fonts.ready);
   const readHead = () => page.evaluate(() => {
@@ -914,123 +906,6 @@ test('the download head breaks without an orphan and its checksum block reads', 
     if (head.lines.length > 1) for (const line of head.lines) expect(line.split(' ').length, `${width}: the line \`${line}\` holds more than one word`).toBeGreaterThan(1);
     expect(head.sub.measure, `${width}: the deck stays within 34ch`).toBeLessThanOrEqual(head.sub.ch34 + 0.5);
   }
-  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
-  // Both copyable strings are visible whole at every width: the hash's two atomic 32-character
-  // halves share a line when they fit and wrap when they do not, and the command breaks at its
-  // argument boundary with the filename whole (D-060).
-  for (const width of [1440, 1024, 390, 375, 320]) {
-    await page.setViewportSize({ width, height: page.viewportSize().height });
-    await page.evaluate(() => document.fonts.ready);
-    await page.waitForTimeout(100);
-    const strings = await page.evaluate(() => {
-      const lineBands = element => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        const bands = [];
-        for (const line of range.getClientRects()) {
-          const band = bands.find(b => line.top < b.bottom && line.bottom > b.top);
-          if (band) { band.top = Math.min(band.top, line.top); band.bottom = Math.max(band.bottom, line.bottom); }
-          else bands.push({ top: line.top, bottom: line.bottom });
-        }
-        return bands.length;
-      };
-      const inside = element => {
-        const box = element.getBoundingClientRect();
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        return [...range.getClientRects()].every(line => line.left >= box.left - 0.5 && line.right <= box.right + 0.5);
-      };
-      const block = element => ({
-        overflowX: getComputedStyle(element).overflowX,
-        scrollWidth: element.scrollWidth, clientWidth: element.clientWidth,
-        text: element.textContent,
-      });
-      const hash = document.querySelector('#sha256');
-      const hashCode = hash.querySelector('code');
-      const install = document.querySelector('#install code');
-      return {
-        hashText: hashCode.textContent,
-        hashBands: lineBands(hashCode),
-        hashLines: [...hashCode.children].map(span => ({
-          text: span.textContent, font: parseFloat(getComputedStyle(span).fontSize),
-          bands: lineBands(span), inside: inside(span), top: span.getBoundingClientRect().top,
-          scrollWidth: span.scrollWidth, clientWidth: span.clientWidth,
-        })),
-        hashLabelInside: inside(hash.querySelector('.sha-label')),
-        hashBlock: block(hash),
-        hashColor: getComputedStyle(hashCode).color,
-        panelBackground: getComputedStyle(hash).backgroundColor,
-        cardBackground: getComputedStyle(hash.closest('.card')).backgroundColor,
-        panelBorder: getComputedStyle(hash).borderTop, panelRadius: getComputedStyle(hash).borderTopLeftRadius,
-        page: getComputedStyle(document.body).backgroundColor,
-        // Card in card (rule 14.4 d): a copyable block that still carries its own fill, a radius or a
-        // closed border is a panel inside the card. One hairline top is the only line it may keep.
-        nestedPanels: [hash, document.querySelector('#release-notes'), install].filter(element => {
-          const style = getComputedStyle(element);
-          const sides = ['Top', 'Right', 'Bottom', 'Left']
-            .filter(side => parseFloat(style['border' + side + 'Width']) > 0 && style['border' + side + 'Style'] !== 'none').length;
-          return style.backgroundColor !== 'rgba(0, 0, 0, 0)' || parseFloat(style.borderTopLeftRadius) > 0 || sides > 1;
-        }).length,
-        commandText: install.textContent,
-        commandParts: [...install.children].map(span => ({ text: span.textContent, bands: lineBands(span), inside: inside(span) })),
-        commandBlock: block(install),
-        ghost: document.querySelectorAll('.dlscroll, .is-more').length,
-      };
-    });
-    expect(strings.hashText, `${width}: the published hash`).toMatch(/^[0-9a-f]{64}$/);
-    expect(strings.hashLines.map(line => line.text), `${width}: two 32-character hash lines`).toEqual([
-      strings.hashText.slice(0, 32), strings.hashText.slice(32),
-    ]);
-    for (const line of strings.hashLines) {
-      expect(line.bands, `${width}: each hash line stays unbroken`).toBe(1);
-      expect(line.inside, `${width}: each hash line sits inside the panel`).toBe(true);
-      expect(line.scrollWidth, `${width}: the hash line is not clipped`).toBeLessThanOrEqual(line.clientWidth + 1);
-    }
-    const expectedLines = width >= 1024 ? 1 : 2;
-    expect(strings.hashBands, `${width}: the hash uses ${expectedLines} rendered line(s)`).toBe(expectedLines);
-    if (expectedLines === 1) expect(Math.abs(strings.hashLines[1].top - strings.hashLines[0].top), `${width}: both halves share one line`).toBeLessThan(1);
-    else expect(strings.hashLines[1].top, `${width}: the second half wraps below the first`).toBeGreaterThan(strings.hashLines[0].top);
-    expect(strings.hashLabelInside, `${width}: the SHA-256 label sits inside the panel`).toBe(true);
-    expect(strings.hashBlock.overflowX, `${width}: the hash panel is not a scroll container`).not.toMatch(/auto|scroll/);
-    expect(strings.hashBlock.scrollWidth, `${width}: the hash panel does not overflow`).toBeLessThanOrEqual(strings.hashBlock.clientWidth + 1);
-    expect(strings.hashLines[0].font, `${width}: the hash keeps its size floor`).toBeCloseTo(width <= 364 ? 12 : 13, 1);
-    expect(strings.commandText, `${width}: the copied command`).toBe(`shasum -a 256 ${dmgFile}`);
-    expect(strings.commandParts.map(part => part.text), `${width}: the command breaks at its argument boundary`).toEqual(['shasum -a 256 ', dmgFile]);
-    for (const part of strings.commandParts) {
-      expect(part.bands, `${width}: each command part stays on one line`).toBe(1);
-      expect(part.inside, `${width}: each command part sits inside the block`).toBe(true);
-    }
-    expect(strings.commandBlock.overflowX, `${width}: the command block is not a scroll container`).not.toMatch(/auto|scroll/);
-    expect(strings.commandBlock.scrollWidth, `${width}: the command block does not overflow`).toBeLessThanOrEqual(strings.commandBlock.clientWidth + 1);
-    expect(strings.ghost, `${width}: no scroller or fade remains`).toBe(0);
-    expect(strings.nestedPanels, `${width}: no copyable block is a card inside a card`).toBe(0);
-    expect(strings.panelBackground, `${width}: the hash adds no fill of its own`).toBe('rgba(0, 0, 0, 0)');
-    expect(strings.panelRadius, `${width}: the hash adds no radius`).toBe('0px');
-    expect(strings.panelBorder, `${width}: the hash opens on one hairline top`).toMatch(/^1px solid/);
-    expect(contrast(strings.hashColor, strings.cardBackground), `${width}: the hash stays legible`).toBeGreaterThanOrEqual(4.5);
-    await page.locator('[data-copy="sha256"]').click();
-    await expect(page.locator('#copy-sha256-status')).toHaveText('Copied.');
-    await expect(page.locator('[data-copy="sha256"]')).toHaveText('Copied');
-    expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole hash`).toBe(strings.hashText);
-    await page.locator('[data-copy="install"]').click();
-    await expect(page.locator('#copy-install-status')).toHaveText('Copied.');
-    await expect(page.locator('[data-copy="install"]')).toHaveText('Copied');
-    expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole command`).toBe(strings.commandText);
-  }
-  await expect(page.locator('[data-copy="sha256"]')).toHaveAccessibleName('Copy the SHA-256');
-  await expect(page.locator('[data-copy="install"]')).toHaveAccessibleName('Copy the install command');
-  await page.evaluate(() => {
-    Object.defineProperty(navigator.clipboard, 'writeText', { value: () => Promise.reject(new Error('blocked')), configurable: true });
-    document.execCommand = () => false;
-  });
-  await page.locator('[data-copy="install"]').click();
-  await expect(page.locator('[data-copy="install"]')).toHaveText('Copy');
-  await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
-  await page.waitForTimeout(2100);
-  await expect(page.locator('[data-copy="install"]')).toHaveText('Copy');
-  await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
-  await expect(page.locator('[data-copy="sha256"]')).toHaveText('Copy');
-  await expect(page.locator('#copy-sha256-status')).toHaveText('');
 });
 
 test('legal pages state the 3-session trial, the local counter and the opt-in updates', async ({ page }) => {
@@ -1187,21 +1062,5 @@ test('the headline keeps its space under the header on every phone', async ({ pa
       - document.querySelector('#landing .home-nav').getBoundingClientRect().bottom);
     expect(gap, `${size.width}x${size.height}: header to headline`).toBeGreaterThanOrEqual(16);
   }
-});
-
-// The install command and its copy control read as one block (Artist audit): the filename's line starts on the
-// command's own left edge, and the copy control keeps space before the paragraph under it.
-test('the install command lines up and its copy control breathes', async ({ page }) => {
-  await page.goto('download/');
-  await page.evaluate(() => document.fonts.ready);
-  const read = await page.evaluate(() => {
-    const left = el => { const r = document.createRange(); r.selectNodeContents(el); return r.getClientRects()[0].left; };
-    const copy = document.querySelector('[data-copy="install"]');
-    const next = copy.closest('.dlcmd').parentElement.querySelector('.dlcmd ~ p:not(.sr-only)');
-    return { call: left(document.querySelector('.cmd-call')), file: left(document.querySelector('.cmd-file')),
-      gap: next.getBoundingClientRect().top - copy.getBoundingClientRect().bottom };
-  });
-  expect(Math.abs(read.file - read.call), 'the filename line starts where the command starts').toBeLessThanOrEqual(0.5);
-  expect(read.gap, 'space between the copy control and the next paragraph').toBeGreaterThanOrEqual(12);
 });
 

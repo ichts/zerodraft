@@ -3,21 +3,19 @@
 //   node release-check.mjs             static check of every launch input (download page
 //                                      and sale page): exits 1 and lists each missing or
 //                                      placeholder input.
-//   node release-check.mjs --download  only the free-trial download page: the DMG link,
-//                                      the Install card's DMG filename and its published
-//                                      SHA-256, and, when present, the release note,
+//   node release-check.mjs --download  only the free-trial download page: the DMG link and,
+//                                      when present, the release note,
 //                                      which declares the version of the linked DMG, and
 //                                      the archive note, which links an older version
 //                                      under releases/.
 //   --live                             after a static pass, fetch the public buy page (never
-//                                      create a checkout or payment) and verify the hosted
-//                                      DMG against its published SHA-256.
+//                                      create a checkout or payment) and check the hosted DMG
+//                                      is served as a disk image.
 //   --root <dir>                       check another site copy (tests use fixtures).
 //
 // Passing proves the inputs are present and reachable, not that a purchase works.
 // Opening LIVE sales still needs a real TEST checkout, returned license key, installed
 // DMG activation and refund verification. Static fixtures do not prove a purchase.
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -109,28 +107,10 @@ export function downloadBlockers({ download }) {
   if (!dmg) found.push('DMG URL: not confirmed in download/index.html');
   else if (!/^<a\s/i.test(dmg.tag)) found.push('DMG URL: not a clickable link');
   else if (!realURL(attr(dmg.tag, 'href'), { dmg: true })) found.push('DMG URL: not a real https .dmg destination');
-  const sha = slot(download, 'sha256');
-  if (!sha) found.push('SHA-256: not published in download/index.html');
-  else {
-    if (!/^[0-9a-f]{64}$/.test(sha.text)) found.push('SHA-256: not 64 lowercase hex digits');
-    if (!/^<span>([0-9a-f]{32})<\/span><span>([0-9a-f]{32})<\/span>$/.test(contentOf(download, sha.tag)))
-      found.push('SHA-256: the code element must hold two 32-character spans');
-  }
-  const installTag = /<div class="card" id="install">/i.exec(download)?.[0];
-  const install = installTag ? contentOf(download, installTag) : '';
-  const commandTag = /<code\b[^>]*>/i.exec(install)?.[0];
-  const commandContent = commandTag ? contentOf(install, commandTag) : '';
-  const command = commandContent.replace(/<[^>]+>/g, '').trim();
-  const installFile = command.match(/shasum -a 256\s+([^\s]+)/)?.[1];
-  if (!/^<span class="cmd-call">shasum -a 256 <\/span><span class="cmd-file">[^<]+<\/span>$/.test(commandContent))
-    found.push('Install command: the code element must hold the call span and the filename span');
   let linkedFile = '';
   if (dmg) {
     try { linkedFile = decodeURIComponent(new URL(attr(dmg.tag, 'href')).pathname.split('/').pop()); } catch {}
   }
-  if (!installFile) found.push('Install command: the card does not name the DMG file to hash');
-  else if (linkedFile && installFile !== linkedFile)
-    found.push(`Install command: hashes ${installFile}, not the linked ${linkedFile}`);
 
   // The release note is optional: when present it is the page's visible claim about the version it
   // links, and it declares that version in data-release-note. A note ahead of or behind the linked
@@ -171,9 +151,7 @@ async function fetchFailure(name, href, method) {
     if (name === 'checkout') return [];
     if (!/octet-stream|apple-diskimage|x-apple/.test(response.headers.get('content-type') || ''))
       return [`DMG: ${href} is not served as a disk image`];
-    const hash = createHash('sha256');
-    for await (const chunk of response.body) hash.update(chunk);
-    return [hash.digest('hex')];
+    return [];
   } catch (error) {
     return [`${name}: ${href} unreachable (${error.cause?.code || error.message})`];
   }
@@ -182,10 +160,7 @@ async function fetchFailure(name, href, method) {
 async function liveBlockers({ mac, download }, { sale }) {
   const found = [];
   if (sale) found.push(...await fetchFailure('checkout', mac.match(/<link\s+rel="canonical"\s+href="([^"]+)"/)[1], 'GET'));
-  const page = stripComments(download);
-  const [result] = await fetchFailure('DMG', attr(slot(page, 'dmg').tag, 'href'), 'GET');
-  if (!/^[0-9a-f]{64}$/.test(result)) found.push(result);
-  else if (result !== slot(page, 'sha256').text) found.push(`SHA-256: the served DMG hashes to ${result}, not the published value`);
+  found.push(...await fetchFailure('DMG', attr(slot(stripComments(download), 'dmg').tag, 'href'), 'HEAD'));
   return found;
 }
 
@@ -224,5 +199,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ? 'LIVE CHECK PASSED: inputs present and reachable.'
     : 'STATIC CHECK PASSED: inputs present. Not verified live; run with --live.');
   if (sale) console.log('Still required before LIVE sales: a real test order through checkout, returned license key, installed DMG activation and refund verification. No live payment was attempted.');
-  else console.log('Download page ready: the DMG link, the Install command and its published SHA-256 agree.');
+  else console.log('Download page ready: the DMG link and the release note agree.');
 }

@@ -87,9 +87,18 @@ final class UpgradeViewController: NSViewController {
         licenseField.heightAnchor.constraint(equalToConstant: 44).isActive = true
 
         activateButton = FirstLineButtons.primary(title: "Activate", target: self, action: #selector(activateTapped))
+        // The pill reserves its widest label, so Activating never widens it or pushes Buy (Q-24).
+        let widest = ["Activate", "Activating", "Begin"].map { title -> CGFloat in
+            activateButton.title = title
+            return activateButton.fittingSize.width
+        }.max() ?? 0
+        activateButton.widthAnchor.constraint(greaterThanOrEqualToConstant: ceil(widest)).isActive = true
         feedbackLabel = label("", font: FirstLineTypography.smallNSFont, color: FirstLineColors.chromeNSColor)
         feedbackLabel.maximumNumberOfLines = 0
         feedbackLabel.isHidden = true
+        // The entry card keeps one feedback line open, so `Checking your license key…` lands without moving the card.
+        feedbackLabel.heightAnchor.constraint(greaterThanOrEqualToConstant:
+            ceil(NSLayoutManager().defaultLineHeight(for: FirstLineTypography.smallNSFont))).isActive = true
 
         // Same 48 pt height as Activate: the pair is one row, not a pill beside a
         // smaller outline button.
@@ -186,9 +195,10 @@ final class UpgradeViewController: NSViewController {
             feedbackLabel.stringValue = "Checking your license key…"
             feedbackLabel.isHidden = false
         } else {
-            feedbackLabel.stringValue = appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
-            feedbackLabel.isHidden = appState.licenseActivationError == nil &&
+            let quiet = appState.licenseActivationError == nil &&
                 appState.settings.licenseStatus == .inactive && appState.trialAccessError == nil
+            feedbackLabel.stringValue = quiet ? "" : appState.licenseActivationError?.errorDescription ?? appState.accessStatusText
+            feedbackLabel.isHidden = false
         }
         let badStatus = appState.licenseActivationError != nil || appState.trialAccessError != nil ||
             appState.settings.licenseStatus == .revoked || appState.settings.licenseStatus == .invalid

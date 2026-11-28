@@ -57,6 +57,29 @@ struct RoundThreeTests {
         #expect(quiet.inkFocusRingInset == 3)
     }
 
+    /// Q-24: pressing Activate turns its label into Activating and nothing moves: the pill keeps its width and place,
+    /// Buy keeps its place, and the card keeps its frame.
+    @Test func activatingMovesNothing() throws {
+        func read(_ inFlight: Bool) throws -> (pill: NSRect, buy: NSRect, card: NSRect) {
+            let state = try trialState(used: 3)
+            state.licenseActivationInFlight = inFlight
+            let controller = UpgradeViewController(appState: state)
+            let window = makeWindow(controller)
+            defer { window.orderOut(nil) }
+            let buttons = descendants(of: controller.view, of: NSButton.self)
+            let pill = try #require(buttons.first { $0.title == (inFlight ? "Activating" : "Activate") })
+            let buy = try #require(buttons.first { $0.title.hasPrefix("Buy") })
+            let card = try #require(descendants(of: controller.view, of: FirstLineCardView.self).first)
+            let frame = { (view: NSView) in controller.view.convert(view.bounds, from: view) }
+            return (frame(pill), frame(buy), frame(card))
+        }
+        let rest = try read(false), busy = try read(true)
+        #expect(abs(rest.pill.width - busy.pill.width) < 0.5, "the pill went from \(rest.pill.width) to \(busy.pill.width)")
+        #expect(abs(rest.buy.minX - busy.buy.minX) < 0.5, "Buy moved \(busy.buy.minX - rest.buy.minX) pt")
+        #expect(abs(rest.card.minY - busy.card.minY) < 0.5 && abs(rest.card.height - busy.card.height) < 0.5,
+                "the card moved from \(rest.card) to \(busy.card)")
+    }
+
     // MARK: - Picker access line
 
     @Test func licensedPickerHidesAccessLineAndTrialPickerKeepsIt() throws {

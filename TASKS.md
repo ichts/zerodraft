@@ -37,7 +37,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
 - 第 6、8、9、11、12、12b、13 条：待审。
-- 第 14（含 20）、15 条：待审。
+- 第 14（含 20）、15、16 条：待审。
 
 ## 清单
 
@@ -71,7 +71,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 - [x] 14. Mac 两种纸跟随系统外观（D-124）：Palette 只剩 white/black，只按 appearance 求解；删掉 Lamp/Paper/Slate、`PaperModeRepaint`、`PaperModeSwitch`、Settings 的 Paper 行、纸面纹理（`PaperField`、`PaperSheetCache`、`Turbulence`）与选择器预渲染；退出确认改为墨色；旧设置里的 `paperMode`/`theme` 读入即丢、不写回，试用次数与许可字段不变（`SettingsStoreTests` 8 种存档逐项断言）；外观切换不是输入（`PaperAppearanceTests`）；`DesignTokenTests` 改读 `writeitdown/tokens.css`，删除 `design/paper-tokens.css`（单一来源）；Mac AGENTS、`docs/wid-mac-behavior.md` 48/62/84/86/87、PLAN §6、Q-09/Q-22、根 AGENTS 同步。`swift test` 400 项通过；快照白/黑两纸已目检。
 - [x] 15. D-126 焦点环：墨色主按钮与其他控件一样，用 3pt 外偏移的 2pt 墨色环（卡片上为页面墨、纸上为纸墨）；三个测试先在旧代码上失败；`swift test` 400 项通过；快照 `picker-focus`、`room-copy-focus` 白/黑两纸目检可见。
-- [ ] 16. Activate → Activating 宽度不跳、卡片不跳。
+- [x] 16. 激活卡：Activate 药丸预留 `Activate`/`Activating`/`Begin` 中最宽的宽度；入口卡始终保留一行反馈高度，`Checking your license key…` 出现时卡片不动。新测试 `activatingMovesNothing` 在旧代码上失败（宽 +13pt、Buy 右移 7pt、卡片位移）。
 - [ ] 17. 结账不可用时 7pt 间距改 20。
 - [ ] 18. License 输入框文字垂直居中，去冷灰 bezel。
 - [ ] 19. Settings 标签句子式大写，accessibility label 同步。

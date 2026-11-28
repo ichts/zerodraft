@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
 const TONES = { light: '#fcfcfa', dark: '#1c1c1a' };
 const INK = { light: '#45433d', dark: '#dcdad3' };
 const QUIET = { light: '#4b4943', dark: '#bdbbb3' };
-const RED = { light: '#9a5255', dark: '#d08a8c' };
+const RED = { light: '#9a3326', dark: '#ec8878' };
 const WASH = { light: '#f4f3f0', dark: '#232321' };
 const WASH_DEEP = { light: '#eae9e5', dark: '#2a2a27' };
 const HISTORY = { light: [0.26, 0.084], dark: [0.172, 0.061] };

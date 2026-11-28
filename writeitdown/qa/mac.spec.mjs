@@ -407,10 +407,10 @@ test.describe('light is the default theme', () => {
       const color = (selector, prop = 'color') => getComputedStyle(document.querySelector(selector))[prop];
       return { hand: color('#landing h1 .hand'), numeral: color('.mo .n'), label: color('.line8 .lab b'), track: color('.line8 .track i', 'backgroundColor') };
     });
-    expect(await reds()).toEqual({ hand: 'rgb(208, 138, 140)', numeral: 'rgb(208, 138, 140)', label: 'rgb(208, 138, 140)', track: 'rgb(208, 138, 140)' });
+    expect(await reds()).toEqual({ hand: 'rgb(236, 136, 120)', numeral: 'rgb(236, 136, 120)', label: 'rgb(236, 136, 120)', track: 'rgb(236, 136, 120)' });
     await page.locator('#landing .home-nav [data-theme-toggle]').click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-    expect(await reds(), 'light keeps the one red everywhere').toEqual({ hand: 'rgb(154, 82, 85)', numeral: 'rgb(154, 82, 85)', label: 'rgb(154, 82, 85)', track: 'rgb(154, 82, 85)' });
+    expect(await reds(), 'light keeps the one red everywhere').toEqual({ hand: 'rgb(154, 51, 38)', numeral: 'rgb(154, 51, 38)', label: 'rgb(154, 51, 38)', track: 'rgb(154, 51, 38)' });
     await page.locator('#landing .home-nav [data-theme-toggle]').click();
     await page.reload();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');

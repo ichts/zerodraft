@@ -27,7 +27,7 @@
   --chrome:#6e6d68;
   --hair:rgba(69,67,61,.12);
   --hair-2:rgba(69,67,61,.20);
-  --red:#9a5255;
+  --red:#9a3326;
   --tag-bg:#ededea;
   --on-ink:#fcfcfa;
   /* type roles (D-125): serif = written text and display, sans = the tool, both Allo; cjk = the Chinese face, named
@@ -74,7 +74,7 @@
   --chrome:#a3a29b;
   --hair:rgba(220,218,211,.10);
   --hair-2:rgba(220,218,211,.18);
-  --red:#d08a8c;
+  --red:#ec8878;
   --tag-bg:#232321;
   --on-ink:#1c1c1a;
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.2),0 24px 48px -16px rgba(0,0,0,.5);

@@ -2869,3 +2869,17 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   white, 5.28:1 black at the deepest wash) and 5.5:1 / 6.3:1 as small text on a card.
 - Tests: the same paper, contrast and token tests as D-124, with these values.
 - Supersedes: D-124's colour values (its two papers, appearance rule, grey wash and single red stand).
+
+## D-131: the calm red
+
+- Date: 2026-11-28. Thinker found D-130's dusty red `#9a5255` / `#d08a8c` off the product: its hue (about 18 deg
+  in OKLCH) leans cool pink against the warm papers, the thin hand stroke reads as a stain, and as 12-13 px text it
+  holds only 5.05:1 on the white wall. On the Artideck board `white-black-paper` (round 4) the captain chose A.
+- Decision: one warm vermilion per paper, the same hue (30 deg in OKLCH) in both modes, at middle chroma:
+  white `#9a3326` (`oklch(0.47 0.140 30)`), black `#ec8878` (`oklch(0.73 0.125 30)`). Every red site keeps its
+  D-124 role: the warning numeral, the hand accent, the labels, the home status line, the activation and Settings
+  messages.
+- Contrast: white 7.11:1 on the paper, 6.52:1 on the wall, 6.01:1 at the deepest wash; black 6.79:1 on the paper,
+  7.34:1 on the wall, 5.73:1 at the deepest wash.
+- Tests: the D-130 paper, contrast and token tests with this red.
+- Supersedes: D-130's red (`#9a5255` / `#d08a8c`); D-130's papers, ink, wash and history stand.

@@ -1,5 +1,5 @@
 /**
- * [INPUT]: writeitdown/tokens.css (D-124: the white and the black paper, one red per mode; values D-130) and the window's effective
+ * [INPUT]: writeitdown/tokens.css (D-124: the white and the black paper, one red per mode; values D-130, red D-131) and the window's effective
  *          appearance, which follows the system.
  * [OUTPUT]: FirstLineColors - dynamic AppKit roles for the page (page, sheet, ink, mute, chrome, hairlines, sheet ring,
  *           red, on-ink) and for the writing sheet (paper tone, paper ink, quiet, the numeral red, wash, deep wash,
@@ -32,8 +32,8 @@ enum FirstLineColors {
             page: 0xF3F2EF, sheet: 0xFCFCFA, tagBackground: 0xEDEDEA,
             ink: 0x45433D, mute: 0x6E6D68, onInk: 0xFCFCFA,
             hairBase: 0x45433D, hair: 0.12, hairStrong: 0.20,
-            red: 0x9A5255, redText: 0x9A5255,
-            paper: 0xFCFCFA, paperInk: 0x45433D, paperQuiet: 0x4B4943, paperDanger: 0x9A5255,
+            red: 0x9A3326, redText: 0x9A3326,
+            paper: 0xFCFCFA, paperInk: 0x45433D, paperQuiet: 0x4B4943, paperDanger: 0x9A3326,
             paperWash: 0xF4F3F0, paperWashDeep: 0xEAE9E5,
             paperHairBase: 0x45433D, paperHair: 0.14, paperHairStrong: 0.24,
             history: [1, 0.26, 0.084], shadow: 0x45433D)
@@ -42,8 +42,8 @@ enum FirstLineColors {
             page: 0x141413, sheet: 0x1C1C1A, tagBackground: 0x232321,
             ink: 0xDCDAD3, mute: 0xA3A29B, onInk: 0x1C1C1A,
             hairBase: 0xDCDAD3, hair: 0.10, hairStrong: 0.18,
-            red: 0xD08A8C, redText: 0xD08A8C,
-            paper: 0x1C1C1A, paperInk: 0xDCDAD3, paperQuiet: 0xBDBBB3, paperDanger: 0xD08A8C,
+            red: 0xEC8878, redText: 0xEC8878,
+            paper: 0x1C1C1A, paperInk: 0xDCDAD3, paperQuiet: 0xBDBBB3, paperDanger: 0xEC8878,
             paperWash: 0x232321, paperWashDeep: 0x2A2A27,
             paperHairBase: 0xDCDAD3, paperHair: 0.16, paperHairStrong: 0.30,
             history: [1, 0.172, 0.061], shadow: 0x000000)

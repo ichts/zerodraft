@@ -149,7 +149,7 @@ final class UpgradeViewController: NSViewController {
         stack.setCustomSpacing(14, after: actions)
         stack.setCustomSpacing(14, after: feedbackLabel)
         stack.setCustomSpacing(14, after: pricingView)
-        stack.setCustomSpacing(6, after: checkoutStatus)
+        stack.setCustomSpacing(20, after: checkoutStatus)
         stack.setCustomSpacing(20, after: checkoutNote)
         stack.setCustomSpacing(20, after: webTrialButton)
         card.contentView.addSubview(stack)

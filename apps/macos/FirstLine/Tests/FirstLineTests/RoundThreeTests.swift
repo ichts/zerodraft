@@ -80,6 +80,27 @@ struct RoundThreeTests {
                 "the card moved from \(rest.card) to \(busy.card)")
     }
 
+    /// Q-14: with checkout unavailable, the status line keeps the same 20 pt before the web trial pill that the
+    /// checkout note keeps when checkout is there (Artist audit: it was 7 pt).
+    @Test func theUnavailableCheckoutLineKeepsItsSpace() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        var settings = AppSettings.defaultValue
+        settings.trialSessionsUsed = 3
+        let store = SettingsStore(configDirectory: root)
+        try store.save(settings)
+        let state = AppState(settingsStore: store, licenseClient: MockLicenseClient(),
+                             checkoutClient: HostedCheckoutClient(baseURL: nil),
+                             installIDStore: InstallIDStore(configDirectory: root), productID: "prod_mock")
+        let controller = UpgradeViewController(appState: state)
+        let window = makeWindow(controller)
+        defer { window.orderOut(nil) }
+        let status = try #require(descendants(of: controller.view, of: NSTextField.self)
+            .first { $0.stringValue == "Checkout is not available yet." && !$0.isHiddenOrHasHiddenAncestor })
+        let trial = try #require(descendants(of: controller.view, of: NSButton.self).first { $0.title == "Try the free web room" })
+        let gap = controller.view.convert(status.bounds, from: status).minY - controller.view.convert(trial.bounds, from: trial).maxY
+        #expect(abs(gap - 20) < 1, "status to web trial is \(gap) pt")
+    }
+
     // MARK: - Picker access line
 
     @Test func licensedPickerHidesAccessLineAndTrialPickerKeepsIt() throws {

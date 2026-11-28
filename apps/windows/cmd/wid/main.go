@@ -87,6 +87,11 @@ func main() {
 			Title: "Write It Down", Width: winW, Height: winH, UseContentSize: content, MinWidth: 760, MinHeight: 480,
 			Content: ui.View(a.View),
 		})
+		win.OnClose(func(e *mygo.CloseEvent) {
+			if !a.MayClose() {
+				e.PreventDefault()
+			}
+		})
 		a.Start()
 	})
 	if err := mygo.App.Run(); err != nil {

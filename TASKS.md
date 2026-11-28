@@ -38,6 +38,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - 第 4、5 条：待审。
 - 第 6、8、9、11、12、12b、13 条：待审。
 - 第 14（含 20）、15、16、17、18、19、21 条：待审。
+- 第 22 条：待审。
 
 ## 清单
 
@@ -80,7 +81,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 ### D. Windows
 
-- [ ] 22. 关窗保护：有稿时 Alt+F4 / ✕ 走两步确认（D-118），SYNC.md 加行。
+- [x] 22. Windows 关窗保护：`Room.ConfirmClose` 在有活稿时拒绝第一次关闭并武装与 Esc 共用的确认，2 秒内再关才放行；空房间、停止屏、成稿屏直接关；`App.MayClose` 接到 `Window.OnClose`；SYNC 第 76 行。room 与 app 两个新测试在旧代码上编译失败（方法不存在）。真窗口验证待 vivobook-1（A8）。
 - [ ] 23. `gen_tokens.py` 与字体派生读 Mac 新 Palette 与 Allo，`check_tokens.sh` 能跑，CI 在 PR 上执行。
 - [ ] 24. Windows 对齐 D-124 / D-125：白黑两纸跟随系统、Allo、纸圆角 4、警告句、警告数字字形、kept 按钮字重、深色红字；SYNC.md 逐行。
 - [ ] 25. kept 页 Ctrl+C 复制。

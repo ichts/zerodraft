@@ -606,3 +606,36 @@ func TestWritingLineHoldsTheAnchorForEveryDraftLength(t *testing.T) {
 		t.Fatalf("baseline %.2f is not half a pitch under the anchor %.2f", want, pr.Y+AnchorY(pr.H))
 	}
 }
+
+// The window's close (Alt+F4, the title bar's X) asks twice while a draft is live, as the Mac's close does (D-118):
+// the first close is refused and arms the same confirmation as Esc, a second inside the window lets it close.
+// Nothing asks before the first input or once the session has ended.
+func TestClosingTheWindowAsksTwiceWhileADraftIsLive(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	if !g.r.ConfirmClose() {
+		t.Fatal("an empty room must close at once")
+	}
+	g.tt.Type("a live draft")
+	if g.r.ConfirmClose() {
+		t.Fatal("the first close must only arm the confirmation")
+	}
+	if g.r.Editor().Text() != "a live draft" || g.quit {
+		t.Fatalf("the first close changed the room: text %q quit %v", g.r.Editor().Text(), g.quit)
+	}
+	g.tt.Advance(500 * time.Millisecond)
+	if !g.r.ConfirmClose() {
+		t.Fatal("a second close inside the window must close")
+	}
+	// Esc and close share one confirmation: a close arms it, and Esc inside the window leaves.
+	g2 := newRig(t, 1040, 620)
+	g2.tt.Type("another draft")
+	g2.r.ConfirmClose()
+	g2.tt.Key(0, ui.KeyEscape)
+	if !g2.quit {
+		t.Fatal("an Esc after an armed close must leave")
+	}
+	g.tt.Advance(9 * time.Second)
+	if g.r.Engine().Phase != session.Failure || !g.r.ConfirmClose() {
+		t.Fatalf("a stopped room must close at once: phase %v", g.r.Engine().Phase)
+	}
+}

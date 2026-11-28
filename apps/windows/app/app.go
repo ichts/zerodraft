@@ -222,6 +222,14 @@ func (a *App) obstacle() room.Obstacle {
 	return room.ObstacleLicenseNeeded
 }
 
+// MayClose answers the window's close: only a live draft in the room asks first (D-118).
+func (a *App) MayClose() bool {
+	if a.surface != Session || a.rm == nil {
+		return true
+	}
+	return a.rm.ConfirmClose()
+}
+
 // leaveRoom is Mac abandonSession: the draft is gone, Home when the app can still be used, otherwise the card.
 func (a *App) leaveRoom() {
 	a.rm = nil

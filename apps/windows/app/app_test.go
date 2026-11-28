@@ -458,3 +458,23 @@ func TestHelpButtonSitsOnTheLogoRowAndTheCardPadding(t *testing.T) {
 		t.Errorf("help right edge is %.2f off the card's inner padding", d)
 	}
 }
+
+// The window's close asks only for a live draft (D-118): Home closes at once, a room with words in it refuses the first
+// close and lets the second through.
+func TestTheWindowCloseAsksOnlyForALiveDraft(t *testing.T) {
+	g := newRig(t)
+	if !g.a.MayClose() {
+		t.Fatal("Home must close at once")
+	}
+	g.click("Begin writing")
+	if !g.a.MayClose() {
+		t.Fatal("an empty room must close at once")
+	}
+	g.tt.Type("words on the sheet")
+	if g.a.MayClose() {
+		t.Fatal("the first close of a live draft must be refused")
+	}
+	if !g.a.MayClose() || g.a.Room().Editor().Text() != "words on the sheet" {
+		t.Fatal("the second close must go through and the first must not touch the draft")
+	}
+}

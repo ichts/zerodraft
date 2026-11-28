@@ -281,15 +281,37 @@ func (r *Room) noticeFade() time.Duration {
 
 func (r *Room) dismissExit() { r.exitArmedAt, r.exitHintOff = time.Time{}, time.Time{} }
 
+// exitArmed reports whether the inline confirmation is armed and still inside its window.
+func (r *Room) exitArmed() bool {
+	return !r.exitArmedAt.IsZero() && r.now().Sub(r.exitArmedAt) <= tokens.ExitWindowSeconds*time.Second
+}
+
 // requestExit is the two-step exit: the first Esc or click arms the inline confirmation, a second inside the
 // window leaves. Nothing is saved either way.
 func (r *Room) requestExit() {
-	now := r.now()
-	if !r.exitArmedAt.IsZero() && now.Sub(r.exitArmedAt) <= tokens.ExitWindowSeconds*time.Second {
+	if r.exitArmed() {
 		r.logf("EXIT left the room")
 		r.cfg.Quit()
 		return
 	}
+	r.armExit()
+}
+
+// ConfirmClose answers the window's close (Alt+F4, the title bar's X) the way the Mac's close does (D-118): with a
+// live draft the first close arms Esc's confirmation and is refused; a second inside the window, or a close before
+// the first input or after the session ended, closes.
+func (r *Room) ConfirmClose() bool {
+	live := r.eng.HasStarted() && (r.eng.Phase == session.Writing || r.eng.Phase == session.Danger)
+	if !live || r.exitArmed() {
+		return true
+	}
+	r.logf("CLOSE asked")
+	r.armExit()
+	return false
+}
+
+func (r *Room) armExit() {
+	now := r.now()
 	r.exitArmedAt = now
 	r.exitHintOff = now.Add(tokens.ExitWindowSeconds * time.Second)
 	sound.Play(sound.Open)

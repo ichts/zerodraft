@@ -138,7 +138,7 @@ assert_warn_geometry() { # assert_warn_geometry <warn-snapshot>
   local ta num hint
   ta="$(frame_of "$1" AXTextArea '')"
   num="$(frame_of "$1" AXStaticText '^[123]$')"
-  hint="$(frame_of "$1" AXStaticText '^KEEP TYPING OR THE DRAFT IS DELETED\.$')"
+  hint="$(frame_of "$1" AXStaticText '^Keep typing or the draft is deleted\.$')"
   [[ -n "$ta" && -n "$num" && -n "$hint" ]] || fail 'warn geometry: missing text area, numeral or caption frame'
   record_geometry warn "$(jq -cn --argjson ta "$ta" --argjson num "$num" --argjson hint "$hint"     '{textArea: $ta, numeral: $num, caption: $hint}')"
   jq -en --argjson ta "$ta" --argjson num "$num" --argjson hint "$hint" '
@@ -314,10 +314,10 @@ check_warn_recovery_wipe() {
   local warn="$output/$tier-warn.json" recovered="$output/$tier-recovered.json" wiped="$output/$tier-wiped.json" wipe_start warn_min warn_max
   warn_min="$(awk -v t="$limit" 'BEGIN { print t - 3 - 0.5 }')"
   warn_max="$(awk -v t="$limit" 'BEGIN { print t - 3 + 2.5 }')"
-  wait_text "$tier-warn" 'KEEP TYPING OR THE DRAFT IS DELETED.' 'KEEP TYPING OR THE DRAFT IS DELETED.' "$max"
+  wait_text "$tier-warn" 'Keep typing or the draft is deleted.' 'Keep typing or the draft is deleted.' "$max"
   assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
-  assert_text "$warn" 'KEEP TYPING OR THE DRAFT IS DELETED.'
+  assert_text "$warn" 'Keep typing or the draft is deleted.'
   assert_text "$warn" 'ESC - EXIT'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
@@ -325,7 +325,7 @@ check_warn_recovery_wipe() {
   wipe_start="$(clock_now)"
   press k
   snap "$tier-recovered-state" >"$recovered"
-  absent_text "$recovered" 'KEEP TYPING'
+  absent_text "$recovered" 'Keep typing or the draft'
   [[ "$(draft_value "$recovered")" == "${before}k" ]] || fail "$tier recovery lost draft"
   wait_text "$tier-wiped" 'You stopped.' 'You stopped.' "$max"
   assert_timing "$tier" wipe "$wipe_start" "$matched_at" "$(awk -v t="$limit" 'BEGIN { print t - 0.5 }')" "$((limit + 3))"

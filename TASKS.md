@@ -95,8 +95,8 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 ### E. 验收
 
-- [!] 30. 验收命令（2026-11-28，main `9f9757c`）：根 `npm test` 21 passed；`writeitdown npm run test:full` 1376 passed；`verify-writing-deadlines` 0 failures；`swift build && swift test` 403 passed；Windows `go test ./...` 全过、`GOOS=windows go build` 通过、`check_tokens.sh` 通过。
-  - 未解决：(1) Gemini 复审：第 1–3 条第 2 轮与第 4–28 条首轮未完成（本会话只能在回复消息时 @ 成员）；(2) advisor 终审未做，原因同上；(3) Mac 真窗口：cua-driver 守护进程未运行、TCC 权限需哥授权，且 `scripts/qa-window.sh` 仍断言 D-120 之前的大写警告句；(4) Windows 真窗口：A8；(5) GitHub 上 `windows`、`writeitdown` 两个工作流处于 disabled_manually，CI 不会运行。
+- [!] 30. 验收（2026-11-28，main `77f6399`）：根 `npm test` 21 passed；`writeitdown npm test` 353 passed（92b9ded 后），全矩阵 1376 passed（a33ed72）；`verify-writing-deadlines` 0 failures；`swift test` 404 passed；Windows `go test ./...`、`GOOS=windows go build`、`check_tokens.sh` 通过。Gemini：第 1–37 条全部通过（第 1–3、5、13–16、23、24、36 条经打回后复审通过）。Thinker 终审的 4 个取舍判断成立，其指出的漏项已作为第 31–35 条修完并经 Gemini 复审；修完后未再请 Thinker 复核（唤醒次数用尽）。
+  - 未解决：(1) Mac 真窗口：cua-driver 守护进程与 TCC 权限待哥授权；(2) Windows 真窗口：A8（Smart App Control）；(3) GitHub 上 `windows`、`writeitdown` 两个工作流 disabled_manually，CI 不运行；(4) 部署由哥手动。
 
 ### F. 终审补漏（Thinker 2026-11-28）
 

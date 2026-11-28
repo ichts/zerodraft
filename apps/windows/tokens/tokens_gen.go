@@ -9,34 +9,34 @@ type Role struct {
 }
 
 var (
-	Page            = Role{0xF7F7F5, 0x000000, 1, 1}
-	Sheet           = Role{0xFFFFFF, 0x111111, 1, 1}
-	Ink             = Role{0x1C1917, 0xEDEDED, 1, 1}
-	Mute            = Role{0x6B655C, 0xA3A3A3, 1, 1}
-	Chrome          = Role{0x6B655C, 0xA3A3A3, 1, 1}
-	Hair            = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
-	SheetRing       = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
-	HairStrong      = Role{0x1C1917, 0xEDEDED, 0.16, 0.18}
-	TagBackground   = Role{0xF2F2F0, 0x1B1B1B, 1, 1}
-	SegmentTrack    = Role{0x1C1917, 0xEDEDED, 0.06, 0.10}
-	Red             = Role{0xB00C15, 0xFF453A, 1, 1}
-	RedText         = Role{0xB00C15, 0xFF453A, 1, 1}
-	OnInk           = Role{0xFFFFFF, 0x111111, 1, 1}
-	Shadow          = Role{0x1C1917, 0x000000, 1, 1}
-	Separator       = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
-	Paper           = Role{0xFFFFFF, 0x111111, 1, 1}
-	PaperInk        = Role{0x1C1917, 0xEDEDED, 1, 1}
-	PaperQuiet      = Role{0x3F3B36, 0xC2BFB7, 1, 1}
-	PaperDanger     = Role{0xB00C15, 0xFF453A, 1, 1}
-	PaperWash       = Role{0xF2F2F2, 0x1B1B1B, 1, 1}
-	PaperWashDeep   = Role{0xE6E6E6, 0x262626, 1, 1}
-	PaperHair       = Role{0x1C1917, 0xEDEDED, 0.12, 0.16}
-	PaperHairStrong = Role{0x1C1917, 0xEDEDED, 0.22, 0.30}
+	Page            = Role{0xF3F2EF, 0x141413, 1, 1}
+	Sheet           = Role{0xFCFCFA, 0x1C1C1A, 1, 1}
+	Ink             = Role{0x45433D, 0xDCDAD3, 1, 1}
+	Mute            = Role{0x6E6D68, 0xA3A29B, 1, 1}
+	Chrome          = Role{0x6E6D68, 0xA3A29B, 1, 1}
+	Hair            = Role{0x45433D, 0xDCDAD3, 0.12, 0.10}
+	SheetRing       = Role{0x45433D, 0xDCDAD3, 0.12, 0.10}
+	HairStrong      = Role{0x45433D, 0xDCDAD3, 0.20, 0.18}
+	TagBackground   = Role{0xEDEDEA, 0x232321, 1, 1}
+	SegmentTrack    = Role{0x45433D, 0xDCDAD3, 0.06, 0.10}
+	Red             = Role{0x9A5255, 0xD08A8C, 1, 1}
+	RedText         = Role{0x9A5255, 0xD08A8C, 1, 1}
+	OnInk           = Role{0xFCFCFA, 0x1C1C1A, 1, 1}
+	Shadow          = Role{0x45433D, 0x000000, 1, 1}
+	Separator       = Role{0x45433D, 0xDCDAD3, 0.12, 0.10}
+	Paper           = Role{0xFCFCFA, 0x1C1C1A, 1, 1}
+	PaperInk        = Role{0x45433D, 0xDCDAD3, 1, 1}
+	PaperQuiet      = Role{0x4B4943, 0xBDBBB3, 1, 1}
+	PaperDanger     = Role{0x9A5255, 0xD08A8C, 1, 1}
+	PaperWash       = Role{0xF4F3F0, 0x232321, 1, 1}
+	PaperWashDeep   = Role{0xEAE9E5, 0x2A2A27, 1, 1}
+	PaperHair       = Role{0x45433D, 0xDCDAD3, 0.14, 0.16}
+	PaperHairStrong = Role{0x45433D, 0xDCDAD3, 0.24, 0.30}
 )
 
 // HistoryOpacities are the history steps (D-092), current line first; lines beyond them are gone.
-var HistoryOpacitiesDark = []float32{1, 0.17, 0.065}
-var HistoryOpacitiesLight = []float32{1, 0.22, 0.07}
+var HistoryOpacitiesDark = []float32{1, 0.172, 0.061}
+var HistoryOpacitiesLight = []float32{1, 0.26, 0.084}
 
 // 4-pt spacing and radii.
 const (

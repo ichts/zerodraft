@@ -247,12 +247,12 @@ func TestFailureCompositionKeepsTheLockedRatios(t *testing.T) {
 }
 
 func TestHistorySteps(t *testing.T) {
-	for d, want := range map[int]float32{0: 1, 1: 0.22, 2: 0.07, 3: -1} {
+	for d, want := range map[int]float32{0: 1, 1: 0.26, 2: 0.084, 3: -1} {
 		if got := HistoryAlpha(d, false); got != want {
 			t.Errorf("light distance %d: %v want %v", d, got, want)
 		}
 	}
-	for d, want := range map[int]float32{1: 0.17, 2: 0.065, 3: -1} {
+	for d, want := range map[int]float32{1: 0.172, 2: 0.061, 3: -1} {
 		if got := HistoryAlpha(d, true); got != want {
 			t.Errorf("dark distance %d: %v want %v", d, got, want)
 		}
@@ -268,7 +268,7 @@ func TestEmptyCaretAndFirstGlyphShareTheInsertionColumn(t *testing.T) {
 		for y := rowLo; y < rowHi; y++ {
 			for x := 40; x < img.Bounds().Dx()-40; x++ {
 				c := img.RGBAAt(x, y)
-				if int(c.R) < 60 && int(c.G) < 60 && int(c.B) < 60 {
+				if int(c.R) < 100 && int(c.G) < 100 && int(c.B) < 100 { // ink #45433d against the #fcfcfa sheet (D-130)
 					lo, hi = min(lo, x), max(hi, x)
 				}
 			}
@@ -506,7 +506,7 @@ func TestHistorySpansColourWholeLines(t *testing.T) {
 	for _, s := range spans {
 		got = append(got, float32(s.Color.A)/255)
 	}
-	want := []float32{0, 0.07, 0.22, 1} // gone, two back, one back, live (alpha of the ink, 255 for the live line)
+	want := []float32{0, 0.084, 0.26, 1} // gone, two back, one back, live (alpha of the ink, 255 for the live line)
 	if len(got) != len(want) {
 		t.Fatalf("%d spans, want %d: %v", len(got), len(want), spans)
 	}
@@ -517,7 +517,7 @@ func TestHistorySpansColourWholeLines(t *testing.T) {
 	}
 }
 
-// D-092: Return starts the dissolve of the line just written; it lands on .22 after 320 ms, then .07 on the next Return.
+// D-092: Return starts the dissolve of the line just written; it lands on .26 after 320 ms, then .084 on the next Return (D-130).
 func TestReturnStartsTheHistoryDissolve(t *testing.T) {
 	g := newRig(t, 1040, 620)
 	t0 := time.Unix(1000, 0)
@@ -535,21 +535,21 @@ func TestReturnStartsTheHistoryDissolve(t *testing.T) {
 	if a = alphas("First line\n", 170); a[0] > 0.9 || a[0] < 0.3 {
 		t.Fatalf("half way the line is between ink and its step: %v", a)
 	}
-	if a = alphas("First line\n", 400); !near(a[0], 0.22) {
+	if a = alphas("First line\n", 400); !near(a[0], 0.26) {
 		t.Fatalf("the dissolve lands on one back: %v", a)
 	}
 	if _, moving = g.r.historyAlphas("First line\n", false, at(500)); moving {
 		t.Fatal("a settled history asks for no more frames")
 	}
-	if a = alphas("First line\nSecond line", 600); !near(a[0], 0.22) || a[1] < 0.99 {
+	if a = alphas("First line\nSecond line", 600); !near(a[0], 0.26) || a[1] < 0.99 {
 		t.Fatalf("typing on the new line moves nothing above it: %v", a)
 	}
 	text := "First line\nSecond line\n"
 	if a = alphas(text, 610); a[0] < 0.2 || a[1] < 0.99 {
 		t.Fatalf("Return starts both dissolves from where the lines are: %v", a)
 	}
-	if a = alphas(text, 1000); !near(a[0], 0.07) || !near(a[1], 0.22) {
-		t.Fatalf("every Return line gets exactly its step, 1 / .22 / .07: %v", a)
+	if a = alphas(text, 1000); !near(a[0], 0.084) || !near(a[1], 0.26) {
+		t.Fatalf("every Return line gets exactly its step, 1 / .26 / .084: %v", a)
 	}
 	if a = alphas("a\nb\nc\nd\ne", 5000); !near(a[4], 1) {
 		t.Fatalf("a rebuilt draft is drawn at its steps at once: %v", a)

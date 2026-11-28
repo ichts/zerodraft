@@ -175,7 +175,7 @@ func TestKeptPillIs48Tall(t *testing.T) {
 		run, mx := 0, 0
 		for y := 150; y < 330; y++ {
 			c := img.RGBAAt(x, y)
-			if int(c.R) < 40 && int(c.G) < 38 && int(c.B) < 36 {
+			if int(c.R) < 0x45+8 && int(c.G) < 0x43+8 && int(c.B) < 0x3D+8 { // the ink fill (D-130)
 				run++
 				mx = max(mx, run)
 			} else {

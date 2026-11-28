@@ -27,9 +27,9 @@ type Config struct {
 	Log func(format string, a ...any)
 	// Quit leaves the room (second Esc). Defaults to mygo.App.Quit.
 	Quit func()
-	// Copy puts the kept text on the clipboard. Defaults to mygo.Clipboard.WriteText (a test replaces it: the
-	// headless backend has no clipboard to answer).
-	Copy func(string)
+	// Copy puts the kept text on the clipboard and reports whether the clipboard now holds exactly it. Defaults to
+	// mygo.Clipboard with a read-back (a test replaces it: the headless backend has no clipboard to answer).
+	Copy func(string) bool
 	// SyncPaper renders the paper texture on the calling goroutine (first frame carries it, tests).
 	SyncPaper bool
 	// Writing font size in pt (28 is the Mac default).
@@ -134,7 +134,10 @@ func New(cfg Config) *Room {
 		cfg.Quit = func() { mygo.App.Quit() }
 	}
 	if cfg.Copy == nil {
-		cfg.Copy = func(s string) { mygo.Clipboard.WriteText(s) }
+		cfg.Copy = func(s string) bool {
+			mygo.Clipboard.WriteText(s)
+			return mygo.Clipboard.ReadText() == s
+		}
 	}
 	r := &Room{cfg: cfg, eng: session.New(cfg.Duration, cfg.Silence), copyLabel: tokens.StrCopyText,
 		shapes: map[string]*ui.TextLayout{}}
@@ -383,6 +386,9 @@ func (r *Room) View(c *ui.Context) {
 	if !r.ed.Composing() && c.Shortcut(0, ui.KeyEscape) {
 		r.requestExit() // Exit, stopped and kept buttons may hold focus; Esc still uses the same confirmation
 	}
+	if r.eng.Phase == session.Success && c.Shortcut(ui.Cmd, ui.KeyC) {
+		r.activate("copy") // Ctrl+C copies the kept draft whichever kept button holds focus, as the Mac's Cmd+C does
+	}
 	W, H := c.Size()
 	box := ui.Box(c).Fill().Background(rc(tokens.Page, dark)).Label("Writing room").Role(ui.RoleTextField).
 		Value(r.ed.Text()).HandleInput(r.input).AutoFocus().KeepFocus()
@@ -471,7 +477,12 @@ func (r *Room) activate(name string) {
 	case "pill", "run":
 		r.restart()
 	case "copy":
-		r.cfg.Copy(r.eng.Text)
+		if !r.cfg.Copy(r.eng.Text) {
+			r.copyLabel = tokens.StrCopyRetry
+			r.announce = append(r.announce, tokens.StrCopyRetry)
+			r.logf("COPY failed")
+			break
+		}
 		r.eng.CopiedKept = true
 		r.copyLabel = tokens.StrCopied
 		r.announce = append(r.announce, "Copied.")

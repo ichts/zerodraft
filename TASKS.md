@@ -38,7 +38,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - 第 4、5 条：待审。
 - 第 6、8、9、11、12、12b、13 条：待审。
 - 第 14（含 20）、15、16、17、18、19、21 条：待审。
-- 第 22、23、24 条：待审。
+- 第 22、23、24、25、26、27 条：待审。
 
 ## 清单
 
@@ -85,9 +85,9 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 23. Windows 生成器与漂移检查：`gen_tokens.py` 改读 Mac 的 white/black Palette 与角色表（别名递归解析），历史行按纸取值，警告句取 `warningText`，删掉纹理常量；`gen_fonts.py` 从 Mac 的 `allo-latin.woff2`、`resource-han-rounded-gb2312.woff2` 派生 TrueType（两次生成逐字节一致）；`check_tokens.sh` 本机通过；CI 增加 push 到 main 的触发与 `writeitdown/tokens.css` 路径、安装 brotli。
 - [!] 24. Windows 对齐 D-124/D-125：纸为纯色（删 `paper/` 纹理包与 `cmd/papershot`），颜色随生成的 token；书写、标题、警告数字换 Allo 410/540/360 与 Resource Han Rounded；警告句为 Mac 的句子式、不加字距；成稿屏按钮 15/600；纸圆角随 Mac 为 4；成稿块对齐 Mac 实测帧（标题 104、按钮 221..269、正文 331）。`go test ./...`、`GOOS=windows go build` 通过。
   - 未解决：没有真窗口（A8，Smart App Control），视觉对齐与 DirectWrite 下的字形未验证；界面 chrome 仍用 Segoe UI Variable（其行盒是按 Segoe 调过的，换 Allo 需真窗口度量，SYNC 第 22 行记为 different）；真机脚本 `scripts/measure.py` 仍按 Wheat 纸取样，需在真机可用时改写。
-- [ ] 25. kept 页 Ctrl+C 复制。
-- [ ] 26. 复制失败显示 `Try copy again`。
-- [ ] 27. Begin 后预热，100ms 内进房。
+- [x] 25. Windows 成稿屏 Ctrl+C：无论哪个成稿按钮有焦点，Ctrl+C 都复制全文（`c.Shortcut(ui.Cmd, ui.KeyC)`），与 Mac 的 Cmd+C 一致；SYNC 第 73 行。
+- [x] 26. Windows 复制失败：`Config.Copy` 返回剪贴板是否真的持有全文（默认写入后读回比对），失败时显示 `Try copy again` 并朗读；SYNC 第 11 行。新测试在旧代码上编译失败、再在未接线时失败（复制 0 次）。
+- [!] 27. Begin 100ms 内进房：350-390ms 的来源是同步生成纸面纹理，第 24 条去掉纹理后已不存在（SYNC 第 17 行）。未解决：没有真窗口测时（A8）。
 - [ ] 28. 激活卡不被裁。
 - [ ] 29. 焦点环不读成双线。
 

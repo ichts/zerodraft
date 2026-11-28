@@ -639,3 +639,18 @@ func TestClosingTheWindowAsksTwiceWhileADraftIsLive(t *testing.T) {
 		t.Fatalf("a stopped room must close at once: phase %v", g.r.Engine().Phase)
 	}
 }
+
+// The kept screen answers Ctrl+C with the whole draft, as the Mac's Cmd+C does (Q-35, D-082), and a copy the clipboard
+// did not take says so instead of claiming Copied.
+func TestCtrlCCopiesTheKeptDraftAndAFailedCopySaysSo(t *testing.T) {
+	g := keptRig(t)
+	g.tt.Key(ui.Cmd, ui.KeyC)
+	if len(g.copied) != 1 || g.copied[0] != g.r.Engine().Text || g.r.copyLabel != tokens.StrCopied {
+		t.Fatalf("Ctrl+C on the kept screen: copied %d times, label %q", len(g.copied), g.r.copyLabel)
+	}
+	g.copyOK = false
+	g.tt.Key(ui.Cmd, ui.KeyC)
+	if g.r.copyLabel != tokens.StrCopyRetry {
+		t.Fatalf("a failed copy must say %q, got %q", tokens.StrCopyRetry, g.r.copyLabel)
+	}
+}

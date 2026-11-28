@@ -21,10 +21,12 @@ func init() {
 }
 
 type rig struct {
-	t    *testing.T
-	tt   *ui.Tester
-	r    *Room
-	quit bool
+	copied []string
+	copyOK bool
+	t      *testing.T
+	tt     *ui.Tester
+	r      *Room
+	quit   bool
 }
 
 func newRig(t *testing.T, w, h int) *rig {
@@ -35,7 +37,8 @@ func newRig(t *testing.T, w, h int) *rig {
 			return time.Unix(1_800_000_000, 0)
 		}
 		return tt.Now()
-	}, Copy: func(string) {}, Quit: func() { g.quit = true }})
+	}, Copy: func(s string) bool { g.copied = append(g.copied, s); return g.copyOK }, Quit: func() { g.quit = true }})
+	g.copyOK = true
 	tt = ui.NewTester(g.r.View, w, h)
 	g.tt = tt
 	tt.Frame()

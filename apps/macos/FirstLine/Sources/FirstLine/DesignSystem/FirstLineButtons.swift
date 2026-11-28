@@ -173,18 +173,10 @@ private final class FirstLineButton: FirstLineInkFocusButton {
     // contentTintColor 是 content 属性，设它会触发 setNeedsLayout。绝不能在 updateLayer()（layout/display
     // pass 内）设它，否则触发 _NSViewLayoutFeedbackLoop 无限回环卡死。这里在 role 变更时设一次；
     // ink/sheet 是 dynamic NSColor，自动随明暗适配，无需在 updateLayer 里重设。
+    // Every pill, the ink pill included, wears the one ink ring 3 pt outside it (D-126): a light ring on the ink
+    // pill's edge matched the white paper and vanished there.
     var role: Role = .secondary {
-        didSet {
-            // An ink-filled pill cannot carry an ink ring outside itself, and a ring
-            // three points inside leaves a dark margin that also reads as a doubled
-            // outline. Draw the single light ring on the pill edge instead.
-            inkFocusRingInset = role == .primary ? 0 : 3
-            refreshAppearance()
-        }
-    }
-
-    override var inkFocusRingColor: NSColor {
-        role == .primary ? onInk : ink
+        didSet { refreshAppearance() }
     }
 
     override var onPaper: Bool { didSet { refreshAppearance() } }

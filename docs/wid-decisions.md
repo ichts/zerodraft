@@ -2792,3 +2792,16 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   `qa/shared-type-baseline.json` holds the web's Allo advances.
 - Supersedes: D-057's Newsreader, Zhuque Fangsong and system-sans roles, and D-121's restoration of them on the web.
   D-057's hand-accent rule stands.
+
+## D-126: every Mac pill, the ink pill included, wears the outer ink focus ring
+
+- Date: 2026-11-28. Artist's audit: on the white paper and every card the ink pill's focus ring (D-024: a 2 pt
+  light ring on the pill's own edge) is the colour of the ground, so Begin, Activate, Copy text and Done showed no
+  visible focus (Q-13, WCAG 2.4.7). On the black paper the same light ring sat on a light pill. D-124's two papers
+  make it fail on both.
+- Decision: the primary ink pill wears the same focus treatment as every other control on the Mac and as the web
+  (D-059): one 2 pt ink ring 3 pt outside the control, in the ground's ink (page ink on a card, paper ink on the
+  sheet). No control draws a second ring.
+- Tests: `RoundThreeTests.everyPillWearsTheOuterInkRing` and `everyCardControlUsesTheInkFocusRingInLightAndDark`,
+  `RoomTests.keptStateFocusesCopyText` (the ring's frame is 3 pt outside the pill, in paper ink, on both papers).
+- Supersedes: D-024's light ring on the ink pill's edge.

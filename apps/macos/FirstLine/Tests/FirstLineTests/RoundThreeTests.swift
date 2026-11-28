@@ -37,7 +37,9 @@ struct RoundThreeTests {
         #expect(copy.frame == ring.frame)
     }
 
-    @Test func primaryPillsHugTheEdgeWhileOutlineAndQuietControlsKeepTheOuterRing() throws {
+    /// D-126: every control, the ink pill included, wears the same 2 pt ink ring 3 pt outside it, so the ring shows
+    /// on the white paper, the black paper and a card alike.
+    @Test func everyPillWearsTheOuterInkRing() throws {
         let action = #selector(NSResponder.selectAll(_:))
         let primary = try #require(FirstLineButtons.primary(title: "Begin", target: nil, action: action)
             as? FirstLineInkFocusButton)
@@ -48,8 +50,9 @@ struct RoundThreeTests {
             as? FirstLineInkFocusButton)
         let quiet = try #require(FirstLineButtons.link(title: "Esc to exit", target: nil, action: action)
             as? FirstLineInkFocusButton)
-        #expect(primary.inkFocusRingInset == 0)
-        #expect(roomPrimary.inkFocusRingInset == 0)
+        #expect(primary.inkFocusRingInset == 3)
+        #expect(roomPrimary.inkFocusRingInset == 3)
+        #expect(sameRGB(primary.inkFocusRingColor, FirstLineColors.inkNSColor))
         #expect(secondary.inkFocusRingInset == 3)
         #expect(quiet.inkFocusRingInset == 3)
     }
@@ -119,14 +122,9 @@ struct RoundThreeTests {
                     // A control on the sheet takes the sheet's roles, as the web rebinds `--ink` and `--on-ink`
                     // inside the paper (D-120); a control on a card takes the page's.
                     let onPaper = (control as? FirstLineInkFocusButton)?.onPaper ?? false
+                    // Every control, the ink pill included, wears the ink ring (D-126).
                     let ink = resolved(onPaper ? FirstLineColors.paperInkNSColor : FirstLineColors.inkNSColor, appearance)
-                    let onInk = resolved(onPaper ? FirstLineColors.paperNSColor : FirstLineColors.onInkNSColor, appearance)
-                    // Ink-filled pills use the light inner ring (single outline); every
-                    // other control uses the ink ring.
-                    let fill = control.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) }
-                    let isInkPill = fill.map { resolved($0, appearance) == ink } ?? false
-                    let expected = isInkPill ? onInk : ink
-                    #expect(ringColor == expected, "\(name) control \(control.title) ring is not the expected token")
+                    #expect(ringColor == ink, "\(name) control \(control.title) ring is not the ink token")
                 }
                 window.orderOut(nil)
             }
@@ -903,3 +901,10 @@ private struct NoRenderedText: Error, CustomStringConvertible {
 private final class DenyCounter {
     var count = 0
 }
+
+@MainActor
+private func sameRGB(_ a: NSColor, _ b: NSColor) -> Bool {
+    let (x, y) = (a.usingColorSpace(.sRGB), b.usingColorSpace(.sRGB))
+    return x != nil && x == y
+}
+

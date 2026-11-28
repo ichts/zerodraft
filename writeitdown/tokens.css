@@ -14,27 +14,20 @@
 .home{
   /* colour roles: ink-tinted neutrals; red is the pen and the stakes only */
   --sheet:#ffffff;
-  /* The writing sheet is plain white in light (D-123, the sheet of the first white-and-ink identity: no grain, no
-     tint) and the warm charcoal paper in dark. Quiet, history and danger are measured roles: every word on the
-     paper clears 7:1 against the paper's own tone, except the dimmed history lines (D-092: one back about 1.6:1,
-     two back about 1.15:1), and the pen red is deepened until the numeral and the exit hint clear it too. */
+  /* The sheet is white in light, black in dark (D-124); every word on it clears 7:1 except the history lines and the large numeral. */
   --paper-tone:#ffffff;
-  --paper-quiet:#48443E; /* the Mac's warm `paperQuiet` (D-084): one quiet grey on both surfaces */
+  --paper-quiet:#3f3b36;
   --paper-history-1:.22;
   --paper-history-2:.07;
-  --paper-danger:#63140b;
-  /* The warn wash of the white sheet is the soft red of the first identity (--red-soft, --red-deep); dark
-     keeps its own mix below. */
-  --paper-wash:var(--red-soft);
-  --paper-wash-deep:var(--red-deep);
+  /* D-124: the warn wash greys the sheet (white darkens, black lightens); red is one hue per mode. */
+  --paper-wash:#f2f2f2;
+  --paper-wash-deep:#e6e6e6;
   --ink:#1c1917;
   --mute:#6b655c;
   --chrome:#5c564d;
   --hair:rgba(28,25,23,.10);
   --hair-2:rgba(28,25,23,.16);
-  --red:#b02a1e;
-  --red-text:#b02a1e;--red-text-small:#b02a1e; /* red as words; dark brightens it for APCA (D-103) */
-  --red-soft:#f6e2dc;--red-deep:#ebc8bd;
+  --red:#b00c15;
   --tag-bg:#f2f2f0;
   --on-ink:#ffffff;
   /* type: serif = written text and display, cjk = the same roles in Chinese, hand = the landing's pen
@@ -74,7 +67,6 @@
   --paper-quiet:#c2bfb7;
   --paper-history-1:.16; /* the same 1.57:1 on the dark paper */
   --paper-history-2:.05; /* the same 1.15:1 */
-  --paper-danger:#ffc2b4;
   --paper-wash:#453226;
   --paper-wash-deep:#573428;
   --ink:#ece7d9;
@@ -82,9 +74,7 @@
   --chrome:#a39d8e;
   --hair:rgba(236,231,217,.10);
   --hair-2:rgba(236,231,217,.18);
-  --red:#e4604a;
-  --red-text:#f6715a;--red-text-small:#ff9b88; /* Lc 45 big on the page and the red card, Lc 60 small on the card */
-  --red-soft:#3a1c15;--red-deep:#4a2318;
+  --red:#ff453a;
   --tag-bg:#2e2a22;
   --on-ink:#15140f;
   --lift:0 0 0 1px var(--hair),0 1px 1px rgba(0,0,0,.2),0 24px 48px -16px rgba(0,0,0,.5);

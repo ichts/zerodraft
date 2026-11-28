@@ -139,7 +139,7 @@
           "name": "numeral",
           "selector": "#room-numeral",
           "property": "color",
-          "token": "--paper-danger"
+          "token": "--red"
         },
         {
           "name": "caption",

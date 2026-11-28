@@ -1,16 +1,15 @@
 // The three landing moment cards (#core .mo: writing, warning, deleted) measured as rendered text.
 // Every text element on a card is checked against the card's own ground, in light and dark, at 1440 and 390.
 // Floors follow WCAG 2.x: 4.5:1 for normal text, 3:1 for large text (24 px, or 18.66 px bold).
-// Fails on the shipped `.mo .r` line (`--mute` on `--red-deep`: 3.72:1 light) before it was repainted (D-071).
 import { test, expect } from '@playwright/test';
 
 const CAPTURE_DIR = process.env.WID_CAPTURE_DIR;
 
 // The text roles each card carries, in document order. A new text element must be added here on purpose.
 const ROLES = {
-  m1: ['small', 't'],
-  m2: ['small', 'n'],
-  m3: ['small', 't', 'r'],
+  writing: ['small', 't'],
+  warning: ['small', 'n'],
+  deleted: ['small', 't', 'r'],
 };
 
 const channels = colour => colour.match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -28,8 +27,8 @@ const contrast = (a, b) => {
   return (light + 0.05) / (dark + 0.05);
 };
 
-const readCard = (page, name) => page.evaluate(cls => {
-  const card = document.querySelector(`#core .mo.${cls}`);
+const readCard = (page, name) => page.evaluate(index => {
+  const card = document.querySelectorAll('#core .mo')[index];
   const style = getComputedStyle(card);
   const grounds = style.backgroundImage === 'none' ? [style.backgroundColor] : style.backgroundImage.match(/rgba?\([^)]*\)/g);
   const texts = [...card.querySelectorAll('*')]
@@ -47,7 +46,7 @@ const readCard = (page, name) => page.evaluate(cls => {
       };
     });
   return { grounds, texts };
-}, name);
+}, Object.keys(ROLES).indexOf(name));
 
 const floorFor = ({ size, weight }) => (size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5);
 
@@ -73,5 +72,28 @@ test('every text role on the three landing moment cards clears its WCAG floor on
   }
   if (CAPTURE_DIR) {
     await page.locator('#core .moments').screenshot({ path: `${CAPTURE_DIR}/${info.project.name}-moments.png` });
+  }
+});
+
+// D-124: the three cards are one neutral ground; the warning is told by the numeral, not by a tinted card.
+test('the three moment cards share the sheet ground, with no wash and no gradient', async ({ page }) => {
+  await page.goto('index.html');
+  const cards = await page.evaluate(() => {
+    const read = name => getComputedStyle(document.querySelector('.home')).getPropertyValue(name).trim();
+    const probe = value => { const i = document.createElement('i'); i.style.color = value; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; };
+    return {
+      grounds: [...document.querySelectorAll('#core .mo')].map(card => {
+        const style = getComputedStyle(card);
+        return { colour: style.backgroundColor, image: style.backgroundImage };
+      }),
+      sheet: probe(read('--sheet')),
+      washes: [probe(read('--paper-wash')), probe(read('--paper-wash-deep'))],
+    };
+  });
+  expect(cards.grounds).toHaveLength(3);
+  for (const ground of cards.grounds) {
+    expect(ground.image, 'no gradient on a moment card').toBe('none');
+    expect(ground.colour, 'every moment card is the sheet').toBe(cards.sheet);
+    expect(cards.washes, 'no moment card wears a wash').not.toContain(ground.colour);
   }
 });

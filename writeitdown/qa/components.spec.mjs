@@ -33,9 +33,9 @@ test('a field is reached through its label, is a 44 px target at 16 px, and an i
   expect(ok.fontSize).toBe('16px');
   expect(ok.borderTopLeftRadius).toBe('8px');
   const bad = await style(page, '#kit-f-bad', ['borderTopColor']);
-  expect(bad.borderTopColor).toBe(await token(page, '--red-text'));
+  expect(bad.borderTopColor).toBe(await token(page, '--red'));
   expect(bad.borderTopColor).not.toBe(ok.borderTopColor);
-  expect((await style(page, '#kit-f-bad-note', ['color'])).color).toBe(await token(page, '--red-text'));
+  expect((await style(page, '#kit-f-bad-note', ['color'])).color).toBe(await token(page, '--red'));
   expect(await page.locator('#kit-f-bad').getAttribute('aria-describedby')).toBe(await page.locator('#kit-f-bad-note').getAttribute('id'));
 });
 

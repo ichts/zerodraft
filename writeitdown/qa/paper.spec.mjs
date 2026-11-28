@@ -8,10 +8,10 @@ import { test, expect } from '@playwright/test';
 
 const TONES = { light: '#ffffff', dark: '#342e24' };
 const INK = { light: '#1c1917', dark: '#ece7d9' };
-const QUIET = { light: '#48443e', dark: '#c2bfb7' };
-const DANGER = { light: '#63140b', dark: '#ffc2b4' };
-const WASH = { light: '#f6e2dc', dark: '#453226' };
-const WASH_DEEP = { light: '#ebc8bd', dark: '#573428' };
+const QUIET = { light: '#3f3b36', dark: '#c2bfb7' };
+const RED = { light: '#b00c15', dark: '#ff453a' };
+const WASH = { light: '#f2f2f2', dark: '#453226' };
+const WASH_DEEP = { light: '#e6e6e6', dark: '#573428' };
 
 const parseColour = value => {
   const match = String(value).match(/rgba?\(([^)]+)\)/);
@@ -67,7 +67,6 @@ const expectGrain = (grain, mode, label) => {
 
 /** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
  *  already warm. */
-const warmth = ({ r, g }) => (r - g) / 255;
 
 const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
 
@@ -242,14 +241,13 @@ test.describe('the sheet', () => {
     expect(contrast(parseColour(await style(page, '#failure-note', 'color')), paper)).toBeGreaterThanOrEqual(7);
   });
 
-  test('the warn wash tints the sheet: the soft red on the white sheet, its own mix on the dark one', async ({ page }) => {
+  test('the warn wash greys the sheet one step, deeper at the cut, and the numeral is the one red (D-124)', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
     const wash = await style(page, '.room-paper-wash', 'backgroundColor');
     expect(toHex(parseColour(wash)), 'the warn wash').toBe(WASH[mode]);
 
-    // The cut steps one step deeper, and the numeral sitting on it still clears 7:1. The attribute and
-    // the read happen in one evaluation: the room's own frame loop owns `data-cut`.
+    // The attribute and the read happen in one evaluation: the room's own frame loop owns `data-cut`.
     const cut = await page.evaluate(() => {
       const room = document.querySelector('#room');
       room.dataset.cut = 'true';
@@ -258,13 +256,15 @@ test.describe('the sheet', () => {
     const deep = parseColour(cut);
     expect(toHex(deep), 'the wash at the cut').toBe(WASH_DEEP[mode]);
     const numeral = parseColour(await style(page, '.danger .numeral', 'color'));
-    expect(toHex(numeral), 'the pen red on the sheet').toBe(DANGER[mode]);
-    expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(7);
-    // The wash is a tint of the sheet: warmer than the paper and warmer still at the cut. It is measured
-    // against the locked tone, not the grain-corrected base the renderer sets on the sheet (D-073).
+    expect(toHex(numeral), 'the numeral is the one red').toBe(RED[mode]);
+    // The numeral is large text (D-124), so its floor on the deepest wash is 3:1; the caption is ink at 7:1.
+    expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(3);
+    expect(contrast(parseColour(await style(page, '.danger .caption', 'color')), deep), 'the caption on the deepest wash').toBeGreaterThanOrEqual(7);
+    if (mode === 'light') expect(contrast(parseColour(await style(page, '#room-count', 'color')), deep), 'the quiet chrome on the deepest wash').toBeGreaterThanOrEqual(7);
     const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
-    expect(warmth(parseColour(wash)) - warmth(paper), 'the wash does not warm the paper').toBeGreaterThan(0.05);
-    expect(warmth(deep), 'the cut is not deeper than the ramp').toBeGreaterThan(warmth(parseColour(wash)));
+    const step = contrast(parseColour(wash), paper);
+    expect(step, 'the wash is visible on the paper').toBeGreaterThan(1.05);
+    expect(contrast(deep, paper), 'the cut is one step past the ramp').toBeGreaterThan(step);
   });
 
   test('the kept screen stays on the same paper', async ({ page }) => {

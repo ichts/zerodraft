@@ -1173,3 +1173,17 @@ test('the header Buy holds through the tablet band', async ({ page }, info) => {
     expect(Math.abs(read.sheet.bottom - read.first.bottom), `${label}: the sheet still owns the first screen's remainder`).toBeLessThanOrEqual(1);
   }
 });
+
+// The headline keeps the desktop's breathing room under the header on a phone too (Artist audit: it sat 4 px under
+// the nav at 390 and 320). The 61% sheet floor at the same sizes is held by the phone sweeps above.
+test('the headline keeps its space under the header on every phone', async ({ page }, info) => {
+  test.skip(info.project.name !== '390-light-no-preference', 'One project sweeps the phone sizes');
+  for (const size of [{ width: 390, height: 844 }, { width: 375, height: 667 }, { width: 320, height: 700 }]) {
+    await page.setViewportSize(size);
+    await page.goto('index.html');
+    await page.evaluate(() => document.fonts.ready);
+    const gap = await page.evaluate(() => document.querySelector('#landing h1').getBoundingClientRect().top
+      - document.querySelector('#landing .home-nav').getBoundingClientRect().bottom);
+    expect(gap, `${size.width}x${size.height}: header to headline`).toBeGreaterThanOrEqual(16);
+  }
+});

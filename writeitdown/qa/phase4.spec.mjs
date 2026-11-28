@@ -329,7 +329,9 @@ test('warning numeral and caption are placed by ink under the writing line', asy
       captionText: document.querySelector('#room-warning').textContent };
   });
   expect(warning.numeralText).toMatch(/^[123]$/);
-  expect(warning.captionText).toBe('KEEP TYPING OR THE DRAFT IS DELETED.');
+  expect(warning.captionText).toBe('Keep typing or the draft is deleted.');
+  // The Mac's sentence (D-120): sentence case, untracked, never set in capitals by CSS.
+  expect(await page.locator('#room-warning').evaluate(el => [getComputedStyle(el).textTransform, getComputedStyle(el).letterSpacing])).toEqual(['none', 'normal']);
   expect(warning.numeral.inkTop - warning.baseline, 'numeral ink top under the writing baseline').toBeGreaterThan(40);
   expect(warning.numeral.inkTop - warning.baseline).toBeLessThan(48);
   expect(warning.caption.inkTop - (warning.numeral.inkTop + warning.numeral.inkHeight), 'caption under the numeral ink').toBeGreaterThan(16);
@@ -1364,7 +1366,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
     await seek(SILENT_END + offset);
     await expect(page.locator('#paper')).toHaveClass(/warn/);
     await expect(page.locator('#numeral')).toHaveText(numeral);
-    await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
+    await expect(page.locator('#warn-caption')).toHaveText('Keep typing or the draft is deleted.');
   }
   const warning = await page.evaluate(() => {
     const script = window.__run(document.querySelector('.script'));
@@ -1463,7 +1465,7 @@ test('the demo danger group clears when a new loop reaches typing', async ({ pag
   test.skip(info.project.use.reducedMotion === 'reduce', 'the static demo never loops');
   await page.clock.fastForward(SILENT_END + 150);
   await expect(page.locator('#warn')).toBeVisible();
-  await expect(page.locator('#warn-caption')).toHaveText('KEEP TYPING OR THE DRAFT IS DELETED.');
+  await expect(page.locator('#warn-caption')).toHaveText('Keep typing or the draft is deleted.');
   await page.locator('#landing .cta a[href="#trial"]').click();
   await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();

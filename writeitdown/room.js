@@ -23,7 +23,7 @@ const EXIT_HINT = {
   keyboard: 'Press Esc again to leave and delete the draft.',
   touch: 'Tap EXIT again to leave and delete the draft.'
 };
-const WARNING = 'KEEP TYPING OR THE DRAFT IS DELETED.';
+const WARNING = 'Keep typing or the draft is deleted.';
 // The first refused delete of a session names the rule once, centred just under the line being written,
 // for two seconds (D-100 moves D-077's notice out of the footer); later refusals only shake.
 const REFUSAL = 'You can only add the next word.';

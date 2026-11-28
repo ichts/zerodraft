@@ -36,7 +36,7 @@
 Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Codex）。
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
-- 第 6、8、9 条：待审。
+- 第 6、8、9、11 条：待审。
 
 ## 清单
 
@@ -60,8 +60,8 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 7. 三张状态卡统一中性底：并入第 2 条（退役 `--red-soft`/`--red-deep` 时必须一起改），断言在旧样式上已证明失败。
 - [x] 8. 手机端 header 与 H1 间距：删掉 ≤820px 时把 hero 顶距压到 4px 的覆盖，回到与桌面相同的 16px；新断言在 390x844、375x667、320x700 下要求 ≥16px（旧样式 4px、失败），61% 纸面下限的既有断言仍通过。
 - [x] 9. 房间顶栏 Buy 回到 D-115 的轻量样式（无填充、`--hair` 细边），落地页及其他页的 Buy 仍是 D-122 的实心墨色。phase4 断言房间 Buy 无填充（旧样式为墨色、失败）。
-- [ ] 10. 停止屏去掉角落 `0 words`。
-- [ ] 11. 警告句改句子式 `Keep typing or the draft is deleted.`。
+- [x] 10. 不改：停止屏角落的 `0 words` 是 D-043 明文写定的契约（「`0 words` after a wipe」），D-070 也保留了页脚；Mac 同样显示。只改网页会造成三端不一致，所以本轮不改。
+- [x] 11. 警告句改为 Mac 的句子式 `Keep typing or the draft is deleted.`，去掉 .04em 字距（房间与演示同改）；phase4 断言 `text-transform:none`、`letter-spacing:normal`（旧样式 .04em、失败）；DESIGN.md §12 同步。
 - [ ] 12. `/download/` 命令续行缩进、COPY 与下一段间距、`COPY` 改 `Copy`。
 - [ ] 12b. 房间里浏览器「后退」会清空草稿（Codex 在第 0 条复审中发现，`room.js:369` 的 `hashchange`）：改为与 Esc 相同的两步确认，或说明为何不可行。
 - [ ] 13. 网页文档同步：`writeitdown/AGENTS.md`、`docs/design-system/tokens.json` 重导、`docs/design/canvas.json` 看板。

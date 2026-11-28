@@ -178,7 +178,7 @@ import { landingSound } from './sound.js';
       setPhase("warn");
       setWash((t - SILENT_END) / WARN_MS);
       numeralEl.textContent = String(3 - Math.floor((t - SILENT_END) / 1000));
-      captionEl.textContent = "KEEP TYPING OR THE DRAFT IS DELETED.";
+      captionEl.textContent = "Keep typing or the draft is deleted.";
       warnEl.hidden = false;
       stoppedEl.hidden = true;
       renderDraft(full());

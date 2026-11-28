@@ -410,7 +410,7 @@ Rules that follow from the table:
 
 - **Tracking.** The kept heading and the failure headline are untracked on both surfaces. The machine
   voice's own tracking stays where the Mac has it: `.02em` on the kept receipt (the stopped screen's `Draft deleted.` line is untracked), `.04em` on
-  the warning caption and the pill labels.
+  the pill labels. The warning caption is the Mac's sentence, `Keep typing or the draft is deleted.`, untracked.
 - **Every face is served by the site.** `writeitdown/fonts/` holds the woff2 files and their OFL texts,
   `writeitdown/fonts/build-fonts.py` builds them from pinned upstream files, and `fonts.css` /
   `fonts-cjk.css` are generated from it. No page requests a font host: a third-party font that fails must

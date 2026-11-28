@@ -1568,13 +1568,13 @@ test('nothing in the room can throw a live draft away in one act', async ({ page
   const text = await editor(page).inputValue();
   // The warning names the act this width can perform.
   await expect(page.locator('#exit')).toHaveText((await touchInput(page)) ? 'Exit' : 'Esc to exit');
-  // Both Mac links leave this document alone, so a click on them cannot take the draft down.
-  const macLinks = await page.evaluate(() => [...document.querySelectorAll('#room a[href="download/"]')]
-    .map(link => ({ target: link.target, rel: link.rel })));
-  expect(macLinks.length, 'the room carries the Mac link in the header or the exit row').toBeGreaterThan(0);
-  for (const link of macLinks) {
-    expect(link.target, 'the Mac link opens beside the room, not over it').toBe('_blank');
-    expect(link.rel).toContain('noopener');
+  // Every link in the room but the brand leaves this document alone, so no click can take the draft down.
+  const links = await page.evaluate(() => [...document.querySelectorAll('#room a[href]:not(#room-brand)')]
+    .map(link => ({ href: link.getAttribute('href'), target: link.target, rel: link.rel })));
+  expect(links.filter(link => link.href === 'download/').length, 'the room still offers the app').toBeGreaterThan(0);
+  for (const link of links) {
+    expect(link.target, `${link.href} opens beside the room, not over it`).toBe('_blank');
+    expect(link.rel, link.href).toContain('noopener');
   }
   // The brand is the same act as EXIT: the first click arms the confirmation and keeps the draft.
   await page.locator('#room-brand').click();

@@ -1,6 +1,8 @@
 /**
  * [INPUT]: AppKit, DesignSystem/Colors, DesignSystem/Spacing, DesignSystem/SurfaceViews.
- * [OUTPUT]: After-language segmented control (a segment never compresses below its label), rounded top-edge fill bar and status line used by the picker, room, activation, settings and kept sheet.
+ * [OUTPUT]: After-language segmented control (a segment never compresses below its label), rounded top-edge fill bar,
+ *           status line, and FirstLineTextField (the license field: text on its vertical centre, card surface and
+ *           hairline instead of the system bezel) used by the picker, room, activation, settings and kept sheet.
  * [POS]: Shared After-language controls; keyboard reachability stays AppKit's, focus rings come from InkFocus.
  * [PROTOCOL]: Change this header, then check FirstLine/AGENTS.md.
  */
@@ -354,5 +356,67 @@ final class FirstLineStatusView: NSView {
 
     private func applyTone() {
         label.textColor = tone == .bad ? FirstLineColors.redTextNSColor : FirstLineColors.chromeNSColor
+    }
+}
+
+// MARK: - Text field
+
+/// The license field: the text sits on the field's vertical centre, and the field draws the card's own surface and
+/// hairline. The system rounded bezel pins the text to the top of a 44 pt field and paints its own grey (D-084).
+@MainActor
+final class FirstLineTextField: NSTextField {
+    override class var cellClass: AnyClass? {
+        get { FirstLineCentredFieldCell.self }
+        set {}
+    }
+
+    init(font: NSFont, placeholder: String? = nil) {
+        super.init(frame: .zero)
+        self.font = font
+        placeholderString = placeholder
+        isBezeled = false
+        isBordered = false
+        drawsBackground = false
+        textColor = FirstLineColors.inkNSColor
+        focusRingType = .default
+        wantsLayer = true
+        layer?.cornerRadius = FirstLineRadius.control
+        layer?.borderWidth = 1
+        translatesAutoresizingMaskIntoConstraints = false
+        cell?.isScrollable = true
+        cell?.wraps = false
+        refreshSurface()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshSurface()
+    }
+
+    override var focusRingMaskBounds: NSRect { bounds }
+
+    override func drawFocusRingMask() {
+        NSBezierPath(roundedRect: bounds, xRadius: FirstLineRadius.control, yRadius: FirstLineRadius.control).fill()
+    }
+
+    private func refreshSurface() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = FirstLineColors.sheetNSColor.cgColor
+            layer?.borderColor = FirstLineColors.hairStrongNSColor.cgColor
+        }
+    }
+}
+
+/// Places one line of text on the cell's vertical centre, for drawing and for the field editor alike.
+final class FirstLineCentredFieldCell: NSTextFieldCell {
+    override func drawingRect(forBounds rect: NSRect) -> NSRect {
+        let base = super.drawingRect(forBounds: rect)
+        let line = ceil(NSLayoutManager().defaultLineHeight(for: font ?? .systemFont(ofSize: NSFont.systemFontSize)))
+        let inset: CGFloat = 12
+        return NSRect(x: rect.minX + inset, y: rect.minY + floor((rect.height - line) / 2),
+                      width: max(0, min(base.width, rect.width - inset * 2)), height: line)
     }
 }

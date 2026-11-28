@@ -195,11 +195,7 @@ final class SettingsViewController: NSViewController {
         entry.addArrangedSubview(divider)
         entry.setCustomSpacing(14, after: divider)
 
-        let field = NSTextField(string: "")
-        field.placeholderString = AppState.licenseFieldPlaceholder
-        field.font = FirstLineTypography.uiNSFont
-        field.focusRingType = .default
-        field.translatesAutoresizingMaskIntoConstraints = false
+        let field = FirstLineTextField(font: FirstLineTypography.uiNSFont, placeholder: AppState.licenseFieldPlaceholder)
         field.heightAnchor.constraint(equalToConstant: 44).isActive = true
         licenseField = field
         entry.addArrangedSubview(field)

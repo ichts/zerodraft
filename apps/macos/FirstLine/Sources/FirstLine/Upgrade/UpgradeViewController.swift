@@ -71,15 +71,7 @@ final class UpgradeViewController: NSViewController {
                            font: FirstLineTypography.smallSemiboldNSFont, color: FirstLineColors.chromeNSColor)
         fieldLabel.alignment = .left
 
-        licenseField = NSTextField(string: "")
-        licenseField.translatesAutoresizingMaskIntoConstraints = false
-        licenseField.font = FirstLineTypography.fieldNSFont
-        licenseField.textColor = FirstLineColors.inkNSColor
-        licenseField.backgroundColor = FirstLineColors.sheetNSColor
-        licenseField.drawsBackground = true
-        licenseField.isBezeled = true
-        licenseField.bezelStyle = .roundedBezel
-        licenseField.focusRingType = .default
+        licenseField = FirstLineTextField(font: FirstLineTypography.fieldNSFont)
         licenseField.setAccessibilityLabel("License key")
         licenseField.target = self
         licenseField.action = #selector(activateTapped)

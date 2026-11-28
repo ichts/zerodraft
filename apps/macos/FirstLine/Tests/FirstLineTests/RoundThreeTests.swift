@@ -101,6 +101,34 @@ struct RoundThreeTests {
         #expect(abs(gap - 20) < 1, "status to web trial is \(gap) pt")
     }
 
+    /// Q-14, D-084: the license field on the activation card and in Settings sets its text on the field's vertical
+    /// centre and draws the card's own surface and hairline, not the system bezel's cool grey.
+    @Test func theLicenseFieldIsCentredAndDrawsTheCardSurface() throws {
+        let upgrade = UpgradeViewController(appState: try trialState(used: 3))
+        let settings = SettingsViewController(appState: try trialState(used: 3))
+        for controller in [upgrade, settings] as [NSViewController] {
+            let window = makeWindow(controller, appearance: .darkAqua)
+            defer { window.orderOut(nil) }
+            let field = try #require(descendants(of: controller.view, of: NSTextField.self)
+                .first { $0.isEditable && !$0.isHiddenOrHasHiddenAncestor }, "\(controller) has no license field")
+            #expect(!field.isBezeled, "\(controller): the field draws the system bezel")
+            let cell = try #require(field.cell)
+            let text = cell.drawingRect(forBounds: field.bounds)
+            let line = ceil(NSLayoutManager().defaultLineHeight(for: try #require(field.font)))
+            let above = text.minY - field.bounds.minY
+            let below = field.bounds.maxY - (text.minY + line)
+            #expect(abs(above - below) <= 1, "\(controller): text sits \(above) pt from the top and \(below) pt from the bottom")
+            // The caret line while typing sits where the text is drawn.
+            window.makeFirstResponder(field)
+            let editor = try #require(field.currentEditor())
+            let editing = field.convert(editor.bounds, from: editor)
+            #expect(abs(editing.midY - (text.minY + line / 2)) <= 2, "\(controller): the field editor sits at \(editing), the text at \(text)")
+            let fill = try #require(field.layer?.backgroundColor.flatMap { NSColor(cgColor: $0) })
+            #expect(resolved(fill, .darkAqua) == resolved(FirstLineColors.sheetNSColor, .darkAqua),
+                    "\(controller): the field is not the card surface")
+        }
+    }
+
     // MARK: - Picker access line
 
     @Test func licensedPickerHidesAccessLineAndTrialPickerKeepsIt() throws {

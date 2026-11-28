@@ -37,7 +37,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
 - 第 6、8、9、11、12、12b、13 条：待审。
-- 第 14（含 20）、15、16、17 条：待审。
+- 第 14（含 20）、15、16、17、18 条：待审。
 
 ## 清单
 
@@ -73,7 +73,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 15. D-126 焦点环：墨色主按钮与其他控件一样，用 3pt 外偏移的 2pt 墨色环（卡片上为页面墨、纸上为纸墨）；三个测试先在旧代码上失败；`swift test` 400 项通过；快照 `picker-focus`、`room-copy-focus` 白/黑两纸目检可见。
 - [x] 16. 激活卡：Activate 药丸预留 `Activate`/`Activating`/`Begin` 中最宽的宽度；入口卡始终保留一行反馈高度，`Checking your license key…` 出现时卡片不动。新测试 `activatingMovesNothing` 在旧代码上失败（宽 +13pt、Buy 右移 7pt、卡片位移）。
 - [x] 17. 结账不可用时状态行到 web 试用按钮的间距从 6pt 改为 20pt（与可结账时的说明行一致）；新测试在旧值上失败（6pt）。
-- [ ] 18. License 输入框文字垂直居中，去冷灰 bezel。
+- [x] 18. License 输入框：新增 `FirstLineTextField`（Controls.swift），文字与编辑光标都在垂直中线，画卡片自己的底色与 `hairStrong` 细边、8pt 圆角，不再用系统 roundedBezel；激活卡与 Settings 共用。新测试在旧字段上失败（有 bezel、上下差 16pt、无卡片底色）。
 - [ ] 19. Settings 标签句子式大写，accessibility label 同步。
 - [x] 20. `SessionViewController.swift` L3 头注释：拒删提示位置改为 D-100 的「书写行下方」，并去掉换纸开关描述；并入第 14 条提交。
 - [ ] 21. 快照缺陷：会话条没画出、kept 旧帧、checking fixture。

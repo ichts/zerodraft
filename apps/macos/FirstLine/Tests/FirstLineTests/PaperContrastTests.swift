@@ -2,7 +2,7 @@ import AppKit
 import Testing
 @testable import WriteItDown
 
-/// The two sheets (D-124), measured: each paper's tone and roles, the 7:1 floor of every word on the sheet and on
+/// The two sheets (D-124, values D-130), measured: each paper's tone and roles, the 7:1 floor of every word on the sheet and on
 /// both washes, the numeral's large-text floor, and a rendered sheet that is one flat tone. The Mac half of the web's
 /// paper.spec.mjs.
 @MainActor
@@ -48,8 +48,8 @@ struct PaperContrastTests {
 
     private static let sheet: [TestPaper: (tone: String, ink: String, quiet: String, red: String, wash: String,
                                            deep: String, history: [CGFloat])] = [
-        .white: ("#ffffff", "#1c1917", "#3f3b36", "#b00c15", "#f2f2f2", "#e6e6e6", [1, 0.22, 0.07]),
-        .black: ("#111111", "#ededed", "#c2bfb7", "#ff453a", "#1b1b1b", "#262626", [1, 0.17, 0.065]),
+        .white: ("#fcfcfa", "#45433d", "#4b4943", "#9a5255", "#f4f3f0", "#eae9e5", [1, 0.26, 0.084]),
+        .black: ("#1c1c1a", "#dcdad3", "#bdbbb3", "#d08a8c", "#232321", "#2a2a27", [1, 0.172, 0.061]),
     ]
 
     @Test(arguments: TestPaper.allCases)

@@ -231,13 +231,13 @@ struct EditorFocusTests {
         #expect(abs(paragraph.minimumLineHeight - 44.8) <= 0.001)
     }
 
-    /// The ladder is solved per paper (D-124): white steps 1, .22, .07 and black 1, .17, .065, and an appearance
+    /// The ladder is solved per paper (D-092 targets, D-130 values): white steps 1, .26, .084 and black 1, .172, .061, and an appearance
     /// change re-steps every completed line, so no step from the other paper stays baked into the storage.
     @Test func historyLadderFollowsThePaper() throws {
         let textView = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
         textView.configureSessionTypography()
         textView.loadRestoredText("one\ntwo\nthree")
-        for (paper, ladder) in [(TestPaper.white, [0.07, 0.22]), (.black, [0.065, 0.17]), (.white, [0.07, 0.22])] {
+        for (paper, ladder) in [(TestPaper.white, [0.084, 0.26]), (.black, [0.061, 0.172]), (.white, [0.084, 0.26])] {
             textView.appearance = NSAppearance(named: paper.appearance)
             textView.viewDidChangeEffectiveAppearance()
             #expect(abs(try lineAlpha(in: textView, lineIndex: 0) - ladder[0]) < 0.001, "\(paper)")
@@ -437,7 +437,7 @@ struct EditorFocusTests {
         #expect(abs(colour.alphaComponent - editor.historyLineOpacities[1]) < 0.001)
     }
 
-    /// D-092: every Return line carries exactly its step - 1, .22, .07 - and all rows of a wrapped line carry one.
+    /// D-092: every Return line carries exactly its step - 1, .26, .084 on white (D-130) - and all rows of a wrapped line carry one.
     @Test
     func everyReturnLineGetsExactlyItsStep() throws {
         let editor = AppendOnlyTextView(frame: NSRect(x: 0, y: 0, width: 300, height: 400))
@@ -445,7 +445,7 @@ struct EditorFocusTests {
         editor.configureSessionTypography()
         editor.loadRestoredText("Oldest line that is long enough to wrap onto several rows of the narrow column.\nThree back.\nTwo back is long enough to wrap onto a second row.\nOne back.\nLive")
         let rows = try sentenceRows(in: editor)
-        #expect(rows.map { $0.alphas } == [[0], [0], [0.07], [0.22], [1]])
+        #expect(rows.map { $0.alphas } == [[0], [0], [0.084], [0.26], [1]])
         #expect(rows[2].rows >= 2 && rows[2].alphas.count == 1, "a wrapped line keeps one value on every row")
     }
 

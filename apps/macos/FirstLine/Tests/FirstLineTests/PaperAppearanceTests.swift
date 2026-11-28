@@ -113,11 +113,11 @@ struct PaperAppearanceTests {
         let black = try sheetColour()
 
         #expect(paper.paints > builds, "the sheet was not repainted")
-        #expect(white == [0xFF, 0xFF, 0xFF], "the white sheet is \(white)")
-        #expect(black == [0x11, 0x11, 0x11], "the sheet stayed \(black)")
+        #expect(white == [0xFC, 0xFC, 0xFA], "the white sheet is \(white)")
+        #expect(black == [0x1C, 0x1C, 0x1A], "the sheet stayed \(black)")
         let ink = try #require(fixture.editor.textStorage?.attribute(.foregroundColor, at: 4, effectiveRange: nil) as? NSColor)
-        #expect(srgb(ink, in: fixture.editor) == [0xED, 0xED, 0xED], "the live line kept the white paper's ink")
-        #expect(abs(try historyAlpha(fixture.editor) - 0.17) < 0.001, "the history kept the white paper's step")
+        #expect(srgb(ink, in: fixture.editor) == [0xDC, 0xDA, 0xD3], "the live line kept the white paper's ink")
+        #expect(abs(try historyAlpha(fixture.editor) - 0.172) < 0.001, "the history kept the white paper's step")
         #expect(fixture.engine.text == "one\ntwo")
         fixture.window.orderOut(nil)
     }

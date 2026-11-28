@@ -1,5 +1,5 @@
 /**
- * [INPUT]: writeitdown/tokens.css (D-124: the white and the black paper, one red per mode) and the window's effective
+ * [INPUT]: writeitdown/tokens.css (D-124: the white and the black paper, one red per mode; values D-130) and the window's effective
  *          appearance, which follows the system.
  * [OUTPUT]: FirstLineColors - dynamic AppKit roles for the page (page, sheet, ink, mute, chrome, hairlines, sheet ring,
  *           red, on-ink) and for the writing sheet (paper tone, paper ink, quiet, the numeral red, wash, deep wash,
@@ -29,24 +29,24 @@ enum FirstLineColors {
         let shadow: UInt32
 
         static let white = Palette(
-            page: 0xF7F7F5, sheet: 0xFFFFFF, tagBackground: 0xF2F2F0,
-            ink: 0x1C1917, mute: 0x6B655C, onInk: 0xFFFFFF,
-            hairBase: 0x1C1917, hair: 0.10, hairStrong: 0.16,
-            red: 0xB00C15, redText: 0xB00C15,
-            paper: 0xFFFFFF, paperInk: 0x1C1917, paperQuiet: 0x3F3B36, paperDanger: 0xB00C15,
-            paperWash: 0xF2F2F2, paperWashDeep: 0xE6E6E6,
-            paperHairBase: 0x1C1917, paperHair: 0.12, paperHairStrong: 0.22,
-            history: [1, 0.22, 0.07], shadow: 0x1C1917)
+            page: 0xF3F2EF, sheet: 0xFCFCFA, tagBackground: 0xEDEDEA,
+            ink: 0x45433D, mute: 0x6E6D68, onInk: 0xFCFCFA,
+            hairBase: 0x45433D, hair: 0.12, hairStrong: 0.20,
+            red: 0x9A5255, redText: 0x9A5255,
+            paper: 0xFCFCFA, paperInk: 0x45433D, paperQuiet: 0x4B4943, paperDanger: 0x9A5255,
+            paperWash: 0xF4F3F0, paperWashDeep: 0xEAE9E5,
+            paperHairBase: 0x45433D, paperHair: 0.14, paperHairStrong: 0.24,
+            history: [1, 0.26, 0.084], shadow: 0x45433D)
 
         static let black = Palette(
-            page: 0x000000, sheet: 0x111111, tagBackground: 0x1B1B1B,
-            ink: 0xEDEDED, mute: 0xA3A3A3, onInk: 0x111111,
-            hairBase: 0xEDEDED, hair: 0.10, hairStrong: 0.18,
-            red: 0xFF453A, redText: 0xFF453A,
-            paper: 0x111111, paperInk: 0xEDEDED, paperQuiet: 0xC2BFB7, paperDanger: 0xFF453A,
-            paperWash: 0x1B1B1B, paperWashDeep: 0x262626,
-            paperHairBase: 0xEDEDED, paperHair: 0.16, paperHairStrong: 0.30,
-            history: [1, 0.17, 0.065], shadow: 0x000000)
+            page: 0x141413, sheet: 0x1C1C1A, tagBackground: 0x232321,
+            ink: 0xDCDAD3, mute: 0xA3A29B, onInk: 0x1C1C1A,
+            hairBase: 0xDCDAD3, hair: 0.10, hairStrong: 0.18,
+            red: 0xD08A8C, redText: 0xD08A8C,
+            paper: 0x1C1C1A, paperInk: 0xDCDAD3, paperQuiet: 0xBDBBB3, paperDanger: 0xD08A8C,
+            paperWash: 0x232321, paperWashDeep: 0x2A2A27,
+            paperHairBase: 0xDCDAD3, paperHair: 0.16, paperHairStrong: 0.30,
+            history: [1, 0.172, 0.061], shadow: 0x000000)
     }
 
     /// Whether an appearance shows the black paper (darkAqua) rather than the white one (aqua).

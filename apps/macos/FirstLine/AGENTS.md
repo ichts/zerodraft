@@ -60,7 +60,7 @@ Sources/FirstLine/DesignSystem/Typography.swift: 全部拉丁 role 都是 bundle
 Sources/FirstLine/DesignSystem/FirstLineButtons.swift: After 语言主按钮（48 ink pill）、次按钮（outline pill，默认 44，成稿重开 48）和 quiet link；所有药丸（含 ink 主按钮）都用外偏移 3pt 的 2pt ink 焦点环（D-126）；药丸水平压缩抗性为 required（永不窄于自身标签）；房间主按钮有 160ms live hover/press 反馈与 reduced-motion；updateLayer 只改 layer 视觉属性，绝不在其中设 content 属性（避免 _NSViewLayoutFeedbackLoop 无限回环卡死）。
 Sources/FirstLine/DesignSystem/InkFocus.swift: 共享 ink focus ring 安装器与可测协议；按钮、分段、popup、switch 和 checkbox 共用一圈（InkFocusRing 一份实现）外偏移的 ink 焦点环，主 ink pill 也一样（D-126），禁用系统蓝环。
 Sources/FirstLine/DesignSystem/FloodCanvasView.swift: appearance-aware wall/paper 背景 NSView；updateLayer 里重解析 dynamic NSColor.cgColor（避免静态 cgColor 在暗色下解析错）。
-Sources/FirstLine/DesignSystem/PaperSheetView.swift: 书写纸本体（D-124）：一个纯色（白纸 `#ffffff` 或黑纸 `#111111`，随窗口外观），带纸环与圆角裁切；无纹理，只在尺寸或外观变化时重绘，绝不随输入重绘。
+Sources/FirstLine/DesignSystem/PaperSheetView.swift: 书写纸本体（D-124，色值 D-130）：一个纯色（白纸 `#fcfcfa` 或黑纸 `#1c1c1a`，随窗口外观），带纸环与圆角裁切；无纹理，只在尺寸或外观变化时重绘，绝不随输入重绘。
 Sources/FirstLine/DesignSystem/BundledFonts.swift: 打包字体注册：Allo 拉丁子集（OFL-1.1，与 web `allo-latin.woff2` 逐字节相同）启动即注册并按 `AlloVariable-Regular` 前缀校验；Resource Han Rounded（OFL-1.1，web 的 GB2312 子集）只在首个中文字符出现时注册（`asksForCJK` / `ensureCJKRegistered`），拉丁、重音与希腊文从不加载它。
 Sources/FirstLine/DesignSystem/Spacing.swift: 4-pt 间距与 ctl 8 / sheet 4（web `--r-sheet`，D-120 取代 D-102 的 16）/ card / stage 圆角 token。
 Sources/FirstLine/DesignSystem/SurfaceViews.swift: FirstLineShadowView（每种纸自己的 `--paper-shadow`：首层为 ring，spread 用内缩模拟）与 FirstLineCardView（白/暗 sheet + shadow + content insets）。`reach` 把阴影半径与偏移等比缩到纸张外沿的留白内，窗口边缘不会把阴影切成硬边（D-102）。
@@ -81,7 +81,7 @@ Tests/FirstLineTests/BrandTests.swift: 开始屏 split-W lockup、“?”规则�
 Tests/FirstLineTests/CheckoutClientTests.swift: 本地 URLProtocol fixture 验证 POST 格式、hosted URL、非 Stripe/重定向/错误拒绝，以及 AppState 成功打开 hosted URL、失败回退 mac.html。
 Tests/FirstLineTests/CheckoutFixtures.swift: CheckoutClientTests 的测试替身（MockCheckoutClient）；仅测试目标，不建真实会话、不扣款。
 Tests/FirstLineTests/DesignTokenTests.swift: 直接读 `writeitdown/tokens.css` 的白纸与黑纸（单一来源，D-124），逐个比对 Mac 页面与纸张角色，漂移时同时报出两边的值。
-Tests/FirstLineTests/PaperContrastTests.swift: 两种纸的角色等于 D-124 的值；书写与 quiet 在纸、wash、deep wash 上都过 7:1，警告数字（大字）在最深 wash 上过 3:1；历史行两档在两种纸上同为约 1.57:1、1.15:1；渲染出的纸是一个纯色。
+Tests/FirstLineTests/PaperContrastTests.swift: 两种纸的角色等于 D-130 的值；书写与 quiet 在纸、wash、deep wash 上都过 7:1，警告数字（大字）在最深 wash 上过 3:1；历史行两档在两种纸上同为约 1.57:1、1.15:1；渲染出的纸是一个纯色。
 Tests/FirstLineTests/PaperAppearanceTests.swift: 纸张跟随系统外观：窗口不设自己的 appearance；外观切换不是输入（草稿、相位、会话与静默计时不变，5 s 警告 / 8 s 删除照旧，焦点留在书写）；白到黑整屋重绘；两种纸、四个相位里纸上的每个字都用纸的角色。
 Tests/FirstLineTests/TypographyParityTests.swift: Mac 字体集（D-057，字体 D-120、D-125）：字体平滑已关（与 Web antialiased 同粗细，D-098）、各 role 解析出的字体、bundle 里只剩共享字体、中文 cascade 为 Resource Han Rounded 且只在首个中文字符时注册、clock 等宽数字、kept 标题无 tracking 与收据 0.02em、以及 `design/type-baseline.json` 的 advance；Web 的 `writeitdown/qa/shared-type-baseline.json` 是同样的数（D-125）。
 Tests/FirstLineTests/SnapshotTests.swift: 真实 AppKit surface 在 1040x720 的白纸与黑纸（含 typing fade、exit hint、reduced warning、focus、active/entry 状态、带更新开关的 Settings）PNG 快照与 page/sheet/kept 焦点像素断言；WID_SNAPSHOT_DIR 写证据，不开窗口捕获。

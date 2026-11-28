@@ -372,7 +372,7 @@ struct ReviewRoundTests {
 
         // And it reaches the frame: the rendered white sheet is darker, in grey, against the same patch before
         // the alarm.
-        #expect(Double(plain.greenComponent - washed.greenComponent) > 0.015,
+        #expect(Double(plain.greenComponent - washed.greenComponent) > 0.008,
                 "the warning paper is not greyed: \(washed) against \(plain)")
         #expect(abs(Double(washed.redComponent - washed.greenComponent)) < 0.01, "the wash is not grey: \(washed)")
         #expect(washed.greenComponent < 0.98)

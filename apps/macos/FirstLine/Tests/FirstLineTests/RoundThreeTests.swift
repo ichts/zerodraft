@@ -586,11 +586,10 @@ struct RoundThreeTests {
                 + (paper.bounds.maxY - paper.convert(NSPoint(x: 0, y: baseline), from: editor).y)
             let x = (room.view.bounds.midX - 250)...(room.view.bounds.midX + 250)
             let y = (baselineFromTop - 60)...(paperTopFromRoomTop + paper.bounds.height - 40)
-            // Ink is the product's near-black (#1c1917, #63140b); the Wheat paper's grain is texture, and on
-            // the washed sheet its darkest flecks still sit above 0.4 luma, so the split is 0.3 (D-056).
+            // Ink, quiet and the red numeral (D-130) all sit below 0.4 luma; the flat washed sheet sits above 0.9.
             let runs = inkRowRuns(in: rep, scale: scale, x: x, y: y) { colour in
                 let luma = 0.2126 * colour.redComponent + 0.7152 * colour.greenComponent + 0.0722 * colour.blueComponent
-                return luma < 0.3
+                return luma < 0.5
             }
             #expect(runs.count >= 3, "expected writing line, numeral and caption ink at \(size), got \(runs)")
             guard runs.count >= 3 else { break }

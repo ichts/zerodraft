@@ -2,8 +2,8 @@ import { doorSettled } from './door.mjs';
 // D-077, D-088 and D-092: the room's history fades per line ended by Return, and the first refused delete of a session says why.
 //
 // Fade: the unit is the line ended by Return, never a sentence (D-088). Every row of one line shares one measured opacity
-// (the ink layer's span, read from the computed style and from the pixels). The steps are D-092's: live 1, one back .22,
-// two back .07, older gone, per theme; the lines above dissolve to their next step over 320 ms when Return lands. The
+// (the ink layer's span, read from the computed style and from the pixels). The steps are D-092's: live 1, one back .26,
+// two back .084 (.172 / .061 on black, D-130), older gone; the lines above dissolve to their next step over 320 ms when Return lands. The
 // dimmed lines are exempt from the 7:1 floor (the captain's exception); the live line keeps the full ink. The aperture is
 // a hard clip, so a partial line is cut at its edge and never given an alpha.
 // Refusal: the 200 ms shake stays on every refusal; the first refused delete of a session also says the rule once,

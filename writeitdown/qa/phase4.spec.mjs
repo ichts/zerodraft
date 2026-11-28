@@ -1341,7 +1341,7 @@ test('demo loop: warning group, cut, and the failure screen in the status slot',
   await expect(page.locator('#prev-0')).toHaveText(LINES[2]);
   await expect(page.locator('#cur')).toHaveText(LINES[3]);
   // The demo's history is the room's: the theme's first history step one line up, the second two lines up
-  // (D-092: .22 and .07 light, .16 and .05 dark, exempt from 7:1).
+  // (D-092 targets, D-130 values: .26 and .084 light, .172 and .061 dark, exempt from 7:1).
   const ladder = await page.evaluate(() => {
     const sheet = getComputedStyle(document.querySelector('#paper'));
     return {

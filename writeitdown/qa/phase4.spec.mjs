@@ -1563,6 +1563,25 @@ test('focus is a ring, never a re-cut of the control it lands on', async ({ page
   await capture(page, info, 'focus-exit');
 });
 
+test('the browser Back is the same two acts as Escape while words are on the sheet', async ({ page }) => {
+  await page.goto('./');
+  await page.locator('#landing .cta a[href="#trial"]').click();
+  await expect(page.locator('#room')).toBeVisible();
+  await page.keyboard.insertText('A draft that has to survive the Back button.');
+  const text = await editor(page).inputValue();
+  // The first Back keeps the room and the draft, and arms the same confirmation as Escape.
+  await page.goBack();
+  await expect(page.locator('#room')).toBeVisible();
+  await expect(page.locator('#landing')).toBeHidden();
+  await expect(editor(page)).toHaveValue(text);
+  await expect(page.locator('#exit-hint')).toHaveText(await exitHintFor(page));
+  expect(new URL(page.url()).hash, 'the room keeps its own address').toBe('#trial');
+  // The second Back inside the confirmation leaves.
+  await page.goBack();
+  await expect(page.locator('#room')).toBeHidden();
+  await expect(page.locator('#landing')).toBeVisible();
+});
+
 test('nothing in the room can throw a live draft away in one act', async ({ page }, info) => {
   await enter(page);
   await page.keyboard.insertText('A draft that has to survive a stray click.');

@@ -36,7 +36,7 @@
 Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Codex）。
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
-- 第 6、8、9、11、12 条：待审。
+- 第 6、8、9、11、12、12b 条：待审。
 
 ## 清单
 
@@ -63,7 +63,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 10. 不改：停止屏角落的 `0 words` 是 D-043 明文写定的契约（「`0 words` after a wipe」），D-070 也保留了页脚；Mac 同样显示。只改网页会造成三端不一致，所以本轮不改。
 - [x] 11. 警告句改为 Mac 的句子式 `Keep typing or the draft is deleted.`，去掉 .04em 字距（房间与演示同改）；phase4 断言 `text-transform:none`、`letter-spacing:normal`（旧样式 .04em、失败）；DESIGN.md §12 同步。
 - [x] 12. `/download/`：文件名续行去掉 0.5ch 内缩，与 `shasum` 同一左缘；Copy 控件与下一段留 12px；`COPY`/`COPIED` 改为句子式 `Copy`/`Copied`（与房间的 `Copy text`/`Copied` 一致）。mac.spec 新断言在旧样式上失败（偏 3.9px、间距 0）。
-- [ ] 12b. 房间里浏览器「后退」会清空草稿（Codex 在第 0 条复审中发现，`room.js:369` 的 `hashchange`）：改为与 Esc 相同的两步确认，或说明为何不可行。
+- [x] 12b. 房间里浏览器「后退」：有字（或在 kept 屏）时，第一次后退把 `#trial` 推回历史并武装与 Esc 相同的确认，2 秒内第二次后退才离开；空房间照常直接离开。phase4 新用例在旧代码上失败（房间被隐藏）。
 - [ ] 13. 网页文档同步：`writeitdown/AGENTS.md`、`docs/design-system/tokens.json` 重导、`docs/design/canvas.json` 看板。
 
 ### C. macOS

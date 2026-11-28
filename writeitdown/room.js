@@ -489,6 +489,19 @@ for (const entry of document.querySelectorAll('#landing a[href="#trial"]')) {
   }
 }
 
+// The browser's Back is the same act as Escape: while there are words to lose, the first Back puts the room back on
+// the history and arms the confirmation, and a second Back inside it leaves (Q-29).
+function backOut() {
+  const leaving = location.hash !== '#trial' && !room.hidden;
+  const armed = exitArmedAt !== null && performance.now() - exitArmedAt <= CONFIRM_MS;
+  if (leaving && !armed && (editor.value || state.phase === 'kept')) {
+    history.pushState(null, '', '#trial');
+    requestExit();
+    return;
+  }
+  route();
+}
+
 function exit() {
   history.replaceState(null, '', location.pathname + location.search);
   route();
@@ -623,7 +636,7 @@ window.visualViewport?.addEventListener('resize', () => { syncExitCopy(); sizeCo
 document.fonts.ready.then(() => { syncExitCopy(); sizeCopyFloor(); slot.invalidate(); fitEditor(); placeStatus(); });
 touchInput.addEventListener('change', () => { syncExitCopy(); slot.invalidate(); placeStatus(); });
 reduced.addEventListener('change', tick);
-window.addEventListener('hashchange', route);
+window.addEventListener('hashchange', backOut);
 window.addEventListener('pagehide', reset);
 window.addEventListener('pageshow', event => { if (event.persisted) route(); });
 document.addEventListener('visibilitychange', tick);

@@ -36,6 +36,7 @@
 Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Codex）。
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
+- 第 6 条：待审。
 
 ## 清单
 
@@ -55,7 +56,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
 - [x] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
 - [x] 5. Pricing 文案：价格、`no subscription`、`3 free sessions` 各说一次（事实行不再重复价格），`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
-- [ ] 6. Pricing 标题与价格间距为 0 的根因修复。
+- [x] 6. Pricing 标题与价格间距为 0：根因是 `.card p{margin:0}` 的优先级（0,1,1）高于 `.price-fig`（0,1,0），覆盖了 `margin-top`；选择器改为 `.mac-card .price-fig`。mac.spec 断言价格与标题间距 ≥16px，旧样式上为 0、失败。
 - [x] 7. 三张状态卡统一中性底：并入第 2 条（退役 `--red-soft`/`--red-deep` 时必须一起改），断言在旧样式上已证明失败。
 - [ ] 8. 手机端 header 与 H1 间距补足。
 - [ ] 9. 房间写作 / 警告时 Buy 用 D-115 轻量样式。

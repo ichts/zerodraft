@@ -125,6 +125,7 @@ test('the Pricing block shows the price, one 48 px button row and two-line facts
       radii: [b.borderTopLeftRadius, d.borderTopLeftRadius], buyFill: b.backgroundColor, doorFill: probe.backgroundColor, dlFill: d.backgroundColor,
       buyText: buy.textContent, downloadText: download.textContent,
       headingTop: box(mac.querySelector('h2')).top, firstRowTop: box(li).top,
+      priceGap: box(mac.querySelector('.price-amt')).top - box(mac.querySelector('h2')).bottom,
       labelCols: new Set(labels.map(el => Math.round(el.getBoundingClientRect().width))).size, labelWidth: box(label).width,
       longest: Math.max(...labels.map(el => { const r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width; })),
       lines, priceSize: parseFloat(getComputedStyle(mac.querySelector('.price-amt')).fontSize), headingSize: parseFloat(getComputedStyle(mac.querySelector('h2')).fontSize),
@@ -134,6 +135,7 @@ test('the Pricing block shows the price, one 48 px button row and two-line facts
   expect(read.amount, 'the price is the answer under Pricing').toBe('$4.99');
   expect(read.note, 'the muted line under the price').toBe('once · no subscription');
   expect(read.priceSize, 'the price is larger than the heading').toBeGreaterThan(read.headingSize);
+  expect(read.priceGap, 'the price keeps its own space under the heading').toBeGreaterThanOrEqual(16);
   expect(read.buyText).toBe('Buy for $4.99');
   expect(read.downloadText).toBe('Download for Mac (3 free sessions)');
   expect(read.heights, 'both buttons are 48 px').toEqual([48, 48]);

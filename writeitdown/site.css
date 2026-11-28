@@ -288,7 +288,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
    label, so the descriptions get the rest. */
 .home .mac-card{padding:28px;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:28px;align-items:start}
 .mac-card h2{text-align:left;font-size:clamp(30px,3.6vw,44px)}
-.price-fig{margin:var(--s5) 0 0;display:grid;gap:var(--s1)}
+.mac-card .price-fig{margin:var(--s5) 0 0;display:grid;gap:var(--s1)}
 .price-amt{font:var(--w-display) clamp(52px,12.8vw,96px)/1 var(--serif);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--ink)}
 .price-note{font:400 var(--t-ui)/1.4 var(--sans);color:var(--mute)}
 .mac-card .actions{display:flex;flex-wrap:wrap;gap:var(--s3);margin-top:var(--s5)}

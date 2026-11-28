@@ -2727,3 +2727,45 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 - Tests: `qa/paper.spec.mjs` pins the white tone, the white-sheet wash and the absence of any light grain (the dark
   grain tests are unchanged); `qa/history-fade.spec.mjs` measures its contrast ladder against white.
 - Supersedes: D-069's Wheat tone and grain for the light web sheet only.
+
+## D-124: two papers, white and black, and one red, on every surface
+
+- Date: 2026-11-28. Captain, about the homepage demo sheet: "I don't like the paper colour in the middle ... I
+  just want it white and simple", then "two modes are enough: white, or black", pointing at the near-white sheet
+  that shipped before #71 (9447d99). On the Artideck board `white-black-paper` the captain then rejected every
+  current red ("in light and dark, all the reds look strange") and chose option B: the paper turns grey under the
+  warning, and red stays only on the warning numeral and the landing's hand accent.
+- Decision: writeitdown.app, the Mac app and the Windows app draw exactly two papers. Neither carries grain,
+  cloud or lamp light; every value below is one token set shared by the three surfaces.
+
+  | Role | White | Black |
+  | --- | --- | --- |
+  | wall (page, window ground) | `#f7f7f5` | `#000000` |
+  | paper | `#ffffff` | `#111111` |
+  | ink | `#1c1917` | `#ededed` |
+  | quiet | `#3f3b36` | `#c2bfb7` |
+  | warn wash, seconds 5 to 8 | `#f2f2f2` | `#1b1b1b` |
+  | wash at the cut | `#e6e6e6` | `#262626` |
+  | history lines (D-092 targets 1.57:1, 1.15:1) | `.22` / `.07` | `.17` / `.065` |
+  | red | `#b00c15` | `#ff453a` |
+
+  - The wash is grey: white paper darkens, black paper lightens. Its timing, ramp and the 120 ms snap are unchanged.
+  - Red is one hue per mode and is spent on the warning numeral, the landing's hand accent and its small
+    stakes labels, the deny hairline and error states. The warning caption and the exit confirmation are ink.
+    `--red-soft`, `--red-deep` and the paper's separate danger colour are retired.
+  - Every text role on the paper clears 7:1 at the deepest wash, except the dimmed history lines (D-092) and the
+    numeral, which is large text (at least 120 px or pt) and clears 3:1: `#b00c15` on `#e6e6e6` is 5.78:1,
+    `#ff453a` on `#262626` is 4.3:1.
+  - The web keeps its theme button (light default, dark stored; D-121). The Mac and Windows apps follow the
+    system appearance: light shows the white paper, dark the black one. The Mac's Lamp / Paper / Slate switch
+    and its stored paper mode are removed; a stored mode migrates to following the system.
+- Why: the captain asked for exactly two papers and one look. Grey keeps the warning on the paper without
+  adding a second colour; a pure-black paper would hide the wash (1.004:1), so black paper sits on a black wall
+  one step lighter.
+- Tests: each surface's paper, contrast and wash tests are rewritten to these values as its lane lands
+  (`writeitdown/qa/paper.spec.mjs`, `qa/history-fade.spec.mjs`, `FirstLineTests/PaperContrastTests`,
+  `DesignTokenTests`, `SnapshotTests`, the Windows token drift gate). Until a lane lands, its surface still shows
+  its previous paper.
+- Supersedes: D-069 and D-093 (Wheat tone and grain, the dark grained sheet), D-120's three papers, switch and
+  paper shadows, D-123's light wash and its "the Mac keeps its paper until its next signed release" clause, and
+  D-103's dark red values.

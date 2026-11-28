@@ -114,14 +114,14 @@ record_geometry() { # record_geometry <stage> <json-object>
 }
 
 # The empty room has no hint near the line; its instruction is the bottom-right
-# count prompt ("Type to begin"), which must share the footer row with ESC - EXIT.
+# count prompt ("Type to begin"), which must share the footer row with Esc to exit.
 # AX has no caret frame, so the caret/line origin equality is bound to the
 # deterministic RoundThreeTests.
 assert_room_geometry() { # assert_room_geometry <room-snapshot>
   local ta prompt exit
   ta="$(frame_of "$1" AXTextArea '')"
   prompt="$(frame_of "$1" AXStaticText '^Type to begin$')"
-  exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
+  exit="$(frame_of "$1" AXButton '^Esc to exit$')"
   [[ -n "$ta" && -n "$prompt" && -n "$exit" ]] || fail 'room geometry: missing text area, count prompt or exit frame'
   record_geometry room "$(jq -cn --argjson ta "$ta" --argjson prompt "$prompt" --argjson exit "$exit" \
     '{textArea: $ta, countPrompt: $prompt, exit: $exit}')"
@@ -149,12 +149,12 @@ assert_warn_geometry() { # assert_warn_geometry <warn-snapshot>
   ' >/dev/null || fail 'the warning numeral/caption is not under the writing line'
 }
 
-# The inline confirmation, the ESC - EXIT link and the count share one row.
+# The inline confirmation, the Esc to exit link and the count share one row.
 # Equal centres plus the shared 13 pt 1.6 line box put all three on one baseline;
 # the caption's exact baseline equality is measured in RoundThreeTests.
 assert_exit_row_geometry() { # assert_exit_row_geometry <snapshot>
   local exit hint count
-  exit="$(frame_of "$1" AXButton '^ESC - EXIT$')"
+  exit="$(frame_of "$1" AXButton '^Esc to exit$')"
   hint="$(frame_of "$1" AXStaticText '^Press Esc again to leave and delete the draft\.$')"
   count="$(frame_of "$1" AXStaticText '^([0-9]+ words?|Type to begin)$')"
   [[ -n "$exit" && -n "$hint" && -n "$count" ]] || fail 'exit row geometry: missing a row element'
@@ -251,12 +251,12 @@ exit_room_by_key() {
 exit_room_by_click() {
   local token
   poll exit-before-click
-  token="$(token_of "$output/last-poll.json" button 'ESC - EXIT')"
-  [[ -n "$token" ]] || fail 'no ESC - EXIT button in the room'
+  token="$(token_of "$output/last-poll.json" button 'Esc to exit')"
+  [[ -n "$token" ]] || fail 'no Esc to exit button in the room'
   cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
   assert_exit_hint
-  token="$(token_of "$output/last-poll.json" button 'ESC - EXIT')"
-  [[ -n "$token" ]] || fail 'no ESC - EXIT button after the exit hint'
+  token="$(token_of "$output/last-poll.json" button 'Esc to exit')"
+  [[ -n "$token" ]] || fail 'no Esc to exit button after the exit hint'
   cua click "{\"pid\":$pid,\"element_token\":\"$token\"}" >/dev/null
 }
 
@@ -318,7 +318,7 @@ check_warn_recovery_wipe() {
   assert_timing "$tier" warn "$warn_start" "$matched_at" "$warn_min" "$warn_max"
   snap "$tier-warn-full" >"$warn"
   assert_text "$warn" 'Keep typing or the draft is deleted.'
-  assert_text "$warn" 'ESC - EXIT'
+  assert_text "$warn" 'Esc to exit'
   jq -e '.window_markdown | test("AXStaticText = .[1-3].")' >/dev/null "$warn" \
     || fail "$tier warn state has no 3-2-1 numeral in AX"
   assert_warn_geometry "$warn"
@@ -377,8 +377,8 @@ kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
 launch_app
 snap trial-exhausted-restart >"$output/upgrade.json"
 assert_text "$output/upgrade.json" 'Activate Write It Down'
-assert_text "$output/upgrade.json" 'After 3 free sessions, a license is required to keep writing.'
-assert_text "$output/upgrade.json" 'Try the full web app at writeitdown.app'
+assert_text "$output/upgrade.json" 'A license is required to keep writing on this Mac.'
+assert_text "$output/upgrade.json" 'Try the free web room'
 absent_text "$output/upgrade.json" 'Back to Home'
 absent_text "$output/upgrade.json" 'Type to begin'
 absent_text "$output/upgrade.json" 'Mac trial:'
@@ -412,7 +412,7 @@ enter_room "$output/selected-standard.json"
 snap room >"$output/room.json"
 assert_text "$output/room.json" 'Type to begin'
 assert_text "$output/room.json" '1:00'
-assert_text "$output/room.json" 'ESC - EXIT'
+assert_text "$output/room.json" 'Esc to exit'
 jq -e '[.elements[] | select(.role == "AXTextArea")] | length > 0' >/dev/null "$output/room.json" \
   || fail 'no text area in the room'
 assert_room_geometry "$output/room.json"

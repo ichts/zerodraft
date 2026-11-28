@@ -121,4 +121,5 @@ Gemini 第 1 轮（第 1–28 条）：通过 1、2、3、4、6、8、9、10、1
 - [x] 41. Windows 重新生成 token，测试同步。
 - [x] 42. 红色在 Calm 底色下重选（Thinker：`#9a5255` 色相偏冷粉、浅色小字 5.05:1）。画板第 4 轮 A 暖朱砂 `#9a3326`/`#ec8878`、B 柔赤陶 `#924138`/`#dd8b81`、C 现值；等哥 Submit 后三端换值，新决策取代 D-130 的红。
   - 哥选 A（第 4 轮）。D-131 落三端（92ef548），Gemini 审查通过。
+- [ ] 43. `apps/macos/FirstLine/scripts/qa-window.sh` 的断言文案跟上现行 app：`ESC - EXIT` → `Esc to exit`，激活页副标题、网页房间按钮（Thinker 提醒；真窗口 QA 仍等 cua-driver 授权，只能做语法检查）。
 

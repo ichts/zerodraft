@@ -197,6 +197,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .nav-buy::after{content:"";position:absolute;inset:-5px 0}
 /* On its own page Buy is where the reader already is: the pill drops its edge and underlines, still a link. */
 .home .nav-buy[aria-current="page"]{border-color:transparent;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+.home .room-nav .nav-buy{background:transparent;color:var(--ink);border-color:var(--hair)}
 /* A control that is working looks like it is working: the pressed-looking state is reserved for the press. */
 .home .btn:disabled{opacity:.6;cursor:progress}
 .home .btn:disabled:hover{transform:none}

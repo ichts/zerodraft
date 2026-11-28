@@ -1576,6 +1576,9 @@ test('nothing in the room can throw a live draft away in one act', async ({ page
     expect(link.target, `${link.href} opens beside the room, not over it`).toBe('_blank');
     expect(link.rel, link.href).toContain('noopener');
   }
+  // In the room the header Buy steps back to the quiet pill (D-115): no ink fill beside the writing.
+  const fill = await page.locator('#room .nav-buy').evaluate(el => getComputedStyle(el).backgroundColor);
+  expect(fill, 'the room Buy carries no fill').toBe('rgba(0, 0, 0, 0)');
   // The brand is the same act as EXIT: the first click arms the confirmation and keeps the draft.
   await page.locator('#room-brand').click();
   await expect(page.locator('#room')).toBeVisible();

@@ -3,7 +3,7 @@
 #         app under test packaged at WID_APP_OUTPUT or dist/Write It Down.app.
 #         Spends three native trial sessions, then activates a copied app through a disposable loopback fixture,
 #         never a Waffo purchase. WID_QA_LICENSE_ONLY=1 skips motion timing checks.
-#         WID_QA_THEME=light|dark presets appearance only, never entitlement.
+#         The window follows the system appearance (D-124): set it in System Settings before a run.
 # [OUTPUT] Per-stage screenshots, AX snapshots, geometry.jsonl (element frames and
 #          the cross-element frame comparisons), app.log, and timing.txt in the
 #          output directory; exit 0 only when every assertion below holds.
@@ -84,12 +84,6 @@ launch_app() {
     exit 1
   fi
 }
-if [[ -n "${WID_QA_THEME:-}" ]]; then
-  case "$WID_QA_THEME" in light|dark) ;; *) echo 'WID_QA_THEME must be light or dark' >&2; exit 2 ;; esac
-  config="$qa_home/Library/Application Support/WriteItDown/Config"
-  mkdir -p "$config"
-  printf '{"theme":"%s","defaultDuration":60,"reducedMotion":"always"}\n' "$WID_QA_THEME" >"$config/settings.json"
-fi
 launch_app
 
 fail() {
@@ -476,11 +470,17 @@ for mode in offline refunded; do
   kill "$pid"; wait "$pid" 2>/dev/null || true; pid=''
   printf '%s\n' "$mode" >"$output/fixture-mode"
   launch_app
-  if [[ "$mode" == offline ]]; then expected='License active.'; else expected='This license is no longer valid'; fi
-  wait_text "$mode-license" 'License' "$expected" 30
+  # A licensed picker shows no access line (statusView hidden, RoundThreeTests), so offline waits for Begin.
+  if [[ "$mode" == offline ]]; then
+    wait_text "$mode-license" 'Begin' 'Begin' 30
+  else
+    wait_text "$mode-license" 'License' 'This license is no longer valid' 30
+  fi
   snap "$mode-result" >"$output/$mode-result.json"
   if [[ "$mode" == offline ]]; then
     enter_room "$output/$mode-result.json"
+    absent_text "$output/$mode-result.json" 'free session'
+    absent_text "$output/$mode-result.json" 'This license is no longer valid'
     snap offline-room >"$output/offline-room.json"
     assert_text "$output/offline-room.json" 'Type to begin'
   else

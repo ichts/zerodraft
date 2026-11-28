@@ -253,7 +253,8 @@ final class UpgradeViewController: NSViewController {
         }
         activateButton.isEnabled = false
         activateButton.title = "Activating"
-        feedbackLabel.isHidden = true
+        feedbackLabel.stringValue = "Checking your license key…"
+        feedbackLabel.textColor = FirstLineColors.muteNSColor
         Task { @MainActor [weak self] in
             guard let self else { return }
             await appState.activateLicense(key: key)

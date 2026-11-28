@@ -371,7 +371,8 @@ test('landing: Paper in light - headline, demo card, one room button, sections, 
   // Each fact is said once (Artist audit, D-124 pass): the price and `once` live in the price figure, not in a fact row.
   await expect(mac.locator('.price-fig')).toHaveText(/\$4\.99\s*once/);
   await expect(mac.locator('.facts')).not.toContainText('$4.99');
-  await expect(mac.locator('.facts')).toContainText('3 free sessions');
+  await expect(mac.locator('.facts')).not.toContainText('3 free sessions');
+  await expect(mac.locator('.facts')).toContainText('1, 5, 10, 20, or 30 minutes');
   await expect(mac.locator('.facts')).toContainText('2 computers');
   await expect(mac.locator('.facts')).toContainText('14-day refund');
   await expect(mac.locator('a[href="download/"]')).toHaveText('Download for Mac (3 free sessions)');

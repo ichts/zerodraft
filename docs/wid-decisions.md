@@ -2813,8 +2813,9 @@ first-screen position, the ink, the underline and the absence of a pill all stay
   where D-114 sets the one word `Buy` on every link to the purchase page.
 - Decision: inside the landing's Pricing block, under the `$4.99` figure and its `once · no subscription` line, the
   primary button reads `Buy for $4.99`. Every other link to the purchase page, the header's included, stays `Buy`
-  (D-114). The block still states `$4.99`, and `3 free sessions`, twice: in the figure or a fact row and on a
-  button label; Q-20's `$4.99 once` reads across the figure and its line under it.
+  (D-114). The block states `$4.99` twice, in the figure and on this button; Q-20's `$4.99 once` reads across the
+  figure and its line under it. `3 free sessions` is said once, on the download button; the Mac app fact names
+  the session lengths only.
 - Tests: `writeitdown/qa/mac.spec.mjs` "the Pricing block shows the price, one 48 px button row and two-line
   facts" pins the label; `qa/shell.spec.mjs` keeps its one price string across the purchase path.
 - Supersedes: D-114 for this one button only.

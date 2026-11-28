@@ -185,7 +185,6 @@ final class SessionViewController: NSViewController, NSTextViewDelegate {
     private var outline: RoomWashView!
     private var progressBar: FirstLineFillBar!
     private var timerLabel: NSTextField!
-    /// The paper switch across the clock row from the clock (D-120).
     private var countLabel: NSTextField!
     private var numeralLabel: NSTextField!
     private var warningHint: NSTextField!

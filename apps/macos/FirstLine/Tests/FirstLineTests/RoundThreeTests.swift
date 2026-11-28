@@ -73,6 +73,21 @@ struct RoundThreeTests {
             let frame = { (view: NSView) in controller.view.convert(view.bounds, from: view) }
             return (frame(pill), frame(buy), frame(card))
         }
+        // The click itself moves nothing either: in the turn before the activation task runs, the card keeps its frame.
+        let state = try trialState(used: 3)
+        let controller = UpgradeViewController(appState: state)
+        let window = makeWindow(controller)
+        defer { window.orderOut(nil) }
+        let card = try #require(descendants(of: controller.view, of: FirstLineCardView.self).first)
+        let field = try #require(descendants(of: controller.view, of: NSTextField.self).first { $0.isEditable })
+        let activate = try #require(descendants(of: controller.view, of: NSButton.self).first { $0.title == "Activate" })
+        field.stringValue = "WID-KEY"
+        let before = controller.view.convert(card.bounds, from: card)
+        activate.performClick(nil)
+        controller.view.layoutSubtreeIfNeeded()
+        let after = controller.view.convert(card.bounds, from: card)
+        #expect(abs(before.minY - after.minY) < 0.5 && abs(before.height - after.height) < 0.5,
+                "the click moved the card from \(before) to \(after)")
         let rest = try read(false), busy = try read(true)
         #expect(abs(rest.pill.width - busy.pill.width) < 0.5, "the pill went from \(rest.pill.width) to \(busy.pill.width)")
         #expect(abs(rest.buy.minX - busy.buy.minX) < 0.5, "Buy moved \(busy.buy.minX - rest.buy.minX) pt")

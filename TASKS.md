@@ -57,7 +57,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 2. 网页浅色按 D-124：灰 wash `#f2f2f2`/`#e6e6e6`（`--paper-wash` 自有值）、quiet `#3f3b36`、一个红 `#b00c15`（数字、手写、标签、hairline），警告句与退出确认用墨色，退役 `--red-soft`/`--red-deep`/`--paper-danger`；`paper.spec`、`moments.spec` 等改断言。
 - [x] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
 - [x] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
-- [x] 5. Pricing 文案：事实行不再重复价格与 `no subscription`；卡内 `$4.99`（价格大字与按钮）与 `3 free sessions`（事实行与下载按钮）仍各出现两次，按钮写法记为 D-127；`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
+- [x] 5. Pricing 文案：事实行不再重复价格与 `no subscription`；卡内 `$4.99` 出现两次（价格大字与按钮，D-127 例外）；`3 free sessions` 只在下载按钮上说一次，Mac app 事实行只说时长（Gemini 第 1 轮打回后修正）；`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
 - [x] 6. Pricing 标题与价格间距为 0：根因是 `.card p{margin:0}` 的优先级（0,1,1）高于 `.price-fig`（0,1,0），覆盖了 `margin-top`；选择器改为 `.mac-card .price-fig`。mac.spec 断言价格与标题间距 ≥16px，旧样式上为 0、失败。
 - [x] 7. 三张状态卡统一中性底：并入第 2 条（退役 `--red-soft`/`--red-deep` 时必须一起改），断言在旧样式上已证明失败。
 - [x] 8. 手机端 header 与 H1 间距：删掉 ≤820px 时把 hero 顶距压到 4px 的覆盖，回到与桌面相同的 16px；新断言在 390x844、375x667、320x700 下要求 ≥16px（旧样式 4px、失败），61% 纸面下限的既有断言仍通过。

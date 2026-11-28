@@ -164,6 +164,21 @@ struct PaperAppearanceTests {
         }
     }
 
+    /// D-124: the armed exit confirmation is ink on both papers, not the numeral's red.
+    @Test(arguments: TestPaper.allCases)
+    func theArmedExitConfirmationIsInk(paper: TestPaper) throws {
+        let fixture = try room(paper: paper)
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        fixture.editor.insertText("draft", replacementRange: NSRange(location: NSNotFound, length: 0))
+        fixture.room.requestExit()
+        fixture.room.view.layoutSubtreeIfNeeded()
+        let hint = try #require(descendants(fixture.room.view, of: NSTextField.self)
+            .first { $0.stringValue.hasPrefix("Press Esc again") && !$0.isHiddenOrHasHiddenAncestor })
+        let colour = try #require(hint.attributedStringValue.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor)
+        #expect(srgb(colour, in: hint) == srgb(FirstLineColors.paperInkNSColor, in: hint), "\(paper): the confirmation is not ink")
+        fixture.window.orderOut(nil)
+    }
+
     /// The app sets no appearance of its own: the system's choice is the only switch (D-124).
     @Test func theWindowFollowsTheSystemAppearance() {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

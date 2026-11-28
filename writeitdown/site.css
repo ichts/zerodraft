@@ -372,7 +372,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .sha-label{display:block}
 .dlbox .sha code{display:block;font:500 13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink)}
 .dlbox .sha code span{display:inline-block;white-space:nowrap}
-.dlcopy{display:inline-flex;margin-top:8px}
+.dlcopy{display:inline-flex;margin:8px 0 var(--s3)}
 /* The install command breaks at its argument boundary; the filename stays whole on the hanging line.
    One hairline rule above it, no fill and no radius: the same hairline the hash uses, so the two
    copyable strings read as one role. */
@@ -380,7 +380,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .dl-page #install code{display:block;margin:0;padding:10px 0 0;border-top:1px solid var(--hair);
   white-space:normal;overflow-wrap:normal;font:500 13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
 .dl-page #install code .cmd-call{white-space:pre}
-.dl-page #install code .cmd-file{display:block;padding-left:0.5ch;white-space:nowrap}
+.dl-page #install code .cmd-file{display:block;white-space:nowrap}
 /* The archived previous version sits under the requirements as one quiet line: a reader looking for
    an older build finds it there, and nothing on the card reads as a second current download (D-081). */
 .dlbox .dl-old{margin:4px 0 0;max-width:64ch;font:400 var(--t-small)/1.7 var(--sans);color:var(--mute)}

@@ -1009,11 +1009,11 @@ test('the download head breaks without an orphan and its checksum block reads', 
     expect(contrast(strings.hashColor, strings.cardBackground), `${width}: the hash stays legible`).toBeGreaterThanOrEqual(4.5);
     await page.locator('[data-copy="sha256"]').click();
     await expect(page.locator('#copy-sha256-status')).toHaveText('Copied.');
-    await expect(page.locator('[data-copy="sha256"]')).toHaveText('COPIED');
+    await expect(page.locator('[data-copy="sha256"]')).toHaveText('Copied');
     expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole hash`).toBe(strings.hashText);
     await page.locator('[data-copy="install"]').click();
     await expect(page.locator('#copy-install-status')).toHaveText('Copied.');
-    await expect(page.locator('[data-copy="install"]')).toHaveText('COPIED');
+    await expect(page.locator('[data-copy="install"]')).toHaveText('Copied');
     expect(await page.evaluate(() => navigator.clipboard.readText()), `${width}: COPY returns the whole command`).toBe(strings.commandText);
   }
   await expect(page.locator('[data-copy="sha256"]')).toHaveAccessibleName('Copy the SHA-256');
@@ -1023,12 +1023,12 @@ test('the download head breaks without an orphan and its checksum block reads', 
     document.execCommand = () => false;
   });
   await page.locator('[data-copy="install"]').click();
-  await expect(page.locator('[data-copy="install"]')).toHaveText('COPY');
+  await expect(page.locator('[data-copy="install"]')).toHaveText('Copy');
   await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
   await page.waitForTimeout(2100);
-  await expect(page.locator('[data-copy="install"]')).toHaveText('COPY');
+  await expect(page.locator('[data-copy="install"]')).toHaveText('Copy');
   await expect(page.locator('#copy-install-status')).toHaveText('Copy failed. Select the text and copy it.');
-  await expect(page.locator('[data-copy="sha256"]')).toHaveText('COPY');
+  await expect(page.locator('[data-copy="sha256"]')).toHaveText('Copy');
   await expect(page.locator('#copy-sha256-status')).toHaveText('');
 });
 
@@ -1187,3 +1187,20 @@ test('the headline keeps its space under the header on every phone', async ({ pa
     expect(gap, `${size.width}x${size.height}: header to headline`).toBeGreaterThanOrEqual(16);
   }
 });
+
+// The install command and its copy control read as one block (Artist audit): the filename's line starts on the
+// command's own left edge, and the copy control keeps space before the paragraph under it.
+test('the install command lines up and its copy control breathes', async ({ page }) => {
+  await page.goto('download/');
+  await page.evaluate(() => document.fonts.ready);
+  const read = await page.evaluate(() => {
+    const left = el => { const r = document.createRange(); r.selectNodeContents(el); return r.getClientRects()[0].left; };
+    const copy = document.querySelector('[data-copy="install"]');
+    const next = copy.closest('.dlcmd').parentElement.querySelector('.dlcmd ~ p:not(.sr-only)');
+    return { call: left(document.querySelector('.cmd-call')), file: left(document.querySelector('.cmd-file')),
+      gap: next.getBoundingClientRect().top - copy.getBoundingClientRect().bottom };
+  });
+  expect(Math.abs(read.file - read.call), 'the filename line starts where the command starts').toBeLessThanOrEqual(0.5);
+  expect(read.gap, 'space between the copy control and the next paragraph').toBeGreaterThanOrEqual(12);
+});
+

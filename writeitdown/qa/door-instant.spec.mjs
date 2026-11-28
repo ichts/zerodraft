@@ -1,15 +1,12 @@
 import { test, expect } from '@playwright/test';
 
-// D-103: the door is instant on a 2x screen too. The room's sheet is textured by a worker while the visitor
-// reads the landing, so the click finds it painted: no 4 MP canvas is generated in the click's own task (that
-// froze the page for about 1.2 s on a Retina Mac while the room was already visible, and the first letter waited).
+// D-103, D-124: the door is instant on a 2x screen. The sheet is one flat tone, so the click has nothing to paint:
+// the room's first frame already shows the sheet in its tone, the editor is focused, and the first letter lands.
 //
 // Budget: the target is a room that takes the first letter within 100 ms of the click. The suite runs on shared,
 // loaded hosts where a wall clock counts the seconds the OS spent running someone else, so the gates count the
 // page's own main-thread CPU time (CDP `ThreadTime`): the editor is focused within 120 ms of CPU after the click
-// and the click through the first letter costs under 250 ms of CPU. The frozen build holds the main thread for
-// about 1200 ms on a 2x screen. A click before the texture is ready waits for it without blocking (not asserted
-// here; the visitor needs a moment to read the page).
+// and the click through the first letter costs under 250 ms of CPU.
 test.use({ deviceScaleFactor: 2 });
 
 const FOCUS_BUDGET_MS = 120;
@@ -21,18 +18,19 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => document.fonts.ready);
 });
 
-const roomSheet = page => page.evaluate(() => {
-  const info = window.WriteItDownPaper.paintInfo(document.querySelector('.room-paper'));
-  return info && { width: info.width, height: info.height, at: info.at };
-});
-
-// Give the visitor the moment they need to read the page. A build that never textures the hidden room just times
-// out here and fails on the click's own budgets below, which is the measurement that matters.
-const textureReady = page => page.waitForFunction(() => window.WriteItDownPaper?.paintInfo(document.querySelector('.room-paper'))?.width > 2, null, { timeout: 8000 }).catch(() => {});
-
-test('the room takes the first letter within the budget, and the click paints nothing', async ({ page }) => {
-  await textureReady(page);
-  const warmed = await roomSheet(page);
+test('the room shows its sheet on the first frame and takes the first letter within the budget', async ({ page }) => {
+  // Record the room sheet's colour on the first animation frame after the room is shown.
+  await page.evaluate(() => {
+    const room = document.getElementById('room');
+    new MutationObserver((_, observer) => {
+      if (room.hidden) return;
+      observer.disconnect();
+      requestAnimationFrame(() => {
+        const sheet = document.querySelector('.room-paper');
+        window.__firstFrame = { colour: getComputedStyle(sheet).backgroundColor, tone: getComputedStyle(sheet).getPropertyValue('--paper-tone').trim(), canvases: sheet.querySelectorAll('canvas').length };
+      });
+    }).observe(room, { attributes: true, attributeFilter: ['hidden'] });
+  });
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
@@ -45,39 +43,12 @@ test('the room takes the first letter within the budget, and the click paints no
   await page.waitForTimeout(1500);
   const typed = await cpuMs();
 
-  const r = await page.evaluate(() => ({
-    value: document.getElementById('editor').value,
-    canvas: (c => ({ width: c.width, height: c.height }))(document.querySelector('.room-paper .sheet-paper')),
-    css: (s => [s.clientWidth, s.clientHeight])(document.querySelector('.room-paper')), dpr: devicePixelRatio,
-  }));
-  expect(r.value, 'the letter reached the editor').toBe('a');
+  expect(await page.locator('#editor').inputValue(), 'the letter reached the editor').toBe('a');
   expect(focused - start, `main-thread CPU from click to editor focused (ms), budget ${FOCUS_BUDGET_MS}`).toBeLessThan(FOCUS_BUDGET_MS);
   expect(typed - start, `main-thread CPU from click to the first letter (ms), budget ${FIRST_LETTER_BUDGET_MS}`).toBeLessThan(FIRST_LETTER_BUDGET_MS);
-
-  // The sheet that was warmed is the sheet on screen: same pixels, same size, not painted again by the click.
-  const after = await roomSheet(page);
-  expect(warmed, 'the room sheet was textured before the click').not.toBeNull();
-  expect(after.at, 'the click repainted the sheet').toBe(warmed.at);
-  expect(r.canvas.width).toBe(Math.round(r.css[0] * r.dpr));
-  expect(r.canvas.height).toBe(Math.round(r.css[1] * r.dpr));
-});
-
-test('warming a hidden room moves nothing the visitor can see, and follows a resize', async ({ page }) => {
-  await textureReady(page);
-  await page.evaluate(() => scrollTo(0, 240));
-  const first = await roomSheet(page);
-  expect(first, 'the room sheet was textured before the click').not.toBeNull();
-  const before = await page.evaluate(() => ({ y: scrollY, landing: document.getElementById('landing').hidden, room: document.getElementById('room').hidden }));
-  expect(before.y, 'the landing scrolls').toBeGreaterThan(0);
-
-  await page.setViewportSize({ width: 1180, height: 760 });
-  await page.waitForFunction(w => window.WriteItDownPaper.paintInfo(document.querySelector('.room-paper')).width !== w, first.width, { timeout: 15000 });
-  const after = await page.evaluate(() => ({ y: scrollY, landing: document.getElementById('landing').hidden, room: document.getElementById('room').hidden, inTrial: document.documentElement.classList.contains('in-trial') }));
-  expect(after).toEqual({ ...before, inTrial: false });
-
-  // The resized, still hidden room was warmed for its new size, so the click finds it painted.
-  const warmed = await roomSheet(page);
-  await page.locator('#landing .cta a[href="#trial"]').click();
-  await page.waitForTimeout(500);
-  expect((await roomSheet(page)).at, 'the click after a resize repainted the sheet').toBe(warmed.at);
+  const first = await page.evaluate(() => window.__firstFrame);
+  expect(first, 'the first frame was recorded').toBeTruthy();
+  expect(first.canvases, 'nothing is painted on the sheet').toBe(0);
+  const probe = await page.evaluate(tone => { const i = document.createElement('i'); i.style.color = tone; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; }, first.tone);
+  expect(first.colour, 'the first frame shows the sheet in its tone').toBe(probe);
 });

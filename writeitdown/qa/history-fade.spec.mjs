@@ -10,7 +10,7 @@ import { doorSettled } from './door.mjs';
 // centred just under the line being written, for two seconds (D-100, moved out of the footer), and nothing else moves.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#ffffff', dark: '#342e24' };
+const TONES = { light: '#ffffff', dark: '#111111' };
 const QUIET = { light: '#3f3b36', dark: '#c2bfb7' };
 const REFUSAL = 'You can only add the next word.';
 
@@ -114,7 +114,7 @@ test('each Return line gets exactly its step, 1 / .22 / .07 per theme, and older
     const style = getComputedStyle(document.querySelector('#editor-ink'));
     return [1, 2].map(n => Number(style.getPropertyValue(`--paper-history-${n}`)));
   });
-  expect(tokens).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
+  expect(tokens).toEqual(mode === 'dark' ? [0.17, 0.065] : [0.22, 0.07]);
   const byRung = Object.fromEntries(lines.map(line => [line.rung, line.opacity]));
   expect(byRung).toEqual({ 0: 1, 1: tokens[0], 2: tokens[1], 3: 0 });
   expect(byRung['0']).toBe(1);

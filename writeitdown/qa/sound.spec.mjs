@@ -111,7 +111,7 @@ test('a hidden tab that resumes owes no burst of sound', async ({ page }) => {
 });
 
 test('the sound is part of the landing only: no other shipped page loads it', async ({ request }) => {
-  for (const file of ['room.js', 'feedback.js', 'session.mjs', 'status-slot.js', 'paper.js']) {
+  for (const file of ['room.js', 'feedback.js', 'session.mjs', 'status-slot.js']) {
     const body = await (await request.get(file)).text();
     expect(body, file).not.toMatch(/sound(-cues)?\.m?js|landingSound|AudioContext/);
   }

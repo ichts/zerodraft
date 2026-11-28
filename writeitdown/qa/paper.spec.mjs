@@ -1,17 +1,18 @@
 import { doorSettled } from './door.mjs';
-// The sheet on the writeitdown site (D-123): plain white with no grain in light, the grained charcoal paper in
-// dark, with their ink, measured rather than eyeballed, on the landing demo sheet and in the room.
+// The sheet on the writeitdown site (D-124): one flat white tone in light and one flat black tone in dark, with
+// their ink, quiet chrome, grey wash and one red, measured on the rendered pixels as well as the computed styles.
 //
-// Fails on the Wheat sheet that shipped before the captain chose white: the light tone, the light wash mixes
-// and the absence of any light grain are pinned to the white sheet, and the dark roles stay pinned as they were.
+// Fails on the grained charcoal sheet that dark shipped before D-124: the dark tone, the grey wash and the
+// flatness of the rendered pixels are pinned to the black sheet.
 import { test, expect } from '@playwright/test';
 
-const TONES = { light: '#ffffff', dark: '#342e24' };
-const INK = { light: '#1c1917', dark: '#ece7d9' };
+const TONES = { light: '#ffffff', dark: '#111111' };
+const INK = { light: '#1c1917', dark: '#ededed' };
 const QUIET = { light: '#3f3b36', dark: '#c2bfb7' };
 const RED = { light: '#b00c15', dark: '#ff453a' };
-const WASH = { light: '#f2f2f2', dark: '#453226' };
-const WASH_DEEP = { light: '#e6e6e6', dark: '#573428' };
+const WASH = { light: '#f2f2f2', dark: '#1b1b1b' };
+const WASH_DEEP = { light: '#e6e6e6', dark: '#262626' };
+const HISTORY = { light: [0.22, 0.07], dark: [0.17, 0.065] };
 
 const parseColour = value => {
   const match = String(value).match(/rgba?\(([^)]+)\)/);
@@ -44,87 +45,36 @@ const over = (colour, backdrop) => ({
 const toHex = ({ r, g, b }) =>
   '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
 
-/** How far one patch's rendered mean may sit from the tone: the mottle moves a single patch more on the dark sheet. */
-const GRAIN_BAND = { light: 6, dark: 10 };
-
-/** The largest per-channel gap between a patch's rendered mean and a tone, read off the pixels. */
-const meanOffset = (mean, tone) => {
-  const target = [1, 3, 5].map(i => parseInt(tone.slice(i, i + 2), 16));
-  return Math.max(...mean.map((value, i) => Math.abs(value - target[i])));
-};
-
-/** The light sheet is plain white (D-123): its canvas holds not one painted pixel. The dark sheet keeps its fine grain (D-093). */
-const expectGrain = (grain, mode, label) => {
-  if (mode === 'light') {
-    expect(grain.meanAlpha, `${label} is plain white: nothing is painted on it`).toBe(0);
-    expect(grain.spread, `${label} carries no grain`).toBe(0);
-    expect(grain.distinct, `${label} is one flat value`).toBe(1);
-  } else {
-    expect(grain.spread, `${label} carries the dark grain`).toBeGreaterThan(2);
-    expect(grain.distinct).toBeGreaterThan(8);
-  }
-};
-
-/** How warm a colour reads: red ahead of green: what "the paper turns red" means on a paper that is
- *  already warm. */
-
-const channels = hex => [1, 3, 5].map(index => parseInt(hex.slice(index, index + 2), 16));
-
-/** The sheet's tone, measured within the two levels the texture's correction is allowed to leave behind. */
-const expectTone = (measured, expected, label) => {
-  const a = measured.map(Math.round);
-  const b = channels(expected);
-  a.forEach((value, index) => {
-    expect(Math.abs(value - b[index]), `${label}: channel ${index} of ${a.join(',')} against ${expected}`)
-      .toBeLessThanOrEqual(2);
-  });
-};
+const hexColour = hex => parseColour(`rgb(${[1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(',')})`);
 
 const theme = page => page.evaluate(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 const style = (page, selector, property) =>
   page.evaluate(([sel, prop]) => getComputedStyle(document.querySelector(sel))[prop], [selector, property]);
 
-/** A text-free patch of a sheet, read straight off its canvas: spread (grain), distinct values, and a hash. */
-async function patch(page, selector, where = 0.6) {
-  return page.evaluate(([sel, position]) => {
-    const canvas = document.querySelector(sel + ' .sheet-paper');
-    if (!canvas) return null;
+/** The pixels the screen shows on a text-free strip of a sheet: a real screenshot, decoded in the page. */
+async function strip(page, selector, where) {
+  const box = await page.locator(selector).boundingBox();
+  const clip = { x: Math.round(box.x + box.width * 0.3), y: Math.round(box.y + box.height * where), width: Math.round(box.width * 0.4), height: 12 };
+  const png = (await page.screenshot({ clip, animations: 'disabled' })).toString('base64');
+  return page.evaluate(async data => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${data}`;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    [canvas.width, canvas.height] = [image.width, image.height];
     const ctx = canvas.getContext('2d');
-    const width = Math.max(8, Math.min(200, Math.round(canvas.width * 0.18)));
-    const height = Math.max(8, Math.min(120, Math.round(canvas.height * 0.12)));
-    const x = Math.round((canvas.width - width) / 2);
-    const y = Math.round(canvas.height * position - height / 2);
-    const data = ctx.getImageData(x, y, width, height).data;
-    // The pixel the reader sees: the texture composited over the sheet's own tone.
-    const base = getComputedStyle(document.querySelector(sel)).backgroundColor.match(/\d+/g).slice(0, 3).map(Number);
-    let sum = 0;
-    let sumSquares = 0;
-    let count = 0;
-    let alpha = 0;
-    const channels = [0, 0, 0];
-    const values = [];
-    for (let i = 0; i < data.length; i += 4) {
-      alpha += data[i + 3];
-      const a = data[i + 3] / 255;
-      for (let c = 0; c < 3; c += 1) channels[c] += data[i + c] * a + base[c] * (1 - a);
-      const lum = 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-      sum += lum;
-      sumSquares += lum * lum;
-      count += 1;
-      values.push(data.slice(i, i + 4).join(','));
-    }
-    const mean = sum / count;
-    return {
-      spread: Math.sqrt(Math.max(0, sumSquares / count - mean * mean)),
-      meanAlpha: alpha / count,
-      mean: channels.map(total => total / count),
-      distinct: new Set(values).size,
-      hash: values.reduce((acc, value) => {
-        for (let i = 0; i < value.length; i += 1) acc = (acc * 31 + value.charCodeAt(i)) | 0;
-        return acc;
-      }, 7)
-    };
-  }, [selector, where]);
+    ctx.drawImage(image, 0, 0);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    const seen = new Set();
+    for (let i = 0; i < pixels.length; i += 4) seen.add('#' + [0, 1, 2].map(c => pixels[i + c].toString(16).padStart(2, '0')).join(''));
+    return [...seen];
+  }, png);
+}
+
+/** A sheet is flat: the strip is one colour, the tone, and no texture canvas sits behind its words. */
+async function expectFlat(page, selector, mode, label, where = 0.85) {
+  expect(await page.locator(`${selector} canvas`).count(), `${label} carries no texture canvas`).toBe(0);
+  expect(await strip(page, selector, where), `${label} is the flat ${mode} tone on screen`).toEqual([TONES[mode]]);
 }
 
 async function enterRoom(page) {
@@ -132,108 +82,66 @@ async function enterRoom(page) {
   await page.locator('#landing .cta a[href="#trial"]').click();
   await doorSettled(page);
   await expect(page.locator('#room')).toBeVisible();
-  await waitForPaper(page, '.room-paper');
-}
-
-/** The sheet exists and carries its texture: the room is hidden at 0x0 until the reveal, and the
- *  ResizeObserver textures it in the same rendering step that gives it its size. */
-async function waitForPaper(page, selector) {
-  await page.waitForFunction(sel => {
-    const element = document.querySelector(sel);
-    const info = element && window.WriteItDownPaper.paintInfo(element);
-    if (!info || !(info.width > 2)) return false;
-    // The light sheet is plain white (D-123) and its canvas stays transparent; only the dark sheet has grain to wait for.
-    if (document.documentElement.dataset.theme !== 'dark') return true;
-    const canvas = element.querySelector('.sheet-paper');
-    const data = canvas.getContext('2d').getImageData(1, 1, 4, 4).data;
-    return data.some(value => value !== 0);
-  }, selector);
-}
-
-/** What the screen shows where the sheet is empty: the sheet's own tone composited with the texture's mean,
- *  which is the pixel value the captain locked, not the CSS constant behind it. */
-async function sheetTone(page, selector) {
-  return page.evaluate(sel => {
-    const element = document.querySelector(sel);
-    const value = getComputedStyle(element).backgroundColor;
-    const parts = value.match(/rgba?\(([^)]+)\)/)[1].split(/[,\s/]+/).filter(Boolean).map(Number);
-    const base = [parts[0], parts[1], parts[2]];
-    const canvas = element.querySelector('.sheet-paper');
-    if (!canvas || canvas.width < 2) return base;
-    const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-    const count = canvas.width * canvas.height;
-    const shift = [0, 0, 0];
-    for (let i = 0; i < data.length; i += 4) {
-      const alpha = data[i + 3] / 255;
-      shift[0] += alpha * (data[i] - base[0]);
-      shift[1] += alpha * (data[i + 1] - base[1]);
-      shift[2] += alpha * (data[i + 2] - base[2]);
-    }
-    return base.map((channel, index) => channel + shift[index] / count);
-  }, selector);
 }
 
 test.describe('the sheet', () => {
-  test('the demo sheet and the room carry the locked tone, ink and grain', async ({ page }) => {
+  // The demo stands still under reduced motion, so its sheet is read without the scripted wash crossing it.
+  test.use({ reducedMotion: 'reduce' });
+
+  test('the demo sheet and the room are one flat tone with the locked ink', async ({ page }) => {
     await page.goto('./');
     const mode = await theme(page);
-    const paper = parseColour(await style(page, '#paper', 'backgroundColor'));
-    expectTone(await sheetTone(page, '#paper'), TONES[mode], 'the demo sheet');
-
-    // The words on the demo sheet are the locked ink.
+    expect(toHex(parseColour(await style(page, '#paper', 'backgroundColor')))).toBe(TONES[mode]);
     expect(toHex(parseColour(await style(page, '#paper .script', 'color')))).toBe(INK[mode]);
-
-    await waitForPaper(page, '#paper');
-    const demoGrain = await patch(page, '#paper', 0.75);
-    expectGrain(demoGrain, mode, 'the demo sheet');
-    expect(meanOffset(demoGrain.mean, TONES[mode]), 'the demo grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[mode]);
+    await expectFlat(page, '#paper', mode, 'the demo sheet');
 
     await enterRoom(page);
-    expectTone(await sheetTone(page, '.room-paper'), TONES[mode], 'the room sheet');
+    expect(toHex(parseColour(await style(page, '.room-paper', 'backgroundColor')))).toBe(TONES[mode]);
     expect(toHex(parseColour(await style(page, '#editor-ink', 'color')))).toBe(INK[mode]);
+    await expectFlat(page, '.room-paper', mode, 'the room sheet', 0.7);
+  });
 
-    // The texture is device-exact: one canvas pixel per device pixel, so it cannot shimmer.
-    const exact = await page.evaluate(() => {
-      const canvas = document.querySelector('.room-paper .sheet-paper');
-      const sheet = document.querySelector('.room-paper');
-      return { width: canvas.width, height: canvas.height,
-        css: [sheet.clientWidth, sheet.clientHeight], dpr: window.devicePixelRatio };
-    });
-    expect(exact.width).toBe(Math.round(exact.css[0] * exact.dpr));
-    expect(exact.height).toBe(Math.round(exact.css[1] * exact.dpr));
+  test('the sheet follows the theme on screen: white, black, white, after a reload and a resize', async ({ page }) => {
+    await page.goto('./');
+    const start = await theme(page);
+    const other = start === 'light' ? 'dark' : 'light';
+    const toggle = page.locator('#landing .home-nav [data-theme-toggle]');
+    await expectFlat(page, '#paper', start, 'the demo sheet at load');
+    await toggle.click();
+    await expectFlat(page, '#paper', other, 'the demo sheet after one toggle');
+    await toggle.click();
+    await expectFlat(page, '#paper', start, 'the demo sheet after two toggles');
+    await toggle.click();
+    await page.reload();
+    expect(await theme(page)).toBe(other);
+    await expectFlat(page, '#paper', other, 'the demo sheet after a reload');
+    await page.setViewportSize({ width: 1180, height: 760 });
+    await expectFlat(page, '#paper', other, 'the demo sheet after a resize');
+    await enterRoom(page);
+    await expectFlat(page, '.room-paper', other, 'the room sheet after a resize', 0.7);
   });
 
   test('every word on the sheet clears 7:1, except the dimmed history lines (D-092)', async ({ page }) => {
     await enterRoom(page);
     const mode = await theme(page);
-    // Every role is measured against the locked tone, which is what the rendered sheet averages to: the CSS
-    // background behind the canvas is the grain-corrected base, not the colour on screen (D-073).
-    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
+    const paper = hexColour(TONES[mode]);
     const ink = parseColour(await style(page, '#editor-ink', 'color'));
 
     expect(toHex(ink)).toBe(INK[mode]);
     expect(contrast(ink, paper), 'the writing ink').toBeGreaterThanOrEqual(7);
 
-    // The history (D-092): the alphas the ink layer's rungs apply, composited over the paper. The captain's contrast
-    // exception: one back 1.57:1 and two back 1.15:1 in both themes, so no 7:1 floor applies to them.
+    // The history (D-092): one back about 1.57:1 and two back about 1.15:1 on either sheet, so no 7:1 floor applies.
     const alphas = await page.evaluate(() => {
-      const editor = document.querySelector('#editor');
-      const value = getComputedStyle(editor);
-      return [
-        Number(value.getPropertyValue('--paper-history-1')),
-        Number(value.getPropertyValue('--paper-history-2'))
-      ];
+      const value = getComputedStyle(document.querySelector('#editor'));
+      return [Number(value.getPropertyValue('--paper-history-1')), Number(value.getPropertyValue('--paper-history-2'))];
     });
-    expect(alphas[0]).toBeGreaterThan(0);
-    expect(alphas[1]).toBeGreaterThan(0);
+    expect(alphas).toEqual(HISTORY[mode]);
     const ladder = alphas.map(alpha => contrast(over({ ...ink, a: alpha }, paper), paper));
-    expect(alphas).toEqual(mode === 'dark' ? [0.16, 0.05] : [0.22, 0.07]);
     expect(ladder[0], `history step one: ${ladder[0].toFixed(2)}:1`).toBeGreaterThan(1.5);
     expect(ladder[0]).toBeLessThan(1.65);
     expect(ladder[1], `history step two: ${ladder[1].toFixed(2)}:1`).toBeGreaterThan(1.1);
     expect(ladder[1]).toBeLessThan(1.2);
 
-    // The quiet chrome and the pen red on the sheet.
     expect(toHex(parseColour(await style(page, '#room-count', 'color')))).toBe(QUIET[mode]);
     expect(contrast(parseColour(await style(page, '#room-count', 'color')), paper)).toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#exit', 'color')), paper)).toBeGreaterThanOrEqual(7);
@@ -260,8 +168,8 @@ test.describe('the sheet', () => {
     // The numeral is large text (D-124), so its floor on the deepest wash is 3:1; the caption is ink at 7:1.
     expect(contrast(numeral, deep), 'the numeral on the deepest wash').toBeGreaterThanOrEqual(3);
     expect(contrast(parseColour(await style(page, '.danger .caption', 'color')), deep), 'the caption on the deepest wash').toBeGreaterThanOrEqual(7);
-    if (mode === 'light') expect(contrast(parseColour(await style(page, '#room-count', 'color')), deep), 'the quiet chrome on the deepest wash').toBeGreaterThanOrEqual(7);
-    const paper = parseColour(`rgb(${[1, 3, 5].map(i => parseInt(TONES[mode].slice(i, i + 2), 16)).join(',')})`);
+    expect(contrast(parseColour(await style(page, '#room-count', 'color')), deep), 'the quiet chrome on the deepest wash').toBeGreaterThanOrEqual(7);
+    const paper = hexColour(TONES[mode]);
     const step = contrast(parseColour(wash), paper);
     expect(step, 'the wash is visible on the paper').toBeGreaterThan(1.05);
     expect(contrast(deep, paper), 'the cut is one step past the ramp').toBeGreaterThan(step);
@@ -271,18 +179,17 @@ test.describe('the sheet', () => {
     // The real kept path: type through the whole minute on the fake clock, then read the paper.
     await page.clock.install({ time: new Date('2026-10-26T12:00:00Z') });
     await enterRoom(page);
-    await page.locator('#editor').type('kept words on the note paper ', { delay: 20 });
+    await page.locator('#editor').type('kept words on the paper ', { delay: 20 });
     for (let second = 0; second < 57; second += 3) {
       await page.clock.fastForward(3000);
       await page.locator('#editor').type('keep going ');
     }
     await page.clock.fastForward(3000);
     await expect(page.locator('#room')).toHaveAttribute('data-phase', 'kept');
+    const mode = await theme(page);
     const paper = parseColour(await style(page, '.room-paper', 'backgroundColor'));
-    expectTone(await sheetTone(page, '.room-paper'), TONES[await theme(page)], 'the kept sheet');
-    const grain = await patch(page, '.room-paper', 0.5);
-    expectGrain(grain, await theme(page), 'the kept sheet');
-    expect(meanOffset(grain.mean, TONES[await theme(page)]), 'the kept grain mean is the sheet tone').toBeLessThanOrEqual(GRAIN_BAND[await theme(page)]);
+    expect(toHex(paper), 'the kept sheet').toBe(TONES[mode]);
+    expect(await page.locator('.room-paper canvas').count(), 'the kept sheet carries no texture canvas').toBe(0);
     expect(contrast(parseColour(await style(page, '#kept-text', 'color')), paper),
       'the kept draft on the paper').toBeGreaterThanOrEqual(7);
     expect(contrast(parseColour(await style(page, '#receipt', 'color')), paper),
@@ -290,48 +197,5 @@ test.describe('the sheet', () => {
     // The not-saved caption is a text role on the sheet, so it answers to the same floor (D-061).
     expect(contrast(parseColour(await style(page, '#kept-note', 'color')), paper),
       'the kept not-saved caption on the paper').toBeGreaterThanOrEqual(7);
-  });
-  test('the dark sheet is one fine grain: about +-3 levels, no blotch, every pixel clears 7:1 (D-093)', async ({ page }) => {
-    await page.goto('./');
-    test.skip((await theme(page)) !== 'dark', 'the dark sheet only exists in dark');
-    await page.waitForFunction(() => window.WriteItDownPaper);
-    const sheet = await page.evaluate(() => {
-      const canvas = document.createElement('canvas');
-      const info = window.WriteItDownPaper.render(canvas, 640, 384, 1, 'dark');
-      const out = document.createElement('canvas');
-      out.width = canvas.width;
-      out.height = canvas.height;
-      const ctx = out.getContext('2d');
-      ctx.fillStyle = info.base;
-      ctx.fillRect(0, 0, out.width, out.height);
-      ctx.drawImage(canvas, 0, 0);
-      const { data, width, height } = ctx.getImageData(0, 0, out.width, out.height);
-      const luma = i => 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
-      let mean = 0;
-      let peak = 0;
-      let peakAt = 0;
-      const blocks = new Array(Math.floor(width / 32) * Math.floor(height / 32)).fill(0);
-      for (let y = 0; y < height; y += 1) {
-        for (let x = 0; x < width; x += 1) {
-          const i = (y * width + x) * 4;
-          const l = luma(i);
-          mean += l;
-          if (l > peak) { peak = l; peakAt = i; }
-          const bx = Math.floor(x / 32);
-          const by = Math.floor(y / 32);
-          if (bx < Math.floor(width / 32) && by < Math.floor(height / 32)) blocks[by * Math.floor(width / 32) + bx] += l / 1024;
-        }
-      }
-      mean /= width * height;
-      const blockMean = blocks.reduce((a, b) => a + b, 0) / blocks.length;
-      const blotch = Math.sqrt(blocks.reduce((a, b) => a + (b - blockMean) ** 2, 0) / blocks.length);
-      return { base: info.base, lift: peak - mean, blotch, brightest: [data[peakAt], data[peakAt + 1], data[peakAt + 2]] };
-    });
-    // +-3 levels per channel plus the 8-bit rounding of the alpha composite and luma weighting: Linux CI Chromium measures 3.54.
-    expect(sheet.lift, 'no pixel lifts more than the +-3 grain plus rounding').toBeLessThanOrEqual(4);
-    expect(sheet.blotch, 'no blotch at the 32 px scale').toBeLessThan(0.2);
-    const pixel = { r: sheet.brightest[0], g: sheet.brightest[1], b: sheet.brightest[2] };
-    expect(contrast(parseColour(`rgb(${channels(INK.dark).join(',')})`), pixel), 'ink on the brightest pixel').toBeGreaterThanOrEqual(7);
-    expect(contrast(parseColour(`rgb(${channels(QUIET.dark).join(',')})`), pixel), 'quiet text on the brightest pixel').toBeGreaterThanOrEqual(7);
   });
 });

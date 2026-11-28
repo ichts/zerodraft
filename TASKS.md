@@ -36,6 +36,7 @@
 Codex 2026-11-28 下午额度用尽（恢复约 15:05），哥指示先继续。以下已提交条目欠 Codex 复审，额度恢复后按提交逐条补审，打回就补修：
 - 第 1 条
 - 第 2 条（含第 7 条）
+- 第 3 条
 
 ## 清单
 
@@ -52,7 +53,7 @@ Codex 2026-11-28 下午额度用尽（恢复约 15:05），哥指示先继续。
 ### B. 网页
 
 - [x] 2. 网页浅色按 D-124：灰 wash `#f2f2f2`/`#e6e6e6`（`--paper-wash` 自有值）、quiet `#3f3b36`、一个红 `#b00c15`（数字、手写、标签、hairline），警告句与退出确认用墨色，退役 `--red-soft`/`--red-deep`/`--paper-danger`；`paper.spec`、`moments.spec` 等改断言。
-- [ ] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
+- [x] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
 - [ ] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
 - [ ] 5. Pricing 文案：价格、`no subscription`、`3 free sessions` 各说一次，按钮回 `Buy`（D-114），`2 Macs` 改 `2 computers`（A9）。
 - [ ] 6. Pricing 标题与价格间距为 0 的根因修复。

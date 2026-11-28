@@ -402,7 +402,7 @@ test.describe('light is the default theme', () => {
     await page.locator('#landing .home-nav [data-theme-toggle]').click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     const bg = await page.locator('#landing').evaluate(e => getComputedStyle(e).backgroundColor);
-    expect(bg).toBe('rgb(21, 20, 15)');
+    expect(bg).toBe('rgb(0, 0, 0)');
     // D-124: one red per mode, for the hand accent, the numeral, the stakes label and the track alike.
     const reds = () => page.evaluate(() => {
       const color = (selector, prop = 'color') => getComputedStyle(document.querySelector(selector))[prop];

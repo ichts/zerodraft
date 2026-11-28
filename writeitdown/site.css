@@ -52,11 +52,8 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .room{--room-gut:var(--gut);padding:0 var(--room-gut) var(--room-gut);height:auto;min-height:0;--chrome:var(--ink);--timer:var(--ink)}
 .room-paper{position:relative;flex:1;min-height:calc(100vh - var(--nav-h) - var(--room-gut));min-height:calc(100dvh - var(--nav-h) - var(--room-gut));border-radius:var(--r-sheet);box-shadow:var(--sheet-shadow);overflow:clip}
-/* The sheet is plain white in light (D-123) and the grained charcoal paper in dark: the dark grain is painted by
-   paper.js into a canvas that sits in the sheet's own stacking context behind every word. Nothing repaints while
-   the writer types - the texture only redraws when the sheet's size or the theme changes. */
+/* The sheet is one flat tone, white or black (D-124): nothing paints a texture on it. */
 [data-paper]{background:var(--paper-tone);isolation:isolate}
-.sheet-paper{position:absolute;inset:0;z-index:-1;width:100%;height:100%;border-radius:inherit;pointer-events:none}
 .room .wash{transition:opacity 120ms linear;opacity:0}
 .room-paper-wash{background:var(--paper-wash);border-radius:inherit}
 .room[data-phase="typing"]{--chrome:var(--paper-quiet);--timer:var(--paper-quiet)}

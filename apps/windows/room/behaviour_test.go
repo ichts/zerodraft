@@ -654,3 +654,27 @@ func TestCtrlCCopiesTheKeptDraftAndAFailedCopySaysSo(t *testing.T) {
 		t.Fatalf("a failed copy must say %q, got %q", tokens.StrCopyRetry, g.r.copyLabel)
 	}
 }
+
+// D-124: the armed exit confirmation is ink, not red, on both papers. The footer row is read off the frame.
+func TestTheArmedExitConfirmationIsInk(t *testing.T) {
+	g := newRig(t, 1040, 620)
+	g.tt.Type("a draft")
+	g.tt.Key(0, ui.KeyEscape)
+	g.tt.Frame()
+	img := g.tt.Image()
+	b := img.Bounds()
+	red := Color(tokens.PaperDanger, false)
+	reds := 0
+	for y := b.Max.Y - 60; y < b.Max.Y-20; y++ {
+		for x := b.Min.X + 40; x < b.Min.X+500; x++ {
+			c := img.At(x, y)
+			r8, g8, b8, _ := c.RGBA()
+			if math.Abs(float64(r8>>8)-float64(red.R)) < 30 && math.Abs(float64(g8>>8)-float64(red.G)) < 30 && math.Abs(float64(b8>>8)-float64(red.B)) < 30 {
+				reds++
+			}
+		}
+	}
+	if reds > 0 {
+		t.Fatalf("the exit confirmation draws %d red pixels; it is ink (D-124)", reds)
+	}
+}

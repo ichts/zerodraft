@@ -196,7 +196,7 @@ func (r *Room) drawDenyOutline(p *ui.Painter, pr ui.Rect, now time.Time, dark bo
 // ---- the content
 
 func (r *Room) drawContent(p *ui.Painter, box, pr ui.Rect, now time.Time, dark, failure, kept bool) {
-	ink, quiet, danger := rc(tokens.Ink, dark), rc(tokens.PaperQuiet, dark), rc(tokens.PaperDanger, dark)
+	ink, quiet := rc(tokens.Ink, dark), rc(tokens.PaperQuiet, dark)
 	e := r.eng
 
 	// the 2 px session bar: one continuous drain over the remaining time, off on the stopped sheet
@@ -218,10 +218,10 @@ func (r *Room) drawContent(p *ui.Painter, box, pr ui.Rect, now time.Time, dark, 
 		r.drawWriting(p, box, pr, now, dark)
 	}
 
-	r.drawChrome(p, pr, dark, quiet, danger, ink, failure, kept)
+	r.drawChrome(p, pr, dark, quiet, ink, failure, kept)
 }
 
-func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, ink ui.Color, failure, kept bool) {
+func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, ink ui.Color, failure, kept bool) {
 	e := r.eng
 	// clock, top right: system sans 15 / 600, monospaced digits; off on the stopped sheet
 	if !failure {
@@ -239,10 +239,10 @@ func (r *Room) drawChrome(p *ui.Painter, pr ui.Rect, dark bool, quiet, danger, i
 	exW, _ := ex.Size()
 	exX := pr.X + tokens.RoomInset
 	top := base - sansAscent(13, 400)
-	// the status slot beside the exit link holds the armed exit confirmation, in the pen
+	// the status slot beside the exit link holds the armed exit confirmation, in ink (D-124)
 	if !r.exitHintOff.IsZero() {
 		h := r.shape(textSpec{s: tokens.StrExitHint, family: sans, size: 13, weight: 400})
-		p.TextLayout(h, exX+exW+12, top, danger)
+		p.TextLayout(h, exX+exW+12, top, ink)
 	}
 	label := r.cornerLabel(failure, kept)
 	if label == "" {

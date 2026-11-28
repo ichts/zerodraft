@@ -57,7 +57,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 2. 网页浅色按 D-124：灰 wash `#f2f2f2`/`#e6e6e6`（`--paper-wash` 自有值）、quiet `#3f3b36`、一个红 `#b00c15`（数字、手写、标签、hairline），警告句与退出确认用墨色，退役 `--red-soft`/`--red-deep`/`--paper-danger`；`paper.spec`、`moments.spec` 等改断言。
 - [x] 3. 深色改黑纸（D-124：墙 `#000`、纸 `#111`、灰 wash、红 `#ff453a`）；退役纹理管线（`paper.js`、`paper-render.js`、worker、内联回写），同步 `install.sh`、`qa/test-install.py`、缓存清单、`paper.spec`、`history-fade`、`door-instant`；实测白→黑→白、刷新、缩放后的像素。
 - [x] 4. D-125 + 网页字体换 Allo 与 Resource Han Rounded（取自 3984e24），手写体保留；同步 `fonts/build-fonts.py`、`fonts*.css`、`install.sh`、`typography.spec`、`shared-type-baseline.json`、D-109 中文冻结；截 hero 两版。
-- [x] 5. Pricing 文案：价格、`no subscription`、`3 free sessions` 各说一次（事实行不再重复价格），`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
+- [x] 5. Pricing 文案：事实行不再重复价格与 `no subscription`；卡内 `$4.99`（价格大字与按钮）与 `3 free sessions`（事实行与下载按钮）仍各出现两次，按钮写法记为 D-127；`2 Macs` 改 `2 computers`（A9），两行内。按钮保留 `Buy for $4.99`：它出自哥合并的 #184，是最新认可版本，不按 D-114 改回 `Buy`。
 - [x] 6. Pricing 标题与价格间距为 0：根因是 `.card p{margin:0}` 的优先级（0,1,1）高于 `.price-fig`（0,1,0），覆盖了 `margin-top`；选择器改为 `.mac-card .price-fig`。mac.spec 断言价格与标题间距 ≥16px，旧样式上为 0、失败。
 - [x] 7. 三张状态卡统一中性底：并入第 2 条（退役 `--red-soft`/`--red-deep` 时必须一起改），断言在旧样式上已证明失败。
 - [x] 8. 手机端 header 与 H1 间距：删掉 ≤820px 时把 hero 顶距压到 4px 的覆盖，回到与桌面相同的 16px；新断言在 390x844、375x667、320x700 下要求 ≥16px（旧样式 4px、失败），61% 纸面下限的既有断言仍通过。
@@ -103,6 +103,6 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 31. 网页成稿屏 `Copy text` 焦点环：`.home .room-primary` 仍用 `--on-ink` 内环，白纸 / 黑纸上 1.00:1 看不见；改为与 D-126 同样的 3px 外偏移墨色环，`phase4.spec` 改断言（偏移 3px、颜色等于墨色；旧样式 -2px 失败）。
 - [x] 32. Windows 退出确认用墨色（D-124），不再用 `PaperDanger`；像素测试 `TestTheArmedExitConfirmationIsInk` 在旧代码上读到红色像素、失败。
 - [x] 33. Windows 同步 Mac 第 16、17 条：结账不可用时间距 20；Activate 预留最宽标签；入口卡反馈行预留一行。`TestTheActivationCardMovesNothingWhenItAnswers` 在旧代码上两处都失败（宽 106.7 < 120.2；web trial 435.8 → 451.5）；间距 20 是常量改动，无头测试量不出 pill 内文字的上边，未单独断言。SYNC 第 77 行。
-- [ ] 34. 决策与文档：D-125 改正 Windows 只换了书写/标题/数字三个角色；记录 Pricing 按钮 `Buy for $4.99` 的例外（D-127）；第 5 条措辞改正（卡内 `$4.99` 与 `3 free sessions` 仍各两次）；同步 `docs/ui-quality.md` Q-13/Q-22/Q-23/Q-34、`docs/wid-mac-behavior.md` 39/50、FirstLine AGENTS、writeitdown AGENTS、Windows SYNC 9/25/74/75。
+- [x] 34. 决策与文档：D-125 改正 Windows 只换了书写/标题/数字三个角色；记录 Pricing 按钮 `Buy for $4.99` 的例外（D-127）；第 5 条措辞改正（卡内 `$4.99` 与 `3 free sessions` 仍各两次）；同步 `docs/ui-quality.md` Q-13/Q-22/Q-23/Q-34、`docs/wid-mac-behavior.md` 39/50、FirstLine AGENTS、writeitdown AGENTS、Windows SYNC 9/25/74/75。
 - [ ] 35. `apps/macos/FirstLine/scripts/qa-window.sh` 的警告句断言改为句子式。
 

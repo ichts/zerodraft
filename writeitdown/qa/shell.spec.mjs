@@ -318,7 +318,7 @@ test('the purchase path states one price string', async ({ page, context }) => {
   await page.route('https://fonts.gstatic.com/**', route => route.abort());
   const check = async label => {
     let text = (await page.locator('body').innerText()).replace(/\s+/g, ' ').trim();
-    // D-122: the homepage Pricing block's one button reads `Buy for $4.99`, the single named exception to the string.
+    // D-127: the homepage Pricing block's one button reads `Buy for $4.99`, the single named exception to the string.
     if (label === 'index.html') text = text.replace('Buy for $4.99', 'Buy');
     const mentions = [...text.matchAll(pricePattern)].map(match => match[0].trim());
     for (const mention of mentions)

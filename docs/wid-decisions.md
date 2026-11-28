@@ -2778,10 +2778,11 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 
 - Date: 2026-11-28. Captain: "maybe use this font: https://allo.joshpuckett.me/ - it can be tuned to what we need".
   On the Artideck board `white-black-paper` the captain kept the landing's red hand accent (option A).
-- Decision: writeitdown.app, the Mac app and the Windows app set every product role in Allo (OFL-1.1, allo-font
-  1.0.3, ROND pinned at 30, `wght` 300-700, the same `allo-latin.woff2` the Mac bundles): what the writer writes
-  at 410, headings and result titles at 540, the warning numeral upright at 360, and everything the tool says at
-  400 / 500 / 600. Chinese is Resource Han Rounded (GB2312, one file). Newsreader and Zhuque Fangsong leave the web.
+- Decision: writeitdown.app and the Mac app set every product role in Allo (OFL-1.1, allo-font 1.0.3, ROND pinned
+  at 30, `wght` 300-700, the same `allo-latin.woff2` the Mac bundles): what the writer writes at 410, headings and
+  result titles at 540, the warning numeral upright at 360, and everything the tool says at 400 / 500 / 600. The
+  Windows app sets the writing, the headings and the numeral in Allo at those weights and keeps Segoe UI Variable
+  for its chrome (clock, captions, pills, cards) until that can be measured against the Mac on a real window. Chinese is Resource Han Rounded (GB2312, one file). Newsreader and Zhuque Fangsong leave the web.
   Reenie Beanie stays the landing's hand accent only (D-057, D-121); it never enters the room or the apps.
 - Web: `--serif` (written text and display) and `--sans` (the tool) keep their role names and both resolve to
   Allo; `--w-write`, `--w-display`, `--w-numeral` carry the three weights. D-109's freeze is unchanged: a draft
@@ -2805,3 +2806,16 @@ first-screen position, the ink, the underline and the absence of a pill all stay
 - Tests: `RoundThreeTests.everyPillWearsTheOuterInkRing` and `everyCardControlUsesTheInkFocusRingInLightAndDark`,
   `RoomTests.keptStateFocusesCopyText` (the ring's frame is 3 pt outside the pill, in paper ink, on both papers).
 - Supersedes: D-024's light ring on the ink pill's edge.
+
+## D-127: the Pricing block's Buy button names the price
+
+- Date: 2026-11-28. Recorded after the captain merged #184 (D-122), whose Pricing block carries `Buy for $4.99`
+  where D-114 sets the one word `Buy` on every link to the purchase page.
+- Decision: inside the landing's Pricing block, under the `$4.99` figure and its `once · no subscription` line, the
+  primary button reads `Buy for $4.99`. Every other link to the purchase page, the header's included, stays `Buy`
+  (D-114). The block still states `$4.99`, and `3 free sessions`, twice: in the figure or a fact row and on a
+  button label; Q-20's `$4.99 once` reads across the figure and its line under it.
+- Tests: `writeitdown/qa/mac.spec.mjs` "the Pricing block shows the price, one 48 px button row and two-line
+  facts" pins the label; `qa/shell.spec.mjs` keeps its one price string across the purchase path.
+- Supersedes: D-114 for this one button only.
+

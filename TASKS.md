@@ -95,4 +95,5 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 ### E. 验收
 
-- [ ] 30. 三端逐屏验收与全部命令（根 `npm test`、`writeitdown npm run test:full`、`verify-writing-deadlines`、`swift build && swift test`、Windows `go test ./...` 与 `check_tokens.sh`），advisor 终审，验收表。
+- [!] 30. 验收命令（2026-11-28，main `9f9757c`）：根 `npm test` 21 passed；`writeitdown npm run test:full` 1376 passed；`verify-writing-deadlines` 0 failures；`swift build && swift test` 403 passed；Windows `go test ./...` 全过、`GOOS=windows go build` 通过、`check_tokens.sh` 通过。
+  - 未解决：(1) Gemini 复审：第 1–3 条第 2 轮与第 4–28 条首轮未完成（本会话只能在回复消息时 @ 成员）；(2) advisor 终审未做，原因同上；(3) Mac 真窗口：cua-driver 守护进程未运行、TCC 权限需哥授权，且 `scripts/qa-window.sh` 仍断言 D-120 之前的大写警告句；(4) Windows 真窗口：A8；(5) GitHub 上 `windows`、`writeitdown` 两个工作流处于 disabled_manually，CI 不会运行。

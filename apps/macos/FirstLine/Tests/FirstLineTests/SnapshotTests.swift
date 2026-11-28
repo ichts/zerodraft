@@ -46,7 +46,9 @@ struct SnapshotTests {
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360), focus: true)
             try snapshot(UpgradeViewController(appState: try trialState(used: 3)), name: "activation-focus-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360), focus: true)
-            try snapshot(UpgradeViewController(appState: checkingState()), name: "activation-checking-\(suffix)",
+            let checking = checkingState()
+            #expect(checking.licenseValidationInFlight && !checking.hasFullAccess, "the checking fixture is not a running check")
+            try snapshot(UpgradeViewController(appState: checking), name: "activation-checking-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360))
             try snapshot(UpgradeViewController(appState: activatingState()), name: "activation-activating-\(suffix)",
                          appearance: appearance, output: output, sheetPoint: NSPoint(x: 250, y: 360))
@@ -56,30 +58,31 @@ struct SnapshotTests {
 
             let rest = roomState(appearance: appearance)
             try snapshot(rest.room, name: "room-rest-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 520, y: 660))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660), bar: rest)
 
             let typed = roomState(appearance: appearance)
             typeDraft(typed)
             try snapshot(typed.room, name: "room-typing-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 520, y: 660))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660), bar: typed)
 
             let exitHint = roomState(appearance: appearance)
             typeDraft(exitHint)
             exitHint.room.exitConfirmation = ExitConfirmation(window: 60)
             exitHint.room.requestExit()
             try snapshot(exitHint.room, name: "room-exit-hint-\(suffix)", appearance: appearance,
-                         output: output, paperPoint: NSPoint(x: 520, y: 660))
+                         output: output, paperPoint: NSPoint(x: 520, y: 660), bar: exitHint)
 
             try snapshot(activationError(), name: "activation-error-\(suffix)", appearance: appearance,
                          output: output, sheetPoint: NSPoint(x: 250, y: 360))
             // The warn state is the one room state whose sheet is not the plain tone: it is measured against the
             // wash at the strength the tick produced (idle 5.6 s of the 8 s limit = 0.2).
             let wash = { (fraction: CGFloat) in (NSPoint(x: 520, y: 120), fraction) }
-            try snapshot(warningState(reducesMotion: false, appearance: appearance).room,
-                         name: "room-warning-\(suffix)", appearance: appearance, output: output, washPoint: wash(0.2))
-            try snapshot(warningState(reducesMotion: true, appearance: appearance).room,
-                         name: "room-warning-reduced-\(suffix)", appearance: appearance, output: output,
-                         washPoint: wash(1))
+            let warning = warningState(reducesMotion: false, appearance: appearance)
+            try snapshot(warning.room, name: "room-warning-\(suffix)", appearance: appearance, output: output,
+                         washPoint: wash(0.2), bar: warning)
+            let reduced = warningState(reducesMotion: true, appearance: appearance)
+            try snapshot(reduced.room, name: "room-warning-reduced-\(suffix)", appearance: appearance, output: output,
+                         washPoint: wash(1), bar: reduced)
             for (state, room) in [("deleted", deletedState(appearance: appearance)),
                                   ("kept", keptState(appearance: appearance, copy: false)),
                                   ("copied", keptState(appearance: appearance, copy: true))] {
@@ -169,16 +172,17 @@ struct SnapshotTests {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         var settings = AppSettings.defaultValue
         settings.trialSessionsUsed = 3
+        // A stored key whose last result is unknown: the entry card stays up while its check runs (Q-32).
         settings.licenseKey = "KEY"
-        settings.licenseStatus = .active
+        settings.licenseStatus = .unknown
         settings.licenseActivatedAt = now
         settings.licenseLastValidatedAt = now
         settings.licenseInstanceID = "lki_existing"
         settings.licenseProductID = "prod_mock"
-        settings.licenseToken = "mock-token"
         let store = SettingsStore(configDirectory: root)
         try? store.save(settings)
-        return AppState(settingsStore: store, licenseClient: MockLicenseClient(),
+        // The launch validation is still running when the card is drawn (Q-32), so the client answers late.
+        return AppState(settingsStore: store, licenseClient: MockLicenseClient(artificialDelay: .seconds(120)),
                         checkoutClient: MockCheckoutClient(), installIDStore: InstallIDStore(configDirectory: root),
                         clock: { now }, productID: "prod_mock")
     }
@@ -298,7 +302,7 @@ struct SnapshotTests {
     private func snapshot(_ controller: NSViewController, name: String, appearance: NSAppearance.Name,
                           output: URL?, sheetPoint: NSPoint? = nil, paperPoint: NSPoint? = nil,
                           washPoint: (point: NSPoint, fraction: CGFloat)? = nil,
-                          focus: Bool = false, cornerFill: NSColor = .clear) throws {
+                          focus: Bool = false, cornerFill: NSColor = .clear, bar: RoomFixture? = nil) throws {
         // D-102: the window has no ground, so a surface's corners are clear and the writer's desktop shows there.
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size),
                               styleMask: [.titled], backing: .buffered, defer: false)
@@ -311,9 +315,12 @@ struct SnapshotTests {
         if focus {
             window.makeKeyAndOrderFront(nil)
             controller.viewDidAppear()
-            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-            controller.view.layoutSubtreeIfNeeded()
         }
+        // Layout that settles on the next turn (the kept sheet's block) lands before the capture, and the bar is
+        // settled after the window's size change re-synced it to an empty model.
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        controller.view.layoutSubtreeIfNeeded()
+        if let bar { settleBar(bar) }
         controller.view.displayIfNeeded()
         let rep = try #require(controller.view.bitmapImageRepForCachingDisplay(in: controller.view.bounds))
         controller.view.cacheDisplay(in: controller.view.bounds, to: rep)
@@ -323,6 +330,12 @@ struct SnapshotTests {
             #expect(button.focusRingType == .none)
             let ringing = try #require(button as? FirstLineInkFocusRinging)
             #expect(ringing.showsInkFocusRing)
+        }
+        if let bar, bar.engine.phase == .writing || bar.engine.phase == .danger || !bar.engine.hasStarted {
+            // The 2 pt session bar is drawn along the sheet's top edge on every running room state (Q-01, Q-37).
+            let scale = CGFloat(rep.pixelsWide) / size.width
+            try assertPixel(rep, at: NSPoint(x: 120 * scale, y: 33 * scale), equals: FirstLineColors.paperInkNSColor,
+                            in: appearance, name: "\(name) bar")
         }
         if let output {
             let data = try #require(rep.representation(using: .png, properties: [:]))

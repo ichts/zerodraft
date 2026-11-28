@@ -37,7 +37,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - 第 1、2（含 7）、3 条：Gemini 第 1 轮打回，修复随第 4、5 条一起提交，待第 2 轮复审。
 - 第 4、5 条：待审。
 - 第 6、8、9、11、12、12b、13 条：待审。
-- 第 14（含 20）、15、16、17、18、19 条：待审。
+- 第 14（含 20）、15、16、17、18、19、21 条：待审。
 
 ## 清单
 
@@ -76,7 +76,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 - [x] 18. License 输入框：新增 `FirstLineTextField`（Controls.swift），文字与编辑光标都在垂直中线，画卡片自己的底色与 `hairStrong` 细边、8pt 圆角，不再用系统 roundedBezel；激活卡与 Settings 共用。新测试在旧字段上失败（有 bezel、上下差 16pt、无卡片底色）。
 - [x] 19. Settings 行标签改句子式：`Reduced motion`、`Focus mode`、`Font size`，无障碍名同步；BatchFiveTests 断言旧写法不再出现（旧代码失败）。
 - [x] 20. `SessionViewController.swift` L3 头注释：拒删提示位置改为 D-100 的「书写行下方」，并去掉换纸开关描述；并入第 14 条提交。
-- [ ] 21. 快照缺陷：会话条没画出、kept 旧帧、checking fixture。
+- [x] 21. 快照缺陷：(a) 会话条在窗口改尺寸后被重置为空，现于截图前重新 settle，并在每个运行中的房间状态断言纸顶 2pt 条为墨色（去掉 settle 时 4 处失败）；(b) 截图前统一跑一轮 runloop 再布局，kept 与 copy-focus 的标题顶端都在 114px；(c) checking 改为「存有 key、结果未知、检查进行中」的入口卡，断言 `licenseValidationInFlight && !hasFullAccess`，截图显示 `Checking your license…` 与禁用的 Buy。
 
 ### D. Windows
 

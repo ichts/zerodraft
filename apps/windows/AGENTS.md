@@ -8,11 +8,10 @@ app/: Home、规则、激活、设置四个屏、路由与后台网络调用；�
 room/: 写作房间的状态、绘制与几何（Mac `SessionViewController` 的对应物）；`room.Config.Admit` 是试用扣次的唯一入口。
 ime/: 前向只写的 `ui.TextInputClient`（Windows IMM32）；输入法行为只由真机 `scripts/ime-suite.sh` 证明。
 session/: 纯会话时钟与字数（`SessionEngine.swift` 的移植），截止与擦除按绝对时刻竞争，平局归擦除。
-paper/: Wheat 纸面纹理（`PaperField` 的移植）。
 licence/: licence service 的 Windows 客户端（token 验证、activate/validate/deactivate、checkout、试用、离线宽限、撤销）；token、订单号、状态与试用计数只存 Windows Credential Manager，绝不落文件；`fakeservice/` 只供无头单测。
 tokens/: 由 `scripts/gen_tokens.py` 从 `../macos` 源码生成的颜色、间距、常量与文案，禁止手改。
-fonts/: 字体。Zhuque Fangsong 是 Mac 文件的逐字节拷贝（`go:embed` 不能越出模块）；三个静态 Newsreader 由 `scripts/gen_fonts.py` 从 Mac 的可变字体按角色固定光学字号（Mac 每次绘制都把 opsz 设为字号，mygo 在 Windows 上不会）派生，`scripts/check_tokens.sh` 逐字节复算校验（需要 fonttools 4.68.0）。
-cmd/qaserver、cmd/drv、cmd/imecheck、cmd/papershot: QA 与真机验收工具，不进发布包。
+fonts/: 字体（D-125）。三个静态 Allo（书写 410、标题 540、警告数字 360）与 Resource Han Rounded 的 TrueType 由 `scripts/gen_fonts.py` 从 Mac 包内的 woff2 派生（mygo 不读 woff2，且按 family 选字面），`scripts/check_tokens.sh` 逐字节复算校验（需要 fonttools 4.68.0 与 brotli）。纸是纯色（D-124），没有纹理包。
+cmd/qaserver、cmd/drv、cmd/imecheck: QA 与真机验收工具，不进发布包。
 packaging/: MSIX 清单、素材与签名/安装脚本；`STORE.md` 是 Store 身份表（已保留的 Name/Publisher/PFN/Store ID、提交版本与 Windows 11 下限）；`scripts/package-msix.sh store` 用该身份打未签名 MSIX，`scripts/check_manifest.sh` 断言 store 清单为该身份、版本首段不为 0、下限恰为 Windows 11，sideload 清单为测试身份且同一下限。
 version/: 应用版本的唯一来源 `version.txt`（Settings 的 About 与每个 MSIX 清单的版本都由它来；`mygo.json` 里的副本由 `go test ./version` 守同，三处不一致即失败）。
 scripts/: 生成器、漂移门槛、与 Mac 的并排度量（`compare_mac.py`、`pair.sh`、`screens.sh`）与 vivobook-1 真机脚本（IME 套件、截图度量、端到端）。

@@ -15,11 +15,10 @@ app/             home, rules, activation and settings screens, routing, backgrou
 room/            the writing room: state (room.go), painter (draw.go), pure geometry (geometry.go), pills
 ime/             the one risky layer: the forward-only ui.TextInputClient (IMM32 on Windows)
 session/         the pure session clock and word count (port of SessionEngine.swift)
-paper/           the Wheat paper texture (port of PaperField)
 licence/         the client of services/license: token verifier, activate/validate/deactivate, checkout, trial, vault
 tokens/          GENERATED from the Mac sources by scripts/gen_tokens.py; never edit
-fonts/           Zhuque Fangsong (a byte copy of the Mac app's file; go:embed cannot leave the module) and three static Newsreader
-                 faces derived from the Mac's variable fonts with the optical size the Mac draws each role at (scripts/gen_fonts.py)
+fonts/           Allo at the Mac's weight per role (writing 410, display 540, numeral 360) and Resource Han Rounded, TrueType faces
+                 derived from the Mac app's own woff2 files (scripts/gen_fonts.py, D-125)
 cmd/qaserver     QA only: runs the real services/license behind a loopback fake Stripe + a control port
 cmd/drv          Windows desktop driver (SendInput, TSF IME switching, DPI switching, window captures)
 cmd/imecheck     judges one IME suite run
@@ -73,13 +72,13 @@ generated from the Mac sources at their real paths:
 
 ```
 python3 scripts/gen_tokens.py | gofmt > tokens/tokens_gen.go     # regenerate, from apps/windows
-python3 scripts/gen_fonts.py                                     # the derived Newsreader faces (fonttools 4.68.0)
+python3 scripts/gen_fonts.py                                     # the derived Allo and Resource Han Rounded faces (fonttools 4.68.0, brotli)
 sh scripts/check_tokens.sh                                       # fails when stale, or when a font or the lockup differs from the Mac's
 ```
 
-The lockup SVG (`app/lockup.svg`) and Zhuque Fangsong are byte-compared with the Mac's, and the three Newsreader faces are
-re-derived and compared byte for byte (the Mac sets the font's optical size to the point size on every run, mygo on Windows
-keeps the default, so the Windows room pins the Mac's value per role; SYNC.md row 22). Every Mac sentence is searched for verbatim before it is emitted, so a changed Mac sentence fails the generator instead
+The lockup SVG (`app/lockup.svg`) is byte-compared with the Mac's, and the three Allo faces and Resource Han Rounded are
+re-derived from the Mac's files and compared byte for byte (mygo picks a face by family, so each role is its own static
+instance at the Mac's weight; SYNC.md row 22). Every Mac sentence is searched for verbatim before it is emitted, so a changed Mac sentence fails the generator instead
 of drifting. When the gate fails: regenerate, run `go test ./...`, then update the parity row in `SYNC.md` in the same
 PR.
 
@@ -107,7 +106,7 @@ real input and the Microsoft IMEs, so they are not CI. Host and desktop user com
   1040 x 720 page area at 100% (`WID_WINDOW=1040x720`), compared with the Mac's `SnapshotTests` PNGs by
   `scripts/compare_mac.py` (one detector over both images, rows of ink and pills in DIPs). Produce the Mac side with
   `cd ../macos/FirstLine && WID_SNAPSHOT_DIR=$MAC_SNAPSHOTS swift test --filter SnapshotTests` and pass `MAC_SNAPSHOTS`.
-  `go test ./room ./app -run MacPair` renders the same states headless (its chrome face is a fallback: only Newsreader rows
+  `go test ./room ./app -run MacPair` renders the same states headless (its chrome face is a fallback: only the writing rows
   and geometry mean anything there).
 - `scripts/e2e.sh 150|100 [0]` - the whole product against the real `services/license` (built from this repository,
   unmodified) in Stripe TEST mode behind the loopback fake Stripe: first launch, three trial sessions, activation card,

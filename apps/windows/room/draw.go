@@ -2,6 +2,7 @@ package room
 
 import (
 	"fmt"
+	"math"
 	"slices"
 	"time"
 
@@ -9,14 +10,12 @@ import (
 
 	"github.com/ichts/zerodraft/apps/windows/fonts"
 	"github.com/ichts/zerodraft/apps/windows/ime"
-	"github.com/ichts/zerodraft/apps/windows/paper"
 	"github.com/ichts/zerodraft/apps/windows/session"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
 )
 
 const (
 	sans         = "Segoe UI Variable, Segoe UI"
-	serifItalic  = "Newsreader Italic, Zhuque Fangsong"
 	hairlineW    = 1
 	focusRingW   = 2
 	barHeight    = 2
@@ -82,39 +81,6 @@ func (r *Room) textOrigin() (float32, float32) { return r.ox, r.oy }
 
 // ---- the paper
 
-func (r *Room) ensureSheet(wPx, hPx int, scale float32, dark bool) *sheetState {
-	key := fmt.Sprintf("%dx%d@%.2f-%v", wPx, hPx, scale, dark)
-	cur := r.sheet.Load()
-	if cur != nil && cur.key == key {
-		return cur
-	}
-	build := func() {
-		s := paper.Render(wPx, hPx, float64(scale), dark)
-		st := &sheetState{key: key, bitmap: ui.NewBitmap(s.Texture), base: s.Base, shift: s.Shift, w: wPx, h: hPx}
-		r.sheet.Store(st)
-		r.logf("PAPER rendered %s", key)
-	}
-	if cur == nil { // the first frame already carries the paper: never a flat sheet
-		t0 := time.Now()
-		build()
-		r.logf("PAPER first render %.0f ms", float64(time.Since(t0).Microseconds())/1000)
-		return r.sheet.Load()
-	}
-	r.sheetMu.Lock()
-	if !r.building {
-		r.building = true
-		go func() {
-			build()
-			r.sheetMu.Lock()
-			r.building = false
-			r.sheetMu.Unlock()
-			r.invalidate()
-		}()
-	}
-	r.sheetMu.Unlock()
-	return cur // the previous texture, stretched, until the new size is ready
-}
-
 func clampByte(v float64) uint8 {
 	if v < 0 {
 		return 0
@@ -137,7 +103,6 @@ func (r *Room) draw(p *ui.Painter, box ui.Rect, now time.Time, dark bool) {
 		r.logf("SIZE %s", sz)
 	}
 	pr := PaperRect(W, H)
-	scale := p.Scale()
 	phase := r.eng.Phase
 	failure := phase == session.Failure
 	kept := phase == session.Success
@@ -147,7 +112,7 @@ func (r *Room) draw(p *ui.Painter, box ui.Rect, now time.Time, dark bool) {
 	dx := r.shakeOffset(now)
 	p.Transform(ui.Translation(dx, 0), pr.X+pr.W/2, pr.Y+pr.H/2, func() {
 		p.Clip(pr, tokens.RadiusSheet, func() {
-			r.drawSheet(p, pr, now, dark, scale)
+			r.drawSheet(p, pr, now, dark)
 			r.drawContent(p, box, pr, now, dark, failure, kept)
 			r.drawDenyOutline(p, pr, now, dark)
 		})
@@ -162,26 +127,17 @@ func pick[T any](c bool, a, b T) T {
 	return b
 }
 
-func (r *Room) drawSheet(p *ui.Painter, pr ui.Rect, now time.Time, dark bool, scale float32) {
-	wPx, hPx := int(float64(pr.W*scale)+0.5), int(float64(pr.H*scale)+0.5)
-	st := r.ensureSheet(wPx, hPx, scale, dark)
+// drawSheet paints the sheet: one flat tone, white or black (D-124), and the grey wash over it while the warning runs.
+func (r *Room) drawSheet(p *ui.Painter, pr ui.Rect, now time.Time, dark bool) {
 	tone := rc(tokens.Paper, dark)
-	baseC := ui.RGB(clampByte(float64(tone.R)+st.shift.R), clampByte(float64(tone.G)+st.shift.G), clampByte(float64(tone.B)+st.shift.B))
-	p.Fill(pr, baseC, 0)
-	full := ui.Rect{W: float32(st.w), H: float32(st.h)}
-	p.ImageRegion(st.bitmap, full, pr, ui.ImageOptions{})
+	p.Fill(pr, tone, 0)
 	frac, deep, alpha := r.wash(now)
 	if alpha <= 0 {
 		return
 	}
 	target := rc(pick(deep, tokens.PaperWashDeep, tokens.PaperWash), dark)
-	mix := func(a, b uint8, shift float64) uint8 {
-		return clampByte(float64(a) + (float64(b)-float64(a))*float64(frac) + shift)
-	}
-	tint := ui.RGB(mix(tone.R, target.R, st.shift.R), mix(tone.G, target.G, st.shift.G), mix(tone.B, target.B, st.shift.B))
-	p.Fill(pr, withAlpha(tint, alpha), 0)
-	white := ui.RGBA(255, 255, 255, alpha)
-	p.ImageRegion(st.bitmap, full, pr, ui.ImageOptions{Tint: white})
+	mix := func(a, b uint8) uint8 { return clampByte(float64(a) + (float64(b)-float64(a))*float64(frac)) }
+	p.Fill(pr, withAlpha(ui.RGB(mix(tone.R, target.R), mix(tone.G, target.G), mix(tone.B, target.B)), alpha), 0)
 }
 
 // wash returns the sheet's warm tint 0..1, whether it is the deeper cut step, and its opacity (the exit is
@@ -374,7 +330,7 @@ func (r *Room) drawWriting(p *ui.Painter, box, pr ui.Rect, now time.Time, dark b
 		// every span carries its own rung's colour (shapeWriting); the default colour is the gone rung, invisible
 		p.TextLayout(r.layout, x0, oy, ui.RGBA(0, 0, 0, 0))
 		if !r.ed.Composing() && r.eng.Phase != session.Failure && (now.UnixMilli()/530)%2 == 0 {
-			m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
+			m := ui.Font{Family: "Allo", Size: font.Size}.Metrics()
 			ch := m.Ascent + m.Descent
 			p.Fill(ui.Rect{X: x0 + cb.X, Y: oy + cb.Y + (pitch-ch)/2, W: 1.5, H: ch}, ink, 0)
 		}
@@ -404,16 +360,16 @@ func (r *Room) drawRefusalNote(p *ui.Painter, pr ui.Rect, now time.Time, quiet u
 }
 
 // leadingAbove is how far the Mac's bottom-aligned glyphs sit lower in a 1.6 line box than mygo's evenly split leading
-// puts them: half of the box's leading (D-077's lines and the kept draft are Newsreader in 1.6 boxes).
+// puts them: half of the box's leading (D-077's lines and the kept draft are Allo in 1.6 boxes).
 func (r *Room) leadingAbove() float32 {
 	font := r.writingFont()
-	m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
+	m := ui.Font{Family: "Allo", Size: font.Size}.Metrics()
 	return (font.Size*tokens.LineHeight - (m.Ascent + m.Descent)) / 2
 }
 
 // writingBaseline is the baseline's distance below the top of a writing line's box in mygo's layout.
 func (r *Room) writingBaseline(font ui.Font, pitch float32) float32 {
-	m := ui.Font{Family: "Newsreader", Size: font.Size}.Metrics()
+	m := ui.Font{Family: "Allo", Size: font.Size}.Metrics()
 	return (pitch-(m.Ascent+m.Descent))/2 + m.Ascent
 }
 
@@ -538,12 +494,12 @@ func (r *Room) drawWarning(p *ui.Painter, pr ui.Rect, ink ui.Color, dark bool, a
 	size := round(min(r.winH()*0.18, 170))
 	above, below := DigitInk(rune('0'+n%10), size)
 	numTop := baseline + 44
-	l := r.shape(textSpec{s: fmt.Sprint(n), family: serifItalic, size: size})
+	l := r.shape(textSpec{s: fmt.Sprint(n), family: fonts.Numeral, size: size})
 	w, _ := l.Size()
-	p.TextLayout(l, pr.X+(pr.W-w)/2, numTop+above-r.ascent("Newsreader Italic", size), rc(tokens.PaperDanger, dark))
+	p.TextLayout(l, pr.X+(pr.W-w)/2, numTop+above-r.ascent(fonts.Numeral, size), rc(tokens.PaperDanger, dark))
 	capH := float32(13) * 0.70
 	capTop := numTop + above + below + 20
-	cap := r.shape(textSpec{s: tokens.StrWarning, family: sans, size: 13, weight: 500, spacing: 0.04, lh: 1.5})
+	cap := r.shape(textSpec{s: tokens.StrWarning, family: sans, size: 13, weight: 500, lh: 1.5})
 	cw, ch := cap.Size()
 	asc := r.ascent(sans, 13)
 	lineTop := capTop + capH - asc - (ch-(asc+r.descent(sans, 13)))/2
@@ -575,7 +531,7 @@ func (r *Room) stoppedGeo(W, H float32) stoppedGeo {
 	pr := PaperRect(W, H)
 	f := FailureFor(W)
 	g := stoppedGeo{f: f, pillLabelSize: f.PillLabel}
-	g.headline = r.shape(textSpec{s: tokens.StrStopped, family: fonts.DisplayStack, size: f.Base, weight: 500, lh: tokens.FailureHeadlineLH, width: pr.W - 96, center: true})
+	g.headline = r.shape(textSpec{s: tokens.StrStopped, family: fonts.DisplayStack, size: f.Base, weight: 540, lh: tokens.FailureHeadlineLH, width: pr.W - 96, center: true})
 	_, hh := g.headline.Size()
 	top, _ := f.GroupTop(pr.H, hh)
 	y := pr.Y + top
@@ -617,10 +573,11 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	var g keptGeo
 	top := pr.Y + keptBlockTop
 	hs := KeptHeadingSize(W)
-	g.heading = r.shape(textSpec{s: tokens.StrKeptHeading, family: fonts.DisplayStack, size: hs, weight: 500, width: pr.W - 72, center: true})
+	g.heading = r.shape(textSpec{s: tokens.StrKeptHeading, family: fonts.DisplayStack, size: hs, weight: 540, width: pr.W - 72, center: true})
 	_, hh := g.heading.Size()
 	g.hx, g.hy = pr.X+36, top
-	y := top + hh + tokens.KeptHeadingGap
+	// a label's box is its line rounded up to a whole point, as the Mac's NSTextField sizes it
+	y := top + float32(math.Ceil(float64(hh))) + tokens.KeptHeadingGap
 	// the receipt and the caption are 13 pt labels in the Mac's 1.6 line box, bottom-aligned: the next block starts a
 	// whole box (macLabelBox) under the box's top, whatever the glyphs inside it do
 	g.receipt = r.shape(textSpec{s: keptReceipt(e.WordCount, e.Duration), family: sans, size: 13, weight: 500, spacing: 0.02})
@@ -629,8 +586,8 @@ func (r *Room) keptGeo(W, H float32) keptGeo {
 	y += macLabelBox(13) + tokens.KeptReceiptGap
 	// the copy pill hugs its label but never narrows below the resting Copy text width, so Copied does not move the row
 	// or land Begin again under the pointer; the longer retry label does widen it (D-076 item 7)
-	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 500), r.labelWidth(r.copyLabel, 15, 500)) + 48
-	runW := r.labelWidth(tokens.StrKeptBeginAgain, 15, 500) + 40
+	copyW := max(r.labelWidth(tokens.StrCopyText, 15, 600), r.labelWidth(r.copyLabel, 15, 600)) + 48
+	runW := r.labelWidth(tokens.StrKeptBeginAgain, 15, 600) + 40
 	x := pr.X + (pr.W-(copyW+tokens.KeptActionSpacing+runW))/2
 	g.copyRect = ui.Rect{X: x, Y: y, W: copyW, H: 48}
 	g.runRect = ui.Rect{X: x + copyW + tokens.KeptActionSpacing, Y: y, W: runW, H: 48}

@@ -262,7 +262,7 @@ func rulesMeasure(lines []string) float32 {
 	return min(limit, float32(math.Ceil(float64(widest))))
 }
 
-const roomSerif = fonts.DisplayStack // the rules heading is Newsreader 500 at its own size (the Mac sets the optical axis to the size)
+const roomSerif = fonts.DisplayStack // the rules heading is Allo 540, the Mac's display weight (D-125)
 
 // ---- Upgrade (the activation card)
 

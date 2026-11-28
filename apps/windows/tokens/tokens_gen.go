@@ -2,36 +2,40 @@
 
 package tokens
 
-// Colour roles, light and dark, 0xRRGGBB with alpha 0..1 (1 when the Mac role is opaque).
+// Colour roles, light (the white paper) and dark (the black paper), 0xRRGGBB with alpha 0..1 (D-124).
 type Role struct {
 	Light, Dark           uint32
 	LightAlpha, DarkAlpha float32
 }
 
 var (
-	Page          = Role{0xF7F7F5, 0x15140F, 1, 1}
-	Sheet         = Role{0xFFFFFF, 0x26231C, 1, 1}
-	Paper         = Role{0xE9E2CE, 0x342E24, 1, 1}
-	PaperQuiet    = Role{0x48443E, 0xC2BFB7, 1, 1}
-	PaperDanger   = Role{0x63140B, 0xFFC2B4, 1, 1}
-	PaperWash     = Role{0xE8CFBB, 0x453226, 1, 1}
-	PaperWashDeep = Role{0xE6BCA7, 0x573428, 1, 1}
-	Ink           = Role{0x1C1917, 0xECE7D9, 1, 1}
-	Mute          = Role{0x6B655C, 0xA39D8E, 1, 1}
-	Chrome        = Role{0x5C564D, 0xA39D8E, 1, 1}
-	Hair          = Role{0x1C1917, 0xECE7D9, 0.10, 0.10}
-	SheetRing     = Role{0x1C1917, 0xECE7D9, 0.07, 0.10}
-	HairStrong    = Role{0x1C1917, 0xECE7D9, 0.16, 0.18}
-	TagBackground = Role{0xF2F2F0, 0x2E2A22, 1, 1}
-	SegmentTrack  = Role{0x1C1917, 0xECE7D9, 0.06, 0.10}
-	Red           = Role{0xB02A1E, 0xE4604A, 1, 1}
-	RedText       = Role{0xB02A1E, 0xFF9B88, 1, 1}
-	OnInk         = Role{0xFFFFFF, 0x15140F, 1, 1}
-	Shadow        = Role{0x1C1917, 0x000000, 1, 1}
+	Page            = Role{0xF7F7F5, 0x000000, 1, 1}
+	Sheet           = Role{0xFFFFFF, 0x111111, 1, 1}
+	Ink             = Role{0x1C1917, 0xEDEDED, 1, 1}
+	Mute            = Role{0x6B655C, 0xA3A3A3, 1, 1}
+	Chrome          = Role{0x6B655C, 0xA3A3A3, 1, 1}
+	Hair            = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
+	SheetRing       = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
+	HairStrong      = Role{0x1C1917, 0xEDEDED, 0.16, 0.18}
+	TagBackground   = Role{0xF2F2F0, 0x1B1B1B, 1, 1}
+	SegmentTrack    = Role{0x1C1917, 0xEDEDED, 0.06, 0.10}
+	Red             = Role{0xB00C15, 0xFF453A, 1, 1}
+	RedText         = Role{0xB00C15, 0xFF453A, 1, 1}
+	OnInk           = Role{0xFFFFFF, 0x111111, 1, 1}
+	Shadow          = Role{0x1C1917, 0x000000, 1, 1}
+	Separator       = Role{0x1C1917, 0xEDEDED, 0.10, 0.10}
+	Paper           = Role{0xFFFFFF, 0x111111, 1, 1}
+	PaperInk        = Role{0x1C1917, 0xEDEDED, 1, 1}
+	PaperQuiet      = Role{0x3F3B36, 0xC2BFB7, 1, 1}
+	PaperDanger     = Role{0xB00C15, 0xFF453A, 1, 1}
+	PaperWash       = Role{0xF2F2F2, 0x1B1B1B, 1, 1}
+	PaperWashDeep   = Role{0xE6E6E6, 0x262626, 1, 1}
+	PaperHair       = Role{0x1C1917, 0xEDEDED, 0.12, 0.16}
+	PaperHairStrong = Role{0x1C1917, 0xEDEDED, 0.22, 0.30}
 )
 
 // HistoryOpacities are the history steps (D-092), current line first; lines beyond them are gone.
-var HistoryOpacitiesDark = []float32{1, 0.16, 0.05}
+var HistoryOpacitiesDark = []float32{1, 0.17, 0.065}
 var HistoryOpacitiesLight = []float32{1, 0.22, 0.07}
 
 // 4-pt spacing and radii.
@@ -47,7 +51,7 @@ const (
 )
 const (
 	RadiusControl = 8
-	RadiusSheet   = 16
+	RadiusSheet   = 4
 	RadiusCard    = 22
 	RadiusStage   = 28
 )
@@ -82,21 +86,13 @@ const (
 	KeptDraftGap             = 24
 )
 
-// Paper generator constants (PaperField).
-const (
-	PaperGrain = 0.70
-	PaperSize  = 1.00
-	PaperTooth = 44.0
-	PaperPulp  = 24.0
-)
-
 // Room strings, verbatim from the Mac room.
 const (
 	StrExitHint              = "Press Esc again to leave and delete the draft."
 	StrStopped               = "You stopped."
 	StrDraftDeleted          = "Draft deleted."
 	StrBeginAgain            = "Begin again"
-	StrWarning               = "KEEP TYPING OR THE DRAFT IS DELETED."
+	StrWarning               = "Keep typing or the draft is deleted."
 	StrTypeToBegin           = "Type to begin"
 	StrExitLink              = "Esc to exit"
 	StrKeptHeading           = "You wrote it down."

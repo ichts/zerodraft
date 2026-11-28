@@ -1,5 +1,5 @@
-// Package fonts embeds the shared type set (the Mac app's Newsreader + Zhuque Fangsong) and registers it with mygo.
-// Newsreader is the Mac's variable font pinned to the optical size the Mac draws each role at (scripts/gen_fonts.py).
+// Package fonts embeds the shared writing faces (D-125): Allo at the Mac's weight for each role, and Resource Han
+// Rounded for the same roles in Chinese, all derived from the Mac app's own files (scripts/gen_fonts.py).
 package fonts
 
 import (
@@ -11,20 +11,22 @@ import (
 //go:embed *.ttf
 var files embed.FS
 
-// Stack is the writing font list: Newsreader first, Zhuque Fangsong for the characters Newsreader lacks.
-const Stack = "Newsreader, Zhuque Fangsong"
+// Stack is the writing font list: Allo at 410 first, Resource Han Rounded for the characters Allo lacks.
+const Stack = "Allo, Resource Han Rounded"
 
-// DisplayStack is the heading list: the 500 weight at the display optical size (kept heading, stopped headline, rules).
-const DisplayStack = "Newsreader Display, Zhuque Fangsong"
+// DisplayStack is the heading list: Allo at 540 (kept heading, stopped headline, rules).
+const DisplayStack = "Allo Display, Resource Han Rounded"
 
-// Register adds every shipped face. Newsreader's italic registers as its own family because the
-// numeral is italic and mygo picks styles inside one registered family by the font's own style bits.
+// Numeral is the warning numeral's face: Allo at 360, upright.
+const Numeral = "Allo Numeral"
+
+// Register adds every shipped face, one family per role because mygo picks a face by family.
 func Register() error {
 	for file, family := range map[string]string{
-		"Newsreader-Text.ttf":        "Newsreader",
-		"Newsreader-Display.ttf":     "Newsreader Display",
-		"Newsreader-Numeral.ttf":     "Newsreader Italic",
-		"ZhuqueFangsong-Regular.ttf": "Zhuque Fangsong",
+		"Allo-Text.ttf":          "Allo",
+		"Allo-Display.ttf":       "Allo Display",
+		"Allo-Numeral.ttf":       Numeral,
+		"ResourceHanRounded.ttf": "Resource Han Rounded",
 	} {
 		data, err := files.ReadFile(file)
 		if err != nil {

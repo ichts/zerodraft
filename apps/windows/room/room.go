@@ -6,8 +6,6 @@ package room
 
 import (
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ELY-Open-Source/CrychicUI/sound"
@@ -15,7 +13,6 @@ import (
 	"github.com/egoist/mygo/ui"
 
 	"github.com/ichts/zerodraft/apps/windows/ime"
-	"github.com/ichts/zerodraft/apps/windows/paper"
 	"github.com/ichts/zerodraft/apps/windows/session"
 	"github.com/ichts/zerodraft/apps/windows/tokens"
 )
@@ -115,22 +112,8 @@ type Room struct {
 	layoutKey string
 	shapes    map[string]*ui.TextLayout
 
-	// paper texture
-	sheet    atomic.Pointer[sheetState]
-	sheetKey atomic.Value // string: key being rendered
-	sheetMu  sync.Mutex
-	building bool
-
 	// announcements queued from event callbacks
 	announce []string
-}
-
-type sheetState struct {
-	key    string
-	bitmap *ui.Bitmap
-	base   paper.RGB
-	shift  paper.RGB
-	w, h   int
 }
 
 // New builds a room.

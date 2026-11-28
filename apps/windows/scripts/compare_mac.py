@@ -6,7 +6,7 @@ white or ink pills of each (top, bottom, left, right) and prints one PASS/FAIL l
   usage: compare_mac.py MAC.png WIN.png [--scale S] [--region paper|card] [--tol T] [--chrome]
   MAC.png   the Mac's content snapshot (SnapshotTests, WID_SNAPSHOT_DIR): 1040 x 720 at 1x, window content only
   WIN.png   a Windows window crop (drv shotwin, any scale S: 1.0, 1.25, 1.5) or a headless tester frame (S = 1)
-  --region  paper: the Wheat sheet 32 DIP in from the window (the room); card: the white card centred on the page
+  --region  paper: the sheet 32 DIP in from the window (the room); card: the white card centred on the page
   --tol     allowed difference in DIPs for a vertical or horizontal position (default 2.5)
   --drop-win-rows N  ignore the last N rows of the Windows image (rows the Mac does not have)
   --chrome  also compare rows made of system-sans chrome (the Mac's SF against Segoe UI Variable): positions only, text widths differ

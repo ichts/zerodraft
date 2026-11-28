@@ -66,12 +66,12 @@ func (r *Room) pills(c *ui.Context, W, H float32, dark bool) {
 		g := r.keptGeo(W, H)
 		r.buttons = append(r.buttons, g.copyRect, g.runRect)
 		cp := button.Pill(c, r.copyLabel)
-		r.pillStyle(cp, g.copyRect, 15, 500, dark, false).AutoFocus().Label(r.copyLabel)
+		r.pillStyle(cp, g.copyRect, 15, 600, dark, false).AutoFocus().Label(r.copyLabel)
 		if cp.Clicked() {
 			r.activate("copy")
 		}
 		rn := button.Outline(c, tokens.StrKeptBeginAgain)
-		r.pillStyle(rn, g.runRect, 15, 500, dark, true).Label(tokens.StrKeptBeginAgain)
+		r.pillStyle(rn, g.runRect, 15, 600, dark, true).Label(tokens.StrKeptBeginAgain)
 		if rn.Clicked() {
 			r.activate("run")
 		}

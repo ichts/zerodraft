@@ -13,6 +13,15 @@ on:
     paths:
       - 'apps/windows/**'
       - 'apps/macos/FirstLine/Sources/FirstLine/**'
+      - 'writeitdown/tokens.css'
+      - 'tests/fixtures/word-count.json'
+      - '.github/workflows/windows.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/windows/**'
+      - 'apps/macos/FirstLine/Sources/FirstLine/**'
+      - 'writeitdown/tokens.css'
       - 'tests/fixtures/word-count.json'
       - '.github/workflows/windows.yml'
 
@@ -34,7 +43,7 @@ jobs:
           python-version: '3.12'
       - name: Tokens, fonts and lockup match the Mac sources
         run: |
-          python -m pip install fonttools==4.68.0
+          python -m pip install fonttools==4.68.0 brotli
           sh scripts/check_tokens.sh
       - name: MSIX manifests (Store identity, version and Windows 11 floor; sideload keeps the test identity)
         run: sh scripts/check_manifest.sh

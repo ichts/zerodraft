@@ -252,7 +252,7 @@ func TestHistorySteps(t *testing.T) {
 			t.Errorf("light distance %d: %v want %v", d, got, want)
 		}
 	}
-	for d, want := range map[int]float32{1: 0.16, 2: 0.05, 3: -1} {
+	for d, want := range map[int]float32{1: 0.17, 2: 0.065, 3: -1} {
 		if got := HistoryAlpha(d, true); got != want {
 			t.Errorf("dark distance %d: %v want %v", d, got, want)
 		}
@@ -570,17 +570,17 @@ func TestKeptSheetHasTheCaptionAndNoCornerCount(t *testing.T) {
 		t.Fatal("the corner count is silent on the kept sheet only")
 	}
 	k := g.r.keptGeo(1040, 720)
-	// the Mac's kept block (SessionKeptView frames at 1040 x 720): heading box y=88, receipt box 148, actions 194..242,
-	// caption box 254, the draft area from 304; each 13 pt label box is 26 tall
+	// the Mac's kept block in Allo (SessionKeptView frames at 1040 x 720, D-125): heading box y=104 (59 tall), receipt
+	// box 175, actions 221..269, caption box 281, the draft area from 331; each 13 pt label box is 26 tall
 	bottom := k.copyRect.Y + k.copyRect.H
-	if bottom != 242 || k.copyRect.Y != 194 {
-		t.Fatalf("action row %.1f..%.1f, the Mac's is 194..242", k.copyRect.Y, bottom)
+	if bottom != 269 || k.copyRect.Y != 221 {
+		t.Fatalf("action row %.1f..%.1f, the Mac's is 221..269", k.copyRect.Y, bottom)
 	}
-	if k.area.Y != 304 {
-		t.Fatalf("the draft area starts at %.1f, the Mac's at 304 (caption box 254 + 26 + 24)", k.area.Y)
+	if k.area.Y != 331 {
+		t.Fatalf("the draft area starts at %.1f, the Mac's at 331 (caption box 281 + 26 + 24)", k.area.Y)
 	}
-	if k.hy != 88 {
-		t.Fatalf("heading box top %.1f, the Mac's is 88", k.hy)
+	if k.hy != 104 {
+		t.Fatalf("heading box top %.1f, the Mac's is 104", k.hy)
 	}
 }
 

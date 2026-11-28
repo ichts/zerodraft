@@ -18,7 +18,7 @@ func clampf(v, lo, hi float32) float32 {
 	return float32(math.Max(float64(lo), math.Min(float64(hi), float64(v))))
 }
 
-// PaperRect is the Wheat sheet: inset 32 from the window on every side (installConstraints).
+// PaperRect is the sheet: inset 32 from the window on every side (installConstraints).
 func PaperRect(w, h float32) ui.Rect {
 	return ui.Rect{X: tokens.PaperMargin, Y: tokens.PaperMargin, W: w - 2*tokens.PaperMargin, H: h - 2*tokens.PaperMargin}
 }
@@ -150,9 +150,9 @@ func keyframes(vals, times []float32, t float32) float32 {
 // 1.6 natural lines tall and the text sits at its bottom, descent above the edge. Windows draws the same boxes, so the
 // rows land where the Mac's do whatever the system face is (Segoe UI Variable, not SF).
 const (
-	// keptBlockTop is where the kept heading's box starts under the paper's top edge. SessionKeptView pins its header 16
-	// DIP above verticalInset (72): the Mac's heading frame is y=88 on a sheet at y=32 in a 1040 x 720 window.
-	keptBlockTop = 56
+	// keptBlockTop is where the kept heading's box starts under the paper's top edge: the Mac's heading frame is y=104
+	// on a sheet at y=32 in a 1040 x 720 window (SessionKeptView frames, measured after D-125's Allo).
+	keptBlockTop = 72
 	// footerBaselineInset is the footer row's baseline above the paper's bottom edge: box bottom 25 up, descent 3.
 	footerBaselineInset = 28
 )

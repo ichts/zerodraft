@@ -102,7 +102,7 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 - [x] 31. 网页成稿屏 `Copy text` 焦点环：`.home .room-primary` 仍用 `--on-ink` 内环，白纸 / 黑纸上 1.00:1 看不见；改为与 D-126 同样的 3px 外偏移墨色环，`phase4.spec` 改断言（偏移 3px、颜色等于墨色；旧样式 -2px 失败）。
 - [x] 32. Windows 退出确认用墨色（D-124），不再用 `PaperDanger`；像素测试 `TestTheArmedExitConfirmationIsInk` 在旧代码上读到红色像素、失败。
-- [ ] 33. Windows 同步 Mac 第 16、17 条：结账不可用时间距 20；Activate 预留最宽标签；反馈行预留一行。
+- [x] 33. Windows 同步 Mac 第 16、17 条：结账不可用时间距 20；Activate 预留最宽标签；入口卡反馈行预留一行。`TestTheActivationCardMovesNothingWhenItAnswers` 在旧代码上两处都失败（宽 106.7 < 120.2；web trial 435.8 → 451.5）；间距 20 是常量改动，无头测试量不出 pill 内文字的上边，未单独断言。SYNC 第 77 行。
 - [ ] 34. 决策与文档：D-125 改正 Windows 只换了书写/标题/数字三个角色；记录 Pricing 按钮 `Buy for $4.99` 的例外（D-127）；第 5 条措辞改正（卡内 `$4.99` 与 `3 free sessions` 仍各两次）；同步 `docs/ui-quality.md` Q-13/Q-22/Q-23/Q-34、`docs/wid-mac-behavior.md` 39/50、FirstLine AGENTS、writeitdown AGENTS、Windows SYNC 9/25/74/75。
 - [ ] 35. `apps/macos/FirstLine/scripts/qa-window.sh` 的警告句断言改为句子式。
 

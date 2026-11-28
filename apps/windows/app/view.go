@@ -305,7 +305,10 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 					if snap.Activating {
 						label = tokens.UpgradeActivating
 					}
-					act := primary(c, label).Disabled(snap.Activating)
+					// the pill holds its widest label, so Activating never widens it or pushes Buy (Q-24)
+					widest := max(room.TextWidth(tokens.UpgradeActivate, 15, 600), room.TextWidth(tokens.UpgradeActivating, 15, 600),
+						room.TextWidth(tokens.UpgradeBegin, 15, 600))
+					act := primary(c, label).MinWidth(widest + 48).Disabled(snap.Activating)
 					if (act.Clicked() || submit) && !snap.Activating {
 						a.activate()
 					}
@@ -322,16 +325,17 @@ func (a *App) upgradeView(c *ui.Context, dark bool) {
 						}
 					}
 				})
-				if msg, bad := a.feedback(snap); msg != "" {
+				// the entry card keeps one feedback line open, so an answer lands without moving the card (Q-24)
+				if msg, bad := a.feedback(snap); msg != "" || !licensed {
 					gap(c, 14)
-					text(c, msg, 13, 400, pick(bad, p.of(tokens.Red), p.mute())).TextAlign(ui.Center).MaxWidth(440).LineHeight(1.35)
+					text(c, pick(msg == "", " ", msg), 13, 400, pick(bad, p.of(tokens.Red), p.mute())).TextAlign(ui.Center).MaxWidth(440).LineHeight(1.35)
 				}
 				gap(c, 12)
 				status(c, p, tokens.UpgradePricing, false, 440)
 				gap(c, 13)
 				if !snap.CheckoutOK {
 					text(c, tokens.UpgradeCheckoutUnavailable, 13, 400, p.chrome()).MaxWidth(440)
-					gap(c, 6)
+					gap(c, 20)
 				} else {
 					// Next to Buy, the same sentence the Mac card shows: what the click does and who takes the payment.
 					text(c, tokens.UpgradeCheckoutNote, 13, 400, p.chrome()).MaxWidth(440)
@@ -430,7 +434,10 @@ func (a *App) settingsView(c *ui.Context, dark bool) {
 					gap(c, 12)
 					ui.Row(c).Width(464).Gap(12).Justify(ui.End).Children(func() {
 						label := pick(snap.Activating, tokens.UpgradeActivating, tokens.UpgradeActivate)
-						act := primary(c, label).Disabled(snap.Activating)
+						// the pill holds its widest label, so Activating never widens it or pushes Buy (Q-24)
+						widest := max(room.TextWidth(tokens.UpgradeActivate, 15, 600), room.TextWidth(tokens.UpgradeActivating, 15, 600),
+							room.TextWidth(tokens.UpgradeBegin, 15, 600))
+						act := primary(c, label).MinWidth(widest + 48).Disabled(snap.Activating)
 						if (act.Clicked() || submit) && !snap.Activating {
 							a.activate()
 						}

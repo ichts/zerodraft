@@ -511,3 +511,34 @@ func TestTheActivationCardFitsTheMinimumWindow(t *testing.T) {
 // upgradeInsetTop and upgradeInsetBottom are the activation card's own vertical padding (upgradeView's card call), and
 // upgradeTitleBox the 34 pt title's line with the 6 DIP gap under it.
 const upgradeInsetTop, upgradeInsetBottom, upgradeTitleBox = 39, 39, 46
+
+// Q-24 on the activation card, as the Mac's (items 16 and 17): the Activate pill already holds the width of its widest
+// label, the feedback line does not move the card when it appears, and with checkout unavailable the status line keeps
+// 20 DIP before the web trial pill.
+func TestTheActivationCardMovesNothingWhenItAnswers(t *testing.T) {
+	g := newRig(t)
+	for i := 0; i < 3; i++ {
+		g.spend()
+		if i < 2 {
+			g.tt.Key(0, ui.KeyEscape)
+			g.tt.Key(0, ui.KeyEscape)
+		}
+	}
+	g.tt.Key(0, ui.KeyEnter)
+	g.tt.Frame()
+	pill, ok := g.tt.Find(tokens.UpgradeActivate)
+	if !ok {
+		t.Fatalf("no Activate pill: %q", g.tt.Texts())
+	}
+	if want := room.TextWidth(tokens.UpgradeActivating, 15, 600) + 48; pill.W+0.5 < want {
+		t.Fatalf("the Activate pill is %.1f wide; Activating needs %.1f", pill.W, want)
+	}
+	before, _ := g.tt.Find(tokens.UpgradeWebTrial)
+	g.click(tokens.UpgradeActivate) // an empty field answers with the prompt line
+	g.tt.Frame()
+	g.wantText(tokens.UpgradeEnterFirst)
+	after, _ := g.tt.Find(tokens.UpgradeWebTrial)
+	if before.Y != after.Y {
+		t.Fatalf("the feedback line moved the card: web trial %.1f -> %.1f", before.Y, after.Y)
+	}
+}

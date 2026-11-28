@@ -126,7 +126,7 @@ button{border:0;border-radius:0;background:none;color:inherit;cursor:pointer}
 .home .room-secondary{padding:0 20px;background:var(--sheet);color:var(--ink);border:1px solid var(--hair-2)}
 @media (hover:hover) and (pointer:fine){.home .room-primary:hover,.home .room-secondary:hover{transform:translateY(-1px)}}
 .home .room-primary:active,.home .room-secondary:active{transform:scale(.97)}
-.home .room-primary:focus,.home .room-primary:focus-visible{outline:2px solid var(--on-ink);outline-offset:-2px}
+.home .room-primary:focus,.home .room-primary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 .home .room-secondary:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* The primary's label swaps Copy text -> Copied -> Try copy again after the press. The label holds the
    width of the widest of the three, measured from the face the device actually renders (room.js),

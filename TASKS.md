@@ -97,3 +97,12 @@ Reviewer 改为本群「Gemini 审查」（哥 2026-11-28 指示，不再等 Cod
 
 - [!] 30. 验收命令（2026-11-28，main `9f9757c`）：根 `npm test` 21 passed；`writeitdown npm run test:full` 1376 passed；`verify-writing-deadlines` 0 failures；`swift build && swift test` 403 passed；Windows `go test ./...` 全过、`GOOS=windows go build` 通过、`check_tokens.sh` 通过。
   - 未解决：(1) Gemini 复审：第 1–3 条第 2 轮与第 4–28 条首轮未完成（本会话只能在回复消息时 @ 成员）；(2) advisor 终审未做，原因同上；(3) Mac 真窗口：cua-driver 守护进程未运行、TCC 权限需哥授权，且 `scripts/qa-window.sh` 仍断言 D-120 之前的大写警告句；(4) Windows 真窗口：A8；(5) GitHub 上 `windows`、`writeitdown` 两个工作流处于 disabled_manually，CI 不会运行。
+
+### F. 终审补漏（Thinker 2026-11-28）
+
+- [x] 31. 网页成稿屏 `Copy text` 焦点环：`.home .room-primary` 仍用 `--on-ink` 内环，白纸 / 黑纸上 1.00:1 看不见；改为与 D-126 同样的 3px 外偏移墨色环，`phase4.spec` 改断言（偏移 3px、颜色等于墨色；旧样式 -2px 失败）。
+- [ ] 32. Windows 退出确认用墨色（D-124），不再用 `PaperDanger`。
+- [ ] 33. Windows 同步 Mac 第 16、17 条：结账不可用时间距 20；Activate 预留最宽标签；反馈行预留一行。
+- [ ] 34. 决策与文档：D-125 改正 Windows 只换了书写/标题/数字三个角色；记录 Pricing 按钮 `Buy for $4.99` 的例外（D-127）；第 5 条措辞改正（卡内 `$4.99` 与 `3 free sessions` 仍各两次）；同步 `docs/ui-quality.md` Q-13/Q-22/Q-23/Q-34、`docs/wid-mac-behavior.md` 39/50、FirstLine AGENTS、writeitdown AGENTS、Windows SYNC 9/25/74/75。
+- [ ] 35. `apps/macos/FirstLine/scripts/qa-window.sh` 的警告句断言改为句子式。
+

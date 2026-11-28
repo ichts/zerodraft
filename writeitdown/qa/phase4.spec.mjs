@@ -830,6 +830,7 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
       paperCentre: paper.left + paper.width / 2,
       pill: { background: style.backgroundColor, radius: style.borderRadius, outlineOffset: style.outlineOffset,
         outlineWidth: style.outlineWidth, outlineColor: style.outlineColor, focused: copy.matches(':focus') },
+      inkColour: getComputedStyle(document.querySelector('#kept-text')).color,
       restartStyle: { height: getComputedStyle(restart).height, border: getComputedStyle(restart).borderWidth,
         background: getComputedStyle(restart).backgroundColor, radius: getComputedStyle(restart).borderRadius },
     };
@@ -901,10 +902,12 @@ test('kept screen: headline, quiet receipt, action row above a scrollable draft'
   });
   const fits = kept.copyBox.width + row.gap + kept.restartBox.width <= row.width + 0.5;
   expect(stacked, `the row stacks only when ${kept.copyBox.width} + ${row.gap} + ${kept.restartBox.width} exceeds ${row.width}`).toBe(!fits);
-  // One light ring on the pill edge: no dark margin outside an inset outline.
+  // D-126 on the web: the ink pill wears the shared ink ring 3 px outside it, so focus shows on the white and the
+  // black paper alike (an on-ink ring is the paper's own colour there).
   expect(kept.pill.focused).toBe(true);
-  expect(parseFloat(kept.pill.outlineOffset)).toBeLessThanOrEqual(-2);
+  expect(kept.pill.outlineOffset).toBe('3px');
   expect(kept.pill.outlineWidth).toBe('2px');
+  expect(kept.pill.outlineColor, 'the ring is the ink, not the paper').toBe(kept.inkColour);
   // Focus is a ring on the pill, never a re-cut into a rounded rectangle beside a capsule (D-059).
   expect(kept.pill.radius).toBe('999px');
   expect(kept.restartStyle.radius).toBe('999px');
